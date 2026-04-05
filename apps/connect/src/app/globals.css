@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f6f3;
+  --surface: #ffffff;
+  --surface-muted: #f1f1ee;
+  --foreground: #111111;
+  --foreground-soft: #3d3d3d;
+  --gold: #c8a24f;
+  --gold-soft: #f4ead2;
+  --border: #d9d7d1;
+  --ring: #111111;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% -5%, rgba(200, 162, 79, 0.12), transparent 35%),
+    radial-gradient(circle at 85% 110%, rgba(17, 17, 17, 0.06), transparent 38%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+.surface-card {
+  background: color-mix(in srgb, var(--surface) 94%, white 6%);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, white 22%);
+  box-shadow: 0 20px 44px rgba(10, 10, 10, 0.08);
+}
+
+.gold-glow {
+  box-shadow:
+    0 8px 24px rgba(200, 162, 79, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.fade-rise {
+  animation: fadeRise 420ms ease-out both;
+}
+
+.soft-pulse {
+  animation: softPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    100deg,
+    rgba(17, 17, 17, 0.06) 0%,
+    rgba(200, 162, 79, 0.12) 44%,
+    rgba(17, 17, 17, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.35s linear infinite;
+}
+
+@keyframes fadeRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes softPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+/* ── FullCalendar theme overrides (gold / white / black) ── */
+
+.cc-calendar {
+  --fc-border-color: var(--border);
+  --fc-today-bg-color: var(--gold-soft);
+  --fc-neutral-bg-color: var(--surface-muted);
+  --fc-page-bg-color: var(--surface);
+  --fc-button-bg-color: var(--foreground);
+  --fc-button-border-color: var(--foreground);
+  --fc-button-hover-bg-color: #333;
+  --fc-button-hover-border-color: #333;
+  --fc-button-active-bg-color: var(--gold);
+  --fc-button-active-border-color: var(--gold);
+  --fc-button-text-color: #fff;
+  --fc-now-indicator-color: var(--gold);
+  --fc-event-border-color: transparent;
+}
+
+.cc-calendar .fc .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.cc-calendar .fc .fc-button {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.65rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  box-shadow: none;
+}
+
+.cc-calendar .fc .fc-button-active {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  color: #111 !important;
+}
+
+.cc-calendar .fc .fc-daygrid-day-number {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--foreground-soft);
+  padding: 4px 8px;
+}
+
+.cc-calendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  background: var(--gold);
+  color: #111;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.cc-calendar .fc .fc-event {
+  border-radius: 4px;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+
+.cc-calendar .fc .fc-event:hover {
+  filter: brightness(0.9);
+}
+
+.cc-calendar .fc .fc-col-header-cell-cushion {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground-soft);
+}
+
+.cc-calendar .fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem;
+  color: var(--foreground-soft);
+}
+
+.cc-calendar .fc .fc-more-link {
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* Responsive: stack header toolbar on small screens */
+@media (max-width: 640px) {
+  .cc-calendar .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .cc-calendar .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  .cc-calendar .fc .fc-button {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* ── Map marker styles ────────────────────────────────── */
+
+.cc-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.cc-marker-live span {
+  animation: markerPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes markerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 162, 79, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(200, 162, 79, 0);
+  }
+}
+
+/* Cluster overrides */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background: rgba(200, 162, 79, 0.3) !important;
+}
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  background: var(--gold) !important;
+  color: #111 !important;
+  font-weight: 600;
+}
