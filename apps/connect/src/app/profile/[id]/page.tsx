@@ -56,13 +56,15 @@ export default async function PublicProfilePage({
     redirect("/profile");
   }
 
-  // Fetch social counts + follow state in parallel
+  // Fetch social counts + follow state + mutual friends data in parallel
   const [
     { count: followersCount },
     { count: followingCount },
     currentUserFollows,
     theyFollowBack,
     { data: createdEvents },
+    myFollowingResult,
+    theirFollowingResult,
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -97,30 +99,30 @@ export default async function PublicProfilePage({
           .order("date", { ascending: true })
           .returns<Event[]>()
       : Promise.resolve({ data: [] as Event[] }),
+    user
+      ? supabase
+          .from("follows")
+          .select("followee_id")
+          .eq("follower_id", user.id)
+      : Promise.resolve({ data: null }),
+    user
+      ? supabase
+          .from("follows")
+          .select("followee_id")
+          .eq("follower_id", id)
+      : Promise.resolve({ data: null }),
   ]);
 
   const isFollowing = !!currentUserFollows.data;
   const isFriend = isFollowing && !!theyFollowBack.data;
 
-  // Count mutual friends (users both follow each other with the viewer)
+  // Compute mutual friends from parallel-fetched data
   let mutualFriendsCount = 0;
-  if (user) {
-    const { data: myFollowing } = await supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", user.id);
-
-    const { data: theirFollowing } = await supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", id);
-
-    if (myFollowing && theirFollowing) {
-      const mySet = new Set(myFollowing.map((f) => f.followee_id));
-      mutualFriendsCount = theirFollowing.filter((f) =>
-        mySet.has(f.followee_id)
-      ).length;
-    }
+  if (myFollowingResult.data && theirFollowingResult.data) {
+    const mySet = new Set(myFollowingResult.data.map((f) => f.followee_id));
+    mutualFriendsCount = theirFollowingResult.data.filter((f) =>
+      mySet.has(f.followee_id)
+    ).length;
   }
 
   const isOrganiser = profile.role === "vendor" || profile.role === "admin";

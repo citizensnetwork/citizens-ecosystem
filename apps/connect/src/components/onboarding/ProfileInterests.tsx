@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { InterestGroupWithItems } from "@/types/db";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 
@@ -22,6 +23,7 @@ export default function ProfileInterests({
   notificationEmail,
 }: Props) {
   const [editing, setEditing] = useState(false);
+  const router = useRouter();
 
   // Group selected interests by group
   const selectedByGroup = groups
@@ -43,8 +45,7 @@ export default function ProfileInterests({
           initialNotificationEmail={notificationEmail}
           onComplete={() => {
             setEditing(false);
-            // Reload to get fresh data
-            window.location.reload();
+            router.refresh();
           }}
         />
       </section>
@@ -58,7 +59,7 @@ export default function ProfileInterests({
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="text-sm text-[var(--gold)] hover:underline"
+          className="text-sm text-(--gold) hover:underline"
         >
           Edit interests
         </button>
@@ -70,7 +71,7 @@ export default function ProfileInterests({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-[var(--gold)] hover:underline"
+            className="text-(--gold) hover:underline"
           >
             Add some →
           </button>
@@ -86,7 +87,7 @@ export default function ProfileInterests({
                 {selected.map((interest) => (
                   <span
                     key={interest.id}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[var(--gold-soft)] text-black text-xs rounded-full"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-(--gold-soft) text-black text-xs rounded-full"
                   >
                     <span>{interest.emoji}</span>
                     <span>{interest.label}</span>

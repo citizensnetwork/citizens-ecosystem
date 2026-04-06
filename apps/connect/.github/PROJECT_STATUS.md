@@ -16,7 +16,7 @@
 | 8 | Social Graph | **Complete** | Follows, friends, public profiles, follow button, who's attending with friend badges |
 | 9 | Interest Profile & Onboarding | **Complete** | Interest tables, onboarding wizard, location/radius, event tags, profile interests |
 | 8.5 | Role Refactor & UX Polish | **Complete** | Community Citizen rename, all-user event creation, vendor place booking, nav fixes, cancel/unsaved guard, performance indexes, accessibility |
-| — | Architect Audit Fixes (P8–9) | **In Progress** | 1/10 fixes applied. RLS migration done. Remaining: API error handling, a11y, TW v4, query optimization |
+| — | Architect Audit Fixes (P8–9) | **Complete** | All 10 fixes applied. RLS, API error handling, a11y, TW v4, query optimization |
 
 ---
 

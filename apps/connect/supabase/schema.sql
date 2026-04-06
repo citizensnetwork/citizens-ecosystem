@@ -98,14 +98,10 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Vendors can create events' and tablename = 'events') then
-    create policy "Vendors can create events" on public.events for insert
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can create events' and tablename = 'events') then
+    create policy "Authenticated users can create events" on public.events for insert
       with check (
         auth.uid() = created_by
-        and exists (
-          select 1 from public.profiles
-          where id = auth.uid() and role in ('vendor', 'admin')
-        )
       );
   end if;
 end $$;

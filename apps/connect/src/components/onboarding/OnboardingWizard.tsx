@@ -88,7 +88,8 @@ export default function OnboardingWizard({
   useEffect(() => {
     if (initialLatitude && initialLongitude) {
       fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${initialLatitude}&lon=${initialLongitude}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${initialLatitude}&lon=${initialLongitude}`,
+        { headers: { "User-Agent": "CitizensConnect/1.0" } }
       )
         .then((r) => r.json())
         .then((data) => {
@@ -129,7 +130,8 @@ export default function OnboardingWizard({
         // Reverse geocode for label
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
+            { headers: { "User-Agent": "CitizensConnect/1.0" } }
           );
           const data = await res.json();
           if (data.display_name) {
@@ -154,7 +156,8 @@ export default function OnboardingWizard({
     setLocationLoading(true);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch)}&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch)}&limit=5`,
+        { headers: { "User-Agent": "CitizensConnect/1.0" } }
       );
       const data = await res.json();
       setLocationResults(data ?? []);
@@ -231,8 +234,8 @@ export default function OnboardingWizard({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-black/20 border-t-[var(--gold)] rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-100">
+        <div className="w-8 h-8 border-2 border-black/20 border-t-(--gold) rounded-full animate-spin" />
       </div>
     );
   }
@@ -272,12 +275,13 @@ export default function OnboardingWizard({
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
-                className="w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-black/[0.02] transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-black/2 transition-colors"
+                aria-expanded={isExpanded}
               >
                 <span className="font-medium text-sm">{group.label}</span>
                 <span className="flex items-center gap-2 text-xs text-black/50">
                   {selectedInGroup > 0 && (
-                    <span className="bg-[var(--gold-soft)] text-black px-2 py-0.5 rounded-full font-medium">
+                    <span className="bg-(--gold-soft) text-black px-2 py-0.5 rounded-full font-medium">
                       {selectedInGroup}
                     </span>
                   )}
@@ -308,7 +312,7 @@ export default function OnboardingWizard({
                         onClick={() => toggleInterest(interest.id)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border ${
                           isSelected
-                            ? "bg-[var(--gold-soft)] border-[var(--gold)] text-black font-medium"
+                            ? "bg-(--gold-soft) border-(--gold) text-black font-medium"
                             : "bg-white border-black/8 text-black/70 hover:border-black/20"
                         }`}
                       >
@@ -332,7 +336,7 @@ export default function OnboardingWizard({
         </p>
 
         {locationLabel && (
-          <div className="bg-[var(--gold-soft)] text-black text-sm px-3 py-2 rounded-lg mb-3 flex items-center justify-between">
+          <div className="bg-(--gold-soft) text-black text-sm px-3 py-2 rounded-lg mb-3 flex items-center justify-between">
             <span>{locationLabel}</span>
             <button
               type="button"
@@ -408,7 +412,7 @@ export default function OnboardingWizard({
               step={10}
               value={radius}
               onChange={(e) => setRadius(parseInt(e.target.value, 10))}
-              className="w-full accent-[var(--gold)]"
+              className="w-full accent-(--gold)"
             />
             <div className="flex justify-between text-[10px] text-black/40">
               <span>10 km</span>
@@ -449,7 +453,7 @@ export default function OnboardingWizard({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-2.5 bg-[var(--gold)] text-black text-sm font-medium rounded-lg hover:brightness-95 disabled:opacity-50"
+          className="px-6 py-2.5 bg-(--gold) text-black text-sm font-medium rounded-lg hover:brightness-95 disabled:opacity-50"
         >
           {saving
             ? "Saving..."

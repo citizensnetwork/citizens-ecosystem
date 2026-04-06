@@ -336,7 +336,7 @@ export default function EditEventForm({ event }: Props) {
                     }}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all border ${
                       isSelected
-                        ? "bg-[var(--gold-soft)] border-[var(--gold)] text-black font-medium"
+                        ? "bg-(--gold-soft) border-(--gold) text-black font-medium"
                         : "bg-white border-black/8 text-black/60 hover:border-black/20"
                     }`}
                   >

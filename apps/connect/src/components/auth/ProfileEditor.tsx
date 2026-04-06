@@ -16,12 +16,14 @@ export default function ProfileEditor({ profile, email }: Props) {
   // ── Avatar state ──────────────────────────
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [uploading, setUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Name state ────────────────────────────
   const [fullName, setFullName] = useState(profile.full_name);
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSuccess, setNameSuccess] = useState(false);
+  const [nameError, setNameError] = useState("");
 
   // ── Password state ────────────────────────
   const [newPassword, setNewPassword] = useState("");
@@ -39,15 +41,16 @@ export default function ProfileEditor({ profile, email }: Props) {
     // Validate file type and size (max 2MB)
     const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!validTypes.includes(file.type)) {
-      alert("Please upload a JPEG, PNG, WebP, or GIF image.");
+      setAvatarError("Please upload a JPEG, PNG, WebP, or GIF image.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image must be under 2 MB.");
+      setAvatarError("Image must be under 2 MB.");
       return;
     }
 
     setUploading(true);
+    setAvatarError("");
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
       const path = `avatars/${profile.id}/${Date.now()}.${ext}`;
@@ -72,7 +75,7 @@ export default function ProfileEditor({ profile, email }: Props) {
       setAvatarUrl(publicUrl);
     } catch (err) {
       console.error("Avatar upload failed:", err);
-      alert("Failed to upload avatar. Please try again.");
+      setAvatarError("Failed to upload avatar. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -99,7 +102,7 @@ export default function ProfileEditor({ profile, email }: Props) {
       setTimeout(() => setNameSuccess(false), 2000);
     } catch (err) {
       console.error("Name update failed:", err);
-      alert("Failed to update name.");
+      setNameError("Failed to update name.");
     } finally {
       setNameSaving(false);
     }
@@ -150,7 +153,7 @@ export default function ProfileEditor({ profile, email }: Props) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="group relative flex-shrink-0"
+          className="group relative shrink-0"
           disabled={uploading}
         >
           {avatarUrl ? (
@@ -182,6 +185,9 @@ export default function ProfileEditor({ profile, email }: Props) {
             Click the image to upload a new photo
           </p>
           <p className="text-xs text-black/30">JPEG, PNG, WebP, or GIF · Max 2 MB</p>
+          {avatarError && (
+            <p className="mt-1 text-xs text-red-600">{avatarError}</p>
+          )}
         </div>
       </section>
 
@@ -207,6 +213,9 @@ export default function ProfileEditor({ profile, email }: Props) {
             {nameSaving ? "Saving…" : nameSuccess ? "Saved ✓" : "Save"}
           </button>
         </div>
+        {nameError && (
+          <p className="mt-1.5 text-xs text-red-600">{nameError}</p>
+        )}
       </section>
 
       {/* ── Email (read-only) ──────────────────── */}
@@ -259,16 +268,6 @@ export default function ProfileEditor({ profile, email }: Props) {
             {pwSaving ? "Updating…" : "Update Password"}
           </button>
         </form>
-      </section>
-
-      {/* ── Interests placeholder (Phase 9) ────── */}
-      <section className="rounded-xl border border-dashed border-black/12 p-4">
-        <h3 className="text-sm font-medium text-black/40">
-          Interests — Coming Soon
-        </h3>
-        <p className="mt-1 text-xs text-black/30">
-          Set your interests to discover events that match your passions.
-        </p>
       </section>
     </div>
   );
