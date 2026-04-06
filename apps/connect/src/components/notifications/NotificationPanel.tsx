@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { Notification } from "@/types/db";
 import Link from "next/link";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -44,8 +44,7 @@ export default function NotificationPanel({
   onClose,
 }: NotificationPanelProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const panelRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(panelRef);
+  const panelRef = useFocusTrap<HTMLDivElement>(true);
 
   // Close on Escape key
   useEffect(() => {
