@@ -2,8 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import type { Event, Profile } from "@/types/db";
+import type { Event, Profile, InterestGroupWithItems } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
+import ProfileInterests from "@/components/onboarding/ProfileInterests";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,16 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch profile, RSVPs, social counts, and following list in parallel
+  // Fetch profile, RSVPs, social counts, following list, and interests in parallel
   const [
     { data: profile },
     { data: rsvps },
     { count: followersCount },
     { count: followingCount },
     { data: myFollowing },
+    { data: interestGroups },
+    { data: allInterests },
+    { data: userInterests },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
@@ -43,6 +47,18 @@ export default async function ProfilePage() {
       .from("follows")
       .select("followee_id")
       .eq("follower_id", user.id),
+    supabase
+      .from("interest_groups")
+      .select("*")
+      .order("sort_order"),
+    supabase
+      .from("interests")
+      .select("*")
+      .order("sort_order"),
+    supabase
+      .from("user_interests")
+      .select("interest_id")
+      .eq("user_id", user.id),
   ]);
 
   // Count friends (bidirectional follows)
@@ -83,8 +99,21 @@ export default async function ProfilePage() {
     role: profile?.role ?? "client",
     full_name: profile?.full_name ?? "",
     avatar_url: profile?.avatar_url ?? null,
+    onboarding_completed: profile?.onboarding_completed ?? false,
+    notification_email: profile?.notification_email ?? null,
+    home_latitude: profile?.home_latitude ?? null,
+    home_longitude: profile?.home_longitude ?? null,
+    notification_radius_km: profile?.notification_radius_km ?? 50,
     created_at: profile?.created_at ?? "",
   };
+
+  // Build interest groups with items
+  const groups: InterestGroupWithItems[] = (interestGroups ?? []).map((g) => ({
+    ...g,
+    interests: (allInterests ?? []).filter((i) => i.group_id === g.id),
+  }));
+
+  const selectedInterestIds = (userInterests ?? []).map((ui) => ui.interest_id);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -139,6 +168,17 @@ export default async function ProfilePage() {
         <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
         <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
       </section>
+
+      {/* ── Interests & Location ─── */}
+      <ProfileInterests
+        groups={groups}
+        selectedInterestIds={selectedInterestIds}
+        homeLatitude={typedProfile.home_latitude}
+        homeLongitude={typedProfile.home_longitude}
+        notificationRadiusKm={typedProfile.notification_radius_km}
+        notificationEmail={typedProfile.notification_email}
+      />
+
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-3">My RSVPs</h2>
         {rsvpedEvents.length === 0 ? (

@@ -57,6 +57,11 @@ export type Profile = {
   role: UserRole;
   full_name: string;
   avatar_url: string | null;
+  onboarding_completed: boolean;
+  notification_email: string | null;
+  home_latitude: number | null;
+  home_longitude: number | null;
+  notification_radius_km: number;
   created_at: string;
 };
 
@@ -121,6 +126,37 @@ export type Follow = {
   follower_id: string;
   followee_id: string;
   created_at: string;
+};
+
+export type InterestGroup = {
+  id: string;
+  slug: string;
+  label: string;
+  sort_order: number;
+};
+
+export type Interest = {
+  id: string;
+  group_id: string;
+  slug: string;
+  label: string;
+  emoji: string;
+  sort_order: number;
+};
+
+export type InterestGroupWithItems = InterestGroup & {
+  interests: Interest[];
+};
+
+export type UserInterest = {
+  user_id: string;
+  interest_id: string;
+  created_at: string;
+};
+
+export type EventInterestTag = {
+  event_id: string;
+  interest_id: string;
 };
 
 /** Trending event — includes RSVP count. */

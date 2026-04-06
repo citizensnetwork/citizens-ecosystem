@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
-import type { EventCategory, Category } from "@/types/db";
+import type { EventCategory, Category, Interest } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -51,8 +51,26 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [placePhone, setPlacePhone] = useState("");
   const [placeWebsite, setPlaceWebsite] = useState("");
 
+  // Interest tags
+  const [allInterests, setAllInterests] = useState<Interest[]>([]);
+  const [selectedInterestIds, setSelectedInterestIds] = useState<Set<string>>(new Set());
+  const [interestSearch, setInterestSearch] = useState("");
+
   const router = useRouter();
   const supabase = createClient();
+
+  // Fetch interests for tagging
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("interests")
+      .select("*")
+      .order("sort_order")
+      .then(({ data }) => {
+        if (!cancelled && data) setAllInterests(data);
+      });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track whether form has been touched
   const isDirty = useCallback(() => {
@@ -149,7 +167,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       }
     }
 
-    const { error } = await supabase.from("events").insert({
+    const { data: eventData, error } = await supabase.from("events").insert({
       title,
       description,
       date: new Date(date).toISOString(),
@@ -166,12 +184,21 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       latitude: coords?.[0] ?? null,
       longitude: coords?.[1] ?? null,
       created_by: user.id,
-    });
+    }).select("id").single();
 
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Save interest tags if any selected
+    if (eventData && selectedInterestIds.size > 0) {
+      const tagRows = Array.from(selectedInterestIds).map((interest_id) => ({
+        event_id: eventData.id,
+        interest_id,
+      }));
+      await supabase.from("event_interest_tags").insert(tagRows);
     }
 
     router.push("/events");
@@ -406,6 +433,60 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           </div>
         </div>
       </div>
+
+      {/* ── Interest Tags ──────────────────── */}
+      {allInterests.length > 0 && (
+        <div className="border-t pt-4 mt-4 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Interest Tags</h2>
+          <p className="text-xs text-black/50">Help people with matching interests discover your event.</p>
+
+          <input
+            type="text"
+            value={interestSearch}
+            onChange={(e) => setInterestSearch(e.target.value)}
+            placeholder="Search interests..."
+            className="w-full border rounded-md px-3 py-2 text-sm"
+          />
+
+          <div className="max-h-48 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            {allInterests
+              .filter((i) =>
+                i.label.toLowerCase().includes(interestSearch.toLowerCase())
+              )
+              .map((interest) => {
+                const isSelected = selectedInterestIds.has(interest.id);
+                return (
+                  <button
+                    key={interest.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedInterestIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(interest.id)) next.delete(interest.id);
+                        else next.add(interest.id);
+                        return next;
+                      });
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all border ${
+                      isSelected
+                        ? "bg-[var(--gold-soft)] border-[var(--gold)] text-black font-medium"
+                        : "bg-white border-black/8 text-black/60 hover:border-black/20"
+                    }`}
+                  >
+                    <span>{interest.emoji}</span>
+                    <span className="truncate">{interest.label}</span>
+                  </button>
+                );
+              })}
+          </div>
+
+          {selectedInterestIds.size > 0 && (
+            <p className="text-xs text-black/50">
+              {selectedInterestIds.size} tag{selectedInterestIds.size !== 1 ? "s" : ""} selected
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Vendor-only: Place Booking ──────────────────── */}
       {isVendor && (

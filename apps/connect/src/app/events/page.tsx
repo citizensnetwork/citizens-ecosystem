@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import EventsView from "@/components/events/EventsView";
+import OnboardingOverlay from "@/components/onboarding/OnboardingOverlay";
 import type { Event, Place, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -81,20 +82,25 @@ export default async function EventsPage() {
   } = await supabase.auth.getUser();
 
   let isVendor = false;
+  let showOnboarding = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, onboarding_completed")
       .eq("id", user.id)
       .single();
     isVendor = profile?.role === "vendor" || profile?.role === "admin";
+    showOnboarding = profile?.onboarding_completed === false;
   }
 
   return (
-    <EventsView
-      events={events ?? []}
-      places={placesWithStats}
-      isVendor={isVendor}
-    />
+    <>
+      {showOnboarding && <OnboardingOverlay show />}
+      <EventsView
+        events={events ?? []}
+        places={placesWithStats}
+        isVendor={isVendor}
+      />
+    </>
   );
 }

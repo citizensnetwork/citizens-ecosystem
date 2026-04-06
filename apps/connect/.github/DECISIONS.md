@@ -163,6 +163,26 @@
 **Why:** The platform is a representation of the Kingdom, which serves all its Citizens equally. Organizers create the spaces; non-organizers find where they fit. Both roles are essential — neither is elevated above the other. The Kingdom's door is open.
 **Date:** 2026-04-06.
 
+### Event creation open to all users
+**Decision:** ALL logged-in users can create events, not just vendors. Vendors get an extra "Book at Place" section in EventForm that allows inline place creation during event booking.
+**Why:** User requested. Community Citizens should be able to add events. Organisers have the additional ability to create persistent places via the event booking flow. Place creation is now exclusively through the vendor event form (no standalone "Add Place" button in BurgerMenu).
+**Date:** 2026-04-06.
+
+### "Community Member" renamed to "Community Citizen"
+**Decision:** The user-facing label for the `client` role is "Community Citizen" (was "Community Member"). DB role value remains `client`.
+**Why:** User requested. Aligns with the Citizens brand identity — all users are Citizens.
+**Date:** 2026-04-06.
+
+### Places cannot be removed within 6 months
+**Decision:** Places cannot be deleted within 6 months of creation. Only admin users can delete places. This is noted in the place creation UI.
+**Why:** User requested. Prevents transient/spam place listings and preserves map data integrity.
+**Date:** 2026-04-06.
+
+### Navigation: title→map, Events→calendar
+**Decision:** "Citizens Connect" title in both Navbar and EventsView links to `/events` (map home). "Events" link in Navbar goes to `/events?view=calendar`. EventsView reads `?view=calendar` query param for initial view.
+**Why:** User requested. Provides clear navigation from non-map pages (event creation, profile) back to the primary map/calendar views.
+**Date:** 2026-04-06.
+
 ### Scale as discovery signal (expected attendance)
 **Decision:** Events should expose expected attendance size as a discovery filter. Equal platform dignity means a 5-person home group and a 2,000-person conference both appear and are findable — but users should be able to see and filter by expected scale to self-select the right setting.
 **Why:** A large worship night and a small discipleship circle serve different needs. Hiding scale in the name of equity would actually harm discovery. Size is informational, not hierarchical.
@@ -177,3 +197,8 @@
 **Decision:** Place verification relies solely on community "still exists?" signals in reviews. A DB trigger auto-flags places after 3+ negative signals. No email-based annual verification.
 **Why:** Email verification edge function would cost money at scale. Community signals are free and self-sustaining. Owners can manually re-verify from the place detail page.
 **Date:** 2026-04-05.
+
+### Events INSERT RLS opened to all authenticated users
+**Decision:** Dropped the `"Vendors can create events"` RLS policy (which required `role in ('vendor', 'admin')`) and replaced it with `"Authenticated users can create events"` (`auth.uid() = created_by`). Migration `012_open_event_creation` applied via MCP.
+**Why:** After Phase 8.5 removed the vendor gate from `/events/new` UI, non-vendor users could reach the form but RLS blocked their inserts silently. Flagged in architect audit as critical security/functionality mismatch.
+**Date:** 2026-04-06.

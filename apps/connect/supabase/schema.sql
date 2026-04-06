@@ -1,7 +1,7 @@
 -- ============================================
 -- Citizens Connect - Database Schema
 -- Canonical full schema (idempotent — safe to re-run)
--- Reflects all migrations through 009_performance_indexes_and_rpcs
+-- Reflects all migrations through 011_interest_profile
 -- ============================================
 
 -- ── Helper: admin check ──────────────────────────────────
@@ -26,6 +26,11 @@ create table if not exists public.profiles (
   full_name text not null default '',
   role text not null check (role in ('vendor', 'client', 'admin')) default 'client',
   avatar_url text,
+  onboarding_completed boolean not null default false,
+  notification_email text,
+  home_latitude double precision,
+  home_longitude double precision,
+  notification_radius_km int not null default 50,
   created_at timestamptz not null default now()
 );
 
@@ -585,3 +590,113 @@ begin
   return jsonb_build_object('success', true, 'remaining', v_remaining, 'status', 201);
 end;
 $$;
+
+-- ══════════════════════════════════════════════
+-- Interest Groups
+-- ══════════════════════════════════════════════
+create table if not exists public.interest_groups (
+  id uuid default gen_random_uuid() primary key,
+  slug text not null unique,
+  label text not null,
+  sort_order int not null default 0
+);
+
+alter table public.interest_groups enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Interest groups are viewable by everyone' and tablename = 'interest_groups') then
+    create policy "Interest groups are viewable by everyone" on public.interest_groups for select using (true);
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- Interests
+-- ══════════════════════════════════════════════
+create table if not exists public.interests (
+  id uuid default gen_random_uuid() primary key,
+  group_id uuid not null references public.interest_groups(id) on delete cascade,
+  slug text not null unique,
+  label text not null,
+  emoji text not null default '📌',
+  sort_order int not null default 0
+);
+
+alter table public.interest_groups enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Interests are viewable by everyone' and tablename = 'interests') then
+    create policy "Interests are viewable by everyone" on public.interests for select using (true);
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- User Interests (composite PK)
+-- ══════════════════════════════════════════════
+create table if not exists public.user_interests (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  interest_id uuid not null references public.interests(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, interest_id)
+);
+
+alter table public.user_interests enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'User interests are viewable by everyone' and tablename = 'user_interests') then
+    create policy "User interests are viewable by everyone" on public.user_interests for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage own interests' and tablename = 'user_interests') then
+    create policy "Users can manage own interests" on public.user_interests for insert with check (auth.uid() = user_id);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can delete own interests' and tablename = 'user_interests') then
+    create policy "Users can delete own interests" on public.user_interests for delete using (auth.uid() = user_id);
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- Event Interest Tags (composite PK)
+-- ══════════════════════════════════════════════
+create table if not exists public.event_interest_tags (
+  event_id uuid not null references public.events(id) on delete cascade,
+  interest_id uuid not null references public.interests(id) on delete cascade,
+  primary key (event_id, interest_id)
+);
+
+alter table public.event_interest_tags enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event interest tags are viewable by everyone' and tablename = 'event_interest_tags') then
+    create policy "Event interest tags are viewable by everyone" on public.event_interest_tags for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event creators can manage interest tags' and tablename = 'event_interest_tags') then
+    create policy "Event creators can manage interest tags" on public.event_interest_tags for insert
+      with check (
+        exists (select 1 from public.events where id = event_id and (created_by = auth.uid() or public.is_admin()))
+      );
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event creators can delete interest tags' and tablename = 'event_interest_tags') then
+    create policy "Event creators can delete interest tags" on public.event_interest_tags for delete
+      using (
+        exists (select 1 from public.events where id = event_id and (created_by = auth.uid() or public.is_admin()))
+      );
+  end if;
+end $$;
+
+-- Interest indexes
+create index if not exists user_interests_user_idx on public.user_interests(user_id);
+create index if not exists user_interests_interest_idx on public.user_interests(interest_id);
+create index if not exists event_interest_tags_event_idx on public.event_interest_tags(event_id);
+create index if not exists event_interest_tags_interest_idx on public.event_interest_tags(interest_id);
+create index if not exists interests_group_idx on public.interests(group_id);

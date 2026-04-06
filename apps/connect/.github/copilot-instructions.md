@@ -87,9 +87,9 @@ Marker utilities live in `src/lib/map/markers.ts`:
 
 See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists.
 
-**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8)
+**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9)
 **Current phase:** All core phases complete
-**Upcoming:** Phase 9 (Interest Profile & Location-Aware Onboarding), Phase 10 (Smart Notifications + Calendar Sync)
+**Upcoming:** Phase 10 (Smart Notifications + Calendar Sync)
 
 Platform has two full-screen primary views:
 1. **Map view** — full-viewport map with category markers, temporal encoding, clustering, geolocation, detail panel, floating controls

@@ -14,6 +14,30 @@
 | 6 | Capacitor Mobile | **Complete** | iOS/Android wrapper, native plugins, single codebase |
 | 7 | Event Enrichment & Discovery | **Complete** | End time, contact info, capacity, status, feed view, OG meta, city search, view tracking |
 | 8 | Social Graph | **Complete** | Follows, friends, public profiles, follow button, who's attending with friend badges |
+| 9 | Interest Profile & Onboarding | **Complete** | Interest tables, onboarding wizard, location/radius, event tags, profile interests |
+| 8.5 | Role Refactor & UX Polish | **Complete** | Community Citizen rename, all-user event creation, vendor place booking, nav fixes, cancel/unsaved guard, performance indexes, accessibility |
+| — | Architect Audit Fixes (P8–9) | **In Progress** | 1/10 fixes applied. RLS migration done. Remaining: API error handling, a11y, TW v4, query optimization |
+
+---
+
+## Phase 8.5 — Role Refactor & UX Polish (COMPLETE)
+
+### Delivered
+- [x] "Community Member" renamed to "Community Citizen" across all UI (signup, profile, reviews)
+- [x] Event creation open to ALL logged-in users (vendor gate removed from `/events/new`)
+- [x] Vendors get extra "Book at Place" section in EventForm (inline place creation)
+- [x] "Add Place" button removed from BurgerMenu (place creation only via vendor event booking)
+- [x] Places cannot be removed within 6 months (admin-only, noted in UI)
+- [x] Navbar: "Citizens Connect" → `/events` (map home); "Events" → `/events?view=calendar`
+- [x] EventsView reads `?view=calendar` query param for initial view
+- [x] Cancel button + `beforeunload` unsaved changes guard ("Booking in progress, cancel editing?")
+- [x] Map autoLocate no longer overrides event bounds (extends bounds instead)
+- [x] Place form: custom category text input for "other" + reverse geocode address auto-populate
+- [x] Performance: 7 DB indexes, `trending_events` RPC, `safe_rsvp` RPC (migration 009)
+- [x] BurgerMenu extracted from EventsView (413→378 lines), AccordionSection with scrollHeight
+- [x] Focus trap + Escape key for drawers, ARIA attributes
+- [x] ProfileEditor component (avatar upload, name edit, password change)
+- [x] `isVendor` prop removed from BurgerMenu (no longer needed)
 
 ---
 
@@ -188,6 +212,28 @@
 ### Deferred
 - [ ] Followers/following list pages (clickable counts)
 - [ ] Mutual friends list on public profiles
+
+---
+
+## Phase 9 — Interest Profile & Location-Aware Onboarding (COMPLETE)
+
+### Delivered
+- [x] Migration 011_interest_profile — interest_groups, interests, user_interests, event_interest_tags tables + profile columns (onboarding_completed, notification_email, home_latitude, home_longitude, notification_radius_km)
+- [x] ~56 interests seeded across 5 groups: Events I Enjoy (12), Spiritual Goals (10), Industry / Profession (14), Hobbies & Passions (13), Stage of Life (7)
+- [x] RLS policies on all interest tables (public select; user manages own interests; event creator manages event tags)
+- [x] Onboarding API route (POST /api/onboarding) — saves interests, location, radius, notification email with full validation
+- [x] OnboardingWizard component — single-page with collapsible interest group sections, GPS + city search location, radius slider (10–200 km), notification email, edit mode
+- [x] OnboardingOverlay — full-screen overlay after first login when !onboarding_completed
+- [x] Events page integration — checks onboarding_completed, renders overlay for new users
+- [x] ProfileInterests component — shows selected interests grouped with emoji pills, location/radius display, "Edit interests" re-opens wizard
+- [x] Profile page updated — fetches interest groups, user interests, and renders ProfileInterests section
+- [x] EventForm + EditEventForm — searchable interest tag selector, saves event_interest_tags on create/edit
+- [x] TypeScript types updated — InterestGroup, Interest, InterestGroupWithItems, UserInterest, EventInterestTag; Profile extended
+- [x] Canonical schema.sql updated to reflect migration 011
+- [x] Build verified — clean compilation, no errors
+
+### Deferred
+- [ ] Progressive profiling fallback (subtle re-prompt after first RSVP if skipped)
 
 ---
 

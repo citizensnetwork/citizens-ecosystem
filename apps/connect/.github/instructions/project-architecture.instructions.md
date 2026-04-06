@@ -10,6 +10,7 @@ description: "Reference architecture map for Citizens Connect. Applies everywher
 src/
 ├── app/                          # Next.js App Router (Server Components by default)
 │   ├── api/rsvp/route.ts         # RSVP toggle API (POST, auth-gated)
+│   ├── api/onboarding/route.ts   # Onboarding save API (interests, location, radius)
 │   ├── auth/callback/route.ts    # PKCE code exchange (password reset, email confirm)
 │   ├── events/
 │   │   ├── page.tsx              # /events — fetches all events, renders EventsView
@@ -44,6 +45,10 @@ src/
 │   │   ├── EventMap.tsx          # Full-screen Leaflet map — clustering, category markers, temporal encoding, geolocation
 │   │   ├── LocationPicker.tsx    # Click-to-place marker for event creation
 │   │   └── MiniMap.tsx           # Read-only mini map for event detail
+│   ├── onboarding/
+│   │   ├── OnboardingWizard.tsx   # Single-page interest/location/notification wizard (edit + onboard mode)
+│   │   ├── OnboardingOverlay.tsx  # Full-screen overlay for first-login onboarding
+│   │   └── ProfileInterests.tsx   # Interest display + edit trigger for profile page
 │   └── ui/
 │       └── Navbar.tsx            # Sticky nav (hidden on /events for full-screen map)
 │
@@ -54,7 +59,7 @@ src/
 │       └── client.ts             # Browser Supabase client
 │
 ├── types/
-│   ├── db.ts                     # Event, Profile, RSVP, Comment, EventCategory, UserRole
+│   ├── db.ts                     # Event, Profile, RSVP, Comment, EventCategory, UserRole, InterestGroup, Interest
 │   └── leaflet.markercluster.d.ts# Type declarations for markercluster plugin
 │
 └── middleware.ts                 # Supabase session refresh on all non-static routes
@@ -64,7 +69,8 @@ supabase/
 └── migrations/
     ├── 001_add_coordinates.sql   # lat/lng columns on events
     ├── 002_add_category.sql      # category column on events
-    └── 003_stage2.sql            # image_url + comments table
+    ├── 003_stage2.sql            # image_url + comments table
+    └── 011_interest_profile.sql  # interest groups/items, user_interests, event_interest_tags, profile onboarding columns
 ```
 
 ## Data Flow
