@@ -100,6 +100,14 @@ export default function LoginForm() {
           className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
           placeholder="••••••••"
         />
+        <div className="flex justify-end pt-0.5">
+          <Link
+            href="/login/forgot-password"
+            className="text-xs text-(--foreground-soft) hover:text-black transition"
+          >
+            Forgot password?
+          </Link>
+        </div>
       </div>
 
       <button

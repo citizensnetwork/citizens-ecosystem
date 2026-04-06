@@ -74,3 +74,5 @@ next-env.d.ts
 .vibe/
 .windsurf/
 .zencoder/
+
+.vercel
