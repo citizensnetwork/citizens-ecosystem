@@ -41,6 +41,7 @@ export default function EventMap({
   const eventClusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const placeClusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const geoMarkerRef = useRef<L.CircleMarker | null>(null);
+  const userPositionRef = useRef<L.LatLngExpression | null>(null);
 
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function EventMap({
       getCurrentPosition()
         .then((pos) => {
           const ll: L.LatLngExpression = [pos.latitude, pos.longitude];
-          map.setView(ll, 14);
+          userPositionRef.current = ll;
 
           if (!geoMarkerRef.current) {
             geoMarkerRef.current = L.circleMarker(ll, {
@@ -115,6 +116,14 @@ export default function EventMap({
             })
               .addTo(map)
               .bindPopup("You are here");
+          }
+
+          // If event markers already loaded, extend bounds to include user
+          if (eventClusterRef.current && eventClusterRef.current.getLayers().length > 0) {
+            const bounds = eventClusterRef.current.getBounds().extend(ll);
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+          } else {
+            map.setView(ll, 14);
           }
         })
         .catch(() => {
@@ -177,13 +186,17 @@ export default function EventMap({
 
     map.addLayer(cluster);
 
-    if (mappable.length > 0 && places.length === 0) {
+    if (mappable.length > 0) {
       const bounds = L.latLngBounds(
         mappable.map((e) => [e.latitude!, e.longitude!])
       );
+      // Include places in bounds
+      places.forEach((p) => bounds.extend([p.latitude, p.longitude]));
+      // Include user position if already resolved
+      if (userPositionRef.current) bounds.extend(userPositionRef.current);
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     }
-  }, [events, onSelectEvent, places.length]);
+  }, [events, onSelectEvent, places]);
 
   /* ── Sync place markers ───────────────────────────────── */
   useEffect(() => {

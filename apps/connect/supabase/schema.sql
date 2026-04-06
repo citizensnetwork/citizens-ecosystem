@@ -1,7 +1,7 @@
 -- ============================================
 -- Citizens Connect - Database Schema
 -- Canonical full schema (idempotent — safe to re-run)
--- Reflects all migrations through 007_social_graph
+-- Reflects all migrations through 009_performance_indexes_and_rpcs
 -- ============================================
 
 -- ── Helper: admin check ──────────────────────────────────
@@ -25,6 +25,7 @@ create table if not exists public.profiles (
   email text not null,
   full_name text not null default '',
   role text not null check (role in ('vendor', 'client', 'admin')) default 'client',
+  avatar_url text,
   created_at timestamptz not null default now()
 );
 
@@ -77,6 +78,9 @@ create table if not exists public.events (
 
 alter table public.events enable row level security;
 
+create index if not exists events_status_date_idx on public.events(status, date);
+create index if not exists events_created_by_idx on public.events(created_by);
+
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Published events visible to all, drafts to creator only' and tablename = 'events') then
     create policy "Published events visible to all, drafts to creator only" on public.events for select using (
@@ -126,6 +130,9 @@ create table if not exists public.rsvps (
   unique (user_id, event_id)
 );
 
+create index if not exists rsvps_event_id_idx on public.rsvps(event_id);
+create index if not exists rsvps_user_id_idx on public.rsvps(user_id);
+
 alter table public.rsvps enable row level security;
 
 do $$ begin
@@ -158,6 +165,8 @@ create table if not exists public.comments (
 );
 
 alter table public.comments enable row level security;
+
+create index if not exists comments_event_id_idx on public.comments(event_id);
 
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Comments are viewable by everyone' and tablename = 'comments') then
@@ -228,6 +237,7 @@ create table if not exists public.places (
   description text not null default '',
   address text not null default '',
   category_id uuid references public.categories(id) on delete set null,
+  custom_category text,
   image_url text,
   phone text,
   website text,
@@ -290,6 +300,9 @@ create unique index if not exists reviews_place_user_unique
 
 create unique index if not exists reviews_event_user_unique
   on public.reviews(event_id, user_id) where event_id is not null;
+
+create index if not exists reviews_place_id_idx
+  on public.reviews(place_id) where place_id is not null;
 
 alter table public.reviews enable row level security;
 
@@ -369,11 +382,13 @@ create unique index if not exists event_views_user_day_idx
   on public.event_views (event_id, user_id, view_date)
   where user_id is not null;
 
+create index if not exists event_views_event_id_idx on public.event_views(event_id);
+
 alter table public.event_views enable row level security;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Anyone can record a view' and tablename = 'event_views') then
-    create policy "Anyone can record a view" on public.event_views for insert with check (true);
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can record own views' and tablename = 'event_views') then
+    create policy "Authenticated users can record own views" on public.event_views for insert with check (auth.uid() = user_id);
   end if;
 end $$;
 
@@ -501,3 +516,72 @@ do $$ begin
     create policy "Users can unfollow" on public.follows for delete using (auth.uid() = follower_id);
   end if;
 end $$;
+
+-- ══════════════════════════════════════════════
+-- 11. RPC Functions (Performance)
+-- ══════════════════════════════════════════════
+
+-- Trending events: server-side aggregation (replaces full rsvps table scan)
+create or replace function public.trending_events(lim int default 5)
+returns table(event_id uuid, rsvp_count bigint)
+language sql stable
+security definer
+as $$
+  select r.event_id, count(*) as rsvp_count
+  from public.rsvps r
+  join public.events e on e.id = r.event_id
+  where e.status = 'published' and e.date >= now()
+  group by r.event_id
+  order by rsvp_count desc
+  limit lim;
+$$;
+
+-- Atomic RSVP with capacity check (prevents race condition)
+create or replace function public.safe_rsvp(p_user_id uuid, p_event_id uuid)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_status text;
+  v_max int;
+  v_current int;
+  v_remaining int;
+begin
+  select status, max_attendees into v_status, v_max
+  from public.events
+  where id = p_event_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Event not found', 'status', 404);
+  end if;
+
+  if v_status != 'published' then
+    return jsonb_build_object('success', false, 'error', 'Cannot RSVP to a ' || v_status || ' event', 'status', 400);
+  end if;
+
+  if v_max is not null then
+    select count(*)::int into v_current
+    from public.rsvps
+    where event_id = p_event_id;
+
+    if v_current >= v_max then
+      return jsonb_build_object('success', false, 'error', 'Event is full', 'remaining', 0, 'status', 409);
+    end if;
+
+    v_remaining := v_max - v_current - 1;
+  else
+    v_remaining := null;
+  end if;
+
+  begin
+    insert into public.rsvps (user_id, event_id)
+    values (p_user_id, p_event_id);
+  exception when unique_violation then
+    return jsonb_build_object('success', false, 'error', 'Already RSVPed to this event', 'status', 409);
+  end;
+
+  return jsonb_build_object('success', true, 'remaining', v_remaining, 'status', 201);
+end;
+$$;

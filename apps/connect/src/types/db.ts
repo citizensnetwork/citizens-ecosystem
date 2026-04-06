@@ -56,6 +56,7 @@ export type Profile = {
   email: string;
   role: UserRole;
   full_name: string;
+  avatar_url: string | null;
   created_at: string;
 };
 
@@ -87,6 +88,7 @@ export type Place = {
   description: string;
   address: string;
   category_id: string | null;
+  custom_category: string | null;
   image_url: string | null;
   phone: string | null;
   website: string | null;
@@ -119,4 +121,23 @@ export type Follow = {
   follower_id: string;
   followee_id: string;
   created_at: string;
+};
+
+/** Trending event — includes RSVP count. */
+export type TrendingEvent = Event & { rsvp_count: number };
+
+/** Favourite org — a followed vendor with their upcoming events. */
+export type FavouriteOrg = {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  upcoming_events: Event[];
+};
+
+/** Friend with events they're attending. */
+export type FriendAttending = {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  attending_events: Event[];
 };

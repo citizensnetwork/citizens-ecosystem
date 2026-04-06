@@ -27,6 +27,7 @@ export default function PlaceForm({ categories }: Props) {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -89,11 +90,15 @@ export default function PlaceForm({ categories }: Props) {
       image_url = urlData.publicUrl;
     }
 
+    const selectedCategory = categories.find((c) => c.id === categoryId);
+    const isOther = selectedCategory?.slug === "other";
+
     const { error: insertError } = await supabase.from("places").insert({
       name,
       description,
       address,
       category_id: categoryId || null,
+      custom_category: isOther && customCategory.trim() ? customCategory.trim() : null,
       phone: phone || null,
       website: website || null,
       image_url,
@@ -144,7 +149,12 @@ export default function PlaceForm({ categories }: Props) {
         <select
           id="category"
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          onChange={(e) => {
+            setCategoryId(e.target.value);
+            // Clear custom category when switching away from "other"
+            const cat = categories.find((c) => c.id === e.target.value);
+            if (cat?.slug !== "other") setCustomCategory("");
+          }}
           className="w-full rounded-md border px-3 py-2 text-sm"
         >
           <option value="">Select a category</option>
@@ -154,6 +164,16 @@ export default function PlaceForm({ categories }: Props) {
             </option>
           ))}
         </select>
+        {categories.find((c) => c.id === categoryId)?.slug === "other" && (
+          <input
+            type="text"
+            value={customCategory}
+            onChange={(e) => setCustomCategory(e.target.value)}
+            className="mt-2 w-full rounded-md border px-3 py-2 text-sm"
+            placeholder="Describe the category (e.g. Bookshop, Food Bank)"
+            maxLength={100}
+          />
+        )}
       </div>
 
       <div>
@@ -248,6 +268,7 @@ export default function PlaceForm({ categories }: Props) {
         <LocationPicker
           position={coords}
           onSelect={(lat, lng) => setCoords([lat, lng])}
+          onAddress={(addr) => setAddress(addr)}
         />
       </div>
 

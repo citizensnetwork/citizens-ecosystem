@@ -173,6 +173,7 @@ describe("EventsView", () => {
         created_by: "u1",
         created_at: new Date().toISOString(),
         category_id: null,
+        custom_category: null,
         phone: null,
         website: null,
         image_url: null,

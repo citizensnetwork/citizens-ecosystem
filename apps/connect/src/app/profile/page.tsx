@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import type { Event } from "@/types/db";
+import Image from "next/image";
+import type { Event, Profile } from "@/types/db";
+import ProfileEditor from "@/components/auth/ProfileEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +17,13 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch profile, RSVPs, and social counts in parallel
+  // Fetch profile, RSVPs, social counts, and following list in parallel
   const [
     { data: profile },
     { data: rsvps },
     { count: followersCount },
     { count: followingCount },
+    { data: myFollowing },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
@@ -36,25 +39,22 @@ export default async function ProfilePage() {
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("follower_id", user.id),
+    supabase
+      .from("follows")
+      .select("followee_id")
+      .eq("follower_id", user.id),
   ]);
 
   // Count friends (bidirectional follows)
   let friendsCount = 0;
-  const { data: myFollowing } = await supabase
-    .from("follows")
-    .select("followee_id")
-    .eq("follower_id", user.id);
-
-  if (myFollowing) {
-    const followeeIds = myFollowing.map((f) => f.followee_id);
-    if (followeeIds.length > 0) {
-      const { count } = await supabase
-        .from("follows")
-        .select("*", { count: "exact", head: true })
-        .eq("followee_id", user.id)
-        .in("follower_id", followeeIds);
-      friendsCount = count ?? 0;
-    }
+  const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
+  if (followeeIds.length > 0) {
+    const { count } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("followee_id", user.id)
+      .in("follower_id", followeeIds);
+    friendsCount = count ?? 0;
   }
 
   const rsvpedEvents: Event[] = (rsvps ?? [])
@@ -77,13 +77,32 @@ export default async function ProfilePage() {
   const displayName =
     profile?.full_name || user.user_metadata?.full_name || user.email;
 
+  const typedProfile: Profile = {
+    id: profile?.id ?? user.id,
+    email: profile?.email ?? user.email ?? "",
+    role: profile?.role ?? "client",
+    full_name: profile?.full_name ?? "",
+    avatar_url: profile?.avatar_url ?? null,
+    created_at: profile?.created_at ?? "",
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-16 h-16 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-2xl font-bold uppercase">
-          {(displayName as string)?.[0] ?? "?"}
-        </div>
+        {typedProfile.avatar_url ? (
+          <Image
+            src={typedProfile.avatar_url}
+            alt="Profile photo"
+            width={64}
+            height={64}
+            className="w-16 h-16 rounded-full object-cover ring-2 ring-black/10"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-2xl font-bold uppercase">
+            {(displayName as string)?.[0] ?? "?"}
+          </div>
+        )}
         <div>
           <h1 className="text-2xl font-bold">{displayName}</h1>
           <p className="text-sm text-gray-500">{user.email}</p>
@@ -115,7 +134,11 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      {/* RSVPed events */}
+      {/* ── Profile Editor (avatar, name, password) ─── */}
+      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+        <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
+        <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
+      </section>
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-3">My RSVPs</h2>
         {rsvpedEvents.length === 0 ? (

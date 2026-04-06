@@ -11,6 +11,7 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
     email: "testuser@example.com",
     role: "client",
     full_name: "Test User",
+    avatar_url: null,
     created_at: "2025-01-01T00:00:00Z",
     ...overrides,
   };
@@ -83,6 +84,7 @@ export function makePlace(overrides?: Partial<Place>): Place {
     description: "A welcoming church in central Durban",
     address: "123 Main St, Durban",
     category_id: "cat-111",
+    custom_category: null,
     image_url: null,
     phone: "+27 31 000 0000",
     website: "https://grace.co.za",

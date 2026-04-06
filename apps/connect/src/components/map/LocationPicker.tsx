@@ -7,14 +7,17 @@ import "leaflet/dist/leaflet.css";
 type Props = {
   position: [number, number] | null;
   onSelect: (lat: number, lng: number) => void;
+  onAddress?: (address: string) => void;
 };
 
-export default function LocationPicker({ position, onSelect }: Props) {
+export default function LocationPicker({ position, onSelect, onAddress }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onAddressRef = useRef(onAddress);
+  onAddressRef.current = onAddress;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -54,6 +57,23 @@ export default function LocationPicker({ position, onSelect }: Props) {
       }
 
       onSelectRef.current(lat, lng);
+
+      // Reverse geocode to auto-populate address
+      if (onAddressRef.current) {
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          { headers: { "Accept-Language": "en" } }
+        )
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.display_name) {
+              onAddressRef.current?.(data.display_name);
+            }
+          })
+          .catch(() => {
+            /* reverse geocode failed — user can type manually */
+          });
+      }
     });
 
     return () => {

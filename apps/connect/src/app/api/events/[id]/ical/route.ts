@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { generateICalString } from "@/lib/calendar";
+import { isValidUUID } from "@/lib/validation";
 import type { Event } from "@/types/db";
 
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
+
   const supabase = await createClient();
 
   const { data: event } = await supabase
@@ -28,7 +34,7 @@ export async function GET(
   }
 
   const ical = generateICalString(event);
-  const filename = `${event.title.replace(/[^a-zA-Z0-9]/g, "_")}.ics`;
+  const filename = `${event.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50)}.ics`;
 
   return new NextResponse(ical, {
     headers: {

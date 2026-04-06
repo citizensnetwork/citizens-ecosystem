@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Event, EventCategory, Place } from "@/types/db";
-import { CATEGORY_FILTERS } from "@/lib/categories";
 import { createClient } from "@/lib/supabase/client";
+import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import EventFeed from "./EventFeed";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
@@ -28,11 +30,12 @@ export default function EventsView({
   places = [],
   isVendor = false,
 }: Props) {
-  const [view, setView] = useState<"map" | "calendar" | "feed">("map");
+  const [view, setView] = useState<"map" | "calendar">("map");
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<EventCategory | "all">(
-    "all"
+  const [glanceOpen, setGlanceOpen] = useState(false);
+  const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
+    new Set()
   );
 
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -60,6 +63,31 @@ export default function EventsView({
     user?.email?.split("@")[0] ??
     "Account";
 
+  // Focus traps for drawers
+  const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
+  const glanceRef = useFocusTrap<HTMLElement>(glanceOpen && !selectedEvent && !selectedPlace);
+
+  // Escape key closes drawers and detail panels
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (filtersOpen) { setFiltersOpen(false); return; }
+      if (glanceOpen) { setGlanceOpen(false); return; }
+      if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [filtersOpen, glanceOpen, selectedEvent, selectedPlace]);
+
+  // Burger menu social data (lazy-loaded)
+  const {
+    trending,
+    favouriteOrgs,
+    friends,
+    profile: menuProfile,
+    loading: menuLoading,
+  } = useBurgerMenuData(user?.id ?? null, filtersOpen);
+
   async function handleLogout() {
     await supabaseRef.current!.auth.signOut();
     setUser(null);
@@ -67,10 +95,23 @@ export default function EventsView({
     router.refresh();
   }
 
+  function toggleCategory(cat: EventCategory) {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     return events.filter((e) => {
       const matchesCategory =
-        activeCategory === "all" || e.category === activeCategory;
+        activeCategories.size === 0 ||
+        (e.category != null && activeCategories.has(e.category));
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
@@ -79,7 +120,7 @@ export default function EventsView({
         e.description.toLowerCase().includes(q);
       return matchesCategory && matchesSearch;
     });
-  }, [events, search, activeCategory]);
+  }, [events, search, activeCategories]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase();
@@ -93,14 +134,19 @@ export default function EventsView({
     });
   }, [places, search]);
 
-  const handleSelectEvent = useCallback((event: Event) => {
-    setSelectedPlace(null);
-    setSelectedEvent(event);
-  }, []);
+  const handleSelectEvent = useCallback(
+    (event: Event) => {
+      setSelectedPlace(null);
+      setSelectedEvent(event);
+      setGlanceOpen(false);
+    },
+    []
+  );
 
   const handleSelectPlace = useCallback((place: Place) => {
     setSelectedEvent(null);
     setSelectedPlace(place);
+    setGlanceOpen(false);
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -127,6 +173,9 @@ export default function EventsView({
     }
   }
 
+  // Close glance panel when detail opens
+  const hasDetail = selectedEvent || selectedPlace;
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
       {view === "map" && (
@@ -151,11 +200,6 @@ export default function EventsView({
           </div>
         </div>
       )}
-      {view === "feed" && (
-        <div className="h-full bg-(--surface) pt-22">
-          <EventFeed events={filtered} onSelectEvent={handleSelectEvent} />
-        </div>
-      )}
 
       {/* ── Floating top bar ────────────────────────────── */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 p-3 sm:p-4">
@@ -175,7 +219,7 @@ export default function EventsView({
                 type="button"
                 onClick={() => setFiltersOpen((open) => !open)}
                 className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-base shadow-lg backdrop-blur transition hover:bg-white"
-                aria-label="Toggle filters"
+                aria-label="Toggle menu"
                 aria-expanded={filtersOpen}
               >
                 ☰
@@ -188,135 +232,80 @@ export default function EventsView({
             <button
               type="button"
               onClick={() =>
-                setView((v) =>
-                  v === "map" ? "calendar" : v === "calendar" ? "feed" : "map"
-                )
+                setView((v) => (v === "map" ? "calendar" : "map"))
               }
               className="pointer-events-auto rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
               aria-label="Toggle view mode"
             >
-              {view === "map" ? "📅" : view === "calendar" ? "📋" : "🗺"}
+              {view === "map" ? "📅" : "🗺"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Filter drawer backdrop ──────────────────────── */}
-      {filtersOpen && (
-        <div
-          className="absolute inset-0 z-1001 bg-black/25"
-          onClick={() => setFiltersOpen(false)}
-        />
+      {/* ── "Events at a Glance" right-edge button ──────── */}
+      {!hasDetail && (
+        <button
+          type="button"
+          onClick={() => setGlanceOpen((o) => !o)}
+          className="absolute right-0 top-1/2 z-1000 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition hover:bg-white hover:text-black"
+          aria-label={glanceOpen ? "Close events list" : "Events at a glance"}
+        >
+          {glanceOpen ? "▶" : "◀"}
+        </button>
       )}
 
-      {/* ── Filter drawer ───────────────────────────────── */}
+      {/* ── "Events at a Glance" slide-out panel ────────── */}
       <aside
-        className={`absolute left-0 top-0 z-1002 flex h-full w-[84vw] max-w-xs flex-col bg-white/96 p-4 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-80 ${
-          filtersOpen ? "translate-x-0" : "-translate-x-full"
+        ref={glanceRef}
+        role="dialog"
+        aria-label="Events at a glance"
+        className={`absolute right-0 top-0 z-999 flex h-full w-[84vw] max-w-sm flex-col bg-white/96 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-96 ${
+          glanceOpen && !hasDetail ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-black/8 px-4 py-3 pt-5">
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-black/70">
-            Filters
+            Events at a Glance
           </h2>
           <button
             type="button"
-            onClick={() => setFiltersOpen(false)}
+            onClick={() => setGlanceOpen(false)}
             className="rounded-lg px-2 py-1 text-black/60 hover:bg-black/5"
-            aria-label="Close filters"
+            aria-label="Close"
           >
             ✕
           </button>
         </div>
-
-        <div className="space-y-2 overflow-y-auto pb-4">
-          {CATEGORY_FILTERS.map((c) => (
-            <button
-              key={c.value}
-              onClick={() => {
-                setActiveCategory(c.value);
-                setFiltersOpen(false);
-              }}
-              className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
-                activeCategory === c.value
-                  ? "bg-(--gold) text-black"
-                  : "bg-black/5 text-black/75 hover:bg-black/10"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 border-t border-black/10 pt-4 text-sm text-black/65">
-          <p>
-            {filtered.length} event{filtered.length !== 1 ? "s" : ""}
-            {filteredPlaces.length > 0 &&
-              ` · ${filteredPlaces.length} place${filteredPlaces.length !== 1 ? "s" : ""}`}
-          </p>
-          {isVendor && (
-            <Link
-              href="/events/new"
-              onClick={() => setFiltersOpen(false)}
-              className="mt-3 block rounded-xl bg-(--gold) px-3 py-2 text-center font-semibold text-black"
-            >
-              + Create Event
-            </Link>
-          )}
-          <Link
-            href="/places/new"
-            onClick={() => setFiltersOpen(false)}
-            className="mt-2 block rounded-xl bg-black/5 px-3 py-2 text-center font-semibold text-black hover:bg-black/10"
-          >
-            + Add Place
-          </Link>
-        </div>
-
-        {/* ── Account section ────────────────────────── */}
-        <div className="mt-auto border-t border-black/10 pt-4">
-          {user ? (
-            <div className="space-y-2">
-              <Link
-                href="/profile"
-                onClick={() => setFiltersOpen(false)}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-black/80 transition hover:bg-black/5"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--gold-soft) text-xs font-bold uppercase text-black">
-                  {displayName[0]}
-                </span>
-                {displayName}
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
-              >
-                Log Out
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Link
-                href="/login"
-                onClick={() => setFiltersOpen(false)}
-                className="block rounded-xl bg-black/5 px-3 py-2 text-center text-sm font-medium text-black transition hover:bg-black/10"
-              >
-                Log In
-              </Link>
-              <Link
-                href="/signup"
-                onClick={() => setFiltersOpen(false)}
-                className="block rounded-xl bg-(--gold) px-3 py-2 text-center text-sm font-semibold text-black transition hover:brightness-105"
-              >
-                Sign Up — It&apos;s Free
-              </Link>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto">
+          <EventFeed events={filtered} onSelectEvent={handleSelectEvent} />
         </div>
       </aside>
 
+      {/* ── Burger Menu ──────────────────────────────── */}
+      <BurgerMenu
+        ref={burgerRef}
+        isOpen={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        user={user}
+        displayName={displayName}
+        activeCategories={activeCategories}
+        onToggleCategory={toggleCategory}
+        onClearCategories={() => setActiveCategories(new Set())}
+        trending={trending}
+        favouriteOrgs={favouriteOrgs}
+        friends={friends}
+        menuProfile={menuProfile}
+        menuLoading={menuLoading}
+        onSelectEvent={handleSelectEvent}
+        filteredCount={filtered.length}
+        filteredPlacesCount={filteredPlaces.length}
+        isVendor={isVendor}
+        onLogout={handleLogout}
+      />
+
       {/* ── Detail panel (event or place) ───────────────── */}
-      {(selectedEvent || selectedPlace) && (
+      {hasDetail && (
         <>
           <div
             className="absolute inset-0 z-1003 bg-black/20 sm:bg-transparent"

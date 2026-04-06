@@ -7,11 +7,19 @@ export const dynamic = "force-dynamic";
 export default async function EventsPage() {
   const supabase = await createClient();
 
+  // Limit events to upcoming 6 months to avoid loading the full history
+  const now = new Date().toISOString();
+  const sixMonths = new Date();
+  sixMonths.setMonth(sixMonths.getMonth() + 6);
+  const cutoff = sixMonths.toISOString();
+
   const [{ data: events }, { data: places }, { data: reviews }] = await Promise.all([
     supabase
       .from("events")
       .select("*")
       .eq("status", "published")
+      .gte("date", now)
+      .lte("date", cutoff)
       .order("date", { ascending: true })
       .returns<Event[]>(),
     supabase

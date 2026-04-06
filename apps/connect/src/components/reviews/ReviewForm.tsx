@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -13,7 +13,7 @@ type Props = {
 };
 
 export default function ReviewForm({ user, placeId, eventId, onSubmitted }: Props) {
-  const supabase = createClient();
+  const supabase = useRef(createClient()).current;
   const [rating, setRating] = useState(5);
   const [body, setBody] = useState("");
   const [stillExists, setStillExists] = useState(true);

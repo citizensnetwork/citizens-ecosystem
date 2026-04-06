@@ -23,58 +23,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check the event exists and is published
-  const { data: event } = await supabase
-    .from("events")
-    .select("id, status, max_attendees")
-    .eq("id", eventId)
-    .single();
+  // Atomic RSVP with capacity check (prevents race condition)
+  const { data: result, error: rpcError } = await supabase.rpc("safe_rsvp", {
+    p_user_id: user.id,
+    p_event_id: eventId,
+  });
 
-  if (!event) {
-    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 });
   }
 
-  if (event.status !== "published") {
+  const res = result as { success: boolean; error?: string; remaining?: number; status: number };
+
+  if (!res.success) {
     return NextResponse.json(
-      { error: `Cannot RSVP to a ${event.status} event` },
-      { status: 400 }
+      { error: res.error, remaining: res.remaining },
+      { status: res.status }
     );
   }
 
-  // Check capacity if max_attendees is set
-  let remaining: number | null = null;
-  if (event.max_attendees != null) {
-    const { count } = await supabase
-      .from("rsvps")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", eventId);
-
-    const currentCount = count ?? 0;
-    if (currentCount >= event.max_attendees) {
-      return NextResponse.json(
-        { error: "Event is full", remaining: 0 },
-        { status: 409 }
-      );
-    }
-    remaining = event.max_attendees - currentCount - 1; // -1 for this new RSVP
-  }
-
-  const { error } = await supabase.from("rsvps").insert({
-    user_id: user.id,
-    event_id: eventId,
-  });
-
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json(
-        { error: "Already RSVPed to this event" },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true, remaining }, { status: 201 });
+  return NextResponse.json(
+    { success: true, remaining: res.remaining },
+    { status: 201 }
+  );
 }
 
 export async function DELETE(request: NextRequest) {
