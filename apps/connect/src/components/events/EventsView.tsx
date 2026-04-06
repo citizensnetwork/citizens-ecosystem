@@ -302,7 +302,6 @@ export default function EventsView({
         onSelectEvent={handleSelectEvent}
         filteredCount={filtered.length}
         filteredPlacesCount={filteredPlaces.length}
-        isVendor={isVendor}
         onLogout={handleLogout}
       />
 

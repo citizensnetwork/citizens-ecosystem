@@ -24,7 +24,6 @@ type Props = {
   onSelectEvent: (event: Event) => void;
   filteredCount: number;
   filteredPlacesCount: number;
-  isVendor: boolean;
   onLogout: () => void;
 };
 
@@ -45,7 +44,6 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     onSelectEvent,
     filteredCount,
     filteredPlacesCount,
-    isVendor,
     onLogout,
   },
   ref
