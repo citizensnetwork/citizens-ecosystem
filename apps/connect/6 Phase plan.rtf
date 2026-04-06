@@ -1,0 +1,216 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang2057{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil Calibri;}{\f2\fnil\fcharset1 Cambria Math;}{\f3\fnil\fcharset1 Segoe UI Symbol;}{\f4\fnil\fcharset0 Cambria Math;}}
+{\*\generator Riched20 10.0.19041}{\*\mmathPr\mmathFont2\mwrapIndent1440 }\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\f0\fs22\lang9 Plan: Citizens Connect \f1\emdash  Full Platform Build\par
+A map-first, calendar-integrated web + mobile app for the Christian community to discover ministries, events, places, and connect with one another.\par
+\par
+Phase 1 \emdash  Data Foundation\par
+Expand the database schema and TypeScript types to support the full vision. Everything else depends on this.\par
+\par
+Steps:\par
+\par
+New categories table \emdash  Seed with Christian community categories: Church, Ministry, Fellowship, Worship, Youth, Outreach, Community Service, Music, Conference, Prayer, Bible Study, Christian Business, Christian Shop. Each category gets a name, slug, icon_name, color (for map markers).\par
+\par
+Expand UserRole \emdash  Change the profiles.role check constraint from ('vendor', 'client') to ('individual', 'ministry', 'organization', 'business'). Add columns: bio text, avatar_url text, organization_name text, website text, phone text. Update the TypeScript UserRole and Profile types, and the SignupForm role options.\par
+\par
+New places table \emdash  Persistent map listings (not time-bound). Columns: id, name, description, category_id (FK categories), address, latitude, longitude, phone, email, website, hours (jsonb for operating hours), owner_id (FK profiles), is_verified boolean default false, verified_at timestamptz, created_at. RLS: viewable by everyone, owners can create/update/delete their own.\par
+\par
+Expand events table \emdash  Add columns: category_id (FK categories), visibility text check ('public','private') default 'public', end_date timestamptz (for live-event detection), is_recurring boolean default false, recurrence_rule text (iCal RRULE for future use). Update the Event TypeScript type.\par
+\par
+New reviews table \emdash  For both places and events. Columns: id, user_id (FK profiles), place_id (FK places, nullable), event_id (FK events, nullable), rating smallint check (1-5), comment text, place_exists boolean (the "does this place still exist?" signal), created_at. Constraint: either place_id or event_id must be non-null. Unique on (user_id, place_id) and (user_id, event_id). RLS: viewable by everyone, users can insert/update/delete own.\par
+\par
+Update TypeScript types in db.ts \emdash  Add Category, Place, Review types. Update Event with new fields. Update Profile and UserRole.\par
+\par
+Migration SQL \emdash  002_platform_expansion.sql containing all the above as idempotent statements. Update schema.sql to be the full canonical schema.\par
+\par
+Relevant files:\par
+\par
+supabase/schema.sql \emdash  rewrite with all new tables\par
+supabase/migrations/002_platform_expansion.sql \emdash  migration for existing DBs\par
+src/types/db.ts \emdash  add Category, Place, Review; update Event, Profile, UserRole\par
+src/components/auth/SignupForm.tsx \emdash  update role selection options\par
+Verification:\par
+\par
+Run migration in Supabase SQL Editor\par
+Run npx tsc --noEmit \emdash  zero errors\par
+Confirm tables exist via Supabase dashboard Table Editor\par
+Phase 2 \emdash  App Shell Overhaul\par
+Replace the traditional page-based navigation with a full-screen, mobile-first app shell. This is the architectural backbone for the map and calendar views.\par
+\par
+Steps:\par
+\par
+New app shell layout \emdash  Create src/app/(app)/layout.tsx using a Next.js route group. This layout has: no scrolling body, full viewport height, a compact top bar (logo left, search center, Map/Calendar toggle + profile avatar top-right), and a content area that fills remaining space. Auth routes (/login, /signup) stay outside this group with the current layout.\par
+\par
+Top bar component \emdash  src/components/shell/TopBar.tsx. Contains: Citizens Connect logo (links to map), a search input (initially just UI), Map/Calendar toggle button (icon-based, swaps between the two views), user avatar/menu dropdown (login/signup if not authed, profile/logout if authed). Mobile-responsive: hamburger or simplified bar on small screens.\par
+\par
+View state management \emdash  The map/calendar toggle is client-side state. Both views are loaded but only one is visible (display: none vs block, or conditional rendering). This avoids remounting the map every time the user toggles. Store the current view in a React context (AppShellContext) so child components can know which view is active.\par
+\par
+Modal/panel system \emdash  src/components/shell/SlidePanel.tsx. A reusable slide-in panel from the right side (desktop) or bottom sheet (mobile) for: event details, place details, create event form, create place form, reviews. This replaces navigating to /events/[id] entirely \emdash  clicking a marker or list item opens the panel. Use headless UI pattern (no library needed, just a portal + transitions).\par
+\par
+Refactor existing pages into panel content \emdash  Convert EventDetailContent, EventForm into panel-compatible components (no page wrapper, just the content). They'll be rendered inside SlidePanel when triggered.\par
+\par
+Landing page \emdash  Keep / as a public landing page outside the (app) group. The landing page becomes the entry point for unauthenticated users. Rebrand copy for Christian community. After login, redirect to the app shell (/map or / within the app group).\par
+\par
+Capacitor-ready viewport \emdash  Add proper <meta name="viewport"> tag, safe area insets (env(safe-area-inset-top) etc.), and standalone display mode to manifest.json. This ensures the full-screen layout works when wrapped in Capacitor later.\par
+\par
+Relevant files:\par
+\par
+src/app/(app)/layout.tsx \emdash  new full-screen shell layout\par
+src/app/(app)/page.tsx \emdash  default view (map)\par
+src/components/shell/TopBar.tsx \emdash  compact navigation bar\par
+src/components/shell/SlidePanel.tsx \emdash  reusable detail/form panel\par
+src/components/shell/AppShellContext.tsx \emdash  view state context\par
+src/app/layout.tsx \emdash  update root layout (remove Navbar from here, keep for auth pages)\par
+src/app/page.tsx \emdash  rebrand landing page for Christian community\par
+Verification:\par
+\par
+Map fills full viewport below the top bar\par
+Toggle switches to empty calendar placeholder and back without remounting map\par
+Clicking "view details" opens slide panel, not a page navigation\par
+Mobile viewport: no scrollbars on the shell, panel slides from bottom\par
+Build compiles clean\par
+Phase 3 \emdash  Full-Screen Map\par
+The primary view. A full-viewport interactive map with filters, search, marker clustering, and temporal visual encoding for events.\par
+\par
+Steps:\par
+\par
+Full-viewport MapView component \emdash  src/components/map/MapView.tsx. Replaces the old EventMap. Fills the entire content area below TopBar. Fetches both events and places from Supabase. Uses raw Leaflet (same pattern as current components). Adds geolocation button to center on user's location.\par
+\par
+Custom marker icons per category \emdash  Create src/lib/map/markers.ts. Define SVG-based or icon-based markers for each category type (church, ministry, event, shop, etc.) using Leaflet divIcon. Each category gets its own color from the categories.color column. Events use a distinct shape (circle/pin) vs. places (square/diamond).\par
+\par
+Event temporal encoding \emdash  In src/lib/map/markers.ts, implement a function getEventMarkerStyle(eventDate, endDate) that returns opacity and size based on temporal proximity:\par
+\par
+Live now (between date and end_date): bright, pulsing, full size, distinct highlight color (gold/amber)\par
+Today/tomorrow: full opacity, full size\par
+This week: 90% opacity\par
+This month: 70% opacity, slightly smaller\par
+3+ months away: 50% opacity, minimum size\par
+6+ months away: 30% opacity, minimum size\par
+Use CSS animation for the "live" pulse effect on the marker.\par
+Filter panel \emdash  src/components/map/FilterPanel.tsx. A collapsible sidebar or floating panel with category toggles (checkbox per category), an "Events" vs "Places" toggle, and a time range filter for events (today, this week, this month, all). Filtering updates markers on the map without refetching \emdash  just show/hide marker layers.\par
+\par
+Marker clustering \emdash  Install leaflet.markercluster. Group dense markers into clusters that expand on zoom. Style cluster icons to show count.\par
+\par
+Search \emdash  Search input in TopBar. Client-side fuzzy search over loaded events + places by name, location, description. Results appear in a dropdown or the FilterPanel. Selecting a result flies the map to that location and opens its detail panel.\par
+\par
+Marker click \f2\u8594?\f0  detail panel \f1\emdash  Clicking a marker opens the SlidePanel with event or place details (reusing EventDetailContent or a new PlaceDetailContent). No page navigation.\par
+\par
+Places CRUD \emdash  Ministry/org/business accounts can create places. "Add a Place" button in TopBar or via long-press on map. Opens PlaceForm in the SlidePanel. Fields: name, category, address, location picker, phone, website, hours.\par
+\par
+Relevant files:\par
+\par
+src/components/map/MapView.tsx \emdash  new full-screen map (replaces EventMap for the main view)\par
+src/lib/map/markers.ts \emdash  marker icons, temporal encoding logic\par
+src/components/map/FilterPanel.tsx \emdash  category/time filters\par
+src/components/map/PlaceDetailContent.tsx \emdash  place info panel\par
+src/components/map/PlaceForm.tsx \emdash  create/edit place form\par
+src/components/shell/SlidePanel.tsx \emdash  reused for details\par
+package.json \emdash  add leaflet.markercluster\par
+Verification:\par
+\par
+Map fills viewport, tiles load\par
+Different icons for churches vs events vs shops\par
+Live events pulse, distant events are faded/smaller\par
+Toggling categories hides/shows markers instantly\par
+Clicking marker opens slide panel with details\par
+Clusters appear at low zoom, expand on zoom in\par
+Search finds events and places, flies to location\par
+Phase 4 \emdash  Calendar View\par
+The second primary view. A personal + community calendar.\par
+\par
+Steps:\par
+\par
+Install FullCalendar \emdash  @fullcalendar/core, @fullcalendar/react, @fullcalendar/daygrid, @fullcalendar/timegrid, @fullcalendar/interaction. Wrap in a client component with next/dynamic (ssr: false).\par
+\par
+CalendarView component \emdash  src/components/calendar/CalendarView.tsx. Full-height calendar that fills the content area. Month/week/day toggle buttons. Fetches events from Supabase on view.\par
+\par
+Event color coding \emdash  Three visual tiers:\par
+\par
+Your own events (created_by = user) \emdash  solid blue\par
+RSVP'd events \emdash  solid green\par
+Public community events \emdash  light purple/outlined\par
+Category color as a subtle accent dot/stripe\par
+Click date \f2\u8594?\f0  create event \f1\emdash  Clicking an empty date slot opens EventForm in the SlidePanel with the date pre-filled. User chooses visibility: public (appears on map for all) or private (personal calendar only).\par
+\par
+Click event \f2\u8594?\f0  detail panel \f1\emdash  Clicking a calendar event opens the SlidePanel with EventDetailContent. User can RSVP, view details, see location on mini-map.\par
+\par
+Public/private visibility \emdash  Update EventForm with a visibility toggle. Public events with coordinates appear as map markers. Private events only appear on the creator's calendar.\par
+\par
+Calendar \f3\u8596?\f0  Map interaction \f1\emdash  When viewing a public event's details from the calendar, a "Show on Map" button switches to map view and flies to that event's location.\par
+\par
+Relevant files:\par
+\par
+src/components/calendar/CalendarView.tsx \emdash  main calendar component\par
+src/components/calendar/CalendarEvent.tsx \emdash  custom event renderer\par
+src/components/events/EventForm.tsx \emdash  add visibility toggle, prefilleddate prop\par
+src/components/events/EventDetailContent.tsx \emdash  add "Show on Map" button\par
+src/components/shell/AppShellContext.tsx \emdash  add flyToLocation action\par
+package.json \emdash  add FullCalendar packages\par
+Verification:\par
+\par
+Calendar renders month/week/day views\par
+Own events, RSVP'd events, and community events show with distinct colors\par
+Clicking empty date opens event creation with date pre-filled\par
+Clicking event opens detail panel with RSVP option\par
+Public events appear on map, private events don't\par
+"Show on Map" switches view and centers map\par
+Phase 5 \emdash  Reviews, Verification & Community\par
+Social trust layer and ongoing place verification.\par
+\par
+Steps:\par
+\par
+Review/rating UI \emdash  src/components/reviews/ReviewCard.tsx, ReviewForm.tsx, ReviewList.tsx. Display on place and event detail panels. Star rating (1-5), optional comment, "Does this place still exist?" checkbox (for place reviews only). Aggregate rating displayed on markers and detail panels.\par
+\par
+Post-event attendance prompt \emdash  After an event's date passes, users who RSVP'd see an in-app notification/banner (not push notification yet) on their next visit: "How was [Event Name]? Rate 1-5". Store response in reviews. This could be a simple banner component at the top of the calendar view or a modal on app open.\par
+\par
+Place verification system \emdash  Two mechanisms:\par
+\par
+Community signals: If multiple users mark "this place no longer exists" in reviews, flag the place (auto-set is_verified = false after N negative signals). Show a warning badge on the marker.\par
+Annual owner prompt: A Supabase Edge Function (cron) that runs monthly, finds places where verified_at is older than 11 months, and sends an email to the owner's profile email asking them to confirm. If no response within 30 days, place gets flagged. Owner can click a link to re-verify (sets verified_at = now()).\par
+Aggregate ratings on markers \emdash  Show average rating as a small badge on map markers. Places with high ratings get a subtle glow or gold accent. Places flagged as possibly closed get a dimmed/strikethrough style.\par
+\par
+Invite/share \emdash  Generate shareable links for events and places. "Share" button in detail panel copies link or opens native share dialog (via navigator.share \emdash  works great in Capacitor).\par
+\par
+Relevant files:\par
+\par
+src/components/reviews/ReviewCard.tsx \emdash  single review display\par
+src/components/reviews/ReviewForm.tsx \emdash  star rating + comment form\par
+src/components/reviews/ReviewList.tsx \emdash  list of reviews for a place/event\par
+src/components/reviews/PostEventPrompt.tsx \emdash  attendance feedback banner\par
+supabase/functions/verify-places/index.ts \emdash  Edge Function for annual verification emails\par
+src/lib/map/markers.ts \emdash  update markers with rating badges\par
+Verification:\par
+\par
+Can submit a review with rating + comment for a place\par
+"Place still exists?" checkbox appears on place reviews\par
+Post-event prompt appears for past RSVP'd events\par
+Average ratings display on detail panels\par
+Share button generates working link\par
+Phase 6 \emdash  Mobile (Capacitor)\par
+Wrap the web app for app store distribution.\par
+\par
+Steps:\par
+\par
+Install Capacitor \emdash  @capacitor/core, @capacitor/cli, @capacitor/ios, @capacitor/android\par
+Configure \emdash  npx cap init, point web directory to Next.js static export or use @capgo/capacitor-updater for live updates\par
+Native plugins \emdash  @capacitor/geolocation (map centering), @capacitor/push-notifications (future), @capacitor/share (native share dialog), @capacitor/status-bar (style status bar)\par
+Build & test \emdash  npx next build && npx next export && npx cap sync && npx cap open android/ios\par
+This phase is mostly configuration, not app code changes, since the mobile-first UI is built in Phases 2-4.\par
+\par
+Decisions Captured\par
+Places vs Events: fundamentally separate (places = permanent, events = time-bound)\par
+Mobile: Capacitor wrapper, one codebase, mobile-first web UI\par
+Calendar: FullCalendar library\par
+Map: Raw Leaflet (no react-leaflet) \emdash  already proven pattern\par
+Event marker encoding: temporal scale (live \f2\u8594?\f0  distant) controlling opacity, size, color\par
+Place verification: dual approach (community "still exists?" signals + annual owner email)\par
+Reviews: unified system for both places and events, 1-5 stars + comment\par
+Roles: individual, ministry, organization, business (replacing vendor/client)\par
+\par
+\par
+Phase\f4  \f0 Order\f4  & \f0 Dependencies\par
+Phase\f4  \f0 1\f4  (\f0 Data\f4 ) \f2\u8594? Phase 2 (Shell) \u8594? Phase 3 (Map) \u9472?\u9488?\par
+                                  \u8594? Phase 4 (Calendar) \u9472?\u9508? (parallel after shell)\par
+                                                        \u9500?\u8594? Phase 5 (Reviews)\par
+                                                        \u9492?\u8594? Phase 6 (Capacitor)\f0\lang9\par
+}
+ 

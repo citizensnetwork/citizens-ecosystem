@@ -1,8 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
 export function createClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  // NEXT_PUBLIC_ values are inlined at build time by Next.js.
+  // During static prerendering, they may be unavailable — use placeholders
+  // so the build succeeds (no API calls happen during prerender anyway).
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key-for-prerender";
+
+  return createBrowserClient(url, key);
 }
