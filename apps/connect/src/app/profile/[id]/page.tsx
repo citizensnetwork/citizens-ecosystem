@@ -142,7 +142,7 @@ export default async function PublicProfilePage({
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {isOrganiser ? "Organiser" : "Community Member"}
+            {isOrganiser ? "Organiser" : "Community Citizen"}
           </span>
 
           {/* Social counts */}

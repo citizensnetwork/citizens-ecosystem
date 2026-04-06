@@ -16,7 +16,7 @@ export default function ReviewCard({ review, showStillExists = false }: Props) {
     <div className="surface-card rounded-xl p-4">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-black">
-          {review.profiles?.full_name ?? "Community member"}
+          {review.profiles?.full_name ?? "Community Citizen"}
         </span>
         <span className="text-sm text-(--gold)">{renderStars(review.rating)}</span>
       </div>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
@@ -30,7 +30,9 @@ export default function EventsView({
   places = [],
   isVendor = false,
 }: Props) {
-  const [view, setView] = useState<"map" | "calendar">("map");
+  const searchParams = useSearchParams();
+  const initialView = searchParams.get("view") === "calendar" ? "calendar" : "map";
+  const [view, setView] = useState<"map" | "calendar">(initialView);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [glanceOpen, setGlanceOpen] = useState(false);
@@ -225,7 +227,7 @@ export default function EventsView({
                 ☰
               </button>
               <div className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-semibold tracking-tight text-black shadow-lg backdrop-blur sm:text-base">
-                Citizens Connect
+                <Link href="/events" className="hover:text-(--gold) transition">Citizens Connect</Link>
               </div>
             </div>
 

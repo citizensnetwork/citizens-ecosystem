@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
-import type { EventCategory } from "@/types/db";
+import type { EventCategory, Category } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -16,7 +16,12 @@ const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), 
   ),
 });
 
-export default function EventForm() {
+type Props = {
+  isVendor?: boolean;
+  placeCategories?: Category[];
+};
+
+export default function EventForm({ isVendor = false, placeCategories = [] }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
@@ -34,8 +39,44 @@ export default function EventForm() {
   const [coords, setCoords] = useState<[number, number] | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Vendor-only: place booking
+  const [bookAtPlace, setBookAtPlace] = useState(false);
+  const [addNewPlace, setAddNewPlace] = useState(false);
+  const [placeName, setPlaceName] = useState("");
+  const [placeDescription, setPlaceDescription] = useState("");
+  const [placeAddress, setPlaceAddress] = useState("");
+  const [placeCategoryId, setPlaceCategoryId] = useState("");
+  const [placeCustomCategory, setPlaceCustomCategory] = useState("");
+  const [placePhone, setPlacePhone] = useState("");
+  const [placeWebsite, setPlaceWebsite] = useState("");
+
   const router = useRouter();
   const supabase = createClient();
+
+  // Track whether form has been touched
+  const isDirty = useCallback(() => {
+    return !!(title || description || date || location || imageFile || coords ||
+      placeName || placeDescription || placeAddress);
+  }, [title, description, date, location, imageFile, coords, placeName, placeDescription, placeAddress]);
+
+  // Unsaved changes guard
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (isDirty()) {
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  function handleCancel() {
+    if (isDirty()) {
+      if (!window.confirm("Booking in progress, cancel editing?")) return;
+    }
+    router.push("/events");
+  }
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -81,6 +122,31 @@ export default function EventForm() {
         .from("event-images")
         .getPublicUrl(path);
       image_url = urlData.publicUrl;
+    }
+
+    // If vendor is adding a new place, create it first
+    if (isVendor && bookAtPlace && addNewPlace && placeName.trim()) {
+      const selectedPlaceCat = placeCategories.find((c) => c.id === placeCategoryId);
+      const isOtherCat = selectedPlaceCat?.slug === "other";
+
+      const { error: placeError } = await supabase.from("places").insert({
+        name: placeName,
+        description: placeDescription,
+        address: placeAddress || location,
+        category_id: placeCategoryId || null,
+        custom_category: isOtherCat && placeCustomCategory.trim() ? placeCustomCategory.trim() : null,
+        phone: placePhone || null,
+        website: placeWebsite || null,
+        latitude: coords?.[0] ?? null,
+        longitude: coords?.[1] ?? null,
+        created_by: user.id,
+      });
+
+      if (placeError) {
+        setError("Failed to create place: " + placeError.message);
+        setLoading(false);
+        return;
+      }
     }
 
     const { error } = await supabase.from("events").insert({
@@ -341,12 +407,165 @@ export default function EventForm() {
         </div>
       </div>
 
+      {/* ── Vendor-only: Place Booking ──────────────────── */}
+      {isVendor && (
+        <div className="border-t pt-4 mt-4 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Event Venue</h2>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={bookAtPlace}
+              onChange={(e) => {
+                setBookAtPlace(e.target.checked);
+                if (!e.target.checked) setAddNewPlace(false);
+              }}
+              className="rounded"
+            />
+            Book this event at a place
+          </label>
+
+          {bookAtPlace && (
+            <div className="space-y-3 rounded-lg border border-black/10 bg-black/[.02] p-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={addNewPlace}
+                  onChange={(e) => setAddNewPlace(e.target.checked)}
+                  className="rounded"
+                />
+                Add a new place
+              </label>
+              <p className="text-xs text-black/40">
+                Note: Places cannot be removed within 6 months of creation (admin-only feature).
+              </p>
+
+              {addNewPlace && (
+                <div className="space-y-3 border-t border-black/8 pt-3">
+                  <div>
+                    <label htmlFor="placeName" className="block text-sm font-medium mb-1">
+                      Place Name
+                    </label>
+                    <input
+                      id="placeName"
+                      type="text"
+                      value={placeName}
+                      onChange={(e) => setPlaceName(e.target.value)}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      placeholder="Grace Community Church"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="placeCategory" className="block text-sm font-medium mb-1">
+                      Place Category
+                    </label>
+                    <select
+                      id="placeCategory"
+                      value={placeCategoryId}
+                      onChange={(e) => {
+                        setPlaceCategoryId(e.target.value);
+                        const cat = placeCategories.find((c) => c.id === e.target.value);
+                        if (cat?.slug !== "other") setPlaceCustomCategory("");
+                      }}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="">Select a category</option>
+                      {placeCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.emoji} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {placeCategories.find((c) => c.id === placeCategoryId)?.slug === "other" && (
+                      <input
+                        type="text"
+                        value={placeCustomCategory}
+                        onChange={(e) => setPlaceCustomCategory(e.target.value)}
+                        className="mt-2 w-full rounded-md border px-3 py-2 text-sm"
+                        placeholder="Describe the category (e.g. Bookshop, Food Bank)"
+                        maxLength={100}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="placeDescription" className="block text-sm font-medium mb-1">
+                      Place Description
+                    </label>
+                    <textarea
+                      id="placeDescription"
+                      value={placeDescription}
+                      onChange={(e) => setPlaceDescription(e.target.value)}
+                      rows={2}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      placeholder="A brief description of this place..."
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="placeAddress" className="block text-sm font-medium mb-1">
+                      Place Address <span className="text-gray-400 font-normal">(defaults to event location)</span>
+                    </label>
+                    <input
+                      id="placeAddress"
+                      type="text"
+                      value={placeAddress}
+                      onChange={(e) => setPlaceAddress(e.target.value)}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      placeholder="123 Main St, Durban"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="placePhone" className="block text-sm font-medium mb-1">
+                        Phone <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <input
+                        id="placePhone"
+                        type="tel"
+                        value={placePhone}
+                        onChange={(e) => setPlacePhone(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="+27 31 000 0000"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="placeWebsite" className="block text-sm font-medium mb-1">
+                        Website <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <input
+                        id="placeWebsite"
+                        type="url"
+                        value={placeWebsite}
+                        onChange={(e) => setPlaceWebsite(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="https://example.co.za"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={loading}
         className="w-full bg-(--gold) text-black py-2 rounded-md hover:brightness-95 disabled:opacity-50 text-sm font-medium"
       >
         {loading ? "Creating..." : "Create Event"}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleCancel}
+        className="w-full bg-black/8 text-black/60 py-2 rounded-md hover:bg-black/12 text-sm font-medium transition"
+      >
+        Cancel
       </button>
     </form>
   );

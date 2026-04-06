@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import EventForm from "@/components/events/EventForm";
+import type { Category } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -14,20 +15,30 @@ export default async function NewEventPage() {
     redirect("/login");
   }
 
-  // Check if user is a vendor
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "vendor" && profile?.role !== "admin") {
-    redirect("/events");
+  const isVendor =
+    profile?.role === "vendor" || profile?.role === "admin";
+
+  // Fetch place categories for vendor place-booking section
+  let placeCategories: Category[] = [];
+  if (isVendor) {
+    const { data } = await supabase
+      .from("categories")
+      .select("*")
+      .in("applies_to", ["places", "both"])
+      .order("sort_order")
+      .returns<Category[]>();
+    placeCategories = data ?? [];
   }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <EventForm />
+      <EventForm isVendor={isVendor} placeCategories={placeCategories} />
     </div>
   );
 }

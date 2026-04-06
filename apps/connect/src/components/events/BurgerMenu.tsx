@@ -213,7 +213,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
               {filteredPlacesCount > 0 &&
                 ` · ${filteredPlacesCount} place${filteredPlacesCount !== 1 ? "s" : ""}`}
             </p>
-            {isVendor && (
+            {user && (
               <Link
                 href="/events/new"
                 onClick={onClose}
@@ -222,13 +222,6 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 + Create Event
               </Link>
             )}
-            <Link
-              href="/places/new"
-              onClick={onClose}
-              className="mt-2 block rounded-xl bg-black/5 px-3 py-2 text-center font-semibold text-black hover:bg-black/10"
-            >
-              + Add Place
-            </Link>
           </div>
         </div>
 

@@ -15,6 +15,17 @@ export default async function NewPlacePage() {
     redirect("/login");
   }
 
+  // Only vendors and admins can add places directly
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "vendor" && profile?.role !== "admin") {
+    redirect("/events");
+  }
+
   const { data: categories } = await supabase
     .from("categories")
     .select("*")

@@ -113,7 +113,7 @@ export default async function ProfilePage() {
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {isVendor ? "Organiser" : "Community Member"}
+            {isVendor ? "Organiser" : "Community Citizen"}
           </span>
           <div className="mt-2 flex gap-4 text-sm text-black/70">
             <span>

@@ -12,10 +12,10 @@ describe("ReviewCard", () => {
     expect(screen.getByText("John Doe")).toBeInTheDocument();
   });
 
-  it("falls back to 'Community member' when profile name is missing", () => {
+  it("falls back to 'Community Citizen' when profile name is missing", () => {
     const review = makeReview({ profiles: undefined });
     render(<ReviewCard review={review} />);
-    expect(screen.getByText("Community member")).toBeInTheDocument();
+    expect(screen.getByText("Community Citizen")).toBeInTheDocument();
   });
 
   it("renders correct number of filled stars", () => {

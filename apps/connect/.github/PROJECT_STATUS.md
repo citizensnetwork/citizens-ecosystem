@@ -191,6 +191,42 @@
 
 ---
 
+## Architect Audit Fixes (COMPLETE)
+
+> Applied after Phase 6-8 architect review. 4 critical, 6 warnings, 5 recommendations evaluated.
+
+### Delivered
+- [x] UUID validation helper (`src/lib/validation.ts`) — regex-based `isValidUUID()`
+- [x] Follow API + RSVP API input validation with `isValidUUID()`
+- [x] Events listing filters draft/cancelled events (`.eq("status", "published")`)
+- [x] iCal route rejects non-published events with 404
+- [x] Push notification listeners return `PluginListenerHandle` for cleanup
+- [x] OG type changed from "website" to "article" on event detail pages
+- [x] Supabase client lazy initialization in EventsView (avoids duplicate client per render)
+- [x] Default map center changed from Durban to Pretoria `[-25.7479, 28.2293]`
+
+### Deferred
+- [ ] RSVP capacity race condition RPC (needs DB migration for `rsvp_with_capacity_check` function)
+- [ ] Friend count RPC (sequential waterfall → single query optimization)
+
+---
+
+## Auth & Deployment Fixes (COMPLETE)
+
+### Delivered
+- [x] Vercel env vars configured (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — were missing, causing "Failed to fetch" on login/signup
+- [x] Vercel CLI installed + project linked (`vercel link`)
+- [x] Production redeployment with correct env vars verified
+- [x] Auth callback route (`/auth/callback`) — PKCE code exchange for email links
+- [x] Forgot password page (`/login/forgot-password`) — email input → `resetPasswordForEmail()`
+- [x] Reset password page (`/login/reset-password`) — new password form → `updateUser()`
+- [x] "Forgot password?" link added to login form
+
+### Required (manual)
+- [ ] Supabase Dashboard → Authentication → URL Configuration: set Site URL to `https://citizens-connect.vercel.app` and add `https://citizens-connect.vercel.app/auth/callback` to Redirect URLs
+
+---
+
 ## Current Tech Stack
 
 | Layer | Technology | Version |
@@ -201,7 +237,9 @@
 | Styling | Tailwind CSS | v4 |
 | Backend | Supabase (Auth + Postgres + Storage) | Latest |
 | Maps | Leaflet (raw API) + leaflet.markercluster | 1.9.4 |
-| Mobile (planned) | Capacitor | TBD |
+| Mobile | Capacitor | 8.x |
+| Testing | Vitest + Testing Library | 4.x |
+| Deployment | Vercel (auto-deploy from GitHub) | — |
 
 ## Agent System
 

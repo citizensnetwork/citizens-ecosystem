@@ -143,7 +143,7 @@ export default function SignupForm() {
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Community Member</span>
+              <span className="font-medium text-black">Community Citizen</span>
               <span className="block text-xs text-(--foreground-soft)">
                 Discover events, RSVP, review &amp; connect
               </span>

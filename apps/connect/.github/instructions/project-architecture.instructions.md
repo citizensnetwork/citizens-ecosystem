@@ -10,12 +10,16 @@ description: "Reference architecture map for Citizens Connect. Applies everywher
 src/
 ├── app/                          # Next.js App Router (Server Components by default)
 │   ├── api/rsvp/route.ts         # RSVP toggle API (POST, auth-gated)
+│   ├── auth/callback/route.ts    # PKCE code exchange (password reset, email confirm)
 │   ├── events/
 │   │   ├── page.tsx              # /events — fetches all events, renders EventsView
 │   │   ├── loading.tsx           # Skeleton loader for events page
 │   │   ├── new/page.tsx          # /events/new — event creation (vendor-only)
-│   │   └── [id]/page.tsx         # /events/[id] — event detail page
-│   ├── login/page.tsx            # Email/password login
+│   │   └── [id]/page.tsx        # /events/[id] — event detail page
+│   ├── login/
+│   │   ├── page.tsx              # Email/password login
+│   │   ├── forgot-password/page.tsx  # Request password reset email
+│   │   └── reset-password/page.tsx   # Set new password (after email link)
 │   ├── signup/page.tsx           # Registration with role selection (vendor/client)
 │   ├── profile/page.tsx          # User profile, RSVPs, created events
 │   ├── globals.css               # Tailwind v4 config + CSS variables + FullCalendar overrides
