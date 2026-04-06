@@ -11,6 +11,7 @@ import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import EventFeed from "./EventFeed";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 
@@ -231,16 +232,23 @@ export default function EventsView({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setView((v) => (v === "map" ? "calendar" : "map"))
-              }
-              className="pointer-events-auto rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
-              aria-label="Toggle view mode"
-            >
-              {view === "map" ? "📅" : "🗺"}
-            </button>
+            <div className="pointer-events-auto flex items-center gap-2">
+              {user && (
+                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
+                  <NotificationBell userId={user.id} />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setView((v) => (v === "map" ? "calendar" : "map"))
+                }
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
+                aria-label="Toggle view mode"
+              >
+                {view === "map" ? "📅" : "🗺"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

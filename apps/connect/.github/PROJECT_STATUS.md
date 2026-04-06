@@ -17,6 +17,59 @@
 | 9 | Interest Profile & Onboarding | **Complete** | Interest tables, onboarding wizard, location/radius, event tags, profile interests |
 | 8.5 | Role Refactor & UX Polish | **Complete** | Community Citizen rename, all-user event creation, vendor place booking, nav fixes, cancel/unsaved guard, performance indexes, accessibility |
 | — | Architect Audit Fixes (P8–9) | **Complete** | All 10 fixes applied. RLS, API error handling, a11y, TW v4, query optimization |
+| 10 | Smart Notifications + Calendar Sync | **Complete** | In-app notifications, push tokens, bell UI, preferences, Edge Functions, realtime |
+
+---
+
+## Phase 10 — Smart Notifications + Calendar Sync (COMPLETE)
+
+### Delivered
+- [x] Migration 013_notifications.sql — `push_tokens`, `notifications` tables, `notification_digest` column on profiles
+- [x] RLS policies: users own their tokens and notifications; admin can insert notifications
+- [x] Indexes on notifications (user+created, unread) and push_tokens (user)
+- [x] Push token API (`POST/DELETE /api/push-token`) — register/remove device tokens
+- [x] Notifications API (`GET/PATCH/DELETE /api/notifications`) — fetch, mark read, delete
+- [x] Notification preferences API (`PATCH /api/notifications/preferences`) — update digest frequency
+- [x] `usePushNotifications` hook — Capacitor push registration, foreground listener, notification tap handler
+- [x] `NotificationBell` component — bell icon with unread badge, realtime subscription
+- [x] `NotificationPanel` component — rich notification cards with type icons, time ago, mark read, delete, links
+- [x] `NotificationPreferences` component — instant / daily / off radio selector
+- [x] Bell integrated into Navbar (all non-events pages) + floating controls on /events map page
+- [x] Profile page: notification preferences section with digest frequency selector
+- [x] TypeScript types: `Notification`, `PushTokenRecord`, `NotificationDigest`, `NotificationType`
+- [x] Edge Functions scaffolded:
+  - `_shared/push.ts` — shared push delivery utility (FCM + in-app insert)
+  - `notify-interested-users` — interest + location match on new event publish
+  - `notify-event-cancelled` — notifies RSVPed users on cancellation
+  - `send-rsvp-reminders` — daily cron for events within 24 hours
+  - `notify-new-follower` — follow notification
+  - `send-daily-digest` — batched daily summary for digest-mode users
+- [x] Calendar sync (from Phase 7): Google Calendar URL + .ics download already complete
+
+### Edge Function Deployment Notes
+Edge Functions are scaffolded but require Supabase deployment + DB webhook configuration:
+- `notify-interested-users`: DB webhook on `events` INSERT WHERE status='published'
+- `notify-event-cancelled`: DB webhook on `events` UPDATE WHERE status='cancelled'
+- `send-rsvp-reminders`: pg_cron daily at 8 AM
+- `notify-new-follower`: DB webhook on `follows` INSERT
+- `send-daily-digest`: pg_cron daily at 7 AM
+- `FCM_SERVICE_ACCOUNT_JSON` env var required for push delivery (FCM HTTP v1 API with OAuth2)
+- In-app notifications work without FCM credentials (graceful degradation)
+- Realtime publication must be enabled on `notifications` table (Supabase Dashboard)
+
+### Architect Audit Fixes (Phase 10)
+- [x] FCM legacy API → v1 HTTP API with RSA-SHA256 OAuth2 JWT assertion
+- [x] `sendNotifications()` accepts Supabase client parameter (no duplicate clients)
+- [x] Push token length validation (max 500 chars)
+- [x] Stale closure fix in `usePushNotifications` (useRef pattern)
+- [x] N+1 query fix in `send-rsvp-reminders` (batch RSVP fetch)
+- [x] N+1 query fix in `send-daily-digest` (batch user_interests + event_interest_tags)
+- [x] Shared haversine utility (`_shared/geo.ts`) — eliminates duplication
+- [x] NotificationPanel: z-[9999], role=dialog, focus trap, Escape key handler
+- [x] Floating bell padding fix in EventsView
+- [x] `makeProfile()` test fixture: added `notification_digest` field
+- [x] `deno.json` created for Edge Functions (import map + compiler options)
+- [x] Stale token auto-cleanup on FCM UNREGISTERED response
 
 ---
 
@@ -81,7 +134,7 @@
 
 ---
 
-## Phase 1 — Data Foundation (IN PROGRESS)
+## Phase 1 — Data Foundation (COMPLETE)
 
 ### Delivered
 - [x] Supabase local environment configured (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`)

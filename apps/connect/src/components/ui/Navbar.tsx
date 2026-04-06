@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -61,7 +62,9 @@ export default function Navbar() {
           </Link>
 
           {user ? (
-            <div className="relative">
+            <div className="flex items-center gap-2">
+              <NotificationBell userId={user.id} />
+              <div className="relative">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
                 className="flex items-center gap-1.5 text-sm font-medium text-black/75 transition hover:text-black"
@@ -91,6 +94,7 @@ export default function Navbar() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           ) : (
             <>

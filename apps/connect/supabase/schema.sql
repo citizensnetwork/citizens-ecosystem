@@ -696,3 +696,73 @@ create index if not exists user_interests_interest_idx on public.user_interests(
 create index if not exists event_interest_tags_event_idx on public.event_interest_tags(event_id);
 create index if not exists event_interest_tags_interest_idx on public.event_interest_tags(interest_id);
 create index if not exists interests_group_idx on public.interests(group_id);
+
+-- ══════════════════════════════════════════════
+-- Push Tokens (Phase 10)
+-- ══════════════════════════════════════════════
+create table if not exists public.push_tokens (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  token text not null,
+  platform text not null check (platform in ('ios', 'android', 'web')),
+  created_at timestamptz default now(),
+  unique (user_id, token)
+);
+
+alter table public.push_tokens enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users read own push tokens' and tablename = 'push_tokens') then
+    create policy "Users read own push tokens" on public.push_tokens for select using (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users insert own push tokens' and tablename = 'push_tokens') then
+    create policy "Users insert own push tokens" on public.push_tokens for insert with check (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users delete own push tokens' and tablename = 'push_tokens') then
+    create policy "Users delete own push tokens" on public.push_tokens for delete using (auth.uid() = user_id);
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- Notifications (Phase 10)
+-- ══════════════════════════════════════════════
+create table if not exists public.notifications (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  type text not null check (type in ('event_reminder', 'new_event_match', 'event_cancelled', 'new_follower', 'event_update')),
+  title text not null,
+  body text not null default '',
+  image_url text,
+  data jsonb default '{}'::jsonb,
+  read boolean default false,
+  created_at timestamptz default now()
+);
+
+alter table public.notifications enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users read own notifications' and tablename = 'notifications') then
+    create policy "Users read own notifications" on public.notifications for select using (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users update own notifications' and tablename = 'notifications') then
+    create policy "Users update own notifications" on public.notifications for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Admin insert notifications' and tablename = 'notifications') then
+    create policy "Admin insert notifications" on public.notifications for insert with check (public.is_admin());
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users delete own notifications' and tablename = 'notifications') then
+    create policy "Users delete own notifications" on public.notifications for delete using (auth.uid() = user_id);
+  end if;
+end $$;
+
+-- notification_digest column on profiles
+do $$ begin
+  if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'notification_digest') then
+    alter table public.profiles add column notification_digest text default 'instant' check (notification_digest in ('instant', 'daily', 'off'));
+  end if;
+end $$;
+
+-- Notification indexes
+create index if not exists idx_notifications_user_created on public.notifications(user_id, created_at desc);
+create index if not exists idx_notifications_user_unread on public.notifications(user_id) where read = false;
+create index if not exists idx_push_tokens_user on public.push_tokens(user_id);

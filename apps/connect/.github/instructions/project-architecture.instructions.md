@@ -11,6 +11,9 @@ src/
 ├── app/                          # Next.js App Router (Server Components by default)
 │   ├── api/rsvp/route.ts         # RSVP toggle API (POST, auth-gated)
 │   ├── api/onboarding/route.ts   # Onboarding save API (interests, location, radius)
+│   ├── api/push-token/route.ts   # Push token register/remove (POST, DELETE)
+│   ├── api/notifications/route.ts# Notifications fetch/mark-read/delete (GET, PATCH, DELETE)
+│   ├── api/notifications/preferences/route.ts # Digest frequency update (PATCH)
 │   ├── auth/callback/route.ts    # PKCE code exchange (password reset, email confirm)
 │   ├── events/
 │   │   ├── page.tsx              # /events — fetches all events, renders EventsView
@@ -45,12 +48,21 @@ src/
 │   │   ├── EventMap.tsx          # Full-screen Leaflet map — clustering, category markers, temporal encoding, geolocation
 │   │   ├── LocationPicker.tsx    # Click-to-place marker for event creation
 │   │   └── MiniMap.tsx           # Read-only mini map for event detail
+│   ├── notifications/
+│   │   ├── NotificationBell.tsx  # Bell icon + unread badge + realtime subscription
+│   │   ├── NotificationPanel.tsx # Dropdown list — type icons, timeAgo, mark read, delete, deep links
+│   │   └── NotificationPreferences.tsx # Instant/daily/off radio selector
 │   ├── onboarding/
 │   │   ├── OnboardingWizard.tsx   # Single-page interest/location/notification wizard (edit + onboard mode)
 │   │   ├── OnboardingOverlay.tsx  # Full-screen overlay for first-login onboarding
 │   │   └── ProfileInterests.tsx   # Interest display + edit trigger for profile page
 │   └── ui/
 │       └── Navbar.tsx            # Sticky nav (hidden on /events for full-screen map)
+│
+├── hooks/
+│   ├── useBurgerMenuData.ts      # Burger menu data hook
+│   ├── useFocusTrap.ts           # Focus trap for modals/panels
+│   └── usePushNotifications.ts   # Capacitor push registration + foreground listener
 │
 ├── lib/
 │   ├── map/markers.ts            # Category icons (divIcon + emoji), temporal style calculator
@@ -59,18 +71,28 @@ src/
 │       └── client.ts             # Browser Supabase client
 │
 ├── types/
-│   ├── db.ts                     # Event, Profile, RSVP, Comment, EventCategory, UserRole, InterestGroup, Interest
+│   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, EventCategory, UserRole, InterestGroup, Interest
 │   └── leaflet.markercluster.d.ts# Type declarations for markercluster plugin
 │
 └── middleware.ts                 # Supabase session refresh on all non-static routes
 
 supabase/
 ├── schema.sql                    # Canonical full schema (idempotent)
+├── functions/
+│   ├── _shared/push.ts           # FCM v1 push delivery + in-app notification insert
+│   ├── _shared/geo.ts            # Shared haversine distance calculation
+│   ├── notify-interested-users/  # Interest + location match on new event
+│   ├── notify-event-cancelled/   # Notify RSVPed users on cancellation
+│   ├── send-rsvp-reminders/      # Daily cron: events within 24h
+│   ├── notify-new-follower/      # Follow notification
+│   ├── send-daily-digest/        # Batched daily summary
+│   └── deno.json                 # Deno import map + compiler options
 └── migrations/
     ├── 001_add_coordinates.sql   # lat/lng columns on events
     ├── 002_add_category.sql      # category column on events
     ├── 003_stage2.sql            # image_url + comments table
-    └── 011_interest_profile.sql  # interest groups/items, user_interests, event_interest_tags, profile onboarding columns
+    ├── 011_interest_profile.sql  # interest groups/items, user_interests, event_interest_tags
+    └── 013_notifications.sql     # push_tokens, notifications tables, notification_digest column
 ```
 
 ## Data Flow
@@ -85,6 +107,8 @@ supabase/
 - `EventMap` and `EventCalendar` both call `onSelectEvent` → opens the shared detail panel in `EventsView`
 - `EventForm` embeds `LocationPicker` for lat/lng selection
 - `EventDetailContent` embeds `MiniMap`, `RSVPButton`, and `CommentSection`
+- `NotificationBell` subscribes to Supabase Realtime for live in-app notifications
+- Edge Functions use shared `sendNotifications()` from `_shared/push.ts` (accepts Supabase client param)
 
 ## Environment
 

@@ -62,6 +62,7 @@ export type Profile = {
   home_latitude: number | null;
   home_longitude: number | null;
   notification_radius_km: number;
+  notification_digest: NotificationDigest;
   created_at: string;
 };
 
@@ -157,6 +158,35 @@ export type UserInterest = {
 export type EventInterestTag = {
   event_id: string;
   interest_id: string;
+};
+
+export type NotificationType =
+  | "event_reminder"
+  | "new_event_match"
+  | "event_cancelled"
+  | "new_follower"
+  | "event_update";
+
+export type NotificationDigest = "instant" | "daily" | "off";
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  image_url: string | null;
+  data: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
+};
+
+export type PushTokenRecord = {
+  id: string;
+  user_id: string;
+  token: string;
+  platform: "ios" | "android" | "web";
+  created_at: string;
 };
 
 /** Trending event — includes RSVP count. */

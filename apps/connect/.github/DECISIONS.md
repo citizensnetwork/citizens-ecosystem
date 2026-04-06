@@ -88,6 +88,34 @@
 **Why:** Fast recovery from auth/env/schema linkage issues without depending on chat history.
 **Date:** 2026-04-05.
 
+## Phase 10: Notifications
+
+### In-app + Push notification model
+**Decision:** Store all notifications as in-app rows in `notifications` table. Push delivery via FCM is optional — if `FCM_SERVICE_ACCOUNT_JSON` is not configured, notifications are still stored in-app.
+**Why:** Graceful degradation. Platform works without FCM credentials. In-app notifications via Supabase Realtime provide instant UX regardless.
+**Date:** Phase 10.
+
+### FCM HTTP v1 API (not legacy)
+**Decision:** Use `https://fcm.googleapis.com/v1/projects/{project}/messages:send` with OAuth2 service account credentials.
+**Why:** FCM legacy API (`fcm.googleapis.com/fcm/send`) was shut down June 2024. v1 is the only supported path.
+**Date:** Phase 10.
+
+### Notification digest preferences (instant/daily/off)
+**Decision:** `notification_digest` column on `profiles` with three values: `instant` (push immediately), `daily` (batch at 7 AM), `off` (in-app only, no push).
+**Why:** Respects user preference for notification frequency. Reduces notification fatigue while keeping in-app discovery.
+
+### Edge Functions for notification triggers
+**Decision:** Five Supabase Edge Functions handle notification dispatch: `notify-interested-users`, `notify-event-cancelled`, `send-rsvp-reminders`, `notify-new-follower`, `send-daily-digest`.
+**Why:** Server-side processing keeps notification logic out of the client. Edge Functions run on Deno with service role key (bypasses RLS). Triggered by DB webhooks or pg_cron.
+
+### Supabase Realtime for live notifications
+**Decision:** NotificationBell subscribes to `postgres_changes` on `notifications` table filtered by `user_id`.
+**Why:** Instant in-app notification delivery without polling. Requires Realtime publication enabled on the `notifications` table (Supabase Dashboard → Database → Publications).
+
+### Shared push utility pattern
+**Decision:** `supabase/functions/_shared/push.ts` accepts a Supabase client parameter instead of creating its own.
+**Why:** Avoids duplicate client instantiation across Edge Functions. Each function creates one client and passes it through.
+
 ## Avoided Approaches
 
 | Approach | Why Avoided |

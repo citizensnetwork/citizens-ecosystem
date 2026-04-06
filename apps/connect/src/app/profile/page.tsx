@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { Event, Profile, InterestGroupWithItems } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import ProfileInterests from "@/components/onboarding/ProfileInterests";
+import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,7 @@ export default async function ProfilePage() {
     home_latitude: profile?.home_latitude ?? null,
     home_longitude: profile?.home_longitude ?? null,
     notification_radius_km: profile?.notification_radius_km ?? 50,
+    notification_digest: profile?.notification_digest ?? "instant",
     created_at: profile?.created_at ?? "",
   };
 
@@ -167,6 +169,15 @@ export default async function ProfilePage() {
       <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
         <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
         <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
+      </section>
+
+      {/* ── Notification Preferences ─── */}
+      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+        <h2 className="text-lg font-semibold mb-4">Notifications</h2>
+        <NotificationPreferences
+          currentDigest={typedProfile.notification_digest}
+          notificationEmail={typedProfile.notification_email}
+        />
       </section>
 
       {/* ── Interests & Location ─── */}
