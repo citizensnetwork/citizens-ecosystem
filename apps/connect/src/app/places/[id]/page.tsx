@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import ShareButton from "@/components/ui/ShareButton";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
@@ -55,18 +56,21 @@ export default async function PlaceDetailPage({
 
       <div className="surface-card space-y-4 rounded-2xl p-6">
         {place.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={place.image_url}
-            alt={place.name}
-            className="h-48 w-full rounded-xl object-cover"
-          />
+          <div className="relative h-48 w-full">
+            <Image
+              src={place.image_url}
+              alt={place.name}
+              fill
+              className="rounded-xl object-cover"
+              sizes="(max-width: 768px) 100vw, 720px"
+            />
+          </div>
         )}
 
         <div className="flex items-start justify-between gap-3">
           <div>
             {place.categories && (
-              <span className="inline-block rounded-full bg-[var(--gold-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--foreground-soft)]">
+              <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
                 {place.categories.emoji} {place.categories.name}
               </span>
             )}
@@ -77,7 +81,7 @@ export default async function PlaceDetailPage({
           <div className="flex flex-col items-end gap-2">
             {avgRating !== null && (
               <div className="text-right">
-                <div className="text-xl font-bold text-[var(--gold)]">
+                <div className="text-xl font-bold text-(--gold)">
                   {avgRating.toFixed(1)}
                 </div>
                 <div className="text-xs text-black/50">
@@ -103,7 +107,7 @@ export default async function PlaceDetailPage({
                 href={place.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[var(--gold)] underline"
+                className="text-(--gold) underline"
               >
                 {place.website.replace(/^https?:\/\//, "")}
               </a>

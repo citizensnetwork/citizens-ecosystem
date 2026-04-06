@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Review } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export default function ReviewList({ placeId, eventId, title = "Reviews" }: Props) {
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -24,7 +24,7 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
   const fetchReviews = useCallback(async () => {
     setLoading(true);
 
-    let query = supabase
+    let query = supabaseRef.current
       .from("reviews")
       .select("*, profiles(full_name)")
       .order("created_at", { ascending: false });
@@ -34,7 +34,7 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
     const { data } = await query;
     setReviews((data as Review[]) ?? []);
     setLoading(false);
-  }, [eventId, placeId, supabase]);
+  }, [eventId, placeId]);
 
   useEffect(() => {
     let active = true;
@@ -42,7 +42,7 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
     async function bootstrap() {
       const {
         data: { user: currentUser },
-      } = await supabase.auth.getUser();
+      } = await supabaseRef.current.auth.getUser();
 
       if (active) {
         setUser(currentUser);
@@ -58,7 +58,7 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
     return () => {
       active = false;
     };
-  }, [fetchReviews, supabase]);
+  }, [fetchReviews]);
 
   const avgRating = useMemo(() => {
     if (reviews.length === 0) return null;
@@ -71,7 +71,7 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
         <h2 className="text-lg font-bold text-black">{title}</h2>
         {avgRating !== null && (
           <p className="text-sm text-black/70">
-            <span className="font-semibold text-[var(--gold)]">{avgRating.toFixed(1)}</span> / 5 from {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+            <span className="font-semibold text-(--gold)">{avgRating.toFixed(1)}</span> / 5 from {reviews.length} review{reviews.length !== 1 ? "s" : ""}
           </p>
         )}
       </div>

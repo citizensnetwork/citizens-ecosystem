@@ -21,7 +21,7 @@ export default async function NewEventPage() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "vendor") {
+  if (profile?.role !== "vendor" && profile?.role !== "admin") {
     redirect("/events");
   }
 

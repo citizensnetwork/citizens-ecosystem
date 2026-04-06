@@ -48,7 +48,7 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-black transition hover:text-[var(--gold)]">
+        <Link href="/" className="text-lg font-semibold tracking-tight text-black transition hover:text-(--gold)">
           Citizens Connect
         </Link>
 
@@ -66,7 +66,7 @@ export default function Navbar() {
                 onClick={() => setMenuOpen((o) => !o)}
                 className="flex items-center gap-1.5 text-sm font-medium text-black/75 transition hover:text-black"
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--gold-soft)] text-xs font-bold uppercase text-black">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--gold-soft) text-xs font-bold uppercase text-black">
                   {displayName[0]}
                 </span>
                 {displayName}
@@ -102,7 +102,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/signup"
-                className="rounded-lg bg-[var(--gold)] px-3 py-1.5 text-sm font-medium text-black transition hover:brightness-105"
+                className="rounded-lg bg-(--gold) px-3 py-1.5 text-sm font-medium text-black transition hover:brightness-105"
               >
                 Sign Up
               </Link>

@@ -4,34 +4,31 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { EVENT_CATEGORIES } from "@/lib/categories";
 import type { EventCategory } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
   loading: () => (
-    <div className="surface-card h-[300px] w-full rounded-xl p-3">
+    <div className="surface-card h-75 w-full rounded-xl p-3">
       <div className="skeleton h-full w-full rounded-lg" />
     </div>
   ),
 });
 
-const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
-  { value: "church-service", label: "⛪ Church Service" },
-  { value: "youth", label: "🌟 Youth" },
-  { value: "community-outreach", label: "🤝 Community Outreach" },
-  { value: "worship", label: "🎵 Worship Night" },
-  { value: "bible-study", label: "📖 Bible Study" },
-  { value: "prayer", label: "🙏 Prayer Meeting" },
-  { value: "social", label: "🎉 Social" },
-  { value: "other", label: "📌 Other" },
-];
-
 export default function EventForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState<EventCategory>("other");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [maxAttendees, setMaxAttendees] = useState("");
+  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [attendeesVisible, setAttendeesVisible] = useState<"public" | "authenticated" | "count_only">("authenticated");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [coords, setCoords] = useState<[number, number] | null>(null);
@@ -90,9 +87,16 @@ export default function EventForm() {
       title,
       description,
       date: new Date(date).toISOString(),
+      end_time: endTime ? new Date(endTime).toISOString() : null,
       location,
       category,
       image_url,
+      website_url: websiteUrl || null,
+      contact_email: contactEmail || null,
+      contact_phone: contactPhone || null,
+      max_attendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
+      status,
+      attendees_visible: attendeesVisible,
       latitude: coords?.[0] ?? null,
       longitude: coords?.[1] ?? null,
       created_by: user.id,
@@ -193,7 +197,7 @@ export default function EventForm() {
 
       <div>
         <label htmlFor="date" className="block text-sm font-medium mb-1">
-          Date & Time
+          Start Date & Time
         </label>
         <input
           id="date"
@@ -201,6 +205,20 @@ export default function EventForm() {
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
+          className="w-full border rounded-md px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="endTime" className="block text-sm font-medium mb-1">
+          End Date & Time <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <input
+          id="endTime"
+          type="datetime-local"
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+          min={date}
           className="w-full border rounded-md px-3 py-2 text-sm"
         />
       </div>
@@ -228,10 +246,105 @@ export default function EventForm() {
         />
       </div>
 
+      {/* Contact & details */}
+      <div className="border-t pt-4 mt-4 space-y-4">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Additional Details</h2>
+
+        <div>
+          <label htmlFor="websiteUrl" className="block text-sm font-medium mb-1">
+            Website <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            id="websiteUrl"
+            type="url"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            placeholder="https://example.com"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="contactEmail" className="block text-sm font-medium mb-1">
+              Contact Email <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="contactEmail"
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              placeholder="info@church.org"
+            />
+          </div>
+          <div>
+            <label htmlFor="contactPhone" className="block text-sm font-medium mb-1">
+              Contact Phone <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="contactPhone"
+              type="tel"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              placeholder="+27 31 123 4567"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="maxAttendees" className="block text-sm font-medium mb-1">
+            Max Attendees <span className="text-gray-400 font-normal">(optional — leave blank for unlimited)</span>
+          </label>
+          <input
+            id="maxAttendees"
+            type="number"
+            min="1"
+            value={maxAttendees}
+            onChange={(e) => setMaxAttendees(e.target.value)}
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            placeholder="100"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium mb-1">
+              Status
+            </label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as "draft" | "published")}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="published">Published — visible to everyone</option>
+              <option value="draft">Draft — only you can see this</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="attendeesVisible" className="block text-sm font-medium mb-1">
+              Who&apos;s Attending Visibility
+            </label>
+            <select
+              id="attendeesVisible"
+              value={attendeesVisible}
+              onChange={(e) => setAttendeesVisible(e.target.value as "public" | "authenticated" | "count_only")}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="authenticated">Logged-in users see names</option>
+              <option value="public">Everyone sees names</option>
+              <option value="count_only">Count only — no names</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+        className="w-full bg-(--gold) text-black py-2 rounded-md hover:brightness-95 disabled:opacity-50 text-sm font-medium"
       >
         {loading ? "Creating..." : "Create Event"}
       </button>

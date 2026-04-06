@@ -1,21 +1,35 @@
 -- ============================================
 -- Citizens Connect - Database Schema
--- Safe to run multiple times (idempotent)
--- Run this in Supabase SQL Editor
+-- Canonical full schema (idempotent — safe to re-run)
+-- Reflects all migrations through 007_social_graph
 -- ============================================
 
--- 1. Profiles table (extends Supabase Auth users)
+-- ── Helper: admin check ──────────────────────────────────
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+-- ══════════════════════════════════════════════
+-- 1. Profiles (extends Supabase Auth users)
+-- ══════════════════════════════════════════════
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text not null,
   full_name text not null default '',
-  role text not null check (role in ('vendor', 'client')) default 'client',
+  role text not null check (role in ('vendor', 'client', 'admin')) default 'client',
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles enable row level security;
 
--- Policies: use DO blocks to skip if already exists
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Profiles are viewable by everyone' and tablename = 'profiles') then
     create policy "Profiles are viewable by everyone" on public.profiles for select using (true);
@@ -34,38 +48,43 @@ do $$ begin
   end if;
 end $$;
 
--- 2. Events table
+-- ══════════════════════════════════════════════
+-- 2. Events
+-- ══════════════════════════════════════════════
 create table if not exists public.events (
   id uuid default gen_random_uuid() primary key,
   title text not null,
   description text not null default '',
   date timestamptz not null,
+  end_time timestamptz,
   location text not null default '',
   category text check (category in (
     'church-service', 'youth', 'community-outreach', 'worship',
     'bible-study', 'prayer', 'social', 'other'
   )) default 'other',
   image_url text,
+  website_url text,
+  contact_email text,
+  contact_phone text,
+  max_attendees int,
+  status text not null default 'published' check (status in ('draft', 'published', 'cancelled')),
+  attendees_visible text not null default 'authenticated' check (attendees_visible in ('public', 'authenticated', 'count_only')),
   latitude double precision,
   longitude double precision,
   created_by uuid references public.profiles(id) on delete cascade not null,
   created_at timestamptz not null default now()
 );
 
--- Add columns if they don't exist yet (for older installs)
-alter table public.events add column if not exists latitude double precision;
-alter table public.events add column if not exists longitude double precision;
-alter table public.events add column if not exists image_url text;
-alter table public.events add column if not exists category text check (category in (
-  'church-service', 'youth', 'community-outreach', 'worship',
-  'bible-study', 'prayer', 'social', 'other'
-)) default 'other';
-
 alter table public.events enable row level security;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Events are viewable by everyone' and tablename = 'events') then
-    create policy "Events are viewable by everyone" on public.events for select using (true);
+  if not exists (select 1 from pg_policies where policyname = 'Published events visible to all, drafts to creator only' and tablename = 'events') then
+    create policy "Published events visible to all, drafts to creator only" on public.events for select using (
+      status = 'published'
+      or status = 'cancelled'
+      or created_by = auth.uid()
+      or public.is_admin()
+    );
   end if;
 end $$;
 
@@ -76,25 +95,29 @@ do $$ begin
         auth.uid() = created_by
         and exists (
           select 1 from public.profiles
-          where id = auth.uid() and role = 'vendor'
+          where id = auth.uid() and role in ('vendor', 'admin')
         )
       );
   end if;
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Vendors can update own events' and tablename = 'events') then
-    create policy "Vendors can update own events" on public.events for update using (auth.uid() = created_by);
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can update events' and tablename = 'events') then
+    create policy "Owners or admins can update events" on public.events
+      for update using (auth.uid() = created_by or public.is_admin());
   end if;
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Vendors can delete own events' and tablename = 'events') then
-    create policy "Vendors can delete own events" on public.events for delete using (auth.uid() = created_by);
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can delete events' and tablename = 'events') then
+    create policy "Owners or admins can delete events" on public.events
+      for delete using (auth.uid() = created_by or public.is_admin());
   end if;
 end $$;
 
--- 3. RSVPs table
+-- ══════════════════════════════════════════════
+-- 3. RSVPs
+-- ══════════════════════════════════════════════
 create table if not exists public.rsvps (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
@@ -106,20 +129,8 @@ create table if not exists public.rsvps (
 alter table public.rsvps enable row level security;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Users can view own rsvps' and tablename = 'rsvps') then
-    create policy "Users can view own rsvps" on public.rsvps for select using (auth.uid() = user_id);
-  end if;
-end $$;
-
-do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Event creators can view rsvps' and tablename = 'rsvps') then
-    create policy "Event creators can view rsvps" on public.rsvps for select
-      using (
-        exists (
-          select 1 from public.events
-          where events.id = event_id and events.created_by = auth.uid()
-        )
-      );
+  if not exists (select 1 from pg_policies where policyname = 'RSVPs are viewable by everyone' and tablename = 'rsvps') then
+    create policy "RSVPs are viewable by everyone" on public.rsvps for select using (true);
   end if;
 end $$;
 
@@ -135,7 +146,252 @@ do $$ begin
   end if;
 end $$;
 
--- 4. Function to auto-create profile on signup
+-- ══════════════════════════════════════════════
+-- 4. Comments
+-- ══════════════════════════════════════════════
+create table if not exists public.comments (
+  id uuid default gen_random_uuid() primary key,
+  event_id uuid references public.events(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.comments enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Comments are viewable by everyone' and tablename = 'comments') then
+    create policy "Comments are viewable by everyone" on public.comments for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can comment' and tablename = 'comments') then
+    create policy "Authenticated users can comment" on public.comments for insert with check (auth.uid() = user_id);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can update comments' and tablename = 'comments') then
+    create policy "Owners or admins can update comments" on public.comments
+      for update using (auth.uid() = user_id or public.is_admin());
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can delete comments' and tablename = 'comments') then
+    create policy "Owners or admins can delete comments" on public.comments
+      for delete using (auth.uid() = user_id or public.is_admin());
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 5. Categories (DB-driven)
+-- ══════════════════════════════════════════════
+create table if not exists public.categories (
+  id uuid default gen_random_uuid() primary key,
+  name text not null unique,
+  slug text not null unique,
+  emoji text not null default '📌',
+  color text not null default '#6b7280',
+  applies_to text not null check (applies_to in ('events', 'places', 'both')) default 'both',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.categories enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Categories are viewable by everyone' and tablename = 'categories') then
+    create policy "Categories are viewable by everyone" on public.categories for select using (true);
+  end if;
+end $$;
+
+-- Seed default categories
+insert into public.categories (name, slug, emoji, color, applies_to, sort_order) values
+  ('Church Service', 'church-service', '⛪', '#6366f1', 'both', 1),
+  ('Youth', 'youth', '🌟', '#f59e0b', 'both', 2),
+  ('Community Outreach', 'community-outreach', '🤝', '#10b981', 'both', 3),
+  ('Worship', 'worship', '🎵', '#c8a24f', 'both', 4),
+  ('Bible Study', 'bible-study', '📖', '#8b5cf6', 'both', 5),
+  ('Prayer', 'prayer', '🙏', '#ec4899', 'both', 6),
+  ('Social', 'social', '☕', '#06b6d4', 'both', 7),
+  ('Other', 'other', '📌', '#6b7280', 'both', 8)
+on conflict (slug) do nothing;
+
+-- ══════════════════════════════════════════════
+-- 6. Places (persistent map listings)
+-- ══════════════════════════════════════════════
+create table if not exists public.places (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text not null default '',
+  address text not null default '',
+  category_id uuid references public.categories(id) on delete set null,
+  image_url text,
+  phone text,
+  website text,
+  latitude double precision not null,
+  longitude double precision not null,
+  created_by uuid references public.profiles(id) on delete cascade not null,
+  verified boolean not null default false,
+  verification_flagged boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.places enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Places are viewable by everyone' and tablename = 'places') then
+    create policy "Places are viewable by everyone" on public.places for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can create places' and tablename = 'places') then
+    create policy "Authenticated users can create places" on public.places for insert with check (auth.uid() = created_by);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can update places' and tablename = 'places') then
+    create policy "Owners or admins can update places" on public.places
+      for update using (auth.uid() = created_by or public.is_admin());
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can delete places' and tablename = 'places') then
+    create policy "Owners or admins can delete places" on public.places
+      for delete using (auth.uid() = created_by or public.is_admin());
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 7. Reviews (for places and events)
+-- ══════════════════════════════════════════════
+create table if not exists public.reviews (
+  id uuid default gen_random_uuid() primary key,
+  place_id uuid references public.places(id) on delete cascade,
+  event_id uuid references public.events(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  rating int not null check (rating >= 1 and rating <= 5),
+  body text not null default '',
+  still_exists boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint reviews_one_target_check check (
+    (place_id is not null and event_id is null)
+    or (place_id is null and event_id is not null)
+  )
+);
+
+create unique index if not exists reviews_place_user_unique
+  on public.reviews(place_id, user_id) where place_id is not null;
+
+create unique index if not exists reviews_event_user_unique
+  on public.reviews(event_id, user_id) where event_id is not null;
+
+alter table public.reviews enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Reviews are viewable by everyone' and tablename = 'reviews') then
+    create policy "Reviews are viewable by everyone" on public.reviews for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can review' and tablename = 'reviews') then
+    create policy "Authenticated users can review" on public.reviews for insert with check (auth.uid() = user_id);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can update reviews' and tablename = 'reviews') then
+    create policy "Owners or admins can update reviews" on public.reviews
+      for update using (auth.uid() = user_id or public.is_admin());
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Owners or admins can delete reviews' and tablename = 'reviews') then
+    create policy "Owners or admins can delete reviews" on public.reviews
+      for delete using (auth.uid() = user_id or public.is_admin());
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 8. Event Photos
+-- ══════════════════════════════════════════════
+create table if not exists public.event_photos (
+  id uuid default gen_random_uuid() primary key,
+  event_id uuid not null references public.events(id) on delete cascade,
+  url text not null,
+  sort_order int not null default 0,
+  uploaded_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.event_photos enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event photos are viewable by everyone' and tablename = 'event_photos') then
+    create policy "Event photos are viewable by everyone" on public.event_photos for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can upload event photos' and tablename = 'event_photos') then
+    create policy "Authenticated users can upload event photos" on public.event_photos for insert with check (auth.uid() = uploaded_by);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Photo uploader or admin can delete photos' and tablename = 'event_photos') then
+    create policy "Photo uploader or admin can delete photos" on public.event_photos for delete using (
+      auth.uid() = uploaded_by or public.is_admin()
+    );
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 9. Event Views (analytics)
+-- ══════════════════════════════════════════════
+create table if not exists public.event_views (
+  id uuid default gen_random_uuid() primary key,
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete set null,
+  view_date date not null default current_date,
+  viewed_at timestamptz not null default now()
+);
+
+-- Unique: one view per authenticated user per day per event
+create unique index if not exists event_views_user_day_idx
+  on public.event_views (event_id, user_id, view_date)
+  where user_id is not null;
+
+alter table public.event_views enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Anyone can record a view' and tablename = 'event_views') then
+    create policy "Anyone can record a view" on public.event_views for insert with check (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event creator and admin can see views' and tablename = 'event_views') then
+    create policy "Event creator and admin can see views" on public.event_views for select using (
+      public.is_admin() or exists (
+        select 1 from public.events where events.id = event_views.event_id and events.created_by = auth.uid()
+      )
+    );
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 10. Functions & Triggers
+-- ══════════════════════════════════════════════
+
+-- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
@@ -150,8 +406,98 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- Trigger: drop and recreate to avoid "already exists" error
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Auto-flag places with repeated "no longer exists" signals
+create or replace function public.recompute_place_verification(p_place_id uuid)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  signal_count int;
+begin
+  select count(*)::int into signal_count
+  from public.reviews
+  where place_id = p_place_id
+    and still_exists = false;
+
+  if signal_count >= 3 then
+    update public.places
+    set verified = false,
+        verification_flagged = true
+    where id = p_place_id;
+  else
+    update public.places
+    set verification_flagged = false
+    where id = p_place_id;
+  end if;
+end;
+$$;
+
+create or replace function public.handle_place_review_verification()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  affected_place uuid;
+begin
+  affected_place := coalesce(new.place_id, old.place_id);
+
+  if affected_place is not null then
+    perform public.recompute_place_verification(affected_place);
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_review_place_verification on public.reviews;
+
+create trigger trg_review_place_verification
+after insert or update or delete on public.reviews
+for each row
+execute function public.handle_place_review_verification();
+
+-- ══════════════════════════════════════════════
+-- 8. Follows (Social Graph)
+-- ══════════════════════════════════════════════
+create table if not exists public.follows (
+  id uuid default gen_random_uuid() primary key,
+  follower_id uuid not null references public.profiles(id) on delete cascade,
+  followee_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint follows_no_self_follow check (follower_id != followee_id),
+  constraint follows_unique unique (follower_id, followee_id)
+);
+
+create index if not exists follows_follower_idx on public.follows(follower_id);
+create index if not exists follows_followee_idx on public.follows(followee_id);
+
+alter table public.follows enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Follows are viewable by everyone' and tablename = 'follows') then
+    create policy "Follows are viewable by everyone" on public.follows for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can follow others' and tablename = 'follows') then
+    create policy "Users can follow others" on public.follows for insert with check (auth.uid() = follower_id);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can unfollow' and tablename = 'follows') then
+    create policy "Users can unfollow" on public.follows for delete using (auth.uid() = follower_id);
+  end if;
+end $$;

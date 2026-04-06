@@ -18,7 +18,7 @@ export default function ReviewCard({ review, showStillExists = false }: Props) {
         <span className="text-sm font-semibold text-black">
           {review.profiles?.full_name ?? "Community member"}
         </span>
-        <span className="text-sm text-[var(--gold)]">{renderStars(review.rating)}</span>
+        <span className="text-sm text-(--gold)">{renderStars(review.rating)}</span>
       </div>
 
       {review.body && (

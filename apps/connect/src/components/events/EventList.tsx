@@ -4,7 +4,7 @@ import EventCard from "./EventCard";
 export default function EventList({ events }: { events: Event[] }) {
   if (events.length === 0) {
     return (
-      <div className="surface-card rounded-2xl py-12 text-center text-[var(--foreground-soft)]">
+      <div className="surface-card rounded-2xl py-12 text-center text-(--foreground-soft)">
         <p className="text-lg font-medium text-black">No events yet.</p>
         <p className="mt-1 text-sm">Be the first to create one!</p>
       </div>

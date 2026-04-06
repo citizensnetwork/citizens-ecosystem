@@ -1,6 +1,6 @@
 export default function EventsLoading() {
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden">
+    <div className="relative h-dvh w-full overflow-hidden">
       <div className="skeleton h-full w-full" />
 
       <div className="absolute inset-x-0 top-0 z-20 p-3 sm:p-4">

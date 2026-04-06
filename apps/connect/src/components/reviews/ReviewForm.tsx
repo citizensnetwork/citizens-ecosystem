@@ -59,7 +59,7 @@ export default function ReviewForm({ user, placeId, eventId, onSubmitted }: Prop
   if (!user) {
     return (
       <p className="text-sm text-black/60">
-        <Link href="/login" className="text-[var(--gold)] underline">
+        <Link href="/login" className="text-(--gold) underline">
           Log in
         </Link>{" "}
         to add a review.
@@ -78,7 +78,7 @@ export default function ReviewForm({ user, placeId, eventId, onSubmitted }: Prop
             type="button"
             onClick={() => setRating(value)}
             className={`text-xl leading-none transition ${
-              value <= rating ? "text-[var(--gold)]" : "text-black/25"
+              value <= rating ? "text-(--gold)" : "text-black/25"
             }`}
             aria-label={`Rate ${value} star${value > 1 ? "s" : ""}`}
           >
@@ -112,7 +112,7 @@ export default function ReviewForm({ user, placeId, eventId, onSubmitted }: Prop
       <button
         type="submit"
         disabled={saving || !isReady}
-        className="rounded-lg bg-[var(--gold)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+        className="rounded-lg bg-(--gold) px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
       >
         {saving ? "Saving..." : "Submit review"}
       </button>

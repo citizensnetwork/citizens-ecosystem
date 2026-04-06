@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { Event, EventCategory } from "@/types/db";
+import type { Event } from "@/types/db";
+import { CATEGORY_COLORS } from "@/lib/categories";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -10,17 +11,6 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventClickArg } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 
-/* ── Category colours (match markers.ts) ──────────────── */
-const CATEGORY_COLORS: Record<EventCategory, string> = {
-  "church-service": "#6366f1",
-  youth: "#f59e0b",
-  "community-outreach": "#10b981",
-  worship: "#c8a24f",
-  "bible-study": "#8b5cf6",
-  prayer: "#ec4899",
-  social: "#06b6d4",
-  other: "#6b7280",
-};
 
 type Props = {
   events: Event[];
@@ -41,6 +31,7 @@ export default function EventCalendar({
     id: e.id,
     title: e.title,
     start: e.date,
+    end: e.end_time ?? undefined,
     backgroundColor: CATEGORY_COLORS[e.category ?? "other"] ?? "#6b7280",
     borderColor: "transparent",
     textColor: "#fff",

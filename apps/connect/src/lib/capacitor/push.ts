@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import type { PluginListenerHandle } from "@capacitor/core";
 
 export type PushToken = { value: string };
 
@@ -28,13 +29,14 @@ export async function registerPush(): Promise<PushToken | null> {
 
 /**
  * Listen for incoming push notifications (foreground).
+ * Returns a handle that can be used to remove the listener.
  */
-export function onPushReceived(
+export async function onPushReceived(
   callback: (notification: { title?: string; body?: string; data: Record<string, unknown> }) => void
-): void {
-  if (!Capacitor.isNativePlatform()) return;
+): Promise<PluginListenerHandle | null> {
+  if (!Capacitor.isNativePlatform()) return null;
 
-  PushNotifications.addListener("pushNotificationReceived", (notification) => {
+  return PushNotifications.addListener("pushNotificationReceived", (notification) => {
     callback({
       title: notification.title ?? undefined,
       body: notification.body ?? undefined,
@@ -45,13 +47,14 @@ export function onPushReceived(
 
 /**
  * Listen for push notification taps (app opened from notification).
+ * Returns a handle that can be used to remove the listener.
  */
-export function onPushActionPerformed(
+export async function onPushActionPerformed(
   callback: (data: Record<string, unknown>) => void
-): void {
-  if (!Capacitor.isNativePlatform()) return;
+): Promise<PluginListenerHandle | null> {
+  if (!Capacitor.isNativePlatform()) return null;
 
-  PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+  return PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
     callback((action.notification.data ?? {}) as Record<string, unknown>);
   });
 }

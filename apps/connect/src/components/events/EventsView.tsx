@@ -1,28 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Event, EventCategory, Place } from "@/types/db";
+import { CATEGORY_FILTERS } from "@/lib/categories";
+import { createClient } from "@/lib/supabase/client";
 import EventCalendar from "./EventCalendar";
+import EventFeed from "./EventFeed";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
 import dynamic from "next/dynamic";
+import type { User } from "@supabase/supabase-js";
 
 const EventMap = dynamic(() => import("@/components/map/EventMap"), {
   ssr: false,
   loading: () => <div className="skeleton h-full w-full" />,
 });
-
-const CATEGORIES: { value: EventCategory | "all"; label: string }[] = [
-  { value: "all", label: "All categories" },
-  { value: "church-service", label: "Church Service" },
-  { value: "youth", label: "Youth" },
-  { value: "community-outreach", label: "Outreach" },
-  { value: "worship", label: "Worship" },
-  { value: "bible-study", label: "Bible Study" },
-  { value: "prayer", label: "Prayer" },
-  { value: "social", label: "Social" },
-  { value: "other", label: "Other" },
-];
 
 type Props = {
   events: Event[];
@@ -35,7 +28,7 @@ export default function EventsView({
   places = [],
   isVendor = false,
 }: Props) {
-  const [view, setView] = useState<"map" | "calendar">("map");
+  const [view, setView] = useState<"map" | "calendar" | "feed">("map");
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<EventCategory | "all">(
@@ -44,6 +37,35 @@ export default function EventsView({
 
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+
+  // User state for auth section in burger menu
+  const [user, setUser] = useState<User | null>(null);
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current) supabaseRef.current = createClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = supabaseRef.current!;
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const displayName =
+    user?.user_metadata?.full_name?.split(" ")[0] ??
+    user?.email?.split("@")[0] ??
+    "Account";
+
+  async function handleLogout() {
+    await supabaseRef.current!.auth.signOut();
+    setUser(null);
+    setFiltersOpen(false);
+    router.refresh();
+  }
 
   const filtered = useMemo(() => {
     return events.filter((e) => {
@@ -86,17 +108,39 @@ export default function EventsView({
     setSelectedPlace(null);
   }, []);
 
+  // City search / geocoding state
+  const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+
+  async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter" || !search.trim() || view !== "map") return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}&limit=1`,
+        { headers: { "User-Agent": "CitizensConnect/1.0" } }
+      );
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setMapFlyTo([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+      }
+    } catch {
+      /* geocoding failed — ignore */
+    }
+  }
+
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[var(--surface)]">
-      {view === "map" ? (
+    <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
+      {view === "map" && (
         <EventMap
           events={filtered}
           places={filteredPlaces}
           onSelectEvent={handleSelectEvent}
           onSelectPlace={handleSelectPlace}
+          autoLocate
+          flyTo={mapFlyTo}
         />
-      ) : (
-        <div className="h-full overflow-y-auto bg-[var(--surface)] px-3 pb-6 pt-22 sm:px-5">
+      )}
+      {view === "calendar" && (
+        <div className="h-full overflow-y-auto bg-(--surface) px-3 pb-6 pt-22 sm:px-5">
           <div className="mx-auto max-w-6xl">
             <PostEventPrompt />
             <EventCalendar
@@ -107,15 +151,21 @@ export default function EventsView({
           </div>
         </div>
       )}
+      {view === "feed" && (
+        <div className="h-full bg-(--surface) pt-22">
+          <EventFeed events={filtered} onSelectEvent={handleSelectEvent} />
+        </div>
+      )}
 
       {/* ── Floating top bar ────────────────────────────── */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-3 sm:p-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 p-3 sm:p-4">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
           <input
             type="search"
-            placeholder="Search events or places"
+            placeholder="Search events or places — Enter to jump to city"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             className="pointer-events-auto w-full rounded-2xl border border-black/12 bg-white/95 px-4 py-2.5 text-sm shadow-lg outline-none backdrop-blur focus:border-black/30"
           />
 
@@ -137,11 +187,15 @@ export default function EventsView({
 
             <button
               type="button"
-              onClick={() => setView((v) => (v === "map" ? "calendar" : "map"))}
+              onClick={() =>
+                setView((v) =>
+                  v === "map" ? "calendar" : v === "calendar" ? "feed" : "map"
+                )
+              }
               className="pointer-events-auto rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
-              aria-label="Toggle map or calendar view"
+              aria-label="Toggle view mode"
             >
-              {view === "map" ? "📅" : "🗺"}
+              {view === "map" ? "📅" : view === "calendar" ? "📋" : "🗺"}
             </button>
           </div>
         </div>
@@ -150,14 +204,14 @@ export default function EventsView({
       {/* ── Filter drawer backdrop ──────────────────────── */}
       {filtersOpen && (
         <div
-          className="absolute inset-0 z-[1001] bg-black/25"
+          className="absolute inset-0 z-1001 bg-black/25"
           onClick={() => setFiltersOpen(false)}
         />
       )}
 
       {/* ── Filter drawer ───────────────────────────────── */}
       <aside
-        className={`absolute left-0 top-0 z-[1002] h-full w-[84vw] max-w-xs bg-white/96 p-4 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-80 ${
+        className={`absolute left-0 top-0 z-1002 flex h-full w-[84vw] max-w-xs flex-col bg-white/96 p-4 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-80 ${
           filtersOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -176,7 +230,7 @@ export default function EventsView({
         </div>
 
         <div className="space-y-2 overflow-y-auto pb-4">
-          {CATEGORIES.map((c) => (
+          {CATEGORY_FILTERS.map((c) => (
             <button
               key={c.value}
               onClick={() => {
@@ -185,7 +239,7 @@ export default function EventsView({
               }}
               className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
                 activeCategory === c.value
-                  ? "bg-[var(--gold)] text-black"
+                  ? "bg-(--gold) text-black"
                   : "bg-black/5 text-black/75 hover:bg-black/10"
               }`}
             >
@@ -203,17 +257,61 @@ export default function EventsView({
           {isVendor && (
             <Link
               href="/events/new"
-              className="mt-3 block rounded-xl bg-[var(--gold)] px-3 py-2 text-center font-semibold text-black"
+              onClick={() => setFiltersOpen(false)}
+              className="mt-3 block rounded-xl bg-(--gold) px-3 py-2 text-center font-semibold text-black"
             >
               + Create Event
             </Link>
           )}
           <Link
             href="/places/new"
+            onClick={() => setFiltersOpen(false)}
             className="mt-2 block rounded-xl bg-black/5 px-3 py-2 text-center font-semibold text-black hover:bg-black/10"
           >
             + Add Place
           </Link>
+        </div>
+
+        {/* ── Account section ────────────────────────── */}
+        <div className="mt-auto border-t border-black/10 pt-4">
+          {user ? (
+            <div className="space-y-2">
+              <Link
+                href="/profile"
+                onClick={() => setFiltersOpen(false)}
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-black/80 transition hover:bg-black/5"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--gold-soft) text-xs font-bold uppercase text-black">
+                  {displayName[0]}
+                </span>
+                {displayName}
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+              >
+                Log Out
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Link
+                href="/login"
+                onClick={() => setFiltersOpen(false)}
+                className="block rounded-xl bg-black/5 px-3 py-2 text-center text-sm font-medium text-black transition hover:bg-black/10"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/signup"
+                onClick={() => setFiltersOpen(false)}
+                className="block rounded-xl bg-(--gold) px-3 py-2 text-center text-sm font-semibold text-black transition hover:brightness-105"
+              >
+                Sign Up — It&apos;s Free
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -221,10 +319,10 @@ export default function EventsView({
       {(selectedEvent || selectedPlace) && (
         <>
           <div
-            className="absolute inset-0 z-[1003] bg-black/20 sm:bg-transparent"
+            className="absolute inset-0 z-1003 bg-black/20 sm:bg-transparent"
             onClick={closeDetail}
           />
-          <aside className="fade-rise absolute bottom-0 right-0 z-[1004] w-full bg-white/96 p-5 shadow-2xl backdrop-blur sm:top-0 sm:h-full sm:w-96 sm:border-l sm:border-black/10">
+          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full bg-white/96 p-5 shadow-2xl backdrop-blur sm:top-0 sm:h-full sm:w-96 sm:border-l sm:border-black/10">
             <button
               type="button"
               onClick={closeDetail}
@@ -236,7 +334,7 @@ export default function EventsView({
 
             {selectedEvent && (
               <div className="space-y-3 pt-2">
-                <span className="inline-block rounded-full bg-[var(--gold-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--foreground-soft)]">
+                <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
                   {selectedEvent.category ?? "other"}
                 </span>
                 <h2 className="text-lg font-bold text-black">
@@ -259,7 +357,7 @@ export default function EventsView({
                 </p>
                 <Link
                   href={`/events/${selectedEvent.id}`}
-                  className="mt-2 inline-block rounded-xl bg-[var(--gold)] px-4 py-2 text-sm font-semibold text-black"
+                  className="mt-2 inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black"
                 >
                   View Details →
                 </Link>
@@ -269,7 +367,7 @@ export default function EventsView({
             {selectedPlace && (
               <div className="space-y-3 pt-2">
                 {selectedPlace.categories && (
-                  <span className="inline-block rounded-full bg-[var(--gold-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--foreground-soft)]">
+                  <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
                     {selectedPlace.categories.emoji}{" "}
                     {selectedPlace.categories.name}
                   </span>
@@ -302,7 +400,7 @@ export default function EventsView({
                     href={selectedPlace.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-[var(--gold)] underline"
+                    className="text-sm text-(--gold) underline"
                   >
                     Visit website
                   </a>
@@ -312,7 +410,7 @@ export default function EventsView({
                 </p>
                 <Link
                   href={`/places/${selectedPlace.id}`}
-                  className="mt-2 inline-block rounded-xl bg-[var(--gold)] px-4 py-2 text-sm font-semibold text-black"
+                  className="mt-2 inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black"
                 >
                   View Details →
                 </Link>

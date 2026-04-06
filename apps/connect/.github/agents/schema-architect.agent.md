@@ -1,5 +1,6 @@
 ---
 description: "Use when reviewing database schema changes, planning new tables, analyzing RLS policies, or evaluating data model decisions against the Citizens Connect roadmap. Read-only — never edits files."
+name: "Schema Architect"
 tools: [read, search]
 argument-hint: "Describe the schema question or proposed change"
 ---

@@ -48,5 +48,5 @@ export default function MiniMap({ latitude, longitude }: Props) {
     };
   }, [latitude, longitude]);
 
-  return <div ref={containerRef} className="h-[200px] w-full rounded-lg" />;
+  return <div ref={containerRef} className="h-50 w-full rounded-lg" />;
 }

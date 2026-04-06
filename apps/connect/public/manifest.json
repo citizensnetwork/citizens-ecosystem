@@ -1,7 +1,7 @@
 {
   "name": "Citizens Connect",
   "short_name": "Citizens",
-  "description": "Discover, create, and attend faith-based community events near you.",
+  "description": "Discover faith-based events, places, and community near you. Connecting the Kingdom.",
   "start_url": "/events",
   "display": "standalone",
   "background_color": "#f7f6f3",

@@ -56,13 +56,13 @@ export default function SignupForm() {
       className="surface-card fade-rise w-full max-w-md rounded-3xl p-5 sm:p-7 space-y-5"
     >
       <div className="space-y-2 text-center">
-        <p className="inline-flex items-center rounded-full border border-black/10 bg-[var(--gold-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/80">
+        <p className="inline-flex items-center rounded-full border border-black/10 bg-(--gold-soft) px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/80">
           Join Citizens Connect
         </p>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-black">
           Create your account
         </h1>
-        <p className="text-sm text-[var(--foreground-soft)]">
+        <p className="text-sm text-(--foreground-soft)">
           Discover and share faith-centered events in your city.
         </p>
       </div>
@@ -130,7 +130,7 @@ export default function SignupForm() {
 
       <div className="space-y-2">
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75">
-          I am a
+          I want to
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
@@ -143,9 +143,9 @@ export default function SignupForm() {
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Client</span>
-              <span className="block text-xs text-[var(--foreground-soft)]">
-                Attend events
+              <span className="font-medium text-black">Community Member</span>
+              <span className="block text-xs text-(--foreground-soft)">
+                Discover events, RSVP, review &amp; connect
               </span>
             </span>
           </label>
@@ -159,9 +159,9 @@ export default function SignupForm() {
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Vendor</span>
-              <span className="block text-xs text-[var(--foreground-soft)]">
-                Create events
+              <span className="font-medium text-black">Organiser</span>
+              <span className="block text-xs text-(--foreground-soft)">
+                All of the above + create &amp; manage events
               </span>
             </span>
           </label>
@@ -171,12 +171,12 @@ export default function SignupForm() {
       <button
         type="submit"
         disabled={loading}
-        className="gold-glow w-full rounded-xl bg-[var(--gold)] px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        className="gold-glow w-full rounded-xl bg-(--gold) px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? "Creating account..." : "Sign Up"}
       </button>
 
-      <p className="text-center text-sm text-[var(--foreground-soft)]">
+      <p className="text-center text-sm text-(--foreground-soft)">
         Already have an account?{" "}
         <Link href="/login" className="font-semibold text-black underline-offset-4 hover:underline">
           Log In

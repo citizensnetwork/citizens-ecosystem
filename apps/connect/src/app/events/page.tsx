@@ -11,6 +11,7 @@ export default async function EventsPage() {
     supabase
       .from("events")
       .select("*")
+      .eq("status", "published")
       .order("date", { ascending: true })
       .returns<Event[]>(),
     supabase
@@ -78,7 +79,7 @@ export default async function EventsPage() {
       .select("role")
       .eq("id", user.id)
       .single();
-    isVendor = profile?.role === "vendor";
+    isVendor = profile?.role === "vendor" || profile?.role === "admin";
   }
 
   return (

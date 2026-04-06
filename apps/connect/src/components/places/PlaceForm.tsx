@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -11,7 +11,7 @@ const LocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="surface-card h-[300px] w-full rounded-xl p-3">
+      <div className="surface-card h-75 w-full rounded-xl p-3">
         <div className="skeleton h-full w-full rounded-lg" />
       </div>
     ),
@@ -35,7 +35,8 @@ export default function PlaceForm({ categories }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -253,7 +254,7 @@ export default function PlaceForm({ categories }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-md bg-[var(--gold)] py-2 text-sm font-semibold text-black hover:brightness-95 disabled:opacity-50"
+        className="w-full rounded-md bg-(--gold) py-2 text-sm font-semibold text-black hover:brightness-95 disabled:opacity-50"
       >
         {loading ? "Saving..." : "Add Place"}
       </button>

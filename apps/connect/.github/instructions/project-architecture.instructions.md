@@ -80,6 +80,6 @@ supabase/
 
 - **Project path:** `C:\Users\SJ\Desktop\Businesses\citizens-connect`
 - **Supabase URL:** `https://xyiajtrvhlxaeplsiajj.supabase.co`
-- **Default map center:** Durban, South Africa `[-29.8587, 31.0218]`
+- **Default map center:** Pretoria, South Africa `[-25.7479, 28.2293]`
 - **Build command:** `& ".\node_modules\.bin\next.cmd" build 2>&1` (avoids global Next.js 16)
 - **PATH fix:** `$env:PATH = "C:\Program Files\nodejs;" + $env:PATH`

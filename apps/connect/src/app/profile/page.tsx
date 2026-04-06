@@ -15,18 +15,47 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Fetch profile, RSVPs, and social counts in parallel
+  const [
+    { data: profile },
+    { data: rsvps },
+    { count: followersCount },
+    { count: followingCount },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).single(),
+    supabase
+      .from("rsvps")
+      .select("event_id, events(*)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("followee_id", user.id),
+    supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", user.id),
+  ]);
 
-  // Get events the user has RSVPed to
-  const { data: rsvps } = await supabase
-    .from("rsvps")
-    .select("event_id, events(*)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  // Count friends (bidirectional follows)
+  let friendsCount = 0;
+  const { data: myFollowing } = await supabase
+    .from("follows")
+    .select("followee_id")
+    .eq("follower_id", user.id);
+
+  if (myFollowing) {
+    const followeeIds = myFollowing.map((f) => f.followee_id);
+    if (followeeIds.length > 0) {
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("followee_id", user.id)
+        .in("follower_id", followeeIds);
+      friendsCount = count ?? 0;
+    }
+  }
 
   const rsvpedEvents: Event[] = (rsvps ?? [])
     .map((r: { event_id: string; events: unknown }) => r.events as Event)
@@ -52,7 +81,7 @@ export default async function ProfilePage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-2xl font-bold uppercase">
+        <div className="w-16 h-16 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-2xl font-bold uppercase">
           {(displayName as string)?.[0] ?? "?"}
         </div>
         <div>
@@ -61,12 +90,28 @@ export default async function ProfilePage() {
           <span
             className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${
               isVendor
-                ? "bg-purple-100 text-purple-700"
-                : "bg-green-100 text-green-700"
+                ? "bg-(--gold-soft) text-black"
+                : "bg-black/5 text-black/70"
             }`}
           >
-            {isVendor ? "Organiser / Vendor" : "Community Member"}
+            {isVendor ? "Organiser" : "Community Member"}
           </span>
+          <div className="mt-2 flex gap-4 text-sm text-black/70">
+            <span>
+              <strong className="text-black">{followersCount ?? 0}</strong>{" "}
+              {followersCount === 1 ? "follower" : "followers"}
+            </span>
+            <span>
+              <strong className="text-black">{followingCount ?? 0}</strong>{" "}
+              following
+            </span>
+            {friendsCount > 0 && (
+              <span>
+                <strong className="text-black">{friendsCount}</strong>{" "}
+                {friendsCount === 1 ? "friend" : "friends"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -76,7 +121,7 @@ export default async function ProfilePage() {
         {rsvpedEvents.length === 0 ? (
           <p className="text-sm text-gray-500">
             You haven&apos;t RSVPed to any events yet.{" "}
-            <Link href="/events" className="text-blue-600 hover:underline">
+            <Link href="/events" className="text-(--gold) hover:underline">
               Browse events →
             </Link>
           </p>
@@ -100,7 +145,7 @@ export default async function ProfilePage() {
                       })}
                     </p>
                   </div>
-                  <span className="text-blue-600 text-sm">→</span>
+                  <span className="text-(--gold) text-sm">→</span>
                 </Link>
               </li>
             ))}
@@ -115,7 +160,7 @@ export default async function ProfilePage() {
             <h2 className="text-lg font-semibold">My Events</h2>
             <Link
               href="/events/new"
-              className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700"
+              className="text-sm bg-(--gold) text-black px-3 py-1.5 rounded-md hover:brightness-95"
             >
               + New Event
             </Link>
@@ -144,7 +189,7 @@ export default async function ProfilePage() {
                         })}
                       </p>
                     </div>
-                    <span className="text-blue-600 text-sm">→</span>
+                    <span className="text-(--gold) text-sm">→</span>
                   </Link>
                 </li>
               ))}

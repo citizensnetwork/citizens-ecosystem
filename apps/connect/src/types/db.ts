@@ -8,17 +8,37 @@ export type EventCategory =
   | "social"
   | "other";
 
+export type EventStatus = "draft" | "published" | "cancelled";
+
+export type AttendeesVisibility = "public" | "authenticated" | "count_only";
+
 export type Event = {
   id: string;
   title: string;
   description: string;
   date: string;
+  end_time: string | null;
   location: string;
   category: EventCategory | null;
   image_url: string | null;
+  website_url: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  max_attendees: number | null;
+  status: EventStatus;
+  attendees_visible: AttendeesVisibility;
   latitude: number | null;
   longitude: number | null;
   created_by: string;
+  created_at: string;
+};
+
+export type EventPhoto = {
+  id: string;
+  event_id: string;
+  url: string;
+  sort_order: number;
+  uploaded_by: string;
   created_at: string;
 };
 
@@ -92,4 +112,11 @@ export type Review = {
   still_exists: boolean;
   created_at: string;
   profiles?: { full_name: string };
+};
+
+export type Follow = {
+  id: string;
+  follower_id: string;
+  followee_id: string;
+  created_at: string;
 };

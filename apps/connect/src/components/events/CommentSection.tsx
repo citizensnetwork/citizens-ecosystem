@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import type { Comment } from "@/types/db";
@@ -16,7 +16,8 @@ export default function CommentSection({ eventId, user }: Props) {
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +85,7 @@ export default function CommentSection({ eventId, user }: Props) {
         <ul className="space-y-4 mb-6">
           {comments.map((c) => (
             <li key={c.id} className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold uppercase shrink-0">
+              <div className="w-8 h-8 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-xs font-bold uppercase shrink-0">
                 {c.profiles?.full_name?.[0] ?? "?"}
               </div>
               <div className="flex-1">
@@ -121,7 +122,7 @@ export default function CommentSection({ eventId, user }: Props) {
       {/* Comment form */}
       {user ? (
         <form onSubmit={handleSubmit} className="flex gap-2 items-start">
-          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold uppercase shrink-0 mt-1">
+          <div className="w-8 h-8 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-xs font-bold uppercase shrink-0 mt-1">
             {(user.user_metadata?.full_name?.[0] ?? user.email?.[0] ?? "?").toUpperCase()}
           </div>
           <div className="flex-1">
@@ -136,7 +137,7 @@ export default function CommentSection({ eventId, user }: Props) {
             <button
               type="submit"
               disabled={loading || !body.trim()}
-              className="mt-1.5 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="mt-1.5 px-4 py-1.5 bg-(--gold) text-black text-sm rounded-md hover:brightness-95 disabled:opacity-50"
             >
               {loading ? "Posting…" : "Post"}
             </button>
@@ -144,7 +145,7 @@ export default function CommentSection({ eventId, user }: Props) {
         </form>
       ) : (
         <p className="text-sm text-gray-500">
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-(--gold) hover:underline">
             Log in
           </Link>{" "}
           to leave a comment.

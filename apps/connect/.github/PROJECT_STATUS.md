@@ -12,6 +12,8 @@
 | 4 | Calendar | **Complete** | FullCalendar with day/week/month, category colors, detail panel, vendor quick-create |
 | 5 | Reviews & Verification | **Complete** | Unified reviews (places+events), community verification signals, admin role, share |
 | 6 | Capacitor Mobile | **Complete** | iOS/Android wrapper, native plugins, single codebase |
+| 7 | Event Enrichment & Discovery | **Complete** | End time, contact info, capacity, status, feed view, OG meta, city search, view tracking |
+| 8 | Social Graph | **Complete** | Follows, friends, public profiles, follow button, who's attending with friend badges |
 
 ---
 
@@ -151,6 +153,44 @@
 
 ---
 
+## Phase 7 — Event Enrichment, Lifecycle & Discovery Surface (COMPLETE)
+
+### Delivered
+- [x] Migration 006_event_enrichment — end_time, website_url, contact_email, contact_phone, max_attendees, status, attendees_visible columns + event_photos + event_views tables
+- [x] EventForm + EditEventForm — end time, website, contact, max attendees, status, attendees_visible, cancel event
+- [x] EventDetailContent — end time display, contact info grid, capacity indicator ("X/Y attending", "Sold Out"), cancelled/draft banners
+- [x] RSVP API hardening — status check, capacity check, 409 "Event full"
+- [x] View tracking API — /api/events/[id]/view, fire-and-forget on detail mount
+- [x] OG Meta Tags — generateMetadata() with Open Graph + Twitter Card, structured data
+- [x] Feed View — EventFeed.tsx, three-way toggle (Map/Calendar/Feed), date/distance sort
+- [x] Map city search — Nominatim geocoding in search bar, pan + zoom
+- [x] Calendar buttons — "Add to Google Calendar" + "Download .ics" after RSVPing
+- [x] iCal API — GET /api/events/[id]/ical generates ICS file
+
+### Deferred
+- [ ] EventPhotoGallery (multi-photo rendering component)
+- [ ] VendorAnalytics (creator-only views/RSVP/comment counts)
+- [ ] Multi-photo upload in EventForm
+
+---
+
+## Phase 8 — Social Graph (COMPLETE)
+
+### Delivered
+- [x] Migration 007_social_graph — follows table with self-follow CHECK, unique constraint, indexes, RLS
+- [x] Follow API route — POST (follow) + DELETE (unfollow) with auth, duplicate handling, self-follow prevention
+- [x] FollowButton component — Follow/Following/Friends states, login redirect for unauthenticated
+- [x] Public profile page (/profile/[id]) — name, role, followers/following/mutual counts, friend badge, organiser events, follow button
+- [x] Own profile page updated — followers, following, friends counts displayed
+- [x] WhoIsAttending component — attendee list with privacy levels (public/authenticated/count_only), friends highlighted with gold badge, profile links
+- [x] Event detail page wired — server-side attendee fetching with friend detection via bidirectional follow cross-reference
+
+### Deferred
+- [ ] Followers/following list pages (clickable counts)
+- [ ] Mutual friends list on public profiles
+
+---
+
 ## Current Tech Stack
 
 | Layer | Technology | Version |
@@ -163,6 +203,25 @@
 | Maps | Leaflet (raw API) + leaflet.markercluster | 1.9.4 |
 | Mobile (planned) | Capacitor | TBD |
 
+## Agent System
+
+| Agent | File | Type | Status |
+|-------|------|------|--------|
+| Architect | `architect.agent.md` | Read-only reviewer | **Live** |
+| Testing | `testing.agent.md` | Edit-capable | **Live** |
+| Refactor | `refactor.agent.md` | Edit-capable | **Live** |
+| Data | `data.agent.md` | Edit-capable | **Live** |
+| Community | `community.agent.md` | Edit-capable | **Live** |
+| Notification | `notification.agent.md` | Edit-capable | **Live** |
+| Product Lead | `product-lead.agent.md` | Edit-capable | **Live** |
+| UI | `ui.agent.md` | Edit-capable | Live (pre-existing) |
+| UI Consistency Review | `ui-consistency-review.agent.md` | Read-only auditor | Live (pre-existing) |
+| Schema Architect | `schema-architect.agent.md` | Read-only advisor | Live (pre-existing) |
+| Continuity Manager | `continuity-manager.agent.md` | Edit-capable | Live (pre-existing) |
+| Operations | — | Deferred | Create at 100 users |
+
+See `.github/AGENTS.md` for full registry, invocation guide, and multi-agent workflows.
+
 ## Database Tables
 
 | Table | Status | Description |
@@ -174,3 +233,6 @@
 | categories | **Live** | DB-driven category definitions with emoji, color, sort |
 | places | **Live** | Permanent map listings (churches, shops, ministries) |
 | reviews | **Live** | Ratings and still-exists signals for places AND events |
+| follows | **Live** | Social graph — A follows B, bidirectional = friends |
+| event_photos | **Live** | Multi-photo support for events |
+| event_views | **Live** | View tracking for event analytics |

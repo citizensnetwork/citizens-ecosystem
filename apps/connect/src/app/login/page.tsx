@@ -4,7 +4,7 @@ import LoginForm from "@/components/auth/LoginForm";
 export default function LoginPage() {
   return (
     <div className="relative min-h-[calc(100dvh-3.5rem)] overflow-hidden px-4 py-8 sm:py-10">
-      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-[var(--gold)]/18 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-(--gold)/18 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 bottom-12 h-64 w-64 rounded-full bg-black/10 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-[calc(100dvh-7.5rem)] w-full max-w-5xl items-center justify-center">
@@ -16,7 +16,7 @@ export default function LoginPage() {
             <h1 className="max-w-md text-4xl font-semibold tracking-tight text-black">
               Welcome back to your faith community.
             </h1>
-            <p className="max-w-md text-base text-[var(--foreground-soft)]">
+            <p className="max-w-md text-base text-(--foreground-soft)">
               Log in to browse upcoming services, prayer gatherings, and
               outreach moments near you.
             </p>

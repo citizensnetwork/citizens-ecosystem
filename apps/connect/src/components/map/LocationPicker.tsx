@@ -31,7 +31,7 @@ export default function LocationPicker({ position, onSelect }: Props) {
       shadowSize: [41, 41],
     });
 
-    const center: [number, number] = position ?? [-29.8587, 31.0218];
+    const center: [number, number] = position ?? [-25.7479, 28.2293];
     const map = L.map(containerRef.current).setView(center, 13);
     mapRef.current = map;
 
@@ -69,7 +69,7 @@ export default function LocationPicker({ position, onSelect }: Props) {
       <p className="text-xs text-gray-500">
         Click on the map to set the event location
       </p>
-      <div ref={containerRef} className="h-[300px] w-full rounded-lg border" />
+      <div ref={containerRef} className="h-75 w-full rounded-lg border" />
       {position && (
         <p className="text-xs text-gray-400">
           Coordinates: {position[0].toFixed(5)}, {position[1].toFixed(5)}

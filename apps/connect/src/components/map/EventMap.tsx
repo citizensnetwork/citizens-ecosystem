@@ -22,6 +22,8 @@ type Props = {
   onSelectPlace?: (place: Place) => void;
   center?: [number, number];
   zoom?: number;
+  autoLocate?: boolean;
+  flyTo?: [number, number] | null;
 };
 
 export default function EventMap({
@@ -29,13 +31,16 @@ export default function EventMap({
   places = [],
   onSelectEvent,
   onSelectPlace,
-  center = [-29.8587, 31.0218],
+  center = [-25.7479, 28.2293],
   zoom = 12,
+  autoLocate = false,
+  flyTo = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const eventClusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const placeClusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const geoMarkerRef = useRef<L.CircleMarker | null>(null);
 
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
@@ -69,15 +74,20 @@ export default function EventMap({
                 pos.longitude,
               ];
               map.setView(ll, 15);
-              L.circleMarker(ll, {
-                radius: 8,
-                fillColor: "#4285F4",
-                fillOpacity: 1,
-                color: "#fff",
-                weight: 2,
-              })
-                .addTo(map)
-                .bindPopup("You are here");
+
+              if (geoMarkerRef.current) {
+                geoMarkerRef.current.setLatLng(ll);
+              } else {
+                geoMarkerRef.current = L.circleMarker(ll, {
+                  radius: 8,
+                  fillColor: "#4285F4",
+                  fillOpacity: 1,
+                  color: "#fff",
+                  weight: 2,
+                })
+                  .addTo(map)
+                  .bindPopup("You are here");
+              }
             })
             .catch(() => {
               /* permission denied — ignore */
@@ -88,9 +98,34 @@ export default function EventMap({
     });
     new LocBtn({ position: "bottomright" }).addTo(map);
 
+    /* Auto-locate user on initial load */
+    if (autoLocate) {
+      getCurrentPosition()
+        .then((pos) => {
+          const ll: L.LatLngExpression = [pos.latitude, pos.longitude];
+          map.setView(ll, 14);
+
+          if (!geoMarkerRef.current) {
+            geoMarkerRef.current = L.circleMarker(ll, {
+              radius: 8,
+              fillColor: "#4285F4",
+              fillOpacity: 1,
+              color: "#fff",
+              weight: 2,
+            })
+              .addTo(map)
+              .bindPopup("You are here");
+          }
+        })
+        .catch(() => {
+          /* geolocation denied or unavailable — stay on default center */
+        });
+    }
+
     return () => {
       map.remove();
       mapRef.current = null;
+      geoMarkerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -207,6 +242,12 @@ export default function EventMap({
 
     map.addLayer(cluster);
   }, [places, onSelectPlace]);
+
+  /* ── Fly to coordinates when flyTo prop changes ─────── */
+  useEffect(() => {
+    if (!flyTo || !mapRef.current) return;
+    mapRef.current.flyTo(flyTo, 13);
+  }, [flyTo]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

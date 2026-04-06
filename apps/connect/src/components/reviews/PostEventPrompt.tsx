@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type PromptEvent = {
@@ -11,7 +11,7 @@ type PromptEvent = {
 };
 
 export default function PostEventPrompt() {
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
   const [event, setEvent] = useState<PromptEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -28,14 +28,14 @@ export default function PostEventPrompt() {
     async function findPromptEvent() {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await supabaseRef.current.auth.getUser();
 
       if (!user) {
         if (active) setLoading(false);
         return;
       }
 
-      const { data: rsvps } = await supabase
+      const { data: rsvps } = await supabaseRef.current
         .from("rsvps")
         .select("event_id")
         .eq("user_id", user.id);
@@ -46,7 +46,7 @@ export default function PostEventPrompt() {
         return;
       }
 
-      const { data: events } = await supabase
+      const { data: events } = await supabaseRef.current
         .from("events")
         .select("id,title,date")
         .in("id", eventIds)
@@ -59,7 +59,7 @@ export default function PostEventPrompt() {
         return;
       }
 
-      const { data: reviews } = await supabase
+      const { data: reviews } = await supabaseRef.current
         .from("reviews")
         .select("event_id")
         .eq("user_id", user.id)
@@ -82,7 +82,7 @@ export default function PostEventPrompt() {
     return () => {
       active = false;
     };
-  }, [supabase]);
+  }, []);
 
   async function submitRating(rating: number) {
     if (!event) return;
@@ -90,14 +90,14 @@ export default function PostEventPrompt() {
 
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await supabaseRef.current.auth.getUser();
 
     if (!user) {
       setSubmitting(false);
       return;
     }
 
-    const { error } = await supabase.from("reviews").upsert(
+    const { error } = await supabaseRef.current.from("reviews").upsert(
       {
         event_id: event.id,
         place_id: null,
@@ -122,7 +122,7 @@ export default function PostEventPrompt() {
   }
 
   return (
-    <div className="mb-4 rounded-xl border border-[var(--gold)]/35 bg-[var(--gold-soft)] px-4 py-3">
+    <div className="mb-4 rounded-xl border border-(--gold)/35 bg-(--gold-soft) px-4 py-3">
       <p className="text-sm font-semibold text-black">How was {eventLabel}?</p>
       <p className="text-xs text-black/70">Rate your attendance so others can trust what is active and worth joining.</p>
 
@@ -133,7 +133,7 @@ export default function PostEventPrompt() {
             type="button"
             disabled={submitting}
             onClick={() => submitRating(value)}
-            className="text-xl text-[var(--gold)] transition hover:brightness-90 disabled:opacity-50"
+            className="text-xl text-(--gold) transition hover:brightness-90 disabled:opacity-50"
             aria-label={`Rate ${value} stars`}
           >
             ★
