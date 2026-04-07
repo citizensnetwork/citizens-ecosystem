@@ -1,12 +1,21 @@
 ---
 applyTo: "src/components/map/**"
-description: "Use when creating or editing map components. Enforces raw Leaflet API pattern, SSR-safe dynamic imports, and proper cleanup."
+description: "Use when creating or editing map components. Enforces MapLibre GL JS API pattern, SSR-safe dynamic imports, and proper cleanup."
 ---
 # Map Component Rules
 
-## Raw Leaflet Only — No react-leaflet
+## MapLibre GL JS — No Leaflet, No react-leaflet
 
-Use `L.map()`, `L.marker()`, `L.tileLayer()` directly in `useEffect`. Never use `<MapContainer>`, `<TileLayer>`, or any react-leaflet component — they break under React Strict Mode double-mounting.
+Use `new maplibregl.Map()`, `new maplibregl.Marker()` directly in `useEffect`. The project uses MapLibre GL JS for all map rendering. Leaflet was removed.
+
+## Shared Configuration
+
+All map components import from `src/lib/map/config.ts`:
+- `getMapStyle()` — Returns MapTiler vector style URL (if `NEXT_PUBLIC_MAPTILER_KEY` is set) or free OSM raster fallback
+- `toLngLat(latLng)` — Converts `[lat, lng]` → `[lng, lat]` for MapLibre
+- `DEFAULT_CENTER` — Pretoria `[-25.7479, 28.2293]` as `[lat, lng]`
+
+**Never hardcode API keys in component files.** Always use `getMapStyle()`.
 
 ## Required Pattern
 
@@ -16,24 +25,28 @@ Every map component must follow this structure:
 "use client";
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 
 export default function MyMap() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = L.map(containerRef.current).setView(center, zoom);
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: getMapStyle(),
+      center: toLngLat(DEFAULT_CENTER),
+      zoom: 12,
+      attributionControl: false,
+    });
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
-
-    // ... markers, layers, handlers
+    // ... markers, handlers
 
     return () => {
       map.remove();
@@ -47,9 +60,11 @@ export default function MyMap() {
 
 ## Mandatory Rules
 
-1. **`map.remove()` in cleanup** — Always return a cleanup function that calls `map.remove()` and sets `mapRef.current = null`. Without this, React Strict Mode double-mount causes "Map container is already initialized".
+1. **`map.remove()` in cleanup** — Always return a cleanup function that calls `map.remove()` and resets `mapRef.current = null`.
 2. **Guard against re-init** — Start useEffect with `if (!containerRef.current || mapRef.current) return;`
 3. **`"use client"` directive** — Every map component is a client component.
-4. **Dynamic import with `ssr: false`** — When importing a map component from a page or parent, always use: `const MyMap = dynamic(() => import("@/components/map/MyMap"), { ssr: false });` Leaflet accesses `window` and `document` — it cannot run server-side.
-5. **Default icon setup** — Leaflet's default marker icon is broken in bundlers. Always define a custom icon using unpkg CDN URLs or local assets.
-6. **No template literals in popup HTML** — Use string concatenation for popup content to avoid PowerShell escaping issues during code generation.
+4. **Dynamic import with `ssr: false`** — MapLibre accesses `window`/WebGL — cannot run server-side: `const MyMap = dynamic(() => import("@/components/map/MyMap"), { ssr: false });`
+5. **Coordinate order** — MapLibre uses `[lng, lat]`. Always use `toLngLat()` when converting from `[lat, lng]` props.
+6. **Marker elements** — Use `createCategoryMarkerEl()` and `createPlaceMarkerEl()` from `src/lib/map/markers.ts` for custom marker DOM elements. Use `{ color: "#D4AF37" }` for simple gold markers.
+7. **Popup content** — Use CSS classes (`cc-popup`, `cc-popup-warning`) defined in globals.css. Always escape user input with `escapeHtml()`.
+8. **Event listener cleanup** — When using `map.once("load", handler)`, always clean up with `map.off("load", handler)` in the effect cleanup to prevent stale closures.

@@ -3,14 +3,12 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { getMapStyle } from "@/lib/map/config";
 
 type Props = {
   latitude: number;
   longitude: number;
 };
-
-const MAPTILER_KEY = "UYwNkBMiXAEzjQxQmONO";
-const STYLE_URL = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
 
 export default function MiniMap({ latitude, longitude }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,7 +19,7 @@ export default function MiniMap({ latitude, longitude }: Props) {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE_URL,
+      style: getMapStyle(),
       center: [longitude, latitude],
       zoom: 15,
       interactive: false,

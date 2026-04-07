@@ -48,7 +48,7 @@ src/
 │   │   ├── CommentSection.tsx    # Comments with inline fetch + cancellation
 │   │   └── RSVPButton.tsx        # RSVP toggle button
 │   ├── map/
-│   │   ├── EventMap.tsx          # Full-screen Leaflet map — clustering, category markers, temporal encoding, geolocation
+│   │   ├── EventMap.tsx          # Full-screen MapLibre GL map — category markers, temporal encoding, geolocation
 │   │   ├── LocationPicker.tsx    # Click-to-place marker for event creation
 │   │   └── MiniMap.tsx           # Read-only mini map for event detail
 │   ├── notifications/
@@ -72,14 +72,15 @@ src/
 │   └── usePushNotifications.ts   # Capacitor push registration + foreground listener
 │
 ├── lib/
-│   ├── map/markers.ts            # Category icons (divIcon + emoji), temporal style calculator
+│   ├── map/config.ts             # Shared MapLibre config (getMapStyle, toLngLat, DEFAULT_CENTER)
+│   ├── map/markers.ts            # Category marker elements (DOM builders), temporal style calculator
 │   └── supabase/
 │       ├── server.ts             # Async server Supabase client (cookies)
 │       └── client.ts             # Browser Supabase client
 │
 ├── types/
 │   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, Conversation, Message, ConversationPreview, EventCategory, UserRole, InterestGroup, Interest
-│   └── leaflet.markercluster.d.ts# Type declarations for markercluster plugin
+│   └── leaflet.markercluster.d.ts# Legacy type declarations (cleared after MapLibre migration)
 │
 └── middleware.ts                 # Supabase session refresh on all non-static routes
 

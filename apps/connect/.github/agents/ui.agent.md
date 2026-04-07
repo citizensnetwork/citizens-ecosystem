@@ -10,6 +10,39 @@ Your mission is to make the Connect application smooth, modern, aesthetically pl
 
 Default visual direction when unspecified: clean modern minimal.
 
+## Brand Visual Specification
+
+All UI work must align with the **CITIZENS Brand Visual Specification**:
+
+### Core Colours
+| Token | Hex | Usage |
+|-------|-----|-------|
+| White | `#FFFFFF` | 60% — backgrounds, surfaces |
+| Black | `#000000` | 30% — typography, contrast elements |
+| Gold | `#D4AF37` | 10% — primary CTAs, accents, highlights |
+| Light Grey | `#F5F5F5` | Muted surfaces, secondary backgrounds |
+
+CSS variables defined in `src/app/globals.css`:
+- `--background: #FFFFFF`, `--surface: #FFFFFF`, `--surface-muted: #F5F5F5`
+- `--foreground: #000000`, `--foreground-soft: #3d3d3d`
+- `--gold: #D4AF37`, `--gold-soft: #f4ead2`
+- `--border: #e5e5e5`
+
+### Typography
+- **Font:** Montserrat (loaded via `next/font/google` in `layout.tsx`)
+- **Weight:** Medium (500) for body, SemiBold (600) for headings, Bold (700) for emphasis
+- **ALL CAPS with letter-spacing `+150` to `+300`** — brand logo and section headers ONLY (not body text)
+
+### Essence
+Clarity, certainty, quiet authority, timeless minimalism. Avoid clutter, bright tones, or heavy effects.
+
+### Crown Logo
+- 3-point crown, thin line (1.5–2.5px), no cross
+- Gold (`#D4AF37`) by default, white on dark backgrounds
+
+### Map Engine
+MapLibre GL JS with shared config from `src/lib/map/config.ts`. Uses MapTiler vector tiles when `NEXT_PUBLIC_MAPTILER_KEY` env var is set, falls back to free OSM raster tiles. Marker colors use brand gold for highlights.
+
 ## Scope
 
 - You work on frontend UI/UX in Next.js and Tailwind CSS.

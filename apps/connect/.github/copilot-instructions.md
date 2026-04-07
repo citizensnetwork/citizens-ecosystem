@@ -29,25 +29,36 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 
 ## Key Conventions
 
-### Leaflet Maps (NOT react-leaflet)
+### MapLibre GL Maps
 
-Map components use raw Leaflet API with `useEffect`/`useRef` and `map.remove()` cleanup. This avoids React Strict Mode's "Map container already initialized" error.
+Map components use MapLibre GL JS API with `useEffect`/`useRef` and `map.remove()` cleanup. Shared config lives in `src/lib/map/config.ts`.
 
 ```tsx
-// Pattern: raw Leaflet in useEffect
+// Pattern: MapLibre GL in useEffect
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
+
 const containerRef = useRef<HTMLDivElement>(null);
-const mapRef = useRef<L.Map | null>(null);
+const mapRef = useRef<maplibregl.Map | null>(null);
 
 useEffect(() => {
   if (!containerRef.current || mapRef.current) return;
-  const map = L.map(containerRef.current).setView(center, zoom);
+  const map = new maplibregl.Map({
+    container: containerRef.current,
+    style: getMapStyle(),
+    center: toLngLat(DEFAULT_CENTER),
+    zoom: 12,
+  });
   mapRef.current = map;
-  // ... add tiles, markers
   return () => { map.remove(); mapRef.current = null; };
 }, [deps]);
 ```
 
-All map components must use `dynamic(() => import(...), { ssr: false })` — Leaflet accesses `window` and cannot run server-side.
+MapLibre uses `[lng, lat]` coordinate order — always use `toLngLat()` for conversion.
+`getMapStyle()` returns MapTiler vector tiles if `NEXT_PUBLIC_MAPTILER_KEY` is set, otherwise free OSM raster tiles.
+
+All map components must use `dynamic(() => import(...), { ssr: false })` — MapLibre accesses WebGL/`window` and cannot run server-side.
 
 ### Tailwind CSS v4
 
@@ -78,10 +89,11 @@ Use `next/image` `<Image>` for Supabase-hosted images (the storage domain is con
 ### Map Markers & Clustering
 
 Marker utilities live in `src/lib/map/markers.ts`:
-- `createCategoryIcon(category, temporal)` — Returns a Leaflet `divIcon` with category-specific color and emoji
+- `createCategoryMarkerEl(category, temporal)` — Returns an `HTMLDivElement` for MapLibre GL markers with category-specific color and emoji
+- `createPlaceMarkerEl(category)` — Returns a place marker element
+- `createClusterEl(count)` — Returns a gold-branded cluster badge element
 - `getTemporalStyle(dateStr, endDateStr?)` — Returns opacity/scale/isLive based on event proximity to now
-- Clustering via `leaflet.markercluster` with gold-branded cluster badges
-- Type declarations in `src/types/leaflet.markercluster.d.ts`
+- `escapeHtml(str)` — Sanitizes user input for popup HTML
 
 ## Project Roadmap
 

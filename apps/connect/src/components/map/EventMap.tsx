@@ -10,6 +10,7 @@ import {
   getTemporalStyle,
   escapeHtml,
 } from "@/lib/map/markers";
+import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 
 type Props = {
@@ -23,15 +24,12 @@ type Props = {
   flyTo?: [number, number] | null;
 };
 
-const MAPTILER_KEY = "UYwNkBMiXAEzjQxQmONO";
-const STYLE_URL = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
-
 export default function EventMap({
   events,
   places = [],
   onSelectEvent,
   onSelectPlace,
-  center = [-25.7479, 28.2293],
+  center = DEFAULT_CENTER,
   zoom = 12,
   autoLocate = false,
   flyTo = null,
@@ -41,8 +39,9 @@ export default function EventMap({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const geoMarkerRef = useRef<maplibregl.Marker | null>(null);
   const userPositionRef = useRef<[number, number] | null>(null);
-  const popupRef = useRef<maplibregl.Popup | null>(null);
+  const readyRef = useRef(false);
 
+  // Keep stable refs so marker click handlers always see latest callbacks
   const onSelectEventRef = useRef(onSelectEvent);
   onSelectEventRef.current = onSelectEvent;
   const onSelectPlaceRef = useRef(onSelectPlace);
@@ -59,8 +58,8 @@ export default function EventMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE_URL,
-      center: [center[1], center[0]], // MapLibre uses [lng, lat]
+      style: getMapStyle(),
+      center: toLngLat(center),
       zoom,
       attributionControl: false,
     });
@@ -69,43 +68,53 @@ export default function EventMap({
       new maplibregl.AttributionControl({ compact: true }),
       "bottom-left"
     );
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(
+      new maplibregl.NavigationControl({ showCompass: false }),
+      "bottom-right"
+    );
 
     mapRef.current = map;
 
-    /* Geolocation button */
-    const geoControl = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: false,
+    // Mark map as ready once style is loaded
+    map.once("load", () => {
+      readyRef.current = true;
     });
-    map.addControl(geoControl, "bottom-right");
+
+    /* Geolocation control (native-like button) */
+    map.addControl(
+      new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: false,
+      }),
+      "bottom-right"
+    );
 
     /* Auto-locate user on initial load */
     if (autoLocate) {
-      map.once("load", () => {
-        getCurrentPosition()
-          .then((pos) => {
-            const lngLat: [number, number] = [pos.longitude, pos.latitude];
-            userPositionRef.current = [pos.latitude, pos.longitude];
+      getCurrentPosition()
+        .then((pos) => {
+          const lngLat: [number, number] = [pos.longitude, pos.latitude];
+          userPositionRef.current = [pos.latitude, pos.longitude];
 
-            if (!geoMarkerRef.current) {
-              const el = document.createElement("div");
-              el.style.cssText =
-                "width:16px;height:16px;background:#4285F4;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,.5);";
-              geoMarkerRef.current = new maplibregl.Marker({ element: el })
-                .setLngLat(lngLat)
-                .addTo(map);
-            }
+          const el = document.createElement("div");
+          el.style.cssText =
+            "width:16px;height:16px;background:#4285F4;border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(66,133,244,.45);";
+          geoMarkerRef.current = new maplibregl.Marker({ element: el })
+            .setLngLat(lngLat)
+            .addTo(map);
 
+          // Only fly if map is still alive
+          if (mapRef.current) {
             map.flyTo({ center: lngLat, zoom: 14, duration: 1200 });
-          })
-          .catch(() => {
-            /* geolocation denied */
-          });
-      });
+          }
+        })
+        .catch(() => {
+          /* geolocation denied — stay on default center */
+        });
     }
 
     return () => {
+      readyRef.current = false;
       map.remove();
       mapRef.current = null;
       geoMarkerRef.current = null;
@@ -118,17 +127,14 @@ export default function EventMap({
     const map = mapRef.current;
     if (!map) return;
 
+    // Stable reference to latest data via closure
     const addMarkers = () => {
       clearMarkers();
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-      }
 
       const bounds = new maplibregl.LngLatBounds();
       let hasPoints = false;
 
-      // Event markers
+      // ── Event markers ──
       const mappable = events.filter(
         (e) => e.latitude != null && e.longitude != null
       );
@@ -147,24 +153,23 @@ export default function EventMap({
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat([event.longitude!, event.latitude!])
           .setPopup(
-            new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: "240px" }).setHTML(
-              `<div style="font-family:Montserrat,sans-serif;min-width:180px">
-                <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(event.title)}</h3>
-                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${dateStr}</p>
-                <p style="font-size:12px;color:#4b5563;margin:0">${escapeHtml(event.location)}</p>
-              </div>`
+            new maplibregl.Popup({
+              offset: 16,
+              closeButton: false,
+              maxWidth: "240px",
+            }).setHTML(
+              `<div class="cc-popup"><strong>${escapeHtml(event.title)}</strong><p>${dateStr}</p><p>${escapeHtml(event.location)}</p></div>`
             )
           )
           .addTo(map);
 
         el.addEventListener("click", () => onSelectEventRef.current?.(event));
-
         markersRef.current.push(marker);
         bounds.extend([event.longitude!, event.latitude!]);
         hasPoints = true;
       });
 
-      // Place markers
+      // ── Place markers ──
       places.forEach((place) => {
         const emoji = place.categories?.emoji ?? "📍";
         const color = place.categories?.color ?? "#6b7280";
@@ -185,54 +190,61 @@ export default function EventMap({
             : "No ratings yet";
 
         const warning = isFlagged
-          ? '<p style="font-size:11px;color:#b45309;margin:6px 0 0">Possibly closed - awaiting verification</p>'
+          ? '<p class="cc-popup-warning">Possibly closed - awaiting verification</p>'
           : "";
 
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat([place.longitude, place.latitude])
           .setPopup(
-            new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: "240px" }).setHTML(
-              `<div style="font-family:Montserrat,sans-serif;min-width:180px">
-                <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(place.name)}</h3>
-                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${escapeHtml(place.address)}</p>
-                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">⭐ ${ratingLabel}</p>
-                ${warning}
-              </div>`
+            new maplibregl.Popup({
+              offset: 16,
+              closeButton: false,
+              maxWidth: "240px",
+            }).setHTML(
+              `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>⭐ ${ratingLabel}</p>${warning}</div>`
             )
           )
           .addTo(map);
 
         el.addEventListener("click", () => onSelectPlaceRef.current?.(place));
-
         markersRef.current.push(marker);
         bounds.extend([place.longitude, place.latitude]);
         hasPoints = true;
       });
 
-      // Fit bounds
+      // ── Fit bounds ──
       if (hasPoints) {
         if (userPositionRef.current) {
-          bounds.extend([
-            userPositionRef.current[1],
-            userPositionRef.current[0],
-          ]);
+          bounds.extend(toLngLat(userPositionRef.current));
         }
         map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
       }
     };
 
-    if (map.loaded()) {
+    // If style is loaded, add markers immediately; otherwise wait for load
+    if (readyRef.current) {
       addMarkers();
     } else {
-      map.once("load", addMarkers);
+      const handler = () => {
+        readyRef.current = true;
+        addMarkers();
+      };
+      map.once("load", handler);
+      // Cleanup: remove the listener if effect re-runs before load fires
+      return () => {
+        map.off("load", handler);
+        clearMarkers();
+      };
     }
+
+    return () => clearMarkers();
   }, [events, places, clearMarkers]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
     mapRef.current.flyTo({
-      center: [flyTo[1], flyTo[0]], // [lng, lat]
+      center: toLngLat(flyTo),
       zoom: 13,
       duration: 1200,
     });

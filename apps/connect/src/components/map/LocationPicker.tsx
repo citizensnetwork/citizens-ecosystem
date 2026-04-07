@@ -3,15 +3,13 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 
 type Props = {
   position: [number, number] | null;
   onSelect: (lat: number, lng: number) => void;
   onAddress?: (address: string) => void;
 };
-
-const MAPTILER_KEY = "UYwNkBMiXAEzjQxQmONO";
-const STYLE_URL = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
 
 export default function LocationPicker({ position, onSelect, onAddress }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,12 +24,12 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
     if (!containerRef.current || mapRef.current) return;
 
     const center: [number, number] = position
-      ? [position[1], position[0]] // [lng, lat]
-      : [28.2293, -25.7479];
+      ? toLngLat(position)
+      : toLngLat(DEFAULT_CENTER);
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE_URL,
+      style: getMapStyle(),
       center,
       zoom: 13,
       attributionControl: false,
@@ -67,7 +65,7 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
       if (onAddressRef.current) {
         fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-          { headers: { "Accept-Language": "en" } }
+          { headers: { "Accept-Language": "en", "User-Agent": "CitizensConnect/1.0" } }
         )
           .then((res) => res.json())
           .then((data) => {

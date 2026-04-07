@@ -41,7 +41,7 @@ export const CATEGORY_COLORS: Record<EventCategory, string> = {
   "church-service": "#6366f1",
   youth: "#f59e0b",
   "community-outreach": "#10b981",
-  worship: "#c8a24f",
+  worship: "#D4AF37",
   "bible-study": "#8b5cf6",
   prayer: "#ec4899",
   social: "#06b6d4",

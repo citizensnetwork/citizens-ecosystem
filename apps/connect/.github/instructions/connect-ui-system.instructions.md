@@ -50,7 +50,8 @@ Filter behavior:
 
 - Preserve existing business logic and validation while restyling
 - Do not introduce backend/database changes for UI tasks
-- Keep Leaflet integration pattern from map instructions (`src/components/map/**`)
+- Keep MapLibre GL integration pattern from map instructions (`src/components/map/**`)
+- All map components use shared config from `src/lib/map/config.ts` — never hardcode API keys
 
 ## 6) Completion Checklist for UI Tasks
 

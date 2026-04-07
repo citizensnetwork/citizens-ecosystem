@@ -228,6 +228,31 @@ body {
   font-family: "Montserrat", sans-serif;
 }
 
+.cc-popup {
+  min-width: 180px;
+  font-family: "Montserrat", sans-serif;
+}
+
+.cc-popup strong {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: #000;
+  margin: 0;
+}
+
+.cc-popup p {
+  font-size: 12px;
+  color: #4b5563;
+  margin: 4px 0 0;
+}
+
+.cc-popup-warning {
+  font-size: 11px;
+  color: #b45309;
+  margin: 6px 0 0;
+}
+
 .maplibregl-popup-close-button {
   font-size: 16px;
   color: #666;
