@@ -59,8 +59,8 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses gold (#D4AF37) for worship", () => {
-    expect(CATEGORY_COLORS.worship).toBe("#D4AF37");
+  it("uses monochrome dark for worship", () => {
+    expect(CATEGORY_COLORS.worship).toBe("#111111");
   });
 });
 

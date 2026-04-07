@@ -27,6 +27,11 @@
 **Decision:** White surfaces (60%), black typography (30%), gold accents (10%).
 **Why:** User-specified brand direction. Gold (`#c8a24f`) is the primary accent. No blue-primary patterns.
 
+### Monochrome + Gold mature design (emoji-free)
+**Decision:** Remove all emojis from UI. Replace with inline SVGs (icons) or Unicode glyphs (notification indicators). Category colors changed from rainbow to monochrome dark palette (`#111111`–`#6b7280`). Event markers: gold icon in white circle with black outline. Place markers: black icon in gold rounded-square with black outline. Calendar events use monochrome backgrounds with gold left border.
+**Why:** User feedback: emoji + rainbow colors made the app "seem very child-like." Monochrome + gold is mature, premium, and brand-consistent. No icon library added — all SVGs are inline for zero bundle cost.
+**Date:** 2026-04-07.
+
 ### Map-first full-screen events
 **Decision:** `/events` is a full-viewport map with no page headers. All controls float.
 **Why:** Google Maps-like experience for community discovery. The map IS the page.

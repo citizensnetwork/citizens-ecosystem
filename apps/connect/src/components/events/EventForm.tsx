@@ -554,7 +554,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                       <option value="">Select a category</option>
                       {placeCategories.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.emoji} {c.name}
+                          {c.name}
                         </option>
                       ))}
                     </select>

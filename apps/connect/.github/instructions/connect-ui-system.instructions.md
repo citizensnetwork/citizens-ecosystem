@@ -18,6 +18,17 @@ Implementation baseline:
 - Keep primary CTA emphasis on gold
 - Avoid returning to blue-primary UI patterns unless explicitly requested
 
+### Monochrome + Gold Design Language
+- **No emojis in UI.** All icons are inline SVGs or Unicode glyphs.
+- **Category colors are monochrome** — dark grays/charcoal (`#1a1a1a` to `#6b7280`), defined in `CATEGORY_COLORS` in `src/lib/categories.ts`. No rainbow/bright category colors.
+- **Event map markers**: Gold (#D4AF37) SVG icon inside white circle with 2px black (#111) outline.
+- **Place map markers**: Black (#111) SVG icon inside gold (#D4AF37) rounded-square with 2px black outline.
+- **Cluster badges**: Black circle with gold (#D4AF37) border and text.
+- **Calendar events**: Monochrome category backgrounds with gold (#D4AF37) left border accent.
+- **Burger menu**: Monochrome SVG section icons, thin black separator lines (`border-black/[.12]`).
+- **Notifications**: Simple Unicode glyphs (●, ◆, ✕, ○, ▸) for type indicators, no emojis.
+- Category icons are defined as inline SVGs in `CATEGORY_ICONS` in `src/lib/map/markers.ts`.
+
 ## 2) Events Map Experience (Google Maps Style)
 
 The `/events` map view is map-first and full screen.

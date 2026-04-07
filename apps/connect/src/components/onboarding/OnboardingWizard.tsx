@@ -330,7 +330,7 @@ export default function OnboardingWizard({
 
       {/* Location Section */}
       <div className="border border-black/8 rounded-xl p-4 mb-4">
-        <h2 className="text-sm font-semibold mb-3">📍 Your Location</h2>
+        <h2 className="text-sm font-semibold mb-3">Your Location</h2>
         <p className="text-xs text-black/50 mb-3">
           Help us find events near you. Your exact location is never shown publicly.
         </p>
@@ -359,7 +359,7 @@ export default function OnboardingWizard({
             disabled={locationLoading}
             className="px-3 py-2 bg-black text-white text-xs rounded-lg hover:bg-black/80 disabled:opacity-50"
           >
-            {locationLoading ? "Locating..." : "📍 Use My Location"}
+            {locationLoading ? "Locating..." : "Use My Location"}
           </button>
           <span className="text-xs text-black/40 self-center">or</span>
         </div>
@@ -424,7 +424,7 @@ export default function OnboardingWizard({
 
       {/* Notification Email */}
       <div className="border border-black/8 rounded-xl p-4 mb-6">
-        <h2 className="text-sm font-semibold mb-2">📧 Notification Email</h2>
+        <h2 className="text-sm font-semibold mb-2">Notification Email</h2>
         <p className="text-xs text-black/50 mb-3">
           Optional — receive emails about events matching your interests.
         </p>

@@ -180,7 +180,7 @@ export default function EditEventForm({ event }: Props) {
             disabled={deleting}
             className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
           >
-            {deleting ? "Deleting…" : "🗑 Delete Event"}
+            {deleting ? "Deleting…" : "Delete Event"}
           </button>
         </div>
       </div>

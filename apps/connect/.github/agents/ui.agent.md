@@ -43,6 +43,25 @@ Clarity, certainty, quiet authority, timeless minimalism. Avoid clutter, bright 
 ### Map Engine
 MapLibre GL JS with shared config from `src/lib/map/config.ts`. Uses MapTiler vector tiles when `NEXT_PUBLIC_MAPTILER_KEY` env var is set, falls back to free OSM raster tiles. Marker colors use brand gold for highlights.
 
+### Iconography
+- **No emojis anywhere in the UI.** All icons are inline SVGs or Unicode glyphs.
+- Category icons: inline SVGs defined in `CATEGORY_ICONS` in `src/lib/map/markers.ts`.
+- Burger menu section icons: inline SVGs (folder, chart, star, users).
+- Notification type indicators: Unicode glyphs (●, ◆, ✕, ○, ▸).
+- View toggle (map/calendar): inline SVGs, not emoji characters.
+
+### Map Markers
+- **Event markers**: Gold (#D4AF37) SVG icon inside white circle, 2px black (#111) outline.
+- **Place markers**: Black (#111) SVG icon inside gold (#D4AF37) rounded-square, 2px black outline.
+- **Cluster badges**: Black circle with gold (#D4AF37) border and text.
+- Marker DOM builders: `createCategoryMarkerEl()`, `createPlaceMarkerEl()`, `createClusterEl()` in `src/lib/map/markers.ts`.
+
+### Category Colors
+Monochrome dark palette (no rainbow). Defined in `CATEGORY_COLORS` in `src/lib/categories.ts`:
+- Range: `#111111` (darkest) to `#6b7280` (lightest/other)
+- Calendar events use these as backgrounds with gold (#D4AF37) left border accent.
+- Category labels are plain text with no emoji prefixes.
+
 ## Scope
 
 - You work on frontend UI/UX in Next.js and Tailwind CSS.

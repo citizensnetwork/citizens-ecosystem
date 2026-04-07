@@ -14,11 +14,11 @@ interface NotificationPanelProps {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  event_reminder: "🔔",
-  new_event_match: "✨",
-  event_cancelled: "❌",
-  new_follower: "👤",
-  event_update: "📝",
+  event_reminder: "●",
+  new_event_match: "◆",
+  event_cancelled: "✕",
+  new_follower: "○",
+  event_update: "▸",
 };
 
 function timeAgo(dateStr: string): string {
@@ -100,7 +100,7 @@ export default function NotificationPanel({
       <div className="flex-1 overflow-y-auto">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <span className="text-3xl">🔔</span>
+            <span className="text-2xl text-black/30">●</span>
             <p className="mt-2 text-sm text-black/50">No notifications yet</p>
           </div>
         ) : (
@@ -110,7 +110,7 @@ export default function NotificationPanel({
               const content = (
                 <div className="flex gap-3">
                   <span className="mt-0.5 text-lg shrink-0">
-                    {TYPE_ICONS[n.type] ?? "🔔"}
+                    {TYPE_ICONS[n.type] ?? "●"}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p

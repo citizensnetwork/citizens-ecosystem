@@ -247,7 +247,11 @@ export default function EventsView({
                 className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
                 aria-label="Toggle view mode"
               >
-                {view === "map" ? "📅" : "🗺"}
+                {view === "map" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                )}
               </button>
             </div>
           </div>
@@ -349,7 +353,7 @@ export default function EventsView({
                   })}
                 </p>
                 <p className="text-sm text-black/70">
-                  📍 {selectedEvent.location}
+                  {selectedEvent.location}
                 </p>
                 <p className="text-sm leading-relaxed text-black/80">
                   {selectedEvent.description}
@@ -367,7 +371,6 @@ export default function EventsView({
               <div className="space-y-3 pt-2">
                 {selectedPlace.categories && (
                   <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
-                    {selectedPlace.categories.emoji}{" "}
                     {selectedPlace.categories.name}
                   </span>
                 )}
@@ -375,16 +378,16 @@ export default function EventsView({
                   {selectedPlace.name}
                 </h2>
                 <p className="text-sm text-black/70">
-                  📍 {selectedPlace.address}
+                  {selectedPlace.address}
                 </p>
                 {selectedPlace.phone && (
                   <p className="text-sm text-black/70">
-                    📞 {selectedPlace.phone}
+                    {selectedPlace.phone}
                   </p>
                 )}
                 {selectedPlace.avg_rating != null && (
                   <p className="text-sm text-black/70">
-                    ⭐ {selectedPlace.avg_rating.toFixed(1)} / 5
+                    {selectedPlace.avg_rating.toFixed(1)} / 5
                     {selectedPlace.reviews_count != null &&
                       ` · ${selectedPlace.reviews_count} review${selectedPlace.reviews_count !== 1 ? "s" : ""}`}
                   </p>

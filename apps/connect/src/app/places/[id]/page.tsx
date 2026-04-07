@@ -71,7 +71,7 @@ export default async function PlaceDetailPage({
           <div>
             {place.categories && (
               <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
-                {place.categories.emoji} {place.categories.name}
+                {place.categories.name}
               </span>
             )}
             <h1 className="mt-1 text-2xl font-bold text-black">

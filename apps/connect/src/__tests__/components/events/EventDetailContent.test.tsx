@@ -87,7 +87,7 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    expect(screen.getByText("Worship Night")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Worship Night" })).toBeInTheDocument();
   });
 
   it("renders formatted date", () => {
@@ -137,7 +137,7 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    expect(screen.getByText("🎉 Social")).toBeInTheDocument();
+    expect(screen.getByText("Social")).toBeInTheDocument();
   });
 
   it("renders description", () => {

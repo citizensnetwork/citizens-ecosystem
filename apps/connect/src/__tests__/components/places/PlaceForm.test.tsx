@@ -60,8 +60,8 @@ describe("PlaceForm", () => {
 
   it("renders category options from props", () => {
     render(<PlaceForm categories={categories} />);
-    expect(screen.getByText("⛪ Church")).toBeInTheDocument();
-    expect(screen.getByText("✝️ Ministry")).toBeInTheDocument();
+    expect(screen.getByText("Church")).toBeInTheDocument();
+    expect(screen.getByText("Ministry")).toBeInTheDocument();
   });
 
   it("renders Add Place submit button", () => {

@@ -201,7 +201,7 @@ export default function EventMap({
               closeButton: false,
               maxWidth: "240px",
             }).setHTML(
-              `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>⭐ ${ratingLabel}</p>${warning}</div>`
+              `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>${ratingLabel}</p>${warning}</div>`
             )
           )
           .addTo(map);

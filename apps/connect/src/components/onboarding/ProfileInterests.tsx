@@ -103,7 +103,7 @@ export default function ProfileInterests({
       {homeLatitude !== null && homeLongitude !== null && (
         <div className="mt-4 pt-3 border-t border-black/5">
           <p className="text-xs text-black/50">
-            📍 Location set • Notification radius:{" "}
+            Location set • Notification radius:{" "}
             <strong className="text-black/70">{notificationRadiusKm} km</strong>
           </p>
         </div>
@@ -112,7 +112,7 @@ export default function ProfileInterests({
       {notificationEmail && (
         <div className="mt-2">
           <p className="text-xs text-black/50">
-            📧 Notifications to: <span className="text-black/70">{notificationEmail}</span>
+            Notifications to: <span className="text-black/70">{notificationEmail}</span>
           </p>
         </div>
       )}

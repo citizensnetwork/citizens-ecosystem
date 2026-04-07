@@ -160,7 +160,7 @@ export default function PlaceForm({ categories }: Props) {
           <option value="">Select a category</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.emoji} {c.name}
+              {c.name}
             </option>
           ))}
         </select>

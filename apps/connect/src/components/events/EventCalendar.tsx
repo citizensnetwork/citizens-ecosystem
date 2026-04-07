@@ -33,7 +33,7 @@ export default function EventCalendar({
     start: e.date,
     end: e.end_time ?? undefined,
     backgroundColor: CATEGORY_COLORS[e.category ?? "other"] ?? "#6b7280",
-    borderColor: "transparent",
+    borderColor: "#D4AF37",
     textColor: "#fff",
     extendedProps: { event: e },
   }));

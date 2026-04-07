@@ -184,19 +184,19 @@ describe("EventsView", () => {
     expect(brandLink.closest("a")).toHaveAttribute("href", "/events");
   });
 
-  it("renders view toggle button with calendar emoji on map view", () => {
+  it("renders view toggle button with calendar icon on map view", () => {
     render(<EventsView events={events} />);
     const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
-    expect(toggleBtn).toHaveTextContent("📅");
+    expect(toggleBtn.querySelector("svg")).toBeTruthy();
   });
 
-  it("renders view toggle button with map emoji on calendar view", () => {
+  it("renders view toggle button with map icon on calendar view", () => {
     render(<EventsView events={events} />);
     fireEvent.click(
       screen.getByRole("button", { name: /toggle view mode/i })
     );
     const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
-    expect(toggleBtn).toHaveTextContent("🗺");
+    expect(toggleBtn.querySelector("svg")).toBeTruthy();
   });
 
   it("passes events to calendar view", async () => {
