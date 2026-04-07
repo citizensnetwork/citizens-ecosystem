@@ -18,6 +18,40 @@
 | 8.5 | Role Refactor & UX Polish | **Complete** | Community Citizen rename, all-user event creation, vendor place booking, nav fixes, cancel/unsaved guard, performance indexes, accessibility |
 | — | Architect Audit Fixes (P8–9) | **Complete** | All 10 fixes applied. RLS, API error handling, a11y, TW v4, query optimization |
 | 10 | Smart Notifications + Calendar Sync | **Complete** | In-app notifications, push tokens, bell UI, preferences, Edge Functions, realtime |
+| 11 | In-app Direct Messaging | **Complete** | Conversations, messages, inbox view, real-time chat, message organizer from events/profiles |
+
+---
+
+## Phase 11 — In-app Direct Messaging (COMPLETE)
+
+### Delivered
+- [x] Migration 014_direct_messages.sql — `conversations`, `conversation_participants`, `messages` tables
+- [x] RLS policies: participants-only access, auth-gated creation, self-only read status updates
+- [x] Indexes on messages (conversation+created, sender) and participants (user)
+- [x] `find_conversation(user_a, user_b)` helper function — prevents duplicate conversations
+- [x] Auto-update `conversations.updated_at` trigger on new message
+- [x] Conversations API (`GET/POST /api/conversations`) — list inbox, create/find conversation
+- [x] Messages API (`GET/POST /api/conversations/[id]/messages`) — paginated fetch, send message
+- [x] Read status API (`PATCH /api/conversations/[id]/read`) — mark conversation as read
+- [x] `ConversationList` component — inbox with unread badges, last message preview, timeAgo, realtime updates
+- [x] `ChatView` component — full chat UI with date separators, auto-scroll, load older messages, realtime subscription
+- [x] `MessageButton` component — "Message" button + icon variant for profiles and event details
+- [x] `/messages` page — authenticated inbox view
+- [x] `/messages/[id]` page — individual conversation chat view
+- [x] Messages icon in Navbar (chat bubble icon linking to /messages)
+- [x] "Message Organizer" button on event detail page (visible to non-creators)
+- [x] Message icon on public profiles (next to Follow button)
+- [x] Loading skeleton for messages page
+- [x] TypeScript types: `Conversation`, `ConversationParticipant`, `Message`, `ConversationPreview`
+- [x] `NotificationType` extended with `new_message`
+
+### Data Seeding
+- [x] 50 randomized published events seeded across South Africa
+  - 30 events in Gauteng (Pretoria, Johannesburg, Soweto, Centurion, Midrand, Sandton, Fourways, Roodepoort, etc.)
+  - 10 events in Eastern Cape (Gqeberha, East London, Mthatha, Makhanda)
+  - 10 events in Western Cape (Cape Town, Stellenbosch, Paarl, Khayelitsha, Somerset West, Bellville)
+- [x] Events span April–June 2026 with varied categories, times, capacities and contact info
+- [x] Event interest tags auto-applied based on category mapping
 
 ---
 

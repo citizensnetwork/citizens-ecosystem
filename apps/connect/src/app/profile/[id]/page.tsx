@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
+import MessageButton from "@/components/messaging/MessageButton";
 import type { Event, Profile } from "@/types/db";
 import type { Metadata } from "next";
 
@@ -173,13 +174,20 @@ export default async function PublicProfilePage({
           )}
         </div>
 
-        {/* Follow button */}
+        {/* Follow + Message buttons */}
         {user && (
-          <FollowButton
-            followeeId={id}
-            isFollowing={isFollowing}
-            isFriend={isFriend}
-          />
+          <div className="flex items-center gap-2">
+            <MessageButton
+              recipientId={id}
+              recipientName={profile.full_name}
+              variant="icon"
+            />
+            <FollowButton
+              followeeId={id}
+              isFollowing={isFollowing}
+              isFriend={isFriend}
+            />
+          </div>
         )}
       </div>
 

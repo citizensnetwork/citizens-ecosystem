@@ -14,6 +14,9 @@ src/
 │   ├── api/push-token/route.ts   # Push token register/remove (POST, DELETE)
 │   ├── api/notifications/route.ts# Notifications fetch/mark-read/delete (GET, PATCH, DELETE)
 │   ├── api/notifications/preferences/route.ts # Digest frequency update (PATCH)
+│   ├── api/conversations/route.ts # Conversations list/create (GET, POST)
+│   ├── api/conversations/[id]/messages/route.ts # Messages fetch/send (GET, POST)
+│   ├── api/conversations/[id]/read/route.ts # Mark conversation read (PATCH)
 │   ├── auth/callback/route.ts    # PKCE code exchange (password reset, email confirm)
 │   ├── events/
 │   │   ├── page.tsx              # /events — fetches all events, renders EventsView
@@ -52,6 +55,10 @@ src/
 │   │   ├── NotificationBell.tsx  # Bell icon + unread badge + realtime subscription
 │   │   ├── NotificationPanel.tsx # Dropdown list — type icons, timeAgo, mark read, delete, deep links
 │   │   └── NotificationPreferences.tsx # Instant/daily/off radio selector
+│   ├── messaging/
+│   │   ├── MessageButton.tsx     # "Message" CTA — button + icon variant for profiles/events
+│   │   ├── ConversationList.tsx  # Inbox list with unread badges, realtime updates
+│   │   └── ChatView.tsx          # Chat thread — messages, date separators, send, realtime
 │   ├── onboarding/
 │   │   ├── OnboardingWizard.tsx   # Single-page interest/location/notification wizard (edit + onboard mode)
 │   │   ├── OnboardingOverlay.tsx  # Full-screen overlay for first-login onboarding
@@ -71,7 +78,7 @@ src/
 │       └── client.ts             # Browser Supabase client
 │
 ├── types/
-│   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, EventCategory, UserRole, InterestGroup, Interest
+│   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, Conversation, Message, ConversationPreview, EventCategory, UserRole, InterestGroup, Interest
 │   └── leaflet.markercluster.d.ts# Type declarations for markercluster plugin
 │
 └── middleware.ts                 # Supabase session refresh on all non-static routes

@@ -116,6 +116,28 @@
 **Decision:** `supabase/functions/_shared/push.ts` accepts a Supabase client parameter instead of creating its own.
 **Why:** Avoids duplicate client instantiation across Edge Functions. Each function creates one client and passes it through.
 
+## Phase 11: Direct Messaging
+
+### DM-only conversations (no group chat)
+**Decision:** Conversations are strictly 1:1 between two users. The `find_conversation()` function deduplicates — same two users always share one conversation.
+**Why:** Group chat adds UI/UX complexity out of scope. 1:1 covers the primary use case: attendee→organizer communication and user-to-user networking.
+**Date:** Phase 11.
+
+### Message body limit 2000 characters
+**Decision:** `messages.body CHECK (char_length(body) BETWEEN 1 AND 2000)`.
+**Why:** Prevents abuse (wall-of-text spam) while being generous enough for meaningful messages.
+**Date:** Phase 11.
+
+### Cursor-based message pagination
+**Decision:** Messages API uses `?before=<message_id>` cursor pagination (not offset-based).
+**Why:** Cursor pagination is stable under concurrent inserts — new messages don't shift pages. Offset pagination would cause duplicate/skipped messages during active chats.
+**Date:** Phase 11.
+
+### `updated_at` trigger for conversation ordering
+**Decision:** A trigger on `messages` INSERT updates `conversations.updated_at` to `now()`.
+**Why:** Inbox list orders by `updated_at DESC` — most recent conversations float to top without extra queries.
+**Date:** Phase 11.
+
 ## Avoided Approaches
 
 | Approach | Why Avoided |

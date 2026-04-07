@@ -9,6 +9,7 @@ import CommentSection from "./CommentSection";
 import WhoIsAttending from "./WhoIsAttending";
 import ReviewList from "@/components/reviews/ReviewList";
 import ShareButton from "@/components/ui/ShareButton";
+import MessageButton from "@/components/messaging/MessageButton";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import type { Event, AttendeesVisibility } from "@/types/db";
@@ -248,6 +249,16 @@ export default function EventDetailContent({
           </Link>
         )}
       </div>
+
+      {/* Message Organizer */}
+      {user && user.id !== event.created_by && (
+        <div className="mt-6">
+          <MessageButton
+            recipientId={event.created_by}
+            recipientName="Organizer"
+          />
+        </div>
+      )}
 
       {/* Who's Attending */}
       <div className="mt-10 border-t pt-8">

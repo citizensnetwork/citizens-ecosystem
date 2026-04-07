@@ -1,7 +1,7 @@
 -- ============================================
 -- Citizens Connect - Database Schema
 -- Canonical full schema (idempotent — safe to re-run)
--- Reflects all migrations through 011_interest_profile
+-- Reflects all migrations through 014_direct_messages
 -- ============================================
 
 -- ── Helper: admin check ──────────────────────────────────
@@ -766,3 +766,86 @@ end $$;
 create index if not exists idx_notifications_user_created on public.notifications(user_id, created_at desc);
 create index if not exists idx_notifications_user_unread on public.notifications(user_id) where read = false;
 create index if not exists idx_push_tokens_user on public.push_tokens(user_id);
+
+-- ══════════════════════════════════════════════
+-- 14. Conversations (Phase 11 — Direct Messaging)
+-- ══════════════════════════════════════════════
+create table if not exists public.conversations (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.conversations enable row level security;
+
+create table if not exists public.conversation_participants (
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  last_read_at timestamptz default now(),
+  primary key (conversation_id, user_id)
+);
+
+alter table public.conversation_participants enable row level security;
+create index if not exists idx_conv_participants_user on public.conversation_participants(user_id);
+
+create table if not exists public.messages (
+  id uuid default gen_random_uuid() primary key,
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  sender_id uuid references public.profiles(id) on delete set null,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+
+alter table public.messages enable row level security;
+create index if not exists idx_messages_conversation_created on public.messages(conversation_id, created_at desc);
+create index if not exists idx_messages_sender on public.messages(sender_id);
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Participants can view conversations' and tablename = 'conversations') then
+    create policy "Participants can view conversations" on public.conversations
+      for select using (exists (select 1 from public.conversation_participants where conversation_id = conversations.id and user_id = auth.uid()) or public.is_admin());
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can create conversations' and tablename = 'conversations') then
+    create policy "Authenticated users can create conversations" on public.conversations for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users see participants of their conversations' and tablename = 'conversation_participants') then
+    create policy "Users see participants of their conversations" on public.conversation_participants for select using (
+      exists (select 1 from public.conversation_participants cp where cp.conversation_id = conversation_participants.conversation_id and cp.user_id = auth.uid()) or public.is_admin()
+    );
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can add participants' and tablename = 'conversation_participants') then
+    create policy "Authenticated users can add participants" on public.conversation_participants for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Participants can update own read status' and tablename = 'conversation_participants') then
+    create policy "Participants can update own read status" on public.conversation_participants for update using (user_id = auth.uid());
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Participants can view messages' and tablename = 'messages') then
+    create policy "Participants can view messages" on public.messages for select using (
+      exists (select 1 from public.conversation_participants where conversation_id = messages.conversation_id and user_id = auth.uid()) or public.is_admin()
+    );
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Participants can send messages' and tablename = 'messages') then
+    create policy "Participants can send messages" on public.messages for insert with check (
+      sender_id = auth.uid() and exists (select 1 from public.conversation_participants where conversation_id = messages.conversation_id and user_id = auth.uid())
+    );
+  end if;
+end $$;
+
+create or replace function public.find_conversation(user_a uuid, user_b uuid)
+returns uuid language sql stable as $$
+  select cp1.conversation_id from public.conversation_participants cp1
+  join public.conversation_participants cp2 on cp1.conversation_id = cp2.conversation_id
+  where cp1.user_id = user_a and cp2.user_id = user_b limit 1;
+$$;
+
+create or replace function public.update_conversation_timestamp()
+returns trigger language plpgsql security definer as $$
+begin
+  update public.conversations set updated_at = now() where id = new.conversation_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_message_sent on public.messages;
+create trigger on_message_sent after insert on public.messages
+  for each row execute function public.update_conversation_timestamp();

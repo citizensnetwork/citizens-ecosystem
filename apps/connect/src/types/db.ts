@@ -165,7 +165,8 @@ export type NotificationType =
   | "new_event_match"
   | "event_cancelled"
   | "new_follower"
-  | "event_update";
+  | "event_update"
+  | "new_message";
 
 export type NotificationDigest = "instant" | "daily" | "off";
 
@@ -206,4 +207,43 @@ export type FriendAttending = {
   full_name: string;
   avatar_url: string | null;
   attending_events: Event[];
+};
+
+// ── Phase 11: Direct Messaging ──────────────────
+
+export type Conversation = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationParticipant = {
+  conversation_id: string;
+  user_id: string;
+  last_read_at: string;
+};
+
+export type Message = {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null;
+  body: string;
+  created_at: string;
+};
+
+/** Conversation with preview info for inbox list */
+export type ConversationPreview = {
+  id: string;
+  updated_at: string;
+  other_user: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  };
+  last_message: {
+    body: string;
+    sender_id: string | null;
+    created_at: string;
+  } | null;
+  unread_count: number;
 };

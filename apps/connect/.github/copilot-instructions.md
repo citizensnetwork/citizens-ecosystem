@@ -65,7 +65,7 @@ Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categor
 
 Schema in `supabase/schema.sql` (idempotent — safe to re-run). Migrations in `supabase/migrations/`.
 
-Tables: `profiles` (extends auth.users, roles: vendor/client/admin), `events` (with lat/lng, category, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push).
+Tables: `profiles` (extends auth.users, roles: vendor/client/admin), `events` (with lat/lng, category, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
 
 Trigger `on_auth_user_created` auto-creates a profile row from auth metadata on signup.
 
@@ -87,8 +87,8 @@ Marker utilities live in `src/lib/map/markers.ts`:
 
 See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists.
 
-**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9), Smart Notifications (Phase 10)
-**Current phase:** All core phases complete (Phases 1–10)
+**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9), Smart Notifications (Phase 10), Direct Messaging (Phase 11)
+**Current phase:** All core phases complete (Phases 1–11)
 **Upcoming:** Community feedback & iteration
 
 Platform has two full-screen primary views:
