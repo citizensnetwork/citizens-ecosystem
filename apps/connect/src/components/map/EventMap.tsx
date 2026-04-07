@@ -24,6 +24,9 @@ type Props = {
   flyTo?: [number, number] | null;
 };
 
+/* ── Persist map viewpoint across navigations ── */
+const MAP_VIEW_KEY = "cc-map-viewpoint";
+
 export default function EventMap({
   events,
   places = [],
@@ -52,9 +55,6 @@ export default function EventMap({
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
   }, []);
-
-  /* ── Save / restore map viewpoint via sessionStorage ── */
-  const MAP_VIEW_KEY = "cc-map-viewpoint";
 
   const saveMapView = useCallback(() => {
     const map = mapRef.current;
@@ -205,14 +205,12 @@ export default function EventMap({
 
       // ── Place markers ──
       places.forEach((place) => {
-        const emoji = place.categories?.emoji ?? "📍";
-        const color = place.categories?.color ?? "#6b7280";
         const avgRating = place.avg_rating ?? null;
         const isHighRated = avgRating != null && avgRating >= 4.5;
         const isFlagged =
           !!place.verification_flagged || place.verified === false;
 
-        const el = createPlaceMarkerEl(emoji, color, {
+        const el = createPlaceMarkerEl({
           avgRating,
           isHighRated,
           isFlagged,

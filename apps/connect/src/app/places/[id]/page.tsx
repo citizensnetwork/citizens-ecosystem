@@ -129,7 +129,7 @@ export default async function PlaceDetailPage({
           {place.phone && <p>{place.phone}</p>}
         </div>
 
-        {place.website && (
+        {place.website && /^https?:\/\//i.test(place.website) && (
           <div className="rounded-xl border border-black/8 p-3">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-black/40">
               Website

@@ -411,7 +411,7 @@ export default function EventsView({
                     Possibly closed - awaiting owner verification
                   </p>
                 )}
-                {selectedPlace.website && (
+                {selectedPlace.website && /^https?:\/\//i.test(selectedPlace.website) && (
                   <a
                     href={selectedPlace.website}
                     target="_blank"

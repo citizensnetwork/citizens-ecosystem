@@ -20,12 +20,12 @@ Implementation baseline:
 
 ### Monochrome + Gold Design Language
 - **No emojis in UI.** All icons are inline SVGs or Unicode glyphs.
-- **Category colors are monochrome** — dark grays/charcoal (`#1a1a1a` to `#6b7280`), defined in `CATEGORY_COLORS` in `src/lib/categories.ts`. No rainbow/bright category colors.
-- **Event map markers**: Gold (#D4AF37) SVG icon inside white circle with 2px black (#111) outline.
-- **Place map markers**: Black (#111) SVG icon inside gold (#D4AF37) rounded-square with 2px black outline.
+- **Category colors are an alternating white/grey palette** (`#d4d4d4` to `#f5f5f5`), defined in `CATEGORY_COLORS` in `src/lib/categories.ts`. These are used for un-RSVP'd calendar events; RSVP'd events use gold (#D4AF37).
+- **Event map markers**: Black (#111) SVG icon inside white circle with 2px gold (#D4AF37) outline. 40px base size.
+- **Place map markers**: Bare gold (#D4AF37) SVG pin icon with no background or bubble. 28px size, CSS drop-shadow for visibility.
 - **Cluster badges**: Black circle with gold (#D4AF37) border and text.
-- **Calendar events**: Monochrome category backgrounds with gold (#D4AF37) left border accent.
-- **Burger menu**: Monochrome SVG section icons, thin black separator lines (`border-black/[.12]`).
+- **Calendar events**: White/grey category backgrounds for un-RSVP'd, gold (#D4AF37) background for RSVP'd events.
+- **Burger menu**: Gold SVG section icons (`text-(--gold)`), thin black separator lines (`border-black/[.12]`).
 - **Notifications**: Simple Unicode glyphs (●, ◆, ✕, ○, ▸) for type indicators, no emojis.
 - Category icons are defined as inline SVGs in `CATEGORY_ICONS` in `src/lib/map/markers.ts`.
 

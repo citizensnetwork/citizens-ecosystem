@@ -105,8 +105,6 @@ export function createCategoryMarkerEl(
  * Smaller than event markers to avoid hiding events.
  */
 export function createPlaceMarkerEl(
-  _emoji: string,
-  _color: string,
   options?: {
     avgRating?: number | null;
     isHighRated?: boolean;

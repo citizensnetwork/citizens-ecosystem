@@ -44,6 +44,7 @@ export default function FollowPlaceButton({
       type="button"
       onClick={handleClick}
       disabled={loading}
+      aria-pressed={following}
       className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
         following
           ? "bg-black/5 text-black hover:bg-black/10"

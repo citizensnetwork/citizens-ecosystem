@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "Already following" }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to follow place" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -67,7 +67,7 @@ export async function DELETE(request: NextRequest) {
     .eq("place_id", placeId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to unfollow place" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
