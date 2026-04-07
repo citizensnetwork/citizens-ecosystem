@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 type Props = {
   position: [number, number] | null;
@@ -10,10 +10,13 @@ type Props = {
   onAddress?: (address: string) => void;
 };
 
+const MAPTILER_KEY = "UYwNkBMiXAEzjQxQmONO";
+const STYLE_URL = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
+
 export default function LocationPicker({ position, onSelect, onAddress }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onAddressRef = useRef(onAddress);
@@ -22,38 +25,40 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const defaultIcon = L.icon({
-      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-      iconRetinaUrl:
-        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-      shadowUrl:
-        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41],
+    const center: [number, number] = position
+      ? [position[1], position[0]] // [lng, lat]
+      : [28.2293, -25.7479];
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: STYLE_URL,
+      center,
+      zoom: 13,
+      attributionControl: false,
     });
 
-    const center: [number, number] = position ?? [-25.7479, 28.2293];
-    const map = L.map(containerRef.current).setView(center, 13);
+    map.addControl(
+      new maplibregl.AttributionControl({ compact: true }),
+      "bottom-left"
+    );
+
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
-
     if (position) {
-      markerRef.current = L.marker(position, { icon: defaultIcon }).addTo(map);
+      markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })
+        .setLngLat([position[1], position[0]])
+        .addTo(map);
     }
 
-    map.on("click", (e: L.LeafletMouseEvent) => {
-      const { lat, lng } = e.latlng;
+    map.on("click", (e) => {
+      const { lng, lat } = e.lngLat;
 
       if (markerRef.current) {
-        markerRef.current.setLatLng([lat, lng]);
+        markerRef.current.setLngLat([lng, lat]);
       } else {
-        markerRef.current = L.marker([lat, lng], { icon: defaultIcon }).addTo(map);
+        markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })
+          .setLngLat([lng, lat])
+          .addTo(map);
       }
 
       onSelectRef.current(lat, lng);

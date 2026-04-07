@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
-import "leaflet.markercluster";
+import { useEffect, useRef, useCallback } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import type { Event, Place } from "@/types/db";
 import {
-  createCategoryIcon,
-  createPlaceIcon,
+  createCategoryMarkerEl,
+  createPlaceMarkerEl,
   getTemporalStyle,
   escapeHtml,
 } from "@/lib/map/markers";
@@ -26,6 +23,9 @@ type Props = {
   flyTo?: [number, number] | null;
 };
 
+const MAPTILER_KEY = "UYwNkBMiXAEzjQxQmONO";
+const STYLE_URL = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
+
 export default function EventMap({
   events,
   places = [],
@@ -37,98 +37,72 @@ export default function EventMap({
   flyTo = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const eventClusterRef = useRef<L.MarkerClusterGroup | null>(null);
-  const placeClusterRef = useRef<L.MarkerClusterGroup | null>(null);
-  const geoMarkerRef = useRef<L.CircleMarker | null>(null);
-  const userPositionRef = useRef<L.LatLngExpression | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const geoMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const userPositionRef = useRef<[number, number] | null>(null);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
+
+  const onSelectEventRef = useRef(onSelectEvent);
+  onSelectEventRef.current = onSelectEvent;
+  const onSelectPlaceRef = useRef(onSelectPlace);
+  onSelectPlaceRef.current = onSelectPlace;
+
+  const clearMarkers = useCallback(() => {
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+  }, []);
 
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = L.map(containerRef.current).setView(center, zoom);
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: STYLE_URL,
+      center: [center[1], center[0]], // MapLibre uses [lng, lat]
+      zoom,
+      attributionControl: false,
+    });
+
+    map.addControl(
+      new maplibregl.AttributionControl({ compact: true }),
+      "bottom-left"
+    );
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-
     /* Geolocation button */
-    const LocBtn = L.Control.extend({
-      onAdd() {
-        const btn = L.DomUtil.create("button", "cc-geo-btn");
-        btn.innerHTML = "📍";
-        btn.title = "My location";
-        btn.type = "button";
-        btn.setAttribute(
-          "style",
-          "width:36px;height:36px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;"
-        );
-        L.DomEvent.disableClickPropagation(btn);
-        btn.addEventListener("click", () => {
-          getCurrentPosition()
-            .then((pos) => {
-              const ll: L.LatLngExpression = [
-                pos.latitude,
-                pos.longitude,
-              ];
-              map.setView(ll, 15);
-
-              if (geoMarkerRef.current) {
-                geoMarkerRef.current.setLatLng(ll);
-              } else {
-                geoMarkerRef.current = L.circleMarker(ll, {
-                  radius: 8,
-                  fillColor: "#4285F4",
-                  fillOpacity: 1,
-                  color: "#fff",
-                  weight: 2,
-                })
-                  .addTo(map)
-                  .bindPopup("You are here");
-              }
-            })
-            .catch(() => {
-              /* permission denied — ignore */
-            });
-        });
-        return btn;
-      },
+    const geoControl = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: false,
     });
-    new LocBtn({ position: "bottomright" }).addTo(map);
+    map.addControl(geoControl, "bottom-right");
 
     /* Auto-locate user on initial load */
     if (autoLocate) {
-      getCurrentPosition()
-        .then((pos) => {
-          const ll: L.LatLngExpression = [pos.latitude, pos.longitude];
-          userPositionRef.current = ll;
+      map.once("load", () => {
+        getCurrentPosition()
+          .then((pos) => {
+            const lngLat: [number, number] = [pos.longitude, pos.latitude];
+            userPositionRef.current = [pos.latitude, pos.longitude];
 
-          if (!geoMarkerRef.current) {
-            geoMarkerRef.current = L.circleMarker(ll, {
-              radius: 8,
-              fillColor: "#4285F4",
-              fillOpacity: 1,
-              color: "#fff",
-              weight: 2,
-            })
-              .addTo(map)
-              .bindPopup("You are here");
-          }
+            if (!geoMarkerRef.current) {
+              const el = document.createElement("div");
+              el.style.cssText =
+                "width:16px;height:16px;background:#4285F4;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,.5);";
+              geoMarkerRef.current = new maplibregl.Marker({ element: el })
+                .setLngLat(lngLat)
+                .addTo(map);
+            }
 
-          // If event markers already loaded, extend bounds to include user
-          if (eventClusterRef.current && eventClusterRef.current.getLayers().length > 0) {
-            const bounds = eventClusterRef.current.getBounds().extend(ll);
-            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-          } else {
-            map.setView(ll, 14);
-          }
-        })
-        .catch(() => {
-          /* geolocation denied or unavailable — stay on default center */
-        });
+            map.flyTo({ center: lngLat, zoom: 14, duration: 1200 });
+          })
+          .catch(() => {
+            /* geolocation denied */
+          });
+      });
     }
 
     return () => {
@@ -139,127 +113,129 @@ export default function EventMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Sync event markers ───────────────────────────────── */
+  /* ── Sync event + place markers ───────────────────────── */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove old cluster group
-    if (eventClusterRef.current) {
-      map.removeLayer(eventClusterRef.current);
-    }
+    const addMarkers = () => {
+      clearMarkers();
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
 
-    const cluster = L.markerClusterGroup({
-      maxClusterRadius: 45,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-    });
-    eventClusterRef.current = cluster;
+      const bounds = new maplibregl.LngLatBounds();
+      let hasPoints = false;
 
-    const mappable = events.filter(
-      (e) => e.latitude != null && e.longitude != null
-    );
-
-    mappable.forEach((event) => {
-      const temporal = getTemporalStyle(event.date);
-      const icon = createCategoryIcon(event.category, temporal);
-
-      const dateStr = new Date(event.date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      const popup = `<div style="min-width:190px">
-        <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(event.title)}</h3>
-        <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${dateStr}</p>
-        <p style="font-size:12px;color:#4b5563;margin:0">${escapeHtml(event.location)}</p>
-      </div>`;
-
-      const marker = L.marker([event.latitude!, event.longitude!], { icon })
-        .bindPopup(popup);
-
-      marker.on("click", () => onSelectEvent?.(event));
-      cluster.addLayer(marker);
-    });
-
-    map.addLayer(cluster);
-
-    if (mappable.length > 0) {
-      const bounds = L.latLngBounds(
-        mappable.map((e) => [e.latitude!, e.longitude!])
+      // Event markers
+      const mappable = events.filter(
+        (e) => e.latitude != null && e.longitude != null
       );
-      // Include places in bounds
-      places.forEach((p) => bounds.extend([p.latitude, p.longitude]));
-      // Include user position if already resolved
-      if (userPositionRef.current) bounds.extend(userPositionRef.current);
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-    }
-  }, [events, onSelectEvent, places]);
 
-  /* ── Sync place markers ───────────────────────────────── */
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+      mappable.forEach((event) => {
+        const temporal = getTemporalStyle(event.date);
+        const el = createCategoryMarkerEl(event.category, temporal);
 
-    if (placeClusterRef.current) {
-      map.removeLayer(placeClusterRef.current);
-    }
+        const dateStr = new Date(event.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
-    if (places.length === 0) return;
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([event.longitude!, event.latitude!])
+          .setPopup(
+            new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: "240px" }).setHTML(
+              `<div style="font-family:Montserrat,sans-serif;min-width:180px">
+                <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(event.title)}</h3>
+                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${dateStr}</p>
+                <p style="font-size:12px;color:#4b5563;margin:0">${escapeHtml(event.location)}</p>
+              </div>`
+            )
+          )
+          .addTo(map);
 
-    const cluster = L.markerClusterGroup({
-      maxClusterRadius: 40,
-      showCoverageOnHover: false,
-    });
-    placeClusterRef.current = cluster;
+        el.addEventListener("click", () => onSelectEventRef.current?.(event));
 
-    places.forEach((place) => {
-      const emoji = place.categories?.emoji ?? "📍";
-      const color = place.categories?.color ?? "#6b7280";
-      const avgRating = place.avg_rating ?? null;
-      const isHighRated = avgRating != null && avgRating >= 4.5;
-      const isFlagged = !!place.verification_flagged || place.verified === false;
-
-      const icon = createPlaceIcon(emoji, color, {
-        avgRating,
-        isHighRated,
-        isFlagged,
+        markersRef.current.push(marker);
+        bounds.extend([event.longitude!, event.latitude!]);
+        hasPoints = true;
       });
 
-      const ratingLabel =
-        avgRating != null
-          ? `${avgRating.toFixed(1)} / 5 · ${place.reviews_count ?? 0} review${
-              (place.reviews_count ?? 0) !== 1 ? "s" : ""
-            }`
-          : "No ratings yet";
+      // Place markers
+      places.forEach((place) => {
+        const emoji = place.categories?.emoji ?? "📍";
+        const color = place.categories?.color ?? "#6b7280";
+        const avgRating = place.avg_rating ?? null;
+        const isHighRated = avgRating != null && avgRating >= 4.5;
+        const isFlagged =
+          !!place.verification_flagged || place.verified === false;
 
-      const warning = isFlagged
-        ? '<p style="font-size:11px;color:#b45309;margin:6px 0 0">Possibly closed - awaiting verification</p>'
-        : "";
+        const el = createPlaceMarkerEl(emoji, color, {
+          avgRating,
+          isHighRated,
+          isFlagged,
+        });
 
-      const popup = `<div style="min-width:190px">
-        <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(place.name)}</h3>
-        <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${escapeHtml(place.address)}</p>
-        <p style="font-size:12px;color:#4b5563;margin:4px 0 0">⭐ ${ratingLabel}</p>
-        ${warning}
-      </div>`;
+        const ratingLabel =
+          avgRating != null
+            ? `${avgRating.toFixed(1)} / 5 · ${place.reviews_count ?? 0} review${(place.reviews_count ?? 0) !== 1 ? "s" : ""}`
+            : "No ratings yet";
 
-      const marker = L.marker([place.latitude, place.longitude], { icon })
-        .bindPopup(popup);
+        const warning = isFlagged
+          ? '<p style="font-size:11px;color:#b45309;margin:6px 0 0">Possibly closed - awaiting verification</p>'
+          : "";
 
-      marker.on("click", () => onSelectPlace?.(place));
-      cluster.addLayer(marker);
-    });
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([place.longitude, place.latitude])
+          .setPopup(
+            new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: "240px" }).setHTML(
+              `<div style="font-family:Montserrat,sans-serif;min-width:180px">
+                <h3 style="font-weight:600;font-size:14px;color:#111;margin:0">${escapeHtml(place.name)}</h3>
+                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">${escapeHtml(place.address)}</p>
+                <p style="font-size:12px;color:#4b5563;margin:4px 0 0">⭐ ${ratingLabel}</p>
+                ${warning}
+              </div>`
+            )
+          )
+          .addTo(map);
 
-    map.addLayer(cluster);
-  }, [places, onSelectPlace]);
+        el.addEventListener("click", () => onSelectPlaceRef.current?.(place));
+
+        markersRef.current.push(marker);
+        bounds.extend([place.longitude, place.latitude]);
+        hasPoints = true;
+      });
+
+      // Fit bounds
+      if (hasPoints) {
+        if (userPositionRef.current) {
+          bounds.extend([
+            userPositionRef.current[1],
+            userPositionRef.current[0],
+          ]);
+        }
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
+      }
+    };
+
+    if (map.loaded()) {
+      addMarkers();
+    } else {
+      map.once("load", addMarkers);
+    }
+  }, [events, places, clearMarkers]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo(flyTo, 13);
+    mapRef.current.flyTo({
+      center: [flyTo[1], flyTo[0]], // [lng, lat]
+      zoom: 13,
+      duration: 1200,
+    });
   }, [flyTo]);
 
   return <div ref={containerRef} className="h-full w-full" />;

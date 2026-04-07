@@ -1,4 +1,3 @@
-import L from "leaflet";
 import type { EventCategory } from "@/types/db";
 
 /* ── Category colours & emoji ────────────────────────────── */
@@ -10,7 +9,7 @@ const CATEGORY_CONFIG: Record<
   "church-service": { color: "#6366f1", emoji: "⛪" }, // indigo
   youth: { color: "#f59e0b", emoji: "🌟" }, // amber
   "community-outreach": { color: "#10b981", emoji: "🤝" }, // emerald
-  worship: { color: "#c8a24f", emoji: "🎵" }, // gold
+  worship: { color: "#D4AF37", emoji: "🎵" }, // brand gold
   "bible-study": { color: "#8b5cf6", emoji: "📖" }, // violet
   prayer: { color: "#ec4899", emoji: "🙏" }, // pink
   social: { color: "#06b6d4", emoji: "☕" }, // cyan
@@ -51,42 +50,45 @@ export function getTemporalStyle(
   return { opacity: 0.35, scale: 0.8, isLive: false };
 }
 
-/* ── DivIcon builders ────────────────────────────────────── */
+/* ── MapLibre marker element builders ────────────────────── */
 
 const BASE_SIZE = 36;
 
-export function createCategoryIcon(
-  category: EventCategory | null,
-  temporal: TemporalStyle
-): L.DivIcon {
-  const { color, emoji } = CATEGORY_CONFIG[category ?? "other"] ?? DEFAULT_CONFIG;
-  const size = Math.round(BASE_SIZE * temporal.scale);
-  const half = size / 2;
-
-  const liveClass = temporal.isLive ? " cc-marker-live" : "";
-
-  return L.divIcon({
-    className: `cc-marker${liveClass}`,
-    iconSize: [size, size],
-    iconAnchor: [half, half],
-    popupAnchor: [0, -half],
-    html: `<span style="
-      width:${size}px;height:${size}px;
-      display:flex;align-items:center;justify-content:center;
-      background:${color};
-      opacity:${temporal.opacity};
-      border-radius:50%;
-      border:2.5px solid #fff;
-      box-shadow:0 2px 6px rgba(0,0,0,.35);
-      font-size:${Math.round(size * 0.48)}px;
-      line-height:1;
-      transition:transform 180ms ease;
-    ">${emoji}</span>`,
-  });
+export function getCategoryConfig(category: EventCategory | null) {
+  return CATEGORY_CONFIG[category ?? "other"] ?? DEFAULT_CONFIG;
 }
 
-/** Place icon — always full opacity, square-ish with rounded corners */
-export function createPlaceIcon(
+export function createCategoryMarkerEl(
+  category: EventCategory | null,
+  temporal: TemporalStyle
+): HTMLDivElement {
+  const { color, emoji } = getCategoryConfig(category);
+  const size = Math.round(BASE_SIZE * temporal.scale);
+
+  const el = document.createElement("div");
+  el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}`;
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+
+  el.innerHTML = `<span style="
+    width:${size}px;height:${size}px;
+    display:flex;align-items:center;justify-content:center;
+    background:${color};
+    opacity:${temporal.opacity};
+    border-radius:50%;
+    border:2.5px solid #fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);
+    font-size:${Math.round(size * 0.48)}px;
+    line-height:1;
+    cursor:pointer;
+    transition:transform 180ms ease;
+  ">${emoji}</span>`;
+
+  return el;
+}
+
+/** Place marker — always full opacity, square-ish with rounded corners */
+export function createPlaceMarkerEl(
   emoji: string,
   color: string,
   options?: {
@@ -94,9 +96,8 @@ export function createPlaceIcon(
     isHighRated?: boolean;
     isFlagged?: boolean;
   }
-): L.DivIcon {
+): HTMLDivElement {
   const size = 34;
-  const half = size / 2;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;
@@ -111,7 +112,7 @@ export function createPlaceIcon(
         height:18px;
         padding:0 4px;
         border-radius:10px;
-        background:${isHighRated ? "#c8a24f" : "#111"};
+        background:${isHighRated ? "#D4AF37" : "#111"};
         color:${isHighRated ? "#111" : "#fff"};
         border:1.5px solid #fff;
         font-size:10px;
@@ -144,31 +145,62 @@ export function createPlaceIcon(
     : "";
 
   const glow = isHighRated
-    ? "0 0 0 4px rgba(200,162,79,.32), 0 2px 8px rgba(0,0,0,.35)"
+    ? "0 0 0 4px rgba(212,175,55,.32), 0 2px 8px rgba(0,0,0,.35)"
     : "0 2px 6px rgba(0,0,0,.35)";
 
   const opacity = isFlagged ? 0.62 : 1;
   const lineDecoration = isFlagged ? "line-through" : "none";
 
-  return L.divIcon({
-    className: "cc-marker",
-    iconSize: [size, size],
-    iconAnchor: [half, half],
-    popupAnchor: [0, -half],
-    html: `<span style="
-      position:relative;
-      width:${size}px;height:${size}px;
-      display:flex;align-items:center;justify-content:center;
-      background:${color};
-      border-radius:8px;
-      border:2.5px solid #fff;
-      box-shadow:${glow};
-      opacity:${opacity};
-      font-size:16px;
-      line-height:1;
-      text-decoration:${lineDecoration};
-    ">${emoji}${ratingBadge}${warningBadge}</span>`,
-  });
+  const el = document.createElement("div");
+  el.className = "cc-marker";
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+
+  el.innerHTML = `<span style="
+    position:relative;
+    width:${size}px;height:${size}px;
+    display:flex;align-items:center;justify-content:center;
+    background:${color};
+    border-radius:8px;
+    border:2.5px solid #fff;
+    box-shadow:${glow};
+    opacity:${opacity};
+    font-size:16px;
+    line-height:1;
+    cursor:pointer;
+    text-decoration:${lineDecoration};
+  ">${emoji}${ratingBadge}${warningBadge}</span>`;
+
+  return el;
+}
+
+/** Cluster badge element */
+export function createClusterEl(count: number): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "cc-cluster";
+
+  const size = count < 10 ? 36 : count < 100 ? 42 : 48;
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+
+  el.innerHTML = `<div style="
+    width:${size}px;height:${size}px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(212,175,55,0.3);
+    border-radius:50%;
+  "><div style="
+    width:${size - 8}px;height:${size - 8}px;
+    display:flex;align-items:center;justify-content:center;
+    background:#D4AF37;
+    border-radius:50%;
+    color:#111;
+    font-weight:600;
+    font-size:13px;
+    line-height:1;
+    cursor:pointer;
+  ">${count}</div></div>`;
+
+  return el;
 }
 
 /* ── HTML escaping for popup content ─────────────────────── */
