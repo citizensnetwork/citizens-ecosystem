@@ -2,7 +2,7 @@
 
 Part of the **Citizens ecosystem** — see `.github/VISION.md` for full platform vision, mission, and feature evaluation criteria.
 
-Citizens Connect is the flagship channel: a map-first community discovery platform that serves organizers and non-organizers equally. It surfaces the vibrant, diverse layer of Christian community activity — outreaches, creative events, social gatherings, workshops, healing retreats, markets, celebrations, church services, and more — helping people find the spaces where they fit best and grow the most. Open to all, including non-Christians discovering the Kingdom. Next.js 15 App Router + Supabase + Leaflet + Tailwind CSS v4. Slogan: **Connecting the Kingdom** (Ephesians 2:19–22).
+Citizens Connect is the flagship channel: a map-first community discovery platform that serves organizers and non-organizers equally. It surfaces the vibrant, diverse layer of Christian community activity — outreaches, creative events, social gatherings, workshops, healing retreats, markets, celebrations, church services, and more — helping people find the spaces where they fit best and grow the most. Open to all, including non-Christians discovering the Kingdom. Next.js 15 App Router + Supabase + MapLibre GL + Tailwind CSS v4. Slogan: **Connecting the Kingdom** (Ephesians 2:19–22).
 
 ## Build & Run
 
@@ -121,7 +121,7 @@ To preserve decisions across sessions, the project uses these customization file
 ### Instructions (auto-applied by file pattern)
 - `.github/instructions/project-architecture.instructions.md` — File map, component relationships, data flow, environment details
 - `.github/instructions/connect-ui-system.instructions.md` — UI system rules (60/30/10 white-black-gold, floating controls)
-- `.github/instructions/leaflet-maps.instructions.md` — Raw Leaflet patterns for map components
+- `.github/instructions/leaflet-maps.instructions.md` — MapLibre GL JS API patterns for map components
 - `.github/instructions/supabase-patterns.instructions.md` — Dual-client pattern, RLS, storage, migrations
 
 ### Prompts (reusable workflows)

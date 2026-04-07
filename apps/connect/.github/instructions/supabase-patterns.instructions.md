@@ -75,6 +75,17 @@ The anon key is safe to expose — RLS enforces access. Never bypass RLS with th
 - Get URLs via: `supabase.storage.from("event-images").getPublicUrl(path)`
 - Supabase storage domain is registered in `next.config.ts` for `next/image`
 
+## Security Definer RPCs
+
+These RPC functions run with elevated privileges to perform atomic, safe operations:
+
+| RPC | Signature | Purpose |
+|-----|-----------|--------|
+| `find_or_create_conversation` | `(user_a uuid, user_b uuid) → uuid` | Atomically finds or creates a DM conversation. Prevents TOCTOU race conditions. |
+| `count_friends` | `(target_user uuid) → bigint` | Counts mutual follows (bidirectional). Used on profile pages to avoid N+1 queries. |
+
+Call RPCs via `supabase.rpc("name", { params })`. These bypass RLS intentionally — the function body enforces its own auth checks.
+
 ## Migrations
 
 - Place in `supabase/migrations/NNN_description.sql`
