@@ -27,7 +27,7 @@ This repository is conversation-safe by design. Any chat can be deleted and rebu
 
 ---
 
-## Agent Registry (11 agents)
+## Agent Registry (12 agents)
 
 ### Core Technical Agents
 
@@ -52,6 +52,12 @@ This repository is conversation-safe by design. Any chat can be deleted and rebu
 |-------|------|-------|---------|
 | **UI** | `ui.agent.md` | read, search, edit, execute | Frontend implementation — layout, interactions, visual polish. |
 | **UI Consistency Review** | `ui-consistency-review.agent.md` | read, search | Read-only UI compliance audit against brand system. |
+
+### Growth & Conversion Agents
+
+| Agent | File | Tools | Purpose |
+|-------|------|-------|---------|
+| **InviteFlow Architect** | `invite-flow.agent.md` | read, search, edit, execute | Event invite generation, share templates, channel-optimized formatting, RSVP conversion. |
 
 ### Infrastructure Agents
 
@@ -83,6 +89,7 @@ This repository is conversation-safe by design. Any chat can be deleted and rebu
 | "Does this follow the design system?" | **UI Consistency Review** |
 | "Review this schema change" | **Schema Architect** |
 | "Resume where we left off" | **Continuity Manager** |
+| "Generate WhatsApp invite" / "Optimize share flow" | **InviteFlow Architect** |
 
 ---
 
@@ -97,6 +104,13 @@ Common task flows that involve multiple agents in sequence:
 4. **Architect** — review the implementation
 5. **Testing** — write tests
 6. **Continuity Manager** — update PROJECT_STATUS.md
+
+### Optimizing Event Sharing
+1. **InviteFlow Architect** — design templates, build share components
+2. **UI** — polish share sheet and invite preview
+3. **Notification** — wire share-triggered notifications (if applicable)
+4. **Data** — seed test events for share testing
+5. **Architect** — review for security (XSS in templates, deep link safety)
 
 ### Code Health Check
 1. **Architect** — full codebase review (architecture + security + quality)

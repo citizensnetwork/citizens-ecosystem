@@ -394,7 +394,7 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 | UI | React | 18.x |
 | Styling | Tailwind CSS | v4 |
 | Backend | Supabase (Auth + Postgres + Storage) | Latest |
-| Maps | Leaflet (raw API) + leaflet.markercluster | 1.9.4 |
+| Maps | MapLibre GL JS | 5.x |
 | Mobile | Capacitor | 8.x |
 | Testing | Vitest + Testing Library | 4.x |
 | Deployment | Vercel (auto-deploy from GitHub) | — |
@@ -414,6 +414,7 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 | UI Consistency Review | `ui-consistency-review.agent.md` | Read-only auditor | Live (pre-existing) |
 | Schema Architect | `schema-architect.agent.md` | Read-only advisor | Live (pre-existing) |
 | Continuity Manager | `continuity-manager.agent.md` | Edit-capable | Live (pre-existing) |
+| InviteFlow Architect | `invite-flow.agent.md` | Edit-capable | **Live** |
 | Operations | — | Deferred | Create at 100 users |
 
 See `.github/AGENTS.md` for full registry, invocation guide, and multi-agent workflows.

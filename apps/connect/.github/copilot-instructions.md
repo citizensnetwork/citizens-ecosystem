@@ -142,6 +142,7 @@ To preserve decisions across sessions, the project uses these customization file
 - `.github/agents/community.agent.md` — Content strategy, categories, onboarding copy, SEO/OG meta, brand voice
 - `.github/agents/notification.agent.md` — Notification templates, Edge Functions, push delivery, frequency management
 - `.github/agents/product-lead.agent.md` — Roadmap alignment, feature specs, scope control, progress tracking
+- `.github/agents/invite-flow.agent.md` — Event invite generation, share templates, channel-optimized formatting, RSVP conversion
 - `.github/agents/ui.agent.md` — UI/UX implementation specialist
 - `.github/agents/ui-consistency-review.agent.md` — Read-only UI compliance auditor
 - `.github/agents/schema-architect.agent.md` — Read-only DB schema advisor
