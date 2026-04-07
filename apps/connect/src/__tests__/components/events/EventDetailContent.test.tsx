@@ -51,6 +51,14 @@ vi.mock("@/components/ui/ShareButton", () => ({
   default: () => <button data-testid="share-btn">Share</button>,
 }));
 
+vi.mock("@/components/messaging/MessageButton", () => ({
+  default: () => <button data-testid="message-btn">Message</button>,
+}));
+
+vi.mock("@/components/events/WhoIsAttending", () => ({
+  default: () => <div data-testid="who-attending">Attendees</div>,
+}));
+
 const baseEvent = makeEvent({
   id: "evt-detail-1",
   title: "Worship Night",

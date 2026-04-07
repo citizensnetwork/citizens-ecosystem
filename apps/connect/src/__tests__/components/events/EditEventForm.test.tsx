@@ -20,6 +20,11 @@ vi.mock("@/lib/supabase/client", () => ({
     from: () => ({
       update: mockUpdate,
       delete: mockDeleteFn,
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
     }),
     storage: {
       from: () => ({

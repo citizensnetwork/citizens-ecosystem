@@ -59,8 +59,8 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses gold (#c8a24f) for worship", () => {
-    expect(CATEGORY_COLORS.worship).toBe("#c8a24f");
+  it("uses gold (#D4AF37) for worship", () => {
+    expect(CATEGORY_COLORS.worship).toBe("#D4AF37");
   });
 });
 

@@ -25,10 +25,10 @@ export default async function ProfilePage() {
     { data: rsvps },
     { count: followersCount },
     { count: followingCount },
-    { data: myFollowing },
     { data: interestGroups },
     { data: allInterests },
     { data: userInterests },
+    { data: friendsCount },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
@@ -45,10 +45,6 @@ export default async function ProfilePage() {
       .select("*", { count: "exact", head: true })
       .eq("follower_id", user.id),
     supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", user.id),
-    supabase
       .from("interest_groups")
       .select("*")
       .order("sort_order"),
@@ -60,19 +56,8 @@ export default async function ProfilePage() {
       .from("user_interests")
       .select("interest_id")
       .eq("user_id", user.id),
+    supabase.rpc("count_friends", { target_user: user.id }),
   ]);
-
-  // Count friends (bidirectional follows)
-  let friendsCount = 0;
-  const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
-  if (followeeIds.length > 0) {
-    const { count } = await supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("followee_id", user.id)
-      .in("follower_id", followeeIds);
-    friendsCount = count ?? 0;
-  }
 
   const rsvpedEvents: Event[] = (rsvps ?? [])
     .map((r: { event_id: string; events: unknown }) => r.events as Event)
@@ -155,7 +140,7 @@ export default async function ProfilePage() {
               <strong className="text-black">{followingCount ?? 0}</strong>{" "}
               following
             </span>
-            {friendsCount > 0 && (
+            {(friendsCount ?? 0) > 0 && (
               <span>
                 <strong className="text-black">{friendsCount}</strong>{" "}
                 {friendsCount === 1 ? "friend" : "friends"}

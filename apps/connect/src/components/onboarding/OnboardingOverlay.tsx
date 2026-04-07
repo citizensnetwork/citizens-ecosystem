@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import OnboardingWizard from "./OnboardingWizard";
-import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 type Props = {
   show: boolean;
@@ -10,8 +10,7 @@ type Props = {
 
 export default function OnboardingOverlay({ show }: Props) {
   const [visible, setVisible] = useState(show);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef);
+  const dialogRef = useFocusTrap<HTMLDivElement>(visible);
 
   // Close on Escape key
   useEffect(() => {

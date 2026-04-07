@@ -16,7 +16,16 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: { getUser: mockGetUser },
-    from: () => ({ insert: mockInsert }),
+    from: () => ({
+      insert: mockInsert,
+      select: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
+      delete: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    }),
     storage: {
       from: () => ({
         upload: mockUpload,
@@ -104,7 +113,11 @@ describe("EventForm", () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
     });
-    mockInsert.mockResolvedValue({ error: null });
+    mockInsert.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id: "new-event-1" }, error: null }),
+      }),
+    });
 
     render(<EventForm />);
 
@@ -132,8 +145,10 @@ describe("EventForm", () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
     });
-    mockInsert.mockResolvedValue({
-      error: { message: "Permission denied" },
+    mockInsert.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: null, error: { message: "Permission denied" } }),
+      }),
     });
 
     render(<EventForm />);

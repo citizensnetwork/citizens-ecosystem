@@ -34,10 +34,12 @@ describe("SignupForm", () => {
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("renders role selection with Client and Vendor", () => {
+  it("renders role selection with Community Citizen and Organiser", () => {
     render(<SignupForm />);
-    expect(screen.getByLabelText(/client/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/vendor/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("client")).toBeInTheDocument();
+    expect(screen.getByText("Community Citizen")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("vendor")).toBeInTheDocument();
+    expect(screen.getByText("Organiser")).toBeInTheDocument();
   });
 
   it("defaults to client role", () => {

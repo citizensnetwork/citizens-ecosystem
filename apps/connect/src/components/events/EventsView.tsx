@@ -209,6 +209,7 @@ export default function EventsView({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
           <input
             type="search"
+            aria-label="Search events, places, or city"
             placeholder="Search events or places — Enter to jump to city"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

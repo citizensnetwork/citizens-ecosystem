@@ -813,8 +813,8 @@ do $$ begin
       exists (select 1 from public.conversation_participants cp where cp.conversation_id = conversation_participants.conversation_id and cp.user_id = auth.uid()) or public.is_admin()
     );
   end if;
-  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can add participants' and tablename = 'conversation_participants') then
-    create policy "Authenticated users can add participants" on public.conversation_participants for insert with check (auth.uid() is not null);
+  if not exists (select 1 from pg_policies where policyname = 'Only RPC or admin can add participants' and tablename = 'conversation_participants') then
+    create policy "Only RPC or admin can add participants" on public.conversation_participants for insert with check (public.is_admin());
   end if;
   if not exists (select 1 from pg_policies where policyname = 'Participants can update own read status' and tablename = 'conversation_participants') then
     create policy "Participants can update own read status" on public.conversation_participants for update using (user_id = auth.uid());
@@ -831,6 +831,26 @@ do $$ begin
   end if;
 end $$;
 
+create or replace function public.find_or_create_conversation(user_a uuid, user_b uuid)
+returns uuid language plpgsql security definer as $$
+declare
+  conv_id uuid;
+begin
+  if user_a = user_b then
+    raise exception 'Cannot create conversation with yourself';
+  end if;
+  select cp1.conversation_id into conv_id
+  from public.conversation_participants cp1
+  join public.conversation_participants cp2 on cp1.conversation_id = cp2.conversation_id
+  where cp1.user_id = user_a and cp2.user_id = user_b limit 1;
+  if conv_id is not null then return conv_id; end if;
+  insert into public.conversations default values returning id into conv_id;
+  insert into public.conversation_participants (conversation_id, user_id) values (conv_id, user_a), (conv_id, user_b);
+  return conv_id;
+end;
+$$;
+
+-- Legacy alias kept for backward compat
 create or replace function public.find_conversation(user_a uuid, user_b uuid)
 returns uuid language sql stable as $$
   select cp1.conversation_id from public.conversation_participants cp1
@@ -849,3 +869,18 @@ $$;
 drop trigger if exists on_message_sent on public.messages;
 create trigger on_message_sent after insert on public.messages
   for each row execute function public.update_conversation_timestamp();
+
+-- ══════════════════════════════════════════════
+-- 15. Utility RPCs
+-- ══════════════════════════════════════════════
+
+-- Count mutual (bidirectional) follows for a user
+create or replace function public.count_friends(target_user uuid)
+returns bigint language sql stable as $$
+  select count(*)
+  from public.follows f1
+  join public.follows f2
+    on f1.followee_id = f2.follower_id
+   and f1.follower_id = f2.followee_id
+  where f1.follower_id = target_user;
+$$;

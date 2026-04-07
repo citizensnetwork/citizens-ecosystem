@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { forwardRef } from "react";
 import EventsView from "@/components/events/EventsView";
 import { makeEvent } from "../../helpers/fixtures";
-import type { Place } from "@/types/db";
 
-// Mock next/navigation (useRouter used for logout redirect)
+// Mock next/navigation
+const mockSearchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => mockSearchParams,
 }));
 
-// Mock Supabase browser client (used for auth state)
+// Mock Supabase browser client
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
@@ -41,8 +43,44 @@ vi.mock("@/components/events/EventCalendar", () => ({
   }) => <div data-testid="event-calendar">{events.length} events</div>,
 }));
 
+vi.mock("@/components/events/BurgerMenu", () => {
+  return {
+    default: forwardRef(function BurgerMenuStub(
+      { isOpen, onClose }: { isOpen: boolean; onClose: () => void },
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      _ref: React.Ref<HTMLElement>
+    ) {
+      return isOpen ? (
+        <div data-testid="burger-menu">
+          <button onClick={onClose}>Close Menu</button>
+        </div>
+      ) : null;
+    }),
+  };
+});
+
+vi.mock("@/components/events/EventFeed", () => ({
+  default: ({ events }: { events: unknown[] }) => (
+    <div data-testid="event-feed">{(events as { id: string }[]).length} items</div>
+  ),
+}));
+
 vi.mock("@/components/reviews/PostEventPrompt", () => ({
   default: () => <div data-testid="post-event-prompt" />,
+}));
+
+vi.mock("@/components/notifications/NotificationBell", () => ({
+  default: () => <div data-testid="notification-bell" />,
+}));
+
+vi.mock("@/hooks/useBurgerMenuData", () => ({
+  useBurgerMenuData: () => ({
+    trending: [],
+    favouriteOrgs: [],
+    friends: [],
+    profile: null,
+    loading: false,
+  }),
 }));
 
 vi.mock("next/link", () => ({
@@ -83,69 +121,49 @@ describe("EventsView", () => {
     expect(screen.queryByTestId("event-map")).not.toBeInTheDocument();
   });
 
-  it("renders search input", () => {
+  it("renders search input with proper aria-label", () => {
+    render(<EventsView events={events} />);
+    const input = screen.getByPlaceholderText(/search events or places/i);
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-label", "Search events, places, or city");
+  });
+
+  it("renders toggle menu button", () => {
     render(<EventsView events={events} />);
     expect(
-      screen.getByPlaceholderText(/search events or places/i)
+      screen.getByRole("button", { name: /toggle menu/i })
     ).toBeInTheDocument();
   });
 
-  it("renders filter toggle button", () => {
-    render(<EventsView events={events} />);
-    expect(
-      screen.getByRole("button", { name: /toggle filters/i })
-    ).toBeInTheDocument();
-  });
-
-  it("opens filter drawer when filter button clicked", () => {
+  it("opens burger menu when menu button clicked", () => {
     render(<EventsView events={events} />);
     fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
+      screen.getByRole("button", { name: /toggle menu/i })
     );
-    expect(screen.getByText("Filters")).toBeInTheDocument();
-    expect(screen.getByText("All categories")).toBeInTheDocument();
+    expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
   });
 
-  it("shows Create Event link for vendors in filter drawer", () => {
-    render(<EventsView events={events} isVendor />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-    expect(screen.getByText("+ Create Event")).toBeInTheDocument();
-  });
-
-  it("hides Create Event link for non-vendors", () => {
-    render(<EventsView events={events} isVendor={false} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-    expect(screen.queryByText("+ Create Event")).not.toBeInTheDocument();
-  });
-
-  it("always shows Add Place link in filter drawer", () => {
+  it("closes burger menu with close button", async () => {
     render(<EventsView events={events} />);
     fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
+      screen.getByRole("button", { name: /toggle menu/i })
     );
-    expect(screen.getByText("+ Add Place")).toBeInTheDocument();
+    expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Close Menu"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("burger-menu")).not.toBeInTheDocument();
+    });
   });
 
-  it("filters events by category selection", async () => {
+  it("filters events by search input", async () => {
     render(<EventsView events={events} />);
-    // Open filter drawer
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-
-    // Click "Youth" category filter — should close drawer
-    // Our events: Worship Night (worship), Youth Camp (youth), Bible Study (bible-study)
-    fireEvent.click(screen.getByText(/youth/i));
-
-    // After selecting a category, the drawer closes and activeCategory is "youth"
-    // Switch to calendar to verify
     fireEvent.click(
       screen.getByRole("button", { name: /toggle view mode/i })
     );
+    const input = screen.getByPlaceholderText(/search events or places/i);
+    fireEvent.change(input, { target: { value: "Youth" } });
+
     await waitFor(() => {
       expect(screen.getByTestId("event-calendar")).toHaveTextContent(
         "1 events"
@@ -153,57 +171,39 @@ describe("EventsView", () => {
     });
   });
 
-  it("shows event count in filter drawer", () => {
+  it("shows events at a glance button", () => {
     render(<EventsView events={events} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-    expect(screen.getByText(/3 events/)).toBeInTheDocument();
-  });
-
-  it("shows place count when places are provided", () => {
-    const places: Place[] = [
-      {
-        id: "p1",
-        name: "Grace Church",
-        description: "A church",
-        address: "123 Main",
-        latitude: -29.85,
-        longitude: 31.02,
-        created_by: "u1",
-        created_at: new Date().toISOString(),
-        category_id: null,
-        custom_category: null,
-        phone: null,
-        website: null,
-        image_url: null,
-        verified: true,
-        verification_flagged: false,
-        avg_rating: null,
-        reviews_count: undefined,
-      },
-    ];
-    render(<EventsView events={events} places={places} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-    expect(screen.getByText(/1 place/)).toBeInTheDocument();
-  });
-
-  it("closes filter drawer with close button", () => {
-    render(<EventsView events={events} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /toggle filters/i })
-    );
-    expect(screen.getByText("Filters")).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /close filters/i })
-    );
-    // Drawer is hidden via translate, but the Filters heading may still be in DOM
-    // Just verify the filter toggle still works
     expect(
-      screen.getByRole("button", { name: /toggle filters/i })
+      screen.getByRole("button", { name: /events at a glance/i })
     ).toBeInTheDocument();
+  });
+
+  it("renders Citizens Connect brand link to /events", () => {
+    render(<EventsView events={events} />);
+    const brandLink = screen.getByText("Citizens Connect");
+    expect(brandLink.closest("a")).toHaveAttribute("href", "/events");
+  });
+
+  it("renders view toggle button with calendar emoji on map view", () => {
+    render(<EventsView events={events} />);
+    const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
+    expect(toggleBtn).toHaveTextContent("📅");
+  });
+
+  it("renders view toggle button with map emoji on calendar view", () => {
+    render(<EventsView events={events} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /toggle view mode/i })
+    );
+    const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
+    expect(toggleBtn).toHaveTextContent("🗺");
+  });
+
+  it("passes events to calendar view", async () => {
+    render(<EventsView events={events} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /toggle view mode/i })
+    );
+    expect(screen.getByTestId("event-calendar")).toHaveTextContent("3 events");
   });
 });

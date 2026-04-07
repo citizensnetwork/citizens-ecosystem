@@ -59,6 +59,7 @@ export default function CommentSection({ eventId, user }: Props) {
   }
 
   async function handleDelete(id: string) {
+    if (!confirm("Delete this comment?")) return;
     await supabase.from("comments").delete().eq("id", id);
     setComments((prev) => prev.filter((c) => c.id !== id));
   }

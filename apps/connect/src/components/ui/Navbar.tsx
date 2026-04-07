@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -28,6 +29,27 @@ export default function Navbar() {
     return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Close dropdown on click outside or Escape key
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        closeMenu();
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") closeMenu();
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen, closeMenu]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -73,9 +95,11 @@ export default function Navbar() {
                 </svg>
               </Link>
               <NotificationBell userId={user.id} />
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((o) => !o)}
+                aria-haspopup="true"
+                aria-expanded={menuOpen}
                 className="flex items-center gap-1.5 text-sm font-medium text-black/75 transition hover:text-black"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--gold-soft) text-xs font-bold uppercase text-black">
@@ -86,9 +110,10 @@ export default function Navbar() {
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 z-50 mt-1 w-44 rounded-xl border bg-white py-1 shadow-lg">
+                <div role="menu" className="absolute right-0 z-50 mt-1 w-44 rounded-xl border bg-white py-1 shadow-lg">
                   <Link
                     href="/profile"
+                    role="menuitem"
                     onClick={() => setMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-black/80 transition hover:bg-black/5"
                   >
@@ -96,6 +121,7 @@ export default function Navbar() {
                   </Link>
                   <hr className="my-1" />
                   <button
+                    role="menuitem"
                     onClick={handleLogout}
                     className="w-full px-4 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
                   >

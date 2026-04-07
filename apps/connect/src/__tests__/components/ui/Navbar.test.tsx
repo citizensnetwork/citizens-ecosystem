@@ -43,6 +43,11 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
+// Mock NotificationBell — it uses supabase.channel() and fetch() which aren't available in tests
+vi.mock("@/components/notifications/NotificationBell", () => ({
+  default: () => <div data-testid="notification-bell" />,
+}));
+
 describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,7 +74,7 @@ describe("Navbar", () => {
 
     render(<Navbar />);
     const eventsLink = screen.getByText("Events");
-    expect(eventsLink.closest("a")).toHaveAttribute("href", "/events");
+    expect(eventsLink.closest("a")).toHaveAttribute("href", "/events?view=calendar");
   });
 
   it("shows Log In and Sign Up links when not authenticated", () => {

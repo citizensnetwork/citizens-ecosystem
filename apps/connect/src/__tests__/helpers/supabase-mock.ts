@@ -61,6 +61,7 @@ export function createMockSupabaseClient(overrides?: {
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
     from: vi.fn().mockReturnValue(chain),
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     storage: {
       from: vi.fn().mockReturnValue({
         upload: vi.fn().mockResolvedValue({ error: null }),

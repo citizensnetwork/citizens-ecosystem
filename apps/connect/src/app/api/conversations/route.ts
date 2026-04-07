@@ -32,40 +32,7 @@ export async function GET() {
     participations.map((p) => [p.conversation_id, p.last_read_at])
   );
 
-  // Get conversation details
-  const { data: conversations, error: convError } = await supabase
-    .from("conversations")
-    .select("id, updated_at")
-    .in("id", convIds)
-    .order("updated_at", { ascending: false });
-
-  if (convError) {
-    return NextResponse.json({ error: convError.message }, { status: 500 });
-  }
-
-  // Get other participants
-  const { data: allParticipants, error: apError } = await supabase
-    .from("conversation_participants")
-    .select("conversation_id, user_id, profiles(id, full_name, avatar_url)")
-    .in("conversation_id", convIds)
-    .neq("user_id", user.id);
-
-  if (apError) {
-    return NextResponse.json({ error: apError.message }, { status: 500 });
-  }
-
-  // Get latest message per conversation
-  const { data: latestMessages, error: msgError } = await supabase
-    .from("messages")
-    .select("conversation_id, body, sender_id, created_at")
-    .in("conversation_id", convIds)
-    .order("created_at", { ascending: false });
-
-  if (msgError) {
-    return NextResponse.json({ error: msgError.message }, { status: 500 });
-  }
-
-  // Get unread counts — only fetch messages newer than the oldest last_read_at
+  // Parallelize independent queries
   const lastReadValues = Object.values(lastReadMap).filter(Boolean) as string[];
   const minLastRead = lastReadValues.length > 0
     ? lastReadValues.reduce((min, lr) => (lr < min ? lr : min))
@@ -76,16 +43,26 @@ export async function GET() {
     .select("conversation_id, created_at")
     .in("conversation_id", convIds)
     .neq("sender_id", user.id);
-
   if (minLastRead) {
     unreadQuery = unreadQuery.gt("created_at", minLastRead);
   }
 
-  const { data: allMessages, error: allMsgError } = await unreadQuery;
+  const [convResult, partResult, msgResult, unreadResult] = await Promise.all([
+    supabase.from("conversations").select("id, updated_at").in("id", convIds).order("updated_at", { ascending: false }),
+    supabase.from("conversation_participants").select("conversation_id, user_id, profiles(id, full_name, avatar_url)").in("conversation_id", convIds).neq("user_id", user.id),
+    supabase.from("messages").select("conversation_id, body, sender_id, created_at").in("conversation_id", convIds).order("created_at", { ascending: false }),
+    unreadQuery,
+  ]);
 
-  if (allMsgError) {
-    return NextResponse.json({ error: allMsgError.message }, { status: 500 });
-  }
+  if (convResult.error) return NextResponse.json({ error: convResult.error.message }, { status: 500 });
+  if (partResult.error) return NextResponse.json({ error: partResult.error.message }, { status: 500 });
+  if (msgResult.error) return NextResponse.json({ error: msgResult.error.message }, { status: 500 });
+  if (unreadResult.error) return NextResponse.json({ error: unreadResult.error.message }, { status: 500 });
+
+  const conversations = convResult.data;
+  const allParticipants = partResult.data;
+  const latestMessages = msgResult.data;
+  const allMessages = unreadResult.data;
 
   // Build the preview list
   const participantMap = new Map<string, { id: string; full_name: string; avatar_url: string | null }>();
@@ -169,40 +146,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
   }
 
-  // Check if conversation already exists
-  const { data: existingConvId } = await supabase.rpc("find_conversation", {
+  // Atomically find or create conversation (prevents TOCTOU race)
+  const { data: convId, error: rpcError } = await supabase.rpc("find_or_create_conversation", {
     user_a: user.id,
     user_b: recipient_id,
   });
 
-  if (existingConvId) {
-    return NextResponse.json({ conversation_id: existingConvId });
+  if (rpcError || !convId) {
+    return NextResponse.json({ error: rpcError?.message || "Failed to create conversation" }, { status: 500 });
   }
 
-  // Create new conversation
-  // NOTE: TOCTOU race — concurrent requests could create duplicate conversations.
-  // A DB-level unique constraint on participant pairs would prevent this.
-  const { data: newConv, error: createError } = await supabase
-    .from("conversations")
-    .insert({})
-    .select("id")
-    .single();
-
-  if (createError || !newConv) {
-    return NextResponse.json({ error: createError?.message || "Failed to create conversation" }, { status: 500 });
-  }
-
-  // Add both participants
-  const { error: partError } = await supabase
-    .from("conversation_participants")
-    .insert([
-      { conversation_id: newConv.id, user_id: user.id },
-      { conversation_id: newConv.id, user_id: recipient_id },
-    ]);
-
-  if (partError) {
-    return NextResponse.json({ error: partError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ conversation_id: newConv.id }, { status: 201 });
+  return NextResponse.json({ conversation_id: convId }, { status: 201 });
 }

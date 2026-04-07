@@ -5,15 +5,16 @@ import Navbar from "@/components/ui/Navbar";
 import CapacitorInit from "@/components/ui/CapacitorInit";
 
 const montserrat = Montserrat({
-  variable: "--font-geist-sans",
+  variable: "--font-montserrat",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   subsets: ["latin"],
 });
+
 
 export const viewport: Viewport = {
   width: "device-width",
