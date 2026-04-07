@@ -90,7 +90,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           {/* Categories */}
           <AccordionSection
             title="Categories"
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
             defaultOpen
             badge={activeCategories.size > 0 ? activeCategories.size : undefined}
           >
@@ -134,7 +134,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           </AccordionSection>
 
           {/* Trending */}
-          <AccordionSection title="Trending" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} badge={trending.length || undefined}>
+          <AccordionSection title="Trending" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} badge={trending.length || undefined}>
             {menuLoading ? (
               <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
             ) : trending.length === 0 ? (
@@ -159,7 +159,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           {/* Favourite Orgs */}
           <AccordionSection
             title="Favourite Orgs"
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
             badge={favouriteOrgs.length || undefined}
           >
             {!user ? (
@@ -183,7 +183,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           </AccordionSection>
 
           {/* Friends */}
-          <AccordionSection title="Friends" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} badge={friends.length || undefined}>
+          <AccordionSection title="Friends" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} badge={friends.length || undefined}>
             {!user ? (
               <p className="px-3 py-2 text-xs text-black/40">
                 <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">

@@ -5,6 +5,7 @@ import Image from "next/image";
 import ShareButton from "@/components/ui/ShareButton";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
+import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import type { Place, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,31 @@ export default async function PlaceDetailPage({
 
   const isOwner = !!user && user.id === place.created_by;
 
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select("*, profiles(full_name)")
-    .eq("place_id", id)
-    .order("created_at", { ascending: false })
-    .returns<Review[]>();
+  // Fetch reviews and follow data in parallel
+  const [reviewsRes, followerCountRes, userFollowRes] = await Promise.all([
+    supabase
+      .from("reviews")
+      .select("*, profiles(full_name)")
+      .eq("place_id", id)
+      .order("created_at", { ascending: false })
+      .returns<Review[]>(),
+    supabase
+      .from("place_follows")
+      .select("id", { count: "exact", head: true })
+      .eq("place_id", id),
+    user
+      ? supabase
+          .from("place_follows")
+          .select("id")
+          .eq("place_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const reviews = reviewsRes.data;
+  const followerCount = followerCountRes.count ?? 0;
+  const isFollowing = !!userFollowRes.data;
 
   const avgRating =
     reviews && reviews.length > 0
@@ -89,7 +109,14 @@ export default async function PlaceDetailPage({
                 </div>
               </div>
             )}
-            <ShareButton title={place.name} />
+            <div className="flex items-center gap-2">
+              <FollowPlaceButton
+                placeId={place.id}
+                isFollowing={isFollowing}
+                followerCount={followerCount}
+              />
+              <ShareButton title={place.name} />
+            </div>
           </div>
         </div>
 
@@ -98,32 +125,35 @@ export default async function PlaceDetailPage({
         </p>
 
         <div className="space-y-1 text-sm text-black/70">
-          <p>📍 {place.address}</p>
-          {place.phone && <p>📞 {place.phone}</p>}
-          {place.website && (
-            <p>
-              🌐{" "}
-              <a
-                href={place.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-(--gold) underline"
-              >
-                {place.website.replace(/^https?:\/\//, "")}
-              </a>
-            </p>
-          )}
+          <p>{place.address}</p>
+          {place.phone && <p>{place.phone}</p>}
         </div>
+
+        {place.website && (
+          <div className="rounded-xl border border-black/8 p-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-black/40">
+              Website
+            </p>
+            <a
+              href={place.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-(--gold) hover:underline"
+            >
+              {place.website.replace(/^https?:\/\//, "")}
+            </a>
+          </div>
+        )}
 
         {place.verified && (
           <span className="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-            ✓ Verified
+            Verified
           </span>
         )}
 
         {place.verification_flagged && (
           <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-            ⚠ Possibly closed (community reports)
+            Possibly closed (community reports)
           </span>
         )}
 

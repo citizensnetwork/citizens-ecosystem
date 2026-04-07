@@ -1,7 +1,7 @@
 -- ============================================
 -- Citizens Connect - Database Schema
 -- Canonical full schema (idempotent — safe to re-run)
--- Reflects all migrations through 014_direct_messages
+-- Reflects all migrations through 017_place_follows_and_websites
 -- ============================================
 
 -- ── Helper: admin check ──────────────────────────────────
@@ -884,3 +884,30 @@ returns bigint language sql stable as $$
    and f1.follower_id = f2.followee_id
   where f1.follower_id = target_user;
 $$;
+
+-- ══════════════════════════════════════════════
+-- 16. Place Follows
+-- ══════════════════════════════════════════════
+create table if not exists public.place_follows (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  place_id uuid references public.places(id) on delete cascade not null,
+  created_at timestamptz default now(),
+  unique(user_id, place_id)
+);
+
+alter table public.place_follows enable row level security;
+create index if not exists idx_place_follows_user on public.place_follows(user_id);
+create index if not exists idx_place_follows_place on public.place_follows(place_id);
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Anyone can view place follows' and tablename = 'place_follows') then
+    create policy "Anyone can view place follows" on public.place_follows for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Auth users can follow places' and tablename = 'place_follows') then
+    create policy "Auth users can follow places" on public.place_follows for insert with check (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users can unfollow places' and tablename = 'place_follows') then
+    create policy "Users can unfollow places" on public.place_follows for delete using (auth.uid() = user_id);
+  end if;
+end $$;

@@ -46,17 +46,30 @@ export default function EventsView({
 
   // User state for auth section in burger menu
   const [user, setUser] = useState<User | null>(null);
+  const [rsvpEventIds, setRsvpEventIds] = useState<Set<string>>(new Set());
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const router = useRouter();
 
   useEffect(() => {
     const supabase = supabaseRef.current!;
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      if (user) {
+        supabase
+          .from("rsvps")
+          .select("event_id")
+          .eq("user_id", user.id)
+          .then(({ data }) => {
+            if (data) setRsvpEventIds(new Set(data.map((r) => r.event_id)));
+          });
+      }
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (!session?.user) setRsvpEventIds(new Set());
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -197,6 +210,7 @@ export default function EventsView({
             <PostEventPrompt />
             <EventCalendar
               events={filtered}
+              rsvpEventIds={rsvpEventIds}
               onSelectEvent={handleSelectEvent}
               isVendor={isVendor}
             />
@@ -263,7 +277,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setGlanceOpen((o) => !o)}
-          className="absolute right-0 top-1/2 z-1000 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition hover:bg-white hover:text-black"
+          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition hover:bg-white hover:text-black"
           aria-label={glanceOpen ? "Close events list" : "Events at a glance"}
         >
           {glanceOpen ? "▶" : "◀"}
@@ -275,7 +289,7 @@ export default function EventsView({
         ref={glanceRef}
         role="dialog"
         aria-label="Events at a glance"
-        className={`absolute right-0 top-0 z-999 flex h-full w-[84vw] max-w-sm flex-col bg-white/96 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-96 ${
+        className={`absolute right-0 top-0 z-1004 flex h-full w-[84vw] max-w-sm flex-col bg-white/96 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-96 ${
           glanceOpen && !hasDetail ? "translate-x-0" : "translate-x-full"
         }`}
       >

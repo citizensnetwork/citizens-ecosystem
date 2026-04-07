@@ -129,6 +129,13 @@ export type Follow = {
   created_at: string;
 };
 
+export type PlaceFollow = {
+  id: string;
+  user_id: string;
+  place_id: string;
+  created_at: string;
+};
+
 export type InterestGroup = {
   id: string;
   slug: string;

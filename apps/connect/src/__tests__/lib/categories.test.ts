@@ -59,8 +59,8 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses monochrome dark for worship", () => {
-    expect(CATEGORY_COLORS.worship).toBe("#111111");
+  it("uses light grey/white palette for worship", () => {
+    expect(CATEGORY_COLORS.worship).toBe("#dcdcdc");
   });
 });
 

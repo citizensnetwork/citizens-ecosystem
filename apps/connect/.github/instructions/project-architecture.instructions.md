@@ -14,6 +14,7 @@ src/
 │   ├── api/push-token/route.ts   # Push token register/remove (POST, DELETE)
 │   ├── api/notifications/route.ts# Notifications fetch/mark-read/delete (GET, PATCH, DELETE)
 │   ├── api/notifications/preferences/route.ts # Digest frequency update (PATCH)
+│   ├── api/place-follow/route.ts # Place follow/unfollow (POST, DELETE)
 │   ├── api/conversations/route.ts # Conversations list/create (GET, POST)
 │   ├── api/conversations/[id]/messages/route.ts # Messages fetch/send (GET, POST)
 │   ├── api/conversations/[id]/read/route.ts # Mark conversation read (PATCH)
@@ -59,6 +60,8 @@ src/
 │   │   ├── MessageButton.tsx     # "Message" CTA — button + icon variant for profiles/events
 │   │   ├── ConversationList.tsx  # Inbox list with unread badges, realtime updates
 │   │   └── ChatView.tsx          # Chat thread — messages, date separators, send, realtime
+│   ├── places/
+│   │   └── FollowPlaceButton.tsx # Follow/unfollow place with optimistic count
 │   ├── onboarding/
 │   │   ├── OnboardingWizard.tsx   # Single-page interest/location/notification wizard (edit + onboard mode)
 │   │   ├── OnboardingOverlay.tsx  # Full-screen overlay for first-login onboarding
@@ -79,7 +82,7 @@ src/
 │       └── client.ts             # Browser Supabase client
 │
 ├── types/
-│   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, Conversation, Message, ConversationPreview, EventCategory, UserRole, InterestGroup, Interest
+│   ├── db.ts                     # Event, Profile, RSVP, Comment, Notification, PushTokenRecord, PlaceFollow, Conversation, Message, ConversationPreview, EventCategory, UserRole, InterestGroup, Interest
 │   └── leaflet.markercluster.d.ts# Legacy type declarations (cleared after MapLibre migration)
 │
 └── middleware.ts                 # Supabase session refresh on all non-static routes
@@ -100,7 +103,8 @@ supabase/
     ├── 002_add_category.sql      # category column on events
     ├── 003_stage2.sql            # image_url + comments table
     ├── 011_interest_profile.sql  # interest groups/items, user_interests, event_interest_tags
-    └── 013_notifications.sql     # push_tokens, notifications tables, notification_digest column
+    ├── 013_notifications.sql     # push_tokens, notifications tables, notification_digest column
+    └── 017_place_follows_and_websites.sql # place_follows table, website URLs for seeded places
 ```
 
 ## Data Flow

@@ -40,6 +40,7 @@ export default function EventMap({
   const geoMarkerRef = useRef<maplibregl.Marker | null>(null);
   const userPositionRef = useRef<[number, number] | null>(null);
   const readyRef = useRef(false);
+  const hasRestoredView = useRef(false);
 
   // Keep stable refs so marker click handlers always see latest callbacks
   const onSelectEventRef = useRef(onSelectEvent);
@@ -52,17 +53,46 @@ export default function EventMap({
     markersRef.current = [];
   }, []);
 
+  /* ── Save / restore map viewpoint via sessionStorage ── */
+  const MAP_VIEW_KEY = "cc-map-viewpoint";
+
+  const saveMapView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const c = map.getCenter();
+    const z = map.getZoom();
+    try {
+      sessionStorage.setItem(MAP_VIEW_KEY, JSON.stringify({ lng: c.lng, lat: c.lat, zoom: z }));
+    } catch { /* sessionStorage full or unavailable */ }
+  }, []);
+
+  const getStoredView = useCallback((): { lng: number; lat: number; zoom: number } | null => {
+    try {
+      const raw = sessionStorage.getItem(MAP_VIEW_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }, []);
+
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const stored = getStoredView();
+    const initialCenter = stored
+      ? [stored.lng, stored.lat] as [number, number]
+      : toLngLat(center);
+    const initialZoom = stored ? stored.zoom : zoom;
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: getMapStyle(),
-      center: toLngLat(center),
-      zoom,
+      center: initialCenter,
+      zoom: initialZoom,
       attributionControl: false,
     });
+
+    if (stored) hasRestoredView.current = true;
 
     map.addControl(
       new maplibregl.AttributionControl({ compact: true }),
@@ -80,6 +110,9 @@ export default function EventMap({
       readyRef.current = true;
     });
 
+    // Persist viewpoint on every move
+    map.on("moveend", saveMapView);
+
     /* Geolocation control (native-like button) */
     map.addControl(
       new maplibregl.GeolocateControl({
@@ -89,8 +122,8 @@ export default function EventMap({
       "bottom-right"
     );
 
-    /* Auto-locate user on initial load */
-    if (autoLocate) {
+    /* Auto-locate user on initial load (only if no stored view) */
+    if (autoLocate && !stored) {
       getCurrentPosition()
         .then((pos) => {
           const lngLat: [number, number] = [pos.longitude, pos.latitude];
@@ -115,6 +148,7 @@ export default function EventMap({
 
     return () => {
       readyRef.current = false;
+      saveMapView();
       map.remove();
       mapRef.current = null;
       geoMarkerRef.current = null;
@@ -212,13 +246,15 @@ export default function EventMap({
         hasPoints = true;
       });
 
-      // ── Fit bounds ──
-      if (hasPoints) {
+      // ── Fit bounds (skip if user had a stored viewpoint) ──
+      if (hasPoints && !hasRestoredView.current) {
         if (userPositionRef.current) {
           bounds.extend(toLngLat(userPositionRef.current));
         }
         map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
       }
+      // After first render, allow fitBounds on future data changes
+      hasRestoredView.current = false;
     };
 
     // If style is loaded, add markers immediately; otherwise wait for load

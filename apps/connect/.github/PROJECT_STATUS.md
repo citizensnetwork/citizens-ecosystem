@@ -20,6 +20,26 @@
 | 10 | Smart Notifications + Calendar Sync | **Complete** | In-app notifications, push tokens, bell UI, preferences, Edge Functions, realtime |
 | 11 | In-app Direct Messaging | **Complete** | Conversations, messages, inbox view, real-time chat, message organizer from events/profiles |
 | — | UI Maturity Overhaul | **Complete** | Monochrome + gold design, emojis → SVGs, mature markers, 50 mock places seeded |
+| — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
+
+---
+
+## UI Refinement Pass (COMPLETE)
+
+### Delivered
+- [x] Calendar colors: `CATEGORY_COLORS` changed from monochrome dark to alternating white/grey palette (#d4d4d4–#f5f5f5)
+- [x] RSVP-aware calendar: gold (#D4AF37) background for RSVP'd events, white/grey for un-RSVP'd
+- [x] EventsView fetches user RSVPs and passes `rsvpEventIds` set to EventCalendar
+- [x] Event map markers: enlarged 36→40px, icon color changed gold→black (#111), border changed black→gold (#D4AF37)
+- [x] Place map markers: shrunk 34→28px, removed all background/bubble, bare gold SVG icon with drop-shadow
+- [x] Burger menu section icons colored gold (`text-(--gold)`)
+- [x] Map viewpoint persistence via sessionStorage (`cc-map-viewpoint` key) — restores center+zoom on remount
+- [x] `place_follows` table + RLS (migration 017), `/api/place-follow` route (POST/DELETE), `FollowPlaceButton` component
+- [x] Website URLs added to all 50 seeded places (migration 017)
+- [x] Place detail page: FollowPlaceButton + dedicated website card + remaining emojis removed
+- [x] Events at a Glance panel z-index raised (button z-1005, panel z-1004, above detail panel z-1004→z-1003 area)
+- [x] All 190 tests passing (24 files)
+- [x] Clean production build verified
 
 ---
 

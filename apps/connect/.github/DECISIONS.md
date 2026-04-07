@@ -28,9 +28,19 @@
 **Why:** User-specified brand direction. Gold (`#c8a24f`) is the primary accent. No blue-primary patterns.
 
 ### Monochrome + Gold mature design (emoji-free)
-**Decision:** Remove all emojis from UI. Replace with inline SVGs (icons) or Unicode glyphs (notification indicators). Category colors changed from rainbow to monochrome dark palette (`#111111`–`#6b7280`). Event markers: gold icon in white circle with black outline. Place markers: black icon in gold rounded-square with black outline. Calendar events use monochrome backgrounds with gold left border.
-**Why:** User feedback: emoji + rainbow colors made the app "seem very child-like." Monochrome + gold is mature, premium, and brand-consistent. No icon library added — all SVGs are inline for zero bundle cost.
-**Date:** 2026-04-07.
+**Decision:** Remove all emojis from UI. Replace with inline SVGs (icons) or Unicode glyphs (notification indicators). Category colors changed from rainbow to alternating white/grey palette (`#d4d4d4`–`#f5f5f5`). Event markers: black icon (#111) in 40px circle with gold (#D4AF37) outline. Place markers: bare gold SVG icon (28px, no bubble/background) with CSS drop-shadow. Calendar events: RSVP'd = gold background (#D4AF37), un-RSVP'd = white/grey CATEGORY_COLORS. Burger menu section icons in gold.
+**Why:** User feedback: emoji + rainbow colors made the app "seem very child-like." Further refined: too much black in calendar → lighter white/grey palette with gold RSVP distinction. Place markers were hiding events → made smaller with no background. Monochrome + gold is mature, premium, and brand-consistent. No icon library added — all SVGs are inline for zero bundle cost.
+**Date:** 2026-04-08 (refined from 2026-04-07).
+
+### Map viewpoint persistence
+**Decision:** Store map center + zoom in `sessionStorage` (`cc-map-viewpoint` key). Restore on remount; skip autoLocate and first fitBounds when a stored view exists.
+**Why:** Users expect the map to stay where they left it when navigating to event details and back. Session-scoped (not localStorage) so it resets with a fresh tab.
+**Date:** 2026-04-08.
+
+### Place follows
+**Decision:** `place_follows` table (user_id, place_id, UNIQUE) with RLS. API at `/api/place-follow` (POST/DELETE). `FollowPlaceButton` component with optimistic count.
+**Why:** Users want to follow favourite places for future notification integration. Mirrors the user-follow pattern from Phase 8.
+**Date:** 2026-04-08.
 
 ### Map-first full-screen events
 **Decision:** `/events` is a full-viewport map with no page headers. All controls float.

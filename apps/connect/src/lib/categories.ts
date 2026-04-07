@@ -37,18 +37,19 @@ export const CATEGORY_BADGE_CLASSES: Record<EventCategory, string> = {
 };
 
 /**
- * Monochrome hex colours for calendar events.
- * Events use a unified dark palette — no rainbow category coding.
+ * Alternating white/grey palette for un-RSVP'd calendar events.
+ * Gold (#D4AF37) is used only for RSVP'd events — set at render time.
+ * The 8 entries cycle so overlapping events get different shades.
  */
 export const CATEGORY_COLORS: Record<EventCategory, string> = {
-  "church-service": "#1a1a1a",
-  youth: "#2d2d2d",
-  "community-outreach": "#3a3a3a",
-  worship: "#111111",
-  "bible-study": "#242424",
-  prayer: "#333333",
-  social: "#404040",
-  other: "#6b7280",
+  "church-service": "#e8e8e8",
+  youth: "#d4d4d4",
+  "community-outreach": "#f0f0f0",
+  worship: "#dcdcdc",
+  "bible-study": "#ebebeb",
+  prayer: "#d9d9d9",
+  social: "#f5f5f5",
+  other: "#e2e2e2",
 };
 
 /** Selectable list for forms (create / edit). */

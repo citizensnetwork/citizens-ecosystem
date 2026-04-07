@@ -57,15 +57,15 @@ export function getTemporalStyle(
 
 /* ── MapLibre marker element builders ────────────────────── */
 
-const BASE_SIZE = 36;
+const BASE_SIZE = 40;
 
 export function getCategoryIcon(category: EventCategory | null): string {
   return CATEGORY_ICONS[category ?? "other"] ?? DEFAULT_ICON;
 }
 
 /**
- * Event marker — gold icon on white circle with black outline.
- * Mature monochrome design; category distinguished only by icon shape.
+ * Event marker — black icon on white circle with gold outline.
+ * Slightly larger for prominence on the map.
  */
 export function createCategoryMarkerEl(
   category: EventCategory | null,
@@ -86,13 +86,13 @@ export function createCategoryMarkerEl(
     background:#fff;
     opacity:${temporal.opacity};
     border-radius:50%;
-    border:2px solid #111;
+    border:2px solid #D4AF37;
     box-shadow:0 2px 6px rgba(0,0,0,.25);
     cursor:pointer;
     transition:transform 180ms ease;
   "><span style="
     width:${iconSize}px;height:${iconSize}px;
-    color:#D4AF37;
+    color:#111;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
   ">${icon}</span></span>`;
@@ -101,8 +101,8 @@ export function createCategoryMarkerEl(
 }
 
 /**
- * Place marker — black icon on gold rounded-square with black outline.
- * Distinguished from events by shape (square vs circle) and color inversion.
+ * Place marker — gold and black outlined SVG icon, no bubble/background.
+ * Smaller than event markers to avoid hiding events.
  */
 export function createPlaceMarkerEl(
   _emoji: string,
@@ -113,8 +113,8 @@ export function createPlaceMarkerEl(
     isFlagged?: boolean;
   }
 ): HTMLDivElement {
-  const size = 34;
-  const iconSize = 16;
+  const size = 28;
+  const iconSize = 20;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;
@@ -162,13 +162,13 @@ export function createPlaceMarkerEl(
     : "";
 
   const glow = isHighRated
-    ? "0 0 0 4px rgba(212,175,55,.32), 0 2px 8px rgba(0,0,0,.25)"
-    : "0 2px 6px rgba(0,0,0,.25)";
+    ? "drop-shadow(0 0 4px rgba(212,175,55,.5))"
+    : "drop-shadow(0 1px 3px rgba(0,0,0,.3))";
 
   const opacity = isFlagged ? 0.62 : 1;
 
   const placeIcon =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
 
   const el = document.createElement("div");
   el.className = "cc-marker";
@@ -179,15 +179,12 @@ export function createPlaceMarkerEl(
     position:relative;
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
-    background:#D4AF37;
-    border-radius:8px;
-    border:2px solid #111;
-    box-shadow:${glow};
     opacity:${opacity};
     cursor:pointer;
+    filter:${glow};
   "><span style="
     width:${iconSize}px;height:${iconSize}px;
-    color:#111;
+    color:#D4AF37;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
   ">${placeIcon}</span>${ratingBadge}${warningBadge}</span>`;

@@ -14,12 +14,14 @@ import type { DateClickArg } from "@fullcalendar/interaction";
 
 type Props = {
   events: Event[];
+  rsvpEventIds?: Set<string>;
   onSelectEvent?: (event: Event) => void;
   isVendor?: boolean;
 };
 
 export default function EventCalendar({
   events,
+  rsvpEventIds = new Set(),
   onSelectEvent,
   isVendor = false,
 }: Props) {
@@ -27,16 +29,21 @@ export default function EventCalendar({
   const calendarRef = useRef<FullCalendar>(null);
 
   /* Map Event[] → FullCalendar EventInput[] */
-  const fcEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    start: e.date,
-    end: e.end_time ?? undefined,
-    backgroundColor: CATEGORY_COLORS[e.category ?? "other"] ?? "#6b7280",
-    borderColor: "#D4AF37",
-    textColor: "#fff",
-    extendedProps: { event: e },
-  }));
+  const fcEvents = events.map((e) => {
+    const isRsvpd = rsvpEventIds.has(e.id);
+    return {
+      id: e.id,
+      title: e.title,
+      start: e.date,
+      end: e.end_time ?? undefined,
+      backgroundColor: isRsvpd
+        ? "#D4AF37"
+        : (CATEGORY_COLORS[e.category ?? "other"] ?? "#e2e2e2"),
+      borderColor: isRsvpd ? "#b8941f" : "#c0c0c0",
+      textColor: isRsvpd ? "#111" : "#333",
+      extendedProps: { event: e },
+    };
+  });
 
   /* Click an event → open detail panel or navigate */
   const handleEventClick = useCallback(

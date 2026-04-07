@@ -76,7 +76,7 @@ Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categor
 
 Schema in `supabase/schema.sql` (idempotent — safe to re-run). Migrations in `supabase/migrations/`.
 
-Tables: `profiles` (extends auth.users, roles: vendor/client/admin), `events` (with lat/lng, category, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
+Tables: `profiles` (extends auth.users, roles: vendor/client/admin), `events` (with lat/lng, category, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
 
 Trigger `on_auth_user_created` auto-creates a profile row from auth metadata on signup.
 
