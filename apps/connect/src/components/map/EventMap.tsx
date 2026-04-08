@@ -22,6 +22,7 @@ type Props = {
   zoom?: number;
   autoLocate?: boolean;
   flyTo?: [number, number] | null;
+  flyToZoom?: number;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -36,6 +37,7 @@ export default function EventMap({
   zoom = 12,
   autoLocate = false,
   flyTo = null,
+  flyToZoom,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -136,9 +138,9 @@ export default function EventMap({
             .setLngLat(lngLat)
             .addTo(map);
 
-          // Only fly if map is still alive
+          // Only fly if map is still alive — province-level zoom
           if (mapRef.current) {
-            map.flyTo({ center: lngLat, zoom: 14, duration: 1200 });
+            map.flyTo({ center: lngLat, zoom: 8, duration: 1200 });
           }
         })
         .catch(() => {
@@ -279,10 +281,10 @@ export default function EventMap({
     if (!flyTo || !mapRef.current) return;
     mapRef.current.flyTo({
       center: toLngLat(flyTo),
-      zoom: 13,
+      zoom: flyToZoom ?? 13,
       duration: 1200,
     });
-  }, [flyTo]);
+  }, [flyTo, flyToZoom]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

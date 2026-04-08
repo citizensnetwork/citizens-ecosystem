@@ -172,6 +172,21 @@ export default function EventsView({
 
   // City search / geocoding state
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+  const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
+
+  // "Citizens Connect" chip → zoom to all of South Africa
+  function handleBrandClick() {
+    if (view === "map") {
+      // South Africa center, zoom 5.5 shows full country
+      setMapFlyTo([-28.7, 25.5]);
+      setMapFlyToZoom(5.5);
+    } else {
+      // On calendar view, switch to map then zoom out
+      setView("map");
+      setMapFlyTo([-28.7, 25.5]);
+      setMapFlyToZoom(5.5);
+    }
+  }
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter" || !search.trim() || view !== "map") return;
@@ -183,6 +198,7 @@ export default function EventsView({
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         setMapFlyTo([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+        setMapFlyToZoom(undefined); // let EventMap use its default
       }
     } catch {
       /* geocoding failed — ignore */
@@ -202,10 +218,11 @@ export default function EventsView({
           onSelectPlace={handleSelectPlace}
           autoLocate
           flyTo={mapFlyTo}
+          flyToZoom={mapFlyToZoom}
         />
       )}
       {view === "calendar" && (
-        <div className="h-full overflow-y-auto bg-(--surface) px-3 pb-6 pt-22 sm:px-5">
+        <div className="h-full overflow-y-auto bg-(--surface) px-3 pb-6 pt-28 sm:px-5 sm:pt-24">
           <div className="mx-auto max-w-6xl">
             <PostEventPrompt />
             <EventCalendar
@@ -242,9 +259,13 @@ export default function EventsView({
               >
                 ☰
               </button>
-              <div className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-semibold tracking-tight text-black shadow-lg backdrop-blur sm:text-base">
-                <Link href="/events" className="hover:text-(--gold) transition">Citizens Connect</Link>
-              </div>
+              <button
+                type="button"
+                onClick={handleBrandClick}
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-semibold tracking-tight text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 sm:text-base"
+              >
+                Citizens Connect
+              </button>
             </div>
 
             <div className="pointer-events-auto flex items-center gap-2">

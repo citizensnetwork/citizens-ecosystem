@@ -71,7 +71,7 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/events" className="text-lg font-semibold tracking-tight text-black transition hover:text-(--gold)">
+        <Link href="/events" className="text-lg font-semibold tracking-tight text-(--gold) transition-all active:scale-95 active:brightness-90">
           Citizens Connect
         </Link>
 

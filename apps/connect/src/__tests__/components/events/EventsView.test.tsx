@@ -178,10 +178,11 @@ describe("EventsView", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders Citizens Connect brand link to /events", () => {
+  it("renders Citizens Connect brand button with gold text", () => {
     render(<EventsView events={events} />);
-    const brandLink = screen.getByText("Citizens Connect");
-    expect(brandLink.closest("a")).toHaveAttribute("href", "/events");
+    const brandBtn = screen.getByRole("button", { name: "Citizens Connect" });
+    expect(brandBtn).toBeInTheDocument();
+    expect(brandBtn.className).toContain("text-(--gold)");
   });
 
   it("renders view toggle button with calendar icon on map view", () => {

@@ -21,6 +21,21 @@
 | 11 | In-app Direct Messaging | **Complete** | Conversations, messages, inbox view, real-time chat, message organizer from events/profiles |
 | — | UI Maturity Overhaul | **Complete** | Monochrome + gold design, emojis → SVGs, mature markers, 50 mock places seeded |
 | — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
+| — | Map & Brand Polish | **Complete** | Filled place icons, gold brand tag with zoom, province auto-locate, calendar mobile fix |
+
+---
+
+## Map & Brand Polish (COMPLETE)
+
+### Delivered
+- [x] Place map markers: filled black (#111) with gold (#D4AF37) strokes, size 28→36px (near event size)
+- [x] "Citizens Connect" floating tag: always gold text, active:scale-95 + brightness-90 press animation
+- [x] Brand click → flyTo all of South Africa (center [-28.7, 25.5], zoom 5.5) from map or calendar view
+- [x] Navbar "Citizens Connect" link: always gold, same press animation
+- [x] Auto-locate zoom: province-level (zoom 8) instead of city-level (zoom 14)
+- [x] EventMap: `flyToZoom` prop for dynamic zoom on flyTo
+- [x] Calendar mobile: increased top padding (pt-28 mobile, pt-24 desktop) to clear floating controls
+- [x] Realtime publication enabled on `notifications` and `messages` tables
 
 ---
 
@@ -134,7 +149,7 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 - `send-daily-digest`: pg_cron daily at 7 AM
 - `FCM_SERVICE_ACCOUNT_JSON` env var required for push delivery (FCM HTTP v1 API with OAuth2)
 - In-app notifications work without FCM credentials (graceful degradation)
-- Realtime publication must be enabled on `notifications` table (Supabase Dashboard)
+- Realtime publication enabled on `notifications` and `messages` tables (via `ALTER PUBLICATION supabase_realtime`)
 
 ### Architect Audit Fixes (Phase 10)
 - [x] FCM legacy API → v1 HTTP API with RSA-SHA256 OAuth2 JWT assertion

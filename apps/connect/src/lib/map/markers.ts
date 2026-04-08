@@ -111,8 +111,8 @@ export function createPlaceMarkerEl(
     isFlagged?: boolean;
   }
 ): HTMLDivElement {
-  const size = 28;
-  const iconSize = 20;
+  const size = 36;
+  const iconSize = 24;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;
@@ -166,7 +166,7 @@ export function createPlaceMarkerEl(
   const opacity = isFlagged ? 0.62 : 1;
 
   const placeIcon =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    '<svg viewBox="0 0 24 24" fill="#111" stroke="#D4AF37" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="#D4AF37" stroke="#111" stroke-width="1.5"/></svg>';
 
   const el = document.createElement("div");
   el.className = "cc-marker";
@@ -182,7 +182,6 @@ export function createPlaceMarkerEl(
     filter:${glow};
   "><span style="
     width:${iconSize}px;height:${iconSize}px;
-    color:#D4AF37;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
   ">${placeIcon}</span>${ratingBadge}${warningBadge}</span>`;
