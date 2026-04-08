@@ -24,8 +24,9 @@ Citizens Vision is part of the Citizens ecosystem alongside Citizens Connect. It
 Metric computations and advisory outputs are rule-based and reproducible. Users trust the system because they can understand and verify how scores are calculated.
 
 ## Visual Identity
-- Monochrome foundation: 60% white, 30% black (#111)
-- Gold accent: 10% (#c8a24f / #D4AF37) — inherited from Citizens Connect
+- **Dark-Grey foundation (70%):** Background `#1a1a2e`, surfaces `#242438` / `#2d2d44`
+- **Blue accent (20%):** Interactive elements `#4a90d9`, hover `#3a7bc8`, muted `#2e5a8e`
+- **White highlight (10%):** Emphasis text `#ffffff`, muted highlights `#f0f0f4`
 - No emoji in UI — SVG icons only
 - Data-dense but clean layouts
 - Dashboard panels with consistent metric card design

@@ -18,6 +18,38 @@ export const ROLE_LABELS: Record<OrgRole, string> = {
   org_viewer: "Viewer",
 };
 
+export const ACTIVITY_TYPES = [
+  "event",
+  "meeting",
+  "outreach",
+  "workshop",
+  "service",
+  "training",
+  "other",
+] as const;
+
+export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  event: "Event",
+  meeting: "Meeting",
+  outreach: "Outreach",
+  workshop: "Workshop",
+  service: "Service",
+  training: "Training",
+  other: "Other",
+};
+
+export const ACTIVITY_TYPE_ICONS: Record<string, string> = {
+  event: "📅",
+  meeting: "🤝",
+  outreach: "📢",
+  workshop: "🔧",
+  service: "🤲",
+  training: "🎓",
+  other: "📋",
+};
+
+export const ITEMS_PER_PAGE = 20;
+
 export const ROLE_HIERARCHY: Record<OrgRole, number> = {
   platform_admin: 100,
   org_admin: 80,

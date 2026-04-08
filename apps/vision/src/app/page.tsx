@@ -26,7 +26,7 @@ export default async function Home() {
   return (
     <div className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-lg space-y-6 p-6">
-        <h1 className="text-2xl font-semibold text-neutral-900">
+        <h1 className="text-2xl font-semibold text-text-primary">
           Select Organisation
         </h1>
 
@@ -43,15 +43,15 @@ export default async function Home() {
                 <li key={org.id}>
                   <Link
                     href={`/${org.slug}`}
-                    className="block rounded-lg border border-neutral-200 bg-white p-4 transition-colors hover:border-gold hover:bg-neutral-50"
+                    className="block rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent hover:bg-surface-alt"
                   >
-                    <p className="font-medium text-neutral-900">{org.name}</p>
+                    <p className="font-medium text-text-primary">{org.name}</p>
                     {org.description && (
-                      <p className="mt-1 text-sm text-neutral-500">
+                      <p className="mt-1 text-sm text-text-secondary">
                         {org.description}
                       </p>
                     )}
-                    <p className="mt-1 text-xs uppercase tracking-wide text-neutral-400">
+                    <p className="mt-1 text-xs uppercase tracking-wide text-text-secondary">
                       {m.role.replace("_", " ")}
                     </p>
                   </Link>
@@ -60,13 +60,13 @@ export default async function Home() {
             })}
           </ul>
         ) : (
-          <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
-            <p className="text-neutral-500">
+          <div className="rounded-lg border border-border bg-surface p-6 text-center">
+            <p className="text-text-secondary">
               You are not a member of any organisation yet.
             </p>
             <Link
               href="/orgs/new"
-              className="mt-4 inline-block rounded-md bg-gold px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-hover"
+              className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-highlight transition-colors hover:bg-accent-hover"
             >
               Create Organisation
             </Link>

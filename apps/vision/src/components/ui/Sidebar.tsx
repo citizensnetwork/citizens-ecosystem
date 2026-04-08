@@ -5,10 +5,10 @@ import { useParams, usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Overview", href: "", icon: "◆" },
+  { label: "Activities", href: "/activities", icon: "▸" },
   { label: "Dashboard", href: "/dashboard", icon: "▦" },
   { label: "Map", href: "/map", icon: "◎" },
   { label: "Timeline", href: "/timeline", icon: "━" },
-  { label: "Activities", href: "/activities", icon: "▸" },
   { label: "Projects", href: "/projects", icon: "▪" },
   { label: "Goals", href: "/goals", icon: "◇" },
   { label: "Advisory", href: "/advisory", icon: "⚑" },
@@ -26,7 +26,7 @@ export function Sidebar() {
   const basePath = `/${orgSlug}`;
 
   return (
-    <nav className="flex h-full w-56 flex-col border-r border-gray-200 bg-white py-4">
+    <nav className="flex h-full w-56 flex-col border-r border-border bg-surface py-4">
       <ul className="space-y-0.5 px-2">
         {NAV_ITEMS.map((item) => {
           const href = `${basePath}${item.href}`;
@@ -41,8 +41,8 @@ export function Sidebar() {
                 href={href}
                 className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-text-primary font-medium text-gold"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-accent font-medium text-highlight"
+                    : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
                 }`}
               >
                 <span className="w-4 text-center text-xs">{item.icon}</span>

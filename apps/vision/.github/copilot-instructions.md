@@ -4,12 +4,13 @@
 Citizens Vision is a multi-tenant hierarchical data intelligence platform. It ingests organisational data (events, projects, goals, departments, users) and computes alignment metrics, trend analysis, and impact scoring. It exposes map, timeline, and dashboard visualization surfaces with role-based access control.
 
 ## Tech Stack
-- **Framework:** Next.js 15 (App Router), React 18, TypeScript 5 (strict)
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript 5 (strict)
 - **Database:** Supabase (PostgreSQL 17, Auth PKCE, Realtime, Edge Functions)
 - **Maps:** MapLibre GL JS 5.x
 - **Charts:** Recharts 2.x
 - **State:** Zustand 5.x
 - **Styling:** Tailwind CSS 4 (no config file, `@import` in globals.css)
+- **Design:** Dark-Grey (70%) + Blue (20%) + White (10%) palette
 - **Testing:** Vitest + Testing Library + Playwright (E2E)
 - **Deployment:** Vercel + Supabase Cloud
 - **Node:** 22.x | **Package Manager:** npm

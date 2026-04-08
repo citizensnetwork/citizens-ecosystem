@@ -61,6 +61,38 @@ describe('MetricCard', () => {
 - [ ] Test descriptions read as specifications ("it creates...", "it rejects...")
 - [ ] Mock data is realistic and typed
 
+## Cumulative Review Scope
+Every review MUST cover ALL completed phases, not just the current phase. Run the full test suite and verify no regressions in previously completed work.
+
+## Review Output Format
+
+```markdown
+## Phase [X] Testing Agent Review
+
+**Verdict: [PASS/FAIL]**
+**Coverage: [X%]**
+
+### Test Suite: [PASS/FAIL]
+- Total: [N] tests across [N] files
+- Passed: [N] | Failed: [N] | Skipped: [N]
+
+### Coverage Analysis: [PASS/WARN/FAIL]
+- Statements: [X%]
+- Branches: [X%]
+- Functions: [X%]
+- Lines: [X%]
+
+### Missing Tests
+1. [file/feature without tests]
+
+### Test Quality Issues
+1. [issue description]
+
+### Regression Check (Prior Phases)
+- Phase 0: [PASS/FAIL] — [N] tests
+- Phase N: [PASS/FAIL] — [N] tests
+```
+
 ## Tools
 - Run `npm test` to execute all tests
 - Run `npm test -- --coverage` for coverage report

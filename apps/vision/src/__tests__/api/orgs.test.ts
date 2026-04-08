@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
+
 
 // Mock Supabase client
 const mockSupabase = {
@@ -15,16 +15,6 @@ vi.mock("@/lib/supabase/server", () => ({
 
 // Import after mock setup
 const { GET, POST } = await import("@/app/api/orgs/route");
-
-function mockChain(data: unknown, error: unknown = null) {
-  return {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    then: vi.fn().mockResolvedValue({ data, error }),
-  };
-}
 
 describe("GET /api/orgs", () => {
   beforeEach(() => {

@@ -41,7 +41,7 @@ export function SignupForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-red-900/30 border border-red-700/50 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -58,7 +58,7 @@ export function SignupForm() {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-text-primary placeholder-gray-400 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="Jane Doe"
         />
       </div>
@@ -75,7 +75,7 @@ export function SignupForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-text-primary placeholder-gray-400 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="you@example.com"
         />
       </div>
@@ -93,14 +93,14 @@ export function SignupForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-text-primary placeholder-gray-400 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="••••••••"
         />
       </div>
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-md bg-text-primary px-4 py-2 text-sm font-medium text-white hover:bg-text-secondary disabled:opacity-50"
+        className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-highlight hover:bg-accent-hover disabled:opacity-50"
       >
         {loading ? "Creating account..." : "Create Account"}
       </button>

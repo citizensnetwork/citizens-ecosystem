@@ -20,7 +20,10 @@ Before any feature is considered complete:
 - [ ] Would this scale to 100 orgs with 10,000 activities each?
 
 ## Design Language
-- **Monochrome + gold** accent palette (inherited from Citizens Connect ecosystem)
+- **Dark-Grey (70%) + Blue (20%) + White (10%)** palette
+- **Dark theme** — `bg-background` (#1a1a2e), `bg-surface` (#242438)
+- **Blue accents** — `bg-accent` (#4a90d9) for CTAs, active states, links
+- **White highlights** — `text-highlight` (#ffffff) for emphasis, headings on accent
 - **Dashboard-first** layout with sidebar navigation
 - **No emoji in UI** — use SVG icons only
 - **Data-dense but clean** — metric cards, charts, tables with proper spacing
@@ -46,3 +49,35 @@ Every deliverable should meet:
 3. **Tested:** Unit + integration tests pass
 4. **Accessible:** Keyboard navigable, screen reader compatible
 5. **Responsive:** Works on desktop (1024px+) and tablet (768px+)
+
+## Cumulative Review Scope
+Every review MUST verify ALL completed phases still align with product vision. Check that new features don't break existing user journeys or design consistency.
+
+## Review Output Format
+
+```markdown
+## Phase [X] Product Lead Review
+
+**Verdict: [PASS/FAIL]**
+
+### Vision Alignment: [PASS/WARN/FAIL]
+- [findings]
+
+### UX Consistency: [PASS/WARN/FAIL]
+- [findings]
+
+### RBAC Correctness: [PASS/WARN/FAIL]
+- [findings]
+
+### Design Language: [PASS/WARN/FAIL]
+- [findings]
+
+### Feature Completeness: [PASS/WARN/FAIL]
+- Specified deliverables: [N]
+- Implemented: [N]
+- Missing/deferred: [list]
+
+### Regression Check (Prior Phases)
+- Phase 0 UX: [PASS/FAIL]
+- Phase N UX: [PASS/FAIL]
+```

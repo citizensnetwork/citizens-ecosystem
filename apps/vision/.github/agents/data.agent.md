@@ -43,6 +43,38 @@ For every table with `org_id`:
 4. RLS DELETE policy verifies user has admin/manager role
 5. No policy allows cross-org data access except platform_admin
 
+## Cumulative Review Scope
+Every review MUST cover ALL migrations and database code across all completed phases, not just the current phase. Verify no regressions in schema integrity, RLS coverage, or index strategy.
+
+## Review Output Format
+
+```markdown
+## Phase [X] Data Agent Review
+
+**Verdict: [PASS/FAIL]**
+
+### Schema Integrity: [PASS/WARN/FAIL]
+- Tables audited: [N]
+- Missing constraints: [list]
+
+### RLS Coverage: [PASS/WARN/FAIL]
+- Tables with RLS: [N/N]
+- Policies audited: [N]
+- Isolation gaps: [list]
+
+### Index Coverage: [PASS/WARN/FAIL]
+- Indexes audited: [N]
+- Missing indexes for query patterns: [list]
+
+### Migration Quality: [PASS/WARN/FAIL]
+- Idempotent: [yes/no]
+- Correct cascades: [yes/no]
+
+### Regression Check (Prior Phases)
+- Phase 0 schema: [PASS/FAIL]
+- Phase N schema: [PASS/FAIL]
+```
+
 ## Tools
 - Read migration files in `supabase/migrations/`
 - Review `supabase/schema.sql` for full schema

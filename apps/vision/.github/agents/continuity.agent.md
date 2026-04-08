@@ -57,6 +57,9 @@ git push origin main
 - [ ] All generated files are tracked (no missing from .gitignore)
 - [ ] No secrets committed (check .env.local is gitignored)
 
+## Cumulative Review Scope
+Every review MUST verify all documentation across all completed phases remains accurate and up-to-date. Check that prior phase status entries, decision logs, and instructions still reflect reality after new changes.
+
 ## Git Commit Message Convention
 ```
 Phase [N]: [Short title]

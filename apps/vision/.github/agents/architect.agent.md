@@ -62,6 +62,9 @@ After every phase completion, perform the following review:
 | **C** | Moderate issues (missing RLS policies, N+1 queries, poor separation of concerns). | Must fix all items before phase approval. |
 | **D** | Critical issues (security vulnerabilities, data leaks, broken multi-tenancy, no tests). | Phase rejected. Full rework required. |
 
+## Cumulative Review Scope
+Every review MUST cover ALL source code across all completed phases, not just the current phase. Check for regressions in security, architecture, performance, and code quality introduced by new work.
+
 ## Review Output Format
 
 ```markdown
