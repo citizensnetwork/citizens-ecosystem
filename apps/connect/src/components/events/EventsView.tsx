@@ -176,16 +176,10 @@ export default function EventsView({
 
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
-    if (view === "map") {
-      // South Africa center, zoom 5.5 shows full country
-      setMapFlyTo([-28.7, 25.5]);
-      setMapFlyToZoom(5.5);
-    } else {
-      // On calendar view, switch to map then zoom out
-      setView("map");
-      setMapFlyTo([-28.7, 25.5]);
-      setMapFlyToZoom(5.5);
-    }
+    // South Africa center, zoom 5.5 shows full country
+    setMapFlyTo([-28.7, 25.5]);
+    setMapFlyToZoom(5.5);
+    if (view !== "map") setView("map");
   }
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -253,7 +247,7 @@ export default function EventsView({
               <button
                 type="button"
                 onClick={() => setFiltersOpen((open) => !open)}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-base shadow-lg backdrop-blur transition hover:bg-white"
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-base shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
                 aria-label="Toggle menu"
                 aria-expanded={filtersOpen}
               >
@@ -270,16 +264,18 @@ export default function EventsView({
 
             <div className="pointer-events-auto flex items-center gap-2">
               {user && (
-                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
+                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90">
                   <NotificationBell userId={user.id} />
                 </div>
               )}
               <button
                 type="button"
-                onClick={() =>
-                  setView((v) => (v === "map" ? "calendar" : "map"))
-                }
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition hover:bg-white"
+                onClick={() => {
+                  setMapFlyTo(null);
+                  setMapFlyToZoom(undefined);
+                  setView((v) => (v === "map" ? "calendar" : "map"));
+                }}
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
                 aria-label="Toggle view mode"
               >
                 {view === "map" ? (
@@ -298,7 +294,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setGlanceOpen((o) => !o)}
-          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition hover:bg-white hover:text-black"
+          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white hover:text-black"
           aria-label={glanceOpen ? "Close events list" : "Events at a glance"}
         >
           {glanceOpen ? "▶" : "◀"}
