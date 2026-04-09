@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 2 — Map Visualization (COMPLETE)
+## Current Phase: 3 — Metrics & Insight Dashboards (COMPLETE)
 
 ## Phase Tracker
 
@@ -9,7 +9,7 @@
 | 0 | Foundation | ✅ Complete | 2026-04-08 | 2026-04-09 | A |
 | 1 | Entity & Activity Tracking | ✅ Complete | 2026-04-09 | 2026-04-09 | A |
 | 2 | Map Visualization | ✅ Complete | 2026-04-09 | 2026-04-09 | A |
-| 3 | Metrics & Insight Dashboards | ⏳ Not Started | — | — | — |
+| 3 | Metrics & Insight Dashboards | ✅ Complete | 2026-04-09 | 2026-04-09 | B |
 | 4 | Goals & Alignment Engine | ⏳ Not Started | — | — | — |
 | 5 | Projects & Milestones | ⏳ Not Started | — | — | — |
 | 6 | Timeline Engine | ⏳ Not Started | — | — | — |
@@ -368,3 +368,157 @@ Phase 0+1 complete: 5 tables, 18 RLS policies, 12 indexes, 6 API routes, 6 compo
 
 #### Session Compression
 Phase 0+1+2 complete: 5 tables, 18 RLS policies, 12 indexes, 7 API routes, 14 components, 8 pages, 183 tests, tsc/lint/build clean. Map visualization live with clustering, heatmap, search, geolocation, detail panel. Next: Phase 3 (Metrics & Insight Dashboards).
+
+---
+
+## Phase 3 Deliverables
+
+- [x] Migration `003_metrics.sql` — metric_definitions table, mv_org_activity_summary, mv_department_ranking materialized views, compute_org_kpis() function (SECURITY INVOKER), partial geo index on activities
+- [x] `src/types/metrics.ts` — OrgKPIs, TrendDataPoint, DepartmentMetric, TypeDistribution, MetricDefinition types
+- [x] `src/lib/metrics/utils.ts` — date range helpers, formatting, trend calculation, autoGranularity, chartColours
+- [x] `/api/metrics/overview` route — KPI aggregation + department breakdown + type distribution (auth-gated, org-scoped)
+- [x] `/api/metrics/trends` route — time-series with configurable granularity (day/week/month), date range, AbortController
+- [x] `MetricCard` component — value, label, trend arrow (↑/↓/→), percentage change, colour coding
+- [x] `DateRangePicker` component — preset ranges (7d, 30d, 90d, 1y, custom), custom date inputs
+- [x] `DashboardFilterBar` component — department + activity type selectors, date range integration
+- [x] `TrendChart` component — Recharts line chart, dark theme, responsive, tooltip
+- [x] `DepartmentBarChart` component — horizontal bar chart, department comparison
+- [x] `TypePieChart` component — donut chart, activity type distribution, legend
+- [x] `src/components/dashboard/index.ts` — barrel export for all dashboard components
+- [x] `/[orgSlug]/dashboard/page.tsx` — server component, org validation, metadata
+- [x] `/[orgSlug]/dashboard/DashboardClient.tsx` — client component, useReducer fetch counter, AbortController cleanup
+- [x] `eslint.config.mjs` — added coverage/** to globalIgnores
+- [x] `package.json` — added recharts@^2 dependency
+- [x] Org overview page updated — dashboard link, "Last 30 Days" activity stat
+- [x] 66 new tests across 7 test files (22 lib + 8 overview API + 8 trends API + 7 MetricCard + 6 DateRangePicker + 5 FilterBar + 10 Charts)
+
+### Deferred Items
+- pg_cron scheduled refresh — requires Supabase Cloud pg_cron extension; materialized views created but refresh is manual/API-triggered
+- "Active projects" and "Participants reached" KPIs — depend on Phase 5 (Projects) schema; placeholders in compute_org_kpis()
+
+## Build Verification (Phase 3)
+
+- **Tests**: 249/249 passing (29 files — 183 Phase 0-2 + 66 Phase 3)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors)
+- **Coverage**: ~85% Phase 3 aggregate (overview route 70%, TrendChart 67% — noted as WARN)
+- **New Files**: 17 (1 migration, 1 types, 1 lib, 2 API routes, 7 components, 1 barrel, 2 pages, 7 tests — some grouped under directories)
+- **Modified Files**: 4 (eslint.config.mjs, package.json, package-lock.json, [orgSlug]/page.tsx)
+
+---
+
+## Phase 3 Agent Reviews
+
+### Phase 3 Architect Review
+
+**Grade: B** (initial issues → all fixes applied)
+
+#### Fixes Applied
+1. compute_org_kpis() changed from SECURITY DEFINER to SECURITY INVOKER (RLS compliance)
+2. Date filter SQL bug fixed (was querying wrong column)
+3. Missing aria-labels added to chart components (accessibility)
+4. DELETE RLS policy added to metric_definitions (admin-only)
+5. SQL parameter binding hardened in trends route
+
+#### Security: PASS
+- API routes auth-gated, org-scoped via RLS
+- SECURITY INVOKER on compute_org_kpis() — respects caller's RLS context
+- UUID validation on all org_id parameters
+
+#### Architecture: PASS
+- Server Component page delegates to DashboardClient (correct RSC/RCC split)
+- useReducer for fetch counter (React compiler ESLint compliance)
+- AbortController for effect cleanup (no stale fetches)
+
+#### Database: PASS
+- metric_definitions has RLS enabled with admin write policies
+- Materialized views created as infrastructure (API queries activities directly for now — scale-ready)
+- Partial geo index added: `activities (latitude, longitude) WHERE latitude IS NOT NULL`
+
+---
+
+### Phase 3 Data Agent Review
+
+**Verdict: PASS**
+
+#### Advisories (non-blocking)
+1. WARN: metric_definitions missing platform_admin policy (only org_admin can manage — acceptable for Phase 3)
+2. WARN: Non-idempotent RLS policies in 001/002 (CREATE POLICY without IF NOT EXISTS — pre-existing, not Phase 3 regression)
+
+#### Schema Impact: PASS
+- 003_metrics.sql: 1 table, 2 materialized views, 1 function, 1 index — all idempotent
+- Foreign keys correct (metric_definitions.org_id → organisations.id CASCADE)
+
+---
+
+### Phase 3 Testing Agent Review
+
+**Verdict: PASS**
+**Coverage: 249/249 (~85% Phase 3 aggregate)**
+
+#### Test Suite: PASS
+- 249 passed | 0 failed | 0 skipped across 29 files
+
+#### New Test Files (7)
+- metrics-utils (22 tests) — date ranges, formatting, trend helpers, chart colours
+- metrics-overview API (8 tests) — auth, validation, happy path, error handling
+- metrics-trends API (8 tests) — auth, validation, granularity, date ranges
+- MetricCard (7 tests) — rendering, trend arrows, colour coding
+- DateRangePicker (6 tests) — presets, custom dates, callbacks
+- DashboardFilterBar (5 tests) — department/type selection, date integration
+- Charts (10 tests) — TrendChart, DepartmentBarChart, TypePieChart rendering
+
+#### Coverage Warnings (non-blocking)
+- `/api/metrics/overview` at ~70% (missing edge case for empty org)
+- `TrendChart` at ~67% (tooltip interaction paths untested)
+
+#### Regression Check
+- Phase 1: PASS (59 tests) | Phase 2: PASS (81 tests) | Phase 3: PASS (66 tests)
+
+---
+
+### Phase 3 Product Lead Review
+
+**Verdict: PASS**
+
+#### Feature Completeness: PASS
+- 15/15 specified deliverables implemented
+- Dashboard renders KPI cards, department bar chart, type pie chart, trend line chart
+- Date range picker with presets and custom range
+- Filter bar with department and type selectors
+
+#### Design Language: PASS
+- Dark-grey/blue/white palette consistent across all dashboard components
+- Recharts dark theme (transparent backgrounds, white text, blue accent)
+- Responsive layout (card grid, chart containers)
+
+#### UX Consistency: PASS
+- Loading states with skeletons on all data-dependent sections
+- Empty states for zero-activity scenarios
+- Accessible chart labels and tooltips
+
+---
+
+### Phase 3 Continuity Agent Review
+
+**Verdict: PASS**
+
+#### Documentation: PASS
+- PROJECT_STATUS.md updated with Phase 3 completion, deliverables, build verification, all 5 agent reviews
+- DECISIONS.md updated (DECISION-019 through DECISION-023)
+- copilot-instructions.md already up to date (Recharts 2.x in tech stack)
+
+#### Git Workflow: PASS
+- All Phase 3 files tracked (17 new + 4 modified)
+- No secrets in tracked files
+- .gitignore correct
+
+#### Cumulative Review
+- Phase 0 status: accurate ✅
+- Phase 1 status: accurate ✅
+- Phase 2 status: accurate ✅
+- Phase 3 status: accurate ✅
+- All decisions (001–023) reflect current implementation
+
+#### Session Compression
+Phase 0+1+2+3 complete: 6 tables + 2 materialized views, 19+ RLS policies, 13 indexes, 9 API routes, 21 components, 10 pages, 249 tests, tsc/lint/build clean. Dashboard live with KPIs, trend charts, department comparison, type distribution, date range filtering. Next: Phase 4 (Goals & Alignment Engine).

@@ -106,4 +106,34 @@
 - **Context:** Data Agent recommended `CREATE INDEX ON activities (latitude, longitude) WHERE latitude IS NOT NULL` for map query performance
 - **Decision:** Defer geo index creation to Phase 3 migration (003_metrics.sql)
 - **Rationale:** Current activity volumes don't justify the index; Phase 3 migration is the next schema change opportunity. Documented for inclusion
+- **Status:** Implemented (2026-04-09) — index created in 003_metrics.sql
+
+## DECISION-019: Recharts 2.x for Dashboard Charting
+- **Context:** Phase 3 dashboard requires line charts, bar charts, and pie charts for metrics visualization
+- **Decision:** Use Recharts 2.x as the charting library
+- **Rationale:** React-native composable API, lightweight bundle, built-in dark theme support via prop customization, matches ARCHITECTURE.md recommendation
+- **Status:** Accepted (2026-04-09)
+
+## DECISION-020: SECURITY INVOKER for compute_org_kpis()
+- **Context:** compute_org_kpis() SQL function aggregates activity data; could use DEFINER (bypass RLS) or INVOKER (respect RLS)
+- **Decision:** Use SECURITY INVOKER so the function respects the caller's RLS policies
+- **Rationale:** RLS-first security model — even DB functions must not bypass tenant isolation. Caught by Architect review
+- **Status:** Accepted (2026-04-09)
+
+## DECISION-021: Materialized Views as Scale-Ready Infrastructure
+- **Context:** Phase 3 creates mv_org_activity_summary and mv_department_ranking but API queries could use them or query activities directly
+- **Decision:** Create materialized views in migration but have API routes query activities table directly for now
+- **Rationale:** At current data volumes, direct queries are fast and return live data. Materialized views add refresh lag. Infrastructure is pre-positioned for when org activity counts exceed query performance thresholds
+- **Status:** Accepted (2026-04-09)
+
+## DECISION-022: useReducer for DashboardClient Fetch Counter
+- **Context:** DashboardClient needs a loading counter to track parallel API fetches; useState would trigger React compiler ESLint warnings
+- **Decision:** Use useReducer for the fetch counter state
+- **Rationale:** React compiler (ESLint react-compiler plugin) flags certain useState patterns in effects. useReducer with dispatch is the idiomatic workaround
+- **Status:** Accepted (2026-04-09)
+
+## DECISION-023: Extracted fetchDashboardData with AbortController
+- **Context:** DashboardClient useEffect fetches overview + trends data; needs proper cleanup on unmount/re-render
+- **Decision:** Extract fetchDashboardData as a standalone async function with AbortController signal passed to all fetch calls
+- **Rationale:** Prevents stale fetch responses from updating state after component unmount. AbortController.abort() in effect cleanup ensures no memory leaks
 - **Status:** Accepted (2026-04-09)
