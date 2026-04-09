@@ -50,6 +50,38 @@ export const ACTIVITY_TYPE_ICONS: Record<string, string> = {
 
 export const ITEMS_PER_PAGE = 20;
 
+export const GOAL_STATUSES = [
+  "draft",
+  "active",
+  "completed",
+  "archived",
+] as const;
+
+export const GOAL_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  active: "Active",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+export const GOAL_STATUS_COLOURS: Record<string, string> = {
+  draft: "#abb2bf",
+  active: "#4a90d9",
+  completed: "#6bcf7f",
+  archived: "#6b7280",
+};
+
+export const ALIGNMENT_THRESHOLDS = {
+  low: 30,
+  medium: 70,
+} as const;
+
+export const ALIGNMENT_COLOURS = {
+  low: "#ef4444",
+  medium: "#f5a623",
+  high: "#6bcf7f",
+} as const;
+
 export const ROLE_HIERARCHY: Record<OrgRole, number> = {
   platform_admin: 100,
   org_admin: 80,

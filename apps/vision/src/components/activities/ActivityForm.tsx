@@ -6,11 +6,13 @@ import { ACTIVITY_TYPES } from "@/lib/schemas/activity";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
 import { LocationPicker } from "@/components/map/LocationPicker";
 import type { Department } from "@/types/db";
+import type { Goal } from "@/types/db";
 
 interface ActivityFormProps {
   orgId: string;
   orgSlug: string;
   departments: Department[];
+  goals?: Pick<Goal, "id" | "title">[];
   initialData?: {
     id: string;
     title: string;
@@ -25,6 +27,7 @@ interface ActivityFormProps {
     participant_count: number;
     department_id: string | null;
     activity_tags?: { tag: string }[];
+    linked_goal_ids?: string[];
   };
 }
 
@@ -32,6 +35,7 @@ export function ActivityForm({
   orgId,
   orgSlug,
   departments,
+  goals,
   initialData,
 }: ActivityFormProps) {
   const router = useRouter();
@@ -63,6 +67,9 @@ export function ActivityForm({
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(
     initialData?.activity_tags?.map((t) => t.tag) ?? []
+  );
+  const [linkedGoalIds, setLinkedGoalIds] = useState<string[]>(
+    initialData?.linked_goal_ids ?? []
   );
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -114,6 +121,27 @@ export function ActivityForm({
         const data = await res.json();
         setError(data.error || "Failed to save activity");
         return;
+      }
+
+      // Link goals if any selected (for new activities)
+      if (!isEditing && linkedGoalIds.length > 0) {
+        const result = await res.json();
+        const activityId = result?.data?.id;
+        if (activityId) {
+          await Promise.all(
+            linkedGoalIds.map((goalId) =>
+              fetch(`/api/goals/${goalId}/alignment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  activity_id: activityId,
+                  link_type: "explicit",
+                  confidence: 1.0,
+                }),
+              })
+            )
+          );
+        }
       }
 
       router.push(`/${orgSlug}/activities`);
@@ -380,6 +408,39 @@ export function ActivityForm({
           </div>
         )}
       </div>
+
+      {/* Link to Goals */}
+      {goals && goals.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-text-primary">
+            Link to Goals
+          </label>
+          <p className="mb-2 text-xs text-text-secondary">
+            Select goals this activity contributes toward
+          </p>
+          <div className="mt-1 space-y-1.5 rounded-md border border-border bg-surface p-3">
+            {goals.map((goal) => (
+              <label key={goal.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={linkedGoalIds.includes(goal.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setLinkedGoalIds([...linkedGoalIds, goal.id]);
+                    } else {
+                      setLinkedGoalIds(
+                        linkedGoalIds.filter((id) => id !== goal.id)
+                      );
+                    }
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-text-primary">{goal.title}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Submit */}
       <div className="flex gap-3">

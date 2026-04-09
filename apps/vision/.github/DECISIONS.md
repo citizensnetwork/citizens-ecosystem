@@ -137,3 +137,45 @@
 - **Decision:** Extract fetchDashboardData as a standalone async function with AbortController signal passed to all fetch calls
 - **Rationale:** Prevents stale fetch responses from updating state after component unmount. AbortController.abort() in effect cleanup ensures no memory leaks
 - **Status:** Accepted (2026-04-09)
+
+## DECISION-024: Jaccard Keyword Overlap for Goal-Activity Alignment
+- **Context:** Phase 4 needs to score how well activities align with goals; could use ML embeddings, TF-IDF, or simpler text matching
+- **Decision:** Use Jaccard similarity coefficient on tokenised goal/activity titles+descriptions with stop-word removal
+- **Rationale:** Deterministic, explainable, zero extra dependencies. Confidence capped at 0.95 to acknowledge imperfection. Threshold (0.1) and maxResults (5) configurable. ML can replace later if needed
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-025: Temporal Decay in SQL Alignment Scoring
+- **Context:** compute_alignment_score() needs to weight recent activity links higher than stale ones
+- **Decision:** Four-tier temporal decay in SQL: 0–30d = 1.0, 31–90d = 0.7, 91–365d = 0.4, 365d+ = 0.2
+- **Rationale:** SQL-level computation avoids client roundtrips. Four tiers balance recency signal with historical context. Tiers align with Phase 2 temporal opacity decision (DECISION-015)
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-026: Corrective Migration Pattern (005_goals_security_fixes.sql)
+- **Context:** Security review found RLS gaps after Phase 4 core migration (004); needed to patch without altering 004
+- **Decision:** Create separate corrective migration (005) that drops/recreates affected policies and functions
+- **Rationale:** Keeps 004 as historical record; 005 is additive and idempotent. Avoids editing applied migrations. Pattern reusable for future security hardening
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-027: Generic Error Responses on All API Routes
+- **Context:** SE Security review found raw Supabase error.message being returned to clients (information leakage)
+- **Decision:** All API routes return generic "Internal server error" for 500s; original error logged via console.error with route context prefix
+- **Rationale:** Prevents database schema/constraint names from leaking to clients. Server logs retain full detail for debugging
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-028: Platform Admin RLS Override
+- **Context:** Phase 4 RLS policies only checked org membership; platform admins were locked out
+- **Decision:** All Phase 4 RLS policies include `OR is_platform_admin()` clause
+- **Rationale:** Platform admins need cross-org visibility for support and auditing. is_platform_admin() is a SECURITY DEFINER function checking user metadata
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-029: Org ID Immutability via Trigger
+- **Context:** UPDATE RLS policies couldn't prevent org_id column mutation (WITH CHECK insufficient for column-level control)
+- **Decision:** Database trigger `prevent_org_id_change()` raises exception if org_id changes on vision_statements or goals
+- **Rationale:** Defense-in-depth — even if RLS is bypassed via service role, org_id cannot be mutated. Trigger-level enforcement is authoritative
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-030: Materialized View as Scale-Ready Infrastructure (Phase 4)
+- **Context:** mv_goal_alignment_matrix created in 004 but API routes query tables directly
+- **Decision:** Retain materialized view as infrastructure; API routes use direct queries for now
+- **Rationale:** Consistent with DECISION-021 (Phase 3). Direct queries return live data with no refresh lag. Materialized view activates when goal/activity counts exceed query performance thresholds
+- **Status:** Accepted (2026-04-10)

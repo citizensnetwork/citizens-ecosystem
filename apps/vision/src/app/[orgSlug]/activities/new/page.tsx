@@ -31,6 +31,13 @@ export default async function NewActivityPage({
     .eq("org_id", org.id)
     .order("name");
 
+  const { data: goals } = await supabase
+    .from("goals")
+    .select("id, title")
+    .eq("org_id", org.id)
+    .eq("status", "active")
+    .order("title");
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold text-text-primary">
@@ -40,6 +47,7 @@ export default async function NewActivityPage({
         orgId={org.id}
         orgSlug={orgSlug}
         departments={departments ?? []}
+        goals={goals ?? []}
       />
     </div>
   );

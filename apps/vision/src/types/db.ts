@@ -84,3 +84,52 @@ export interface ActivityTag {
 export interface ActivityWithTags extends Activity {
   activity_tags: ActivityTag[];
 }
+
+// Phase 4: Goals & Alignment
+
+export type GoalStatus = "draft" | "active" | "completed" | "archived";
+export type GoalLinkType = "explicit" | "inferred";
+
+export interface VisionStatement {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Goal {
+  id: string;
+  org_id: string;
+  vision_id: string | null;
+  title: string;
+  description: string | null;
+  target_value: number | null;
+  target_unit: string | null;
+  deadline: string | null;
+  priority_weight: number;
+  status: GoalStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoalWithVision extends Goal {
+  vision_statements: Pick<VisionStatement, "title"> | null;
+}
+
+export interface GoalActivityLink {
+  id: string;
+  goal_id: string;
+  activity_id: string;
+  link_type: GoalLinkType;
+  confidence: number;
+  approved: boolean | null;
+  created_at: string;
+}
+
+export interface GoalActivityLinkWithActivity extends GoalActivityLink {
+  activities: Pick<Activity, "id" | "title" | "type" | "date">;
+}
