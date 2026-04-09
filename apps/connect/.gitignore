@@ -76,3 +76,7 @@ next-env.d.ts
 .zencoder/
 
 .vercel
+
+# Copilot artifacts
+# Code Citations.md
+.testagent/

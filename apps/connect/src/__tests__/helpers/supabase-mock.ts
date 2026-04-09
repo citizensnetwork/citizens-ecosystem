@@ -5,9 +5,15 @@ type MockChain = {
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
+  upsert: ReturnType<typeof vi.fn>;
   eq: ReturnType<typeof vi.fn>;
+  neq: ReturnType<typeof vi.fn>;
+  in: ReturnType<typeof vi.fn>;
+  lt: ReturnType<typeof vi.fn>;
+  gt: ReturnType<typeof vi.fn>;
   single: ReturnType<typeof vi.fn>;
   order: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
   returns: ReturnType<typeof vi.fn>;
   _result: { data: unknown; error: unknown; count?: number };
 };
@@ -19,9 +25,15 @@ function createQueryChain(result?: Partial<MockChain["_result"]>): MockChain {
     insert: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    upsert: vi.fn(),
     eq: vi.fn(),
+    neq: vi.fn(),
+    in: vi.fn(),
+    lt: vi.fn(),
+    gt: vi.fn(),
     single: vi.fn(),
     order: vi.fn(),
+    limit: vi.fn(),
     returns: vi.fn(),
   };
 

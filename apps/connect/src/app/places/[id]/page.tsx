@@ -34,8 +34,8 @@ export default async function PlaceDetailPage({
 
   const isOwner = !!user && user.id === place.created_by;
 
-  // Fetch reviews and follow data in parallel
-  const [reviewsRes, followerCountRes, userFollowRes] = await Promise.all([
+  // Fetch reviews, follow data, and profile in parallel
+  const [reviewsRes, followerCountRes, userFollowRes, profileRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
@@ -54,11 +54,16 @@ export default async function PlaceDetailPage({
           .eq("user_id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    user
+      ? supabase.from("profiles").select("role").eq("id", user.id).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const reviews = reviewsRes.data;
   const followerCount = followerCountRes.count ?? 0;
   const isFollowing = !!userFollowRes.data;
+  const isAdmin = profileRes.data?.role === "admin";
+  const canEdit = isOwner || isAdmin;
 
   const avgRating =
     reviews && reviews.length > 0
@@ -158,6 +163,15 @@ export default async function PlaceDetailPage({
         )}
 
         {isOwner && <ReverifyPlaceButton placeId={place.id} />}
+
+        {canEdit && (
+          <Link
+            href={`/places/${place.id}/edit`}
+            className="inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black hover:brightness-95"
+          >
+            Edit Place
+          </Link>
+        )}
       </div>
 
       {/* Reviews */}

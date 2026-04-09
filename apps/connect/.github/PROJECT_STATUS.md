@@ -22,6 +22,27 @@
 | — | UI Maturity Overhaul | **Complete** | Monochrome + gold design, emojis → SVGs, mature markers, 50 mock places seeded |
 | — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
 | — | Map & Brand Polish | **Complete** | Filled place icons, gold brand tag with zoom, province auto-locate, calendar mobile fix |
+| — | UX Bug Fixes + Quality Hardening | **Complete** | Notification bounce, glance panel jitter, category filter zoom, 333 tests, CI pipeline, place edit/delete, admin categories |
+
+---
+
+## UX Bug Fixes + Quality Hardening (COMPLETE)
+
+### Delivered
+- [x] Notification bell: removed scale/brightness bounce from wrapper div — only button animates, added active:scale-95 to bell `<button>`
+- [x] Glance sidebar: removed active:scale-95 from edge tab (caused map/panel shift), replaced with transition-colors + active:bg-black/5
+- [x] Category filter: map no longer zooms out on filter change — `hasRestoredView` stays true after initial fitBounds
+- [x] GitHub Actions CI pipeline: typecheck + lint + test + build on push/PR to main
+- [x] Place edit/delete: `/places/[id]/edit` page with EditPlaceForm, owner/admin gated, 6-month deletion rule
+- [x] Admin category management: `/admin/categories` page with CategoryManager (add, edit, delete, reorder)
+- [x] Admin link in BurgerMenu (visible only to admin role)
+- [x] Edit Place button on place detail page (visible to owner or admin)
+- [x] Test coverage expanded: 204 → 333 tests across 37 files (11 new test files)
+  - Pure function tests: validation.ts (12), calendar.ts (13), map/config.ts (6)
+  - API route tests: follow (14), onboarding (18), notifications (16+8), push-token (15), conversations (10+13+4)
+  - Supabase mock helpers extended: upsert, neq, in, lt, gt, limit chains
+- [x] All SE agents reviewed and approved (Architecture A, Security clear, DevOps clear, RAI pass, UX pass, Product pass)
+- [x] Vision alignment assessment: A- grade (scaffold agent analysis)
 
 ---
 
@@ -259,10 +280,10 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 - [x] Events page fetches places in parallel (Promise.all)
 
 ### Remaining
-- [ ] Category management UI (admin)
+- [x] Category management UI (admin)
+- [x] Place edit/delete functionality
 - [ ] Migrate events from hardcoded categories to category_id FK (optional phase)
 - [ ] Expanded roles: individual, ministry, organization, business
-- [ ] Place edit/delete functionality
 - [ ] Image storage bucket for places (currently shares event-images)
 
 ---

@@ -19,6 +19,8 @@ src/
 │   ├── api/conversations/[id]/messages/route.ts # Messages fetch/send (GET, POST)
 │   ├── api/conversations/[id]/read/route.ts # Mark conversation read (PATCH)
 │   ├── auth/callback/route.ts    # PKCE code exchange (password reset, email confirm)
+│   ├── admin/
+│   │   └── categories/page.tsx   # /admin/categories — admin category management
 │   ├── events/
 │   │   ├── page.tsx              # /events — fetches all events, renders EventsView
 │   │   ├── loading.tsx           # Skeleton loader for events page
@@ -61,7 +63,10 @@ src/
 │   │   ├── ConversationList.tsx  # Inbox list with unread badges, realtime updates
 │   │   └── ChatView.tsx          # Chat thread — messages, date separators, send, realtime
 │   ├── places/
-│   │   └── FollowPlaceButton.tsx # Follow/unfollow place with optimistic count
+│   │   ├── FollowPlaceButton.tsx # Follow/unfollow place with optimistic count
+│   │   └── EditPlaceForm.tsx     # Edit place form with delete (owner/admin)
+│   ├── admin/
+│   │   └── CategoryManager.tsx   # Category CRUD (admin-only)
 │   ├── onboarding/
 │   │   ├── OnboardingWizard.tsx   # Single-page interest/location/notification wizard (edit + onboard mode)
 │   │   ├── OnboardingOverlay.tsx  # Full-screen overlay for first-login onboarding

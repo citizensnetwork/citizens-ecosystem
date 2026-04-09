@@ -250,6 +250,15 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   <p className="truncate text-xs text-black/50">{user.email}</p>
                 </div>
               </Link>
+              {menuProfile?.role === "admin" && (
+                <Link
+                  href="/admin/categories"
+                  onClick={onClose}
+                  className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                >
+                  Manage Categories
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={onLogout}

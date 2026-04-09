@@ -99,20 +99,16 @@ Marker utilities live in `src/lib/map/markers.ts`:
 
 See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists.
 
-**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9), Smart Notifications (Phase 10), Direct Messaging (Phase 11)
-**Current phase:** All core phases complete (Phases 1–11)
-**Upcoming:** Community feedback & iteration
+**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9), Smart Notifications (Phase 10), Direct Messaging (Phase 11), UX Bug Fixes + Quality Hardening
+**Current phase:** All core phases complete (Phases 1–11). 333 tests, CI pipeline active.
+**Upcoming:** Expanded roles, content diversity, ecosystem readiness
 
 Platform has two full-screen primary views:
 1. **Map view** — full-viewport map with category markers, temporal encoding, clustering, geolocation, detail panel, floating controls
 2. **Calendar view** — FullCalendar with day/week/month views, category-colored events, detail panel integration, vendor quick-create on date click
 **Platform identity:** Serves organizers and non-organizers equally. All people and entities have equal dignity. Open to non-Christians discovering the Kingdom. See `.github/VISION.md` for full vision.
 
-Upcoming tables: `places` (persistent map listings), `categories` (DB-driven), `reviews` (ratings + "place still exists?" signals). Roles expanding to: individual, ministry, organization, business.", "oldString": "- **Map view** — full-viewport map with category markers, temporal encoding, clustering, geolocation, detail panel, floating controls
-2. **Calendar view** — FullCalendar with day/week/month views, category-colored events, detail panel integration, vendor quick-create on date click
-Upcoming tables: `places` (persistent map listings), `categories` (DB-driven), `reviews` (ratings + "place still exists?" signals). Roles expanding to: individual, ministry, organization, business.
-
-Mobile via Capacitor wrapper (single codebase).
+Roles expanding to: individual, ministry, organization, business.
 
 ## Project Customization Files
 

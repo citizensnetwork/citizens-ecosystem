@@ -287,3 +287,49 @@
 **Decision:** The `next/font` variable for Montserrat was renamed from `--font-geist-sans` to `--font-montserrat`. The `@theme inline` block in globals.css builds the full `--font-sans` stack from it.
 **Why:** The old name was a leftover from the Next.js starter template (Geist font) and was misleading.
 **Date:** 2026-04-07.
+
+## UX & Map Behavior
+
+### Map viewport locked after initial fitBounds
+**Decision:** After the first `fitBounds` call (or sessionStorage restore), `hasRestoredView.current` stays `true` permanently. Category filtering, search, and other marker updates never call `fitBounds` — only the initial load or explicit `flyTo` prop can move the camera.
+**Why:** Users expect the map to stay where they positioned it when toggling filters. Auto-zooming to fit filtered results destroys spatial context. Aligns with Google Maps convention: filtering is a data operation, not a navigation operation.
+**Date:** 2026-04-09.
+
+### No scale transforms on edge-anchored UI elements
+**Decision:** Buttons positioned with `absolute` and translate transforms should not use `active:scale-95`. Use `transition-colors` + `active:bg-black/5` for press feedback instead.
+**Why:** `scale-95` on absolutely-positioned elements with existing transforms causes compound transform recalculation, visually shifting adjacent panels and the map. Color-only transitions are cheaper and more stable.
+**Date:** 2026-04-09.
+
+### Interactive styles belong on buttons, not wrapper divs
+**Decision:** `active:scale-95`, `active:brightness-90`, etc. should only be applied to the actual `<button>` element, never to a non-interactive wrapper `<div>`.
+**Why:** Wrapper divs may contain dropdown panels or other child elements. Scaling the wrapper causes the entire subtree (including open panels) to bounce, which is a visual bug.
+**Date:** 2026-04-09.
+
+## Features
+
+### Place edit/delete (owner + admin)
+**Decision:** Place owners and admins can edit places at `/places/[id]/edit`. Deletion enforces the 6-month creation rule client-side. Edit button visible on place detail page for owner/admin only.
+**Why:** Completes the place CRUD cycle. Deletion rule already established in Phase 8.5 but lacked UI enforcement.
+**Date:** 2026-04-09.
+
+### Admin category management UI
+**Decision:** Admin-only page at `/admin/categories` with CategoryManager component for CRUD operations on the `categories` table. Accessible via BurgerMenu link (visible to admin role only).
+**Why:** Categories were previously only managed via direct DB access or migrations. Admin needs UI for adding/editing/removing categories as the platform grows.
+**Date:** 2026-04-09.
+
+## CI/CD
+
+### GitHub Actions CI pipeline
+**Decision:** `.github/workflows/ci.yml` runs typecheck + lint + test + build on every push/PR to main. Uses Node.js version from `.nvmrc`, npm cache.
+**Why:** 333 tests exist but no automated enforcement. CI catches regressions before merge. E2E tests remain local-only until a dedicated test Supabase project is configured.
+**Date:** 2026-04-09.
+
+### Global iteration framework
+**Decision:** Every code iteration follows: Context → Implement → SE Agent Review Chain (Architect → Security → DevOps → Responsible AI → UX → Product Manager → Tech Writer) → Enforce A-grade standards → Optimize file arrangement → Update project assets → Git push.
+**Why:** User-requested quality framework. SE agents provide multi-discipline review. Standards enforced on ALL new code (not N-1). Framework saved globally for reuse across projects.
+**Date:** 2026-04-09.
+
+### Polyglot testing pipeline
+**Decision:** Testing follows: Researcher → Planner → Generator → Builder → Tester → Fixer → Linter. Framework saved globally for reuse.
+**Why:** Structured approach ensures comprehensive coverage with proper planning. Research phase identifies gaps, planner prioritizes by ROI, generator implements in phases.
+**Date:** 2026-04-09.

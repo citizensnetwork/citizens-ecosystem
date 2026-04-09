@@ -252,9 +252,9 @@ export default function EventMap({
           bounds.extend(toLngLat(userPositionRef.current));
         }
         map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
+        // Lock viewpoint so category filtering never moves the map
+        hasRestoredView.current = true;
       }
-      // After first render, allow fitBounds on future data changes
-      hasRestoredView.current = false;
     };
 
     // If style is loaded, add markers immediately; otherwise wait for load

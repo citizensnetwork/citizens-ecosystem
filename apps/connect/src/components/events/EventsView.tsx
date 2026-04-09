@@ -264,7 +264,7 @@ export default function EventsView({
 
             <div className="pointer-events-auto flex items-center gap-2">
               {user && (
-                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90">
+                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
                   <NotificationBell userId={user.id} />
                 </div>
               )}
@@ -294,7 +294,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setGlanceOpen((o) => !o)}
-          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white hover:text-black"
+          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition-colors active:bg-black/5 hover:bg-white hover:text-black"
           aria-label={glanceOpen ? "Close events list" : "Events at a glance"}
         >
           {glanceOpen ? "▶" : "◀"}

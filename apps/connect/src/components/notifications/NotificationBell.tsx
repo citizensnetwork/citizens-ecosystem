@@ -83,7 +83,7 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-8 w-8 items-center justify-center rounded-full text-black/65 transition hover:bg-black/5 hover:text-black"
+        className="relative flex h-8 w-8 items-center justify-center rounded-full text-black/65 transition hover:bg-black/5 hover:text-black active:scale-95"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
       >
         {/* Bell SVG */}
