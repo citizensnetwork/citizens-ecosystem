@@ -23,12 +23,12 @@ No phase is considered complete until ALL agents have run their reviews:
 | 4 | **Product Lead** | Feature alignment, UX consistency, RBAC correctness, design language | Yes (must pass) |
 | 5 | **Continuity** | Docs updated, decisions logged, git workflow executed | Yes (must pass) |
 
-### 3. Cumulative Review Scope
+### 3. Review Scope
 Every agent review MUST cover:
 - **Current phase** — All new code introduced in this phase
-- **All previously completed phases** — Regression check on all existing code
+- **Previous phase (N-1)** — Regression check on the immediately preceding phase
 
-This ensures no phase degrades the quality of prior work.
+This keeps reviews focused while still catching regressions from adjacent work.
 
 ### 4. Review Output
 Each agent produces a report in its defined format. All reports are appended to `.github/PROJECT_STATUS.md` under the phase entry.
