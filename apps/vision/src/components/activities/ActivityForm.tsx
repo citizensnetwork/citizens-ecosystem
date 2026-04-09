@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACTIVITY_TYPES } from "@/lib/schemas/activity";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
+import { LocationPicker } from "@/components/map/LocationPicker";
 import type { Department } from "@/types/db";
 
 interface ActivityFormProps {
@@ -44,6 +45,12 @@ export function ActivityForm({
   const [date, setDate] = useState(initialData?.date ?? "");
   const [startTime, setStartTime] = useState(initialData?.start_time ?? "");
   const [endTime, setEndTime] = useState(initialData?.end_time ?? "");
+  const [latitude, setLatitude] = useState<number | null>(
+    initialData?.latitude ?? null
+  );
+  const [longitude, setLongitude] = useState<number | null>(
+    initialData?.longitude ?? null
+  );
   const [locationName, setLocationName] = useState(
     initialData?.location_name ?? ""
   );
@@ -84,6 +91,8 @@ export function ActivityForm({
       date,
       start_time: startTime || undefined,
       end_time: endTime || undefined,
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined,
       location_name: locationName.trim() || undefined,
       participant_count: participantCount,
       department_id: departmentId || undefined,
@@ -240,40 +249,62 @@ export function ActivityForm({
       </div>
 
       {/* Location + Participants */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="locationName"
-            className="block text-sm font-medium text-text-primary"
-          >
-            Location
-          </label>
-          <input
-            id="locationName"
-            type="text"
-            maxLength={300}
-            value={locationName}
-            onChange={(e) => setLocationName(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-text-primary placeholder:text-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            placeholder="e.g. Community Hall, Ward 5"
-          />
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="locationName"
+              className="block text-sm font-medium text-text-primary"
+            >
+              Location Name
+            </label>
+            <input
+              id="locationName"
+              type="text"
+              maxLength={300}
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-text-primary placeholder:text-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              placeholder="e.g. Community Hall, Ward 5"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="participantCount"
+              className="block text-sm font-medium text-text-primary"
+            >
+              Participants
+            </label>
+            <input
+              id="participantCount"
+              type="number"
+              min={0}
+              value={participantCount}
+              onChange={(e) =>
+                setParticipantCount(parseInt(e.target.value, 10) || 0)
+              }
+              className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
         </div>
+
+        {/* Map Location Picker */}
         <div>
-          <label
-            htmlFor="participantCount"
-            className="block text-sm font-medium text-text-primary"
-          >
-            Participants
+          <label className="block text-sm font-medium text-text-primary">
+            Pin Location on Map
           </label>
-          <input
-            id="participantCount"
-            type="number"
-            min={0}
-            value={participantCount}
-            onChange={(e) =>
-              setParticipantCount(parseInt(e.target.value, 10) || 0)
-            }
-            className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          <p className="mb-2 text-xs text-text-secondary">
+            Search or click the map to set the activity&apos;s coordinates
+          </p>
+          <LocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            locationName={locationName}
+            onLocationChange={(lat, lng, name) => {
+              setLatitude(lat);
+              setLongitude(lng);
+              if (name && !locationName) setLocationName(name);
+            }}
           />
         </div>
       </div>

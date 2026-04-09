@@ -56,7 +56,7 @@ export default async function OrgOverview({ params }: OrgPageProps) {
           Organisation Overview
         </h2>
         <p className="mt-2 text-sm text-text-secondary">
-          Dashboard visualisations and activity feed will appear here in Phase 2.
+          Metrics dashboards and trend analysis will appear here in Phase 3.
         </p>
       </div>
     </div>

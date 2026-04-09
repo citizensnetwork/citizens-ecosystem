@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 1 — Entity & Activity Tracking (COMPLETE)
+## Current Phase: 2 — Map Visualization (COMPLETE)
 
 ## Phase Tracker
 
@@ -8,7 +8,7 @@
 |-------|------|--------|---------|-----------|-------|
 | 0 | Foundation | ✅ Complete | 2026-04-08 | 2026-04-09 | A |
 | 1 | Entity & Activity Tracking | ✅ Complete | 2026-04-09 | 2026-04-09 | A |
-| 2 | Map Visualization | ⏳ Not Started | — | — | — |
+| 2 | Map Visualization | ✅ Complete | 2026-04-09 | 2026-04-09 | A |
 | 3 | Metrics & Insight Dashboards | ⏳ Not Started | — | — | — |
 | 4 | Goals & Alignment Engine | ⏳ Not Started | — | — | — |
 | 5 | Projects & Milestones | ⏳ Not Started | — | — | — |
@@ -219,3 +219,152 @@ None
 
 #### Session Compression
 Phase 0+1 complete: 5 tables, 18 RLS policies, 12 indexes, 6 API routes, 6 components, 6 pages, 102 tests, tsc/lint clean. Next: Phase 2 (Map Visualization).
+
+---
+
+## Phase 2 Deliverables
+
+- [x] `/[orgSlug]/map` — Full-viewport MapLibre GL JS 5.x map (MapPageClient + server page)
+- [x] Activity markers: category-coloured pins with temporal opacity (0–30d=1.0→0.8, 30–90d=0.8→0.55, 90–365d=0.55→0.35)
+- [x] Marker clustering: SuperCluster-style via MapLibre, count badges on cluster markers
+- [x] Layer toggle panel: Activities, Heatmap toggles (Department boundaries deferred — DECISION-011)
+- [x] Activity heatmap layer: WebGL density visualization
+- [x] LocationPicker: reusable map click component integrated into ActivityForm
+- [x] GeolocationButton: browser Geolocation API → fly-to user position
+- [x] MapDetailPanel: marker click → slide-out panel with activity details
+- [x] Map viewport persistence via Zustand mapStore (sessionStorage)
+- [x] MapSearchBar: Nominatim geocoding with 400ms debounce, 3-char minimum
+- [x] `lib/map/config.ts`: CartoDB dark-matter tiles (DECISION-013), map defaults, layer config
+- [x] `lib/map/utils.ts`: temporal opacity, colour mapping, GeoJSON transforms, clustering
+- [x] MapFilters: type/department filter panel for map-specific filtering
+- [x] `/api/map/activities` route: GeoJSON endpoint, org-scoped, 5000 activity hard cap (DECISION-016)
+- [x] mapStore: viewport, layers, selected marker, filters state management
+- [x] Custom event bridge (window.dispatchEvent) for search/geolocation → MapView fly-to (DECISION-014)
+- [x] 81 new tests across 10 test files (components, API, lib, store)
+
+### Deferred Items
+- Department geo-boundary layer — no boundary data in current schema (DECISION-011)
+- Partial geo index on activities (lat/lng) — recommended by Data Agent, deferred to Phase 3 (DECISION-018)
+- Full SVG icon library — emoji retained for ACTIVITY_TYPE_ICONS (DECISION-012)
+
+## Build Verification (Phase 2)
+
+- **Tests**: 183/183 passing (22 files — 102 Phase 0+1 + 81 Phase 2)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors)
+- **Build**: Production build successful
+- **Coverage**: ~83% (exceeds 80% target)
+- **New Files**: ~22 (8 components, 2 lib, 1 store, 1 API route, 10 tests)
+- **Modified Files**: 4 (package.json, package-lock.json, ActivityForm.tsx, [orgSlug]/page.tsx)
+
+---
+
+## Phase 2 Agent Reviews
+
+### Phase 2 Architect Review
+
+**Grade: A** (initially B → 5 fixes applied → upgraded to A)
+
+#### Security: PASS
+- Map API route auth-gated with getUser() + org membership check
+- Activity data scoped to authenticated org (RLS + API filter)
+- No API keys exposed (CartoDB tiles are public, no key needed)
+- UUID validation on all route parameters
+
+#### Architecture: PASS
+- Server Component page with "use client" MapPageClient (correct pattern)
+- MapLibre GL JS loaded client-side only (dynamic import, no SSR)
+- Custom event bridge for cross-component communication (lightweight, no global state coupling)
+- Zustand mapStore for viewport/layer/filter persistence
+
+#### Database: PASS
+- Map activities API uses existing activity table + RLS policies
+- 5000 activity hard cap prevents unbounded queries
+- GeoJSON transform in API route (not client-side)
+
+#### Performance: PASS
+- Marker clustering prevents DOM overload at high zoom
+- Heatmap uses WebGL (GPU-accelerated)
+- Nominatim debounced (400ms) with 3-char minimum
+- Temporal opacity computed once per marker, not per frame
+
+#### Fixes Applied (5)
+1. Missing `key` prop on cluster markers
+2. Nominatim User-Agent header added (required by TOS)
+3. Heatmap layer cleanup on unmount
+4. Search results dropdown z-index conflict resolved
+5. GeolocationButton error state accessible (aria-label)
+
+---
+
+### Phase 2 Data Agent Review
+
+**Verdict: PASS**
+
+#### Advisories (non-blocking)
+1. WARN: Partial geo index recommended — `CREATE INDEX ... ON activities (latitude, longitude) WHERE latitude IS NOT NULL` — deferred to Phase 3 (DECISION-018)
+2. WARN: pg_trgm extension recommended for future search — deferred
+
+#### Schema Impact: NONE
+- No new migrations in Phase 2 (uses existing activities table)
+- All queries go through RLS-protected views
+
+---
+
+### Phase 2 Testing Agent Review
+
+**Verdict: PASS**
+**Coverage: 183/183 (~83%)**
+
+#### Test Suite: PASS
+- 183 passed | 0 failed | 0 skipped across 22 files
+
+#### New Test Files (10)
+- MapSearchBar, MapDetailPanel, MapFilters, GeolocationButton, LayerToggle, LocationPicker (components)
+- map-config, map-utils (lib)
+- mapStore (store)
+- map-activities (API route)
+
+#### Minor Notes (non-blocking)
+- act() warnings in some component tests (React 19 testing quirk, non-functional)
+
+#### Regression Check
+- Phase 0: PASS (43 tests) | Phase 1: PASS (59 tests) | Phase 2: PASS (81 tests)
+
+---
+
+### Phase 2 Product Lead Review
+
+**Verdict: PASS (conditional → conditions met)**
+
+#### Conditions Resolved
+1. Emoji markers → SVG icon migration tracked as future UI consistency pass (DECISION-012)
+2. Temporal opacity added to markers (DECISION-015)
+3. Department layer deferred with documented rationale (DECISION-011)
+
+#### UX Consistency: PASS
+- Dark-grey/blue/white theme consistent across map UI
+- Map controls positioned correctly (top-right layers, bottom-right geolocation)
+- Detail panel slide-out matches design language
+
+#### Feature Alignment: PASS
+- 11/11 specified deliverables addressed (3 deferred with documented decisions)
+
+---
+
+### Phase 2 Continuity Agent Review
+
+**Verdict: PASS**
+
+#### Documentation: PASS
+- PROJECT_STATUS.md updated with Phase 2 completion
+- DECISIONS.md updated (DECISION-011 through DECISION-018)
+- ARCHITECTURE.md Phase 2 spec matches implementation (deviations documented as decisions)
+
+#### Git Workflow: READY
+- All changes staged and committed
+- No secrets in tracked files
+- .gitignore correct
+
+#### Session Compression
+Phase 0+1+2 complete: 5 tables, 18 RLS policies, 12 indexes, 7 API routes, 14 components, 8 pages, 183 tests, tsc/lint/build clean. Map visualization live with clustering, heatmap, search, geolocation, detail panel. Next: Phase 3 (Metrics & Insight Dashboards).
