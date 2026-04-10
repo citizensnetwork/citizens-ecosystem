@@ -9,7 +9,7 @@ import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
-import EventFeed from "./EventFeed";
+import FeaturedPanel from "./FeaturedPanel";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import dynamic from "next/dynamic";
@@ -36,7 +36,7 @@ export default function EventsView({
   const [view, setView] = useState<"map" | "calendar">(initialView);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [glanceOpen, setGlanceOpen] = useState(false);
+  const [featuredOpen, setFeaturedOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set()
   );
@@ -81,19 +81,19 @@ export default function EventsView({
 
   // Focus traps for drawers
   const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
-  const glanceRef = useFocusTrap<HTMLElement>(glanceOpen && !selectedEvent && !selectedPlace);
+  const featuredRef = useFocusTrap<HTMLElement>(featuredOpen && !selectedEvent && !selectedPlace);
 
   // Escape key closes drawers and detail panels
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (filtersOpen) { setFiltersOpen(false); return; }
-      if (glanceOpen) { setGlanceOpen(false); return; }
+      if (featuredOpen) { setFeaturedOpen(false); return; }
       if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [filtersOpen, glanceOpen, selectedEvent, selectedPlace]);
+  }, [filtersOpen, featuredOpen, selectedEvent, selectedPlace]);
 
   // Burger menu social data (lazy-loaded)
   const {
@@ -154,7 +154,7 @@ export default function EventsView({
     (event: Event) => {
       setSelectedPlace(null);
       setSelectedEvent(event);
-      setGlanceOpen(false);
+      setFeaturedOpen(false);
     },
     []
   );
@@ -162,7 +162,7 @@ export default function EventsView({
   const handleSelectPlace = useCallback((place: Place) => {
     setSelectedEvent(null);
     setSelectedPlace(place);
-    setGlanceOpen(false);
+    setFeaturedOpen(false);
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -289,34 +289,46 @@ export default function EventsView({
         </div>
       </div>
 
-      {/* ── "Events at a Glance" right-edge button ──────── */}
+      {/* ── Featured panel toggle button ────────────── */}
       {!hasDetail && (
         <button
           type="button"
-          onClick={() => setGlanceOpen((o) => !o)}
-          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-black/10 bg-white/95 px-1.5 py-4 text-xs text-black/60 shadow-lg backdrop-blur transition-colors active:bg-black/5 hover:bg-white hover:text-black"
-          aria-label={glanceOpen ? "Close events list" : "Events at a glance"}
+          onClick={() => setFeaturedOpen((o) => !o)}
+          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-(--gold)/30 bg-black/90 px-2 py-5 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
+          aria-label={featuredOpen ? "Close featured panel" : "Open featured panel"}
         >
-          {glanceOpen ? "▶" : "◀"}
+          <span className="flex flex-col items-center gap-1">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+              <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
+            </svg>
+            <span className="[writing-mode:vertical-lr] text-[10px]">
+              {featuredOpen ? "CLOSE" : "FEATURED"}
+            </span>
+          </span>
         </button>
       )}
 
-      {/* ── "Events at a Glance" slide-out panel ────────── */}
+      {/* ── Featured panel slide-out ────────────────── */}
       <aside
-        ref={glanceRef}
+        ref={featuredRef}
         role="dialog"
-        aria-label="Events at a glance"
-        className={`absolute right-0 top-0 z-1004 flex h-full w-[84vw] max-w-sm flex-col bg-white/96 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-96 ${
-          glanceOpen && !hasDetail ? "translate-x-0" : "translate-x-full"
+        aria-label="Featured content"
+        className={`absolute right-0 top-0 z-1004 flex h-full w-[84vw] max-w-sm flex-col border-l border-(--gold)/10 bg-white/97 shadow-2xl backdrop-blur transition-transform duration-300 ease-out sm:w-96 ${
+          featuredOpen && !hasDetail ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-black/8 px-4 py-3 pt-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-black/70">
-            Events at a Glance
-          </h2>
+        <div className="flex items-center justify-between border-b border-(--gold)/10 px-4 py-3 pt-5">
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-(--gold)">
+              <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
+            </svg>
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
+              Featured
+            </h2>
+          </div>
           <button
             type="button"
-            onClick={() => setGlanceOpen(false)}
+            onClick={() => setFeaturedOpen(false)}
             className="rounded-lg px-2 py-1 text-black/60 hover:bg-black/5"
             aria-label="Close"
           >
@@ -324,7 +336,11 @@ export default function EventsView({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <EventFeed events={filtered} onSelectEvent={handleSelectEvent} />
+          <FeaturedPanel
+            onSelectEvent={handleSelectEvent}
+            onSelectPlace={handleSelectPlace}
+            fallbackEvents={filtered}
+          />
         </div>
       </aside>
 

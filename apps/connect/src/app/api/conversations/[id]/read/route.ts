@@ -28,7 +28,8 @@ export async function PATCH(_request: NextRequest, { params }: RouteParams) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API conversations read PATCH]", error);
+    return NextResponse.json({ error: "Failed to mark conversation as read" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

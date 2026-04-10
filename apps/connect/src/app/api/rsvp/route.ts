@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -11,6 +12,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`rsvp:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   let body;
@@ -35,7 +41,8 @@ export async function POST(request: NextRequest) {
   });
 
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    console.error("[API rsvp POST]", rpcError);
+    return NextResponse.json({ error: "Failed to RSVP" }, { status: 500 });
   }
 
   const res = result as { success: boolean; error?: string; remaining?: number; status: number };
@@ -86,7 +93,8 @@ export async function DELETE(request: NextRequest) {
     .eq("event_id", eventId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API rsvp DELETE]", error);
+    return NextResponse.json({ error: "Failed to cancel RSVP" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

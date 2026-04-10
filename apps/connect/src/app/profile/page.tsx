@@ -91,6 +91,7 @@ export default async function ProfilePage() {
     home_longitude: profile?.home_longitude ?? null,
     notification_radius_km: profile?.notification_radius_km ?? 50,
     notification_digest: profile?.notification_digest ?? "instant",
+    location_sharing: profile?.location_sharing ?? false,
     created_at: profile?.created_at ?? "",
   };
 

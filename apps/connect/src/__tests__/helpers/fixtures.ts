@@ -19,6 +19,7 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
     home_longitude: null,
     notification_radius_km: 50,
     notification_digest: "instant",
+    location_sharing: false,
     ...overrides,
   };
 }

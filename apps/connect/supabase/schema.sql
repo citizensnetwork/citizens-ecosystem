@@ -1,7 +1,7 @@
 -- ============================================
 -- Citizens Connect - Database Schema
 -- Canonical full schema (idempotent — safe to re-run)
--- Reflects all migrations through 017_place_follows_and_websites
+-- Reflects all migrations through 019_live_location
 -- ============================================
 
 -- ── Helper: admin check ──────────────────────────────────
@@ -911,3 +911,101 @@ do $$ begin
     create policy "Users can unfollow places" on public.place_follows for delete using (auth.uid() = user_id);
   end if;
 end $$;
+
+-- ══════════════════════════════════════════════
+-- 17. Featured Listings
+-- ══════════════════════════════════════════════
+create table if not exists public.featured_listings (
+  id            uuid primary key default gen_random_uuid(),
+  event_id      uuid references public.events(id) on delete cascade,
+  place_id      uuid references public.places(id) on delete cascade,
+  cover_url     text not null,
+  tagline       text not null default '',
+  priority      int not null default 0,
+  starts_at     timestamptz not null default now(),
+  ends_at       timestamptz,
+  created_by    uuid not null references auth.users(id),
+  created_at    timestamptz not null default now(),
+  constraint exactly_one_target check (
+    (event_id is not null and place_id is null) or
+    (event_id is null and place_id is not null)
+  )
+);
+
+alter table public.featured_listings enable row level security;
+
+create index if not exists idx_featured_listings_active
+  on public.featured_listings (priority desc, starts_at)
+  where ends_at is null or ends_at > now();
+create index if not exists idx_featured_listings_event
+  on public.featured_listings (event_id) where event_id is not null;
+create index if not exists idx_featured_listings_place
+  on public.featured_listings (place_id) where place_id is not null;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Anyone can read featured listings' and tablename = 'featured_listings') then
+    create policy "Anyone can read featured listings" on public.featured_listings for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Admin insert featured listings' and tablename = 'featured_listings') then
+    create policy "Admin insert featured listings" on public.featured_listings for insert with check (public.is_admin());
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Admin update featured listings' and tablename = 'featured_listings') then
+    create policy "Admin update featured listings" on public.featured_listings for update using (public.is_admin());
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Admin delete featured listings' and tablename = 'featured_listings') then
+    create policy "Admin delete featured listings" on public.featured_listings for delete using (public.is_admin());
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 18. Live Location Sharing
+-- ══════════════════════════════════════════════
+create table if not exists public.user_locations (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  event_id    uuid not null references public.events(id) on delete cascade,
+  latitude    double precision not null,
+  longitude   double precision not null,
+  accuracy    double precision,
+  updated_at  timestamptz not null default now(),
+  unique(user_id, event_id)
+);
+
+alter table public.user_locations enable row level security;
+
+create index if not exists idx_user_locations_event on public.user_locations (event_id, updated_at desc);
+create index if not exists idx_user_locations_user on public.user_locations (user_id);
+
+alter table public.profiles add column if not exists location_sharing boolean not null default false;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Attendees can view event locations' and tablename = 'user_locations') then
+    create policy "Attendees can view event locations" on public.user_locations for select
+      using (exists (select 1 from public.rsvps where rsvps.event_id = user_locations.event_id and rsvps.user_id = auth.uid()));
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users can upsert own location' and tablename = 'user_locations') then
+    create policy "Users can upsert own location" on public.user_locations for insert with check (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users can update own location' and tablename = 'user_locations') then
+    create policy "Users can update own location" on public.user_locations for update using (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Users can delete own location' and tablename = 'user_locations') then
+    create policy "Users can delete own location" on public.user_locations for delete using (auth.uid() = user_id);
+  end if;
+end $$;
+
+create or replace function public.cleanup_stale_locations()
+returns void language plpgsql security definer as $$
+begin
+  delete from public.user_locations ul
+  where not exists (
+    select 1 from public.events e
+    where e.id = ul.event_id
+      and (
+        (e.end_time is not null and e.end_time::timestamptz > now() - interval '30 minutes')
+        or
+        (e.end_time is null and e.date::timestamptz + interval '4 hours' > now() - interval '30 minutes')
+      )
+  );
+end;
+$$;

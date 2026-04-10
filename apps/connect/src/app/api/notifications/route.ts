@@ -21,7 +21,8 @@ export async function GET() {
     .limit(50);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API notifications GET]", error);
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 
   return NextResponse.json({ notifications: data });
@@ -56,7 +57,8 @@ export async function PATCH(request: NextRequest) {
       .eq("read", false);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[API notifications PATCH all]", error);
+      return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
@@ -73,7 +75,8 @@ export async function PATCH(request: NextRequest) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API notifications PATCH]", error);
+    return NextResponse.json({ error: "Failed to update notification" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -110,7 +113,8 @@ export async function DELETE(request: NextRequest) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API notifications DELETE]", error);
+    return NextResponse.json({ error: "Failed to delete notification" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

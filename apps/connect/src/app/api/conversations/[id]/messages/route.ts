@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -61,7 +62,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { data: messages, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API messages GET]", error);
+    return NextResponse.json({ error: "Failed to load messages" }, { status: 500 });
   }
 
   // Get other participant info
@@ -124,6 +126,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });
   }
 
+  const rl = checkRateLimit(`msg:${user.id}`, RATE_LIMITS.message);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many messages" }, { status: 429 });
+  }
+
   // Insert message
   const { data: message, error } = await supabase
     .from("messages")
@@ -136,7 +143,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API messages POST]", error);
+    return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
   }
 
   // Update sender's last_read_at to now

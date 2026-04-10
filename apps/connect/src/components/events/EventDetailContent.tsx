@@ -10,6 +10,7 @@ import WhoIsAttending from "./WhoIsAttending";
 import ReviewList from "@/components/reviews/ReviewList";
 import ShareButton from "@/components/ui/ShareButton";
 import MessageButton from "@/components/messaging/MessageButton";
+import LocationSharingToggle from "./LocationSharingToggle";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import type { Event, AttendeesVisibility } from "@/types/db";
@@ -36,6 +37,7 @@ type Props = {
   user: User | null;
   hasRsvped: boolean;
   attendees?: Attendee[];
+  locationSharingEnabled?: boolean;
 };
 
 export default function EventDetailContent({
@@ -44,6 +46,7 @@ export default function EventDetailContent({
   user,
   hasRsvped,
   attendees = [],
+  locationSharingEnabled = false,
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -205,7 +208,7 @@ export default function EventDetailContent({
 
       {hasCoords && (
         <div className="mt-6">
-          <MiniMap latitude={event.latitude!} longitude={event.longitude!} />
+          <MiniMap latitude={event.latitude!} longitude={event.longitude!} eventId={hasRsvped ? event.id : undefined} />
         </div>
       )}
 
@@ -249,6 +252,17 @@ export default function EventDetailContent({
           </Link>
         )}
       </div>
+
+      {/* Live Location Sharing */}
+      {user && hasRsvped && (
+        <div className="mt-4">
+          <LocationSharingToggle
+            event={event}
+            isAttending={hasRsvped}
+            locationSharingEnabled={locationSharingEnabled}
+          />
+        </div>
+      )}
 
       {/* Message Organizer */}
       {user && user.id !== event.created_by && (

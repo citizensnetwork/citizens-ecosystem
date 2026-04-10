@@ -63,6 +63,7 @@ export type Profile = {
   home_longitude: number | null;
   notification_radius_km: number;
   notification_digest: NotificationDigest;
+  location_sharing: boolean;
   created_at: string;
 };
 
@@ -217,6 +218,40 @@ export type FriendAttending = {
 };
 
 // ── Phase 11: Direct Messaging ──────────────────
+
+// ── Phase 12: Featured Listings ─────────────────
+
+export type FeaturedListing = {
+  id: string;
+  event_id: string | null;
+  place_id: string | null;
+  cover_url: string;
+  tagline: string;
+  priority: number;
+  starts_at: string;
+  ends_at: string | null;
+  created_by: string;
+  created_at: string;
+  events?: Event;
+  places?: Place;
+};
+
+// ── Direct Messaging ────────────────────────────
+
+// ── Phase 12C: Live Location ────────────────────
+
+export type UserLocation = {
+  id: string;
+  user_id: string;
+  event_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  updated_at: string;
+  profiles?: { full_name: string; avatar_url: string | null };
+};
+
+// ── Direct Messaging (continued) ────────────────
 
 export type Conversation = {
   id: string;

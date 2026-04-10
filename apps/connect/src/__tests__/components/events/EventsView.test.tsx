@@ -171,10 +171,10 @@ describe("EventsView", () => {
     });
   });
 
-  it("shows events at a glance button", () => {
+  it("shows featured panel button", () => {
     render(<EventsView events={events} />);
     expect(
-      screen.getByRole("button", { name: /events at a glance/i })
+      screen.getByRole("button", { name: /open featured panel/i })
     ).toBeInTheDocument();
   });
 

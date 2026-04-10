@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { createMockSupabaseClient } from "../../helpers/supabase-mock";
+import { resetRateLimitStore } from "@/lib/rate-limit";
 
 const mockClient = createMockSupabaseClient();
 
@@ -23,6 +24,7 @@ function makeRequest(body: Record<string, unknown>) {
 describe("POST /api/rsvp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRateLimitStore();
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -119,7 +121,7 @@ describe("POST /api/rsvp", () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(json.error).toBe("Something broke");
+    expect(json.error).toBe("Failed to RSVP");
   });
 
   it("returns 404 when event does not exist via RPC", async () => {

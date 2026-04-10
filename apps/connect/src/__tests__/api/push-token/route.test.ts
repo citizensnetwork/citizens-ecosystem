@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { createMockSupabaseClient } from "../../helpers/supabase-mock";
+import { resetRateLimitStore } from "@/lib/rate-limit";
 
 const mockClient = createMockSupabaseClient();
 
@@ -30,7 +31,7 @@ function makeDeleteRequest(body: Record<string, unknown>) {
 
 // --- POST ---
 describe("POST /api/push-token", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); resetRateLimitStore(); });
 
   it("returns 401 when user is not authenticated", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({
@@ -159,7 +160,7 @@ describe("POST /api/push-token", () => {
 
 // --- DELETE ---
 describe("DELETE /api/push-token", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); resetRateLimitStore(); });
 
   it("returns 401 when user is not authenticated", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({

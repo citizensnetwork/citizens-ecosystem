@@ -116,8 +116,9 @@ export async function POST(request: Request) {
     .eq("id", user.id);
 
   if (profileError) {
+    console.error("[API onboarding] profile update", profileError);
     return NextResponse.json(
-      { error: profileError.message },
+      { error: "Failed to update profile" },
       { status: 500 }
     );
   }
@@ -130,8 +131,9 @@ export async function POST(request: Request) {
       .eq("user_id", user.id);
 
     if (deleteError) {
+      console.error("[API onboarding] delete interests", deleteError);
       return NextResponse.json(
-        { error: deleteError.message },
+        { error: "Failed to update interests" },
         { status: 500 }
       );
     }
@@ -147,8 +149,9 @@ export async function POST(request: Request) {
         .insert(rows);
 
       if (insertError) {
+        console.error("[API onboarding] insert interests", insertError);
         return NextResponse.json(
-          { error: insertError.message },
+          { error: "Failed to save interests" },
           { status: 500 }
         );
       }

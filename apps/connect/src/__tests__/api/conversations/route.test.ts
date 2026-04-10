@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { createMockSupabaseClient } from "../../helpers/supabase-mock";
+import { resetRateLimitStore } from "@/lib/rate-limit";
 
 const mockClient = createMockSupabaseClient();
 
@@ -67,7 +68,7 @@ describe("GET /api/conversations", () => {
 
 // --- POST ---
 describe("POST /api/conversations", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); resetRateLimitStore(); });
 
   it("returns 401 when user is not authenticated", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({

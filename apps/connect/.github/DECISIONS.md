@@ -208,6 +208,38 @@
 **Why:** Every feature decision must be evaluated against the ecosystem mission: restoring Kingdom unity, visibility, and collaboration. Cross-channel readiness should inform architecture choices. Feature evaluation criteria: does it increase visibility, connect siloed entities, highlight entity value, enable collaboration, serve discovery, and move toward ecosystem readiness?
 **Date:** 2026-04-06.
 
+## Phase 12: Security + Featured + Live Location
+
+### In-memory sliding-window rate limiter
+**Decision:** Custom in-memory rate limiter using a `Map<string, timestamps[]>` with auto-cleanup. Pre-configured limits: mutation (30/min), message (20/min), auth (10/min), heavy (5/min). All 429 responses include `Retry-After` header.
+**Why:** No external dependency needed at current scale. Redis (Upstash) swap documented for multi-instance scaling. Sliding window is more precise than fixed window.
+**Date:** Phase 12.
+
+### CSP without unsafe-eval
+**Decision:** Content-Security-Policy uses `'unsafe-inline'` (required by Next.js) but NOT `'unsafe-eval'` in production.
+**Why:** `unsafe-eval` permits `eval()` and `new Function()` — effectively nullifies XSS protection. Next.js production builds do not require it. Longer-term: migrate to nonce-based CSP.
+**Date:** Phase 12.
+
+### Featured listings (polymorphic)
+**Decision:** `featured_listings` table with polymorphic `event_id` / `place_id` references (exactly one must be set, enforced by CHECK constraint). Admin-only write, public read. Priority ordering.
+**Why:** Featured panel needs to showcase both events and places. Polymorphic pattern with CHECK constraint is simpler than separate featured_events/featured_places tables. Admin control prevents user self-promotion.
+**Date:** Phase 12.
+
+### Live location with RSVP-enforced RLS
+**Decision:** `user_locations` table with RLS INSERT/UPDATE policies that verify the user has an RSVP for the target event (not just `auth.uid() = user_id`). Coordinate precision truncated to 4 decimal places (~11m).
+**Why:** The API validates RSVP, but RLS must also enforce it — the Supabase anon key is client-exposed, so direct inserts would bypass API checks. Precision truncation protects exact position (centimeter accuracy is unnecessary for event attendance).
+**Date:** Phase 12.
+
+### Location sharing opt-in model
+**Decision:** `location_sharing` boolean column on profiles (default `false`). Users must explicitly enable sharing. Hook enforces minimum 15s tracking interval and stops polling on error.
+**Why:** Location data is sensitive. Default-off respects privacy. Minimum interval prevents DoS. Error-stop prevents infinite retry loops.
+**Date:** Phase 12.
+
+### Idempotent migration policies
+**Decision:** All RLS `CREATE POLICY` statements wrapped in `DO $$ BEGIN IF NOT EXISTS ... END IF; END $$;` pattern.
+**Why:** Bare `CREATE POLICY` fails on re-run. Idempotent pattern is the established project convention (per supabase-patterns instructions).
+**Date:** Phase 12.
+
 ### Vercel env vars for NEXT_PUBLIC_ Supabase config
 **Decision:** Always set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` as Vercel environment variables (production + preview). Verify after every fresh deploy that JS bundles contain real URLs, not placeholders.
 **Why:** `NEXT_PUBLIC_` env vars are inlined at build time. The client code has `|| "placeholder..."` fallbacks for prerender resilience, but if Vercel's build environment lacks the vars, the placeholders get baked into production bundles permanently, causing "Failed to fetch" on all auth operations.

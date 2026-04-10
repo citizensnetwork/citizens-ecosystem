@@ -23,6 +23,65 @@
 | — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
 | — | Map & Brand Polish | **Complete** | Filled place icons, gold brand tag with zoom, province auto-locate, calendar mobile fix |
 | — | UX Bug Fixes + Quality Hardening | **Complete** | Notification bounce, glance panel jitter, category filter zoom, 333 tests, CI pipeline, place edit/delete, admin categories |
+| 12A | Security Hardening | **Complete** | CSP/HSTS/security headers, auth middleware, rate limiting, error sanitization, open redirect fix |
+| 12B | Featured Panel | **Complete** | Featured listings table + API + premium social-feed panel replacing glance panel |
+| 12C | Live Location Foundation | **Complete** | User locations table, location API, geolocation hook, attendee markers, privacy controls |
+| — | Phase 12 Architect Review Fixes | **Complete** | UUID validation, coordinate range checks, RLS RSVP enforcement, idempotent migrations, CSP hardening |
+| 11 | In-app Direct Messaging | **Complete** | Conversations, messages, inbox view, real-time chat, message organizer from events/profiles |
+| — | UI Maturity Overhaul | **Complete** | Monochrome + gold design, emojis → SVGs, mature markers, 50 mock places seeded |
+| — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
+| — | Map & Brand Polish | **Complete** | Filled place icons, gold brand tag with zoom, province auto-locate, calendar mobile fix |
+| — | UX Bug Fixes + Quality Hardening | **Complete** | Notification bounce, glance panel jitter, category filter zoom, 333 tests, CI pipeline, place edit/delete, admin categories |
+
+---
+
+## Phase 12: Security + Featured + Live Location (COMPLETE)
+
+### Phase 12A: Security Hardening
+- [x] Security headers: CSP, HSTS (2yr + preload), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy (camera/mic denied, geolocation self)
+- [x] `poweredByHeader: false` — removed Next.js server fingerprint
+- [x] CSP: `unsafe-eval` removed from production (only `unsafe-inline` for Next.js requirements)
+- [x] Open redirect fix: `/auth/callback` validates `next` param starts with `/` and not `//`
+- [x] Auth enforcement middleware: protected routes (`/profile`, `/events/new`, `/messages`, `/admin`) redirect unauthenticated users to `/login?redirect=...`
+- [x] In-memory sliding-window rate limiter (`src/lib/rate-limit.ts`) with pre-configured limits (mutation/message/auth/heavy)
+- [x] Rate limiting on: follow, rsvp, conversations, messages, push-token, place-follow, location, featured POST/DELETE
+- [x] All 22 error message leaks fixed across 9 API routes — generic client messages + `console.error` server-side logging
+- [x] Retry-After header on all 429 responses
+
+### Phase 12B: Featured Panel
+- [x] `featured_listings` table (migration 018): polymorphic event/place references, priority, lifecycle dates, admin-only RLS
+- [x] `/api/featured` route: public GET (explicit column selection), admin-only POST/DELETE with UUID validation and rate limiting
+- [x] `FeaturedPanel.tsx`: premium social-feed panel with hero carousel, upcoming RSVP'd events, featured grid cards
+- [x] Replaced "Events at a Glance" glance panel in EventsView — renamed all state from `glanceOpen` to `featuredOpen`
+- [x] Gold accent styling, gradient overlays, smooth slide animation
+
+### Phase 12C: Live Location Foundation
+- [x] `user_locations` table (migration 019): user/event location records with RSVP-enforced RLS INSERT/UPDATE policies
+- [x] `location_sharing` column on profiles (default `false`)
+- [x] `/api/location` route: POST (rate-limited, UUID-validated, coordinate-range-checked, precision-truncated to 4dp ~11m), GET (rate-limited, UUID-validated), DELETE (UUID-validated)
+- [x] `useLocationTracking` hook: Capacitor geolocation + browser fallback, 15s min interval, stops polling on error
+- [x] `LocationSharingToggle` component: opt-in toggle on event detail pages for RSVP'd users
+- [x] `AttendeeMarkers` component: gold-bordered profile photo markers on MapLibre map, 15s refresh
+- [x] Integrated into MiniMap and EventDetailContent
+
+### Phase 12 Architect Review Fixes
+- [x] Added UUID validation to all location API handlers
+- [x] Added coordinate range validation (-90/90, -180/180) to location POST
+- [x] Removed `unsafe-eval` from CSP production policy
+- [x] Added POST/DELETE handlers to featured API (was GET-only)
+- [x] Made all RLS policies idempotent (DO $$ IF NOT EXISTS pattern) in migrations 018 and 019
+- [x] RLS INSERT/UPDATE on user_locations now requires RSVP check (prevents Supabase client bypass)
+- [x] Added rate limiting to place-follow and location GET routes
+- [x] Added Retry-After header to all 429 responses
+- [x] Renamed `glanceOpen` → `featuredOpen` throughout EventsView
+- [x] Coordinate precision truncated to 4 decimal places (~11m) for privacy
+- [x] Minimum 15s tracking interval enforced in useLocationTracking hook
+- [x] Hook stops polling on error (clears interval instead of infinite retry)
+- [x] Hook sends accuracy field with location updates
+- [x] Added console.error to place-follow error paths
+- [x] Featured GET uses explicit column selection (no wildcard data leakage)
+- [x] All SE agent reviews passed (Architect B+→A-, Security clear after fixes)
+- [x] 323 tests passing across 36 test files, zero failures
 
 ---
 

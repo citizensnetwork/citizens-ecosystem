@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 /** GET — list current user's conversations with preview */
 export async function GET() {
@@ -20,7 +21,8 @@ export async function GET() {
     .eq("user_id", user.id);
 
   if (partError) {
-    return NextResponse.json({ error: partError.message }, { status: 500 });
+    console.error("[API conversations GET]", partError);
+    return NextResponse.json({ error: "Failed to load conversations" }, { status: 500 });
   }
 
   if (!participations || participations.length === 0) {
@@ -54,10 +56,10 @@ export async function GET() {
     unreadQuery,
   ]);
 
-  if (convResult.error) return NextResponse.json({ error: convResult.error.message }, { status: 500 });
-  if (partResult.error) return NextResponse.json({ error: partResult.error.message }, { status: 500 });
-  if (msgResult.error) return NextResponse.json({ error: msgResult.error.message }, { status: 500 });
-  if (unreadResult.error) return NextResponse.json({ error: unreadResult.error.message }, { status: 500 });
+  if (convResult.error) { console.error("[API conversations GET] convResult", convResult.error); return NextResponse.json({ error: "Failed to load conversations" }, { status: 500 }); }
+  if (partResult.error) { console.error("[API conversations GET] partResult", partResult.error); return NextResponse.json({ error: "Failed to load conversations" }, { status: 500 }); }
+  if (msgResult.error) { console.error("[API conversations GET] msgResult", msgResult.error); return NextResponse.json({ error: "Failed to load conversations" }, { status: 500 }); }
+  if (unreadResult.error) { console.error("[API conversations GET] unreadResult", unreadResult.error); return NextResponse.json({ error: "Failed to load conversations" }, { status: 500 }); }
 
   const conversations = convResult.data;
   const allParticipants = partResult.data;
@@ -135,6 +137,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
   }
 
+  const rl = checkRateLimit(`conv:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   // Check recipient exists
   const { data: recipient } = await supabase
     .from("profiles")
@@ -153,7 +160,8 @@ export async function POST(request: NextRequest) {
   });
 
   if (rpcError || !convId) {
-    return NextResponse.json({ error: rpcError?.message || "Failed to create conversation" }, { status: 500 });
+    console.error("[API conversations POST]", rpcError);
+    return NextResponse.json({ error: "Failed to create conversation" }, { status: 500 });
   }
 
   return NextResponse.json({ conversation_id: convId }, { status: 201 });

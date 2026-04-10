@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -9,6 +10,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`push:${user.id}`, RATE_LIMITS.heavy);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   let body;
@@ -42,7 +48,8 @@ export async function POST(request: NextRequest) {
   );
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API push-token POST]", error);
+    return NextResponse.json({ error: "Failed to register push token" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -78,7 +85,8 @@ export async function DELETE(request: NextRequest) {
     .eq("token", token);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API push-token DELETE]", error);
+    return NextResponse.json({ error: "Failed to remove push token" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

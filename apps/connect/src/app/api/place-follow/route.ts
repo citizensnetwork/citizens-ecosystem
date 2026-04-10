@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "Already following" }, { status: 409 });
     }
+    console.error("[API place-follow POST]", error);
     return NextResponse.json({ error: "Failed to follow place" }, { status: 500 });
   }
 
@@ -67,6 +69,7 @@ export async function DELETE(request: NextRequest) {
     .eq("place_id", placeId);
 
   if (error) {
+    console.error("[API place-follow DELETE]", error);
     return NextResponse.json({ error: "Failed to unfollow place" }, { status: 500 });
   }
 

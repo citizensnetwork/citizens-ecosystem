@@ -82,10 +82,11 @@ export default async function EventDetailPage({
 
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
+  let locationSharingEnabled = false;
 
   if (user) {
-    // Fetch RSVP status, attendee list, and user's follows in parallel
-    const [{ data: rsvp }, { data: rsvpRows }, { data: myFollowing }] =
+    // Fetch RSVP status, attendee list, user's follows, and profile in parallel
+    const [{ data: rsvp }, { data: rsvpRows }, { data: myFollowing }, { data: profile }] =
       await Promise.all([
         supabase
           .from("rsvps")
@@ -101,9 +102,15 @@ export default async function EventDetailPage({
           .from("follows")
           .select("followee_id")
           .eq("follower_id", user.id),
+        supabase
+          .from("profiles")
+          .select("location_sharing")
+          .eq("id", user.id)
+          .single(),
       ]);
 
     hasRsvped = !!rsvp;
+    locationSharingEnabled = profile?.location_sharing ?? false;
 
     // Build friend set (bidirectional follows)
     const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
@@ -149,6 +156,7 @@ export default async function EventDetailPage({
       user={user}
       hasRsvped={hasRsvped}
       attendees={attendees}
+      locationSharingEnabled={locationSharingEnabled}
     />
   );
 }
