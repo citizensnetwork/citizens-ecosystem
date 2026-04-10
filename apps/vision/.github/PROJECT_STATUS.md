@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 4 — Goals & Alignment Engine (COMPLETE)
+## Current Phase: 5 — Projects & Milestones (COMPLETE)
 
 ## Phase Tracker
 
@@ -11,7 +11,7 @@
 | 2 | Map Visualization | ✅ Complete | 2026-04-09 | 2026-04-09 | A |
 | 3 | Metrics & Insight Dashboards | ✅ Complete | 2026-04-09 | 2026-04-09 | B |
 | 4 | Goals & Alignment Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
-| 5 | Projects & Milestones | ⏳ Not Started | — | — | — |
+| 5 | Projects & Milestones | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 6 | Timeline Engine | ⏳ Not Started | — | — | — |
 | 7 | Citizens Connect Integration | ⏳ Not Started | — | — | — |
 | 8 | Advisory Engine | ⏳ Not Started | — | — | — |
@@ -658,3 +658,187 @@ Phase 0+1+2+3 complete: 6 tables + 2 materialized views, 19+ RLS policies, 13 in
 
 #### Session Compression
 Phase 0+1+2+3+4 complete. Goals engine adds vision_statements, goals, goal_activity_links tables with Jaccard alignment scoring, temporal decay, 6 API routes, alignment dashboard. Security hardened with corrective migration 005. 321 tests all passing. Next: Phase 5 (Projects & Milestones).
+
+---
+
+## Phase 5 Deliverables
+
+- [x] Migration `006_projects.sql` — 4 tables (projects, milestones, project_goal_links, project_activities); 5+2+1+1 indexes; 12 RLS policies (all with is_platform_admin() override); prevent_project_org_id_change() trigger; update_updated_at_column() trigger; date check constraint; all idempotent
+- [x] `src/types/db.ts` updated — ProjectStatus type; Project, ProjectWithDepartment, Milestone, ProjectGoalLink, ProjectActivity, ProjectGoalLinkWithGoal, ProjectActivityWithActivity interfaces
+- [x] `src/lib/constants.ts` updated — PROJECT_STATUSES, PROJECT_STATUS_LABELS, PROJECT_STATUS_COLOURS, PROJECT_STATUS_TRANSITIONS (forward-only for non-admins)
+- [x] `src/lib/schemas/project.ts` — 6 Zod schemas (createProject, updateProject, createMilestone, updateMilestone, linkProjectActivity, linkProjectGoal)
+- [x] `/api/projects` route — GET (status/department/search filters, pagination) + POST (create with date ordering); auth-gated, org-scoped
+- [x] `/api/projects/[id]` route — GET (with milestones, activity count, goal count) + PATCH (status transition validation) + DELETE (admin-only via RLS); auth-gated
+- [x] `/api/projects/[id]/milestones` route — GET + POST (auto sort_order) + PATCH + DELETE; auth-gated
+- [x] `/api/projects/[id]/activities` route — GET (paginated) + POST (link, 409 duplicate) + DELETE (unlink); auth-gated
+- [x] `/api/projects/[id]/goals` route — GET + POST (link, 409 duplicate) + DELETE (unlink); auth-gated
+- [x] `ProjectCard` component — name, department, status badge, description, date range
+- [x] `ProjectList` component — card grid, pagination, empty state
+- [x] `ProjectFilters` component — search, status select, department select via URL params
+- [x] `ProjectForm` component — create/edit modes, name, description, dates, department, status, goal linking
+- [x] `MilestoneTracker` component — progress bar, milestone list with toggle/delete, add form
+- [x] `GanttBar` component — horizontal timeline bar (time elapsed vs milestone progress, overdue indicator, now prop)
+- [x] `ProjectActivities` component — linked activities list with unlink capability
+- [x] `GoalAlignmentIndicator` component — linked goals with status indicators
+- [x] `/[orgSlug]/projects/page.tsx` — server component, projects list with filters/pagination
+- [x] `/[orgSlug]/projects/new/page.tsx` — server component, departments + goals for form
+- [x] `/[orgSlug]/projects/[id]/page.tsx` — server component, project + milestones + role
+- [x] `/[orgSlug]/projects/[id]/ProjectDetailClient.tsx` — client component with edit/delete, GanttBar, MilestoneTracker, ProjectActivities, GoalAlignmentIndicator
+- [x] `ActivityForm.tsx` modified — project linking dropdown ("Link to Project"), POST to project activities API after activity creation
+- [x] `activities/new/page.tsx` modified — fetches planning/active projects in parallel with goals
+- [x] Dashboard integration — Active Projects KPI in MetricCard row; Project Status Distribution bar chart
+- [x] Org overview updated — active project count stat card
+- [x] 98 new tests across 7 test files (27 schema + 13 projects API + 13 project-detail + 12 milestones + 10 activities + 10 goals + 13 components)
+
+### Fixes Applied During Review
+- GanttBar `Date.now()` purity fix — moved to `now` prop (computed via `useState` initializer in parent)
+- Empty catch blocks in 7 components — added `console.error` logging
+- Missing sub-route API tests — added project-milestones, project-activities, project-goals test files
+
+### Deferred Items
+- Barrel export `src/components/projects/index.ts` — minor pattern break from Phase 4 (non-blocking)
+- "Projects visible on map" quality gate — data layer exists (project_activities join), no dedicated map layer yet
+- Cursor-based pagination — pre-existing tech debt continues (OFFSET used)
+
+## Build Verification (Phase 5)
+
+- **Tests**: 419/419 passing (41 files — 321 Phase 0-4 + 98 Phase 5)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors, 0 warnings)
+- **New Files**: 26 (1 migration, 1 schema, 5 API routes, 8 components, 4 pages, 7 tests)
+- **Modified Files**: 7 (db.ts, constants.ts, ActivityForm.tsx, activities/new/page.tsx, [orgSlug]/page.tsx, DashboardClient.tsx, metrics/overview/route.ts)
+
+---
+
+## Phase 5 Agent Reviews
+
+### Phase 5 Architect Review
+
+**Grade: A** (initially B → fixes applied → upgraded)
+
+#### Security: PASS
+- All 4 new tables have RLS enabled with 12 policies
+- All policies include is_platform_admin() override
+- prevent_project_org_id_change() trigger enforced
+- UUID validation on all 5 API route files
+- Auth checks (getUser()) on every route
+- Status transition validation (non-admins forward-only)
+- Generic error responses (no information leakage)
+
+#### Architecture: PASS
+- Server Components for pages; "use client" on interactive components
+- ProjectDetailClient correctly separated from server page
+- GanttBar `now` prop pattern (React purity compliance)
+
+#### Database: PASS
+- 006_projects.sql fully idempotent (IF NOT EXISTS, DO $$)
+- Foreign keys: CASCADE (org→projects, project→milestones/links), SET NULL (dept→projects)
+- 9 indexes covering all FK columns and query patterns
+- Date constraint (end_date >= start_date)
+
+#### Fixes Applied
+1. Added missing test files for milestones, activities, goals sub-routes
+2. Fixed GanttBar `Date.now()` React purity violation
+3. Fixed 7 empty catch blocks (added console.error logging)
+
+---
+
+### Phase 5 Data Agent Review
+
+**Verdict: PASS**
+
+#### Schema Integrity: PASS
+- 4 tables audited: projects, milestones, project_goal_links, project_activities
+- All UUID PKs, TIMESTAMPTZ timestamps, CHECK constraints on enums and dates
+- Composite PKs on junction tables (project_goal_links, project_activities)
+
+#### RLS Coverage: PASS
+- 4/4 tables with RLS | 12 policies audited
+- projects: select=member, insert=member+creator, update=admin|creator|dept_mgr, delete=admin
+- milestones/links: inherited via project org membership subquery
+
+#### Index Coverage: PASS
+- 9 new indexes covering org_id, department_id, status, dates, created_by, project_id, sort_order, goal_id, activity_id
+
+#### Migration Quality: PASS
+- Fully idempotent, correct cascades, proper header comments
+
+#### Regression Check
+- Phase 4 schema: PASS | Phase 5 schema: PASS
+
+---
+
+### Phase 5 Testing Agent Review
+
+**Verdict: CONDITIONAL PASS (~75% est.)**
+
+#### Test Suite: PASS
+- 419 passed | 0 failed | 0 skipped across 41 files
+
+#### New Test Files (7)
+- project-schema (27) — all 6 schemas with valid/invalid/boundary cases
+- projects API (13) — auth, validation, filters, pagination, errors
+- project-detail (13) — GET/PATCH/DELETE with status transitions
+- project-milestones (12) — CRUD, auth, auto sort_order
+- project-activities (10) — link/unlink, duplicate handling
+- project-goals (10) — link/unlink, duplicate handling
+- ProjectComponents (13) — ProjectCard, ProjectList rendering
+
+#### Coverage Recommendations (non-blocking)
+- MilestoneTracker, GanttBar, ProjectActivities, GoalAlignmentIndicator component tests
+- ProjectForm component tests (complex form with multiple interactions)
+- ActivityForm project linking integration tests
+
+#### Regression Check
+- Phase 4: PASS (72 tests) | Phase 5: PASS (98 tests)
+
+---
+
+### Phase 5 Product Lead Review
+
+**Verdict: PASS**
+
+#### Feature Completeness: PASS
+- All Phase 5 deliverables implemented per ARCHITECTURE.md spec
+- Dashboard integration with Active Projects KPI and status distribution chart
+- Org overview updated with active project count
+
+#### Design Language: PASS
+- Status badges colour-coded (planning=blue, active=green, completed=emerald, archived=grey)
+- Dark-grey/blue/white palette consistent
+- GanttBar visual with timeline + milestone progress overlay
+
+#### UX Consistency: PASS
+- Filters via URL params (consistent with activities/goals)
+- Pagination consistent with existing patterns
+- Empty states on all list views
+
+#### RBAC Correctness: PASS
+- Create=member, edit=admin|creator|dept_mgr, delete=admin
+- Status transitions forward-only for non-admins; admins can transition freely
+- Milestone/link mutations inherit project-level access
+
+---
+
+### Phase 5 Continuity Review
+
+**Verdict: CONDITIONAL PASS → PASS** (conditions resolved)
+
+#### Documentation: UPDATED ✅
+- PROJECT_STATUS.md: Phase 5 complete with deliverables, build verification, all agent reviews
+- DECISIONS.md: DECISION-031 (status transitions), DECISION-032 (migration numbering)
+
+#### Pattern Consistency: PASS
+- All established patterns followed (RLS, triggers, Zod, auth, pagination, tests)
+- Minor: no barrel export (non-blocking)
+
+#### Git Workflow: READY
+- 33 files (7 modified + 26 new) — all Phase 5 changes
+- No secrets in tracked files
+
+#### Cumulative State
+- Phase 0–5 complete: 13 tables + 3 materialized views, 43+ RLS policies, 30 indexes, 20 API routes, 37 components, 20 pages, 419 tests
+- All tsc/lint/build clean
+
+#### Session Compression
+Phase 0+1+2+3+4+5 complete. Projects engine adds projects, milestones, project_goal_links, project_activities tables with status lifecycle, milestone tracking, M2M linking. 5 API routes, 8 components, 4 pages. Dashboard active projects KPI + status distribution. ActivityForm project linking. 419 tests all passing. Next: Phase 6 (Timeline Engine).

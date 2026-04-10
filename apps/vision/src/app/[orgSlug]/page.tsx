@@ -28,7 +28,7 @@ export default async function OrgOverview({ params }: OrgPageProps) {
     .toISOString()
     .split("T")[0];
 
-  const [deptResult, memberResult, activityResult, recentResult] =
+  const [deptResult, memberResult, activityResult, recentResult, projectResult] =
     await Promise.all([
       supabase
         .from("departments")
@@ -48,6 +48,11 @@ export default async function OrgOverview({ params }: OrgPageProps) {
         .eq("org_id", org.id)
         .gte("date", thirtyDaysAgo)
         .lte("date", today),
+      supabase
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", org.id)
+        .eq("status", "active"),
     ]);
 
   return (
@@ -63,12 +68,16 @@ export default async function OrgOverview({ params }: OrgPageProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Departments" value={String(deptResult.count ?? 0)} />
         <StatCard label="Members" value={String(memberResult.count ?? 0)} />
         <StatCard
           label="Activities"
           value={String(activityResult.count ?? 0)}
+        />
+        <StatCard
+          label="Active Projects"
+          value={String(projectResult.count ?? 0)}
         />
         <StatCard
           label="Last 30 Days"

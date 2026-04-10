@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get("date_to") ?? undefined;
 
   // Build KPI query using direct aggregation (works with RLS)
-  const [kpiResult, deptResult, typeResult] = await Promise.all([
+  const [kpiResult, deptResult, typeResult, projectResult] = await Promise.all([
     computeKPIs(supabase, orgId, dateFrom, dateTo),
     supabase
       .from("activities")
@@ -43,12 +43,32 @@ export async function GET(request: NextRequest) {
       .gte("date", dateFrom ?? "1970-01-01")
       .lte("date", dateTo ?? "2099-12-31")
       .then(({ data }) => aggregateTypes(data ?? [])),
+    supabase
+      .from("projects")
+      .select("status")
+      .eq("org_id", orgId)
+      .then(({ data }) => {
+        const all = data ?? [];
+        const active = all.filter((p) => p.status === "active").length;
+        const statusDist: Record<string, number> = {};
+        for (const p of all) {
+          statusDist[p.status] = (statusDist[p.status] || 0) + 1;
+        }
+        return {
+          total: all.length,
+          active,
+          status_distribution: Object.entries(statusDist).map(
+            ([status, count]) => ({ status, count })
+          ),
+        };
+      }),
   ]);
 
   return NextResponse.json({
     kpis: kpiResult,
     departments: deptResult,
     type_distribution: typeResult,
+    projects: projectResult,
   });
 }
 

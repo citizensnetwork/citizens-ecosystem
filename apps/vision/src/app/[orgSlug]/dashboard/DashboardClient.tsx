@@ -24,6 +24,11 @@ interface OverviewData {
   kpis: OrgKPIs;
   departments: DepartmentMetric[];
   type_distribution: Array<{ type: string; count: number }>;
+  projects?: {
+    total: number;
+    active: number;
+    status_distribution: Array<{ status: string; count: number }>;
+  };
 }
 
 interface TrendData {
@@ -153,7 +158,7 @@ export function DashboardClient({
       ) : overview ? (
         <>
           {/* KPI Row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <MetricCard
               label="Total Activities"
               value={overview.kpis.total_activities}
@@ -168,6 +173,10 @@ export function DashboardClient({
               value={overview.kpis.participants_reached}
             />
             <MetricCard
+              label="Active Projects"
+              value={overview.projects?.active ?? 0}
+            />
+            <MetricCard
               label="Activity Growth"
               value={overview.kpis.activity_growth_pct}
               suffix="%"
@@ -180,9 +189,54 @@ export function DashboardClient({
             <DepartmentBarChart data={filteredDepartments} />
           </div>
 
-          {/* Full-width type distribution */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Full-width type distribution + project status */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <TypePieChart data={filteredTypes} />
+
+            {/* Project Status Distribution */}
+            {overview.projects && overview.projects.total > 0 && (
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <h3 className="mb-3 text-sm font-medium text-text-primary">
+                  Project Status
+                </h3>
+                <div className="space-y-2">
+                  {overview.projects.status_distribution.map((item) => {
+                    const pct = Math.round(
+                      (item.count / overview.projects!.total) * 100
+                    );
+                    const colours: Record<string, string> = {
+                      planning: "#abb2bf",
+                      active: "#4a90d9",
+                      completed: "#6bcf7f",
+                      archived: "#6b7280",
+                    };
+                    const colour = colours[item.status] ?? "#abb2bf";
+                    return (
+                      <div key={item.status}>
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="capitalize text-text-primary">
+                            {item.status}
+                          </span>
+                          <span className="text-text-secondary">
+                            {item.count} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-surface-alt">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: colour,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-border bg-surface p-4">
               <h3 className="mb-3 text-sm font-medium text-text-primary">
                 Period Summary

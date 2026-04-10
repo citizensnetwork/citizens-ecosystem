@@ -89,3 +89,34 @@ export const ROLE_HIERARCHY: Record<OrgRole, number> = {
   org_member: 40,
   org_viewer: 20,
 };
+
+// Phase 5: Projects & Milestones
+
+export const PROJECT_STATUSES = [
+  "planning",
+  "active",
+  "completed",
+  "archived",
+] as const;
+
+export const PROJECT_STATUS_LABELS: Record<string, string> = {
+  planning: "Planning",
+  active: "Active",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+export const PROJECT_STATUS_COLOURS: Record<string, string> = {
+  planning: "#abb2bf",
+  active: "#4a90d9",
+  completed: "#6bcf7f",
+  archived: "#6b7280",
+};
+
+/** Valid forward transitions for project status (non-admins) */
+export const PROJECT_STATUS_TRANSITIONS: Record<string, string[]> = {
+  planning: ["active"],
+  active: ["completed"],
+  completed: ["archived"],
+  archived: [],
+};

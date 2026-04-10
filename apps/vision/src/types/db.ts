@@ -133,3 +133,55 @@ export interface GoalActivityLink {
 export interface GoalActivityLinkWithActivity extends GoalActivityLink {
   activities: Pick<Activity, "id" | "title" | "type" | "date">;
 }
+
+// Phase 5: Projects & Milestones
+
+export type ProjectStatus = "planning" | "active" | "completed" | "archived";
+
+export interface Project {
+  id: string;
+  org_id: string;
+  department_id: string | null;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  start_date: string | null;
+  end_date: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectWithDepartment extends Project {
+  departments: Pick<Department, "name"> | null;
+}
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  target_date: string | null;
+  completed_at: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ProjectGoalLink {
+  project_id: string;
+  goal_id: string;
+  created_at: string;
+}
+
+export interface ProjectActivity {
+  project_id: string;
+  activity_id: string;
+  created_at: string;
+}
+
+export interface ProjectGoalLinkWithGoal extends ProjectGoalLink {
+  goals: Pick<Goal, "id" | "title" | "status">;
+}
+
+export interface ProjectActivityWithActivity extends ProjectActivity {
+  activities: Pick<Activity, "id" | "title" | "type" | "date">;
+}

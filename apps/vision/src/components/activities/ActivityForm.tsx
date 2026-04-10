@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { ACTIVITY_TYPES } from "@/lib/schemas/activity";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
 import { LocationPicker } from "@/components/map/LocationPicker";
-import type { Department } from "@/types/db";
-import type { Goal } from "@/types/db";
+import type { Department, Goal, Project } from "@/types/db";
 
 interface ActivityFormProps {
   orgId: string;
   orgSlug: string;
   departments: Department[];
   goals?: Pick<Goal, "id" | "title">[];
+  projects?: Pick<Project, "id" | "name">[];
   initialData?: {
     id: string;
     title: string;
@@ -28,6 +28,7 @@ interface ActivityFormProps {
     department_id: string | null;
     activity_tags?: { tag: string }[];
     linked_goal_ids?: string[];
+    project_id?: string | null;
   };
 }
 
@@ -36,6 +37,7 @@ export function ActivityForm({
   orgSlug,
   departments,
   goals,
+  projects,
   initialData,
 }: ActivityFormProps) {
   const router = useRouter();
@@ -70,6 +72,9 @@ export function ActivityForm({
   );
   const [linkedGoalIds, setLinkedGoalIds] = useState<string[]>(
     initialData?.linked_goal_ids ?? []
+  );
+  const [projectId, setProjectId] = useState(
+    initialData?.project_id ?? ""
   );
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -128,19 +133,41 @@ export function ActivityForm({
         const result = await res.json();
         const activityId = result?.data?.id;
         if (activityId) {
-          await Promise.all(
-            linkedGoalIds.map((goalId) =>
-              fetch(`/api/goals/${goalId}/alignment`, {
+          const linkPromises = linkedGoalIds.map((goalId) =>
+            fetch(`/api/goals/${goalId}/alignment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                activity_id: activityId,
+                link_type: "explicit",
+                confidence: 1.0,
+              }),
+            })
+          );
+
+          // Also link to project if selected
+          if (projectId) {
+            linkPromises.push(
+              fetch(`/api/projects/${projectId}/activities`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  activity_id: activityId,
-                  link_type: "explicit",
-                  confidence: 1.0,
-                }),
+                body: JSON.stringify({ activity_id: activityId }),
               })
-            )
-          );
+            );
+          }
+
+          await Promise.all(linkPromises);
+        }
+      } else if (!isEditing && projectId) {
+        // Only project link, no goal links
+        const result = await res.json();
+        const activityId = result?.data?.id;
+        if (activityId) {
+          await fetch(`/api/projects/${projectId}/activities`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activity_id: activityId }),
+          });
         }
       }
 
@@ -408,6 +435,31 @@ export function ActivityForm({
           </div>
         )}
       </div>
+
+      {/* Link to Project */}
+      {projects && projects.length > 0 && (
+        <div>
+          <label
+            htmlFor="projectId"
+            className="block text-sm font-medium text-text-primary"
+          >
+            Link to Project
+          </label>
+          <select
+            id="projectId"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-border bg-surface px-3 py-2 text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">No project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Link to Goals */}
       {goals && goals.length > 0 && (

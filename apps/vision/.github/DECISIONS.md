@@ -179,3 +179,15 @@
 - **Decision:** Retain materialized view as infrastructure; API routes use direct queries for now
 - **Rationale:** Consistent with DECISION-021 (Phase 3). Direct queries return live data with no refresh lag. Materialized view activates when goal/activity counts exceed query performance thresholds
 - **Status:** Accepted (2026-04-10)
+
+## DECISION-031: Forward-Only Status Transitions for Non-Admins
+- **Context:** Projects have a lifecycle (planning→active→completed→archived); need to prevent non-admin users from moving projects backwards
+- **Decision:** Non-admin users restricted to forward-only transitions via `PROJECT_STATUS_TRANSITIONS` map enforced at API layer; admins can transition freely in any direction
+- **Rationale:** Prevents accidental status regression by regular members while giving admins full control for corrections. Enforced at API route level (PATCH /api/projects/[id]) rather than database to keep transition logic visible and testable
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-032: Migration Numbering Deviation (006 instead of 005)
+- **Context:** ARCHITECTURE.md specified `005_projects.sql` for Phase 5, but 005 was consumed by `005_goals_security_fixes.sql` (Phase 4 corrective migration, DECISION-026)
+- **Decision:** Projects migration uses `006_projects.sql` instead of the originally planned 005
+- **Rationale:** Migrations are sequential and immutable once applied. 005 was correctly used for security hardening. Numbering deviation documented for traceability
+- **Status:** Accepted (2026-04-10)
