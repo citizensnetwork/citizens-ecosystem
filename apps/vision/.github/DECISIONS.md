@@ -191,3 +191,27 @@
 - **Decision:** Projects migration uses `006_projects.sql` instead of the originally planned 005
 - **Rationale:** Migrations are sequential and immutable once applied. 005 was correctly used for security hardening. Numbering deviation documented for traceability
 - **Status:** Accepted (2026-04-10)
+
+## DECISION-033: Timeline Activity Cap (500)
+- **Context:** Timeline renders individual activity dots per item (not clustered like map). Unbounded queries could return thousands of items, overwhelming non-virtualized DOM rendering
+- **Decision:** API hard cap of 500 activities with `truncated: boolean` response flag, vs map's 5000 (DECISION-016). UI can inform users to narrow date range when truncated
+- **Rationale:** 500 items is the practical limit for non-virtualized timeline rendering. Virtualized rendering (e.g. tanstack-virtual) needed before raising cap
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-034: Timeline-Map Sync Deferred
+- **Context:** ARCHITECTURE.md specified bidirectional timeline↔map sync (date range filters map, map click highlights timeline, playback animates both)
+- **Decision:** Deferred. `timelineStore` and `mapStore` remain independent. Cross-store subscription planned for future iteration
+- **Rationale:** Phase 6 delivers the timeline as a standalone visualization surface. Sync requires cross-store wiring (Zustand subscribe()) which adds coupling. Better to validate timeline UX first, then integrate
+- **Status:** Deferred (2026-04-10)
+
+## DECISION-035: No Schema Changes for Phase 6
+- **Context:** Timeline Engine queries existing tables (activities, milestones, project_activities, goal_activity_links, departments, projects)
+- **Decision:** No new migration required. Phase 6 is a read-only consumer of existing schema
+- **Rationale:** All data needed for timeline visualization already exists in Phases 1-5 tables. Adding a timeline-specific table would be premature abstraction
+- **Status:** Accepted (2026-04-10)
+
+## DECISION-036: Activity Type Swim Lane Grouping
+- **Context:** ARCHITECTURE.md specified department/project/goal swim lane groupings. Implementation opportunity to add a fourth grouping
+- **Decision:** Added "type" (activity type) as a fourth swim lane grouping option
+- **Rationale:** Activity type grouping enables cross-department pattern analysis (e.g., seeing all meetings across departments on one timeline). Low implementation cost with high analytical value
+- **Status:** Accepted (2026-04-10)

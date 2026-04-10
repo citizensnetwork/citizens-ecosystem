@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 5 — Projects & Milestones (COMPLETE)
+## Current Phase: 6 — Timeline Engine (COMPLETE)
 
 ## Phase Tracker
 
@@ -12,7 +12,7 @@
 | 3 | Metrics & Insight Dashboards | ✅ Complete | 2026-04-09 | 2026-04-09 | B |
 | 4 | Goals & Alignment Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 5 | Projects & Milestones | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
-| 6 | Timeline Engine | ⏳ Not Started | — | — | — |
+| 6 | Timeline Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 7 | Citizens Connect Integration | ⏳ Not Started | — | — | — |
 | 8 | Advisory Engine | ⏳ Not Started | — | — | — |
 | 9 | Geo-Boundaries & Coverage | ⏳ Not Started | — | — | — |
@@ -842,3 +842,154 @@ Phase 0+1+2+3+4 complete. Goals engine adds vision_statements, goals, goal_activ
 
 #### Session Compression
 Phase 0+1+2+3+4+5 complete. Projects engine adds projects, milestones, project_goal_links, project_activities tables with status lifecycle, milestone tracking, M2M linking. 5 API routes, 8 components, 4 pages. Dashboard active projects KPI + status distribution. ActivityForm project linking. 419 tests all passing. Next: Phase 6 (Timeline Engine).
+
+---
+
+## Phase 6 Deliverables
+
+- [x] `src/stores/timelineStore.ts` — Zustand store: zoom levels (year/quarter/month/week/day), swim lane groupings (department/project/goal/type), playback state/speed/cursor, date range, item selection, reset
+- [x] `src/types/metrics.ts` updated — TimelineItem, TimelineMilestone, TimelineBucket, TimelineResponse (with truncated flag)
+- [x] `/api/timeline` route — GET: auth-gated, org-scoped, UUID validation on 4 params, date range/department/project/goal/type filters, 500-item cap with truncated flag, parallel sub-queries via Promise.all, generic error responses
+- [x] `TimelineView` component — main orchestrator with data fetching, AbortController cleanup, playback animation (cursor-based), detail panel with map link, loading/error/empty states
+- [x] `TimelineControls` component — date range inputs, 5 zoom level buttons, 4 swim lane grouping options
+- [x] `PlaybackControl` component — play/pause toggle, stop button, 3 speed options (1x/2x/4x), cursor date display
+- [x] `DensityStrip` component — activity volume colour-intensity bar, max-normalized opacity, playback cursor highlight
+- [x] `SwimLane` component — lane rendering with activity dots (type icons), milestone diamonds, groupItemsIntoLanes utility
+- [x] `src/components/timeline/index.ts` — barrel export
+- [x] `/[orgSlug]/timeline/page.tsx` — server component with auth + org validation
+- [x] Sidebar updated — "Timeline" entry between Map and Projects
+- [x] 43 new tests across 3 test files (23 store + 11 API + 9 components)
+
+### Architect Fixes Applied
+1. Raw DB error replaced with generic "Internal server error" (H-1)
+2. Activity query capped at LIMIT 500 with `truncated` response flag (H-2)
+3. 4 independent DB calls parallelized via Promise.all (M-1)
+
+### Deferred Items
+- Timeline ↔ Map bidirectional sync — stores remain independent (DECISION-034)
+- Virtualized rendering for 5000+ items — 500-item API cap sufficient for non-virtualized DOM (DECISION-033)
+- Component render tests for TimelineView, TimelineControls, PlaybackControl, SwimLane — pure logic well-covered via store + utility tests
+
+## Build Verification (Phase 6)
+
+- **Tests**: 462/462 passing (44 files — 419 Phase 0-5 + 43 Phase 6)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors)
+- **Build**: Production build successful
+- **New Files**: 13 (1 store, 6 components, 1 barrel, 1 page, 1 API route, 3 tests)
+- **Modified Files**: 1 (src/types/metrics.ts)
+
+---
+
+## Phase 6 Agent Reviews
+
+### Phase 6 Architect Review
+
+**Grade: B → A** (3 required fixes applied)
+
+#### Security: PASS
+- Auth + membership check before data access
+- UUID validation on all 4 UUID parameters
+- Generic "Internal server error" on 500s (no DB message leakage)
+- Multi-tenant isolation: all queries scoped by org_id
+
+#### Architecture: PASS
+- Server Component page → "use client" interactive components (correct RSC/RCC split)
+- Store follows use[Name]Store convention
+- Barrel export on components
+- Zero `any` types, zero `@ts-ignore`
+
+#### Database: PASS
+- Queries existing tables efficiently (no new migrations needed)
+- 4 parallel sub-queries via Promise.all
+- All hot paths covered by existing indexes
+
+#### Performance: PASS (after fixes)
+- 500-item cap with truncated flag prevents unbounded queries
+- AbortController for fetch cancellation
+- Playback timer cleanup on unmount
+
+#### Code Quality: PASS
+- Loading/error/empty states; aria-labels; ACTIVITY_TYPE_ICONS reuse
+
+#### Test Coverage: PASS
+- 43 tests: store (23), API (11), components (9)
+
+---
+
+### Phase 6 Data Agent Review
+
+**Verdict: PASS**
+
+#### Schema Correctness: PASS
+- All 6 queried tables match existing schemas exactly
+
+#### RLS Coverage: PASS
+- 7/7 queried tables have RLS; double-layered isolation (app + DB)
+
+#### Index Coverage: PASS
+- All query patterns covered by 8+ relevant indexes
+
+#### Migration Quality: N/A
+- No new migrations (Phase 6 is read-only against existing schema)
+
+#### Org Isolation: CONFIRMED
+- All 6 data queries tenant-isolated; no cross-org exposure path
+
+---
+
+### Phase 6 Testing Agent Review
+
+**Verdict: PASS**
+
+#### Test Suite: PASS
+- 462 passed | 0 failed | 0 skipped across 44 files
+
+#### New Test Files (3)
+- timelineStore.test.ts (23) — all actions + reset
+- timeline.test.ts (11) — auth, validation, happy path, type filter, truncation, error
+- TimelineComponents.test.tsx (9) — DensityStrip rendering + cursor, groupItemsIntoLanes all 4 groupings
+
+#### Coverage: ~85% for tested files
+- Store: ~95% | API: ~85% | Components (tested): ~85%
+- Component render tests deferred (TimelineView, Controls, Playback, SwimLane)
+
+#### Regression Check
+- Phase 5: PASS | Phase 6: PASS
+
+---
+
+### Phase 6 Product Lead Review
+
+**Verdict: PASS**
+
+#### Feature Alignment: PASS
+- All Phase 6 deliverables implemented per ARCHITECTURE.md spec
+
+#### UX Consistency: PASS
+- Dark theme tokens consistent across all timeline components
+- Loading/error/empty states present
+- Accent blue (#4a90d9) used correctly
+
+#### RBAC Correctness: PASS
+- Page + API both auth-gated with org membership verification
+
+#### Design Language: PASS
+- Progressive disclosure: density strip → swim lanes → detail panel → map link
+
+---
+
+### Phase 6 Continuity Review
+
+**Verdict: PASS**
+
+#### Documentation: UPDATED ✅
+- PROJECT_STATUS.md: Phase 6 complete with deliverables, build verification, all agent reviews
+- DECISIONS.md: DECISION-033 through DECISION-036
+
+#### Cumulative State
+- Phase 0–6 complete: 13 tables + 3 materialized views, 43+ RLS policies, 30 indexes, 21 API routes, 42 components, 21 pages, 462 tests
+- All tsc/lint/build clean
+
+#### Session Compression
+Phase 0+1+2+3+4+5+6 complete. Timeline engine adds timelineStore, /api/timeline endpoint (500-cap, Promise.all parallel queries), 5 components (TimelineView, Controls, Playback, DensityStrip, SwimLane), timeline page. Architect fixes: generic errors, limit cap, query parallelization. 462 tests all passing. Next: Phase 7 (Citizens Connect Integration).

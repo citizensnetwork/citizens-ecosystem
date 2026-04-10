@@ -80,3 +80,46 @@ export interface AlignmentMatrixEntry {
   department_name: string | null;
   activity_count: number;
 }
+
+// Phase 6: Timeline Types
+
+export interface TimelineItem {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  aligned_goals: string[];
+  latitude: number | null;
+  longitude: number | null;
+  participant_count: number;
+}
+
+export interface TimelineMilestone {
+  id: string;
+  project_id: string;
+  project_name: string;
+  title: string;
+  target_date: string | null;
+  completed_at: string | null;
+  department_id: string | null;
+  department_name: string | null;
+}
+
+export interface TimelineBucket {
+  date: string;
+  count: number;
+}
+
+export interface TimelineResponse {
+  items: TimelineItem[];
+  milestones: TimelineMilestone[];
+  density: TimelineBucket[];
+  total_count: number;
+  truncated: boolean;
+}
