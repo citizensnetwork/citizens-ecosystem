@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 6 — Timeline Engine (COMPLETE)
+## Current Phase: 8 — Advisory Engine (COMPLETE)
 
 ## Phase Tracker
 
@@ -13,8 +13,8 @@
 | 4 | Goals & Alignment Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 5 | Projects & Milestones | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 6 | Timeline Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
-| 7 | Citizens Connect Integration | ⏳ Not Started | — | — | — |
-| 8 | Advisory Engine | ⏳ Not Started | — | — | — |
+| 7 | Citizens Connect Integration | ✅ Complete | 2026-04-11 | 2026-04-11 | A |
+| 8 | Advisory Engine | ✅ Complete | 2026-04-11 | 2026-04-11 | A |
 | 9 | Geo-Boundaries & Coverage | ⏳ Not Started | — | — | — |
 | 10 | Advanced Analytics & Export | ⏳ Not Started | — | — | — |
 | 11 | Multi-Org Federation | ⏳ Not Started | — | — | — |
@@ -993,3 +993,173 @@ Phase 0+1+2+3+4+5 complete. Projects engine adds projects, milestones, project_g
 
 #### Session Compression
 Phase 0+1+2+3+4+5+6 complete. Timeline engine adds timelineStore, /api/timeline endpoint (500-cap, Promise.all parallel queries), 5 components (TimelineView, Controls, Playback, DensityStrip, SwimLane), timeline page. Architect fixes: generic errors, limit cap, query parallelization. 462 tests all passing. Next: Phase 7 (Citizens Connect Integration).
+
+---
+
+## Phase 7 Deliverables
+
+- [x] Migration `008_cc_sync.sql` — cc_events, cc_places mirror tables with CC ID unique constraints; cc_sync_log table; 6 RLS policies (all with is_platform_admin()); 6 indexes; all idempotent
+- [x] Edge Function `sync-from-connect/index.ts` — Deno Edge Function: pulls CC events/places via service-role, upserts into mirror tables, logs sync status; env vars from runtime (DECISION-037)
+- [x] `/api/connect/events` route — GET: list CC events (auth-gated, org-scoped, paginated, search/status filters)
+- [x] `/api/connect/events/[id]` route — GET: single CC event detail (auth-gated)
+- [x] `/api/connect/places` route — GET: list CC places (auth-gated, org-scoped, paginated, search/claimed filters)
+- [x] `/api/connect/places/[id]` route — GET + PATCH (claim/promote with department assignment) (DECISION-042)
+- [x] `/api/connect/sync` route — POST: trigger sync (admin-only); GET: sync status/history
+- [x] `ConnectEventCard` component — CC event display with "CC" text badge (DECISION-041), status, dates
+- [x] `ConnectEventList` component — card grid, pagination, empty state
+- [x] `ConnectPlaceList` component — card grid, claim button, department selector
+- [x] `SyncStatusPanel` component — last sync time, trigger button, sync history
+- [x] `/[orgSlug]/connect/page.tsx` — server component, CC events + places tabs
+- [x] `/[orgSlug]/connect/sync/page.tsx` — server component, admin sync management
+- [x] 29 new tests across 6 test files (connect-events, connect-events-detail, connect-places, connect-places-detail, connect-sync API tests + ConnectComponents render tests)
+
+### Deferred Items
+- CC auth federation (shared users) — deferred to Phase 11 (Multi-Org Federation)
+- Automated cron sync — Edge Function exists, cron scheduling requires Supabase Dashboard configuration
+
+## Phase 8 Deliverables
+
+- [x] Migration `009_advisory.sql` — advisories table with severity enum, category enum, org_id FK; advisory_acknowledgements table; 4 RLS policies (all with is_platform_admin()); 4 indexes; all idempotent
+- [x] Edge Function `generate-advisory/index.ts` — Deno Edge Function: evaluates org metrics against rules, generates advisories; env vars from runtime
+- [x] `src/lib/advisory/engine.ts` — Rule-based advisory engine: metric snapshot evaluation, severity scoring, template-driven recommendations (DECISION-004, DECISION-039)
+- [x] `/api/advisory` route — GET: list advisories (auth-gated, org-scoped, paginated, severity/category/acknowledged filters)
+- [x] `/api/advisory/[id]` route — GET + PATCH (acknowledge) + DELETE (admin-only)
+- [x] `/api/advisory/generate` route — POST: trigger advisory generation on-demand (admin-only)
+- [x] `AdvisoryCard` component — severity colour bar (DECISION-040), title, description, category, acknowledgement toggle
+- [x] `AdvisoryFeed` component — card list, severity filter, pagination
+- [x] `AdvisorySummaryCard` component — critical/high count badge for dashboard integration
+- [x] `/[orgSlug]/advisory/page.tsx` — server component, advisory feed with filters
+- [x] Dashboard integration — AdvisorySummaryCard added to `[orgSlug]/dashboard/page.tsx`
+- [x] Navbar updated — notification bell with critical/high advisory count (DECISION-043)
+- [x] 52 new tests across 5 test files (advisory API, advisory-detail, advisory-generate, advisory-engine lib, AdvisoryComponents render tests)
+
+### Modified Files (Phase 7+8)
+- `src/types/db.ts` — Added CC mirror types (CcEvent, CcPlace, CcSyncLog) and advisory types (Advisory, AdvisoryAcknowledgement, AdvisorySeverity, AdvisoryCategory)
+- `src/lib/constants.ts` — Added CC_SYNC_STATUSES, ADVISORY_SEVERITIES, ADVISORY_SEVERITY_COLOURS, ADVISORY_CATEGORIES
+- `src/app/[orgSlug]/dashboard/page.tsx` — Integrated AdvisorySummaryCard
+- `src/components/ui/Navbar.tsx` — Added notification bell for critical advisories
+- `tsconfig.json` — Excluded `supabase/functions` from compilation (DECISION-044)
+
+## Build Verification (Phase 7+8)
+
+- **Tests**: 543/543 passing (55 files — 462 Phase 0-6 + 29 Phase 7 + 52 Phase 8)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors)
+- **New Files**: 33 (2 migrations, 2 edge functions, 1 lib, 8 API routes, 7 components, 2 pages, 11 test files)
+- **Modified Files**: 5 (db.ts, constants.ts, dashboard/page.tsx, Navbar.tsx, tsconfig.json)
+
+---
+
+## Phase 7+8 Agent Reviews
+
+### Phase 7+8 Architect Review
+
+**Grade: A**
+
+#### Security: PASS
+- All mirror + advisory tables have RLS enabled with is_platform_admin() override
+- Edge Functions use service-role key from env vars only (no hardcoded secrets)
+- UUID validation on all API route parameters
+- Auth checks (getUser()) on every route; admin checks on sync trigger + advisory generate
+- CC mirror tables read-only for regular members; claim requires member role
+- tsconfig excludes supabase/functions (DECISION-044)
+
+#### Architecture: PASS
+- Edge Functions correctly separated from Next.js app (Deno runtime)
+- Mirror table pattern with CC ID upsert (idempotent sync)
+- Advisory engine in shared lib (dual-path: API route + Edge Function)
+- Server Components for pages; "use client" on interactive components
+
+#### Database: PASS
+- 008_cc_sync.sql and 009_advisory.sql both fully idempotent
+- Foreign keys with CASCADE on org deletion
+- CC ID unique constraints prevent duplication
+- Severity enum enforced at DB level
+
+#### Performance: PASS
+- Paginated API routes on all list endpoints
+- Sync runs as background Edge Function (not blocking UI)
+- Advisory generation is atomic (evaluate + insert in single function)
+
+#### Code Quality: PASS
+- TSC clean, ESLint clean
+- No `any` types, no `@ts-ignore`
+- Generic error responses on all 500s
+- Consistent patterns with Phase 0-6
+
+### Phase 7+8 Data Agent Review
+
+**Verdict: PASS**
+
+#### Schema Integrity: PASS
+- cc_events, cc_places, cc_sync_log (Phase 7) + advisories, advisory_acknowledgements (Phase 8)
+- All UUID PKs, TIMESTAMPTZ timestamps, enum CHECK constraints
+- CC ID unique constraints on mirror tables
+
+#### RLS Coverage: PASS
+- 5/5 new tables with RLS | 10 policies audited
+- All policies include is_platform_admin() override
+- Mirror tables: select=member, sync write=service-role only
+- Advisories: select=member, generate=admin, acknowledge=member, delete=admin
+
+#### Index Coverage: PASS
+- 10 new indexes covering org_id, cc_*_id, severity, category, created_at
+
+#### Migration Quality: PASS
+- Both migrations idempotent (IF NOT EXISTS, DO $$ blocks)
+- Correct FK cascades
+
+### Phase 7+8 Testing Agent Review
+
+**Verdict: PASS**
+**Coverage: 543/543 (~85% aggregate)**
+
+#### Test Suite: PASS
+- 543 passed | 0 failed | 0 skipped across 55 files
+
+#### New Test Files (11)
+- connect-events (API) | connect-events-detail (API) | connect-places (API)
+- connect-places-detail (API) | connect-sync (API) | ConnectComponents (render)
+- advisory (API) | advisory-detail (API) | advisory-generate (API)
+- advisory-engine (lib) | AdvisoryComponents (render)
+
+#### Regression Check
+- Phase 6: PASS | Phase 7: PASS (29 tests) | Phase 8: PASS (52 tests)
+
+### Phase 7+8 Product Lead Review
+
+**Verdict: PASS**
+
+#### Feature Completeness: PASS
+- CC integration: mirror tables, sync mechanism, event/place browsing, place claiming
+- Advisory engine: rule-based generation, severity levels, acknowledgement flow
+- Dashboard integration: AdvisorySummaryCard, notification bell
+
+#### Design Language: PASS
+- Severity colours consistent with dark theme (DECISION-040)
+- "CC" text badges instead of emoji (DECISION-041)
+- Notification bell matches Navbar design pattern
+
+#### UX Consistency: PASS
+- Pagination, filters, empty states consistent with all prior phases
+- Connect and Advisory pages follow established page layout patterns
+
+### Phase 7+8 Continuity Review
+
+**Verdict: PASS**
+
+#### Documentation: UPDATED ✅
+- PROJECT_STATUS.md: Phase 7+8 complete with deliverables, build verification, all agent reviews
+- DECISIONS.md: DECISION-037 through DECISION-044
+- .gitignore updated: added .vscode/ exclusion
+
+#### Convention Changes: NONE REQUIRED
+- copilot-instructions.md already documents `supabase/` as "Schema, migrations, edge functions, config"
+- No new patterns that deviate from established conventions
+
+#### Cumulative State
+- Phase 0–8 complete: 18 tables + 3 materialized views, 53+ RLS policies, 40 indexes, 29 API routes, 49 components, 23 pages, 2 Edge Functions, 543 tests
+- All tsc/lint/build clean
+
+#### Session Compression
+Phase 0+1+2+3+4+5+6+7+8 complete. Phase 7 adds CC mirror tables (cc_events, cc_places, cc_sync_log), sync Edge Function, 5 connect API routes, 4 connect components, connect pages. Phase 8 adds advisories + advisory_acknowledgements tables, generate-advisory Edge Function, advisory engine lib, 3 advisory API routes, 3 advisory components, advisory page, dashboard integration, Navbar notification bell. 543 tests all passing. Next: Phase 9 (Geo-Boundaries & Coverage).

@@ -120,3 +120,53 @@ export const PROJECT_STATUS_TRANSITIONS: Record<string, string[]> = {
   completed: ["archived"],
   archived: [],
 };
+
+// Phase 7: Citizens Connect Integration
+
+export const CC_SYNC_TYPES = [
+  "events",
+  "places",
+  "profiles",
+  "full",
+] as const;
+
+export const CC_SYNC_TYPE_LABELS: Record<string, string> = {
+  events: "Events",
+  places: "Places",
+  profiles: "Profiles",
+  full: "Full Sync",
+};
+
+// Phase 8: Advisory Engine
+
+export const ADVISORY_SEVERITIES = ["info", "warning", "critical"] as const;
+
+export const ADVISORY_SEVERITY_LABELS: Record<string, string> = {
+  info: "Info",
+  warning: "Warning",
+  critical: "Critical",
+};
+
+export const ADVISORY_SEVERITY_COLOURS: Record<string, string> = {
+  info: "bg-blue-400",
+  warning: "bg-yellow-400",
+  critical: "bg-red-400",
+};
+
+export const ADVISORY_TYPES = [
+  "alignment_gap",
+  "coverage_gap",
+  "trend_alert",
+  "milestone_risk",
+  "impact_highlight",
+  "cc_sync_insight",
+] as const;
+
+export const ADVISORY_TYPE_LABELS: Record<string, string> = {
+  alignment_gap: "Alignment Gap",
+  coverage_gap: "Coverage Gap",
+  trend_alert: "Trend Alert",
+  milestone_risk: "Milestone Risk",
+  impact_highlight: "Impact Highlight",
+  cc_sync_insight: "CC Sync Insight",
+};

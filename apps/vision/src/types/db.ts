@@ -185,3 +185,111 @@ export interface ProjectGoalLinkWithGoal extends ProjectGoalLink {
 export interface ProjectActivityWithActivity extends ProjectActivity {
   activities: Pick<Activity, "id" | "title" | "type" | "date">;
 }
+
+// Phase 7: Citizens Connect Integration
+
+export type CCSyncType = "events" | "places" | "profiles" | "full";
+
+export interface CCEvent {
+  cc_event_id: string;
+  title: string;
+  description: string | null;
+  date: string | null;
+  end_time: string | null;
+  location: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  category: string | null;
+  status: string | null;
+  created_by: string | null;
+  rsvp_count: number;
+  avg_rating: number | null;
+  synced_at: string;
+  cv_org_id: string | null;
+  cv_project_id: string | null;
+  cv_activity_id: string | null;
+}
+
+export interface CCPlace {
+  cc_place_id: string;
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  category: string | null;
+  verified: boolean;
+  avg_rating: number | null;
+  cv_org_id: string | null;
+  synced_at: string;
+}
+
+export interface CCProfile {
+  cc_user_id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  synced_at: string;
+}
+
+export interface CCSyncLog {
+  id: string;
+  sync_type: CCSyncType;
+  started_at: string;
+  completed_at: string | null;
+  records_synced: number;
+  errors: unknown[];
+  org_id: string | null;
+}
+
+// Phase 8: Advisory Engine
+
+export type AdvisorySeverity = "info" | "warning" | "critical";
+
+export type AdvisoryType =
+  | "alignment_gap"
+  | "coverage_gap"
+  | "trend_alert"
+  | "milestone_risk"
+  | "impact_highlight"
+  | "cc_sync_insight";
+
+export interface AdvisoryTemplate {
+  id: string;
+  type: AdvisoryType;
+  title_template: string;
+  body_template: string;
+  severity: AdvisorySeverity;
+  active: boolean;
+  created_at: string;
+}
+
+export interface AdvisoryRule {
+  id: string;
+  template_id: string;
+  metric_slug: string;
+  operator: string;
+  threshold: number;
+  lookback_days: number;
+  cooldown_hours: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface AdvisoryOutput {
+  id: string;
+  org_id: string;
+  template_id: string;
+  rule_id: string;
+  title: string;
+  body: string;
+  severity: AdvisorySeverity;
+  data: Record<string, unknown>;
+  dismissed: boolean;
+  dismissed_at: string | null;
+  dismissed_notes: string | null;
+  created_at: string;
+}
+
+export interface AdvisoryRuleWithTemplate extends AdvisoryRule {
+  advisory_templates: Pick<AdvisoryTemplate, "type" | "title_template" | "body_template" | "severity">;
+}

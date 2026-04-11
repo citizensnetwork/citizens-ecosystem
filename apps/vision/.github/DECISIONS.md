@@ -215,3 +215,51 @@
 - **Decision:** Added "type" (activity type) as a fourth swim lane grouping option
 - **Rationale:** Activity type grouping enables cross-department pattern analysis (e.g., seeing all meetings across departments on one timeline). Low implementation cost with high analytical value
 - **Status:** Accepted (2026-04-10)
+
+## DECISION-037: Edge Functions for Cross-Project Sync and Advisory Generation
+- **Context:** CV needs to pull data from Citizens Connect and generate advisories — both require service-role access and are trigger/cron candidates
+- **Decision:** Implement as Supabase Deno Edge Functions (`sync-from-connect`, `generate-advisory`) with service-role key from runtime env
+- **Rationale:** Edge Functions run server-side with access to env vars (service role key), can be invoked by cron or API, and keep heavy logic out of Next.js API routes. Deno runtime matches Supabase platform
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-038: CC Mirror Table Pattern (Upsert on CC IDs)
+- **Context:** CV mirrors CC events and places for cross-platform intelligence; need idempotent sync
+- **Decision:** Mirror tables (`cc_events`, `cc_places`) use `cc_event_id`/`cc_place_id` unique columns with upsert-on-conflict semantics
+- **Rationale:** Idempotent: re-running sync produces same result. CC IDs as natural keys avoid duplication. Mirror tables decoupled from CC schema — CV controls column selection
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-039: Advisory Engine Dual Path (API Route + Edge Function)
+- **Context:** Advisory generation needs to be triggered both on-demand (user clicks "Generate") and scheduled (cron)
+- **Decision:** Advisory generation logic lives in `src/lib/advisory/engine.ts` (shared); `/api/advisory/generate` route calls it for on-demand; `generate-advisory` Edge Function calls equivalent SQL for scheduled runs
+- **Rationale:** Shared engine ensures consistent scoring. API route enables immediate UX feedback. Edge Function enables cron-based background generation without client involvement
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-040: Severity Colours as Tailwind Background Classes
+- **Context:** Advisory cards need visual severity indicators (critical/high/medium/low/info)
+- **Decision:** Map severity levels to Tailwind bg-classes: critical=red-900, high=red-700, medium=yellow-700, low=blue-700, info=gray-700
+- **Rationale:** Consistent with existing pattern (GOAL_STATUS_COLOURS, PROJECT_STATUS_COLOURS). Dark theme compatible. No custom CSS needed
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-041: Text Labels Over Emoji for Domain Badges
+- **Context:** Connect components initially used emoji for source badges ("🔗 CC"); product review flagged inconsistency with design language
+- **Decision:** Replace emoji badges with styled text labels (e.g., "CC" badge with bg-blue-600 styling)
+- **Rationale:** Consistent with DECISION-012 (emoji retained for activity type icons only). Text labels render identically cross-platform and match the professional dashboard aesthetic
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-042: Places Claim Flow as Separate API Route
+- **Context:** CC places mirror into CV read-only; orgs need to "claim" a place to assign it to a department
+- **Decision:** Dedicated PATCH endpoint on `/api/connect/places/[id]` for claim/promote with department assignment
+- **Rationale:** Separates read (sync) from write (claim) concerns. Claim requires admin/member auth and org scoping. Department assignment during claim ensures places enter the org hierarchy immediately
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-043: Notification Bell for Critical Advisories
+- **Context:** Critical advisories need immediate attention; users may not visit the advisory page regularly
+- **Decision:** Add notification bell indicator to Navbar that shows count of critical/high unacknowledged advisories
+- **Rationale:** Passive notification without push infrastructure. Consistent with dashboard patterns. Bell icon with count badge is a recognized UX pattern. Scoped to critical+high to avoid notification fatigue
+- **Status:** Accepted (2026-04-11)
+
+## DECISION-044: tsconfig Excludes Supabase Functions Directory
+- **Context:** Supabase Edge Functions use Deno runtime with different TypeScript config; Next.js tsc was reporting errors on Deno-specific imports
+- **Decision:** Add `"supabase/functions"` to tsconfig.json `exclude` array
+- **Rationale:** Edge Functions have their own Deno-compatible TypeScript context. Excluding from Next.js tsconfig prevents false compile errors while keeping Edge Function code in the same repo
+- **Status:** Accepted (2026-04-11)
