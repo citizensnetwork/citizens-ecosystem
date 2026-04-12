@@ -23,16 +23,19 @@ import {
   type MapActivity,
 } from "@/lib/map/utils";
 import { useMapStore } from "@/stores/mapStore";
+import { COVERAGE_LEVEL_COLOURS } from "@/lib/constants";
 
 interface MapViewProps {
   activities: MapActivity[];
   orgSlug: string;
+  boundaryGeoJSON?: GeoJSON.FeatureCollection | null;
 }
 
 const SOURCE_ID = "activities";
 const CLUSTER_SOURCE_ID = "activities-clustered";
+const BOUNDARY_SOURCE_ID = "boundaries";
 
-export function MapView({ activities, orgSlug }: MapViewProps) {
+export function MapView({ activities, orgSlug, boundaryGeoJSON }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const { activeLayers, selectActivity, setViewport } = useMapStore();
@@ -144,9 +147,68 @@ export function MapView({ activities, orgSlug }: MapViewProps) {
       type: "geojson",
       data: geojson,
     });
+
+    // Boundary polygon source
+    map.addSource(BOUNDARY_SOURCE_ID, {
+      type: "geojson",
+      data: boundaryGeoJSON ?? { type: "FeatureCollection", features: [] },
+    });
   }
 
   function addLayers(map: maplibregl.Map) {
+    // --- Boundary fill layer (below all point layers) ---
+    map.addLayer({
+      id: "boundary-fill",
+      type: "fill",
+      source: BOUNDARY_SOURCE_ID,
+      paint: {
+        "fill-color": [
+          "match",
+          ["get", "coverage_level"],
+          "gap", COVERAGE_LEVEL_COLOURS.gap,
+          "low", COVERAGE_LEVEL_COLOURS.low,
+          "moderate", COVERAGE_LEVEL_COLOURS.moderate,
+          "well-covered", COVERAGE_LEVEL_COLOURS["well-covered"],
+          ["coalesce", ["get", "colour"], "#4a90d9"],
+        ],
+        "fill-opacity": 0.18,
+      },
+    });
+
+    // --- Boundary outline layer ---
+    map.addLayer({
+      id: "boundary-outline",
+      type: "line",
+      source: BOUNDARY_SOURCE_ID,
+      paint: {
+        "line-color": [
+          "coalesce",
+          ["get", "colour"],
+          "#4a90d9",
+        ],
+        "line-width": 2,
+        "line-opacity": 0.7,
+      },
+    });
+
+    // --- Boundary label layer ---
+    map.addLayer({
+      id: "boundary-label",
+      type: "symbol",
+      source: BOUNDARY_SOURCE_ID,
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["Open Sans Bold"],
+        "text-size": 12,
+        "text-anchor": "center",
+      },
+      paint: {
+        "text-color": "#ffffff",
+        "text-halo-color": "#1a1a2e",
+        "text-halo-width": 1.5,
+      },
+    });
+
     // --- Heatmap layer ---
     map.addLayer({
       id: "heatmap-layer",
@@ -261,6 +323,7 @@ export function MapView({ activities, orgSlug }: MapViewProps) {
     const showMarkers = activeLayers.has("markers");
     const showClusters = activeLayers.has("clusters");
     const showHeatmap = activeLayers.has("heatmap");
+    const showBoundaries = activeLayers.has("boundaries");
 
     // Individual markers visible when markers is on and clusters is off
     const pointVisibility = showMarkers && !showClusters ? "visible" : "none";
@@ -268,6 +331,8 @@ export function MapView({ activities, orgSlug }: MapViewProps) {
     const clusterVisibility = showClusters ? "visible" : "none";
     // Unclustered point within cluster source visible when clusters on
     const unclusteredInCluster = showClusters ? "visible" : "none";
+    // Boundary layers
+    const boundaryVisibility = showBoundaries ? "visible" : "none";
 
     if (map.getLayer("unclustered-point")) {
       map.setLayoutProperty(
@@ -284,6 +349,15 @@ export function MapView({ activities, orgSlug }: MapViewProps) {
     }
     if (map.getLayer("heatmap-layer")) {
       map.setLayoutProperty("heatmap-layer", "visibility", showHeatmap ? "visible" : "none");
+    }
+    if (map.getLayer("boundary-fill")) {
+      map.setLayoutProperty("boundary-fill", "visibility", boundaryVisibility);
+    }
+    if (map.getLayer("boundary-outline")) {
+      map.setLayoutProperty("boundary-outline", "visibility", boundaryVisibility);
+    }
+    if (map.getLayer("boundary-label")) {
+      map.setLayoutProperty("boundary-label", "visibility", boundaryVisibility);
     }
   }
 
@@ -323,6 +397,17 @@ export function MapView({ activities, orgSlug }: MapViewProps) {
       source.setData(geojson);
     }
   }, [activities]);
+
+  // Update boundary data when boundaries change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const source = map.getSource(BOUNDARY_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      source.setData(boundaryGeoJSON ?? { type: "FeatureCollection", features: [] });
+    }
+  }, [boundaryGeoJSON]);
 
   // Update layer visibility when layer toggles change
   useEffect(() => {

@@ -170,3 +170,39 @@ export const ADVISORY_TYPE_LABELS: Record<string, string> = {
   impact_highlight: "Impact Highlight",
   cc_sync_insight: "CC Sync Insight",
 };
+
+// ── Geo-Boundaries ────────────────────────────────────────
+
+export const COVERAGE_LEVELS = ["gap", "low", "moderate", "well-covered"] as const;
+
+export const COVERAGE_LEVEL_LABELS: Record<string, string> = {
+  gap: "Coverage Gap",
+  low: "Low Coverage",
+  moderate: "Moderate",
+  "well-covered": "Well Covered",
+};
+
+export const COVERAGE_LEVEL_COLOURS: Record<string, string> = {
+  gap: "#f87171",
+  low: "#facc15",
+  moderate: "#60a5fa",
+  "well-covered": "#4ade80",
+};
+
+export const COVERAGE_LEVEL_BG_CLASSES: Record<string, string> = {
+  gap: "bg-red-400",
+  low: "bg-yellow-400",
+  moderate: "bg-blue-400",
+  "well-covered": "bg-green-400",
+};
+
+/** Default boundary colours for picker */
+export const BOUNDARY_COLOURS = [
+  "#4a90d9",
+  "#50c878",
+  "#e6a23c",
+  "#9b59b6",
+  "#e74c3c",
+  "#1abc9c",
+  "#95a5a6",
+] as const;

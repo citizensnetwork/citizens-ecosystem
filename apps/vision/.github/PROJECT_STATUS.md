@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: 8 — Advisory Engine (COMPLETE)
+## Current Phase: 9 — Geo-Boundaries & Coverage Analysis (COMPLETE)
 
 ## Phase Tracker
 
@@ -15,7 +15,7 @@
 | 6 | Timeline Engine | ✅ Complete | 2026-04-10 | 2026-04-10 | A |
 | 7 | Citizens Connect Integration | ✅ Complete | 2026-04-11 | 2026-04-11 | A |
 | 8 | Advisory Engine | ✅ Complete | 2026-04-11 | 2026-04-11 | A |
-| 9 | Geo-Boundaries & Coverage | ⏳ Not Started | — | — | — |
+| 9 | Geo-Boundaries & Coverage | ✅ Complete | 2026-04-12 | 2026-04-12 | B+ |
 | 10 | Advanced Analytics & Export | ⏳ Not Started | — | — | — |
 | 11 | Multi-Org Federation | ⏳ Not Started | — | — | — |
 | 12 | Mobile & Polish | ⏳ Not Started | — | — | — |
@@ -1163,3 +1163,113 @@ Phase 0+1+2+3+4+5+6 complete. Timeline engine adds timelineStore, /api/timeline 
 
 #### Session Compression
 Phase 0+1+2+3+4+5+6+7+8 complete. Phase 7 adds CC mirror tables (cc_events, cc_places, cc_sync_log), sync Edge Function, 5 connect API routes, 4 connect components, connect pages. Phase 8 adds advisories + advisory_acknowledgements tables, generate-advisory Edge Function, advisory engine lib, 3 advisory API routes, 3 advisory components, advisory page, dashboard integration, Navbar notification bell. 543 tests all passing. Next: Phase 9 (Geo-Boundaries & Coverage).
+
+---
+
+## Phase 9 Deliverables
+
+- [x] Migration 010_boundaries.sql (geo_boundaries table, mv_boundary_activity_coverage MV, refresh_boundary_coverage() function, 5 indexes + 1 MV unique index, 4 RLS policies, advisory template/rule seeds)
+- [x] TypeScript types: CoverageLevel, GeoBoundary, BoundaryCoverage
+- [x] Constants: COVERAGE_LEVELS, COVERAGE_LEVEL_LABELS, COVERAGE_LEVEL_COLOURS, COVERAGE_LEVEL_BG_CLASSES, BOUNDARY_COLOURS
+- [x] Geo utility library (src/lib/map/geo.ts): 8 functions — getBoundingBox, pointInBBox, pointInPolygon, pointInMultiPolygon, pointInGeometry, approximateAreaKm2, isValidBoundaryGeoJSON, boundaryToFeature
+- [x] Boundary API routes: GET/POST list (boundaries/route.ts), GET/PATCH/DELETE detail (boundaries/[id]/route.ts), GET coverage (boundaries/[id]/coverage/route.ts), GET map GeoJSON (map/boundaries/route.ts)
+- [x] GeoFenceEditor component (GeoJSON paste + file import, Feature/FeatureCollection unwrapping, 5MB limit)
+- [x] CoverageOverlay component (coverage level legend with traffic-light colours)
+- [x] BoundaryFormClient component (name, description, colour picker, GeoFenceEditor)
+- [x] Boundary pages: list (search, active filter, pagination), new (admin/manager gate), detail (coverage stats grid)
+- [x] Map boundary layer integration: fill (coverage-coloured), outline (boundary colour), label (name with halo)
+- [x] MapStore extended with "boundaries" layer type + LayerToggle updated
+- [x] MapPageClient fetches boundary GeoJSON for map rendering
+- [x] Sidebar updated with Boundaries nav link
+- [x] Advisory engine extended: boundary-scoped evaluation loop with MV refresh, per-boundary cooldowns
+- [x] Hex colour validation (HEX_COLOUR_RE) in POST and PATCH routes
+- [x] 64 new tests across 5 test files (geo: 26, boundaries: 9, boundary-detail: 15, map-boundaries: 4, BoundaryComponents: 10)
+
+### Deferred Items
+- Dashboard boundary filter dropdown (dashboard does not filter by boundary — deferred)
+- Cursor-based pagination for boundary list (uses OFFSET pagination — non-blocking deviation)
+
+## Build Verification (Phase 9)
+
+- **Tests**: 607/607 passing (60 files)
+- **TypeScript**: Clean (0 errors)
+- **ESLint**: Clean (0 errors)
+- **New Files**: 17 (1 migration, 1 lib, 4 API routes, 3 components, 3 pages, 5 test files)
+- **Modified Files**: 8 (db.ts, constants.ts, mapStore.ts, LayerToggle.tsx, MapView.tsx, MapPageClient.tsx, Sidebar.tsx, generate-advisory/index.ts)
+
+---
+
+## Phase 9 Agent Reviews
+
+### Phase 9 Architect Review
+
+**Grade: B+** — PASS
+
+#### Security: PASS
+- All 4 RLS policies correct (SELECT=member, INSERT/UPDATE=admin+manager, DELETE=admin)
+- UUID validation on all route parameters
+- Auth checks on every endpoint
+- Hex colour validation prevents arbitrary string injection
+
+#### Architecture: PASS
+- Bounding-box approximation avoids PostGIS dependency (serverless-compatible)
+- Ray-casting point-in-polygon for client-side spatial queries
+- MV with REFRESH CONCURRENTLY via `refresh_boundary_coverage()` SQL function
+- MapView boundary layers at correct z-order (below point layers)
+
+#### Fixes Applied
+1. Added `refresh_boundary_coverage()` SQL function (SECURITY DEFINER) for MV refresh strategy
+2. Added `HEX_COLOUR_RE` validation in POST and PATCH routes
+
+---
+
+### Phase 9 Data Agent Review
+
+**Verdict: PASS** (with WARN notes, all non-blocking)
+
+- Schema correct: geo_boundaries table, MV, function, indexes all aligned
+- RLS complete: 4 policies with correct role checks + platform_admin bypass
+- Type alignment confirmed: TypeScript interfaces match DB schema
+- Indexes cover all query patterns
+- MV refresh via function call in edge function before reading coverage
+
+---
+
+### Phase 9 Testing Agent Review
+
+**Verdict: PASS**
+
+- 64 new tests across 5 files
+- Estimated coverage: 80%+ (boundary routes fully covered with happy paths + error cases)
+- All tests deterministic, properly mocked
+- Regression: all 543 pre-Phase-9 tests still passing (607 total)
+
+---
+
+### Phase 9 Product Lead Review
+
+**Verdict: PASS**
+
+- Vision alignment: boundaries + coverage analysis core data intelligence feature
+- UX consistency: follows established page patterns (list, detail, form)
+- RBAC: view=member, create/edit=manager+admin, delete=admin — correct at API + page level
+- Design language: dark-grey/blue/white palette, coverage traffic-light colours
+- Feature completeness: 5.5/6 (dashboard boundary filter deferred)
+- Regression: Phase 8 advisory + connect features intact
+
+---
+
+### Phase 9 Continuity Review
+
+**Verdict: PASS**
+
+#### Documentation: UPDATED ✅
+- PROJECT_STATUS.md: Phase 9 complete with deliverables, build verification, all agent reviews
+- DECISIONS.md: DECISION-045 through DECISION-051
+
+#### Cumulative State
+- Phase 0–9 complete: 19 tables + 4 materialized views, 57+ RLS policies, 46 indexes, 33 API routes, 52 components, 26 pages, 2 Edge Functions, 607 tests
+- All tsc/lint/build clean
+
+#### Session Compression
+Phase 0–9 complete. Phase 9 adds geo_boundaries table, mv_boundary_activity_coverage MV, 8 geo utility functions, 4 boundary API routes, GeoFenceEditor/CoverageOverlay/BoundaryFormClient components, boundary pages (list/new/detail), map boundary layers (fill/outline/label), advisory engine boundary-scoped evaluation, hex colour validation. 607 tests all passing. Next: Phase 10 (Advanced Analytics & Export).

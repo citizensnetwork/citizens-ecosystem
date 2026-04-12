@@ -263,3 +263,45 @@
 - **Decision:** Add `"supabase/functions"` to tsconfig.json `exclude` array
 - **Rationale:** Edge Functions have their own Deno-compatible TypeScript context. Excluding from Next.js tsconfig prevents false compile errors while keeping Edge Function code in the same repo
 - **Status:** Accepted (2026-04-11)
+
+## DECISION-045: Bounding-Box Approximation Over PostGIS
+- **Context:** Phase 9 needs spatial queries (point-in-polygon, area calculation) for geo-boundaries. PostGIS would require extension activation and may not be available on all Supabase plans
+- **Decision:** Use bounding-box approximation for MV coverage aggregation and ray-casting for client-side point-in-polygon. No PostGIS dependency
+- **Rationale:** Stays fully serverless-compatible. Bounding-box is sufficient for coverage estimation (overestimates slightly). Ray-casting is O(n) per ring but boundaries typically have manageable vertex counts. Can upgrade to PostGIS later if precision needed
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-046: Ray-Casting for Client-Side Point-in-Polygon
+- **Context:** Need to determine if activity coordinates fall within boundary polygons on the client
+- **Decision:** Implement ray-casting algorithm in `src/lib/map/geo.ts` with bbox pre-filter optimisation
+- **Rationale:** Zero dependencies, deterministic, handles polygon holes, O(n) per ring. Standard computational geometry approach
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-047: Shoelace Formula with Spherical Correction for Area
+- **Context:** Need to estimate boundary area in km² without PostGIS ST_Area
+- **Decision:** Use Shoelace formula with cos(latitude) correction for approximate area
+- **Rationale:** Simple, no dependencies, adequate accuracy for service area estimation. Error < 1% for boundaries < 100km across at typical UK/EU latitudes
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-048: Materialized View for Boundary Coverage Aggregation
+- **Context:** Coverage stats (activity count, participant reach per boundary) require joining activities with boundaries using spatial logic
+- **Decision:** Create `mv_boundary_activity_coverage` MV using bounding-box intersection, refreshed via `refresh_boundary_coverage()` SECURITY DEFINER function with REFRESH CONCURRENTLY
+- **Rationale:** Pre-computed aggregation avoids expensive spatial join on every request. REFRESH CONCURRENTLY allows reads during refresh. SECURITY DEFINER function can be called from Edge Functions via `supabase.rpc()`
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-049: Coverage Level Thresholds
+- **Context:** Need to classify boundaries into coverage levels for colour-coding and advisories
+- **Decision:** gap=<5 activities, low=5-14, moderate=15-29, well-covered=30+ (within 90-day window)
+- **Rationale:** Thresholds based on roughly 1-2 activities per week as the "well-covered" baseline. Gap threshold of 5 triggers advisory generation. Can be made configurable per-org later
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-050: 5MB GeoJSON File Import Limit
+- **Context:** GeoFenceEditor allows file import of GeoJSON boundary definitions
+- **Decision:** Cap file size at 5MB for GeoJSON imports
+- **Rationale:** Prevents excessive client-side memory usage and processing time. Typical boundary GeoJSON files are well under 1MB. Complex boundaries (detailed coastlines) may need simplification
+- **Status:** Accepted (2026-04-12)
+
+## DECISION-051: Migration Numbering 010 for Boundaries
+- **Context:** ARCHITECTURE.md spec listed boundaries migration as 008, but actual sequence is 007 (org select fix), 008 (CC sync), 009 (advisory), making boundaries 010
+- **Decision:** Use `010_boundaries.sql` as actual migration filename
+- **Rationale:** Sequential numbering must match actual migration order. Same pattern as DECISION-032 (Phase 5 numbering deviation). Spec numbers are indicative, not prescriptive
+- **Status:** Accepted (2026-04-12)

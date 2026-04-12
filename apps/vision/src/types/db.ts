@@ -293,3 +293,35 @@ export interface AdvisoryOutput {
 export interface AdvisoryRuleWithTemplate extends AdvisoryRule {
   advisory_templates: Pick<AdvisoryTemplate, "type" | "title_template" | "body_template" | "severity">;
 }
+
+// ── Phase 9: Geo-Boundaries ────────────────────────────────
+
+export type CoverageLevel = "gap" | "low" | "moderate" | "well-covered";
+
+export interface GeoBoundary {
+  id: string;
+  org_id: string;
+  name: string;
+  description: string | null;
+  boundary_geojson: GeoJSON.Polygon | GeoJSON.MultiPolygon;
+  area_km2: number | null;
+  colour: string;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BoundaryCoverage {
+  boundary_id: string;
+  org_id: string;
+  boundary_name: string;
+  activity_count: number;
+  participant_reach: number;
+  department_count: number;
+  coverage_level: CoverageLevel;
+  min_lng: number;
+  max_lng: number;
+  min_lat: number;
+  max_lat: number;
+}

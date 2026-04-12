@@ -19,6 +19,7 @@ interface MapPageClientProps {
 
 export function MapPageClient({ orgId, orgSlug, departments, apiQuery }: MapPageClientProps) {
   const [activities, setActivities] = useState<MapActivity[]>([]);
+  const [boundaryGeoJSON, setBoundaryGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +58,29 @@ export function MapPageClient({ orgId, orgSlug, departments, apiQuery }: MapPage
     return () => {
       cancelled = true;
     };
+  }, [apiQuery]);
+
+  // Fetch boundary GeoJSON
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(apiQuery);
+    const orgIdParam = params.get("org_id");
+    if (!orgIdParam) return;
+
+    async function fetchBoundaries() {
+      try {
+        const res = await fetch(`/api/map/boundaries?org_id=${orgIdParam}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setBoundaryGeoJSON(data);
+        }
+      } catch {
+        // Boundaries are non-critical — silently fail
+      }
+    }
+
+    fetchBoundaries();
+    return () => { cancelled = true; };
   }, [apiQuery]);
 
   const handleSearchSelect = useCallback((_lat: number, lng: number) => {
@@ -113,7 +137,7 @@ export function MapPageClient({ orgId, orgSlug, departments, apiQuery }: MapPage
 
       {/* Map */}
       <div className="relative flex-1">
-        <MapView activities={activities} orgSlug={orgSlug} />
+        <MapView activities={activities} orgSlug={orgSlug} boundaryGeoJSON={boundaryGeoJSON} />
         <MapDetailPanel orgSlug={orgSlug} />
       </div>
     </div>

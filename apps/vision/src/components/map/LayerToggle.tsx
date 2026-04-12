@@ -6,6 +6,7 @@ const LAYERS: { id: MapLayer; label: string; icon: string; description: string }
   { id: "markers", label: "Markers", icon: "●", description: "Individual activity markers" },
   { id: "clusters", label: "Clusters", icon: "◉", description: "Grouped activity clusters" },
   { id: "heatmap", label: "Heatmap", icon: "▓", description: "Activity density heatmap" },
+  { id: "boundaries", label: "Boundaries", icon: "◻", description: "Service area boundaries with coverage" },
 ];
 
 export function LayerToggle() {

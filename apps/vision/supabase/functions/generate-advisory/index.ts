@@ -104,9 +104,13 @@ Deno.serve(async (req) => {
 
     const metrics: Record<string, number> = snapshot ?? {};
 
+    // Standard metric-based rules
     for (const rule of rules as Rule[]) {
       const template = rule.advisory_templates;
       if (!template) continue;
+
+      // Skip boundary-scoped rules — handled separately below
+      if (rule.metric_slug === "boundary_activity_count") continue;
 
       const metricValue = metrics[rule.metric_slug];
       if (metricValue === undefined) continue;
@@ -153,6 +157,73 @@ Deno.serve(async (req) => {
         });
 
       if (!insertErr) totalGenerated++;
+    }
+
+    // --- Boundary-scoped rules (coverage gap advisories) ---
+    const boundaryRules = (rules as Rule[]).filter(
+      (r) => r.metric_slug === "boundary_activity_count" && r.advisory_templates
+    );
+
+    if (boundaryRules.length > 0) {
+      // Refresh the MV before reading to ensure fresh coverage data
+      await supabase.rpc("refresh_boundary_coverage");
+
+      const { data: coverageRows } = await supabase
+        .from("mv_boundary_activity_coverage")
+        .select("boundary_id, boundary_name, activity_count, coverage_level")
+        .eq("org_id", org.id);
+
+      for (const row of coverageRows ?? []) {
+        for (const rule of boundaryRules) {
+          const template = rule.advisory_templates;
+          if (!template) continue;
+
+          if (!evaluateRule(rule.operator, row.activity_count, rule.threshold))
+            continue;
+
+          // Cooldown per boundary — check using data->>boundary_id
+          const cooldownCutoff = new Date(
+            Date.now() - rule.cooldown_hours * 60 * 60 * 1000
+          ).toISOString();
+
+          const { count: recentCount } = await supabase
+            .from("advisory_outputs")
+            .select("id", { count: "exact", head: true })
+            .eq("org_id", org.id)
+            .eq("rule_id", rule.id)
+            .contains("data", { boundary_id: row.boundary_id })
+            .gte("created_at", cooldownCutoff);
+
+          if ((recentCount ?? 0) > 0) continue;
+
+          const data: Record<string, unknown> = {
+            boundary_id: row.boundary_id,
+            boundary_name: row.boundary_name,
+            count: row.activity_count,
+            coverage_level: row.coverage_level,
+            threshold: rule.threshold,
+            org_id: org.id,
+          };
+
+          const title = renderTemplate(template.title_template, data);
+          const body = renderTemplate(template.body_template, data);
+
+          const { error: insertErr } = await supabase
+            .from("advisory_outputs")
+            .insert({
+              org_id: org.id,
+              template_id: rule.template_id,
+              rule_id: rule.id,
+              title,
+              body,
+              severity: template.severity,
+              data,
+              dismissed: false,
+            });
+
+          if (!insertErr) totalGenerated++;
+        }
+      }
     }
   }
 

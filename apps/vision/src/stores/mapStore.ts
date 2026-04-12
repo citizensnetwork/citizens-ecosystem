@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { MapActivity } from "@/lib/map/utils";
 
-export type MapLayer = "markers" | "clusters" | "heatmap";
+export type MapLayer = "markers" | "clusters" | "heatmap" | "boundaries";
 
 interface MapState {
   /** Currently visible layers */

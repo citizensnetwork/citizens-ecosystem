@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "Projects", href: "/projects", icon: "▪" },
   { label: "Goals", href: "/goals", icon: "◇" },
   { label: "Advisory", href: "/advisory", icon: "⚑" },
+  { label: "Boundaries", href: "/boundaries", icon: "◻" },
   { label: "Connect", href: "/connect", icon: "⇄" },
   { label: "Settings", href: "/settings", icon: "⚙" },
 ];
