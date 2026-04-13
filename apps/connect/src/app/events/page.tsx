@@ -81,7 +81,7 @@ export default async function EventsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let isVendor = false;
+  let canCreateEvents = false;
   let showOnboarding = false;
   if (user) {
     const { data: profile } = await supabase
@@ -89,7 +89,8 @@ export default async function EventsPage() {
       .select("role, onboarding_completed")
       .eq("id", user.id)
       .single();
-    isVendor = profile?.role === "vendor" || profile?.role === "admin";
+    // All authenticated users can create events (open creation)
+    canCreateEvents = !!profile;
     showOnboarding = profile?.onboarding_completed === false;
   }
 
@@ -99,7 +100,7 @@ export default async function EventsPage() {
       <EventsView
         events={events ?? []}
         places={placesWithStats}
-        isVendor={isVendor}
+        isVendor={canCreateEvents}
       />
     </>
   );

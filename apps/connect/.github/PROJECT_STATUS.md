@@ -44,6 +44,7 @@
 | 16B | Event Rating Rework | **Complete** | InlineEventRating component under event title (hover/click 5-star, avg display) |
 | 12C-auth | Phone Auth + 2FA | **Complete** | PhoneAuthForm (OTP login), TwoFactorSetup (TOTP), Login email/phone toggle |
 | 17 | Indemnity Forms | **Complete** | indemnity_templates + indemnity_signatures tables, IndemnityForm gate before event creation |
+| 25 | Expanded Roles & Data Model | **Complete** | 7-role system (individual/ministry/org/business), category_id FK, place-images bucket, RLS hardening |
 
 ---
 
@@ -121,6 +122,42 @@
 - [x] `npx tsc --noEmit` — 0 errors (3 type assertion fixes applied)
 - [x] `next build` — all routes compiled, new routes `/events/manage`, `/places/manage` included
 - [x] `npx vitest run` — **335 tests, 37 files, 0 failures** ✅
+
+---
+
+## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
+
+### Expanded Roles
+- [x] Profile roles expanded from 3 (vendor/client/admin) → 7 (individual/ministry/organization/business/vendor/client/admin)
+- [x] All existing users migrated: vendor → individual, client → individual
+- [x] Default role changed to 'individual'
+- [x] Auth trigger validates role whitelist (prevents admin self-assignment)
+- [x] `protect_role_column()` trigger prevents role self-escalation via profile UPDATE
+- [x] `UserRole` TypeScript type updated with legacy fallbacks
+- [x] `ORGANISER_ROLES` + `ROLE_LABELS` constants in `types/db.ts`
+- [x] SignupForm updated: 4 role radio options (Individual/Ministry/Organization/Business)
+- [x] `isVendor` checks updated across app: events open to all, places restricted to organiser roles
+- [x] Profile pages show role-specific labels via `ROLE_LABELS`
+
+### Place Images Bucket
+- [x] `place-images` public storage bucket created
+- [x] RLS: INSERT (own folder), SELECT (public), UPDATE (own), DELETE (own)
+
+### Category FK
+- [x] `category_id uuid REFERENCES categories(id)` column added to events
+- [x] Backfilled from text `category` column
+- [x] `sync_event_category_id` trigger auto-fills `category_id` on INSERT/UPDATE
+- [x] 15 new categories upserted into categories table
+
+### RLS Hardening
+- [x] `is_organiser()` DB function — checks ministry/organization/business/admin
+- [x] Places INSERT restricted to organiser roles via RLS policy
+- [x] Role escalation prevented via `protect_role_column()` trigger
+
+### Tests
+- [x] SignupForm test updated for 4 new roles
+- [x] Fixtures updated: default role → individual, Event type has category_id
+- [x] All 335 tests passing, build clean
 
 ---
 

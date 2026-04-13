@@ -2,9 +2,9 @@
 // Triggered by DB webhook on events UPDATE WHERE status changed to 'cancelled'
 // Notifies all users who RSVPed to the event
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
+import { createServiceClient } from "../_shared/client.ts";
 
 serve(async (req) => {
   try {
@@ -15,9 +15,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true }), { status: 200 });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createServiceClient();
 
     // Get all RSVPed users
     const { data: rsvps } = await supabase

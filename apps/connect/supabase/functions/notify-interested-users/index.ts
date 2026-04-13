@@ -2,11 +2,11 @@
 // Triggered by DB webhook on events INSERT WHERE status = 'published'
 // Matches event category against user interests + location radius
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { haversineKm } from "../_shared/geo.ts";
 import { CATEGORY_INTEREST_MAP } from "../_shared/category-interests.ts";
+import { createServiceClient, DEFAULT_NOTIFICATION_RADIUS_KM } from "../_shared/client.ts";
 
 serve(async (req) => {
   try {
@@ -17,9 +17,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true }), { status: 200 });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createServiceClient();
 
     const eventId = record.id;
     const eventLat = record.latitude;
@@ -41,7 +39,7 @@ serve(async (req) => {
 
     if (interestErr) {
       console.error("Failed to fetch interests:", interestErr);
-      return new Response(JSON.stringify({ notified: 0, reason: "interest_lookup_failed" }), { status: 200 });
+      return new Response(JSON.stringify({ error: "interest_lookup_failed" }), { status: 500 });
     }
 
     const interestIds = (interests ?? []).map((i) => i.id);
@@ -50,44 +48,56 @@ serve(async (req) => {
       return new Response(JSON.stringify({ notified: 0, reason: "no_matching_interests" }), { status: 200 });
     }
 
-    // 3. Find users who share at least one matched interest
-    const { data: matches } = await supabase
-      .from("user_interests")
-      .select("user_id")
-      .in("interest_id", interestIds);
+    // 3. Find users who share at least one matched interest (batched for scale)
+    const matchedUserIdSet = new Set<string>();
+    for (let i = 0; i < interestIds.length; i += 500) {
+      const batch = interestIds.slice(i, i + 500);
+      const { data: matches } = await supabase
+        .from("user_interests")
+        .select("user_id")
+        .in("interest_id", batch);
+      for (const m of matches ?? []) matchedUserIdSet.add(m.user_id);
+    }
 
-    let matchedUserIds = [...new Set((matches ?? []).map((m) => m.user_id))];
-
-    if (matchedUserIds.length === 0) {
+    if (matchedUserIdSet.size === 0) {
       return new Response(JSON.stringify({ notified: 0, reason: "no_interest_matches" }), { status: 200 });
     }
 
-    // 4. Fetch profiles to filter by digest preference and location
-    //    - Only notify 'instant' users (daily users get batched by send-daily-digest)
-    //    - Include users without home coordinates (don't silently drop them)
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, home_latitude, home_longitude, notification_radius_km, notification_digest")
-      .in("id", matchedUserIds)
-      .eq("notification_digest", "instant");
+    // 4. Fetch profiles — only 'instant' users (daily users get batched by send-daily-digest)
+    //    Batched in chunks of 500 to avoid PostgREST URL limits
+    const matchedUserIds = [...matchedUserIdSet];
+    const profiles: Array<{
+      id: string;
+      home_latitude: number | null;
+      home_longitude: number | null;
+      notification_radius_km: number | null;
+    }> = [];
 
-    if (!profiles || profiles.length === 0) {
+    for (let i = 0; i < matchedUserIds.length; i += 500) {
+      const batch = matchedUserIds.slice(i, i + 500);
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, home_latitude, home_longitude, notification_radius_km")
+        .in("id", batch)
+        .eq("notification_digest", "instant");
+      if (data) profiles.push(...data);
+    }
+
+    if (profiles.length === 0) {
       return new Response(JSON.stringify({ notified: 0, reason: "all_users_opted_out" }), { status: 200 });
     }
 
-    // Filter by location radius only for users who have set a home location
+    // 5. Filter by location radius — users without home location always pass
     let filteredUserIds: string[];
     if (eventLat != null && eventLng != null) {
       filteredUserIds = profiles
         .filter((p) => {
-          // Users without home location always pass (don't drop them)
           if (p.home_latitude == null || p.home_longitude == null) return true;
           const dist = haversineKm(p.home_latitude, p.home_longitude, eventLat, eventLng);
-          return dist <= (p.notification_radius_km ?? 50);
+          return dist <= (p.notification_radius_km ?? DEFAULT_NOTIFICATION_RADIUS_KM);
         })
         .map((p) => p.id);
     } else {
-      // Event has no coordinates — notify all matched users
       filteredUserIds = profiles.map((p) => p.id);
     }
 

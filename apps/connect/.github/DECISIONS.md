@@ -371,3 +371,23 @@
 **Decision:** Testing follows: Researcher → Planner → Generator → Builder → Tester → Fixer → Linter. Framework saved globally for reuse.
 **Why:** Structured approach ensures comprehensive coverage with proper planning. Research phase identifies gaps, planner prioritizes by ROI, generator implements in phases.
 **Date:** 2026-04-09.
+
+### Expanded role system (migration 025)
+**Decision:** Replaced 3-role system (vendor/client/admin) with 7 roles (individual/ministry/organization/business + legacy vendor/client + admin). All existing users migrated to `individual`. New signups choose from 4 roles. Legacy roles kept in DB constraint for backward compat.
+**Why:** Platform identity serves organizers and non-organizers equally. Expanded roles give ministry, organization, and business entities distinct identity while preserving the "all citizens can create events" principle. Place creation restricted to organiser roles (ministry/organization/business/admin).
+**Date:** 2026-06-06.
+
+### Role self-escalation prevention
+**Decision:** Two DB triggers protect roles: (1) `handle_new_user()` whitelists self-assignable roles (no admin); (2) `protect_role_column()` silently reverts non-admin role changes on profile UPDATE.
+**Why:** SE Security review found users could self-assign admin via signup metadata or profile UPDATE. Both vectors now blocked at the DB level.
+**Date:** 2026-06-06.
+
+### category_id FK with text column sync trigger
+**Decision:** Added `category_id uuid REFERENCES categories(id)` to events alongside existing text `category` column. A `sync_event_category_id` trigger auto-fills `category_id` from text column on INSERT/UPDATE.
+**Why:** Enables proper FK joins for category queries while maintaining backward compatibility with existing code that uses the text category column. Text column to be deprecated in a future migration.
+**Date:** 2026-06-06.
+
+### is_organiser() DB function for RLS
+**Decision:** Created `is_organiser()` function that checks if current user has role IN ('ministry', 'organization', 'business', 'admin'). Used in places INSERT RLS policy.
+**Why:** Centralizes the organiser role check in the DB layer, similar to existing `is_admin()`. Prevents bypass via direct Supabase client calls.
+**Date:** 2026-06-06.

@@ -42,6 +42,7 @@ export type Event = {
   marker_icon: string | null;
   marker_color: string | null;
   marker_image_url: string | null;
+  category_id: string | null;
   created_by: string;
   created_at: string;
 };
@@ -73,7 +74,28 @@ export type ConsiderJoin = {
   profiles?: { full_name: string; avatar_url: string | null };
 };
 
-export type UserRole = "vendor" | "client" | "admin";
+export type UserRole =
+  | "individual"
+  | "ministry"
+  | "organization"
+  | "business"
+  | "vendor"   // legacy — migrated to individual
+  | "client"   // legacy — migrated to individual
+  | "admin";
+
+/** Roles that can create & manage places (\"Book at Place\" in EventForm). */
+export const ORGANISER_ROLES: UserRole[] = ["ministry", "organization", "business", "admin"];
+
+/** Human-readable label for each role. */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  individual: "Community Citizen",
+  ministry: "Ministry",
+  organization: "Organization",
+  business: "Business",
+  vendor: "Community Citizen",  // legacy fallback
+  client: "Community Citizen",  // legacy fallback
+  admin: "Admin",
+};
 
 export type Profile = {
   id: string;

@@ -2,15 +2,13 @@
 // Triggered by daily cron (8 AM)
 // Sends reminders to users RSVPed to events within the next 24 hours
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
+import { createServiceClient } from "../_shared/client.ts";
 
 serve(async () => {
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createServiceClient();
 
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);

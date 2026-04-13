@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import EventFormWithIndemnity from "@/components/events/EventFormWithIndemnity";
-import type { Category } from "@/types/db";
+import { ORGANISER_ROLES, type Category, type UserRole } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +21,9 @@ export default async function NewEventPage() {
     .eq("id", user.id)
     .single();
 
-  const isVendor =
-    profile?.role === "vendor" || profile?.role === "admin";
+  const isVendor = ORGANISER_ROLES.includes(profile?.role as UserRole);
 
-  // Fetch place categories for vendor place-booking section
+  // Fetch place categories for organiser place-booking section
   let placeCategories: Category[] = [];
   if (isVendor) {
     const { data } = await supabase

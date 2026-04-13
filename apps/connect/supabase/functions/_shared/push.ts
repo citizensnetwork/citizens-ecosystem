@@ -2,7 +2,7 @@
 // Shared push delivery utility. Used by all notification trigger functions.
 // Sends push via FCM HTTP v1 API (OAuth2) and inserts in-app notification rows.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface PushPayload {
   user_ids: string[];

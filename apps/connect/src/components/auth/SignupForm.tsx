@@ -12,7 +12,7 @@ export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<UserRole>("client");
+  const [role, setRole] = useState<UserRole>("individual");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -150,20 +150,20 @@ export default function SignupForm() {
 
       <div className="space-y-2">
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75">
-          I want to
+          I am a
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
             <input
               type="radio"
               name="role"
-              value="client"
-              checked={role === "client"}
-              onChange={() => setRole("client")}
+              value="individual"
+              checked={role === "individual"}
+              onChange={() => setRole("individual")}
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Community Citizen</span>
+              <span className="font-medium text-black">Individual</span>
               <span className="block text-xs text-(--foreground-soft)">
                 Discover events, RSVP, review &amp; connect
               </span>
@@ -173,15 +173,47 @@ export default function SignupForm() {
             <input
               type="radio"
               name="role"
-              value="vendor"
-              checked={role === "vendor"}
-              onChange={() => setRole("vendor")}
+              value="ministry"
+              checked={role === "ministry"}
+              onChange={() => setRole("ministry")}
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Organiser</span>
+              <span className="font-medium text-black">Ministry</span>
               <span className="block text-xs text-(--foreground-soft)">
-                All of the above + create &amp; manage events
+                Church or ministry — host events &amp; share content
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
+            <input
+              type="radio"
+              name="role"
+              value="organization"
+              checked={role === "organization"}
+              onChange={() => setRole("organization")}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-black">Organization</span>
+              <span className="block text-xs text-(--foreground-soft)">
+                Community org — create &amp; manage events
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
+            <input
+              type="radio"
+              name="role"
+              value="business"
+              checked={role === "business"}
+              onChange={() => setRole("business")}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-black">Business</span>
+              <span className="block text-xs text-(--foreground-soft)">
+                Promote events &amp; list your place
               </span>
             </span>
           </label>

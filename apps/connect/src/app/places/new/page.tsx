@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import PlaceForm from "@/components/places/PlaceForm";
-import type { Category } from "@/types/db";
+import { ORGANISER_ROLES, type Category, type UserRole } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +15,14 @@ export default async function NewPlacePage() {
     redirect("/login");
   }
 
-  // Only vendors and admins can add places directly
+  // Only organiser roles and admins can add places directly
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "vendor" && profile?.role !== "admin") {
+  if (!ORGANISER_ROLES.includes(profile?.role as UserRole)) {
     redirect("/events");
   }
 

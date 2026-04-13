@@ -3,17 +3,15 @@
 // Sends batched notification summary to users with digest = 'daily'
 // Matches events by category → interest mapping + location radius
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { haversineKm } from "../_shared/geo.ts";
 import { CATEGORY_INTEREST_MAP } from "../_shared/category-interests.ts";
+import { createServiceClient, DEFAULT_NOTIFICATION_RADIUS_KM } from "../_shared/client.ts";
 
 serve(async () => {
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createServiceClient();
 
     // Get users with daily digest preference
     const { data: dailyUsers } = await supabase
@@ -37,16 +35,21 @@ serve(async () => {
       return new Response(JSON.stringify({ digests: 0, reason: "no_new_events" }), { status: 200 });
     }
 
-    // Batch-fetch all user interests for daily users
+    // Batch-fetch all user interests for daily users (chunked for scale)
     const dailyUserIds = dailyUsers.map((u) => u.id);
-    const { data: allUserInterests } = await supabase
-      .from("user_interests")
-      .select("user_id, interest_id")
-      .in("user_id", dailyUserIds);
+    const allUserInterests: Array<{ user_id: string; interest_id: string }> = [];
+    for (let i = 0; i < dailyUserIds.length; i += 500) {
+      const batch = dailyUserIds.slice(i, i + 500);
+      const { data } = await supabase
+        .from("user_interests")
+        .select("user_id, interest_id")
+        .in("user_id", batch);
+      if (data) allUserInterests.push(...data);
+    }
 
     // Group interest IDs by user
     const interestIdsByUser = new Map<string, Set<string>>();
-    for (const ui of allUserInterests ?? []) {
+    for (const ui of allUserInterests) {
       const set = interestIdsByUser.get(ui.user_id) ?? new Set();
       set.add(ui.interest_id);
       interestIdsByUser.set(ui.user_id, set);
@@ -66,7 +69,7 @@ serve(async () => {
 
     if (slugErr) {
       console.error("Failed to resolve interest slugs:", slugErr);
-      return new Response(JSON.stringify({ digests: 0, reason: "slug_lookup_failed" }), { status: 200 });
+      return new Response(JSON.stringify({ error: "slug_lookup_failed" }), { status: 500 });
     }
 
     const slugToId = new Map<string, string>();
@@ -85,7 +88,14 @@ serve(async () => {
       categoryInterestIds.set(cat, ids);
     }
 
-    let digestsSent = 0;
+    // Build digest payloads per user, then batch-send
+    const digestPayloads: Array<{
+      userId: string;
+      title: string;
+      body: string;
+      image_url?: string;
+      event_id?: string;
+    }> = [];
 
     for (const user of dailyUsers) {
       const userInterestIds = interestIdsByUser.get(user.id);
@@ -109,23 +119,39 @@ serve(async () => {
         matchingEvents = matchingEvents.filter((e) => {
           if (e.latitude == null || e.longitude == null) return true;
           const dist = haversineKm(user.home_latitude!, user.home_longitude!, e.latitude, e.longitude);
-          return dist <= (user.notification_radius_km ?? 50);
+          return dist <= (user.notification_radius_km ?? DEFAULT_NOTIFICATION_RADIUS_KM);
         });
       }
 
       if (matchingEvents.length === 0) continue;
 
-      await sendNotifications(supabase, {
-        user_ids: [user.id],
+      digestPayloads.push({
+        userId: user.id,
         title: `${matchingEvents.length} new event${matchingEvents.length > 1 ? "s" : ""} near you`,
         body: matchingEvents.slice(0, 3).map((e) => e.title).join(", ") +
           (matchingEvents.length > 3 ? ` and ${matchingEvents.length - 3} more` : ""),
-        type: "new_event_match",
         image_url: matchingEvents[0]?.image_url,
-        data: { event_id: matchingEvents[0]?.id },
+        event_id: matchingEvents[0]?.id,
       });
+    }
 
-      digestsSent++;
+    // Send all digests in parallel (batches of 10 to avoid overwhelming)
+    let digestsSent = 0;
+    for (let i = 0; i < digestPayloads.length; i += 10) {
+      const batch = digestPayloads.slice(i, i + 10);
+      await Promise.allSettled(
+        batch.map((d) =>
+          sendNotifications(supabase, {
+            user_ids: [d.userId],
+            title: d.title,
+            body: d.body,
+            type: "new_event_match",
+            image_url: d.image_url,
+            data: d.event_id ? { event_id: d.event_id } : {},
+          })
+        )
+      );
+      digestsSent += batch.length;
     }
 
     return new Response(JSON.stringify({ digests: digestsSent }), { status: 200 });

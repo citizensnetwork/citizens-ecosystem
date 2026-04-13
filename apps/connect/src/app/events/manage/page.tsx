@@ -18,13 +18,8 @@ export default async function ManageEventsPage() {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isVendor = profile?.role === "vendor" || profile?.role === "admin";
+  // All authenticated users can manage their own events
+  const isVendor = true;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

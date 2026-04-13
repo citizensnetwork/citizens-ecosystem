@@ -30,7 +30,7 @@ src/
 │   │   ├── page.tsx              # Email/password login
 │   │   ├── forgot-password/page.tsx  # Request password reset email
 │   │   └── reset-password/page.tsx   # Set new password (after email link)
-│   ├── signup/page.tsx           # Registration with role selection (vendor/client)
+│   ├── signup/page.tsx           # Registration with role selection (individual/ministry/org/business)
 │   ├── profile/page.tsx          # User profile, RSVPs, created events
 │   ├── globals.css               # Tailwind v4 config + CSS variables + FullCalendar overrides
 │   ├── layout.tsx                # Root layout with fonts, Navbar

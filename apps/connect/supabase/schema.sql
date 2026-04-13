@@ -24,7 +24,7 @@ create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text not null,
   full_name text not null default '',
-  role text not null check (role in ('vendor', 'client', 'admin')) default 'client',
+  role text not null check (role in ('individual', 'ministry', 'organization', 'business', 'vendor', 'client', 'admin')) default 'individual',
   avatar_url text,
   onboarding_completed boolean not null default false,
   notification_email text,
@@ -65,9 +65,11 @@ create table if not exists public.events (
   end_time timestamptz,
   location text not null default '',
   category text check (category in (
-    'church-service', 'youth', 'community-outreach', 'worship',
-    'bible-study', 'prayer', 'social', 'other'
-  )) default 'other',
+    'entertainment', 'sport-fun', 'social-fun', 'community-upliftment',
+    'education', 'church', 'missional', 'marriage-and-couples',
+    'mens', 'womens', 'kids', 'recovery', 'equip', 'weekend', 'members-only'
+  )) default 'church',
+  category_id uuid references public.categories(id),
   image_url text,
   website_url text,
   contact_email text,
@@ -410,13 +412,20 @@ end $$;
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  signup_role text;
 begin
+  signup_role := coalesce(new.raw_user_meta_data->>'role', 'individual');
+  -- Only allow self-assignable roles; admin requires manual DB update
+  if signup_role not in ('individual', 'ministry', 'organization', 'business') then
+    signup_role := 'individual';
+  end if;
   insert into public.profiles (id, email, full_name, role)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', ''),
-    coalesce(new.raw_user_meta_data->>'role', 'client')
+    signup_role
   );
   return new;
 end;
@@ -426,6 +435,53 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Prevent role self-escalation via profile UPDATE
+create or replace function public.protect_role_column()
+returns trigger as $$
+begin
+  if new.role is distinct from old.role then
+    if not exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    ) then
+      new.role := old.role;
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists protect_role_trigger on public.profiles;
+create trigger protect_role_trigger
+  before update on public.profiles
+  for each row execute function public.protect_role_column();
+
+-- Helper: check if current user is an organiser role
+create or replace function public.is_organiser()
+returns boolean as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and role in ('ministry', 'organization', 'business', 'admin')
+  );
+$$ language sql security definer stable;
+
+-- Auto-sync category_id from text category column
+create or replace function public.sync_event_category_id()
+returns trigger as $$
+begin
+  if new.category is not null and new.category_id is null then
+    select id into new.category_id from public.categories where slug = new.category;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists sync_event_category_id_trigger on public.events;
+create trigger sync_event_category_id_trigger
+  before insert or update of category on public.events
+  for each row execute function public.sync_event_category_id();
 
 -- Auto-flag places with repeated "no longer exists" signals
 create or replace function public.recompute_place_verification(p_place_id uuid)

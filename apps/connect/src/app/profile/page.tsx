@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import type { Event, Profile, InterestGroupWithItems } from "@/types/db";
+import type { Event, Profile, InterestGroupWithItems, UserRole } from "@/types/db";
+import { ORGANISER_ROLES, ROLE_LABELS } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
@@ -65,10 +66,10 @@ export default async function ProfilePage() {
     .map((r: { event_id: string; events: unknown }) => r.events as Event)
     .filter(Boolean);
 
-  // If vendor, get events they created
-  const isVendor = profile?.role === "vendor";
+  // Get events created by this user (all users can create events now)
+  const isVendor = ORGANISER_ROLES.includes(profile?.role as UserRole);
   let createdEvents: Event[] = [];
-  if (isVendor) {
+  {
     const { data } = await supabase
       .from("events")
       .select("*")
@@ -84,7 +85,7 @@ export default async function ProfilePage() {
   const typedProfile: Profile = {
     id: profile?.id ?? user.id,
     email: profile?.email ?? user.email ?? "",
-    role: profile?.role ?? "client",
+    role: profile?.role ?? "individual",
     full_name: profile?.full_name ?? "",
     avatar_url: profile?.avatar_url ?? null,
     onboarding_completed: profile?.onboarding_completed ?? false,
@@ -135,7 +136,7 @@ export default async function ProfilePage() {
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {isVendor ? "Organiser" : "Community Citizen"}
+            {ROLE_LABELS[(profile?.role as UserRole) ?? "individual"] ?? "Community Citizen"}
           </span>
           <div className="mt-2 flex gap-4 text-sm text-black/70">
             <span>
@@ -248,8 +249,8 @@ export default async function ProfilePage() {
         )}
       </section>
 
-      {/* Created events (vendors only) */}
-      {isVendor && (
+      {/* Created events */}
+      {createdEvents.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">My Events</h2>

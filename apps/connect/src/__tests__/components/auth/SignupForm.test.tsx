@@ -38,18 +38,22 @@ describe("SignupForm", () => {
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("renders role selection with Community Citizen and Organiser", () => {
+  it("renders role selection with four role options", () => {
     render(<SignupForm />);
-    expect(screen.getByDisplayValue("client")).toBeInTheDocument();
-    expect(screen.getByText("Community Citizen")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("vendor")).toBeInTheDocument();
-    expect(screen.getByText("Organiser")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("individual")).toBeInTheDocument();
+    expect(screen.getByText("Individual")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("ministry")).toBeInTheDocument();
+    expect(screen.getByText("Ministry")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("organization")).toBeInTheDocument();
+    expect(screen.getByText("Organization")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("business")).toBeInTheDocument();
+    expect(screen.getByText("Business")).toBeInTheDocument();
   });
 
-  it("defaults to client role", () => {
+  it("defaults to individual role", () => {
     render(<SignupForm />);
-    const clientRadio = screen.getByDisplayValue("client") as HTMLInputElement;
-    expect(clientRadio.checked).toBe(true);
+    const individualRadio = screen.getByDisplayValue("individual") as HTMLInputElement;
+    expect(individualRadio.checked).toBe(true);
   });
 
   it("renders Sign Up button", () => {
@@ -83,13 +87,13 @@ describe("SignupForm", () => {
         email: "jane@test.com",
         password: "password123",
         options: {
-          data: { full_name: "Jane Doe", role: "client" },
+          data: { full_name: "Jane Doe", role: "individual" },
         },
       });
     });
   });
 
-  it("submits with vendor role when selected", async () => {
+  it("submits with ministry role when selected", async () => {
     mockSignUp.mockResolvedValue({ data: { session: null }, error: null });
 
     render(<SignupForm />);
@@ -102,13 +106,13 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "secure123" },
     });
-    fireEvent.click(screen.getByDisplayValue("vendor"));
+    fireEvent.click(screen.getByDisplayValue("ministry"));
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
       expect(mockSignUp).toHaveBeenCalledWith(
         expect.objectContaining({
-          options: { data: { full_name: "Pastor Bob", role: "vendor" } },
+          options: { data: { full_name: "Pastor Bob", role: "ministry" } },
         })
       );
     });

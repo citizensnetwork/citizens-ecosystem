@@ -76,7 +76,7 @@ Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categor
 
 Schema in `supabase/schema.sql` (idempotent — safe to re-run). Migrations in `supabase/migrations/`.
 
-Tables: `profiles` (extends auth.users, roles: vendor/client/admin), `events` (with lat/lng, category, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
+Tables: `profiles` (extends auth.users, roles: individual/ministry/organization/business/admin), `events` (with lat/lng, category, category_id FK, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
 
 Trigger `on_auth_user_created` auto-creates a profile row from auth metadata on signup.
 
@@ -108,7 +108,7 @@ Platform has two full-screen primary views:
 2. **Calendar view** — FullCalendar with day/week/month views, category-colored events, detail panel integration, vendor quick-create on date click
 **Platform identity:** Serves organizers and non-organizers equally. All people and entities have equal dignity. Open to non-Christians discovering the Kingdom. See `.github/VISION.md` for full vision.
 
-Roles expanding to: individual, ministry, organization, business.
+Roles expanding to: individual, ministry, organization, business, admin. Organiser roles (ministry/organization/business/admin) can create places.
 
 ## Project Customization Files
 

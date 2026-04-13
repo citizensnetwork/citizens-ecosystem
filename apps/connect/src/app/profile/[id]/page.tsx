@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
-import type { Event, Profile } from "@/types/db";
+import type { Event, Profile, UserRole } from "@/types/db";
+import { ORGANISER_ROLES, ROLE_LABELS } from "@/types/db";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -91,15 +92,13 @@ export default async function PublicProfilePage({
           .eq("followee_id", user.id)
           .single()
       : Promise.resolve({ data: null }),
-    profile.role === "vendor"
-      ? supabase
-          .from("events")
-          .select("*")
-          .eq("created_by", id)
-          .eq("status", "published")
-          .order("date", { ascending: true })
-          .returns<Event[]>()
-      : Promise.resolve({ data: [] as Event[] }),
+    supabase
+      .from("events")
+      .select("*")
+      .eq("created_by", id)
+      .eq("status", "published")
+      .order("date", { ascending: true })
+      .returns<Event[]>(),
     user
       ? supabase
           .from("follows")
@@ -126,7 +125,7 @@ export default async function PublicProfilePage({
     ).length;
   }
 
-  const isOrganiser = profile.role === "vendor" || profile.role === "admin";
+  const isOrganiser = ORGANISER_ROLES.includes(profile.role as UserRole);
   const displayName = profile.full_name || profile.email;
 
   return (
@@ -145,7 +144,7 @@ export default async function PublicProfilePage({
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {isOrganiser ? "Organiser" : "Community Citizen"}
+            {ROLE_LABELS[(profile.role as UserRole) ?? "individual"] ?? "Community Citizen"}
           </span>
 
           {/* Social counts */}
@@ -191,11 +190,11 @@ export default async function PublicProfilePage({
         )}
       </div>
 
-      {/* Events by this organiser */}
-      {isOrganiser && (
+      {/* Events created by this user */}
+      {(createdEvents ?? []).length > 0 && (
         <section className="mt-8">
           <h2 className="mb-3 text-lg font-semibold">
-            Events by {profile.full_name?.split(" ")[0] ?? "this organiser"}
+            Events by {profile.full_name?.split(" ")[0] ?? "this user"}
           </h2>
           {(createdEvents ?? []).length === 0 ? (
             <p className="text-sm text-gray-500">No published events yet.</p>
