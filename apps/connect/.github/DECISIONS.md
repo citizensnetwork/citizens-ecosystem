@@ -74,6 +74,12 @@
 **Decision:** Run `$env:PATH = "C:\Program Files\nodejs;" + $env:PATH` before any Node commands.
 **Why:** Windows PowerShell doesn't persist PATH additions between terminal sessions.
 
+### Repository-local Git identity lock (Citizens Connect)
+**Decision:** For this repository, enforce local commit identity as Name = Citizens Network and Email = citizensnetworkpbo@gmail.com, with `user.useConfigOnly=true`, plus local hooks that block commits/pushes if identity or origin URL drift.
+**Why:** Guarantees all edits, commits, and pushes are attributed to the Citizens Network owner account for this project, independent of global Git config.
+**Ops Note:** This enforcement is clone-local (`.git/config` + `.git/hooks`) and is not versioned by Git. Re-apply after cloning to a new machine/clone.
+**Date:** 2026-04-13.
+
 ### Pin Node runtime to 22.x
 **Decision:** Pin project runtime using `.nvmrc` (`22`) and `package.json` engines (`>=20 <23`).
 **Why:** Node 24 triggered unstable Next.js build behavior in this environment; Node 22 is the safer baseline for Next.js 15 here.
