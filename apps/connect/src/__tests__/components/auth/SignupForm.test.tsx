@@ -18,7 +18,11 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
-    auth: { signUp: mockSignUp },
+    auth: {
+      signUp: mockSignUp,
+      resend: vi.fn().mockResolvedValue({ error: null }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
   }),
 }));
 
@@ -133,7 +137,7 @@ describe("SignupForm", () => {
     });
   });
 
-  it("redirects to /login?confirmed=false when email confirmation required", async () => {
+  it("shows verification pending screen when email confirmation required", async () => {
     mockSignUp.mockResolvedValue({
       data: { session: null },
       error: null,
@@ -152,7 +156,8 @@ describe("SignupForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/login?confirmed=false");
+      expect(screen.getByText(/check your email/i)).toBeInTheDocument();
+      expect(screen.getByText("t@t.com")).toBeInTheDocument();
     });
   });
 

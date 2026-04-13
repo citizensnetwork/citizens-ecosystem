@@ -32,9 +32,9 @@ describe("EventCard", () => {
   });
 
   it("renders category badge when category exists", () => {
-    const event = makeEvent({ category: "worship" });
+    const event = makeEvent({ category: "entertainment", location: "City Hall" });
     render(<EventCard event={event} />);
-    expect(screen.getByText(/Worship/)).toBeInTheDocument();
+    expect(screen.getByText("Entertainment")).toBeInTheDocument();
   });
 
   it("links to the event detail page", () => {

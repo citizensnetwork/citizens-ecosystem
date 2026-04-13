@@ -31,16 +31,15 @@ export default function EventCalendar({
   /* Map Event[] → FullCalendar EventInput[] */
   const fcEvents = events.map((e) => {
     const isRsvpd = rsvpEventIds.has(e.id);
+    const catColor = CATEGORY_COLORS[e.category ?? "church"] ?? "#D4AF37";
     return {
       id: e.id,
       title: e.title,
       start: e.date,
       end: e.end_time ?? undefined,
-      backgroundColor: isRsvpd
-        ? "#D4AF37"
-        : (CATEGORY_COLORS[e.category ?? "other"] ?? "#e2e2e2"),
-      borderColor: isRsvpd ? "#b8941f" : "#c0c0c0",
-      textColor: isRsvpd ? "#111" : "#333",
+      backgroundColor: isRsvpd ? "#D4AF37" : catColor,
+      borderColor: isRsvpd ? "#b8941f" : catColor,
+      textColor: isRsvpd ? "#111" : "#fff",
       extendedProps: { event: e },
     };
   });

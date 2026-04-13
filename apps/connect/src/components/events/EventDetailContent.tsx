@@ -7,8 +7,10 @@ import Link from "next/link";
 import RSVPButton from "./RSVPButton";
 import CommentSection from "./CommentSection";
 import WhoIsAttending from "./WhoIsAttending";
+import LiveTrackingPrompt from "./LiveTrackingPrompt";
 import ReviewList from "@/components/reviews/ReviewList";
-import ShareButton from "@/components/ui/ShareButton";
+import InlineEventRating from "@/components/reviews/InlineEventRating";
+import SocialShareButtons from "@/components/ui/SocialShareButtons";
 import MessageButton from "@/components/messaging/MessageButton";
 import LocationSharingToggle from "./LocationSharingToggle";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
@@ -77,10 +79,19 @@ export default function EventDetailContent({
   const dateStr = endStr ? `${startStr} – ${endStr}` : startStr;
 
   const hasCoords = event.latitude != null && event.longitude != null;
-  const cat = event.category ?? "other";
+  const cat = event.category ?? "church";
   const isCancelled = event.status === "cancelled";
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;
+
+  // Live event detection
+  const now = new Date();
+  const eventStart = new Date(event.date);
+  const eventEnd = event.end_time ? new Date(event.end_time) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+  const isLive = eventStart <= now && eventEnd > now;
+  const hasStarted = eventStart <= now;
+  const durationMs = eventEnd.getTime() - eventStart.getTime();
+  const isInSession = isLive && durationMs > 5 * 60 * 60 * 1000;
 
   // Fire-and-forget view tracking
   useEffect(() => {
@@ -131,18 +142,36 @@ export default function EventDetailContent({
       )}
 
       {event.category && (
-        <div className="mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <span
             className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
           >
             {CATEGORY_LABELS[cat]}
           </span>
+          {isLive && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              {isInSession ? "In Session" : "Live"}
+            </span>
+          )}
         </div>
       )}
 
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-3xl font-bold">{event.title}</h1>
-        <ShareButton title={event.title} />
+      </div>
+
+      {/* Inline star rating */}
+      <div className="mt-1">
+        <InlineEventRating eventId={event.id} isAuthenticated={!!user} />
+      </div>
+
+      {/* Social sharing */}
+      <div className="mt-3">
+        <SocialShareButtons
+          title={event.title}
+          description={`${new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${event.location}`}
+        />
       </div>
 
       <div className="mt-4 space-y-3">
@@ -220,6 +249,8 @@ export default function EventDetailContent({
       <div className="mt-8">
         {isCancelled ? (
           <div className="text-gray-400 text-sm font-medium">RSVP is disabled for cancelled events.</div>
+        ) : hasStarted && !hasRsvped ? (
+          <div className="text-gray-400 text-sm font-medium">This event has already started. RSVP is no longer available.</div>
         ) : user ? (
           <>
             <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
@@ -293,6 +324,16 @@ export default function EventDetailContent({
       <div className="mt-10 border-t pt-8">
         <CommentSection eventId={event.id} user={user} />
       </div>
+
+      {/* Live location tracking prompt */}
+      {user && hasRsvped && (
+        <LiveTrackingPrompt
+          eventId={event.id}
+          eventDate={event.date}
+          hasRsvped={hasRsvped}
+          locationSharingEnabled={locationSharingEnabled}
+        />
+      )}
     </div>
   );
 }

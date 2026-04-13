@@ -4,6 +4,8 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import VerificationPending from "./VerificationPending";
+import OAuthButtons from "./OAuthButtons";
 import type { UserRole } from "@/types/db";
 
 export default function SignupForm() {
@@ -13,6 +15,7 @@ export default function SignupForm() {
   const [role, setRole] = useState<UserRole>("client");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -45,9 +48,18 @@ export default function SignupForm() {
       return;
     }
 
-    // Email confirmation is required → send to login with a notice
-    router.push("/login?confirmed=false");
-    router.refresh();
+    // Email confirmation is required → show in-app verification polling screen
+    setLoading(false);
+    setPendingVerification(true);
+  }
+
+  if (pendingVerification) {
+    return (
+      <VerificationPending
+        email={email}
+        onBack={() => setPendingVerification(false)}
+      />
+    );
   }
 
   return (
@@ -72,6 +84,14 @@ export default function SignupForm() {
           {error}
         </div>
       )}
+
+      <OAuthButtons />
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-(--border)" />
+        <span className="text-xs font-medium text-black/40 uppercase tracking-wider">or</span>
+        <div className="h-px flex-1 bg-(--border)" />
+      </div>
 
       <div className="space-y-1.5">
         <label

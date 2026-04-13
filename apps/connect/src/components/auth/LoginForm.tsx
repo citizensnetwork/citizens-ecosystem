@@ -4,12 +4,17 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import OAuthButtons from "./OAuthButtons";
+import PhoneAuthForm from "./PhoneAuthForm";
+
+type AuthMode = "email" | "phone";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("email");
   const router = useRouter();
   const searchParams = useSearchParams();
   const needsConfirmation = searchParams.get("confirmed") === "false";
@@ -65,6 +70,41 @@ export default function LoginForm() {
         </div>
       )}
 
+      <OAuthButtons />
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-(--border)" />
+        <span className="text-xs font-medium text-black/40 uppercase tracking-wider">or</span>
+        <div className="h-px flex-1 bg-(--border)" />
+      </div>
+
+      {/* Auth mode toggle */}
+      <div className="flex rounded-xl border border-black/10 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => { setAuthMode("email"); setError(""); }}
+          className={`flex-1 py-2 text-xs font-semibold transition ${
+            authMode === "email" ? "bg-black text-white" : "bg-white text-black/60 hover:bg-black/5"
+          }`}
+        >
+          Email
+        </button>
+        <button
+          type="button"
+          onClick={() => { setAuthMode("phone"); setError(""); }}
+          className={`flex-1 py-2 text-xs font-semibold transition ${
+            authMode === "phone" ? "bg-black text-white" : "bg-white text-black/60 hover:bg-black/5"
+          }`}
+        >
+          Phone
+        </button>
+      </div>
+
+      {authMode === "phone" ? (
+        <PhoneAuthForm />
+      ) : (
+        <>
+
       <div className="space-y-1.5">
         <label
           htmlFor="email"
@@ -117,6 +157,9 @@ export default function LoginForm() {
       >
         {loading ? "Logging in..." : "Log In"}
       </button>
+
+        </>
+      )}
 
       <p className="text-center text-sm text-(--foreground-soft)">
         Don&apos;t have an account?{" "}

@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Event, Place } from "@/types/db";
 import {
   createCategoryMarkerEl,
+  createCustomMarkerEl,
   createPlaceMarkerEl,
   getTemporalStyle,
   escapeHtml,
@@ -16,7 +17,7 @@ import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 type Props = {
   events: Event[];
   places?: Place[];
-  onSelectEvent?: (event: Event) => void;
+  onSelectEvent?: (event: Event, clickEvent?: MouseEvent) => void;
   onSelectPlace?: (place: Place) => void;
   center?: [number, number];
   zoom?: number;
@@ -177,7 +178,16 @@ export default function EventMap({
 
       mappable.forEach((event) => {
         const temporal = getTemporalStyle(event.date);
-        const el = createCategoryMarkerEl(event.category, temporal);
+        const el = event.marker_type && event.marker_type !== "category"
+          ? createCustomMarkerEl({
+              markerType: event.marker_type,
+              category: event.category,
+              temporal,
+              markerIcon: event.marker_icon,
+              markerColor: event.marker_color,
+              markerImageUrl: event.marker_image_url,
+            })
+          : createCategoryMarkerEl(event.category, temporal);
 
         const dateStr = new Date(event.date).toLocaleDateString("en-US", {
           month: "short",
@@ -199,7 +209,7 @@ export default function EventMap({
           )
           .addTo(map);
 
-        el.addEventListener("click", () => onSelectEventRef.current?.(event));
+        el.addEventListener("click", (e) => onSelectEventRef.current?.(event, e));
         markersRef.current.push(marker);
         bounds.extend([event.longitude!, event.latitude!]);
         hasPoints = true;

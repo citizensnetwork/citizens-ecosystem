@@ -40,12 +40,27 @@ vi.mock("@/lib/supabase/client", () => ({
       signOut: mockSignOut,
       onAuthStateChange: mockOnAuthStateChange,
     },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          in: () => Promise.resolve({ data: [] }),
+          order: () => Promise.resolve({ data: [] }),
+        }),
+        in: () => Promise.resolve({ data: [] }),
+        order: () => Promise.resolve({ data: [] }),
+      }),
+    }),
   }),
 }));
 
 // Mock NotificationBell — it uses supabase.channel() and fetch() which aren't available in tests
 vi.mock("@/components/notifications/NotificationBell", () => ({
   default: () => <div data-testid="notification-bell" />,
+}));
+
+// Mock ConsiderBadge — it chains supabase queries internally
+vi.mock("@/components/ui/ConsiderBadge", () => ({
+  default: () => <div data-testid="consider-badge" />,
 }));
 
 describe("Navbar", () => {

@@ -29,7 +29,7 @@ export default function EditEventForm({ event }: Props) {
   );
   const [location, setLocation] = useState(event.location);
   const [category, setCategory] = useState<EventCategory>(
-    event.category ?? "other"
+    event.category ?? "church"
   );
   const [websiteUrl, setWebsiteUrl] = useState(event.website_url ?? "");
   const [contactEmail, setContactEmail] = useState(event.contact_email ?? "");

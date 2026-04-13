@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import ConsiderBadge from "@/components/ui/ConsiderBadge";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -85,6 +86,8 @@ export default function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-2">
+              {/* Consider badge */}
+              <ConsiderBadge userId={user.id} />
               <Link
                 href="/messages"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-black/60 transition hover:bg-black/5 hover:text-black"

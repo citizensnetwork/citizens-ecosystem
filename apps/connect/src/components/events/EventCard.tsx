@@ -13,7 +13,7 @@ export default function EventCard({ event }: { event: Event }) {
     minute: "2-digit",
   });
 
-  const cat = event.category ?? "other";
+  const cat = event.category ?? "church";
 
   return (
     <Link

@@ -1,16 +1,25 @@
 export type EventCategory =
-  | "church-service"
-  | "youth"
-  | "community-outreach"
-  | "worship"
-  | "bible-study"
-  | "prayer"
-  | "social"
-  | "other";
+  | "entertainment"
+  | "sport-fun"
+  | "social-fun"
+  | "community-upliftment"
+  | "education"
+  | "church"
+  | "missional"
+  | "marriage-and-couples"
+  | "mens"
+  | "womens"
+  | "kids"
+  | "recovery"
+  | "equip"
+  | "weekend"
+  | "members-only";
 
 export type EventStatus = "draft" | "published" | "cancelled";
 
 export type AttendeesVisibility = "public" | "authenticated" | "count_only";
+
+export type MarkerType = "category" | "profile" | "icon" | "logo";
 
 export type Event = {
   id: string;
@@ -29,6 +38,10 @@ export type Event = {
   attendees_visible: AttendeesVisibility;
   latitude: number | null;
   longitude: number | null;
+  marker_type: MarkerType;
+  marker_icon: string | null;
+  marker_color: string | null;
+  marker_image_url: string | null;
   created_by: string;
   created_at: string;
 };
@@ -42,11 +55,22 @@ export type EventPhoto = {
   created_at: string;
 };
 
+export type RsvpStatus = "attending" | "considering";
+
 export type RSVP = {
   id: string;
   user_id: string;
   event_id: string;
+  status: RsvpStatus;
   created_at: string;
+};
+
+export type ConsiderJoin = {
+  id: string;
+  rsvp_id: string;
+  joiner_id: string;
+  created_at: string;
+  profiles?: { full_name: string; avatar_url: string | null };
 };
 
 export type UserRole = "vendor" | "client" | "admin";
@@ -64,6 +88,9 @@ export type Profile = {
   notification_radius_km: number;
   notification_digest: NotificationDigest;
   location_sharing: boolean;
+  instagram_handle: string | null;
+  facebook_url: string | null;
+  tiktok_handle: string | null;
   created_at: string;
 };
 
@@ -288,4 +315,31 @@ export type ConversationPreview = {
     created_at: string;
   } | null;
   unread_count: number;
+};
+
+// ── Phase 17: Indemnity Forms ───────────────────
+
+export type IndemnityTemplate = {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+  version: number;
+  applies_to: "events" | "places" | "both";
+  required: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IndemnitySignature = {
+  id: string;
+  template_id: string;
+  user_id: string;
+  event_id: string | null;
+  place_id: string | null;
+  full_name: string;
+  agreed_at: string;
+  ip_address: string | null;
+  template_version: number;
+  created_at: string;
 };

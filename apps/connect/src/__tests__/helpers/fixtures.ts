@@ -20,6 +20,9 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
     notification_radius_km: 50,
     notification_digest: "instant",
     location_sharing: false,
+    instagram_handle: null,
+    facebook_url: null,
+    tiktok_handle: null,
     ...overrides,
   };
 }
@@ -32,7 +35,7 @@ export function makeEvent(overrides?: Partial<Event>): Event {
     date: "2026-04-12T09:00:00Z",
     end_time: null,
     location: "Grace Church, Durban",
-    category: "church-service",
+    category: "church",
     image_url: null,
     website_url: null,
     contact_email: null,
@@ -42,6 +45,10 @@ export function makeEvent(overrides?: Partial<Event>): Event {
     attendees_visible: "authenticated",
     latitude: -29.8587,
     longitude: 31.0218,
+    marker_type: "category",
+    marker_icon: null,
+    marker_color: null,
+    marker_image_url: null,
     created_by: TEST_VENDOR_ID,
     created_at: "2025-06-01T00:00:00Z",
     ...overrides,
@@ -53,6 +60,7 @@ export function makeRSVP(overrides?: Partial<RSVP>): RSVP {
     id: "rsvp-111",
     user_id: TEST_USER_ID,
     event_id: TEST_EVENT_ID,
+    status: "attending",
     created_at: "2026-04-01T00:00:00Z",
     ...overrides,
   };

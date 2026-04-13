@@ -16,13 +16,15 @@ describe("getTemporalStyle", () => {
 
   it("returns full opacity for events within 24 hours", () => {
     const now = new Date();
-    const start = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 hours from now
+    // Use an event 12 hours from now; scale depends on whether it's still "today"
+    const start = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+    const isToday = start.toDateString() === now.toDateString();
 
     const result = getTemporalStyle(start.toISOString());
 
     expect(result.isLive).toBe(false);
     expect(result.opacity).toBe(1);
-    expect(result.scale).toBe(1);
+    expect(result.scale).toBe(isToday ? 1.1 : 1);
   });
 
   it("returns reduced opacity for events 3 days away", () => {

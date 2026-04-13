@@ -32,6 +32,95 @@
 | — | UI Refinement Pass | **Complete** | Calendar white/grey/gold, smaller place markers, map memory, follow places, glance z-fix |
 | — | Map & Brand Polish | **Complete** | Filled place icons, gold brand tag with zoom, province auto-locate, calendar mobile fix |
 | — | UX Bug Fixes + Quality Hardening | **Complete** | Notification bounce, glance panel jitter, category filter zoom, 333 tests, CI pipeline, place edit/delete, admin categories |
+| — | Sprint 1: Auth & Categories | **Complete** | Email verification polling, Google OAuth, 15 new event categories (migration 020) |
+| 14A | Social Sharing | **Complete** | SocialShareButtons (WhatsApp, Facebook, copy-link, native share) on event detail |
+| 14B | Social Profile Links | **Complete** | instagram_handle, facebook_url, tiktok_handle on profiles; SocialLinksEditor in profile |
+| 15A | Map Quick-Action Popup | **Complete** | 5-button popup (View, Join, Share, Consider, Visit) on marker click |
+| 15B | Consider System | **Complete** | consider RSVP status, ConsiderBadge in navbar, friend join tracking |
+| 15C | Custom Map Markers | **Complete** | Profile photo markers, SVG icon picker, organiser logo, default fallback |
+| 15D | Live Events | **Complete** | isToday/isInSession badges, temporal encoding, cc-marker-today CSS pulse |
+| 15E | Live Location Tracking Prompt | **Complete** | LiveTrackingPrompt on event detail for RSVP'd attendees |
+| 16 | Manage Events & Places | **Complete** | ManageEventsView, ManagePlacesView, manage pages, stats (attendee/consider/view counts) |
+| 16B | Event Rating Rework | **Complete** | InlineEventRating component under event title (hover/click 5-star, avg display) |
+| 12C-auth | Phone Auth + 2FA | **Complete** | PhoneAuthForm (OTP login), TwoFactorSetup (TOTP), Login email/phone toggle |
+| 17 | Indemnity Forms | **Complete** | indemnity_templates + indemnity_signatures tables, IndemnityForm gate before event creation |
+
+---
+
+## Sprint 2–4: Social Sharing, Map UX, Manage, Rating, Phone Auth, Indemnity (COMPLETE)
+
+### Phase 14A — Social Sharing (COMPLETE)
+- [x] `SocialShareButtons.tsx` — WhatsApp, Facebook, copy-link, TikTok copy, native Capacitor share
+- [x] Share URLs include event title + link; native share uses `@capacitor/share`
+- [x] Rendered in `EventDetailContent` replacing previous `ShareButton`
+
+### Phase 14B — Social Profile Links (COMPLETE)
+- [x] Migration `021_social_profiles.sql` — `instagram_handle`, `facebook_url`, `tiktok_handle` columns on `profiles`
+- [x] `SocialLinksEditor.tsx` — edit social links in profile with validation
+- [x] Displayed in public profile view with brand-coloured icons
+
+### Phase 15A — Map Quick-Action Popup (COMPLETE)
+- [x] `QuickActionPopup.tsx` — 5-button popup: View Details, Join/Leave, Share, Consider, Visit
+- [x] Rendered on event marker click in `EventMap.tsx` (replaces direct popup open)
+- [x] Optimistic local state for Join/Consider counts
+- [x] EventsView updated to receive and forward `onQuickAction` callbacks
+
+### Phase 15B — Consider System (COMPLETE)
+- [x] Migration `022_consider_system.sql` — adds `consider` RSVP status; `consider_count` column on events
+- [x] `ConsiderBadge.tsx` — navbar icon showing count of events user is considering
+- [x] `/api/consider` API route — toggle consider status (POST)
+- [x] Friend join tracking: who's attending badge includes "considering" friends
+
+### Phase 15C — Custom Map Markers (COMPLETE)
+- [x] Migration `023_custom_markers.sql` — `marker_icon`, `marker_color` columns on events; `organiser_logo` on profiles
+- [x] `createCustomMarkerEl()` in `markers.ts` — profile photo, SVG icon picker, organiser logo, default fallback
+- [x] Fallback chain: profile photo → organiser logo → SVG icon → default category marker
+
+### Phase 15D — Live Events (COMPLETE)
+- [x] `isToday` and `isInSession` computed in `getTemporalStyle()` — events active today get scale 1.1
+- [x] Live badge (gold pulse) + In-Session badge on event detail for live events
+- [x] `cc-marker-today` CSS class in `globals.css` — animated gold ring for today's markers
+
+### Phase 15E — Live Location Tracking Prompt (COMPLETE)
+- [x] `LiveTrackingPrompt.tsx` — opt-in prompt on event detail for RSVP'd attendees (links to LocationSharingToggle)
+- [x] Only shown when event is today and user has RSVP'd
+
+### Phase 16 — Manage Events & Places (COMPLETE)
+- [x] `ManageEventsView.tsx` — event dashboard with attendee/consider/view counts, expandable attendee list, edit links
+- [x] `ManagePlacesView.tsx` — place dashboard with follower/rating/review stats, edit links
+- [x] `/events/manage` page — auth-gated, fetches from `/api/manage/events`
+- [x] `/places/manage` page — auth-gated, fetches from `/api/manage/places`
+- [x] `/api/manage/events` route — returns user's events with aggregated participant counts
+- [x] `/api/manage/places` route — returns user's places with follower/review stats
+- [x] "Manage Events" + "Manage Places" links added to profile page (Account Settings)
+
+### Phase 16B — Event Rating Rework (COMPLETE)
+- [x] `InlineEventRating.tsx` — compact 5-star interactive rating component
+- [x] Shows avg rating + total count fetched from `reviews` table
+- [x] Hover/click rating submits upsert to `reviews` (event_id + user_id unique)
+- [x] Rendered directly under event title in `EventDetailContent`
+- [x] Disabled/read-only when not authenticated
+
+### Phase 12C-auth — Phone Auth + 2FA (COMPLETE)
+- [x] `PhoneAuthForm.tsx` — 2-step phone OTP: enter phone → verify 6-digit OTP via `signInWithOtp`/`verifyOtp`
+- [x] `TwoFactorSetup.tsx` — TOTP 2FA management: enroll with QR code, verify challenge, unenroll; shows Active badge
+- [x] `LoginForm.tsx` updated — email/phone toggle segment; phone mode renders `PhoneAuthForm`
+- [x] `profile/page.tsx` updated — `TwoFactorSetup` section in Account Settings (below ProfileEditor)
+
+### Phase 17 — Indemnity Forms (COMPLETE)
+- [x] Migration `024_indemnity_forms.sql` — `indemnity_templates` + `indemnity_signatures` tables
+- [x] RLS: anyone reads templates; users insert own signatures; admins manage all
+- [x] 2 seed templates: `organiser-event-liability` (required, events) + `attendee-participation-waiver` (not required)
+- [x] `IndemnityTemplate` + `IndemnitySignature` types added to `db.ts`
+- [x] `/api/indemnity` route — GET templates + user signatures + `allSigned` flag; POST sign with IP audit trail
+- [x] `IndemnityForm.tsx` — sequential multi-template form: legal text, full name field, agree checkbox
+- [x] `EventFormWithIndemnity.tsx` — wrapper: shows IndemnityForm gate, then EventForm after all signed
+- [x] `/events/new` updated to render `EventFormWithIndemnity`
+
+### Build & Test Verification
+- [x] `npx tsc --noEmit` — 0 errors (3 type assertion fixes applied)
+- [x] `next build` — all routes compiled, new routes `/events/manage`, `/places/manage` included
+- [x] `npx vitest run` — **335 tests, 37 files, 0 failures** ✅
 
 ---
 

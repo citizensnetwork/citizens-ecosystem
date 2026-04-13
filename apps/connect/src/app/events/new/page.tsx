@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import EventForm from "@/components/events/EventForm";
+import EventFormWithIndemnity from "@/components/events/EventFormWithIndemnity";
 import type { Category } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function NewEventPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <EventForm isVendor={isVendor} placeCategories={placeCategories} />
+      <EventFormWithIndemnity isVendor={isVendor} placeCategories={placeCategories} />
     </div>
   );
 }

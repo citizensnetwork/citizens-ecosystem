@@ -47,8 +47,20 @@ vi.mock("@/components/reviews/ReviewList", () => ({
   default: () => <div data-testid="reviews">Reviews</div>,
 }));
 
-vi.mock("@/components/ui/ShareButton", () => ({
-  default: () => <button data-testid="share-btn">Share</button>,
+vi.mock("@/components/ui/SocialShareButtons", () => ({
+  default: () => <div data-testid="social-share-btns">Share</div>,
+}));
+
+vi.mock("@/components/reviews/InlineEventRating", () => ({
+  default: () => <div data-testid="inline-rating">Rating</div>,
+}));
+
+vi.mock("@/components/events/LiveTrackingPrompt", () => ({
+  default: () => <div data-testid="live-tracking">Tracking</div>,
+}));
+
+vi.mock("@/components/events/LocationSharingToggle", () => ({
+  default: () => <div data-testid="location-sharing">Location</div>,
 }));
 
 vi.mock("@/components/messaging/MessageButton", () => ({
@@ -65,7 +77,7 @@ const baseEvent = makeEvent({
   description: "A night of praise",
   date: "2026-05-10T18:00:00Z",
   location: "City Hall",
-  category: "worship",
+  category: "church",
   image_url: "https://example.com/worship.jpg",
   latitude: -29.85,
   longitude: 31.02,
@@ -128,7 +140,7 @@ describe("EventDetailContent", () => {
   });
 
   it("renders category badge for categorized events", () => {
-    const socialEvent = makeEvent({ ...baseEvent, category: "social" });
+    const socialEvent = makeEvent({ ...baseEvent, category: "social-fun" });
     render(
       <EventDetailContent
         event={socialEvent}
@@ -137,7 +149,7 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    expect(screen.getByText("Social")).toBeInTheDocument();
+    expect(screen.getByText("Social Fun")).toBeInTheDocument();
   });
 
   it("renders description", () => {
@@ -287,7 +299,7 @@ describe("EventDetailContent", () => {
     expect(screen.getByTestId("reviews")).toBeInTheDocument();
   });
 
-  it("renders ShareButton", () => {
+  it("renders SocialShareButtons", () => {
     render(
       <EventDetailContent
         event={baseEvent}
@@ -296,6 +308,6 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    expect(screen.getByTestId("share-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("social-share-btns")).toBeInTheDocument();
   });
 });

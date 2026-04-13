@@ -25,8 +25,7 @@ create table if not exists public.featured_listings (
 
 -- Indexes
 create index if not exists idx_featured_listings_active
-  on public.featured_listings (priority desc, starts_at)
-  where ends_at is null or ends_at > now();
+  on public.featured_listings (priority desc, starts_at, ends_at);
 
 create index if not exists idx_featured_listings_event
   on public.featured_listings (event_id) where event_id is not null;

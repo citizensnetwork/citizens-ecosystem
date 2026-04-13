@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Event, Profile, InterestGroupWithItems } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
+import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
+import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
 import ProfileInterests from "@/components/onboarding/ProfileInterests";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 
@@ -92,6 +94,9 @@ export default async function ProfilePage() {
     notification_radius_km: profile?.notification_radius_km ?? 50,
     notification_digest: profile?.notification_digest ?? "instant",
     location_sharing: profile?.location_sharing ?? false,
+    instagram_handle: profile?.instagram_handle ?? null,
+    facebook_url: profile?.facebook_url ?? null,
+    tiktok_handle: profile?.tiktok_handle ?? null,
     created_at: profile?.created_at ?? "",
   };
 
@@ -155,6 +160,9 @@ export default async function ProfilePage() {
       <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
         <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
         <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
+        <div className="mt-6 pt-6 border-t border-black/5">
+          <TwoFactorSetup />
+        </div>
       </section>
 
       {/* ── Notification Preferences ─── */}
@@ -163,6 +171,17 @@ export default async function ProfilePage() {
         <NotificationPreferences
           currentDigest={typedProfile.notification_digest}
           notificationEmail={typedProfile.notification_email}
+        />
+      </section>
+
+      {/* ── Social Platform Connections ─── */}
+      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+        <h2 className="text-lg font-semibold mb-4">Social Platforms</h2>
+        <SocialLinksEditor
+          profileId={typedProfile.id}
+          instagramHandle={typedProfile.instagram_handle}
+          facebookUrl={typedProfile.facebook_url}
+          tiktokHandle={typedProfile.tiktok_handle}
         />
       </section>
 
@@ -175,6 +194,22 @@ export default async function ProfilePage() {
         notificationRadiusKm={typedProfile.notification_radius_km}
         notificationEmail={typedProfile.notification_email}
       />
+
+      {/* ── Management Links ─── */}
+      <section className="mb-8 flex flex-wrap gap-3">
+        <Link
+          href="/events/manage"
+          className="rounded-xl border border-black/8 bg-white px-5 py-3 text-sm font-medium hover:shadow-sm transition-shadow"
+        >
+          📊 Manage Events
+        </Link>
+        <Link
+          href="/places/manage"
+          className="rounded-xl border border-black/8 bg-white px-5 py-3 text-sm font-medium hover:shadow-sm transition-shadow"
+        >
+          📍 Manage Places
+        </Link>
+      </section>
 
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-3">My RSVPs</h2>

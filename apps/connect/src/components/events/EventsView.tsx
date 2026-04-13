@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
+import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import FeaturedPanel from "./FeaturedPanel";
+import QuickActionPopup from "./QuickActionPopup";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import dynamic from "next/dynamic";
@@ -151,12 +153,20 @@ export default function EventsView({
   }, [places, search]);
 
   const handleSelectEvent = useCallback(
-    (event: Event) => {
+    (event: Event, clickEvent?: MouseEvent) => {
+      // On map view, show quick-action popup at click position
+      if (view === "map" && clickEvent) {
+        setQuickActionEvent(event);
+        setQuickActionPos({ x: clickEvent.clientX, y: clickEvent.clientY });
+        return;
+      }
+      setQuickActionEvent(null);
+      setQuickActionPos(null);
       setSelectedPlace(null);
       setSelectedEvent(event);
       setFeaturedOpen(false);
     },
-    []
+    [view]
   );
 
   const handleSelectPlace = useCallback((place: Place) => {
@@ -173,6 +183,10 @@ export default function EventsView({
   // City search / geocoding state
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
+
+  // Quick-action popup state (map marker click)
+  const [quickActionEvent, setQuickActionEvent] = useState<Event | null>(null);
+  const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
 
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
@@ -202,6 +216,11 @@ export default function EventsView({
   // Close glance panel when detail opens
   const hasDetail = selectedEvent || selectedPlace;
 
+  function closeQuickAction() {
+    setQuickActionEvent(null);
+    setQuickActionPos(null);
+  }
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
       {view === "map" && (
@@ -213,6 +232,15 @@ export default function EventsView({
           autoLocate
           flyTo={mapFlyTo}
           flyToZoom={mapFlyToZoom}
+        />
+      )}
+
+      {/* Quick-action popup for map markers */}
+      {quickActionEvent && quickActionPos && (
+        <QuickActionPopup
+          event={quickActionEvent}
+          position={quickActionPos}
+          onClose={closeQuickAction}
         />
       )}
       {view === "calendar" && (
@@ -384,8 +412,8 @@ export default function EventsView({
 
             {selectedEvent && (
               <div className="space-y-3 pt-2">
-                <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
-                  {selectedEvent.category ?? "other"}
+                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
+                  {CATEGORY_LABELS[selectedEvent.category ?? "church"]}
                 </span>
                 <h2 className="text-lg font-bold text-black">
                   {selectedEvent.title}

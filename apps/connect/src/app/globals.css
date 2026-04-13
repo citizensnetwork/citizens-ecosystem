@@ -209,6 +209,11 @@ body {
   animation: markerPulse 1.6s ease-in-out infinite;
 }
 
+.cc-marker-today span {
+  border-width: 3px !important;
+  border-color: #000 !important;
+}
+
 @keyframes markerPulse {
   0%,
   100% {
