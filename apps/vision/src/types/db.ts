@@ -325,3 +325,33 @@ export interface BoundaryCoverage {
   min_lat: number;
   max_lat: number;
 }
+
+// ── Phase 11: Multi-Org Federation ─────────────────────────
+
+export type PartnershipStatus = "pending" | "active" | "rejected" | "revoked";
+export type SharingLevel = "none" | "summary" | "detailed";
+
+export interface OrgPartnership {
+  id: string;
+  org_a_id: string;
+  org_b_id: string;
+  status: PartnershipStatus;
+  sharing_level: SharingLevel;
+  initiated_by: string;
+  responded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrgPartnershipWithOrgs extends OrgPartnership {
+  org_a: Pick<Organisation, "id" | "name" | "slug">;
+  org_b: Pick<Organisation, "id" | "name" | "slug">;
+}
+
+export interface SharedMetric {
+  id: string;
+  partnership_id: string;
+  metric_slug: string;
+  visible: boolean;
+  created_at: string;
+}

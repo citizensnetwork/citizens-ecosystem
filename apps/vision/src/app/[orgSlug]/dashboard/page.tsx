@@ -71,6 +71,20 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       <div className="mt-6">
         <AdvisorySummaryCard summary={advisorySummary} orgSlug={orgSlug} />
       </div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <a
+          href={`/${orgSlug}/dashboard/analytics`}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#252540] px-4 py-2 text-sm text-[#4a90d9] hover:bg-[#303050] transition-colors"
+        >
+          📊 Advanced Analytics & Export →
+        </a>
+        <a
+          href={`/${orgSlug}/dashboard/federation`}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#252540] px-4 py-2 text-sm text-[#4a90d9] hover:bg-[#303050] transition-colors"
+        >
+          🤝 Multi-Org Federation →
+        </a>
+      </div>
     </>
   );
 }

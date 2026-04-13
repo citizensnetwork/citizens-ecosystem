@@ -42,3 +42,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp test/coverage files
+coverage_out.txt
+coverage_review.txt
+test_run*.txt

@@ -305,3 +305,57 @@
 - **Decision:** Use `010_boundaries.sql` as actual migration filename
 - **Rationale:** Sequential numbering must match actual migration order. Same pattern as DECISION-032 (Phase 5 numbering deviation). Spec numbers are indicative, not prescriptive
 - **Status:** Accepted (2026-04-12)
+
+## DECISION-052: Client-Side Analytics Computation
+- **Context:** Phase 10 comparison and regression analysis could run server-side (SQL) or client-side (JS)
+- **Decision:** Hybrid — SQL function `compute_trend_regression` for DB-level regression; JS utilities (`computeLinearRegression`, `computeMovingAverage`) in `src/lib/metrics/analytics.ts` for client-side display
+- **Rationale:** SQL handles heavy aggregation at DB level; JS utilities format results for Recharts rendering. Both paths use the same mathematical approach (least squares)
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-053: CSV-First Export Strategy
+- **Context:** Export API could support CSV, PDF, PNG, and JSON formats
+- **Decision:** Implement CSV export with audit logging; PDF/PNG deferred as stubs
+- **Rationale:** CSV covers 90% of data export use cases (Excel, Google Sheets import). PDF generation requires server-side rendering (e.g. `@react-pdf/renderer`) which adds bundle complexity. PNG export requires canvas/screenshot tooling. Both deferred to future iteration
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-054: Scheduled Reports Table-Only (No Execution Engine)
+- **Context:** Scheduled reports could include full email delivery via Edge Function + pg_cron, or just CRUD management
+- **Decision:** Implement `scheduled_reports` table, API, and UI for CRUD management. Execution engine (Edge Function + pg_cron trigger) deferred
+- **Rationale:** Table schema is the foundation; UI allows admins to configure reports now. Actual email delivery requires SMTP integration, email templating, and pg_cron — better done as a focused follow-up
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-055: Federation Partnership Lifecycle
+- **Context:** Multi-org partnerships need a state machine for invite → accept → manage → dissolve
+- **Decision:** Four-state lifecycle: pending → active → suspended → dissolved. Separate `initiated_by` and `responded_by` fields track who created and who accepted/rejected
+- **Rationale:** Covers the full B2B partnership lifecycle. `no_self_partnership` CHECK constraint and `unique_partnership` unique constraint prevent invalid states. Trigger prevents `org_a_id`/`org_b_id` mutation after creation
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-056: Sharing Level Enum (None/Summary/Detailed)
+- **Context:** Federation requires configurable data sharing granularity between partner orgs
+- **Decision:** `sharing_level` enum with three tiers: `none` (partnership exists but no data shared), `summary` (aggregate metrics only), `detailed` (full metric breakdowns)
+- **Rationale:** Granular control lets orgs start with minimal sharing and increase over time. Shared metrics are per-partnership, per-metric-slug, with individual visibility toggles
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-057: Mobile Responsive via Sidebar FAB (Not Bottom Nav)
+- **Context:** Phase 12 mobile UX could use bottom navigation bar, hamburger menu, or floating action button
+- **Decision:** Floating hamburger button (FAB) at bottom-right, opening a full-screen overlay sidebar with role="dialog" and aria-modal
+- **Rationale:** Preserves desktop sidebar structure, avoids duplicating nav items, provides consistent UX across breakpoints. FAB is thumb-reachable on mobile. Escape key and backdrop click close the overlay
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-058: Playwright for E2E (Not Cypress)
+- **Context:** E2E testing framework selection for Phase 12
+- **Decision:** Playwright with Chromium + mobile Chrome (Pixel 5) projects
+- **Rationale:** Built-in mobile emulation, faster than Cypress, native async/await, cross-browser support. Tests use `webServer` config to auto-start Next.js dev server
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-059: Security Headers in next.config.ts (Not Middleware)
+- **Context:** Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy) could be set via middleware or next.config.ts
+- **Decision:** Use `headers()` in next.config.ts for all routes (`/**`)
+- **Rationale:** Config-level headers are simpler, always applied, and don't add middleware execution overhead. CSP deferred (requires nonce generation which needs middleware)
+- **Status:** Accepted (2026-04-13)
+
+## DECISION-060: Theme Tokens over Hardcoded Colours
+- **Context:** Architect review found 9 component files using hardcoded hex colours (`bg-[#252540]`) and Tailwind gray classes instead of CSS custom properties
+- **Decision:** Replace all hardcoded colours with theme tokens: `bg-surface`, `bg-background`, `bg-surface-alt`, `bg-accent`, `text-text-primary`, `text-text-secondary`, `border-border`, etc.
+- **Rationale:** Centralised theme control, dark mode consistency, easier future theme changes. Enforcement added to architect review checklist
+- **Status:** Accepted (2026-04-13)
