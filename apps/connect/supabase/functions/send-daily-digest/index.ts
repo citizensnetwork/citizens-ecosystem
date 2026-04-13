@@ -1,11 +1,13 @@
 // Edge Function: send-daily-digest
 // Triggered by daily cron (7 AM)
 // Sends batched notification summary to users with digest = 'daily'
+// Matches events by category → interest mapping + location radius
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendNotifications } from "../_shared/push.ts";
 import { haversineKm } from "../_shared/geo.ts";
+import { CATEGORY_INTEREST_MAP } from "../_shared/category-interests.ts";
 
 serve(async () => {
   try {
@@ -27,7 +29,7 @@ serve(async () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: newEvents } = await supabase
       .from("events")
-      .select("id, title, latitude, longitude, image_url")
+      .select("id, title, category, latitude, longitude, image_url")
       .eq("status", "published")
       .gte("created_at", yesterday);
 
@@ -35,56 +37,74 @@ serve(async () => {
       return new Response(JSON.stringify({ digests: 0, reason: "no_new_events" }), { status: 200 });
     }
 
-    // Batch-fetch all user interests for daily users in a single query
+    // Batch-fetch all user interests for daily users
     const dailyUserIds = dailyUsers.map((u) => u.id);
     const { data: allUserInterests } = await supabase
       .from("user_interests")
       .select("user_id, interest_id")
       .in("user_id", dailyUserIds);
 
-    // Group interests by user_id
-    const interestsByUser = new Map<string, string[]>();
+    // Group interest IDs by user
+    const interestIdsByUser = new Map<string, Set<string>>();
     for (const ui of allUserInterests ?? []) {
-      const list = interestsByUser.get(ui.user_id) ?? [];
-      list.push(ui.interest_id);
-      interestsByUser.set(ui.user_id, list);
+      const set = interestIdsByUser.get(ui.user_id) ?? new Set();
+      set.add(ui.interest_id);
+      interestIdsByUser.set(ui.user_id, set);
     }
 
-    // Batch-fetch all event interest tags for new events in a single query
-    const newEventIds = newEvents.map((e) => e.id);
-    const { data: allEventTags } = await supabase
-      .from("event_interest_tags")
-      .select("event_id, interest_id")
-      .in("event_id", newEventIds);
+    // Build a set of all interest slugs needed across all categories
+    const allSlugs = new Set<string>();
+    for (const slugs of Object.values(CATEGORY_INTEREST_MAP)) {
+      for (const s of slugs) allSlugs.add(s);
+    }
 
-    // Group tags by event_id
-    const tagsByEvent = new Map<string, Set<string>>();
-    for (const tag of allEventTags ?? []) {
-      const set = tagsByEvent.get(tag.event_id) ?? new Set();
-      set.add(tag.interest_id);
-      tagsByEvent.set(tag.event_id, set);
+    // Single query to resolve slugs → IDs
+    const { data: interestRows, error: slugErr } = await supabase
+      .from("interests")
+      .select("id, slug")
+      .in("slug", [...allSlugs]);
+
+    if (slugErr) {
+      console.error("Failed to resolve interest slugs:", slugErr);
+      return new Response(JSON.stringify({ digests: 0, reason: "slug_lookup_failed" }), { status: 200 });
+    }
+
+    const slugToId = new Map<string, string>();
+    for (const row of interestRows ?? []) {
+      slugToId.set(row.slug, row.id);
+    }
+
+    // Pre-compute interest ID sets per category
+    const categoryInterestIds = new Map<string, Set<string>>();
+    for (const [cat, slugs] of Object.entries(CATEGORY_INTEREST_MAP)) {
+      const ids = new Set<string>();
+      for (const s of slugs) {
+        const id = slugToId.get(s);
+        if (id) ids.add(id);
+      }
+      categoryInterestIds.set(cat, ids);
     }
 
     let digestsSent = 0;
 
     for (const user of dailyUsers) {
-      const userInterestIds = interestsByUser.get(user.id) ?? [];
+      const userInterestIds = interestIdsByUser.get(user.id);
 
-      // Filter events by interest match
-      let matchingEvents = newEvents;
-      if (userInterestIds.length > 0) {
-        const userInterestSet = new Set(userInterestIds);
-        matchingEvents = newEvents.filter((e) => {
-          const eventTags = tagsByEvent.get(e.id);
-          if (!eventTags) return false;
-          for (const tag of eventTags) {
-            if (userInterestSet.has(tag)) return true;
-          }
-          return false;
-        });
-      }
+      // Users without interests — skip (don't spam)
+      if (!userInterestIds || userInterestIds.size === 0) continue;
 
-      // Filter by location radius
+      // Filter events by category-to-interest match
+      let matchingEvents = newEvents.filter((e) => {
+        if (!e.category) return false;
+        const catInterests = categoryInterestIds.get(e.category);
+        if (!catInterests) return false;
+        for (const id of catInterests) {
+          if (userInterestIds.has(id)) return true;
+        }
+        return false;
+      });
+
+      // Filter by location radius (users without home location pass through)
       if (user.home_latitude != null && user.home_longitude != null) {
         matchingEvents = matchingEvents.filter((e) => {
           if (e.latitude == null || e.longitude == null) return true;
@@ -102,7 +122,7 @@ serve(async () => {
           (matchingEvents.length > 3 ? ` and ${matchingEvents.length - 3} more` : ""),
         type: "new_event_match",
         image_url: matchingEvents[0]?.image_url,
-        data: {},
+        data: { event_id: matchingEvents[0]?.id },
       });
 
       digestsSent++;
