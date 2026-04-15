@@ -157,9 +157,9 @@ export default function LandingPage({ events, places }: Props) {
           dismissed ? "-translate-y-full" : "translate-y-0"
         }`}
         style={{
-          background: "rgba(255,255,255,0.20)",
-          backdropFilter: "blur(18px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(18px) saturate(1.4)",
+          background: "rgba(255,255,255,0.10)",
+          backdropFilter: "blur(10px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(10px) saturate(1.2)",
         }}
       >
         {/* ── Top section: logo & crown ── */}
@@ -170,8 +170,14 @@ export default function LandingPage({ events, places }: Props) {
           >
             Citizens
           </h1>
-          <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-white/70">
+          <p
+            className="mt-2 text-xs font-semibold uppercase tracking-widest text-white/70"
+            style={{ WebkitTextStroke: "0.5px rgba(0,0,0,0.5)" }}
+          >
             CONNECTING THE KINGDOM
+          </p>
+          <p className="mt-1.5 text-[10px] font-medium tracking-wider" style={{ color: "var(--gold)" }}>
+            Eph. 2:19-22
           </p>
         </div>
 
@@ -380,7 +386,10 @@ export default function LandingPage({ events, places }: Props) {
         {/* ── Bottom: swipe indicator (always visible for guest browsing) ── */}
         <div className="flex flex-col items-center gap-1.5 pb-6 pt-1">
           {!user && (
-            <p className="text-[11px] font-medium tracking-wide text-white/50">
+            <p
+              className="text-[11px] font-medium tracking-wide text-white/50"
+              style={{ WebkitTextStroke: "0.3px rgba(0,0,0,0.3)" }}
+            >
               swipe up or tap to browse
             </p>
           )}
@@ -392,6 +401,7 @@ export default function LandingPage({ events, places }: Props) {
               setTimeout(() => router.push("/events"), 300);
             }}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white/50 transition hover:border-white/60 hover:text-white active:scale-90"
+            style={{ WebkitTextStroke: "0.5px rgba(0,0,0,0.4)" }}
             aria-label="Browse without logging in"
           >
             <svg
@@ -401,7 +411,7 @@ export default function LandingPage({ events, places }: Props) {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
