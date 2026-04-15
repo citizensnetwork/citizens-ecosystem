@@ -196,20 +196,31 @@ export default function EventMap({
           minute: "2-digit",
         });
 
+        const popup = new maplibregl.Popup({
+          offset: 16,
+          closeButton: false,
+          maxWidth: "260px",
+        }).setHTML(
+          `<div class="cc-popup">
+            <strong>${escapeHtml(event.title)}</strong>
+            <p>${dateStr}</p>
+            <p>${escapeHtml(event.location)}</p>
+            <button class="cc-popup-btn" data-event-id="${escapeHtml(event.id)}">View Details</button>
+          </div>`
+        );
+
+        popup.on("open", () => {
+          const btn = document.querySelector(`button[data-event-id="${event.id}"]`);
+          btn?.addEventListener("click", (e) => {
+            popup.remove();
+            onSelectEventRef.current?.(event, e as MouseEvent);
+          });
+        });
+
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat([event.longitude!, event.latitude!])
-          .setPopup(
-            new maplibregl.Popup({
-              offset: 16,
-              closeButton: false,
-              maxWidth: "240px",
-            }).setHTML(
-              `<div class="cc-popup"><strong>${escapeHtml(event.title)}</strong><p>${dateStr}</p><p>${escapeHtml(event.location)}</p></div>`
-            )
-          )
+          .setPopup(popup)
           .addTo(map);
-
-        el.addEventListener("click", (e) => onSelectEventRef.current?.(event, e));
         markersRef.current.push(marker);
         bounds.extend([event.longitude!, event.latitude!]);
         hasPoints = true;

@@ -252,6 +252,25 @@ body {
   margin: 4px 0 0;
 }
 
+.cc-popup-btn {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "Montserrat", sans-serif;
+  color: #000;
+  background: var(--gold, #d4a843);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: brightness 0.15s;
+}
+.cc-popup-btn:hover {
+  filter: brightness(0.95);
+}
+
 .cc-popup-warning {
   font-size: 11px;
   color: #b45309;

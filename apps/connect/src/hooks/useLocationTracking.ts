@@ -85,7 +85,7 @@ export function useLocationTracking(
         // Best effort
       }
     }
-  }, [eventId]);
+  }, [eventId, clearTracking]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -22,7 +22,7 @@ export default function LiveTrackingPrompt({
 }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const { state, startTracking, stopTracking } = useLocationTracking(
+  const { state, startTracking } = useLocationTracking(
     eventId,
     locationSharingEnabled
   );

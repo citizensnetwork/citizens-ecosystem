@@ -20,9 +20,10 @@ type ManagedEvent = {
 };
 
 type Props = {
-  isVendor: boolean;
+  isVendor?: boolean;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function ManageEventsView({ isVendor }: Props) {
   const [events, setEvents] = useState<ManagedEvent[]>([]);
   const [loading, setLoading] = useState(true);

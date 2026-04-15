@@ -153,7 +153,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       }
     }
 
-    const { data: eventData, error } = await supabase.from("events").insert({
+    const { error } = await supabase.from("events").insert({
       title,
       description,
       date: new Date(date).toISOString(),
