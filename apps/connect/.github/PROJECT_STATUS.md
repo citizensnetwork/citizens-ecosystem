@@ -45,6 +45,47 @@
 | 12C-auth | Phone Auth + 2FA | **Complete** | PhoneAuthForm (OTP login), TwoFactorSetup (TOTP), Login email/phone toggle |
 | 17 | Indemnity Forms | **Complete** | indemnity_templates + indemnity_signatures tables, IndemnityForm gate before event creation |
 | 25 | Expanded Roles & Data Model | **Complete** | 7-role system (individual/ministry/org/business), category_id FK, place-images bucket, RLS hardening |
+| — | Auth Hardening Sprint | **Complete** | Google OAuth callback fix, phone SMS 2FA, Google account linking, account deletion, 5 SE agent reviews |
+
+---
+
+## Auth Hardening Sprint (COMPLETE)
+
+### Google OAuth Fix
+- [x] Auth callback route uses `NEXT_PUBLIC_SITE_URL` env var for safe redirects (no x-forwarded-host spoofing)
+- [x] Hardened `next` param validation: blocks backslashes, colons, double-slashes, encoded bypasses
+
+### Phone SMS 2FA (replaces QR/TOTP)
+- [x] `TwoFactorSetup.tsx` rewritten: phone number input → SMS OTP → verify → enrolled
+- [x] 60s resend cooldown with `useRef` cleanup on unmount
+- [x] Proper unenroll error handling (breaks on failure, no silent swallow)
+- [x] Supports both phone and legacy TOTP factor unenrollment
+
+### Google Account Linking
+- [x] `LinkedAccounts.tsx` — shows email + Google linked providers with status badges
+- [x] "Link Google Account" button via `supabase.auth.linkIdentity({ provider: 'google' })`
+- [x] Automatic linking when emails match (Supabase Dashboard setting)
+- [x] Decorative SVGs have `aria-hidden="true"` for screen readers
+
+### Account Deletion
+- [x] `DELETE /api/account/delete` — auth-gated, rate-limited (3 per hour), admin client with service_role key
+- [x] `createAdminClient()` in `src/lib/supabase/admin.ts` — server-only, no session persistence
+- [x] `DeleteAccountButton.tsx` — two-step: button → "type DELETE" (case-insensitive) → confirm
+- [x] Signs out client-side before redirect after deletion
+- [x] Cascading FK deletes handle all related data cleanup
+- [x] Danger Zone section placed at absolute bottom of profile page
+
+### SE Agent Reviews
+- [x] **SE: Security** — Fixed host header injection (CRITICAL), stricter rate limit, SMS cooldown, unenroll error handling
+- [x] **SE: Architect** — Fixed session invalidation after deletion, timer leak cleanup, callback origin safety
+- [x] **SE: Responsible AI** — Added `role="alert"` on error divs, `aria-hidden` on decorative SVGs, fixed contrast ratios
+- [x] **SE: DevOps/CI** — Deployment checklist: `SUPABASE_SERVICE_ROLE_KEY` + `NEXT_PUBLIC_SITE_URL` env vars, phone provider setup
+- [x] **SE: UX Designer** — Moved Danger Zone to bottom, case-insensitive DELETE check, SMS help text
+
+### Build & Test Verification
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `next build` — all routes compiled, new route `/api/account/delete` included
+- [x] `npx vitest run` — **335 tests, 37 files, 0 failures** ✓
 
 ---
 

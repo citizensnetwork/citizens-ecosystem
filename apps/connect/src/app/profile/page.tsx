@@ -7,6 +7,8 @@ import { ORGANISER_ROLES, ROLE_LABELS } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
+import LinkedAccounts from "@/components/auth/LinkedAccounts";
+import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
 import ProfileInterests from "@/components/onboarding/ProfileInterests";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 
@@ -164,6 +166,9 @@ export default async function ProfilePage() {
         <div className="mt-6 pt-6 border-t border-black/5">
           <TwoFactorSetup />
         </div>
+        <div className="mt-6 pt-6 border-t border-black/5">
+          <LinkedAccounts />
+        </div>
       </section>
 
       {/* ── Notification Preferences ─── */}
@@ -293,6 +298,15 @@ export default async function ProfilePage() {
           )}
         </section>
       )}
+
+      {/* ── Danger Zone (always last) ─── */}
+      <section className="mb-8 rounded-xl border border-red-100 bg-white p-5">
+        <h2 className="text-lg font-semibold mb-2 text-red-700">Danger Zone</h2>
+        <p className="text-xs text-black/60 mb-4">
+          Permanently delete your account and all associated data.
+        </p>
+        <DeleteAccountButton />
+      </section>
     </div>
   );
 }
