@@ -328,12 +328,7 @@ export default function EventsView({
                   setMapFlyToZoom(undefined);
                   setView((v) => (v === "map" ? "calendar" : "map"));
                 }}
-                className={`rounded-xl px-3 py-2 text-sm font-medium shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:brightness-105 ${
-                  view === "map"
-                    ? "border-0 text-white"
-                    : "border border-black/10 bg-white/95 text-black hover:bg-white"
-                }`}
-                style={view === "map" ? { background: "linear-gradient(135deg, #7c3aed, #db2777, #f59e0b)" } : undefined}
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
                 aria-label="Toggle view mode"
               >
                 {view === "map" ? (
@@ -352,30 +347,30 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setFeaturedOpen((o) => !o)}
-          className="absolute right-0 top-1/2 z-1005 -translate-y-1/2 rounded-l-xl border border-r-0 border-(--gold)/30 bg-black/90 px-2 py-5 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
+          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/30 bg-black/90 px-5 py-2 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
           aria-label={featuredOpen ? "Close featured panel" : "Open featured panel"}
         >
-          <span className="flex flex-col items-center gap-1">
+          <span className="flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
               <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
             </svg>
-            <span className="[writing-mode:vertical-lr] text-[10px]">
+            <span className="text-[10px]">
               {featuredOpen ? "CLOSE" : "FEATURED"}
             </span>
           </span>
         </button>
       )}
 
-      {/* ── Featured panel slide-out ────────────────── */}
+      {/* ── Featured panel slide-up from bottom ────────── */}
       <aside
         ref={featuredRef}
         role="dialog"
         aria-label="Featured content"
-        className={`absolute right-0 top-0 z-1004 flex h-full w-[84vw] max-w-sm flex-col border-l border-(--gold)/10 bg-white/97 shadow-2xl backdrop-blur transition-transform duration-300 ease-out sm:w-96 ${
-          featuredOpen && !hasDetail ? "translate-x-0" : "translate-x-full"
+        className={`absolute inset-x-0 bottom-0 z-1004 flex max-h-[60dvh] flex-col rounded-t-2xl border-t border-(--gold)/10 bg-white/97 shadow-2xl backdrop-blur transition-transform duration-300 ease-out ${
+          featuredOpen && !hasDetail ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-(--gold)/10 px-4 py-3 pt-5">
+        <div className="flex items-center justify-between border-b border-(--gold)/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-(--gold)">
               <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>

@@ -7,6 +7,7 @@ type Props = {
   icon: React.ReactNode;
   defaultOpen?: boolean;
   badge?: number | string;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -15,6 +16,7 @@ export default function AccordionSection({
   icon,
   defaultOpen = false,
   badge,
+  headerAction,
   children,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
@@ -34,6 +36,9 @@ export default function AccordionSection({
           <span className="rounded-full bg-black/8 px-2 py-0.5 text-xs font-medium text-black/60">
             {badge}
           </span>
+        )}
+        {headerAction && (
+          <span className="ml-auto">{headerAction}</span>
         )}
         <span
           className={`text-xs text-black/40 transition-transform duration-200 ${
