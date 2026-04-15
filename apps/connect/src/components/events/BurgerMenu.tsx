@@ -4,7 +4,7 @@ import { forwardRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Event, EventCategory, FavouriteOrg, FriendAttending, Profile, TrendingEvent } from "@/types/db";
-import { EVENT_CATEGORIES } from "@/lib/categories";
+import { EVENT_CATEGORIES, CATEGORY_HEX } from "@/lib/categories";
 import AccordionSection from "@/components/ui/AccordionSection";
 import type { User } from "@supabase/supabase-js";
 
@@ -79,10 +79,10 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-black/60 hover:bg-black/5"
+            className="rounded-lg p-1.5 text-black/60 hover:bg-black/5"
             aria-label="Close menu"
           >
-            ✕
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
@@ -106,27 +106,27 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
               )}
               {EVENT_CATEGORIES.map((c) => {
                 const active = activeCategories.has(c.value);
+                const catColor = CATEGORY_HEX[c.value];
                 return (
                   <button
                     key={c.value}
                     type="button"
                     onClick={() => onToggleCategory(c.value)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
                       active
-                        ? "bg-(--gold) text-black font-medium"
+                        ? "font-medium text-black"
                         : "text-black/75 hover:bg-black/5"
                     }`}
+                    style={active ? { backgroundColor: `${catColor}20`, borderLeft: `3px solid ${catColor}` } : { borderLeft: "3px solid transparent" }}
                   >
                     <span
-                      className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
-                        active
-                          ? "border-(--gold) bg-black text-white"
-                          : "border-black/20"
-                      }`}
-                    >
-                      {active && "✓"}
-                    </span>
+                      className="flex-shrink-0 h-2.5 w-2.5 rounded-full ring-1 ring-black/10"
+                      style={{ background: catColor }}
+                    />
                     {c.label}
+                    {active && (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="ml-auto h-3.5 w-3.5 flex-shrink-0" style={{ color: catColor }}><polyline points="20 6 9 17 4 12"/></svg>
+                    )}
                   </button>
                 );
               })}

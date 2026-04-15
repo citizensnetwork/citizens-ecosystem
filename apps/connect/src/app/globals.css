@@ -98,7 +98,7 @@ body {
 
 .cc-calendar {
   --fc-border-color: var(--border);
-  --fc-today-bg-color: var(--gold-soft);
+  --fc-today-bg-color: rgba(212,175,55,0.08);
   --fc-neutral-bg-color: var(--surface-muted);
   --fc-page-bg-color: var(--surface);
   --fc-button-bg-color: var(--foreground);
@@ -150,18 +150,27 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
+  font-weight: 700;
+}
+
+/* Gold left border on today's column in all views */
+.cc-calendar .fc .fc-day-today {
+  border-top: 2px solid rgba(212,175,55,0.5) !important;
 }
 
 .cc-calendar .fc .fc-event {
-  border-radius: 4px;
-  font-size: 0.75rem;
-  padding: 1px 4px;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 2px 5px;
   cursor: pointer;
-  transition: filter 150ms ease;
+  transition: filter 150ms ease, transform 120ms ease;
+  border-left-width: 3px !important;
 }
 
 .cc-calendar .fc .fc-event:hover {
-  filter: brightness(0.9);
+  filter: brightness(0.92);
+  transform: translateY(-1px);
 }
 
 .cc-calendar .fc .fc-col-header-cell-cushion {
@@ -211,7 +220,8 @@ body {
 
 .cc-marker-today span {
   border-width: 3px !important;
-  border-color: #000 !important;
+  /* Preserve category colour from inline style — add a gold outer glow instead */
+  box-shadow: 0 2px 6px rgba(0,0,0,.25), 0 0 0 2px rgba(212,175,55,0.45) !important;
 }
 
 @keyframes markerPulse {

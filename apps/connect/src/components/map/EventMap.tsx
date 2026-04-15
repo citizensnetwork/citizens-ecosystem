@@ -134,7 +134,7 @@ export default function EventMap({
 
           const el = document.createElement("div");
           el.style.cssText =
-            "width:16px;height:16px;background:#4285F4;border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(66,133,244,.45);";
+            "width:14px;height:14px;background:#D4AF37;border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(212,175,55,.5);";
           geoMarkerRef.current = new maplibregl.Marker({ element: el })
             .setLngLat(lngLat)
             .addTo(map);

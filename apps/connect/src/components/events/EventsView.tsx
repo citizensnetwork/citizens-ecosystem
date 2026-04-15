@@ -296,11 +296,15 @@ export default function EventsView({
               <button
                 type="button"
                 onClick={() => setFiltersOpen((open) => !open)}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-base shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
+                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
                 aria-label="Toggle menu"
                 aria-expanded={filtersOpen}
               >
-                ☰
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5">
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
               </button>
               <button
                 type="button"
@@ -324,7 +328,12 @@ export default function EventsView({
                   setMapFlyToZoom(undefined);
                   setView((v) => (v === "map" ? "calendar" : "map"));
                 }}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium text-black shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
+                className={`rounded-xl px-3 py-2 text-sm font-medium shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:brightness-105 ${
+                  view === "map"
+                    ? "border-0 text-white"
+                    : "border border-black/10 bg-white/95 text-black hover:bg-white"
+                }`}
+                style={view === "map" ? { background: "linear-gradient(135deg, #7c3aed, #db2777, #f59e0b)" } : undefined}
                 aria-label="Toggle view mode"
               >
                 {view === "map" ? (
@@ -378,10 +387,10 @@ export default function EventsView({
           <button
             type="button"
             onClick={() => setFeaturedOpen(false)}
-            className="rounded-lg px-2 py-1 text-black/60 hover:bg-black/5"
+            className="rounded-lg p-1.5 text-black/60 hover:bg-black/5"
             aria-label="Close"
           >
-            ✕
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -421,14 +430,14 @@ export default function EventsView({
             className="absolute inset-0 z-1003 bg-black/20 sm:bg-transparent"
             onClick={closeDetail}
           />
-          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full bg-white/96 p-5 shadow-2xl backdrop-blur sm:top-0 sm:h-full sm:w-96 sm:border-l sm:border-black/10">
+          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full max-h-[78dvh] overflow-y-auto bg-white/96 p-5 shadow-2xl backdrop-blur sm:top-0 sm:max-h-full sm:h-full sm:w-96 sm:border-l sm:border-black/10">
             <button
               type="button"
               onClick={closeDetail}
-              className="absolute right-3 top-3 rounded-lg px-2 py-1 text-black/60 hover:bg-black/5"
+              className="absolute right-3 top-3 rounded-lg p-1.5 text-black/60 hover:bg-black/5"
               aria-label="Close detail"
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
 
             {selectedEvent && (
