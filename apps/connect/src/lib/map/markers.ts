@@ -304,7 +304,7 @@ export function createPlaceMarkerEl(
   const opacity = isFlagged ? 0.62 : 1;
 
   const placeIcon =
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#3d3d3d" stroke="#D4AF37" stroke-width="2.5"/><circle cx="12" cy="12" r="3.5" fill="#D4AF37"/></svg>';
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="white" stroke="#D4AF37" stroke-width="1"/><circle cx="12" cy="12" r="3.5" fill="#D4AF37"/></svg>';
 
   const el = document.createElement("div");
   el.className = "cc-marker";

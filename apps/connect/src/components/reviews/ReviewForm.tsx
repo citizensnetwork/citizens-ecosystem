@@ -39,11 +39,30 @@ export default function ReviewForm({ user, placeId, eventId, onSubmitted }: Prop
       still_exists: isPlaceReview ? stillExists : true,
     };
 
-    const target = isPlaceReview ? "place_id,user_id" : "event_id,user_id";
+    const filterCol = isPlaceReview ? "place_id" : "event_id";
+    const filterVal = isPlaceReview ? placeId! : eventId!;
 
-    const { error: upsertError } = await supabase
+    // Partial unique indexes aren't supported as upsert conflict targets,
+    // so we check for an existing review then insert or update explicitly.
+    const { data: existing } = await supabase
       .from("reviews")
-      .upsert(payload, { onConflict: target });
+      .select("id")
+      .eq(filterCol, filterVal)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let upsertError: { message: string } | null = null;
+
+    if (existing) {
+      const { error } = await supabase
+        .from("reviews")
+        .update({ rating, body: body.trim(), still_exists: isPlaceReview ? stillExists : true })
+        .eq("id", existing.id);
+      upsertError = error;
+    } else {
+      const { error } = await supabase.from("reviews").insert(payload);
+      upsertError = error;
+    }
 
     if (upsertError) {
       setError(upsertError.message);
