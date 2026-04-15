@@ -107,9 +107,9 @@ export default function EventDetailContent({
         {user?.id === event.created_by && (
           <Link
             href={`/events/${event.id}/edit`}
-            className="text-sm text-gray-500 hover:text-gray-800 border rounded-md px-3 py-1.5"
+            className="text-sm text-black/60 hover:text-black border border-black/15 rounded-xl px-3 py-1.5 transition hover:bg-black/5"
           >
-            ✏️ Edit Event
+            Edit Event
           </Link>
         )}
       </div>
@@ -175,15 +175,15 @@ export default function EventDetailContent({
       </div>
 
       <div className="mt-4 space-y-3">
-        <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex items-center gap-2 text-black/60">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>{dateStr}</span>
         </div>
-        <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex items-center gap-2 text-black/60">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span>{event.location}</span>
         </div>
-        <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex items-center gap-2 text-black/60">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>
             {event.max_attendees
@@ -243,14 +243,14 @@ export default function EventDetailContent({
 
       <div className="mt-6">
         <h2 className="text-lg font-semibold mb-2">About this event</h2>
-        <p className="text-gray-700 whitespace-pre-wrap">{event.description}</p>
+        <p className="text-black/70 whitespace-pre-wrap">{event.description}</p>
       </div>
 
       <div className="mt-8">
         {isCancelled ? (
-          <div className="text-gray-400 text-sm font-medium">RSVP is disabled for cancelled events.</div>
+          <div className="text-black/40 text-sm font-medium">RSVP is disabled for cancelled events.</div>
         ) : hasStarted && !hasRsvped ? (
-          <div className="text-gray-400 text-sm font-medium">This event has already started. RSVP is no longer available.</div>
+          <div className="text-black/40 text-sm font-medium">This event has already started. RSVP is no longer available.</div>
         ) : user ? (
           <>
             <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
@@ -260,14 +260,14 @@ export default function EventDetailContent({
                   href={buildGoogleCalendarUrl(event)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-3 py-1.5 text-xs font-medium text-black hover:bg-(--gold)/20 transition"
                 >
                   Add to Google Calendar
                 </a>
                 <a
                   href={`/api/events/${event.id}/ical`}
                   download
-                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-3 py-1.5 text-xs font-medium text-black hover:bg-(--gold)/20 transition"
                 >
                   Download .ics
                 </a>

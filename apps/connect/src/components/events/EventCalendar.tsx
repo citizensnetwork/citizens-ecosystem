@@ -11,6 +11,19 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventClickArg } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 
+/**
+ * Returns black or white text colour based on the perceived luminance of the
+ * background hex, ensuring WCAG AA contrast for calendar event labels.
+ */
+function calendarTextColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Relative luminance (ITU-R BT.601 coefficients)
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 155 ? "#111" : "#fff";
+}
+
 
 type Props = {
   events: Event[];
@@ -32,14 +45,15 @@ export default function EventCalendar({
   const fcEvents = events.map((e) => {
     const isRsvpd = rsvpEventIds.has(e.id);
     const catColor = CATEGORY_COLORS[e.category ?? "church"] ?? "#D4AF37";
+    const bgColor = isRsvpd ? "#D4AF37" : catColor;
     return {
       id: e.id,
       title: e.title,
       start: e.date,
       end: e.end_time ?? undefined,
-      backgroundColor: isRsvpd ? "#D4AF37" : catColor,
+      backgroundColor: bgColor,
       borderColor: isRsvpd ? "#b8941f" : catColor,
-      textColor: isRsvpd ? "#111" : "#fff",
+      textColor: isRsvpd ? "#111" : calendarTextColor(catColor),
       extendedProps: { event: e },
     };
   });
