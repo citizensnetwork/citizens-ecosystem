@@ -93,17 +93,17 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
             defaultOpen
             badge={activeCategories.size > 0 ? activeCategories.size : undefined}
+            headerAction={activeCategories.size > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onClearCategories(); }}
+                className="rounded-md px-2 py-0.5 text-[10px] font-medium text-black/45 transition hover:bg-black/5 hover:text-black/70"
+              >
+                Clear
+              </button>
+            ) : undefined}
           >
-            <div className="space-y-1">
-              {activeCategories.size > 0 && (
-                <button
-                  type="button"
-                  onClick={onClearCategories}
-                  className="mb-1 w-full rounded-lg px-3 py-1.5 text-left text-xs font-medium text-black/50 transition hover:bg-black/5"
-                >
-                  Clear all filters
-                </button>
-              )}
+            <div className="space-y-0.5">
               {EVENT_CATEGORIES.map((c) => {
                 const active = activeCategories.has(c.value);
                 const catColor = CATEGORY_HEX[c.value];
@@ -115,18 +115,22 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
                       active
                         ? "font-medium text-black"
-                        : "text-black/75 hover:bg-black/5"
+                        : "text-black/70 hover:bg-black/[.04]"
                     }`}
-                    style={active ? { backgroundColor: `${catColor}20`, borderLeft: `3px solid ${catColor}` } : { borderLeft: "3px solid transparent" }}
+                    style={active ? { backgroundColor: `${catColor}15` } : undefined}
                   >
                     <span
-                      className="flex-shrink-0 h-2.5 w-2.5 rounded-full ring-1 ring-black/10"
-                      style={{ background: catColor }}
-                    />
+                      className="flex-shrink-0 flex h-4 w-4 items-center justify-center rounded-full border transition-all"
+                      style={active
+                        ? { borderColor: catColor, backgroundColor: `${catColor}30` }
+                        : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
+                      }
+                    >
+                      {active && (
+                        <svg viewBox="0 0 24 24" fill="none" stroke={catColor} strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      )}
+                    </span>
                     {c.label}
-                    {active && (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="ml-auto h-3.5 w-3.5 flex-shrink-0" style={{ color: catColor }}><polyline points="20 6 9 17 4 12"/></svg>
-                    )}
                   </button>
                 );
               })}

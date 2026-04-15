@@ -207,6 +207,31 @@ body {
   }
 }
 
+/* ── FullCalendar prev/next arrow icon fixes ──────────── */
+.cc-calendar .fc .fc-prev-button,
+.cc-calendar .fc .fc-next-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+}
+
+.cc-calendar .fc .fc-icon {
+  font-family: "fcicons" !important;
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 1.1em;
+  vertical-align: middle;
+  display: inline-block;
+}
+
 /* ── Map marker styles ────────────────────────────────── */
 
 .cc-marker {

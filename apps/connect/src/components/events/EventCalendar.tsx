@@ -40,6 +40,7 @@ export default function EventCalendar({
 }: Props) {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   /* Map Event[] → FullCalendar EventInput[] */
   const fcEvents = events.map((e) => {
@@ -89,8 +90,45 @@ export default function EventCalendar({
     return () => clearTimeout(timer);
   }, []);
 
+  /* Mobile swipe left/right to navigate months */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let startX = 0;
+    let startY = 0;
+
+    function handleTouchStart(e: TouchEvent) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }
+
+    function handleTouchEnd(e: TouchEvent) {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+
+      // Only trigger if horizontal swipe is dominant and exceeds threshold
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        const api = calendarRef.current?.getApi();
+        if (!api) return;
+        if (dx < 0) {
+          api.next();
+        } else {
+          api.prev();
+        }
+      }
+    }
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+
   return (
-    <div className="cc-calendar surface-card rounded-2xl p-3 sm:p-4">
+    <div ref={containerRef} className="cc-calendar surface-card rounded-2xl p-3 sm:p-4">
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
