@@ -101,9 +101,12 @@ export default function EventMap({
 
     mapRef.current = map;
 
-    // Mark map as ready once style is loaded
+    // Mark map as ready once style is loaded.
+    // resize() re-measures the container after the dynamic import resolves
+    // so MapLibre always gets the correct canvas dimensions.
     map.once("load", () => {
       readyRef.current = true;
+      map.resize();
     });
 
     // Persist viewpoint on every move
