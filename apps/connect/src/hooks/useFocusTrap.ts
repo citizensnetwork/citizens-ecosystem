@@ -16,10 +16,13 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
     // Remember where focus was before the trap
     previousFocusRef.current = document.activeElement as HTMLElement;
 
-    // Focus the first focusable element inside the container
+    // Focus the first focusable element inside the container.
+    // preventScroll: true prevents the browser from scrolling to bring
+    // an off-screen (CSS-transformed) element into view, which would cause
+    // the entire page to jerk down when opening a slide-up panel.
     const focusable = getFocusableElements(containerRef.current);
     if (focusable.length > 0) {
-      (focusable[0] as HTMLElement).focus();
+      (focusable[0] as HTMLElement).focus({ preventScroll: true });
     }
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -44,7 +47,7 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       // Restore focus when trap is deactivated
-      previousFocusRef.current?.focus();
+      previousFocusRef.current?.focus({ preventScroll: true });
     };
   }, [active]);
 

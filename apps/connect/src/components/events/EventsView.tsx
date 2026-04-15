@@ -54,6 +54,20 @@ export default function EventsView({
   const panelSwipeStartY = useRef(0);
   const router = useRouter();
 
+  // Lock document scroll while the full-screen map view is mounted.
+  // Without this, any focus() call on an off-screen element (e.g. the
+  // featured panel while it is still translated off-screen) can scroll the
+  // page and push the map out of view.
+  useEffect(() => {
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prev;
+      document.body.style.overflow = "";
+    };
+  }, []);
+
   useEffect(() => {
     const supabase = supabaseRef.current!;
     supabase.auth.getUser().then(({ data: { user } }) => {
