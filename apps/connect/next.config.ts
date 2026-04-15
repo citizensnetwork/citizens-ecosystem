@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com",
               "font-src 'self'",
-              "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com",
+              "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com https://tile.openstreetmap.org",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",
