@@ -120,7 +120,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     style={active ? { backgroundColor: `${catColor}15` } : undefined}
                   >
                     <span
-                      className="flex-shrink-0 flex h-4 w-4 items-center justify-center rounded-full border transition-all"
+                      className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
                       style={active
                         ? { borderColor: catColor, backgroundColor: `${catColor}30` }
                         : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }

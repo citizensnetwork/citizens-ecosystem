@@ -93,7 +93,7 @@ export default function EventCalendar({
   /* Mobile swipe left/right to navigate months */
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !("ontouchstart" in window)) return;
 
     let startX = 0;
     let startY = 0;
