@@ -307,6 +307,9 @@ create unique index if not exists reviews_event_user_unique
 create index if not exists reviews_place_id_idx
   on public.reviews(place_id) where place_id is not null;
 
+create index if not exists reviews_event_id_idx
+  on public.reviews(event_id) where event_id is not null;
+
 alter table public.reviews enable row level security;
 
 do $$ begin
