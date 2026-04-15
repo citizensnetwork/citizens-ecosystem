@@ -3,13 +3,27 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import type { User } from "@supabase/supabase-js";
 
-const mockUpsert = vi.fn();
+const mockInsert = vi.fn();
+const mockMaybeSingle = vi.fn();
+
+// Build a chainable mock that mirrors the new select → insert/update flow.
+const makeFromChain = () => ({
+  select: () => ({
+    eq: () => ({
+      eq: () => ({
+        maybeSingle: mockMaybeSingle,
+      }),
+    }),
+  }),
+  insert: mockInsert,
+  update: () => ({
+    eq: vi.fn().mockResolvedValue({ error: null }),
+  }),
+});
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
-    from: () => ({
-      upsert: mockUpsert,
-    }),
+    from: () => makeFromChain(),
   }),
 }));
 
@@ -26,7 +40,11 @@ vi.mock("next/link", () => ({
 const user = { id: "user-123" } as User;
 
 describe("ReviewForm", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: no existing review found
+    mockMaybeSingle.mockResolvedValue({ data: null });
+  });
 
   it("shows login prompt when user is null", () => {
     render(<ReviewForm user={null} eventId="e1" />);
@@ -74,7 +92,7 @@ describe("ReviewForm", () => {
   });
 
   it("submits review with rating and body", async () => {
-    mockUpsert.mockResolvedValue({ error: null });
+    mockInsert.mockResolvedValue({ error: null });
     const onSubmitted = vi.fn();
 
     render(
@@ -92,21 +110,20 @@ describe("ReviewForm", () => {
     );
 
     await waitFor(() => {
-      expect(mockUpsert).toHaveBeenCalledWith(
+      expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({
           event_id: "e1",
           user_id: "user-123",
           rating: 4,
           body: "Great event!",
-        }),
-        expect.any(Object)
+        })
       );
       expect(onSubmitted).toHaveBeenCalled();
     });
   });
 
   it("shows error on upsert failure", async () => {
-    mockUpsert.mockResolvedValue({
+    mockInsert.mockResolvedValue({
       error: { message: "Permission denied" },
     });
 
@@ -121,7 +138,8 @@ describe("ReviewForm", () => {
   });
 
   it("shows Saving... during submission", async () => {
-    mockUpsert.mockReturnValue(new Promise(() => {}));
+    // Keep the operation pending by never resolving maybeSingle
+    mockMaybeSingle.mockReturnValue(new Promise(() => {}));
 
     render(<ReviewForm user={user} eventId="e1" />);
     fireEvent.click(
