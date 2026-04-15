@@ -340,5 +340,5 @@ export default function EventMap({
     });
   }, [flyTo, flyToZoom]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return <div ref={containerRef} className="h-full w-full" />;
 }
