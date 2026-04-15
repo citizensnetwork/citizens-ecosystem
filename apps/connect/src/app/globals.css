@@ -234,7 +234,7 @@ body {
 }
 
 .cc-popup {
-  min-width: 180px;
+  min-width: 200px;
   font-family: "Montserrat", sans-serif;
 }
 
@@ -252,23 +252,40 @@ body {
   margin: 4px 0 0;
 }
 
-.cc-popup-btn {
-  display: block;
-  width: 100%;
+.cc-popup-actions {
+  display: flex;
+  gap: 2px;
   margin: 8px 0 0;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  justify-content: center;
+}
+
+.cc-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 500;
   font-family: "Montserrat", sans-serif;
   color: #000;
-  background: var(--gold, #d4a843);
+  background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: brightness 0.15s;
+  transition: background 0.15s;
+  line-height: 1;
 }
-.cc-popup-btn:hover {
-  filter: brightness(0.95);
+.cc-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.cc-action-btn svg {
+  flex-shrink: 0;
+}
+.cc-action-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .cc-popup-warning {

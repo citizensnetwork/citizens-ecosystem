@@ -6,12 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import FeaturedPanel from "./FeaturedPanel";
-import QuickActionPopup from "./QuickActionPopup";
 import PostEventPrompt from "@/components/reviews/PostEventPrompt";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import dynamic from "next/dynamic";
@@ -153,20 +153,58 @@ export default function EventsView({
   }, [places, search]);
 
   const handleSelectEvent = useCallback(
-    (event: Event, clickEvent?: MouseEvent) => {
-      // On map view, show quick-action popup at click position
-      if (view === "map" && clickEvent) {
-        setQuickActionEvent(event);
-        setQuickActionPos({ x: clickEvent.clientX, y: clickEvent.clientY });
-        return;
-      }
-      setQuickActionEvent(null);
-      setQuickActionPos(null);
+    (event: Event) => {
       setSelectedPlace(null);
       setSelectedEvent(event);
       setFeaturedOpen(false);
     },
-    [view]
+    []
+  );
+
+  const handleQuickAction = useCallback(
+    async (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => {
+      try {
+        switch (action) {
+          case "view":
+            router.push(`/events/${event.id}`);
+            break;
+          case "join": {
+            const res = await fetch("/api/rsvp", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ event_id: event.id }),
+            });
+            if (res.status === 401) { router.push("/login"); return; }
+            if (res.ok) {
+              setRsvpEventIds((prev) => new Set([...prev, event.id]));
+            }
+            break;
+          }
+          case "share": {
+            const eventUrl = `${window.location.origin}/events/${event.id}`;
+            await share({ title: event.title, url: eventUrl });
+            break;
+          }
+          case "consider": {
+            const res = await fetch("/api/consider", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ event_id: event.id }),
+            });
+            if (res.status === 401) router.push("/login");
+            break;
+          }
+          case "visit":
+            if (event.website_url && /^https?:\/\//i.test(event.website_url)) {
+              window.open(event.website_url, "_blank", "noopener,noreferrer");
+            }
+            break;
+        }
+      } catch {
+        /* network error — fail silently for quick actions */
+      }
+    },
+    [router]
   );
 
   const handleSelectPlace = useCallback((place: Place) => {
@@ -183,10 +221,6 @@ export default function EventsView({
   // City search / geocoding state
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
-
-  // Quick-action popup state (map marker click)
-  const [quickActionEvent, setQuickActionEvent] = useState<Event | null>(null);
-  const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
 
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
@@ -216,33 +250,20 @@ export default function EventsView({
   // Close glance panel when detail opens
   const hasDetail = selectedEvent || selectedPlace;
 
-  function closeQuickAction() {
-    setQuickActionEvent(null);
-    setQuickActionPos(null);
-  }
-
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
       {view === "map" && (
         <EventMap
           events={filtered}
           places={filteredPlaces}
-          onSelectEvent={handleSelectEvent}
           onSelectPlace={handleSelectPlace}
+          onQuickAction={handleQuickAction}
           autoLocate
           flyTo={mapFlyTo}
           flyToZoom={mapFlyToZoom}
         />
       )}
 
-      {/* Quick-action popup for map markers */}
-      {quickActionEvent && quickActionPos && (
-        <QuickActionPopup
-          event={quickActionEvent}
-          position={quickActionPos}
-          onClose={closeQuickAction}
-        />
-      )}
       {view === "calendar" && (
         <div className="h-full overflow-y-auto bg-(--surface) px-3 pb-6 pt-28 sm:px-5 sm:pt-24">
           <div className="mx-auto max-w-6xl">

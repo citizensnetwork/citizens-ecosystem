@@ -54,8 +54,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Check if user has set up interests (progressive profiling hint)
+  const { count } = await supabase
+    .from("user_interests")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
   return NextResponse.json(
-    { success: true, remaining: res.remaining },
+    { success: true, remaining: res.remaining, needsProfileSetup: count === 0 },
     { status: 201 }
   );
 }
@@ -69,6 +75,11 @@ export async function DELETE(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`rsvp:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   let body;

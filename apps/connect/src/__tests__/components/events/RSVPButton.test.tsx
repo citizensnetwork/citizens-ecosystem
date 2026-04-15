@@ -44,7 +44,10 @@ describe("RSVPButton", () => {
   });
 
   it("calls POST /api/rsvp to create RSVP", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ success: true, needsProfileSetup: false }),
+    });
 
     render(<RSVPButton eventId="event-1" hasRsvped={false} />);
     fireEvent.click(screen.getByRole("button"));

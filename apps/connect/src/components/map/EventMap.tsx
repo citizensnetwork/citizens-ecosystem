@@ -17,8 +17,8 @@ import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 type Props = {
   events: Event[];
   places?: Place[];
-  onSelectEvent?: (event: Event, clickEvent?: MouseEvent) => void;
   onSelectPlace?: (place: Place) => void;
+  onQuickAction?: (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => void;
   center?: [number, number];
   zoom?: number;
   autoLocate?: boolean;
@@ -32,8 +32,8 @@ const MAP_VIEW_KEY = "cc-map-viewpoint";
 export default function EventMap({
   events,
   places = [],
-  onSelectEvent,
   onSelectPlace,
+  onQuickAction,
   center = DEFAULT_CENTER,
   zoom = 12,
   autoLocate = false,
@@ -49,10 +49,10 @@ export default function EventMap({
   const hasRestoredView = useRef(false);
 
   // Keep stable refs so marker click handlers always see latest callbacks
-  const onSelectEventRef = useRef(onSelectEvent);
-  onSelectEventRef.current = onSelectEvent;
   const onSelectPlaceRef = useRef(onSelectPlace);
   onSelectPlaceRef.current = onSelectPlace;
+  const onQuickActionRef = useRef(onQuickAction);
+  onQuickActionRef.current = onQuickAction;
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach((m) => m.remove());
@@ -196,24 +196,54 @@ export default function EventMap({
           minute: "2-digit",
         });
 
+        const hasWebsite = event.website_url && /^https?:\/\//i.test(event.website_url);
+        const now = new Date();
+        const hasStarted = new Date(event.date) <= now;
+
         const popup = new maplibregl.Popup({
           offset: 16,
-          closeButton: false,
-          maxWidth: "260px",
+          closeButton: true,
+          maxWidth: "280px",
         }).setHTML(
           `<div class="cc-popup">
             <strong>${escapeHtml(event.title)}</strong>
             <p>${dateStr}</p>
             <p>${escapeHtml(event.location)}</p>
-            <button class="cc-popup-btn" data-event-id="${escapeHtml(event.id)}">View Details</button>
+            <div class="cc-popup-actions">
+              <button class="cc-action-btn" data-action="view" title="View details">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>View</span>
+              </button>
+              <button class="cc-action-btn${hasStarted ? " cc-action-disabled" : ""}" data-action="join" title="${hasStarted ? "Event started" : "Join event"}"${hasStarted ? " disabled" : ""}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                <span>Join</span>
+              </button>
+              <button class="cc-action-btn" data-action="share" title="Share event">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Share</span>
+              </button>
+              <button class="cc-action-btn" data-action="consider" title="Consider">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                <span>Consider</span>
+              </button>
+              <button class="cc-action-btn${hasWebsite ? "" : " cc-action-disabled"}" data-action="visit" title="${hasWebsite ? "Visit website" : "No website"}"${hasWebsite ? "" : " disabled"}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span>Visit</span>
+              </button>
+            </div>
           </div>`
         );
 
         popup.on("open", () => {
-          const btn = document.querySelector(`button[data-event-id="${event.id}"]`);
-          btn?.addEventListener("click", (e) => {
-            popup.remove();
-            onSelectEventRef.current?.(event, e as MouseEvent);
+          const el = popup.getElement();
+          el?.querySelectorAll(".cc-action-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const action = btn.getAttribute("data-action") as "view" | "join" | "share" | "consider" | "visit";
+              if (action) {
+                popup.remove();
+                onQuickActionRef.current?.(action, event);
+              }
+            });
           });
         });
 
@@ -248,20 +278,27 @@ export default function EventMap({
           ? '<p class="cc-popup-warning">Possibly closed - awaiting verification</p>'
           : "";
 
+        const popup = new maplibregl.Popup({
+          offset: 16,
+          closeButton: true,
+          maxWidth: "240px",
+        }).setHTML(
+          `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>${ratingLabel}</p>${warning}<div class="cc-popup-actions"><button class="cc-action-btn" data-action="view" title="View details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></button></div></div>`
+        );
+
+        popup.on("open", () => {
+          const el = popup.getElement();
+          el?.querySelector(".cc-action-btn")?.addEventListener("click", () => {
+            popup.remove();
+            onSelectPlaceRef.current?.(place);
+          });
+        });
+
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat([place.longitude, place.latitude])
-          .setPopup(
-            new maplibregl.Popup({
-              offset: 16,
-              closeButton: false,
-              maxWidth: "240px",
-            }).setHTML(
-              `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>${ratingLabel}</p>${warning}</div>`
-            )
-          )
+          .setPopup(popup)
           .addTo(map);
 
-        el.addEventListener("click", () => onSelectPlaceRef.current?.(place));
         markersRef.current.push(marker);
         bounds.extend([place.longitude, place.latitude]);
         hasPoints = true;

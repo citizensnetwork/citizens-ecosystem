@@ -50,7 +50,7 @@ describe("map/config", () => {
       const style = getMapStyle();
 
       expect(typeof style).toBe("string");
-      expect(style).toContain("https://api.maptiler.com/maps/streets-v2/style.json");
+      expect(style).toContain("https://api.maptiler.com/maps/streets-v4/style.json");
       expect(style).toContain("key=test-key-123");
 
       // Cleanup

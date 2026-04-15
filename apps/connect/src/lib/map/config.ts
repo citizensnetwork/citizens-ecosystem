@@ -26,7 +26,7 @@ const OSM_RASTER_STYLE: StyleSpecification = {
 
 /** MapTiler vector style URL (requires valid API key). */
 function maptilerStyleUrl(): string {
-  return `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
+  return `https://api.maptiler.com/maps/streets-v4/style.json?key=${MAPTILER_KEY}`;
 }
 
 /**
