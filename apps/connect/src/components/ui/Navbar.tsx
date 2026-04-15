@@ -78,7 +78,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-4">
           <Link
-            href="/events"
+            href="/events?view=calendar"
             className="text-sm text-black/65 transition hover:text-black"
           >
             Events
