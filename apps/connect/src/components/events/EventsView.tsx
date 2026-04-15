@@ -268,7 +268,7 @@ export default function EventsView({
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
       {/* Map is always rendered so it shows through transparent calendar */}
-      <div className={view === "calendar" ? "pointer-events-none" : ""}>
+      <div className={`absolute inset-0${view === "calendar" ? " pointer-events-none" : ""}`}>
         <EventMap
           events={filtered}
           places={filteredPlaces}
