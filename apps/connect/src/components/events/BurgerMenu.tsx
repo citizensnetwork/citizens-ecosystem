@@ -68,7 +68,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
         ref={ref}
         role="dialog"
         aria-label="Menu"
-        className={`absolute left-0 top-0 z-1002 flex h-full w-[84vw] max-w-xs flex-col bg-white/96 shadow-2xl backdrop-blur transition-transform duration-300 sm:w-80 ${
+        className={`absolute left-0 top-0 z-1002 flex h-full w-[84vw] max-w-xs flex-col bg-white/60 shadow-2xl backdrop-blur-md transition-transform duration-300 sm:w-80 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

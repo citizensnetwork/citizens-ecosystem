@@ -267,7 +267,8 @@ export default function EventsView({
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
-      {view === "map" && (
+      {/* Map is always rendered so it shows through transparent calendar */}
+      <div className={view === "calendar" ? "pointer-events-none" : ""}>
         <EventMap
           events={filtered}
           places={filteredPlaces}
@@ -277,10 +278,10 @@ export default function EventsView({
           flyTo={mapFlyTo}
           flyToZoom={mapFlyToZoom}
         />
-      )}
+      </div>
 
       {view === "calendar" && (
-        <div className="h-full overflow-y-auto bg-(--surface) px-3 pb-6 pt-28 sm:px-5 sm:pt-24">
+        <div className="absolute inset-0 z-10 h-full overflow-y-auto bg-white/80 px-3 pb-6 pt-28 backdrop-blur-md sm:px-5 sm:pt-24">
           <div className="mx-auto max-w-6xl">
             <PostEventPrompt />
             <EventCalendar
@@ -402,7 +403,7 @@ export default function EventsView({
           </div>
         </div>
         {/* Scrollable content — semi-transparent so map shows through */}
-        <div className="flex-1 overflow-y-auto bg-white/30 backdrop-blur-sm">
+        <div className="flex-1 overflow-y-auto bg-white/80 backdrop-blur-md">
           <FeaturedPanel
             onSelectEvent={handleSelectEvent}
             onSelectPlace={handleSelectPlace}
@@ -439,7 +440,7 @@ export default function EventsView({
             className="absolute inset-0 z-1003 bg-black/20 sm:bg-transparent"
             onClick={closeDetail}
           />
-          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full max-h-[78dvh] overflow-y-auto bg-white/96 p-5 shadow-2xl backdrop-blur sm:top-0 sm:max-h-full sm:h-full sm:w-96 sm:border-l sm:border-black/10">
+          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full max-h-[78dvh] overflow-y-auto bg-white/85 p-5 shadow-2xl backdrop-blur-md sm:top-0 sm:max-h-full sm:h-full sm:w-96 sm:border-l sm:border-black/10">
             <button
               type="button"
               onClick={closeDetail}

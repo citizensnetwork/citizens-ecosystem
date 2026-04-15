@@ -66,11 +66,19 @@ vi.mock("@/components/ui/ConsiderBadge", () => ({
 describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPathname.mockReturnValue("/");
+    mockPathname.mockReturnValue("/profile");
   });
 
   it("renders null on /events page", () => {
     mockPathname.mockReturnValue("/events");
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const { container } = render(<Navbar />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders null on landing page", () => {
+    mockPathname.mockReturnValue("/");
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
     const { container } = render(<Navbar />);

@@ -134,7 +134,8 @@ describe("EventsView", () => {
       fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
     });
     expect(screen.getByTestId("event-calendar")).toBeInTheDocument();
-    expect(screen.queryByTestId("event-map")).not.toBeInTheDocument();
+    // Map is always rendered (visible behind transparent calendar) but non-interactive
+    expect(screen.getByTestId("event-map")).toBeInTheDocument();
   });
 
   it("renders search input with proper aria-label", async () => {

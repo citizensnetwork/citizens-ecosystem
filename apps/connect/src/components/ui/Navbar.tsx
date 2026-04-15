@@ -65,12 +65,12 @@ export default function Navbar() {
     user?.email?.split("@")[0] ??
     "Account";
 
-  if (pathname === "/events") {
+  if (pathname === "/events" || pathname === "/") {
     return null;
   }
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b bg-white/60 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link href="/events" className="text-lg font-semibold tracking-tight text-(--gold) transition-all active:scale-95 active:brightness-90">
           Citizens Connect
@@ -113,7 +113,7 @@ export default function Navbar() {
               </button>
 
               {menuOpen && (
-                <div role="menu" className="absolute right-0 z-50 mt-1 w-44 rounded-xl border bg-white py-1 shadow-lg">
+                <div role="menu" className="absolute right-0 z-50 mt-1 w-44 rounded-xl border bg-white/60 py-1 shadow-lg backdrop-blur-md">
                   <Link
                     href="/profile"
                     role="menuitem"

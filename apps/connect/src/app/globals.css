@@ -10,6 +10,11 @@
   --gold-soft: #f4ead2;
   --border: #e5e5e5;
   --ring: #000000;
+
+  /* ── Citizens Transparency System ── */
+  --glass-30: rgba(255,255,255,0.30);
+  --glass-60: rgba(255,255,255,0.60);
+  --glass-20: rgba(255,255,255,0.20);
 }
 
 @theme inline {
