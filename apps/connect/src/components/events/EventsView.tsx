@@ -51,6 +51,7 @@ export default function EventsView({
   const [rsvpEventIds, setRsvpEventIds] = useState<Set<string>>(new Set());
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
+  const panelSwipeStartY = useRef(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -332,7 +333,7 @@ export default function EventsView({
                 aria-label="Toggle view mode"
               >
                 {view === "map" ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-(--gold)"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 )}
@@ -342,22 +343,15 @@ export default function EventsView({
         </div>
       </div>
 
-      {/* ── Featured panel toggle button ────────────── */}
-      {!hasDetail && (
+      {/* ── Featured panel open button (only when panel is closed) ────── */}
+      {!hasDetail && !featuredOpen && (
         <button
           type="button"
-          onClick={() => setFeaturedOpen((o) => !o)}
+          onClick={() => setFeaturedOpen(true)}
           className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/30 bg-black/90 px-5 py-2 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
-          aria-label={featuredOpen ? "Close featured panel" : "Open featured panel"}
+          aria-label="Open featured panel"
         >
-          <span className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-              <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
-            </svg>
-            <span className="text-[10px]">
-              {featuredOpen ? "CLOSE" : "FEATURED"}
-            </span>
-          </span>
+          <span className="text-[10px]">FEATURED</span>
         </button>
       )}
 
@@ -366,29 +360,35 @@ export default function EventsView({
         ref={featuredRef}
         role="dialog"
         aria-label="Featured content"
-        className={`absolute inset-x-0 bottom-0 z-1004 flex max-h-[60dvh] flex-col rounded-t-2xl border-t border-(--gold)/10 bg-white/97 shadow-2xl backdrop-blur transition-transform duration-300 ease-out ${
+        className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
           featuredOpen && !hasDetail ? "translate-y-0" : "translate-y-full"
         }`}
+        onTouchStart={(e) => { panelSwipeStartY.current = e.touches[0].clientY; }}
+        onTouchEnd={(e) => {
+          if (e.changedTouches[0].clientY - panelSwipeStartY.current > 60) setFeaturedOpen(false);
+        }}
       >
-        <div className="flex items-center justify-between border-b border-(--gold)/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-(--gold)">
-              <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
-            </svg>
+        {/* Title bar — solid white, 100% opacity */}
+        <div className="flex-shrink-0 rounded-t-2xl bg-white shadow-sm">
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setFeaturedOpen(false)}
+              aria-label="Close featured panel"
+              className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
+            >
+              <span className="block h-1.5 w-16 rounded-full border border-(--gold)/50 bg-black transition-colors hover:bg-black/70" />
+            </button>
+          </div>
+          {/* Centred title */}
+          <div className="flex items-center justify-center px-4 pb-3">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
               Featured
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => setFeaturedOpen(false)}
-            className="rounded-lg p-1.5 text-black/60 hover:bg-black/5"
-            aria-label="Close"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        {/* Scrollable content — semi-transparent so map shows through */}
+        <div className="flex-1 overflow-y-auto bg-white/30 backdrop-blur-sm">
           <FeaturedPanel
             onSelectEvent={handleSelectEvent}
             onSelectPlace={handleSelectPlace}
