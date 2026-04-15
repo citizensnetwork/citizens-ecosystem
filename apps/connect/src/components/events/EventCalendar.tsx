@@ -46,15 +46,18 @@ export default function EventCalendar({
   const fcEvents = events.map((e) => {
     const isRsvpd = rsvpEventIds.has(e.id);
     const catColor = CATEGORY_COLORS[e.category ?? "church"] ?? "#D4AF37";
-    const bgColor = isRsvpd ? "#D4AF37" : catColor;
+    // RSVP'd: full vibrant category colour; un-RSVP'd: pale tinted background
+    const bgColor = isRsvpd ? catColor : `${catColor}30`;
+    const borderColor = catColor;
+    const textColor = isRsvpd ? calendarTextColor(catColor) : catColor;
     return {
       id: e.id,
       title: e.title,
       start: e.date,
       end: e.end_time ?? undefined,
       backgroundColor: bgColor,
-      borderColor: isRsvpd ? "#b8941f" : catColor,
-      textColor: isRsvpd ? "#111" : calendarTextColor(catColor),
+      borderColor,
+      textColor,
       extendedProps: { event: e },
     };
   });

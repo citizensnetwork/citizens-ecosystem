@@ -97,14 +97,7 @@ export default function EventMap({
 
     if (stored) hasRestoredView.current = true;
 
-    map.addControl(
-      new maplibregl.AttributionControl({ compact: true }),
-      "bottom-left"
-    );
-    map.addControl(
-      new maplibregl.NavigationControl({ showCompass: false }),
-      "bottom-right"
-    );
+    // Attribution and zoom controls intentionally hidden per design spec
 
     mapRef.current = map;
 
