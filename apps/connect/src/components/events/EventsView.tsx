@@ -370,14 +370,15 @@ export default function EventsView({
       >
         {/* Title bar — solid white, 100% opacity */}
         <div className="flex-shrink-0 rounded-t-2xl bg-white shadow-sm">
-          {/* Swipe-down handle */}
-          <div className="flex justify-center pt-3 pb-1">
+          <div className="flex justify-center">
             <button
               type="button"
               onClick={() => setFeaturedOpen(false)}
               aria-label="Close featured panel"
-              className="h-1.5 w-16 cursor-pointer rounded-full border border-(--gold)/50 bg-black transition-colors hover:bg-black/70 active:scale-95"
-            />
+              className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
+            >
+              <span className="block h-1.5 w-16 rounded-full border border-(--gold)/50 bg-black transition-colors hover:bg-black/70" />
+            </button>
           </div>
           {/* Centred title */}
           <div className="flex items-center justify-center px-4 pb-3">
