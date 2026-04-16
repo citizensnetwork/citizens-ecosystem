@@ -8,7 +8,6 @@ import RSVPButton from "./RSVPButton";
 import CommentSection from "./CommentSection";
 import WhoIsAttending from "./WhoIsAttending";
 import LiveTrackingPrompt from "./LiveTrackingPrompt";
-import ReviewList from "@/components/reviews/ReviewList";
 import InlineEventRating from "@/components/reviews/InlineEventRating";
 import SocialShareButtons from "@/components/ui/SocialShareButtons";
 import MessageButton from "@/components/messaging/MessageButton";
@@ -100,15 +99,15 @@ export default function EventDetailContent({
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
-      <div className="flex items-center justify-between mb-4">
-        <Link href="/events" className="text-(--gold) hover:underline text-sm">
+      <div className="glass-panel w-full max-w-2xl px-5 py-6 sm:px-6">
+      <div className="flex items-center justify-between mb-3">
+        <Link href="/events" className="text-(--gold) hover:underline text-xs">
           ← Back to Events
         </Link>
         {user?.id === event.created_by && (
           <Link
             href={`/events/${event.id}/edit`}
-            className="text-sm text-black/60 hover:text-black border border-black/15 rounded-xl px-3 py-1.5 transition hover:bg-black/5"
+            className="text-xs text-black/60 hover:text-black border border-black/15 rounded-xl px-2.5 py-1 transition hover:bg-black/5"
           >
             Edit Event
           </Link>
@@ -117,21 +116,21 @@ export default function EventDetailContent({
 
       {/* Cancelled banner */}
       {isCancelled && (
-        <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4 text-center font-semibold">
+        <div className="bg-red-100 border border-red-300 text-red-800 px-3 py-2 rounded-lg mb-3 text-center text-xs font-semibold">
           This event has been cancelled
         </div>
       )}
 
       {/* Draft banner */}
       {event.status === "draft" && (
-        <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-lg mb-4 text-center text-sm font-medium">
+        <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-lg mb-3 text-center text-xs font-medium">
           Draft — only you can see this event
         </div>
       )}
 
       {/* Cover image */}
       {event.image_url && (
-        <div className="relative w-full h-64 mb-4">
+        <div className="relative w-full h-48 mb-3">
           <Image
             src={event.image_url}
             alt={event.title}
@@ -143,55 +142,55 @@ export default function EventDetailContent({
       )}
 
       {event.category && (
-        <div className="mb-2 flex items-center gap-2">
+        <div className="mb-1.5 flex items-center gap-2">
           <span
-            className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
+            className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
           >
             {CATEGORY_LABELS[cat]}
           </span>
           {isLive && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
               {isInSession ? "In Session" : "Live"}
             </span>
           )}
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="text-3xl font-bold">{event.title}</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-xl font-bold leading-tight">{event.title}</h1>
       </div>
 
       {/* Inline star rating */}
-      <div className="mt-1">
+      <div className="mt-0.5">
         <InlineEventRating eventId={event.id} isAuthenticated={!!user} />
       </div>
 
       {/* Social sharing */}
-      <div className="mt-3">
+      <div className="mt-2">
         <SocialShareButtons
           title={event.title}
           description={`${new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${event.location}`}
         />
       </div>
 
-      <div className="mt-4 space-y-3">
-        <div className="flex items-center gap-2 text-black/60">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center gap-2 text-black/60 text-xs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>{dateStr}</span>
         </div>
-        <div className="flex items-center gap-2 text-black/60">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div className="flex items-center gap-2 text-black/60 text-xs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span>{event.location}</span>
         </div>
-        <div className="flex items-center gap-2 text-black/60">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <div className="flex items-center gap-2 text-black/60 text-xs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>
             {event.max_attendees
               ? `${count} / ${event.max_attendees} attending`
               : `${count} attending`}
             {isFull && (
-              <span className="ml-2 inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+              <span className="ml-1.5 inline-block bg-red-100 text-red-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                 Sold Out
               </span>
             )}
@@ -200,8 +199,8 @@ export default function EventDetailContent({
 
         {/* Contact info */}
         {event.website_url && /^https?:\/\//i.test(event.website_url) && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div className="flex items-center gap-2 text-gray-600 text-xs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <a
               href={event.website_url}
               target="_blank"
@@ -213,8 +212,8 @@ export default function EventDetailContent({
           </div>
         )}
         {event.contact_email && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <div className="flex items-center gap-2 text-gray-600 text-xs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             <a
               href={`mailto:${event.contact_email}`}
               className="text-(--gold) hover:underline"
@@ -224,8 +223,8 @@ export default function EventDetailContent({
           </div>
         )}
         {event.contact_phone && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <div className="flex items-center gap-2 text-gray-600 text-xs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             <a
               href={`tel:${event.contact_phone}`}
               className="text-(--gold) hover:underline"
@@ -237,38 +236,38 @@ export default function EventDetailContent({
       </div>
 
       {hasCoords && (
-        <div className="mt-6">
+        <div className="mt-4">
           <MiniMap latitude={event.latitude!} longitude={event.longitude!} eventId={hasRsvped ? event.id : undefined} />
         </div>
       )}
 
-      <div className="mt-6">
-        <h2 className="text-lg font-semibold mb-2">About this event</h2>
-        <p className="text-black/70 whitespace-pre-wrap">{event.description}</p>
+      <div className="mt-4">
+        <h2 className="text-sm font-semibold mb-1">About this event</h2>
+        <p className="text-xs text-black/70 whitespace-pre-wrap leading-relaxed">{event.description}</p>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6">
         {isCancelled ? (
-          <div className="text-black/40 text-sm font-medium">RSVP is disabled for cancelled events.</div>
+          <div className="text-black/40 text-xs font-medium">RSVP is disabled for cancelled events.</div>
         ) : hasStarted && !hasRsvped ? (
-          <div className="text-black/40 text-sm font-medium">This event has already started. RSVP is no longer available.</div>
+          <div className="text-black/40 text-xs font-medium">This event has already started. RSVP is no longer available.</div>
         ) : user ? (
           <>
             <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
             {hasRsvped && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 <a
                   href={buildGoogleCalendarUrl(event)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-3 py-1.5 text-xs font-medium text-black hover:bg-(--gold)/20 transition"
+                  className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black hover:bg-(--gold)/20 transition"
                 >
                   Add to Google Calendar
                 </a>
                 <a
                   href={`/api/events/${event.id}/ical`}
                   download
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-3 py-1.5 text-xs font-medium text-black hover:bg-(--gold)/20 transition"
+                  className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black hover:bg-(--gold)/20 transition"
                 >
                   Download .ics
                 </a>
@@ -278,7 +277,7 @@ export default function EventDetailContent({
         ) : (
           <Link
             href="/login"
-            className="inline-block rounded-lg bg-(--gold) px-6 py-2 text-sm font-semibold text-black transition hover:brightness-105"
+            className="inline-block rounded-lg bg-(--gold) px-5 py-1.5 text-xs font-semibold text-black transition hover:brightness-105"
           >
             Log in to RSVP
           </Link>
@@ -287,7 +286,7 @@ export default function EventDetailContent({
 
       {/* Live Location Sharing */}
       {user && hasRsvped && (
-        <div className="mt-4">
+        <div className="mt-3">
           <LocationSharingToggle
             event={event}
             isAttending={hasRsvped}
@@ -298,7 +297,7 @@ export default function EventDetailContent({
 
       {/* Message Organizer */}
       {user && user.id !== event.created_by && (
-        <div className="mt-6">
+        <div className="mt-4">
           <MessageButton
             recipientId={event.created_by}
             recipientName="Organizer"
@@ -307,8 +306,8 @@ export default function EventDetailContent({
       )}
 
       {/* Who's Attending */}
-      <div className="mt-10 border-t pt-8">
-        <h2 className="text-lg font-semibold mb-4">Who&apos;s Attending</h2>
+      <div className="mt-6 border-t pt-5">
+        <h2 className="text-sm font-semibold mb-3">Who&apos;s Attending</h2>
         <WhoIsAttending
           attendees={attendees}
           totalCount={count}
@@ -317,12 +316,8 @@ export default function EventDetailContent({
         />
       </div>
 
-      <div className="mt-10 border-t pt-8">
-        <ReviewList eventId={event.id} title="Event Reviews" />
-      </div>
-
       {/* Comments */}
-      <div className="mt-10 border-t pt-8">
+      <div className="mt-6 border-t pt-5">
         <CommentSection eventId={event.id} user={user} />
       </div>
 

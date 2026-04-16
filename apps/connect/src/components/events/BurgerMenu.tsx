@@ -31,6 +31,7 @@ type Props = {
   filteredCount: number;
   filteredPlacesCount: number;
   onLogout: () => void;
+  considerVersion?: number;
 };
 
 const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
@@ -54,6 +55,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     filteredCount,
     filteredPlacesCount,
     onLogout,
+    considerVersion,
   },
   ref
 ) {
@@ -308,7 +310,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           </AccordionSection>
 
           {/* Considers */}
-          <BurgerConsiderSection user={user} onClose={onClose} />
+          <BurgerConsiderSection user={user} onClose={onClose} considerVersion={considerVersion} />
 
           {/* Quick actions (always visible) */}
           <div className="mt-4 border-t border-black/8 pt-4 text-sm text-black/65">
@@ -543,7 +545,7 @@ type ConsiderRsvpRow = {
   events: { title: string; date: string } | null;
 };
 
-function BurgerConsiderSection({ user, onClose }: { user: User | null; onClose: () => void }) {
+function BurgerConsiderSection({ user, onClose, considerVersion }: { user: User | null; onClose: () => void; considerVersion?: number }) {
   const [items, setItems] = useState<ConsiderItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -577,7 +579,7 @@ function BurgerConsiderSection({ user, onClose }: { user: User | null; onClose: 
 
   useEffect(() => {
     fetchConsiders();
-  }, [fetchConsiders]);
+  }, [fetchConsiders, considerVersion]);
 
   return (
     <AccordionSection

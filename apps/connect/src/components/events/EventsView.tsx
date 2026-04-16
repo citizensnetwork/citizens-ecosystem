@@ -82,6 +82,7 @@ export default function EventsView({
   // User state for auth section in burger menu
   const [user, setUser] = useState<User | null>(null);
   const [rsvpEventIds, setRsvpEventIds] = useState<Set<string>>(new Set());
+  const [considerVersion, setConsiderVersion] = useState(0);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const panelSwipeStartY = useRef(0);
@@ -279,6 +280,7 @@ export default function EventsView({
               body: JSON.stringify({ event_id: event.id }),
             });
             if (res.status === 401) router.push("/login");
+            if (res.ok) setConsiderVersion((v) => v + 1);
             break;
           }
           case "visit":
@@ -467,7 +469,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setFeaturedOpen(true)}
-          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-black shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
+          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
           aria-label="Open trending panel"
         >
           <span className="text-[10px]">TRENDING</span>
@@ -504,7 +506,7 @@ export default function EventsView({
               <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
               <polyline points="16 7 22 7 22 13"/>
             </svg>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-(--gold)">
               Trending
             </h2>
           </div>
@@ -687,16 +689,18 @@ export default function EventsView({
         filteredCount={filtered.length}
         filteredPlacesCount={filteredPlaces.length}
         onLogout={handleLogout}
+        considerVersion={considerVersion}
       />
 
       {/* ── Detail panel (event or place) ───────────────── */}
       {hasDetail && (
         <>
           <div
-            className="absolute inset-0 z-1003 bg-black/20 sm:bg-transparent"
+            className="absolute inset-0 z-1003 bg-black/40"
             onClick={closeDetail}
           />
-          <aside className="fade-rise absolute bottom-0 right-0 z-1004 w-full max-h-[78dvh] overflow-y-auto bg-white/85 p-5 shadow-2xl backdrop-blur-md sm:top-0 sm:max-h-full sm:h-full sm:w-96 sm:border-l sm:border-black/10">
+          <aside className="fade-rise absolute inset-0 z-1004 flex items-center justify-center p-4 sm:p-8 pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-md max-h-[80dvh] overflow-y-auto rounded-2xl bg-white/90 p-5 shadow-2xl backdrop-blur-md">
             <button
               type="button"
               onClick={closeDetail}
@@ -707,31 +711,31 @@ export default function EventsView({
             </button>
 
             {selectedEvent && (
-              <div className="space-y-3 pt-2">
-                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
+              <div className="space-y-2 pt-1">
+                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
                   {CATEGORY_LABELS[selectedEvent.category ?? "church"]}
                 </span>
-                <h2 className="text-lg font-bold text-black">
+                <h2 className="text-base font-bold text-black leading-tight">
                   {selectedEvent.title}
                 </h2>
-                <p className="text-sm text-black/70">
+                <p className="text-xs text-black/60">
                   {new Date(selectedEvent.date).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
+                    weekday: "short",
+                    month: "short",
                     day: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
                 </p>
-                <p className="text-sm text-black/70">
+                <p className="text-xs text-black/60">
                   {selectedEvent.location}
                 </p>
-                <p className="text-sm leading-relaxed text-black/80">
+                <p className="text-xs leading-relaxed text-black/70 line-clamp-4">
                   {selectedEvent.description}
                 </p>
                 <Link
                   href={`/events/${selectedEvent.id}`}
-                  className="mt-2 inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black"
+                  className="mt-1 inline-block rounded-xl bg-(--gold) px-3 py-1.5 text-xs font-semibold text-black"
                 >
                   View Details →
                 </Link>
@@ -739,32 +743,32 @@ export default function EventsView({
             )}
 
             {selectedPlace && (
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2 pt-1">
                 {selectedPlace.categories && (
-                  <span className="inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--foreground-soft)">
+                  <span className="inline-block rounded-full bg-(--gold-soft) px-2 py-0.5 text-[10px] font-semibold text-(--foreground-soft)">
                     {selectedPlace.categories.name}
                   </span>
                 )}
-                <h2 className="text-lg font-bold text-black">
+                <h2 className="text-base font-bold text-black leading-tight">
                   {selectedPlace.name}
                 </h2>
-                <p className="text-sm text-black/70">
+                <p className="text-xs text-black/60">
                   {selectedPlace.address}
                 </p>
                 {selectedPlace.phone && (
-                  <p className="text-sm text-black/70">
+                  <p className="text-xs text-black/60">
                     {selectedPlace.phone}
                   </p>
                 )}
                 {selectedPlace.avg_rating != null && (
-                  <p className="text-sm text-black/70">
+                  <p className="text-xs text-black/60">
                     {selectedPlace.avg_rating.toFixed(1)} / 5
                     {selectedPlace.reviews_count != null &&
                       ` · ${selectedPlace.reviews_count} review${selectedPlace.reviews_count !== 1 ? "s" : ""}`}
                   </p>
                 )}
                 {selectedPlace.verification_flagged && (
-                  <p className="rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                  <p className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
                     Possibly closed - awaiting owner verification
                   </p>
                 )}
@@ -773,22 +777,23 @@ export default function EventsView({
                     href={selectedPlace.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-(--gold) underline"
+                    className="text-xs text-(--gold) underline"
                   >
                     Visit website
                   </a>
                 )}
-                <p className="text-sm leading-relaxed text-black/80">
+                <p className="text-xs leading-relaxed text-black/70 line-clamp-4">
                   {selectedPlace.description}
                 </p>
                 <Link
                   href={`/places/${selectedPlace.id}`}
-                  className="mt-2 inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black"
+                  className="mt-1 inline-block rounded-xl bg-(--gold) px-3 py-1.5 text-xs font-semibold text-black"
                 >
                   View Details →
                 </Link>
               </div>
             )}
+            </div>
           </aside>
         </>
       )}

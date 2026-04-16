@@ -286,7 +286,7 @@ describe("EventDetailContent", () => {
     expect(back.closest("a")).toHaveAttribute("href", "/events");
   });
 
-  it("renders CommentSection and ReviewList", () => {
+  it("renders CommentSection", () => {
     render(
       <EventDetailContent
         event={baseEvent}
@@ -296,7 +296,6 @@ describe("EventDetailContent", () => {
       />
     );
     expect(screen.getByTestId("comments")).toBeInTheDocument();
-    expect(screen.getByTestId("reviews")).toBeInTheDocument();
   });
 
   it("renders SocialShareButtons", () => {

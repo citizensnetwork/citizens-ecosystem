@@ -200,8 +200,8 @@ export default function EventMap({
         line.setAttribute("y1", origY.toFixed(1));
         line.setAttribute("x2", x.toFixed(1));
         line.setAttribute("y2", y.toFixed(1));
-        line.setAttribute("stroke", "rgba(255,255,255,0.80)");
-        line.setAttribute("stroke-width", "1.5");
+        line.setAttribute("stroke", "transparent");
+        line.setAttribute("stroke-width", "0");
         line.setAttribute("stroke-linecap", "round");
         svg.appendChild(line);
       }
