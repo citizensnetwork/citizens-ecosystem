@@ -82,8 +82,9 @@ export default function EventMap({
   const activePlaceCategoriesRef = useRef(activePlaceCategories);
   activePlaceCategoriesRef.current = activePlaceCategories;
 
-  // Deconfliction data: stores each event marker + its lat/lng
+  // Deconfliction data: stores each event/place marker + its lat/lng
   const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number }[]>([]);
+  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number }[]>([]);
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
   const updateMarkerSizesRef = useRef<() => void>(() => {});
@@ -94,6 +95,7 @@ export default function EventMap({
     placeMarkersRef.current.forEach((m) => m.remove());
     placeMarkersRef.current = [];
     evtMarkerDataRef.current = [];
+    placeMarkerDataRef.current = [];
     // Clear leader lines
     const svg = svgOverlayRef.current;
     if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -151,11 +153,23 @@ export default function EventMap({
       evtMarkerDataRef.current.forEach(({ marker }) => {
         marker.setOffset([0, 0]);
       });
+      placeMarkerDataRef.current.forEach(({ marker }) => {
+        marker.setOffset([0, 0]);
+      });
       return;
     }
 
+    // Combine event + visible place markers for unified deconfliction
+    const allMarkerData = [
+      ...evtMarkerDataRef.current,
+      ...placeMarkerDataRef.current.filter(({ marker }) => {
+        const el = marker.getElement() as HTMLElement;
+        return el.style.visibility !== "hidden";
+      }),
+    ];
+
     // Project lat/lng → screen px
-    const items = evtMarkerDataRef.current.map(({ marker, lngLat }) => {
+    const items = allMarkerData.map(({ marker, lngLat }) => {
       const px = map.project(lngLat as maplibregl.LngLatLike);
       const el = marker.getElement() as HTMLElement;
       const size = parseInt(el.style.width || "40") || 40;
@@ -200,8 +214,8 @@ export default function EventMap({
         line.setAttribute("y1", origY.toFixed(1));
         line.setAttribute("x2", x.toFixed(1));
         line.setAttribute("y2", y.toFixed(1));
-        line.setAttribute("stroke", "rgba(255,255,255,0.80)");
-        line.setAttribute("stroke-width", "1.5");
+        line.setAttribute("stroke", "transparent");
+        line.setAttribute("stroke-width", "0");
         line.setAttribute("stroke-linecap", "round");
         svg.appendChild(line);
       }
@@ -498,6 +512,14 @@ export default function EventMap({
         );
 
         popup.on("open", () => {
+          // Adjust popup position to follow deconflicted marker offset
+          const markerData = placeMarkerDataRef.current.find((d) => d.marker === marker);
+          if (markerData) {
+            const offset = marker.getOffset();
+            const POPUP_BASE_OFFSET = 16;
+            popup.setOffset([offset.x, offset.y - POPUP_BASE_OFFSET]);
+          }
+
           const popupEl = popup.getElement();
           popupEl?.querySelector(".cc-action-btn")?.addEventListener("click", () => {
             popup.remove();
@@ -505,13 +527,16 @@ export default function EventMap({
           });
         });
 
+        const lngLat: [number, number] = [place.longitude, place.latitude];
+        const baseSize = parseInt(placeEl.style.width || "28") || 28;
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
-          .setLngLat([place.longitude, place.latitude])
+          .setLngLat(lngLat)
           .setPopup(popup)
           .addTo(map);
 
         placeMarkersRef.current.push(marker);
-        bounds.extend([place.longitude, place.latitude]);
+        placeMarkerDataRef.current.push({ marker, lngLat, baseSize });
+        bounds.extend(lngLat);
         hasPoints = true;
       });
 
