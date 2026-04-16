@@ -192,10 +192,10 @@ describe("EventsView", () => {
     });
   });
 
-  it("shows featured panel button", async () => {
+  it("shows trending panel button", async () => {
     await renderView();
     expect(
-      screen.getByRole("button", { name: /open featured panel/i })
+      screen.getByRole("button", { name: /open trending panel/i })
     ).toBeInTheDocument();
   });
 
