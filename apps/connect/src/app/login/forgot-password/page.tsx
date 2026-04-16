@@ -32,11 +32,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="relative min-h-[calc(100dvh-3.5rem)] overflow-hidden px-4 py-8 sm:py-10">
-      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-(--gold)/18 blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 bottom-12 h-64 w-64 rounded-full bg-black/10 blur-3xl" />
-
       <div className="relative mx-auto flex min-h-[calc(100dvh-7.5rem)] w-full max-w-md items-center justify-center">
-        <div className="surface-card fade-rise w-full rounded-3xl p-5 sm:p-7 space-y-5">
+        <div className="glass-panel fade-rise w-full p-5 sm:p-7 space-y-5">
           <div className="space-y-2 text-center">
             <p className="inline-flex items-center rounded-full border border-black/10 bg-(--gold-soft) px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/80">
               Password Reset
