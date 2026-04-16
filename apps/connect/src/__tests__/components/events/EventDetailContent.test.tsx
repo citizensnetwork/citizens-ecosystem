@@ -296,6 +296,7 @@ describe("EventDetailContent", () => {
       />
     );
     expect(screen.getByTestId("comments")).toBeInTheDocument();
+    expect(screen.queryByTestId("reviews")).not.toBeInTheDocument();
   });
 
   it("renders SocialShareButtons", () => {

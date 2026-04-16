@@ -698,7 +698,6 @@ export default function EventsView({
           <div
             className="absolute inset-0 z-1003 bg-black/40"
             role="presentation"
-            aria-hidden="true"
             onClick={closeDetail}
           />
           <aside
