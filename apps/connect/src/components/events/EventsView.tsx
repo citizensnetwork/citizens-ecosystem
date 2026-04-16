@@ -51,6 +51,9 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+/** Glass-like inactive background for quick access buttons (silver, 80% opacity). */
+const QUICK_ACCESS_INACTIVE_BG = "rgba(192,192,192,0.80)";
+
 /** Quick access tool definitions — SVG icons, colour, and matching categories. */
 type QuickAccessItem = {
   id: string;
@@ -221,12 +224,15 @@ export default function EventsView({
     router.refresh();
   }
 
+  /** Clear quick-access selection and its derived state (shared by multiple handlers). */
+  function clearQuickAccess() {
+    setActiveQuickAccess(null);
+    setQuickPanelOpen(false);
+  }
+
   function toggleCategory(cat: EventCategory) {
     // Clear quick access when using regular category toggle
-    if (activeQuickAccess) {
-      setActiveQuickAccess(null);
-      setQuickPanelOpen(false);
-    }
+    if (activeQuickAccess) clearQuickAccess();
     setActiveCategories((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) {
@@ -260,14 +266,15 @@ export default function EventsView({
     });
   }
 
-  // Quick-access toggle: sets both event + place categories, clears regular selections
+  // Quick-access toggle: sets both event + place categories, clears regular selections.
+  // NOTE: Quick access items map to DB event categories by slug (e.g. "education", "church").
+  // If category slugs are renamed in the DB, update QUICK_ACCESS_ITEMS accordingly.
   function toggleQuickAccess(itemId: string) {
     if (activeQuickAccess === itemId) {
       // Deselect
-      setActiveQuickAccess(null);
+      clearQuickAccess();
       setActiveCategories(new Set());
       setActivePlaceCategories(new Set());
-      setQuickPanelOpen(false);
     } else {
       const item = QUICK_ACCESS_ITEMS.find((i) => i.id === itemId);
       if (!item) return;
@@ -581,7 +588,7 @@ export default function EventsView({
                   onClick={() => toggleQuickAccess(item.id)}
                   className="group flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all active:scale-90"
                   style={{
-                    background: isActive ? hexToRgba(item.color, 0.25) : "rgba(192,192,192,0.80)",
+                    background: isActive ? hexToRgba(item.color, 0.25) : QUICK_ACCESS_INACTIVE_BG,
                     border: isActive ? `2px solid ${item.color}` : "1px solid rgba(0,0,0,0.08)",
                   }}
                   aria-label={item.label}
@@ -975,10 +982,10 @@ export default function EventsView({
         displayName={displayName}
         activeCategories={activeCategories}
         onToggleCategory={toggleCategory}
-        onClearCategories={() => { setActiveCategories(new Set()); setActiveQuickAccess(null); setQuickPanelOpen(false); }}
+        onClearCategories={() => { setActiveCategories(new Set()); clearQuickAccess(); }}
         activePlaceCategories={activePlaceCategories}
         onTogglePlaceCategory={togglePlaceCategory}
-        onClearPlaceCategories={() => { setActivePlaceCategories(new Set()); setActiveQuickAccess(null); setQuickPanelOpen(false); }}
+        onClearPlaceCategories={() => { setActivePlaceCategories(new Set()); clearQuickAccess(); }}
         trending={trending}
         favouriteOrgs={favouriteOrgs}
         friends={friends}
