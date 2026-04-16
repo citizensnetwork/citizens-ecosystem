@@ -28,6 +28,29 @@ const TYPE_ICONS: Record<string, string> = {
   event_update: "▸",
 };
 
+/** Safely read dismissed review IDs from localStorage. */
+function getDismissedReviewIds(): string[] {
+  try {
+    const str = localStorage.getItem("cc_dismissed_reviews");
+    return str ? JSON.parse(str) as string[] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Safely persist a dismissed review ID to localStorage. */
+function addDismissedReviewId(eventId: string): void {
+  try {
+    const dismissed = getDismissedReviewIds();
+    if (!dismissed.includes(eventId)) {
+      dismissed.push(eventId);
+      localStorage.setItem("cc_dismissed_reviews", JSON.stringify(dismissed));
+    }
+  } catch {
+    // localStorage unavailable — dismiss is session-only
+  }
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -93,8 +116,7 @@ export default function NotificationPanel({
       const reviewedIds = new Set((reviews ?? []).map((r) => r.event_id));
 
       // Also check localStorage for permanently dismissed reviews
-      const dismissedStr = localStorage.getItem("cc_dismissed_reviews");
-      const dismissed = dismissedStr ? new Set(JSON.parse(dismissedStr) as string[]) : new Set<string>();
+      const dismissed = new Set(getDismissedReviewIds());
 
       if (active) {
         setDismissedReviews(dismissed);
@@ -129,13 +151,7 @@ export default function NotificationPanel({
     setSubmittingReview(null);
     if (!error) {
       setCompletedReviews((prev) => new Set([...prev, eventId]));
-      // Permanently mark as completed in localStorage
-      const dismissedStr = localStorage.getItem("cc_dismissed_reviews");
-      const dismissed: string[] = dismissedStr ? JSON.parse(dismissedStr) : [];
-      if (!dismissed.includes(eventId)) {
-        dismissed.push(eventId);
-        localStorage.setItem("cc_dismissed_reviews", JSON.stringify(dismissed));
-      }
+      addDismissedReviewId(eventId);
       // Remove from pending after a brief highlight
       setTimeout(() => {
         setPendingReviews((prev) => prev.filter((r) => r.id !== eventId));
@@ -144,13 +160,7 @@ export default function NotificationPanel({
   }, []);
 
   const dismissReview = useCallback((eventId: string) => {
-    // Permanently dismiss in localStorage
-    const dismissedStr = localStorage.getItem("cc_dismissed_reviews");
-    const dismissed: string[] = dismissedStr ? JSON.parse(dismissedStr) : [];
-    if (!dismissed.includes(eventId)) {
-      dismissed.push(eventId);
-      localStorage.setItem("cc_dismissed_reviews", JSON.stringify(dismissed));
-    }
+    addDismissedReviewId(eventId);
     setDismissedReviews((prev) => new Set([...prev, eventId]));
     setPendingReviews((prev) => prev.filter((r) => r.id !== eventId));
   }, []);

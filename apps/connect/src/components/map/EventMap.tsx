@@ -294,6 +294,7 @@ export default function EventMap({
 
     return () => {
       readyRef.current = false;
+      if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
       saveMapView();
       map.remove();
       mapRef.current = null;
