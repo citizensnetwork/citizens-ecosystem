@@ -73,6 +73,8 @@ export default function EventMap({
   onQuickActionRef.current = onQuickAction;
   const activeCategoriesRef = useRef(activeCategories);
   activeCategoriesRef.current = activeCategories;
+  const activePlaceCategoriesRef = useRef(activePlaceCategories);
+  activePlaceCategoriesRef.current = activePlaceCategories;
 
   // Deconfliction data: stores each event marker + its lat/lng
   const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number] }[]>([]);
@@ -113,8 +115,10 @@ export default function EventMap({
     const map = mapRef.current;
     if (!map) return;
     const z = map.getZoom();
-    const cats = activeCategoriesRef.current;
-    const shouldShow = z >= PLACE_ZOOM_MIN && (!cats || cats.size === 0);
+    const placeCats = activePlaceCategoriesRef.current;
+    const hasPlaceCatsSelected = placeCats && placeCats.size > 0;
+    // Show places when: place categories are explicitly selected (any zoom), OR at high zoom with no event-category filter
+    const shouldShow = hasPlaceCatsSelected || z >= PLACE_ZOOM_MIN;
     placeMarkersRef.current.forEach((m) => {
       (m.getElement() as HTMLElement).style.visibility = shouldShow ? "" : "hidden";
     });
@@ -134,7 +138,7 @@ export default function EventMap({
     // At close zoom, snap markers back to their real positions
     if (z >= DECONFLICT_MAX_ZOOM) {
       evtMarkerDataRef.current.forEach(({ marker }) => {
-        (marker.getElement() as HTMLElement).style.transform = "";
+        marker.setOffset([0, 0]);
       });
       return;
     }
@@ -144,7 +148,7 @@ export default function EventMap({
       const px = map.project(lngLat as maplibregl.LngLatLike);
       const el = marker.getElement() as HTMLElement;
       const size = parseInt(el.style.width || "40") || 40;
-      return { el, origX: px.x, origY: px.y, x: px.x, y: px.y, size };
+      return { marker, origX: px.x, origY: px.y, x: px.x, y: px.y, size };
     });
 
     // Iterative force spread (DECONFLICT_ITERATIONS iterations)
@@ -170,14 +174,14 @@ export default function EventMap({
       }
     }
 
-    // Apply CSS offset transforms and draw white leader lines
-    items.forEach(({ el, origX, origY, x, y }) => {
+    // Apply marker offsets via MapLibre API and draw leader lines from origin to displaced position
+    items.forEach(({ marker, origX, origY, x, y }) => {
       const dx = x - origX;
       const dy = y - origY;
       const hasMoved = Math.abs(dx) > 1 || Math.abs(dy) > 1;
-      el.style.transform = hasMoved
-        ? `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`
-        : "";
+
+      // Use MapLibre's setOffset so the marker actually moves to the line endpoint
+      marker.setOffset(hasMoved ? [dx, dy] : [0, 0]);
 
       if (hasMoved) {
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -237,10 +241,10 @@ export default function EventMap({
       runDeconflictionRef.current();
     });
 
-    // During movement: reset transforms and clear leader lines for smooth panning
+    // During movement: reset marker offsets and clear leader lines for smooth panning
     map.on("movestart", () => {
       evtMarkerDataRef.current.forEach(({ marker }) => {
-        (marker.getElement() as HTMLElement).style.transform = "";
+        marker.setOffset([0, 0]);
       });
       const svg = svgOverlayRef.current;
       if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -296,10 +300,10 @@ export default function EventMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Update place visibility when activeCategories changes ── */
+  /* ── Update place visibility when activeCategories or activePlaceCategories changes ── */
   useEffect(() => {
     updatePlaceVisibility();
-  }, [activeCategories, updatePlaceVisibility]);
+  }, [activeCategories, activePlaceCategories, updatePlaceVisibility]);
 
   /* ── Sync event + place markers ───────────────────────── */
   useEffect(() => {

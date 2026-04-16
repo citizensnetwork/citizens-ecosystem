@@ -333,9 +333,12 @@ export default function EventsView({
       </div>
 
       {view === "calendar" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 backdrop-blur-sm">
-          <div className="glass-calendar-overlay mx-3 my-4 flex h-[85dvh] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[82dvh]">
-            <div className="flex-1 overflow-y-auto px-4 pb-4 pt-20 sm:px-6 sm:pt-20">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
+          <div className="glass-calendar-overlay mx-3 my-4 flex h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[calc(100dvh-3rem)]">
+            <div
+              className="flex-1 overflow-auto px-4 pb-4 pt-20 sm:px-6 sm:pt-20"
+              style={{ touchAction: "pan-x pan-y pinch-zoom" }}
+            >
               <PostEventPrompt />
               <EventCalendar
                 events={filtered}
@@ -417,7 +420,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setFeaturedOpen(true)}
-          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/30 bg-black/90 px-5 py-2 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
+          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-white shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
           aria-label="Open trending panel"
         >
           <span className="text-[10px]">TRENDING</span>
@@ -438,29 +441,29 @@ export default function EventsView({
         }}
       >
         {/* Title bar */}
-        <div className="flex-shrink-0 rounded-t-2xl bg-white shadow-sm">
+        <div className="flex-shrink-0 rounded-t-2xl bg-white/20 backdrop-blur-md">
           <div className="flex justify-center">
             <button
               type="button"
               onClick={() => setFeaturedOpen(false)}
               aria-label="Close trending panel"
-              className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
+              className="flex cursor-pointer items-center justify-center px-8 py-1.5 active:scale-95"
             >
-              <span className="block h-1.5 w-16 rounded-full border border-(--gold)/50 bg-black transition-colors hover:bg-black/70" />
+              <span className="block h-1 w-12 rounded-full bg-white/60 transition-colors hover:bg-white/80" />
             </button>
           </div>
-          <div className="flex items-center justify-center gap-2 px-4 pb-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+          <div className="flex items-center justify-center gap-2 px-4 pb-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
               <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
               <polyline points="16 7 22 7 22 13"/>
             </svg>
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-white/90">
               Trending
             </h2>
           </div>
         </div>
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto bg-white/80 backdrop-blur-md">
+        <div className="flex-1 overflow-y-auto bg-white/20 backdrop-blur-md">
           <FeaturedPanel
             trendingEvents={trending}
             onSelectEvent={handleSelectEvent}
