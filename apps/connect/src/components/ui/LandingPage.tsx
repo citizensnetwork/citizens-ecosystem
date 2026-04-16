@@ -475,7 +475,7 @@ export default function LandingPage({ events, places }: Props) {
           <div className="flex flex-col items-center gap-1.5 pt-1">
             {!user && (
               <p
-                className="text-[11px] font-medium tracking-wide text-white/40"
+                className="text-[11px] font-medium tracking-wide text-white/50"
                 style={{ WebkitTextStroke: "0.3px rgba(0,0,0,0.3)" }}
               >
                 swipe up or tap to browse
@@ -484,13 +484,13 @@ export default function LandingPage({ events, places }: Props) {
             <button
               type="button"
               onClick={handleBrowse}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white/40 transition hover:border-white/60 hover:text-white active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white/50 transition hover:border-white/60 hover:text-white active:scale-90"
               aria-label="Browse without logging in"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
