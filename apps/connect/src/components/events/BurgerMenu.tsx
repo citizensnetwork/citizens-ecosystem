@@ -1,8 +1,9 @@
 "use client";
 
-import { forwardRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
 import type { Event, EventCategory, FavouriteOrg, FriendAttending, Profile, TrendingEvent } from "@/types/db";
 import { EVENT_CATEGORIES, CATEGORY_HEX } from "@/lib/categories";
 import AccordionSection from "@/components/ui/AccordionSection";
@@ -216,15 +217,29 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 ` · ${filteredPlacesCount} place${filteredPlacesCount !== 1 ? "s" : ""}`}
             </p>
             {user && (
-              <Link
-                href="/events/new"
-                onClick={onClose}
-                className="mt-3 block rounded-xl bg-(--gold) px-3 py-2 text-center font-semibold text-black"
-              >
-                + Create Event
-              </Link>
+              <>
+                <Link
+                  href="/events/manage"
+                  onClick={onClose}
+                  className="mt-3 block rounded-xl bg-black/5 px-3 py-2 text-center font-medium text-black hover:bg-black/10 transition"
+                >
+                  My Events
+                </Link>
+                <Link
+                  href="/events/new"
+                  onClick={onClose}
+                  className="mt-2 block rounded-xl bg-(--gold) px-3 py-2 text-center font-semibold text-black"
+                >
+                  + Create Event
+                </Link>
+              </>
             )}
           </div>
+
+          {/* Consider section */}
+          {user && (
+            <BurgerConsiderSection userId={user.id} onClose={onClose} />
+          )}
         </div>
 
         {/* Profile section */}
@@ -415,6 +430,87 @@ function FriendAccordion({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── BurgerConsiderSection: shows "Considering" events in burger menu ── */
+
+type ConsiderItem = {
+  event_id: string;
+  title: string;
+  date: string;
+};
+
+function BurgerConsiderSection({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const [items, setItems] = useState<ConsiderItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const fetchConsiders = useCallback(async () => {
+    const supabase = createClient();
+    const today = new Date().toISOString().split("T")[0];
+    const { data: rsvps } = await supabase
+      .from("rsvps")
+      .select("event_id, events(title, date)")
+      .eq("user_id", userId)
+      .eq("status", "considering")
+      .gte("events.date", today);
+
+    const validRsvps = (rsvps ?? []).filter(
+      (r) => (r as Record<string, unknown>).events != null
+    );
+
+    setItems(
+      validRsvps.map((r) => {
+        const ev = (r as Record<string, unknown>).events as { title: string; date: string } | null;
+        return {
+          event_id: r.event_id,
+          title: ev?.title ?? "Event",
+          date: ev?.date ?? "",
+        };
+      })
+    );
+    setLoaded(true);
+  }, [userId]);
+
+  useEffect(() => {
+    fetchConsiders();
+  }, [fetchConsiders]);
+
+  if (!loaded || items.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t border-black/8 pt-3">
+      <div className="flex items-center gap-2 px-1 pb-2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
+        <span className="text-xs font-semibold uppercase tracking-wider text-black/50">
+          Considering ({items.length})
+        </span>
+      </div>
+      <div className="space-y-0.5">
+        {items.map((item) => (
+          <Link
+            key={item.event_id}
+            href={`/events/${item.event_id}`}
+            onClick={onClose}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
+          >
+            <span className="flex-1 truncate">{item.title}</span>
+            <span className="text-xs text-black/40">
+              {item.date
+                ? new Date(item.date).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })
+                : ""}
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

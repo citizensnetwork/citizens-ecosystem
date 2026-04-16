@@ -32,7 +32,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [status] = useState<"draft" | "published">("published");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [attendeesVisible, setAttendeesVisible] = useState<"public" | "authenticated" | "count_only">("authenticated");
   const [imageFile, setImageFile] = useState<File | null>(null);
