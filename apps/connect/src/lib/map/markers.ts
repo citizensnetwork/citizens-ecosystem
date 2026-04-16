@@ -247,10 +247,12 @@ export function createPlaceMarkerEl(
     avgRating?: number | null;
     isHighRated?: boolean;
     isFlagged?: boolean;
+    highlighted?: boolean;
   }
 ): HTMLDivElement {
-  const size = 36;
-  const iconSize = 24;
+  const highlighted = options?.highlighted ?? false;
+  const size = highlighted ? 54 : 36;
+  const iconSize = highlighted ? 36 : 24;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;
@@ -297,9 +299,11 @@ export function createPlaceMarkerEl(
     ">!</span>`
     : "";
 
-  const glow = isHighRated
-    ? "drop-shadow(0 0 4px rgba(212,175,55,.5))"
-    : "drop-shadow(0 1px 3px rgba(0,0,0,.3))";
+  const glow = highlighted
+    ? "drop-shadow(0 0 6px rgba(212,175,55,.6))"
+    : isHighRated
+      ? "drop-shadow(0 0 4px rgba(212,175,55,.5))"
+      : "drop-shadow(0 1px 3px rgba(0,0,0,.3))";
 
   const opacity = isFlagged ? 0.62 : 1;
 

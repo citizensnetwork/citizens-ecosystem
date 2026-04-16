@@ -1,4 +1,4 @@
-import type { EventCategory } from "@/types/db";
+import type { EventCategory, PlaceCategory } from "@/types/db";
 
 /** Human-readable labels for each event category. */
 export const CATEGORY_LABELS: Record<EventCategory, string> = {
@@ -108,3 +108,68 @@ export const CATEGORY_FILTERS: { value: EventCategory | "all"; label: string }[]
   { value: "all", label: "All categories" },
   ...EVENT_CATEGORIES,
 ];
+
+/* ── Place categories ─────────────────────────────────── */
+
+/** Human-readable labels for each place category. */
+export const PLACE_CATEGORY_LABELS: Record<PlaceCategory, string> = {
+  church: "Church",
+  relax: "Relax",
+  exercise: "Exercise",
+  media: "Media",
+  shopping: "Shopping",
+  health: "Health",
+  education: "Education",
+  arts: "Arts & Culture",
+};
+
+/** Descriptions for place categories (shown as subtitle). */
+export const PLACE_CATEGORY_DESCRIPTIONS: Record<PlaceCategory, string> = {
+  church: "Churches, ministries, worship venues",
+  relax: "Coffee shops, restaurants, parks",
+  exercise: "Gyms, hikes, nature, sport venues",
+  media: "Radio, concert halls, stadiums",
+  shopping: "Markets, malls, retail shops",
+  health: "Clinics, wellness, pharmacies",
+  education: "Schools, libraries, training centres",
+  arts: "Galleries, theatres, museums",
+};
+
+/** Hex colour per place category. */
+export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
+  church: "#D4AF37",
+  relax: "#8B4513",
+  exercise: "#2ECC71",
+  media: "#9B59B6",
+  shopping: "#E91E63",
+  health: "#E74C3C",
+  education: "#3498DB",
+  arts: "#FF6B35",
+};
+
+/** Selectable list for place categories. */
+export const PLACE_CATEGORIES: { value: PlaceCategory; label: string }[] = [
+  { value: "church", label: "Church" },
+  { value: "relax", label: "Relax" },
+  { value: "exercise", label: "Exercise" },
+  { value: "media", label: "Media" },
+  { value: "shopping", label: "Shopping" },
+  { value: "health", label: "Health" },
+  { value: "education", label: "Education" },
+  { value: "arts", label: "Arts & Culture" },
+];
+
+/**
+ * Map place category slugs to keywords matched against place name, description,
+ * address, and DB category name for client-side filtering.
+ */
+export const PLACE_CATEGORY_KEYWORDS: Record<PlaceCategory, string[]> = {
+  church: ["church", "ministry", "chapel", "cathedral", "worship", "parish"],
+  relax: ["coffee", "café", "restaurant", "bistro", "lounge", "park", "garden", "spa"],
+  exercise: ["gym", "hike", "trail", "nature", "sport", "fitness", "yoga", "swimming", "stadium"],
+  media: ["radio", "studio", "concert", "media", "broadcast", "stadium", "arena"],
+  shopping: ["shop", "market", "mall", "retail", "store", "boutique"],
+  health: ["clinic", "hospital", "pharmacy", "wellness", "medical", "health"],
+  education: ["school", "university", "college", "library", "training", "academy", "institute"],
+  arts: ["gallery", "theatre", "theater", "museum", "art", "cultural", "cinema"],
+};

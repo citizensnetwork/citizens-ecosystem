@@ -15,6 +15,16 @@ export type EventCategory =
   | "weekend"
   | "members-only";
 
+export type PlaceCategory =
+  | "church"
+  | "relax"
+  | "exercise"
+  | "media"
+  | "shopping"
+  | "health"
+  | "education"
+  | "arts";
+
 export type EventStatus = "draft" | "published" | "cancelled";
 
 export type EventVisibility = "public" | "private";
