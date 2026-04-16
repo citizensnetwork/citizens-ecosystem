@@ -61,33 +61,72 @@ export default function FeaturedPanel({
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);
 
-  // ── Trending mode: show trending events as glass blocks ──
+  // ── Trending mode: show trending events as horizontal scrollable blocks ──
   const hasTrending = trendingEvents.length > 0;
+  const trendingScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollTrending = useCallback((direction: "left" | "right") => {
+    const el = trendingScrollRef.current;
+    if (!el) return;
+    const scrollAmount = el.clientWidth * 0.7;
+    el.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
+  }, []);
 
   if (hasTrending) {
     return (
-      <div className="flex h-full flex-col overflow-y-auto">
+      <div className="flex h-full flex-col">
         {/* Header */}
-        <div className="flex items-center gap-2 px-4 pb-2 pt-5">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+        <div className="flex items-center gap-2 px-4 pb-2 pt-3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
             <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
             <polyline points="16 7 22 7 22 13"/>
           </svg>
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-white/80">
             Trending
           </h2>
         </div>
 
-        {/* Trending event glass blocks */}
-        <div className="flex flex-col gap-3 px-4 pb-6">
-          {trendingEvents.map((event) => (
-            <TrendingBlock
-              key={event.id}
-              event={event}
-              onSelectEvent={onSelectEvent}
-              onQuickAction={onQuickAction}
-            />
-          ))}
+        {/* Horizontal scrollable trending blocks with nav buttons */}
+        <div className="relative flex-1 px-2">
+          {/* Left nav button */}
+          <button
+            type="button"
+            onClick={() => scrollTrending("left")}
+            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+            aria-label="Scroll left"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+
+          <div
+            ref={trendingScrollRef}
+            className="scrollbar-hide flex gap-3 overflow-x-auto px-8 pb-4 pt-1"
+            style={{ scrollSnapType: "x mandatory" }}
+          >
+            {trendingEvents.map((event) => (
+              <div key={event.id} className="trending-card">
+                <TrendingBlock
+                  event={event}
+                  onSelectEvent={onSelectEvent}
+                  onQuickAction={onQuickAction}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Right nav button */}
+          <button
+            type="button"
+            onClick={() => scrollTrending("right")}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+            aria-label="Scroll right"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
         </div>
       </div>
     );
@@ -123,12 +162,12 @@ export default function FeaturedPanel({
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 pb-2 pt-5">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+      <div className="flex items-center gap-2 px-4 pb-2 pt-3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
           <polyline points="16 7 22 7 22 13"/>
         </svg>
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-white/80">
           Trending
         </h2>
       </div>

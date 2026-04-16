@@ -16,6 +16,7 @@ export default function PostEventPrompt() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   const eventLabel = useMemo(() => {
     if (!event) return "";
@@ -117,12 +118,23 @@ export default function PostEventPrompt() {
     }
   }
 
-  if (loading || done || !event) {
+  if (loading || done || dismissed || !event) {
     return null;
   }
 
   return (
-    <div className="mb-4 rounded-xl border border-(--gold)/35 bg-(--gold-soft) px-4 py-3">
+    <div className="relative mb-4 rounded-xl border border-(--gold)/35 bg-(--gold-soft) px-4 py-3">
+      {/* Dismiss button */}
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:text-white/90"
+        aria-label="Dismiss review prompt"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-3.5 w-3.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
       <p className="text-sm font-semibold text-black">How was {eventLabel}?</p>
       <p className="text-xs text-black/70">Rate your attendance so others can trust what is active and worth joining.</p>
 
@@ -133,7 +145,7 @@ export default function PostEventPrompt() {
             type="button"
             disabled={submitting}
             onClick={() => submitRating(value)}
-            className="text-xl text-(--gold) transition hover:brightness-90 disabled:opacity-50"
+            className="text-xl text-(--gold)/30 transition hover:text-(--gold) hover:brightness-90 disabled:opacity-50"
             aria-label={`Rate ${value} stars`}
           >
             ★
