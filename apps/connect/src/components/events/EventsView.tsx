@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { Event, EventCategory, Place } from "@/types/db";
+import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -40,6 +40,9 @@ export default function EventsView({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [featuredOpen, setFeaturedOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
+    new Set()
+  );
+  const [activePlaceCategories, setActivePlaceCategories] = useState<Set<PlaceCategory>>(
     new Set()
   );
 
@@ -140,6 +143,18 @@ export default function EventsView({
     });
   }
 
+  function togglePlaceCategory(cat: PlaceCategory) {
+    setActivePlaceCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     return events.filter((e) => {
       const matchesCategory =
@@ -163,9 +178,19 @@ export default function EventsView({
         p.name.toLowerCase().includes(q) ||
         p.address.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q);
+
+      // Filter by place category keywords if any place categories are active
+      if (activePlaceCategories.size > 0) {
+        const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
+        const matchesPlaceCat = [...activePlaceCategories].some((cat) =>
+          PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
+        );
+        if (!matchesPlaceCat) return false;
+      }
+
       return matchesSearch;
     });
-  }, [places, search]);
+  }, [places, search, activePlaceCategories]);
 
   const handleSelectEvent = useCallback(
     (event: Event) => {
@@ -277,6 +302,8 @@ export default function EventsView({
           autoLocate
           flyTo={mapFlyTo}
           flyToZoom={mapFlyToZoom}
+          activeCategories={activeCategories}
+          activePlaceCategories={activePlaceCategories}
         />
       </div>
 
@@ -424,6 +451,9 @@ export default function EventsView({
         activeCategories={activeCategories}
         onToggleCategory={toggleCategory}
         onClearCategories={() => setActiveCategories(new Set())}
+        activePlaceCategories={activePlaceCategories}
+        onTogglePlaceCategory={togglePlaceCategory}
+        onClearPlaceCategories={() => setActivePlaceCategories(new Set())}
         trending={trending}
         favouriteOrgs={favouriteOrgs}
         friends={friends}

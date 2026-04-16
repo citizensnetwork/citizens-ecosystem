@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { Event, Place } from "@/types/db";
+import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import {
   createCategoryMarkerEl,
   createCustomMarkerEl,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/map/markers";
 import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
+import { PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
 
 type Props = {
   events: Event[];
@@ -24,10 +25,15 @@ type Props = {
   autoLocate?: boolean;
   flyTo?: [number, number] | null;
   flyToZoom?: number;
+  activeCategories?: Set<EventCategory>;
+  activePlaceCategories?: Set<PlaceCategory>;
 };
 
 /* ── Persist map viewpoint across navigations ── */
 const MAP_VIEW_KEY = "cc-map-viewpoint";
+
+/** Scale multiplier for highlighted (category-selected) markers. */
+const HIGHLIGHT_SCALE = 1.5;
 
 export default function EventMap({
   events,
@@ -39,6 +45,8 @@ export default function EventMap({
   autoLocate = false,
   flyTo = null,
   flyToZoom,
+  activeCategories,
+  activePlaceCategories,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -174,16 +182,24 @@ export default function EventMap({
 
       mappable.forEach((event) => {
         const temporal = getTemporalStyle(event.date);
+
+        // Highlight: if this event's category is actively selected, scale up 1.5x
+        const isHighlighted = activeCategories && activeCategories.size > 0 &&
+          event.category != null && activeCategories.has(event.category);
+        const effectiveTemporal = isHighlighted
+          ? { ...temporal, scale: temporal.scale * HIGHLIGHT_SCALE, opacity: 1 }
+          : temporal;
+
         const el = event.marker_type && event.marker_type !== "category"
           ? createCustomMarkerEl({
               markerType: event.marker_type,
               category: event.category,
-              temporal,
+              temporal: effectiveTemporal,
               markerIcon: event.marker_icon,
               markerColor: event.marker_color,
               markerImageUrl: event.marker_image_url,
             })
-          : createCategoryMarkerEl(event.category, temporal);
+          : createCategoryMarkerEl(event.category, effectiveTemporal);
 
         const dateStr = new Date(event.date).toLocaleDateString("en-US", {
           month: "short",
@@ -259,10 +275,20 @@ export default function EventMap({
         const isFlagged =
           !!place.verification_flagged || place.verified === false;
 
+        // Highlight: if this place matches an active place category, scale up
+        let placeIsHighlighted = false;
+        if (activePlaceCategories && activePlaceCategories.size > 0) {
+          const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
+          placeIsHighlighted = [...activePlaceCategories].some((cat) =>
+            PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
+          );
+        }
+
         const el = createPlaceMarkerEl({
           avgRating,
           isHighRated,
           isFlagged,
+          highlighted: placeIsHighlighted,
         });
 
         const ratingLabel =
@@ -328,7 +354,7 @@ export default function EventMap({
     }
 
     return () => clearMarkers();
-  }, [events, places, clearMarkers]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {
