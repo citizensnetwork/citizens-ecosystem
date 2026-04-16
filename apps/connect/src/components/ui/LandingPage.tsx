@@ -213,9 +213,9 @@ export default function LandingPage({ events, places }: Props) {
           dismissed ? "-translate-y-full" : "translate-y-0"
         }`}
         style={{
-          background: "linear-gradient(to bottom, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.50) 100%)",
-          backdropFilter: "blur(10px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(10px) saturate(1.2)",
+          background: "rgba(255,255,255,0.72)",
+          backdropFilter: "blur(12px) saturate(1.1)",
+          WebkitBackdropFilter: "blur(12px) saturate(1.1)",
         }}
       >
         {/* ── Top section: logo & crown ── */}
@@ -227,11 +227,12 @@ export default function LandingPage({ events, places }: Props) {
             Citizens
           </h1>
           <p
-            className="mt-2 text-xs font-semibold uppercase tracking-widest text-black"
+            className="mt-2 text-xs font-bold uppercase tracking-widest"
+            style={{ color: "#000" }}
           >
             CONNECTING THE KINGDOM
           </p>
-          <p className="mt-1.5 text-[10px] font-medium tracking-wider" style={{ color: "var(--gold)" }}>
+          <p className="mt-1.5 text-[10px] font-semibold tracking-wider" style={{ color: "var(--gold)" }}>
             Eph. 2:19-22
           </p>
         </div>

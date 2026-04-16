@@ -254,6 +254,32 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,.25), 0 0 0 2px rgba(212,175,55,0.45) !important;
 }
 
+/* Highlighted (category-selected) marker — pulsing glow ring */
+.cc-marker-highlighted > span:first-child {
+  animation: markerGlow 1.6s ease-in-out infinite !important;
+}
+
+@keyframes markerGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(212,175,55,0.7), 0 2px 6px rgba(0,0,0,.25);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(212,175,55,0.25), 0 0 18px rgba(212,175,55,0.45), 0 2px 6px rgba(0,0,0,.25);
+  }
+}
+
+/* SVG leader lines for displaced markers */
+.cc-leader-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
 @keyframes markerPulse {
   0%,
   100% {
