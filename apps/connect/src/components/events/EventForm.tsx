@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
+import { validateImageFile, safeImageExtension } from "@/lib/validation";
 import type { EventCategory, Category } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
@@ -85,6 +86,15 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    if (file) {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        setError(validationError);
+        e.target.value = "";
+        return;
+      }
+    }
+    setError("");
     setImageFile(file);
     if (file) {
       setImagePreview(URL.createObjectURL(file));
@@ -111,8 +121,8 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     // Upload image if provided
     let image_url: string | null = null;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
+      const safeExt = safeImageExtension(imageFile.name);
+      const path = `${user.id}/${Date.now()}.${safeExt}`;
       const { error: uploadError } = await supabase.storage
         .from("event-images")
         .upload(path, imageFile, { upsert: true });
@@ -204,6 +214,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
+          maxLength={200}
           className="w-full border rounded-md px-3 py-2 text-sm"
           placeholder="Community Clean-Up Day"
         />
@@ -235,7 +246,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
         <input
           id="coverImage"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
           onChange={handleImageChange}
           className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
         />
@@ -262,6 +273,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           onChange={(e) => setDescription(e.target.value)}
           required
           rows={4}
+          maxLength={5000}
           className="w-full border rounded-md px-3 py-2 text-sm"
           placeholder="Tell people what this event is about..."
         />
@@ -305,6 +317,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           required
+          maxLength={300}
           className="w-full border rounded-md px-3 py-2 text-sm"
           placeholder="123 Main St, City"
         />
