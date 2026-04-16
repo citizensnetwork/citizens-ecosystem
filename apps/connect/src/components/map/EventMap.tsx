@@ -185,7 +185,7 @@ export default function EventMap({
 
         // Highlight: if this event's category is actively selected, scale up 1.5x
         const isHighlighted = activeCategories && activeCategories.size > 0 &&
-          event.category != null && activeCategories.has(event.category);
+          event.category !== null && event.category !== undefined && activeCategories.has(event.category);
         const effectiveTemporal = isHighlighted
           ? { ...temporal, scale: temporal.scale * HIGHLIGHT_SCALE, opacity: 1 }
           : temporal;

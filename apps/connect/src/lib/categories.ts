@@ -160,8 +160,8 @@ export const PLACE_CATEGORIES: { value: PlaceCategory; label: string }[] = [
 ];
 
 /**
- * Map place category slugs to keywords that match place names/descriptions.
- * Used for client-side filtering when places don't have a formal place_category field.
+ * Map place category slugs to keywords matched against place name, description,
+ * address, and DB category name for client-side filtering.
  */
 export const PLACE_CATEGORY_KEYWORDS: Record<PlaceCategory, string[]> = {
   church: ["church", "ministry", "chapel", "cathedral", "worship", "parish"],
