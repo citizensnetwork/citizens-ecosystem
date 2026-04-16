@@ -75,17 +75,7 @@ export default function FeaturedPanel({
   if (hasTrending) {
     return (
       <div className="flex h-full flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
-            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-            <polyline points="16 7 22 7 22 13"/>
-          </svg>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
-            Trending
-          </h2>
-        </div>
-        <div className="relative flex-1 px-2">
+        <div className="relative flex-1 px-2 pt-2">
           {/* Left nav button */}
           <button
             type="button"
@@ -159,16 +149,6 @@ export default function FeaturedPanel({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-          <polyline points="16 7 22 7 22 13"/>
-        </svg>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
-          Trending
-        </h2>
-      </div>
 
       {/* Hero carousel (admin-featured) */}
       {heroListings.length > 0 && (

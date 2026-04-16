@@ -232,8 +232,8 @@ body {
   border-color: #333 !important;
 }
 
+/* Use Unicode arrows as reliable fallback for fcicons font */
 .cc-calendar .fc .fc-icon {
-  font-family: "fcicons" !important;
   font-style: normal;
   font-weight: 400;
   font-variant: normal;
@@ -244,15 +244,20 @@ body {
   font-size: 1.2em;
   vertical-align: middle;
   display: inline-block;
-  speak: none;
   color: inherit;
 }
 
 .cc-calendar .fc .fc-icon-chevron-left::before {
-  content: "\e900";
+  content: "\2039";
+  font-family: sans-serif;
+  font-size: 1.6em;
+  font-weight: bold;
 }
 .cc-calendar .fc .fc-icon-chevron-right::before {
-  content: "\e901";
+  content: "\203A";
+  font-family: sans-serif;
+  font-size: 1.6em;
+  font-weight: bold;
 }
 
 /* ── Map marker styles ────────────────────────────────── */
@@ -298,6 +303,11 @@ body {
   background: transparent !important;
   border: none !important;
   z-index: 3 !important;
+}
+
+/* MapLibre popups render above all markers */
+.maplibregl-popup {
+  z-index: 10 !important;
 }
 
 @keyframes markerPulse {

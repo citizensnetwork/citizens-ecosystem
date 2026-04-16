@@ -44,6 +44,12 @@ const MIN_GAP_PX = 0;
 /** Number of force-simulation iterations for deconfliction. */
 const DECONFLICT_ITERATIONS = 10;
 
+/** Returns a scale factor [0.5 – 1.0] based on current zoom (higher zoom = bigger). */
+function zoomScale(z: number): number {
+  // At zoom >= 14 markers are full size; at zoom <= 6 markers shrink to 50%.
+  return Math.min(1, Math.max(0.5, (z - 6) / 8));
+}
+
 export default function EventMap({
   events,
   places = [],
@@ -77,9 +83,10 @@ export default function EventMap({
   activePlaceCategoriesRef.current = activePlaceCategories;
 
   // Deconfliction data: stores each event marker + its lat/lng
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number] }[]>([]);
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number }[]>([]);
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
+  const updateMarkerSizesRef = useRef<() => void>(() => {});
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach((m) => m.remove());
@@ -201,8 +208,28 @@ export default function EventMap({
     });
   }, []);
 
+  /** Resize event marker elements based on current zoom level. */
+  const updateMarkerSizes = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const scale = zoomScale(map.getZoom());
+    evtMarkerDataRef.current.forEach(({ marker, baseSize }) => {
+      const el = marker.getElement() as HTMLElement;
+      const newSize = Math.round(baseSize * scale);
+      el.style.width = `${newSize}px`;
+      el.style.height = `${newSize}px`;
+      // Also scale the inner span
+      const inner = el.querySelector("span") as HTMLElement | null;
+      if (inner) {
+        inner.style.width = `${newSize}px`;
+        inner.style.height = `${newSize}px`;
+      }
+    });
+  }, []);
+
   // Keep stable ref so init-effect listener always calls latest runDeconfliction
   runDeconflictionRef.current = runDeconfliction;
+  updateMarkerSizesRef.current = updateMarkerSizes;
 
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
@@ -239,10 +266,10 @@ export default function EventMap({
 
     map.on("moveend", saveMapView);
 
-    // Zoom-gate place visibility and run deconfliction on zoom/move changes.
-    // Keep markers deconflicted at all times — never reset during interactions.
+    // Zoom-gate place visibility, resize markers, and run deconfliction on zoom changes.
     map.on("zoomend", () => {
       updatePlaceVisibility();
+      updateMarkerSizesRef.current();
       runDeconflictionRef.current();
     });
 
@@ -396,6 +423,13 @@ export default function EventMap({
         );
 
         popup.on("open", () => {
+          // Adjust popup position to follow deconflicted marker offset
+          const markerData = evtMarkerDataRef.current.find((d) => d.marker === marker);
+          if (markerData) {
+            const offset = marker.getOffset();
+            popup.setOffset([offset.x, offset.y - 16]);
+          }
+
           const popupEl = popup.getElement();
           popupEl?.querySelectorAll(".cc-action-btn").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -409,12 +443,13 @@ export default function EventMap({
         });
 
         const lngLat: [number, number] = [event.longitude!, event.latitude!];
+        const baseSize = parseInt(el.style.width || "40") || 40;
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
           .addTo(map);
         markersRef.current.push(marker);
-        evtMarkerDataRef.current.push({ marker, lngLat });
+        evtMarkerDataRef.current.push({ marker, lngLat, baseSize });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -489,8 +524,11 @@ export default function EventMap({
         hasRestoredView.current = true;
       }
 
-      // Run deconfliction after markers settle
-      setTimeout(() => runDeconflictionRef.current(), 300);
+      // Apply zoom-based marker sizing and run deconfliction after markers settle
+      setTimeout(() => {
+        updateMarkerSizesRef.current();
+        runDeconflictionRef.current();
+      }, 300);
     };
 
     if (readyRef.current) {

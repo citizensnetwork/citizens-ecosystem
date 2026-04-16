@@ -417,7 +417,7 @@ export default function EventsView({
         <button
           type="button"
           onClick={() => setFeaturedOpen(true)}
-          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-white shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
+          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-black shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
           aria-label="Open trending panel"
         >
           <span className="text-[10px]">TRENDING</span>

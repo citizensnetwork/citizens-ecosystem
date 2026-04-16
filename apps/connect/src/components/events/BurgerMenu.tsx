@@ -308,9 +308,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
           </AccordionSection>
 
           {/* Considers */}
-          {user && (
-            <BurgerConsiderSection userId={user.id} onClose={onClose} />
-          )}
+          <BurgerConsiderSection user={user} onClose={onClose} />
 
           {/* Quick actions (always visible) */}
           <div className="mt-4 border-t border-black/8 pt-4 text-sm text-black/65">
@@ -545,17 +543,21 @@ type ConsiderRsvpRow = {
   events: { title: string; date: string } | null;
 };
 
-function BurgerConsiderSection({ userId, onClose }: { userId: string; onClose: () => void }) {
+function BurgerConsiderSection({ user, onClose }: { user: User | null; onClose: () => void }) {
   const [items, setItems] = useState<ConsiderItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const fetchConsiders = useCallback(async () => {
+    if (!user) {
+      setLoaded(true);
+      return;
+    }
     const supabase = createClient();
     const today = new Date().toISOString().split("T")[0];
     const { data: rsvps } = await supabase
       .from("rsvps")
       .select("event_id, events(title, date)")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .eq("status", "considering")
       .gte("events.date", today);
 
@@ -571,46 +573,53 @@ function BurgerConsiderSection({ userId, onClose }: { userId: string; onClose: (
         }))
     );
     setLoaded(true);
-  }, [userId]);
+  }, [user]);
 
   useEffect(() => {
     fetchConsiders();
   }, [fetchConsiders]);
 
-  if (!loaded || items.length === 0) return null;
-
   return (
-    <div className="mt-3 border-t border-black/8 pt-3">
-      <div className="flex items-center gap-2 px-1 pb-2">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="16" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-        <span className="text-xs font-semibold uppercase tracking-wider text-black/50">
-          Considering ({items.length})
-        </span>
-      </div>
-      <div className="space-y-0.5">
-        {items.map((item) => (
-          <Link
-            key={item.event_id}
-            href={`/events/${item.event_id}`}
-            onClick={onClose}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
-          >
-            <span className="flex-1 truncate">{item.title}</span>
-            <span className="text-xs text-black/40">
-              {item.date
-                ? new Date(item.date).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })
-                : ""}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+    <AccordionSection
+      title="Considering"
+      icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>}
+      badge={items.length || undefined}
+    >
+      {!user ? (
+        <p className="px-3 py-2 text-xs text-black/40">
+          <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
+            Log in
+          </Link>{" "}
+          to see events you&apos;re considering
+        </p>
+      ) : !loaded ? (
+        <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
+      ) : items.length === 0 ? (
+        <p className="px-3 py-2 text-xs text-black/40">
+          Use the &quot;Consider&quot; action on events to track them here
+        </p>
+      ) : (
+        <div className="space-y-0.5">
+          {items.map((item) => (
+            <Link
+              key={item.event_id}
+              href={`/events/${item.event_id}`}
+              onClick={onClose}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
+            >
+              <span className="flex-1 truncate">{item.title}</span>
+              <span className="text-xs text-black/40">
+                {item.date
+                  ? new Date(item.date).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : ""}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </AccordionSection>
   );
 }
