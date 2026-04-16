@@ -63,6 +63,22 @@ export default function EditEventForm({ event }: Props) {
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    if (file) {
+      // Validate MIME type — only allow safe image formats
+      const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+      if (!allowedTypes.includes(file.type)) {
+        setError("Only JPEG, PNG, GIF, WebP, or SVG images are allowed.");
+        e.target.value = "";
+        return;
+      }
+      // Validate file size — max 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image must be smaller than 5 MB.");
+        e.target.value = "";
+        return;
+      }
+    }
+    setError("");
     setImageFile(file);
     if (file) setImagePreview(URL.createObjectURL(file));
   }
@@ -79,8 +95,9 @@ export default function EditEventForm({ event }: Props) {
 
     let image_url = event.image_url;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
+      const rawExt = (imageFile.name.split(".").pop() ?? "jpg").toLowerCase();
+      const safeExt = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(rawExt) ? rawExt : "jpg";
+      const path = `${user.id}/${Date.now()}.${safeExt}`;
       const { error: upErr } = await supabase.storage
         .from("event-images")
         .upload(path, imageFile, { upsert: true });
@@ -174,7 +191,7 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label htmlFor="title" className="block text-sm font-medium mb-1">Title</label>
-        <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full border rounded-md px-3 py-2 text-sm" />
+        <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} className="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
 
       <div>
@@ -190,7 +207,7 @@ export default function EditEventForm({ event }: Props) {
         <label htmlFor="coverImage" className="block text-sm font-medium mb-1">
           Cover Image <span className="text-gray-400 font-normal">(optional)</span>
         </label>
-        <input id="coverImage" type="file" accept="image/*" onChange={handleImageChange}
+        <input id="coverImage" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml" onChange={handleImageChange}
           className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
         {imagePreview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -200,7 +217,7 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label htmlFor="description" className="block text-sm font-medium mb-1">Description</label>
-        <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required rows={4} className="w-full border rounded-md px-3 py-2 text-sm" />
+        <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required rows={4} maxLength={5000} className="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
 
       <div>
@@ -217,7 +234,7 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label htmlFor="location" className="block text-sm font-medium mb-1">Location</label>
-        <input id="location" type="text" value={location} onChange={(e) => setLocation(e.target.value)} required className="w-full border rounded-md px-3 py-2 text-sm" />
+        <input id="location" type="text" value={location} onChange={(e) => setLocation(e.target.value)} required maxLength={300} className="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
 
       <div>

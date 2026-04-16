@@ -30,6 +30,19 @@ type Props = {
 /** Number of event cards shown per page in the category panel. */
 const CARDS_PER_PAGE = 3;
 
+/** South African provinces for calendar filter. */
+const SA_PROVINCES = [
+  "Gauteng",
+  "Western Cape",
+  "KwaZulu-Natal",
+  "Eastern Cape",
+  "Free State",
+  "Limpopo",
+  "Mpumalanga",
+  "North West",
+  "Northern Cape",
+];
+
 /** Convert hex colour to rgba string (used for category panel card backgrounds). */
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -59,6 +72,9 @@ export default function EventsView({
   // Category panel state (shows when categories are selected)
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [categoryPanelPage, setCategoryPanelPage] = useState(0);
+
+  // Province filter for calendar view
+  const [calendarProvince, setCalendarProvince] = useState("");
 
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -216,6 +232,13 @@ export default function EventsView({
     });
   }, [places, search, activePlaceCategories]);
 
+  // Calendar province-filtered events (applies province filter on top of category/search filter)
+  const calendarEvents = useMemo(() => {
+    if (!calendarProvince) return filtered;
+    const prov = calendarProvince.toLowerCase();
+    return filtered.filter((e) => e.location.toLowerCase().includes(prov));
+  }, [filtered, calendarProvince]);
+
   const handleSelectEvent = useCallback(
     (event: Event) => {
       setSelectedPlace(null);
@@ -334,11 +357,38 @@ export default function EventsView({
       {view === "calendar" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
           <div className="glass-calendar-overlay mx-3 my-4 flex h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[calc(100dvh-3rem)]">
+            {/* Province filter bar */}
+            <div className="flex items-center gap-2 px-4 pt-16 pb-2 sm:px-6 sm:pt-16">
+              <label htmlFor="province-filter" className="sr-only">Filter by province</label>
+              <select
+                id="province-filter"
+                value={calendarProvince}
+                onChange={(e) => setCalendarProvince(e.target.value)}
+                className="rounded-xl border border-black/12 bg-white/80 px-3 py-1.5 text-xs font-medium text-black shadow-sm backdrop-blur-sm outline-none focus:border-(--gold)"
+              >
+                <option value="">All Provinces</option>
+                {SA_PROVINCES.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              {calendarProvince && (
+                <button
+                  type="button"
+                  onClick={() => setCalendarProvince("")}
+                  className="rounded-lg px-2 py-1 text-[10px] font-medium text-black/50 transition hover:bg-black/5 hover:text-black/70"
+                >
+                  Clear
+                </button>
+              )}
+              <span className="ml-auto text-[10px] text-black/40">
+                {calendarEvents.length} event{calendarEvents.length !== 1 ? "s" : ""}
+              </span>
+            </div>
             <div
-              className="flex-1 overflow-auto touch-pan-x touch-pan-y touch-pinch-zoom px-4 pb-4 pt-20 sm:px-6 sm:pt-20"
+              className="flex-1 overflow-auto touch-pan-x touch-pan-y touch-pinch-zoom px-4 pb-4 sm:px-6"
             >
               <EventCalendar
-                events={filtered}
+                events={calendarEvents}
                 rsvpEventIds={rsvpEventIds}
                 onSelectEvent={handleSelectEvent}
                 isVendor={isVendor}
