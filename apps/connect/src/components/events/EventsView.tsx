@@ -28,6 +28,17 @@ type Props = {
   isVendor?: boolean;
 };
 
+/** Number of event cards shown per page in the category panel. */
+const CARDS_PER_PAGE = 3;
+
+/** Convert hex colour to rgba string (used for category panel card backgrounds). */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export default function EventsView({
   events,
   places = [],
@@ -547,7 +558,7 @@ export default function EventsView({
                     </svg>
                   </button>
 
-                  {/* Cards row — 3 per page */}
+                  {/* Cards row — CARDS_PER_PAGE per page */}
                   <div className="overflow-hidden">
                     <div
                       className="flex gap-3 transition-transform duration-300"
@@ -563,7 +574,7 @@ export default function EventsView({
                             onClick={() => handleSelectEvent(event)}
                             className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
                             style={{
-                              background: `rgba(${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)},0.35)`,
+                              background: hexToRgba(hex, 0.35),
                             }}
                           >
                             <div
@@ -588,8 +599,8 @@ export default function EventsView({
                   {/* Right arrow */}
                   <button
                     type="button"
-                    onClick={() => setCategoryPanelPage((p) => Math.min(Math.ceil(filtered.length / 3) - 1, p + 1))}
-                    disabled={categoryPanelPage >= Math.ceil(filtered.length / 3) - 1}
+                    onClick={() => setCategoryPanelPage((p) => Math.min(Math.ceil(filtered.length / CARDS_PER_PAGE) - 1, p + 1))}
+                    disabled={categoryPanelPage >= Math.ceil(filtered.length / CARDS_PER_PAGE) - 1}
                     className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
                     aria-label="Next events"
                   >

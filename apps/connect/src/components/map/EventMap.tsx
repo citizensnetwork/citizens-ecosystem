@@ -41,6 +41,9 @@ const DECONFLICT_MAX_ZOOM = 13;
 /** Minimum pixel gap between marker edges (≈2mm at 96 dpi). */
 const MIN_GAP_PX = 8;
 
+/** Number of force-simulation iterations for deconfliction. */
+const DECONFLICT_ITERATIONS = 10;
+
 export default function EventMap({
   events,
   places = [],
@@ -144,8 +147,8 @@ export default function EventMap({
       return { el, origX: px.x, origY: px.y, x: px.x, y: px.y, size };
     });
 
-    // Iterative force spread (10 iterations)
-    for (let iter = 0; iter < 10; iter++) {
+    // Iterative force spread (DECONFLICT_ITERATIONS iterations)
+    for (let iter = 0; iter < DECONFLICT_ITERATIONS; iter++) {
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
           const a = items[i];
