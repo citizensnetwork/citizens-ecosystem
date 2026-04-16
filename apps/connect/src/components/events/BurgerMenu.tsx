@@ -128,189 +128,188 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
         </div>
 
         <div className="flex-1 overflow-y-auto px-4">
+          {/* Categories section — different per tab */}
           {activeTab === "events" ? (
-            <>
-              {/* Categories */}
-              <AccordionSection
-                title="Categories"
-                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
-                defaultOpen
-                badge={activeCategories.size > 0 ? activeCategories.size : undefined}
-                headerAction={activeCategories.size > 0 ? (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onClearCategories(); }}
-                    className="rounded-md px-2 py-0.5 text-[10px] font-medium text-black/45 transition hover:bg-black/5 hover:text-black/70"
-                  >
-                    Clear
-                  </button>
-                ) : undefined}
-              >
-                <div className="space-y-0.5">
-                  {EVENT_CATEGORIES.map((c) => {
-                    const active = activeCategories.has(c.value);
-                    const catColor = CATEGORY_HEX[c.value];
-                    return (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => onToggleCategory(c.value)}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
-                          active
-                            ? "font-medium text-black"
-                            : "text-black/70 hover:bg-black/[.04]"
-                        }`}
-                        style={active ? { backgroundColor: `${catColor}15` } : undefined}
+          <>
+            <AccordionSection
+              title="Categories"
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
+              defaultOpen
+              badge={activeCategories.size > 0 ? activeCategories.size : undefined}
+              headerAction={activeCategories.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearCategories(); }}
+                  className="rounded-md px-2 py-0.5 text-[10px] font-medium text-black/45 transition hover:bg-black/5 hover:text-black/70"
+                >
+                  Clear
+                </button>
+              ) : undefined}
+            >
+              <div className="space-y-0.5">
+                {EVENT_CATEGORIES.map((c) => {
+                  const active = activeCategories.has(c.value);
+                  const catColor = CATEGORY_HEX[c.value];
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => onToggleCategory(c.value)}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
+                        active
+                          ? "font-medium text-black"
+                          : "text-black/70 hover:bg-black/[.04]"
+                      }`}
+                      style={active ? { backgroundColor: `${catColor}15` } : undefined}
+                    >
+                      <span
+                        className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
+                        style={active
+                          ? { borderColor: catColor, backgroundColor: `${catColor}30` }
+                          : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
+                        }
                       >
-                        <span
-                          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
-                          style={active
-                            ? { borderColor: catColor, backgroundColor: `${catColor}30` }
-                            : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
-                          }
-                        >
-                          {active && (
-                            <svg viewBox="0 0 24 24" fill="none" stroke={catColor} strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          )}
-                        </span>
-                        {c.label}
-                      </button>
-                    );
-                  })}
+                        {active && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke={catColor} strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        )}
+                      </span>
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </AccordionSection>
+
+            {/* Trending — only in events tab */}
+            <AccordionSection title="Trending" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} badge={trending.length || undefined}>
+              {menuLoading ? (
+                <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
+              ) : trending.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-black/40">No trending events yet</p>
+              ) : (
+                <div className="space-y-1">
+                  {trending.map((te) => (
+                    <button
+                      key={te.id}
+                      type="button"
+                      onClick={() => selectAndClose(te)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
+                    >
+                      <span className="flex-1 truncate">{te.title}</span>
+                      <span className="text-xs text-black/40">{te.rsvp_count} attending</span>
+                    </button>
+                  ))}
                 </div>
-              </AccordionSection>
-
-              {/* Trending */}
-              <AccordionSection title="Trending" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} badge={trending.length || undefined}>
-                {menuLoading ? (
-                  <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-                ) : trending.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-black/40">No trending events yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {trending.map((te) => (
-                      <button
-                        key={te.id}
-                        type="button"
-                        onClick={() => selectAndClose(te)}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
-                      >
-                        <span className="flex-1 truncate">{te.title}</span>
-                        <span className="text-xs text-black/40">{te.rsvp_count} attending</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </AccordionSection>
-
-              {/* Favourite Orgs */}
-              <AccordionSection
-                title="Favourite Orgs"
-                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
-                badge={favouriteOrgs.length || undefined}
-              >
-                {!user ? (
-                  <p className="px-3 py-2 text-xs text-black/40">
-                    <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
-                      Log in
-                    </Link>{" "}
-                    to see your favourite organisers
-                  </p>
-                ) : menuLoading ? (
-                  <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-                ) : favouriteOrgs.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-black/40">Follow organisers to see them here</p>
-                ) : (
-                  <div className="space-y-1">
-                    {favouriteOrgs.map((org) => (
-                      <OrgAccordion key={org.id} org={org} onSelectEvent={selectAndClose} />
-                    ))}
-                  </div>
-                )}
-              </AccordionSection>
-
-              {/* Friends */}
-              <AccordionSection title="Friends" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} badge={friends.length || undefined}>
-                {!user ? (
-                  <p className="px-3 py-2 text-xs text-black/40">
-                    <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
-                      Log in
-                    </Link>{" "}
-                    to see friends
-                  </p>
-                ) : menuLoading ? (
-                  <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-                ) : friends.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-black/40">Your mutual follows will appear here</p>
-                ) : (
-                  <div className="space-y-1">
-                    {friends.map((fr) => (
-                      <FriendAccordion key={fr.id} friend={fr} onSelectEvent={selectAndClose} />
-                    ))}
-                  </div>
-                )}
-              </AccordionSection>
-
-              {/* Consider section */}
-              {user && (
-                <BurgerConsiderSection userId={user.id} onClose={onClose} />
               )}
-            </>
+            </AccordionSection>
+          </>
           ) : (
-            <>
-              {/* Place Categories */}
-              <AccordionSection
-                title="Place Categories"
-                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>}
-                defaultOpen
-                badge={activePlaceCategories.size > 0 ? activePlaceCategories.size : undefined}
-                headerAction={activePlaceCategories.size > 0 ? (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onClearPlaceCategories(); }}
-                    className="rounded-md px-2 py-0.5 text-[10px] font-medium text-black/45 transition hover:bg-black/5 hover:text-black/70"
-                  >
-                    Clear
-                  </button>
-                ) : undefined}
-              >
-                <div className="space-y-0.5">
-                  {PLACE_CATEGORIES.map((c) => {
-                    const active = activePlaceCategories.has(c.value);
-                    const catColor = PLACE_CATEGORY_HEX[c.value];
-                    return (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => onTogglePlaceCategory(c.value)}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
-                          active
-                            ? "font-medium text-black"
-                            : "text-black/70 hover:bg-black/[.04]"
-                        }`}
-                        style={active ? { backgroundColor: `${catColor}15` } : undefined}
+            <AccordionSection
+              title="Categories"
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>}
+              defaultOpen
+              badge={activePlaceCategories.size > 0 ? activePlaceCategories.size : undefined}
+              headerAction={activePlaceCategories.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearPlaceCategories(); }}
+                  className="rounded-md px-2 py-0.5 text-[10px] font-medium text-black/45 transition hover:bg-black/5 hover:text-black/70"
+                >
+                  Clear
+                </button>
+              ) : undefined}
+            >
+              <div className="space-y-0.5">
+                {PLACE_CATEGORIES.map((c) => {
+                  const active = activePlaceCategories.has(c.value);
+                  const catColor = PLACE_CATEGORY_HEX[c.value];
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => onTogglePlaceCategory(c.value)}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
+                        active
+                          ? "font-medium text-black"
+                          : "text-black/70 hover:bg-black/[.04]"
+                      }`}
+                      style={active ? { backgroundColor: `${catColor}15` } : undefined}
+                    >
+                      <span
+                        className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
+                        style={active
+                          ? { borderColor: catColor, backgroundColor: `${catColor}30` }
+                          : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
+                        }
                       >
-                        <span
-                          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
-                          style={active
-                            ? { borderColor: catColor, backgroundColor: `${catColor}30` }
-                            : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
-                          }
-                        >
-                          {active && (
-                            <svg viewBox="0 0 24 24" fill="none" stroke={catColor} strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <span className="block">{c.label}</span>
-                          <span className="block truncate text-[10px] text-black/40">{PLACE_CATEGORY_DESCRIPTIONS[c.value]}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </AccordionSection>
-            </>
+                        {active && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke={catColor} strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block">{c.label}</span>
+                        <span className="block truncate text-[10px] text-black/40">{PLACE_CATEGORY_DESCRIPTIONS[c.value]}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </AccordionSection>
+          )}
+
+          {/* Shared sections: Favourites, Friends, Considers — always visible in both tabs */}
+
+          {/* Favourites */}
+          <AccordionSection
+            title="Favourites"
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
+            badge={favouriteOrgs.length || undefined}
+          >
+            {!user ? (
+              <p className="px-3 py-2 text-xs text-black/40">
+                <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
+                  Log in
+                </Link>{" "}
+                to see your favourites
+              </p>
+            ) : menuLoading ? (
+              <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
+            ) : favouriteOrgs.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-black/40">Follow organisers to see them here</p>
+            ) : (
+              <div className="space-y-1">
+                {favouriteOrgs.map((org) => (
+                  <OrgAccordion key={org.id} org={org} onSelectEvent={selectAndClose} />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
+
+          {/* Friends */}
+          <AccordionSection title="Friends" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} badge={friends.length || undefined}>
+            {!user ? (
+              <p className="px-3 py-2 text-xs text-black/40">
+                <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
+                  Log in
+                </Link>{" "}
+                to see friends
+              </p>
+            ) : menuLoading ? (
+              <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
+            ) : friends.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-black/40">Your mutual follows will appear here</p>
+            ) : (
+              <div className="space-y-1">
+                {friends.map((fr) => (
+                  <FriendAccordion key={fr.id} friend={fr} onSelectEvent={selectAndClose} />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
+
+          {/* Considers */}
+          {user && (
+            <BurgerConsiderSection userId={user.id} onClose={onClose} />
           )}
 
           {/* Quick actions (always visible) */}

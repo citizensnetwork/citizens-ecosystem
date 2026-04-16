@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Notification } from "@/types/db";
 import Link from "next/link";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { createClient } from "@/lib/supabase/client";
+
+type PendingReview = {
+  id: string;
+  title: string;
+  date: string;
+};
 
 interface NotificationPanelProps {
   notifications: Notification[];
@@ -20,6 +27,29 @@ const TYPE_ICONS: Record<string, string> = {
   new_follower: "○",
   event_update: "▸",
 };
+
+/** Safely read dismissed review IDs from localStorage. */
+function getDismissedReviewIds(): string[] {
+  try {
+    const str = localStorage.getItem("cc_dismissed_reviews");
+    return str ? JSON.parse(str) as string[] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Safely persist a dismissed review ID to localStorage. */
+function addDismissedReviewId(eventId: string): void {
+  try {
+    const dismissed = getDismissedReviewIds();
+    if (!dismissed.includes(eventId)) {
+      dismissed.push(eventId);
+      localStorage.setItem("cc_dismissed_reviews", JSON.stringify(dismissed));
+    }
+  } catch {
+    // localStorage unavailable — dismiss is session-only
+  }
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -45,6 +75,95 @@ export default function NotificationPanel({
 }: NotificationPanelProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const panelRef = useFocusTrap<HTMLDivElement>(true);
+  const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
+  const [completedReviews, setCompletedReviews] = useState<Set<string>>(new Set());
+  const [dismissedReviews, setDismissedReviews] = useState<Set<string>>(new Set());
+  const [submittingReview, setSubmittingReview] = useState<string | null>(null);
+  const [hoveredStar, setHoveredStar] = useState<{ eventId: string; star: number } | null>(null);
+
+  // Fetch pending reviews on mount
+  useEffect(() => {
+    let active = true;
+    async function fetchReviews() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: rsvps } = await supabase
+        .from("rsvps")
+        .select("event_id")
+        .eq("user_id", user.id);
+
+      const eventIds = (rsvps ?? []).map((r) => r.event_id);
+      if (eventIds.length === 0) return;
+
+      const { data: events } = await supabase
+        .from("events")
+        .select("id,title,date")
+        .in("id", eventIds)
+        .lt("date", new Date().toISOString())
+        .order("date", { ascending: false })
+        .limit(10);
+
+      if (!events || events.length === 0) return;
+
+      const { data: reviews } = await supabase
+        .from("reviews")
+        .select("event_id")
+        .eq("user_id", user.id)
+        .in("event_id", events.map((e) => e.id));
+
+      const reviewedIds = new Set((reviews ?? []).map((r) => r.event_id));
+
+      // Also check localStorage for permanently dismissed reviews
+      const dismissed = new Set(getDismissedReviewIds());
+
+      if (active) {
+        setDismissedReviews(dismissed);
+        setPendingReviews(
+          events.filter((e) => !reviewedIds.has(e.id) && !dismissed.has(e.id))
+        );
+      }
+    }
+
+    fetchReviews();
+    return () => { active = false; };
+  }, []);
+
+  const submitReviewRating = useCallback(async (eventId: string, rating: number) => {
+    setSubmittingReview(eventId);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSubmittingReview(null); return; }
+
+    const { error } = await supabase.from("reviews").upsert(
+      {
+        event_id: eventId,
+        place_id: null,
+        user_id: user.id,
+        rating,
+        body: "",
+        still_exists: true,
+      },
+      { onConflict: "event_id,user_id" }
+    );
+
+    setSubmittingReview(null);
+    if (!error) {
+      setCompletedReviews((prev) => new Set([...prev, eventId]));
+      addDismissedReviewId(eventId);
+      // Remove from pending after a brief highlight
+      setTimeout(() => {
+        setPendingReviews((prev) => prev.filter((r) => r.id !== eventId));
+      }, 1200);
+    }
+  }, []);
+
+  const dismissReview = useCallback((eventId: string) => {
+    addDismissedReviewId(eventId);
+    setDismissedReviews((prev) => new Set([...prev, eventId]));
+    setPendingReviews((prev) => prev.filter((r) => r.id !== eventId));
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -98,7 +217,78 @@ export default function NotificationPanel({
 
       {/* Notification list */}
       <div className="flex-1 overflow-y-auto">
-        {notifications.length === 0 ? (
+        {/* Pending review notifications at the top */}
+        {pendingReviews.filter((r) => !dismissedReviews.has(r.id)).length > 0 && (
+          <ul>
+            {pendingReviews
+              .filter((r) => !dismissedReviews.has(r.id))
+              .map((review) => {
+                const isCompleted = completedReviews.has(review.id);
+                const isSubmitting = submittingReview === review.id;
+                return (
+                  <li
+                    key={`review-${review.id}`}
+                    className={`border-b border-black/5 transition-colors duration-300 ${
+                      isCompleted ? "bg-white" : "bg-(--gold-soft)/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 px-4 py-2.5">
+                      <Link
+                        href={`/events/${review.id}`}
+                        onClick={onClose}
+                        className="min-w-0 flex-1"
+                      >
+                        <p className="text-xs font-medium text-black truncate">
+                          Review: {review.title}
+                        </p>
+                        <div className="mt-1 flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => {
+                            const isHovered = hoveredStar?.eventId === review.id && hoveredStar.star >= star;
+                            return (
+                              <button
+                                key={star}
+                                type="button"
+                                disabled={isSubmitting || isCompleted}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  submitReviewRating(review.id, star);
+                                }}
+                                onMouseEnter={() => setHoveredStar({ eventId: review.id, star })}
+                                onMouseLeave={() => setHoveredStar(null)}
+                                className={`text-base transition ${
+                                  isCompleted
+                                    ? "text-(--gold)"
+                                    : isHovered
+                                      ? "text-(--gold)"
+                                      : "text-(--gold)/30"
+                                } disabled:cursor-default`}
+                                aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
+                              >
+                                ★
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Link>
+                      {/* Dismiss X */}
+                      <button
+                        type="button"
+                        onClick={() => dismissReview(review.id)}
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-sm text-black/80 transition hover:text-black"
+                        aria-label="Dismiss review"
+                        title="Dismiss"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+        )}
+
+        {notifications.length === 0 && pendingReviews.filter((r) => !dismissedReviews.has(r.id)).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl text-black/30">●</span>
             <p className="mt-2 text-sm text-black/50">No notifications yet</p>

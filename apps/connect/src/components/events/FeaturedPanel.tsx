@@ -81,18 +81,16 @@ export default function FeaturedPanel({
             <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
             <polyline points="16 7 22 7 22 13"/>
           </svg>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-white/80">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
             Trending
           </h2>
         </div>
-
-        {/* Horizontal scrollable trending blocks with nav buttons */}
         <div className="relative flex-1 px-2">
           {/* Left nav button */}
           <button
             type="button"
             onClick={() => scrollTrending("left")}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-black backdrop-blur-sm transition hover:bg-black/20"
             aria-label="Scroll left"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
@@ -120,7 +118,7 @@ export default function FeaturedPanel({
           <button
             type="button"
             onClick={() => scrollTrending("right")}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-black backdrop-blur-sm transition hover:bg-black/20"
             aria-label="Scroll right"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
@@ -167,7 +165,7 @@ export default function FeaturedPanel({
           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
           <polyline points="16 7 22 7 22 13"/>
         </svg>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-white/80">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
           Trending
         </h2>
       </div>

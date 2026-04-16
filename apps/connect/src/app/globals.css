@@ -221,28 +221,41 @@ body {
   justify-content: center;
   min-width: 2rem;
   min-height: 2rem;
+  color: #fff !important;
+  background: var(--foreground) !important;
+  border-color: var(--foreground) !important;
+}
+
+.cc-calendar .fc .fc-prev-button:hover,
+.cc-calendar .fc .fc-next-button:hover {
+  background: #333 !important;
+  border-color: #333 !important;
 }
 
 .cc-calendar .fc .fc-icon {
   font-family: "fcicons" !important;
   font-style: normal;
-  font-weight: normal;
+  font-weight: 400;
   font-variant: normal;
   text-transform: none;
   line-height: 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 1.1em;
+  font-size: 1.2em;
   vertical-align: middle;
   display: inline-block;
+  speak: none;
+  color: inherit;
+}
+
+.cc-calendar .fc .fc-icon-chevron-left::before {
+  content: "\e900";
+}
+.cc-calendar .fc .fc-icon-chevron-right::before {
+  content: "\e901";
 }
 
 /* ── Map marker styles ────────────────────────────────── */
-
-.cc-marker {
-  background: transparent !important;
-  border: none !important;
-}
 
 .cc-marker-live span {
   animation: markerPulse 1.6s ease-in-out infinite;
@@ -268,7 +281,7 @@ body {
   }
 }
 
-/* SVG leader lines for displaced markers */
+/* SVG leader lines for displaced markers — below marker icons */
 .cc-leader-svg {
   position: absolute;
   top: 0;
@@ -276,8 +289,15 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 2;
+  z-index: 1;
   overflow: visible;
+}
+
+/* Ensure event marker elements render above leader lines */
+.cc-marker {
+  background: transparent !important;
+  border: none !important;
+  z-index: 3 !important;
 }
 
 @keyframes markerPulse {

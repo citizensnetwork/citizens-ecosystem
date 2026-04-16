@@ -251,8 +251,8 @@ export function createPlaceMarkerEl(
   }
 ): HTMLDivElement {
   const highlighted = options?.highlighted ?? false;
-  const size = highlighted ? 54 : 36;
-  const iconSize = highlighted ? 36 : 24;
+  const size = highlighted ? 42 : 28;
+  const iconSize = highlighted ? 28 : 18;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;

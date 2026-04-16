@@ -12,7 +12,6 @@ import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import FeaturedPanel from "./FeaturedPanel";
-import PostEventPrompt from "@/components/reviews/PostEventPrompt";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
@@ -338,7 +337,6 @@ export default function EventsView({
             <div
               className="flex-1 overflow-auto touch-pan-x touch-pan-y touch-pinch-zoom px-4 pb-4 pt-20 sm:px-6 sm:pt-20"
             >
-              <PostEventPrompt />
               <EventCalendar
                 events={filtered}
                 rsvpEventIds={rsvpEventIds}
@@ -456,7 +454,7 @@ export default function EventsView({
               <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
               <polyline points="16 7 22 7 22 13"/>
             </svg>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-white/90">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-black">
               Trending
             </h2>
           </div>
