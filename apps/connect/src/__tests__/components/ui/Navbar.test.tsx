@@ -22,12 +22,16 @@ vi.mock("next/link", () => ({
     href,
     children,
     onClick,
+    title,
+    className,
   }: {
     href: string;
     children: React.ReactNode;
     onClick?: () => void;
+    title?: string;
+    className?: string;
   }) => (
-    <a href={href} onClick={onClick}>
+    <a href={href} onClick={onClick} title={title} className={className}>
       {children}
     </a>
   ),
@@ -92,12 +96,12 @@ describe("Navbar", () => {
     expect(screen.getByText("Citizens Connect")).toBeInTheDocument();
   });
 
-  it("renders Events link", () => {
+  it("renders Events icon link", () => {
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
     render(<Navbar />);
-    const eventsLink = screen.getByText("Events");
-    expect(eventsLink.closest("a")).toHaveAttribute("href", "/events?view=calendar");
+    const eventsLink = screen.getByTitle("Events");
+    expect(eventsLink).toHaveAttribute("href", "/events?view=calendar");
   });
 
   it("shows Log In and Sign Up links when not authenticated", () => {
@@ -108,7 +112,7 @@ describe("Navbar", () => {
     expect(screen.getByText("Sign Up")).toBeInTheDocument();
   });
 
-  it("shows user display name when authenticated", async () => {
+  it("shows user initial when authenticated", async () => {
     const user = {
       id: "u1",
       user_metadata: { full_name: "John Doe" },
@@ -118,7 +122,7 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     await waitFor(() => {
-      expect(screen.getByText("John")).toBeInTheDocument();
+      expect(screen.getByText("J")).toBeInTheDocument();
     });
   });
 
@@ -146,12 +150,14 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     await waitFor(() => {
-      expect(screen.getByText("John")).toBeInTheDocument();
+      expect(screen.getByText("J")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("John"));
+    // Click the user button (contains the initial "J" and dropdown arrow)
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
 
     expect(screen.getByText("My Profile")).toBeInTheDocument();
+    expect(screen.getByText("My Events")).toBeInTheDocument();
     expect(screen.getByText("Log Out")).toBeInTheDocument();
   });
 
@@ -165,10 +171,10 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     await waitFor(() => {
-      expect(screen.getByText("John")).toBeInTheDocument();
+      expect(screen.getByText("J")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("John"));
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByText("Log Out"));
 
     await waitFor(() => {
