@@ -34,8 +34,10 @@ export default async function NewPlacePage() {
     .returns<Category[]>();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <PlaceForm categories={categories ?? []} />
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel mx-auto w-full max-w-2xl px-6 py-8 sm:px-8">
+        <PlaceForm categories={categories ?? []} />
+      </div>
     </div>
   );
 }

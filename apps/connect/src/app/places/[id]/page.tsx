@@ -71,7 +71,8 @@ export default async function PlaceDetailPage({
       : null;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
       <Link
         href="/events"
         className="mb-4 inline-block text-sm text-black/60 hover:text-black"
@@ -79,7 +80,7 @@ export default async function PlaceDetailPage({
         ← Back to map
       </Link>
 
-      <div className="surface-card space-y-4 rounded-2xl p-6">
+      <div className="space-y-4 rounded-2xl p-6">
         {place.image_url && (
           <div className="relative h-48 w-full">
             <Image
@@ -177,6 +178,7 @@ export default async function PlaceDetailPage({
       {/* Reviews */}
       <div className="mt-6">
         <ReviewList placeId={place.id} title="Place Reviews" />
+      </div>
       </div>
     </div>
   );

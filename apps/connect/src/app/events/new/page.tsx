@@ -36,8 +36,10 @@ export default async function NewEventPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <EventFormWithIndemnity isVendor={isVendor} placeCategories={placeCategories} />
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
+        <EventFormWithIndemnity isVendor={isVendor} placeCategories={placeCategories} />
+      </div>
     </div>
   );
 }

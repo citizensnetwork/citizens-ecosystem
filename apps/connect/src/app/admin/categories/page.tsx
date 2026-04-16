@@ -34,15 +34,17 @@ export default async function AdminCategoriesPage() {
     .returns<Category[]>();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <Link
-        href="/events"
-        className="mb-4 inline-block text-sm text-black/60 hover:text-black"
-      >
-        ← Back to map
-      </Link>
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
+        <Link
+          href="/events"
+          className="mb-4 inline-block text-sm text-black/60 hover:text-black"
+        >
+          ← Back to map
+        </Link>
 
-      <CategoryManager categories={categories ?? []} />
+        <CategoryManager categories={categories ?? []} />
+      </div>
     </div>
   );
 }

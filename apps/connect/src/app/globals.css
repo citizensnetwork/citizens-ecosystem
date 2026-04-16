@@ -15,6 +15,7 @@
   --glass-30: rgba(255,255,255,0.30);
   --glass-60: rgba(255,255,255,0.60);
   --glass-20: rgba(255,255,255,0.20);
+  --glass-10: rgba(255,255,255,0.10);
 }
 
 @theme inline {
@@ -353,4 +354,47 @@ body {
 
 .maplibregl-ctrl-group button:hover {
   background-color: var(--surface-muted);
+}
+
+/* ── Glass Panel System ─────────────────────────── */
+
+.glass-panel {
+  background: var(--glass-60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Map-like background for non-map pages (subtle topo gradient) */
+.map-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 30%, rgba(0,0,0,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(212,175,55,0.04) 0%, transparent 60%),
+    linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 25%, #e5e5e5 50%, #ebebeb 75%, #e8e8e8 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 200% 200%;
+}
+
+/* Calendar glass overlay (when calendar is shown over map) */
+.glass-calendar-overlay {
+  background: var(--glass-60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+}
+
+/* Glass calendar FullCalendar overrides for transparent backgrounds */
+.glass-calendar-overlay .cc-calendar {
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: rgba(245,245,245,0.4);
+}
+
+.glass-calendar-overlay .cc-calendar .surface-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }

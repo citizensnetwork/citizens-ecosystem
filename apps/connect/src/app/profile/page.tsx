@@ -112,7 +112,8 @@ export default async function ProfilePage() {
   const selectedInterestIds = (userInterests ?? []).map((ui) => ui.interest_id);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8">
         {typedProfile.avatar_url ? (
@@ -160,7 +161,7 @@ export default async function ProfilePage() {
       </div>
 
       {/* ── Profile Editor (avatar, name, password) ─── */}
-      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+      <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
         <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
         <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
         <div className="mt-6 pt-6 border-t border-black/5">
@@ -172,7 +173,7 @@ export default async function ProfilePage() {
       </section>
 
       {/* ── Notification Preferences ─── */}
-      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+      <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
         <h2 className="text-lg font-semibold mb-4">Notifications</h2>
         <NotificationPreferences
           currentDigest={typedProfile.notification_digest}
@@ -181,7 +182,7 @@ export default async function ProfilePage() {
       </section>
 
       {/* ── Social Platform Connections ─── */}
-      <section className="mb-8 rounded-xl border border-black/8 bg-white p-5">
+      <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
         <h2 className="text-lg font-semibold mb-4">Social Platforms</h2>
         <SocialLinksEditor
           profileId={typedProfile.id}
@@ -300,13 +301,14 @@ export default async function ProfilePage() {
       )}
 
       {/* ── Danger Zone (always last) ─── */}
-      <section className="mb-8 rounded-xl border border-red-100 bg-white p-5">
+      <section className="mb-8 rounded-xl border border-red-100 bg-white/50 p-5">
         <h2 className="text-lg font-semibold mb-2 text-red-700">Danger Zone</h2>
         <p className="text-xs text-black/60 mb-4">
           Permanently delete your account and all associated data.
         </p>
         <DeleteAccountButton />
       </section>
+      </div>
     </div>
   );
 }

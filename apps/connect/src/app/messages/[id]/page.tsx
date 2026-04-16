@@ -22,8 +22,10 @@ export default async function ConversationPage({
   }
 
   return (
-    <div className="mx-auto h-[calc(100dvh-3.5rem)] max-w-2xl">
-      <ChatView conversationId={id} userId={user.id} />
+    <div className="flex h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel flex h-full max-h-[calc(100dvh-6.5rem)] w-full max-w-2xl flex-col overflow-hidden">
+        <ChatView conversationId={id} userId={user.id} />
+      </div>
     </div>
   );
 }
