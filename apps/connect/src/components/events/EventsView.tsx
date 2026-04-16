@@ -548,18 +548,22 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1004 flex flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               categoryPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label="Category filter results"
+            onTouchStart={(e) => { panelSwipeStartY.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              if (e.changedTouches[0].clientY - panelSwipeStartY.current > 60) setCategoryPanelOpen(false);
+            }}
           >
-            {/* Category title bar */}
+            {/* Category title bar — same dimensions as trending, category-coloured */}
             <div
-              className="flex-shrink-0 rounded-t-2xl"
+              className="flex-shrink-0 rounded-t-2xl backdrop-blur-md"
               style={{
                 background: activeCategories.size === 1
-                  ? `${CATEGORY_HEX[[...activeCategories][0]]}f0`
-                  : "rgba(17,17,17,0.92)",
+                  ? hexToRgba(CATEGORY_HEX[[...activeCategories][0]], 0.6)
+                  : "rgba(17,17,17,0.6)",
               }}
             >
               <div className="flex justify-center">
@@ -567,30 +571,32 @@ export default function EventsView({
                   type="button"
                   onClick={() => setCategoryPanelOpen(false)}
                   aria-label="Collapse category panel"
-                  className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
+                  className="flex cursor-pointer items-center justify-center px-8 py-1.5 active:scale-95"
                 >
-                  <span className="block h-1.5 w-16 rounded-full bg-white/50 transition-colors hover:bg-white/70" />
+                  <span className="block h-1 w-12 rounded-full bg-white/60 transition-colors hover:bg-white/80" />
                 </button>
               </div>
-              <div className="flex items-center justify-between px-4 pb-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">
-                    Category
-                  </p>
-                  <h2 className="text-sm font-bold text-white">
-                    {activeCategories.size === 1
-                      ? CATEGORY_LABELS[[...activeCategories][0]]
-                      : `${activeCategories.size} Categories Selected`}
-                  </h2>
-                </div>
-                <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-semibold text-white">
-                  {filtered.length} event{filtered.length !== 1 ? "s" : ""}
+              <div className="flex items-center justify-center gap-2 px-4 pb-2">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-white">
+                  {activeCategories.size === 1
+                    ? CATEGORY_LABELS[[...activeCategories][0]]
+                    : `${activeCategories.size} Categories Selected`}
+                </h2>
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  {filtered.length}
                 </span>
               </div>
             </div>
 
-            {/* Horizontal swipeable event cards */}
-            <div className="bg-black/85 backdrop-blur-md pb-4">
+            {/* Horizontal swipeable event cards — category-coloured translucent background */}
+            <div
+              className="flex-1 overflow-y-auto backdrop-blur-md pb-4"
+              style={{
+                background: activeCategories.size === 1
+                  ? hexToRgba(CATEGORY_HEX[[...activeCategories][0]], 0.6)
+                  : "rgba(17,17,17,0.6)",
+              }}
+            >
               {filtered.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-white/50">
                   No events found
@@ -602,7 +608,7 @@ export default function EventsView({
                     type="button"
                     onClick={() => setCategoryPanelPage((p) => Math.max(0, p - 1))}
                     disabled={categoryPanelPage === 0}
-                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
+                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
                     aria-label="Previous events"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
@@ -653,7 +659,7 @@ export default function EventsView({
                     type="button"
                     onClick={() => setCategoryPanelPage((p) => Math.min(Math.ceil(filtered.length / CARDS_PER_PAGE) - 1, p + 1))}
                     disabled={categoryPanelPage >= Math.ceil(filtered.length / CARDS_PER_PAGE) - 1}
-                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
+                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
                     aria-label="Next events"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">

@@ -1,5 +1,6 @@
 import type { EventCategory } from "@/types/db";
 import type { MarkerType } from "@/types/db";
+import { CATEGORY_HEX } from "@/lib/categories";
 
 /* ── Minimal SVG icons per category (monochrome, no emoji) ── */
 
@@ -112,27 +113,28 @@ export function getCategoryIcon(category: EventCategory | null): string {
  */
 export function createCategoryMarkerEl(
   category: EventCategory | null,
-  temporal: TemporalStyle
+  temporal: TemporalStyle,
+  overrideColor?: string
 ): HTMLDivElement {
   const cat = category ?? "church";
   const icon = getCategoryIcon(cat);
+  const borderColor = overrideColor ?? CATEGORY_HEX[cat] ?? "#D4AF37";
   const size = Math.round(BASE_SIZE * temporal.scale);
-  const iconSize = Math.round(size * 0.55);
+  const iconSize = Math.round(size * 0.48);
 
   const el = document.createElement("div");
   el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}${temporal.isToday && !temporal.isLive ? " cc-marker-today" : ""}`;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
 
-  // Design: black SVG icon, white fill, golden ring with thin black lines on each side
   el.innerHTML = `<span style="
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
     background:#fff;
     opacity:${temporal.opacity};
     border-radius:50%;
-    border:1.5px solid #111;
-    box-shadow:0 0 0 1.5px #D4AF37, 0 0 0 3px #111, 0 2px 6px rgba(0,0,0,.25);
+    border:2px solid ${borderColor};
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
     cursor:pointer;
     transition:transform 180ms ease;
   "><span style="
@@ -208,7 +210,7 @@ export function createCustomMarkerEl(
   if (markerType === "icon" && options.markerIcon) {
     const fillColor = options.markerColor ?? "#D4AF37";
     const iconSvg = CATEGORY_ICONS[options.markerIcon as EventCategory] ?? DEFAULT_ICON;
-    const iconSize = Math.round(size * 0.55);
+    const iconSize = Math.round(size * 0.48);
 
     const el = document.createElement("div");
     el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}`;
@@ -221,8 +223,8 @@ export function createCustomMarkerEl(
       background:#fff;
       opacity:${temporal.opacity};
       border-radius:50%;
-      border:1.5px solid #111;
-      box-shadow:0 0 0 1.5px #D4AF37, 0 0 0 3px #111, 0 2px 6px rgba(0,0,0,.25);
+      border:2px solid ${escapeHtml(fillColor)};
+      box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
     "><span style="
       width:${iconSize}px;height:${iconSize}px;
@@ -238,7 +240,7 @@ export function createCustomMarkerEl(
 }
 
 /**
- * Place marker — gold filled SVG icon with white outline, no bubble/background.
+ * Place marker — gold dot inside white circle with category-coloured outline.
  * Slightly smaller than event markers to avoid hiding events.
  */
 export function createPlaceMarkerEl(
@@ -247,9 +249,11 @@ export function createPlaceMarkerEl(
     isHighRated?: boolean;
     isFlagged?: boolean;
     highlighted?: boolean;
+    highlightColor?: string;
   }
 ): HTMLDivElement {
   const highlighted = options?.highlighted ?? false;
+  const highlightColor = options?.highlightColor ?? "#D4AF37";
   const size = highlighted ? 42 : 28;
   const iconSize = highlighted ? 28 : 18;
   const avgRating = options?.avgRating ?? null;
@@ -306,9 +310,10 @@ export function createPlaceMarkerEl(
 
   const opacity = isFlagged ? 0.62 : 1;
 
-  // Gold-filled place icon inside white circle with golden ring + black outline
+  // Circle-dot place icon with category-coloured outline
+  const dotColor = options?.highlightColor ?? "#D4AF37";
   const placeIcon =
-    '<svg viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3" fill="#fff" stroke="#fff" stroke-width="1"/></svg>';
+    `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="white" stroke="${escapeHtml(dotColor)}" stroke-width="1"/><circle cx="12" cy="12" r="3.5" fill="${escapeHtml(dotColor)}"/></svg>`;
 
   const el = document.createElement("div");
   el.className = "cc-marker";
@@ -323,17 +328,10 @@ export function createPlaceMarkerEl(
     cursor:pointer;
     filter:${glow};
   "><span style="
-    width:${size}px;height:${size}px;
-    display:flex;align-items:center;justify-content:center;
-    background:#fff;
-    border-radius:50%;
-    border:1.5px solid #111;
-    box-shadow:0 0 0 1.5px #D4AF37, 0 0 0 3px #111;
-  "><span style="
     width:${iconSize}px;height:${iconSize}px;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
-  ">${placeIcon}</span></span>${ratingBadge}${warningBadge}</span>`;
+  ">${placeIcon}</span>${ratingBadge}${warningBadge}</span>`;
 
   return el;
 }

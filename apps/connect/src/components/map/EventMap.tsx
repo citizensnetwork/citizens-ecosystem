@@ -13,7 +13,7 @@ import {
 } from "@/lib/map/markers";
 import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
-import { PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
 
 type Props = {
   events: Event[];
@@ -480,11 +480,16 @@ export default function EventMap({
 
         // Place category highlighting
         let placeIsHighlighted = false;
+        let placeHighlightColor: string | undefined;
         if (activePlaceCategories && activePlaceCategories.size > 0) {
           const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
-          placeIsHighlighted = [...activePlaceCategories].some((cat) =>
+          const matchedCat = [...activePlaceCategories].find((cat) =>
             PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
           );
+          if (matchedCat) {
+            placeIsHighlighted = true;
+            placeHighlightColor = PLACE_CATEGORY_HEX[matchedCat];
+          }
         }
 
         const placeEl = createPlaceMarkerEl({
@@ -492,6 +497,7 @@ export default function EventMap({
           isHighRated,
           isFlagged,
           highlighted: placeIsHighlighted,
+          highlightColor: placeHighlightColor,
         });
 
         const ratingLabel =
