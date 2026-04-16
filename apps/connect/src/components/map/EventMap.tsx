@@ -32,8 +32,17 @@ type Props = {
 /* ── Persist map viewpoint across navigations ── */
 const MAP_VIEW_KEY = "cc-map-viewpoint";
 
-/** Scale multiplier for highlighted (category-selected) markers. */
-const HIGHLIGHT_SCALE = 1.5;
+/** Minimum zoom level to show place markers (~30% of a single city). */
+const PLACE_ZOOM_MIN = 14;
+
+/** Below this zoom, run marker deconfliction with leader lines. */
+const DECONFLICT_MAX_ZOOM = 13;
+
+/** Minimum pixel gap between marker edges (≈2mm at 96 dpi). */
+const MIN_GAP_PX = 8;
+
+/** Number of force-simulation iterations for deconfliction. */
+const DECONFLICT_ITERATIONS = 10;
 
 export default function EventMap({
   events,
@@ -50,21 +59,35 @@ export default function EventMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const markersRef = useRef<maplibregl.Marker[]>([]);          // event markers
+  const placeMarkersRef = useRef<maplibregl.Marker[]>([]);     // place markers (zoom-gated)
   const geoMarkerRef = useRef<maplibregl.Marker | null>(null);
   const userPositionRef = useRef<[number, number] | null>(null);
   const readyRef = useRef(false);
   const hasRestoredView = useRef(false);
 
-  // Keep stable refs so marker click handlers always see latest callbacks
+  // Stable refs so marker click handlers always see latest callbacks
   const onSelectPlaceRef = useRef(onSelectPlace);
   onSelectPlaceRef.current = onSelectPlace;
   const onQuickActionRef = useRef(onQuickAction);
   onQuickActionRef.current = onQuickAction;
+  const activeCategoriesRef = useRef(activeCategories);
+  activeCategoriesRef.current = activeCategories;
+
+  // Deconfliction data: stores each event marker + its lat/lng
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number] }[]>([]);
+  const svgOverlayRef = useRef<SVGSVGElement | null>(null);
+  const runDeconflictionRef = useRef<() => void>(() => {});
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    placeMarkersRef.current.forEach((m) => m.remove());
+    placeMarkersRef.current = [];
+    evtMarkerDataRef.current = [];
+    // Clear leader lines
+    const svg = svgOverlayRef.current;
+    if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
   }, []);
 
   const saveMapView = useCallback(() => {
@@ -84,6 +107,94 @@ export default function EventMap({
       return JSON.parse(raw);
     } catch { return null; }
   }, []);
+
+  /** Show or hide place markers based on zoom + active category state. */
+  const updatePlaceVisibility = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const z = map.getZoom();
+    const cats = activeCategoriesRef.current;
+    const shouldShow = z >= PLACE_ZOOM_MIN && (!cats || cats.size === 0);
+    placeMarkersRef.current.forEach((m) => {
+      (m.getElement() as HTMLElement).style.visibility = shouldShow ? "" : "hidden";
+    });
+  }, []);
+
+  /** Force-directed deconfliction: spread overlapping markers, draw leader lines. */
+  const runDeconfliction = useCallback(() => {
+    const map = mapRef.current;
+    const svg = svgOverlayRef.current;
+    if (!map || !svg || !readyRef.current) return;
+
+    // Clear previous leader lines
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const z = map.getZoom();
+
+    // At close zoom, snap markers back to their real positions
+    if (z >= DECONFLICT_MAX_ZOOM) {
+      evtMarkerDataRef.current.forEach(({ marker }) => {
+        (marker.getElement() as HTMLElement).style.transform = "";
+      });
+      return;
+    }
+
+    // Project lat/lng → screen px
+    const items = evtMarkerDataRef.current.map(({ marker, lngLat }) => {
+      const px = map.project(lngLat as maplibregl.LngLatLike);
+      const el = marker.getElement() as HTMLElement;
+      const size = parseInt(el.style.width || "40") || 40;
+      return { el, origX: px.x, origY: px.y, x: px.x, y: px.y, size };
+    });
+
+    // Iterative force spread (DECONFLICT_ITERATIONS iterations)
+    for (let iter = 0; iter < DECONFLICT_ITERATIONS; iter++) {
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i];
+          const b = items[j];
+          const minDist = (a.size + b.size) / 2 + MIN_GAP_PX;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0 && dist < minDist) {
+            const push = (minDist - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            a.x -= nx * push;
+            a.y -= ny * push;
+            b.x += nx * push;
+            b.y += ny * push;
+          }
+        }
+      }
+    }
+
+    // Apply CSS offset transforms and draw white leader lines
+    items.forEach(({ el, origX, origY, x, y }) => {
+      const dx = x - origX;
+      const dy = y - origY;
+      const hasMoved = Math.abs(dx) > 1 || Math.abs(dy) > 1;
+      el.style.transform = hasMoved
+        ? `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`
+        : "";
+
+      if (hasMoved) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", origX.toFixed(1));
+        line.setAttribute("y1", origY.toFixed(1));
+        line.setAttribute("x2", x.toFixed(1));
+        line.setAttribute("y2", y.toFixed(1));
+        line.setAttribute("stroke", "rgba(255,255,255,0.80)");
+        line.setAttribute("stroke-width", "1.5");
+        line.setAttribute("stroke-linecap", "round");
+        svg.appendChild(line);
+      }
+    });
+  }, []);
+
+  // Keep stable ref so init-effect listener always calls latest runDeconfliction
+  runDeconflictionRef.current = runDeconfliction;
 
   /* ── Initialise map once ──────────────────────────────── */
   useEffect(() => {
@@ -105,22 +216,42 @@ export default function EventMap({
 
     if (stored) hasRestoredView.current = true;
 
-    // Attribution and zoom controls intentionally hidden per design spec
-
     mapRef.current = map;
 
-    // Mark map as ready once style is loaded.
-    // resize() re-measures the container after the dynamic import resolves
-    // so MapLibre always gets the correct canvas dimensions.
+    // SVG overlay for deconfliction leader lines
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgEl.setAttribute("class", "cc-leader-svg");
+    containerRef.current.appendChild(svgEl);
+    svgOverlayRef.current = svgEl;
+
     map.once("load", () => {
       readyRef.current = true;
       map.resize();
     });
 
-    // Persist viewpoint on every move
     map.on("moveend", saveMapView);
 
-    /* Geolocation control (native-like button) */
+    // Zoom-gate place visibility and run deconfliction on zoom change
+    map.on("zoomend", () => {
+      updatePlaceVisibility();
+      runDeconflictionRef.current();
+    });
+
+    // During movement: reset transforms and clear leader lines for smooth panning
+    map.on("movestart", () => {
+      evtMarkerDataRef.current.forEach(({ marker }) => {
+        (marker.getElement() as HTMLElement).style.transform = "";
+      });
+      const svg = svgOverlayRef.current;
+      if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
+    });
+
+    // After panning stops, re-run deconfliction
+    map.on("moveend", () => {
+      runDeconflictionRef.current();
+    });
+
+    /* Geolocation control */
     map.addControl(
       new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
@@ -143,7 +274,6 @@ export default function EventMap({
             .setLngLat(lngLat)
             .addTo(map);
 
-          // Only fly if map is still alive — province-level zoom
           if (mapRef.current) {
             map.flyTo({ center: lngLat, zoom: 8, duration: 1200 });
           }
@@ -159,16 +289,23 @@ export default function EventMap({
       map.remove();
       mapRef.current = null;
       geoMarkerRef.current = null;
+      // Remove SVG overlay
+      if (svgEl.parentNode) svgEl.parentNode.removeChild(svgEl);
+      svgOverlayRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ── Update place visibility when activeCategories changes ── */
+  useEffect(() => {
+    updatePlaceVisibility();
+  }, [activeCategories, updatePlaceVisibility]);
 
   /* ── Sync event + place markers ───────────────────────── */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Stable reference to latest data via closure
     const addMarkers = () => {
       clearMarkers();
 
@@ -183,23 +320,25 @@ export default function EventMap({
       mappable.forEach((event) => {
         const temporal = getTemporalStyle(event.date);
 
-        // Highlight: if this event's category is actively selected, scale up 1.5x
+        // Glow effect for highlighted (category-selected) markers — no scale change
         const isHighlighted = activeCategories && activeCategories.size > 0 &&
           event.category !== null && event.category !== undefined && activeCategories.has(event.category);
-        const effectiveTemporal = isHighlighted
-          ? { ...temporal, scale: temporal.scale * HIGHLIGHT_SCALE, opacity: 1 }
-          : temporal;
 
         const el = event.marker_type && event.marker_type !== "category"
           ? createCustomMarkerEl({
               markerType: event.marker_type,
               category: event.category,
-              temporal: effectiveTemporal,
+              temporal,
               markerIcon: event.marker_icon,
               markerColor: event.marker_color,
               markerImageUrl: event.marker_image_url,
             })
-          : createCategoryMarkerEl(event.category, effectiveTemporal);
+          : createCategoryMarkerEl(event.category, temporal);
+
+        // Add glow class for highlighted markers (CSS animation)
+        if (isHighlighted) {
+          el.classList.add("cc-marker-highlighted");
+        }
 
         const dateStr = new Date(event.date).toLocaleDateString("en-US", {
           month: "short",
@@ -247,8 +386,8 @@ export default function EventMap({
         );
 
         popup.on("open", () => {
-          const el = popup.getElement();
-          el?.querySelectorAll(".cc-action-btn").forEach((btn) => {
+          const popupEl = popup.getElement();
+          popupEl?.querySelectorAll(".cc-action-btn").forEach((btn) => {
             btn.addEventListener("click", () => {
               const action = btn.getAttribute("data-action") as "view" | "join" | "share" | "consider" | "visit";
               if (action) {
@@ -259,23 +398,25 @@ export default function EventMap({
           });
         });
 
+        const lngLat: [number, number] = [event.longitude!, event.latitude!];
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-          .setLngLat([event.longitude!, event.latitude!])
+          .setLngLat(lngLat)
           .setPopup(popup)
           .addTo(map);
         markersRef.current.push(marker);
-        bounds.extend([event.longitude!, event.latitude!]);
+        evtMarkerDataRef.current.push({ marker, lngLat });
+        bounds.extend(lngLat);
         hasPoints = true;
       });
 
-      // ── Place markers ──
+      // ── Place markers (zoom-gated) ──
       places.forEach((place) => {
         const avgRating = place.avg_rating ?? null;
         const isHighRated = avgRating != null && avgRating >= 4.5;
         const isFlagged =
           !!place.verification_flagged || place.verified === false;
 
-        // Highlight: if this place matches an active place category, scale up
+        // Place category highlighting
         let placeIsHighlighted = false;
         if (activePlaceCategories && activePlaceCategories.size > 0) {
           const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
@@ -284,7 +425,7 @@ export default function EventMap({
           );
         }
 
-        const el = createPlaceMarkerEl({
+        const placeEl = createPlaceMarkerEl({
           avgRating,
           isHighRated,
           isFlagged,
@@ -309,22 +450,25 @@ export default function EventMap({
         );
 
         popup.on("open", () => {
-          const el = popup.getElement();
-          el?.querySelector(".cc-action-btn")?.addEventListener("click", () => {
+          const popupEl = popup.getElement();
+          popupEl?.querySelector(".cc-action-btn")?.addEventListener("click", () => {
             popup.remove();
             onSelectPlaceRef.current?.(place);
           });
         });
 
-        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat([place.longitude, place.latitude])
           .setPopup(popup)
           .addTo(map);
 
-        markersRef.current.push(marker);
+        placeMarkersRef.current.push(marker);
         bounds.extend([place.longitude, place.latitude]);
         hasPoints = true;
       });
+
+      // Apply zoom-based visibility to freshly placed place markers
+      updatePlaceVisibility();
 
       // ── Fit bounds (skip if user had a stored viewpoint) ──
       if (hasPoints && !hasRestoredView.current) {
@@ -332,12 +476,13 @@ export default function EventMap({
           bounds.extend(toLngLat(userPositionRef.current));
         }
         map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
-        // Lock viewpoint so category filtering never moves the map
         hasRestoredView.current = true;
       }
+
+      // Run deconfliction after markers settle
+      setTimeout(() => runDeconflictionRef.current(), 300);
     };
 
-    // If style is loaded, add markers immediately; otherwise wait for load
     if (readyRef.current) {
       addMarkers();
     } else {
@@ -346,7 +491,6 @@ export default function EventMap({
         addMarkers();
       };
       map.once("load", handler);
-      // Cleanup: remove the listener if effect re-runs before load fires
       return () => {
         map.off("load", handler);
         clearMarkers();
@@ -354,7 +498,7 @@ export default function EventMap({
     }
 
     return () => clearMarkers();
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {

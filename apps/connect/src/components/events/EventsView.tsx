@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -28,6 +28,17 @@ type Props = {
   isVendor?: boolean;
 };
 
+/** Number of event cards shown per page in the category panel. */
+const CARDS_PER_PAGE = 3;
+
+/** Convert hex colour to rgba string (used for category panel card backgrounds). */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export default function EventsView({
   events,
   places = [],
@@ -45,6 +56,10 @@ export default function EventsView({
   const [activePlaceCategories, setActivePlaceCategories] = useState<Set<PlaceCategory>>(
     new Set()
   );
+
+  // Category panel state (shows when categories are selected)
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
+  const [categoryPanelPage, setCategoryPanelPage] = useState(0);
 
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -115,14 +130,14 @@ export default function EventsView({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [filtersOpen, featuredOpen, selectedEvent, selectedPlace]);
 
-  // Burger menu social data (lazy-loaded)
+  // Burger menu social data — load eagerly so trending data is available for the panel
   const {
     trending,
     favouriteOrgs,
     friends,
     profile: menuProfile,
     loading: menuLoading,
-  } = useBurgerMenuData(user?.id ?? null, filtersOpen);
+  } = useBurgerMenuData(user?.id ?? null, true);
 
   async function handleLogout() {
     await supabaseRef.current!.auth.signOut();
@@ -142,6 +157,16 @@ export default function EventsView({
       return next;
     });
   }
+
+  // Auto-open category panel when categories are selected; close when all deselected
+  useEffect(() => {
+    if (activeCategories.size > 0) {
+      setCategoryPanelOpen(true);
+      setCategoryPanelPage(0);
+    } else {
+      setCategoryPanelOpen(false);
+    }
+  }, [activeCategories]);
 
   function togglePlaceCategory(cat: PlaceCategory) {
     setActivePlaceCategories((prev) => {
@@ -387,59 +412,208 @@ export default function EventsView({
         </div>
       </div>
 
-      {/* ── Featured panel open button (only when panel is closed) ────── */}
-      {!hasDetail && !featuredOpen && (
+      {/* ── Trending panel open button (only when panel is closed and no category selected) ────── */}
+      {!hasDetail && !featuredOpen && activeCategories.size === 0 && (
         <button
           type="button"
           onClick={() => setFeaturedOpen(true)}
           className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/30 bg-black/90 px-5 py-2 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-black"
-          aria-label="Open featured panel"
+          aria-label="Open trending panel"
         >
-          <span className="text-[10px]">FEATURED</span>
+          <span className="text-[10px]">TRENDING</span>
         </button>
       )}
 
-      {/* ── Featured panel slide-up from bottom ────────── */}
+      {/* ── Trending panel slide-up from bottom ────────── */}
       <aside
         ref={featuredRef}
         role="dialog"
-        aria-label="Featured content"
+        aria-label="Trending content"
         className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
-          featuredOpen && !hasDetail ? "translate-y-0" : "translate-y-full"
+          featuredOpen && !hasDetail && activeCategories.size === 0 ? "translate-y-0" : "translate-y-full"
         }`}
         onTouchStart={(e) => { panelSwipeStartY.current = e.touches[0].clientY; }}
         onTouchEnd={(e) => {
           if (e.changedTouches[0].clientY - panelSwipeStartY.current > 60) setFeaturedOpen(false);
         }}
       >
-        {/* Title bar — solid white, 100% opacity */}
+        {/* Title bar */}
         <div className="flex-shrink-0 rounded-t-2xl bg-white shadow-sm">
           <div className="flex justify-center">
             <button
               type="button"
               onClick={() => setFeaturedOpen(false)}
-              aria-label="Close featured panel"
+              aria-label="Close trending panel"
               className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
             >
               <span className="block h-1.5 w-16 rounded-full border border-(--gold)/50 bg-black transition-colors hover:bg-black/70" />
             </button>
           </div>
-          {/* Centred title */}
-          <div className="flex items-center justify-center px-4 pb-3">
+          <div className="flex items-center justify-center gap-2 px-4 pb-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+              <polyline points="16 7 22 7 22 13"/>
+            </svg>
             <h2 className="text-sm font-semibold uppercase tracking-widest text-black/70">
-              Featured
+              Trending
             </h2>
           </div>
         </div>
-        {/* Scrollable content — semi-transparent so map shows through */}
+        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto bg-white/80 backdrop-blur-md">
           <FeaturedPanel
+            trendingEvents={trending}
             onSelectEvent={handleSelectEvent}
             onSelectPlace={handleSelectPlace}
+            onQuickAction={handleQuickAction}
             fallbackEvents={filtered}
           />
         </div>
       </aside>
+
+      {/* ── Category selection panel (when categories are active) ── */}
+      {activeCategories.size > 0 && !hasDetail && (
+        <>
+          {/* Re-open tab when panel is collapsed */}
+          {!categoryPanelOpen && (
+            <button
+              type="button"
+              onClick={() => setCategoryPanelOpen(true)}
+              className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
+              style={{
+                borderColor: `${CATEGORY_HEX[[...activeCategories][0]]}60`,
+                background: `${CATEGORY_HEX[[...activeCategories][0]]}dd`,
+                color: "#fff",
+              }}
+              aria-label="Re-open category panel"
+            >
+              <span className="text-[10px]">
+                {activeCategories.size === 1
+                  ? CATEGORY_LABELS[[...activeCategories][0]]
+                  : `${activeCategories.size} Categories`}
+              </span>
+            </button>
+          )}
+
+          <aside
+            className={`absolute inset-x-0 bottom-0 z-1004 flex flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+              categoryPanelOpen ? "translate-y-0" : "translate-y-full"
+            }`}
+            aria-label="Category filter results"
+          >
+            {/* Category title bar */}
+            <div
+              className="flex-shrink-0 rounded-t-2xl"
+              style={{
+                background: activeCategories.size === 1
+                  ? `${CATEGORY_HEX[[...activeCategories][0]]}f0`
+                  : "rgba(17,17,17,0.92)",
+              }}
+            >
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setCategoryPanelOpen(false)}
+                  aria-label="Collapse category panel"
+                  className="flex cursor-pointer items-center justify-center px-8 py-3 active:scale-95"
+                >
+                  <span className="block h-1.5 w-16 rounded-full bg-white/50 transition-colors hover:bg-white/70" />
+                </button>
+              </div>
+              <div className="flex items-center justify-between px-4 pb-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">
+                    Category
+                  </p>
+                  <h2 className="text-sm font-bold text-white">
+                    {activeCategories.size === 1
+                      ? CATEGORY_LABELS[[...activeCategories][0]]
+                      : `${activeCategories.size} Categories Selected`}
+                  </h2>
+                </div>
+                <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-semibold text-white">
+                  {filtered.length} event{filtered.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+
+            {/* Horizontal swipeable event cards */}
+            <div className="bg-black/85 backdrop-blur-md pb-4">
+              {filtered.length === 0 ? (
+                <div className="flex h-24 items-center justify-center text-sm text-white/50">
+                  No events found
+                </div>
+              ) : (
+                <div className="relative px-10 py-3">
+                  {/* Left arrow */}
+                  <button
+                    type="button"
+                    onClick={() => setCategoryPanelPage((p) => Math.max(0, p - 1))}
+                    disabled={categoryPanelPage === 0}
+                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
+                    aria-label="Previous events"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                  </button>
+
+                  {/* Cards row — CARDS_PER_PAGE per page */}
+                  <div className="overflow-hidden">
+                    <div
+                      className="flex gap-3 transition-transform duration-300"
+                      style={{ transform: `translateX(calc(-${categoryPanelPage * 100}% - ${categoryPanelPage * 12}px))` }}
+                    >
+                      {filtered.map((event) => {
+                        const cat = (event.category ?? "church") as EventCategory;
+                        const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
+                        return (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => handleSelectEvent(event)}
+                            className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
+                            style={{
+                              background: hexToRgba(hex, 0.35),
+                            }}
+                          >
+                            <div
+                              className="mb-1 h-0.5 w-8 rounded-full"
+                              style={{ background: hex }}
+                            />
+                            <h3 className="text-xs font-semibold leading-tight text-white line-clamp-2">
+                              {event.title}
+                            </h3>
+                            <p className="mt-1 text-[10px] text-white/65 line-clamp-1">
+                              {event.location}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-white/50">
+                              {new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right arrow */}
+                  <button
+                    type="button"
+                    onClick={() => setCategoryPanelPage((p) => Math.min(Math.ceil(filtered.length / CARDS_PER_PAGE) - 1, p + 1))}
+                    disabled={categoryPanelPage >= Math.ceil(filtered.length / CARDS_PER_PAGE) - 1}
+                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
+                    aria-label="Next events"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* ── Burger Menu ──────────────────────────────── */}
       <BurgerMenu
