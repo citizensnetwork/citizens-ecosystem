@@ -19,6 +19,58 @@ type Props = {
 
 type AuthView = "idle" | "login" | "signup";
 
+// Citizens platform channels — Connect is live, others are upcoming
+const PLATFORM_CHANNELS = [
+  {
+    id: "connect",
+    name: "Connect",
+    tagline: "Community map & events",
+    active: true,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="11" r="3" />
+        <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: "wear",
+    name: "Wear",
+    tagline: "Faith-inspired fashion",
+    active: false,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z" />
+      </svg>
+    ),
+  },
+  {
+    id: "central",
+    name: "Central",
+    tagline: "Kingdom directory",
+    active: false,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    id: "impact",
+    name: "Impact",
+    tagline: "Community projects",
+    active: false,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      </svg>
+    ),
+  },
+];
+
 export default function LandingPage({ events, places }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -59,6 +111,12 @@ export default function LandingPage({ events, places }: Props) {
     setDismissed(true);
     setTimeout(() => router.push("/events"), 300);
   }, [user, router]);
+
+  const handleBrowse = useCallback(() => {
+    router.prefetch("/events");
+    setDismissed(true);
+    setTimeout(() => router.push("/events"), 300);
+  }, [router]);
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -115,9 +173,7 @@ export default function LandingPage({ events, places }: Props) {
   function handleTouchEnd(e: React.TouchEvent) {
     const delta = swipeStartY.current - e.changedTouches[0].clientY;
     if (delta > 80) {
-      router.prefetch("/events");
-      setDismissed(true);
-      setTimeout(() => router.push("/events"), 300);
+      handleBrowse();
     }
   }
 
@@ -278,11 +334,7 @@ export default function LandingPage({ events, places }: Props) {
                   {/* Browse as guest */}
                   <button
                     type="button"
-                    onClick={() => {
-                      router.prefetch("/events");
-                      setDismissed(true);
-                      setTimeout(() => router.push("/events"), 300);
-                    }}
+                    onClick={handleBrowse}
                     className="mx-auto block text-xs font-medium text-white/50 underline underline-offset-2 transition hover:text-white/80"
                   >
                     Browse as guest →
@@ -383,41 +435,73 @@ export default function LandingPage({ events, places }: Props) {
           )}
         </div>
 
-        {/* ── Bottom: swipe indicator (always visible for guest browsing) ── */}
-        <div className="flex flex-col items-center gap-1.5 pb-6 pt-1">
-          {!user && (
-            <p
-              className="text-[11px] font-medium tracking-wide text-white/50"
-              style={{ WebkitTextStroke: "0.3px rgba(0,0,0,0.3)" }}
-            >
-              swipe up or tap to browse
+        {/* ── Bottom: platform channels + browse hint ── */}
+        <div className="w-full px-4 pb-6 pt-1">
+          {/* Platform channels row */}
+          <div className="mb-3">
+            <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+              Citizens Platform
             </p>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              router.prefetch("/events");
-              setDismissed(true);
-              setTimeout(() => router.push("/events"), 300);
-            }}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white/50 transition hover:border-white/60 hover:text-white active:scale-90"
-            style={{ WebkitTextStroke: "0.5px rgba(0,0,0,0.4)" }}
-            aria-label="Browse without logging in"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <div className="grid grid-cols-4 gap-2">
+              {PLATFORM_CHANNELS.map((ch) =>
+                ch.active ? (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={handleBrowse}
+                    className="flex flex-col items-center gap-1 rounded-xl border border-(--gold)/60 bg-(--gold)/15 px-1 py-2.5 text-center backdrop-blur transition hover:bg-(--gold)/25 active:scale-[0.96]"
+                    aria-label={`Open Citizens ${ch.name}`}
+                  >
+                    <span className="text-(--gold)">{ch.icon}</span>
+                    <span className="text-[11px] font-semibold text-(--gold)">{ch.name}</span>
+                    <span className="text-[9px] leading-tight text-white/50">{ch.tagline}</span>
+                  </button>
+                ) : (
+                  <div
+                    key={ch.id}
+                    className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1 py-2.5 text-center"
+                    aria-label={`Citizens ${ch.name} — coming soon`}
+                  >
+                    <span className="text-white/30">{ch.icon}</span>
+                    <span className="text-[11px] font-medium text-white/40">{ch.name}</span>
+                    <span className="text-[9px] leading-tight text-white/25">Soon</span>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Swipe / browse hint */}
+          <div className="flex flex-col items-center gap-1.5 pt-1">
+            {!user && (
+              <p
+                className="text-[11px] font-medium tracking-wide text-white/40"
+                style={{ WebkitTextStroke: "0.3px rgba(0,0,0,0.3)" }}
+              >
+                swipe up or tap to browse
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleBrowse}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white/40 transition hover:border-white/60 hover:text-white active:scale-90"
+              aria-label="Browse without logging in"
             >
-              <polyline points="18 15 12 9 6 15" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
