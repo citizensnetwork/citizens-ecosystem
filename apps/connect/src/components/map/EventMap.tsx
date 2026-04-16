@@ -27,6 +27,8 @@ type Props = {
   flyToZoom?: number;
   activeCategories?: Set<EventCategory>;
   activePlaceCategories?: Set<PlaceCategory>;
+  /** Override marker border colour (used by quick-access tools for unified colour). */
+  markerOverrideColor?: string;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -62,6 +64,7 @@ export default function EventMap({
   flyToZoom,
   activeCategories,
   activePlaceCategories,
+  markerOverrideColor,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -384,7 +387,7 @@ export default function EventMap({
               markerColor: event.marker_color,
               markerImageUrl: event.marker_image_url,
             })
-          : createCategoryMarkerEl(event.category, temporal);
+          : createCategoryMarkerEl(event.category, temporal, markerOverrideColor);
 
         // Add glow class for highlighted markers (CSS animation)
         if (isHighlighted) {
@@ -497,7 +500,7 @@ export default function EventMap({
           isHighRated,
           isFlagged,
           highlighted: placeIsHighlighted,
-          highlightColor: placeHighlightColor,
+          highlightColor: markerOverrideColor ?? placeHighlightColor,
         });
 
         const ratingLabel =
@@ -580,7 +583,7 @@ export default function EventMap({
     }
 
     return () => clearMarkers();
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {

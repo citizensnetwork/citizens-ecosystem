@@ -311,9 +311,8 @@ export function createPlaceMarkerEl(
   const opacity = isFlagged ? 0.62 : 1;
 
   // Circle-dot place icon with category-coloured outline
-  const dotColor = options?.highlightColor ?? "#D4AF37";
   const placeIcon =
-    `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="white" stroke="${escapeHtml(dotColor)}" stroke-width="1"/><circle cx="12" cy="12" r="3.5" fill="${escapeHtml(dotColor)}"/></svg>`;
+    `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="white" stroke="${escapeHtml(highlightColor)}" stroke-width="1"/><circle cx="12" cy="12" r="3.5" fill="${escapeHtml(highlightColor)}"/></svg>`;
 
   const el = document.createElement("div");
   el.className = "cc-marker";
