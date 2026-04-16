@@ -106,7 +106,7 @@ export default function FeaturedPanel({
             style={{ scrollSnapType: "x mandatory" }}
           >
             {trendingEvents.map((event) => (
-              <div key={event.id} className="flex-shrink-0" style={{ scrollSnapAlign: "start", width: "min(280px, 75vw)" }}>
+              <div key={event.id} className="trending-card">
                 <TrendingBlock
                   event={event}
                   onSelectEvent={onSelectEvent}

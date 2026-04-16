@@ -336,8 +336,7 @@ export default function EventsView({
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
           <div className="glass-calendar-overlay mx-3 my-4 flex h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[calc(100dvh-3rem)]">
             <div
-              className="flex-1 overflow-auto px-4 pb-4 pt-20 sm:px-6 sm:pt-20"
-              style={{ touchAction: "pan-x pan-y pinch-zoom" }}
+              className="flex-1 overflow-auto touch-pan-x touch-pan-y touch-pinch-zoom px-4 pb-4 pt-20 sm:px-6 sm:pt-20"
             >
               <PostEventPrompt />
               <EventCalendar

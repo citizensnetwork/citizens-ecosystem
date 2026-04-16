@@ -433,3 +433,10 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── Trending card snap ─────────────────────────────────── */
+.trending-card {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  width: min(280px, 75vw);
+}
