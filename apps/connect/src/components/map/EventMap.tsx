@@ -38,8 +38,8 @@ const PLACE_ZOOM_MIN = 14;
 /** Below this zoom, run marker deconfliction with leader lines. */
 const DECONFLICT_MAX_ZOOM = 13;
 
-/** Minimum pixel gap between marker edges (≈2mm at 96 dpi). */
-const MIN_GAP_PX = 8;
+/** Minimum pixel gap between marker edges — 0 allows touching but never overlapping. */
+const MIN_GAP_PX = 0;
 
 /** Number of force-simulation iterations for deconfliction. */
 const DECONFLICT_ITERATIONS = 10;
@@ -235,22 +235,23 @@ export default function EventMap({
 
     map.on("moveend", saveMapView);
 
-    // Zoom-gate place visibility and run deconfliction on zoom change
+    // Zoom-gate place visibility and run deconfliction on zoom/move changes.
+    // Keep markers deconflicted at all times — never reset during interactions.
     map.on("zoomend", () => {
       updatePlaceVisibility();
       runDeconflictionRef.current();
     });
 
-    // During movement: reset marker offsets and clear leader lines for smooth panning
-    map.on("movestart", () => {
-      evtMarkerDataRef.current.forEach(({ marker }) => {
-        marker.setOffset([0, 0]);
+    // Continuously re-run deconfliction during panning/zooming so markers stay spread
+    let deconflictRaf = 0;
+    map.on("move", () => {
+      if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
+      deconflictRaf = requestAnimationFrame(() => {
+        runDeconflictionRef.current();
       });
-      const svg = svgOverlayRef.current;
-      if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
     });
 
-    // After panning stops, re-run deconfliction
+    // After panning stops, do a final deconfliction pass
     map.on("moveend", () => {
       runDeconflictionRef.current();
     });
