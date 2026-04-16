@@ -442,6 +442,11 @@ type ConsiderItem = {
   date: string;
 };
 
+type ConsiderRsvpRow = {
+  event_id: string;
+  events: { title: string; date: string } | null;
+};
+
 function BurgerConsiderSection({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [items, setItems] = useState<ConsiderItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -456,19 +461,16 @@ function BurgerConsiderSection({ userId, onClose }: { userId: string; onClose: (
       .eq("status", "considering")
       .gte("events.date", today);
 
-    const validRsvps = (rsvps ?? []).filter(
-      (r) => (r as Record<string, unknown>).events != null
-    );
+    const rows = (rsvps ?? []) as unknown as ConsiderRsvpRow[];
 
     setItems(
-      validRsvps.map((r) => {
-        const ev = (r as Record<string, unknown>).events as { title: string; date: string } | null;
-        return {
+      rows
+        .filter((r) => r.events != null)
+        .map((r) => ({
           event_id: r.event_id,
-          title: ev?.title ?? "Event",
-          date: ev?.date ?? "",
-        };
-      })
+          title: r.events?.title ?? "Event",
+          date: r.events?.date ?? "",
+        }))
     );
     setLoaded(true);
   }, [userId]);
