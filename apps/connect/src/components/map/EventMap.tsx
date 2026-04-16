@@ -122,6 +122,10 @@ export default function EventMap({
     placeMarkersRef.current.forEach((m) => {
       (m.getElement() as HTMLElement).style.visibility = shouldShow ? "" : "hidden";
     });
+    // Hide event markers when place categories are selected (user is browsing places)
+    markersRef.current.forEach((m) => {
+      (m.getElement() as HTMLElement).style.visibility = hasPlaceCatsSelected ? "hidden" : "";
+    });
   }, []);
 
   /** Force-directed deconfliction: spread overlapping markers, draw leader lines. */
