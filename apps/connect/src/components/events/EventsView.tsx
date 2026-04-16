@@ -697,9 +697,16 @@ export default function EventsView({
         <>
           <div
             className="absolute inset-0 z-1003 bg-black/40"
+            role="presentation"
+            aria-hidden="true"
             onClick={closeDetail}
           />
-          <aside className="fade-rise absolute inset-0 z-1004 flex items-center justify-center p-4 sm:p-8 pointer-events-none">
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedEvent ? selectedEvent.title : selectedPlace?.name ?? "Details"}
+            className="fade-rise absolute inset-0 z-1004 flex items-center justify-center p-4 sm:p-8 pointer-events-none"
+          >
             <div className="pointer-events-auto w-full max-w-md max-h-[80dvh] overflow-y-auto rounded-2xl bg-white/90 p-5 shadow-2xl backdrop-blur-md">
             <button
               type="button"
