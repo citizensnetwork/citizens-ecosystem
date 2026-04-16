@@ -76,6 +76,7 @@ create table if not exists public.events (
   contact_phone text,
   max_attendees int,
   status text not null default 'published' check (status in ('draft', 'published', 'cancelled')),
+  visibility text not null default 'public' check (visibility in ('public', 'private')),
   attendees_visible text not null default 'authenticated' check (attendees_visible in ('public', 'authenticated', 'count_only')),
   latitude double precision,
   longitude double precision,
@@ -87,6 +88,7 @@ alter table public.events enable row level security;
 
 create index if not exists events_status_date_idx on public.events(status, date);
 create index if not exists events_created_by_idx on public.events(created_by);
+create index if not exists events_visibility_idx on public.events(visibility);
 
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Published events visible to all, drafts to creator only' and tablename = 'events') then

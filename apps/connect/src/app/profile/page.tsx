@@ -277,10 +277,19 @@ export default async function ProfilePage() {
                 <li key={e.id}>
                   <Link
                     href={`/events/${e.id}`}
-                    className="flex items-center justify-between border rounded-lg px-4 py-3 hover:shadow-sm transition-shadow"
+                    className="flex items-center justify-between border border-black/8 rounded-lg px-4 py-3 hover:shadow-sm transition-shadow bg-white/40"
                   >
                     <div>
-                      <p className="font-medium text-sm">{e.title}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-medium text-sm">{e.title}</p>
+                        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          e.visibility === "private"
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-green-100 text-green-700"
+                        }`}>
+                          {e.visibility === "private" ? "Private" : "Public"}
+                        </span>
+                      </div>
                       <p className="text-xs text-gray-500">
                         {new Date(e.date).toLocaleDateString("en-US", {
                           weekday: "short",
