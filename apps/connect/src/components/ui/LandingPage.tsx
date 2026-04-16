@@ -213,7 +213,7 @@ export default function LandingPage({ events, places }: Props) {
           dismissed ? "-translate-y-full" : "translate-y-0"
         }`}
         style={{
-          background: "rgba(255,255,255,0.10)",
+          background: "linear-gradient(to bottom, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.50) 100%)",
           backdropFilter: "blur(10px) saturate(1.2)",
           WebkitBackdropFilter: "blur(10px) saturate(1.2)",
         }}
@@ -227,8 +227,7 @@ export default function LandingPage({ events, places }: Props) {
             Citizens
           </h1>
           <p
-            className="mt-2 text-xs font-semibold uppercase tracking-widest text-white/70"
-            style={{ WebkitTextStroke: "0.5px rgba(0,0,0,0.5)" }}
+            className="mt-2 text-xs font-semibold uppercase tracking-widest text-black"
           >
             CONNECTING THE KINGDOM
           </p>
@@ -280,22 +279,22 @@ export default function LandingPage({ events, places }: Props) {
                   <button
                     type="button"
                     onClick={handleGoogleAuth}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/20 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-white backdrop-blur transition hover:bg-white/30 active:scale-[0.97]"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
                   >
                     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#fff"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/>
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#111"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#111"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#111"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#111"/>
                     </svg>
                     Continue with Google
                   </button>
 
                   {/* Divider */}
                   <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-white/25" />
-                    <span className="text-xs font-medium text-white/60">or</span>
-                    <div className="h-px flex-1 bg-white/25" />
+                    <div className="h-px flex-1 bg-black/20" />
+                    <span className="text-xs font-medium text-black/50">or</span>
+                    <div className="h-px flex-1 bg-black/20" />
                   </div>
 
                   {/* Email login / signup toggle */}
@@ -303,14 +302,14 @@ export default function LandingPage({ events, places }: Props) {
                     <button
                       type="button"
                       onClick={() => { setAuthView("login"); setError(""); setSuccess(""); }}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/30 bg-white/20 px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-white backdrop-blur transition hover:bg-white/30 active:scale-[0.97]"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-black/20 bg-white/60 px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
                     >
                       Log in
                     </button>
                     <button
                       type="button"
                       onClick={() => { setAuthView("signup"); setError(""); setSuccess(""); }}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-medium uppercase tracking-widest text-white/80 backdrop-blur transition hover:bg-white/20 active:scale-[0.97]"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white/40 px-3 py-2.5 text-xs font-medium uppercase tracking-widest text-black/70 backdrop-blur transition hover:bg-white/60 active:scale-[0.97]"
                     >
                       Sign up
                     </button>
@@ -322,11 +321,11 @@ export default function LandingPage({ events, places }: Props) {
                       type="button"
                       disabled
                       aria-describedby="connect-hint"
-                      className="w-full rounded-2xl border-2 border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold uppercase tracking-widest text-white/30 backdrop-blur cursor-not-allowed"
+                      className="w-full rounded-2xl border-2 border-black/15 bg-white/30 px-6 py-2.5 text-sm font-semibold uppercase tracking-widest text-black/30 backdrop-blur cursor-not-allowed"
                     >
                       Connect
                     </button>
-                    <p id="connect-hint" className="text-center text-[11px] text-white/40">
+                    <p id="connect-hint" className="text-center text-[11px] text-black/40">
                       Log in or sign up to connect
                     </p>
                   </div>
@@ -335,7 +334,7 @@ export default function LandingPage({ events, places }: Props) {
                   <button
                     type="button"
                     onClick={handleBrowse}
-                    className="mx-auto block text-xs font-medium text-white/50 underline underline-offset-2 transition hover:text-white/80"
+                    className="mx-auto block text-xs font-medium text-black/50 underline underline-offset-2 transition hover:text-black/80"
                   >
                     Browse as guest →
                   </button>
@@ -347,7 +346,7 @@ export default function LandingPage({ events, places }: Props) {
                   <button
                     type="button"
                     onClick={() => { setAuthView("idle"); setError(""); setSuccess(""); }}
-                    className="mb-1 text-xs font-medium text-white/60 transition hover:text-white"
+                    className="mb-1 text-xs font-medium text-black/50 transition hover:text-black"
                   >
                     ← Back
                   </button>
@@ -358,7 +357,7 @@ export default function LandingPage({ events, places }: Props) {
                     placeholder="Email"
                     aria-label="Email address"
                     required
-                    className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none backdrop-blur transition focus:border-white/50 focus:bg-white/20"
+                    className="w-full rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-sm text-black placeholder-black/40 outline-none backdrop-blur transition focus:border-black/40 focus:bg-white/80"
                   />
                   <input
                     type="password"
@@ -368,11 +367,11 @@ export default function LandingPage({ events, places }: Props) {
                     aria-label="Password"
                     required
                     minLength={6}
-                    className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none backdrop-blur transition focus:border-white/50 focus:bg-white/20"
+                    className="w-full rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-sm text-black placeholder-black/40 outline-none backdrop-blur transition focus:border-black/40 focus:bg-white/80"
                   />
                   <a
                     href="/login/forgot-password"
-                    className="block text-right text-[11px] font-medium text-white/50 transition hover:text-white/80"
+                    className="block text-right text-[11px] font-medium text-black/50 transition hover:text-black/80"
                   >
                     Forgot password?
                   </a>
@@ -391,7 +390,7 @@ export default function LandingPage({ events, places }: Props) {
                   <button
                     type="button"
                     onClick={() => { setAuthView("idle"); setError(""); setSuccess(""); }}
-                    className="mb-1 text-xs font-medium text-white/60 transition hover:text-white"
+                    className="mb-1 text-xs font-medium text-black/50 transition hover:text-black"
                   >
                     ← Back
                   </button>
@@ -401,7 +400,7 @@ export default function LandingPage({ events, places }: Props) {
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Full Name"
                     aria-label="Full name"
-                    className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none backdrop-blur transition focus:border-white/50 focus:bg-white/20"
+                    className="w-full rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-sm text-black placeholder-black/40 outline-none backdrop-blur transition focus:border-black/40 focus:bg-white/80"
                   />
                   <input
                     type="email"
@@ -410,7 +409,7 @@ export default function LandingPage({ events, places }: Props) {
                     placeholder="Email"
                     aria-label="Email address"
                     required
-                    className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none backdrop-blur transition focus:border-white/50 focus:bg-white/20"
+                    className="w-full rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-sm text-black placeholder-black/40 outline-none backdrop-blur transition focus:border-black/40 focus:bg-white/80"
                   />
                   <input
                     type="password"
@@ -420,12 +419,12 @@ export default function LandingPage({ events, places }: Props) {
                     aria-label="Password"
                     required
                     minLength={6}
-                    className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none backdrop-blur transition focus:border-white/50 focus:bg-white/20"
+                    className="w-full rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-sm text-black placeholder-black/40 outline-none backdrop-blur transition focus:border-black/40 focus:bg-white/80"
                   />
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full rounded-2xl border-2 border-white/30 bg-white/20 px-6 py-3 text-base font-bold text-white backdrop-blur transition-all hover:bg-white/30 active:scale-95 disabled:opacity-50"
+                    className="w-full rounded-2xl border-2 border-black/20 bg-white/60 px-6 py-3 text-base font-bold text-black backdrop-blur transition-all hover:bg-white/80 active:scale-95 disabled:opacity-50"
                   >
                     {loading ? "Creating account..." : "Create Account"}
                   </button>
@@ -439,7 +438,7 @@ export default function LandingPage({ events, places }: Props) {
         <div className="w-full px-4 pb-6 pt-1">
           {/* Platform channels row */}
           <div className="mb-3">
-            <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+            <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-black/40">
               Citizens Platform
             </p>
             <div className="grid grid-cols-4 gap-2">
@@ -454,17 +453,17 @@ export default function LandingPage({ events, places }: Props) {
                   >
                     <span className="text-(--gold)">{ch.icon}</span>
                     <span className="text-[11px] font-semibold text-(--gold)">{ch.name}</span>
-                    <span className="text-[9px] leading-tight text-white/50">{ch.tagline}</span>
+                    <span className="text-[9px] leading-tight text-black/50">{ch.tagline}</span>
                   </button>
                 ) : (
                   <div
                     key={ch.id}
-                    className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1 py-2.5 text-center"
+                    className="flex flex-col items-center gap-1 rounded-xl border border-black/10 bg-white/30 px-1 py-2.5 text-center"
                     aria-label={`Citizens ${ch.name} — coming soon`}
                   >
-                    <span className="text-white/30">{ch.icon}</span>
-                    <span className="text-[11px] font-medium text-white/40">{ch.name}</span>
-                    <span className="text-[9px] leading-tight text-white/25">Soon</span>
+                    <span className="text-black/30">{ch.icon}</span>
+                    <span className="text-[11px] font-medium text-black/40">{ch.name}</span>
+                    <span className="text-[9px] leading-tight text-black/25">Soon</span>
                   </div>
                 )
               )}
@@ -474,17 +473,14 @@ export default function LandingPage({ events, places }: Props) {
           {/* Swipe / browse hint */}
           <div className="flex flex-col items-center gap-1.5 pt-1">
             {!user && (
-              <p
-                className="text-[11px] font-medium tracking-wide text-white/50"
-                style={{ WebkitTextStroke: "0.3px rgba(0,0,0,0.3)" }}
-              >
+              <p className="text-[11px] font-medium tracking-wide text-black/50">
                 swipe up or tap to browse
               </p>
             )}
             <button
               type="button"
               onClick={handleBrowse}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white/50 transition hover:border-white/60 hover:text-white active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/25 text-black/50 transition hover:border-black/50 hover:text-black active:scale-90"
               aria-label="Browse without logging in"
             >
               <svg
