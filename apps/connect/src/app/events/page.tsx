@@ -14,7 +14,8 @@ export default async function EventsPage() {
   sixMonths.setMonth(sixMonths.getMonth() + 6);
   const cutoff = sixMonths.toISOString();
 
-  const [{ data: events }, { data: places }, { data: reviews }] = await Promise.all([
+  // Fetch public events, user's private events (RSVPed or created), places, and reviews in parallel
+  const [{ data: publicEvents }, { data: places }, { data: reviews }] = await Promise.all([
     supabase
       .from("events")
       .select("*")
@@ -34,6 +35,30 @@ export default async function EventsPage() {
       .not("place_id", "is", null)
       .returns<Pick<Review, "place_id" | "rating" | "still_exists">[]>(),
   ]);
+
+  // Filter: show public events to everyone; show private events only to creator or RSVPed users
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+
+  let events: Event[] = [];
+  if (currentUser) {
+    // Get event IDs the user has RSVPed to
+    const { data: rsvpRows } = await supabase
+      .from("rsvps")
+      .select("event_id")
+      .eq("user_id", currentUser.id);
+    const rsvpedIds = new Set((rsvpRows ?? []).map((r) => r.event_id));
+
+    events = (publicEvents ?? []).filter((e) => {
+      if (e.visibility !== "private") return true;
+      // Private: show if user created it or RSVPed
+      return e.created_by === currentUser.id || rsvpedIds.has(e.id);
+    });
+  } else {
+    // Not logged in: only public events
+    events = (publicEvents ?? []).filter((e) => e.visibility !== "private");
+  }
 
   const reviewBuckets = new Map<
     string,
@@ -76,18 +101,14 @@ export default async function EventsPage() {
     };
   });
 
-  // Check if current user is a vendor
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // Check if current user can create events
   let canCreateEvents = false;
   let showOnboarding = false;
-  if (user) {
+  if (currentUser) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, onboarding_completed")
-      .eq("id", user.id)
+      .eq("id", currentUser.id)
       .single();
     // All authenticated users can create events (open creation)
     canCreateEvents = !!profile;

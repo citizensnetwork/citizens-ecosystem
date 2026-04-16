@@ -99,7 +99,8 @@ export default function EventDetailContent({
   }, [event.id]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
       <div className="flex items-center justify-between mb-4">
         <Link href="/events" className="text-(--gold) hover:underline text-sm">
           ← Back to Events
@@ -334,6 +335,7 @@ export default function EventDetailContent({
           locationSharingEnabled={locationSharingEnabled}
         />
       )}
+      </div>
     </div>
   );
 }

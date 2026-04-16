@@ -281,15 +281,17 @@ export default function EventsView({
       </div>
 
       {view === "calendar" && (
-        <div className="absolute inset-0 z-10 h-full overflow-y-auto bg-white/80 px-3 pb-6 pt-28 backdrop-blur-md sm:px-5 sm:pt-24">
-          <div className="mx-auto max-w-6xl">
-            <PostEventPrompt />
-            <EventCalendar
-              events={filtered}
-              rsvpEventIds={rsvpEventIds}
-              onSelectEvent={handleSelectEvent}
-              isVendor={isVendor}
-            />
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+          <div className="glass-calendar-overlay mx-3 my-4 flex h-[85dvh] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[82dvh]">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 pt-20 sm:px-6 sm:pt-20">
+              <PostEventPrompt />
+              <EventCalendar
+                events={filtered}
+                rsvpEventIds={rsvpEventIds}
+                onSelectEvent={handleSelectEvent}
+                isVendor={isVendor}
+              />
+            </div>
           </div>
         </div>
       )}

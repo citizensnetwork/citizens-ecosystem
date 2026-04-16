@@ -42,6 +42,7 @@ export function makeEvent(overrides?: Partial<Event>): Event {
     contact_phone: null,
     max_attendees: null,
     status: "published",
+    visibility: "public",
     attendees_visible: "authenticated",
     latitude: -29.8587,
     longitude: 31.0218,

@@ -19,9 +19,11 @@ export default async function ManagePlacesPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Manage Places</h1>
-      <ManagePlacesView />
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-4xl px-6 py-8 sm:px-8">
+        <h1 className="text-2xl font-bold mb-6">Manage Places</h1>
+        <ManagePlacesView />
+      </div>
     </div>
   );
 }

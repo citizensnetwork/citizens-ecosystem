@@ -17,7 +17,7 @@ export async function GET() {
   // Get user's created events with stats
   const { data: events } = await supabase
     .from("events")
-    .select("id, title, date, end_time, status, category, max_attendees")
+    .select("id, title, date, end_time, status, visibility, category, max_attendees")
     .eq("created_by", user.id)
     .order("date", { ascending: false });
 

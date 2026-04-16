@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
-import type { Event, EventCategory, EventStatus, AttendeesVisibility } from "@/types/db";
+import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -38,6 +38,9 @@ export default function EditEventForm({ event }: Props) {
     event.max_attendees != null ? String(event.max_attendees) : ""
   );
   const [status, setStatus] = useState<EventStatus>(event.status);
+  const [visibility, setVisibility] = useState<EventVisibility>(
+    event.visibility ?? "public"
+  );
   const [attendeesVisible, setAttendeesVisible] = useState<AttendeesVisibility>(
     event.attendees_visible
   );
@@ -100,6 +103,7 @@ export default function EditEventForm({ event }: Props) {
         contact_phone: contactPhone || null,
         max_attendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
         status,
+        visibility,
         attendees_visible: attendeesVisible,
         latitude: coords?.[0] ?? null,
         longitude: coords?.[1] ?? null,
@@ -254,13 +258,20 @@ export default function EditEventForm({ event }: Props) {
           <input id="maxAttendees" type="number" min="1" value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="100" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="status" className="block text-sm font-medium mb-1">Status</label>
             <select id="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)} className="w-full border rounded-md px-3 py-2 text-sm">
               <option value="published">Published</option>
               <option value="draft">Draft</option>
               {event.status === "cancelled" && <option value="cancelled">Cancelled</option>}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="visibility" className="block text-sm font-medium mb-1">Visibility</label>
+            <select id="visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as EventVisibility)} className="w-full border rounded-md px-3 py-2 text-sm">
+              <option value="public">Public</option>
+              <option value="private">Private — invited only</option>
             </select>
           </div>
           <div>

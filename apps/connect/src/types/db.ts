@@ -17,6 +17,8 @@ export type EventCategory =
 
 export type EventStatus = "draft" | "published" | "cancelled";
 
+export type EventVisibility = "public" | "private";
+
 export type AttendeesVisibility = "public" | "authenticated" | "count_only";
 
 export type MarkerType = "category" | "profile" | "icon" | "logo";
@@ -35,6 +37,7 @@ export type Event = {
   contact_phone: string | null;
   max_attendees: number | null;
   status: EventStatus;
+  visibility: EventVisibility;
   attendees_visible: AttendeesVisibility;
   latitude: number | null;
   longitude: number | null;

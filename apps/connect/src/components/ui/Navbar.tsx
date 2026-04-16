@@ -86,6 +86,12 @@ export default function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-2">
+              <Link
+                href="/events/manage"
+                className="text-sm text-black/65 transition hover:text-black"
+              >
+                My Events
+              </Link>
               {/* Consider badge */}
               <ConsiderBadge userId={user.id} />
               <Link

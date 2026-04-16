@@ -12,7 +12,7 @@ export default async function Home() {
   sixMonths.setMonth(sixMonths.getMonth() + 6);
   const cutoff = sixMonths.toISOString();
 
-  const [{ data: events }, { data: places }] = await Promise.all([
+  const [{ data: rawEvents }, { data: places }] = await Promise.all([
     supabase
       .from("events")
       .select("*")
@@ -28,7 +28,10 @@ export default async function Home() {
       .returns<Place[]>(),
   ]);
 
-  return <LandingPage events={events ?? []} places={places ?? []} />;
+  // Landing page only shows public events
+  const events = (rawEvents ?? []).filter((e) => e.visibility !== "private");
+
+  return <LandingPage events={events} places={places ?? []} />;
 }
 
 

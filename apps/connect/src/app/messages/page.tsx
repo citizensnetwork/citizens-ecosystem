@@ -18,11 +18,13 @@ export default async function MessagesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="border-b px-4 py-4">
-        <h1 className="text-lg font-semibold text-black">Messages</h1>
+    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
+      <div className="glass-panel w-full max-w-2xl overflow-hidden">
+        <div className="border-b border-black/8 px-4 py-4">
+          <h1 className="text-lg font-semibold text-black">Messages</h1>
+        </div>
+        <ConversationList userId={user.id} />
       </div>
-      <ConversationList userId={user.id} />
     </div>
   );
 }

@@ -32,7 +32,8 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [status] = useState<"draft" | "published">("published");
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [attendeesVisible, setAttendeesVisible] = useState<"public" | "authenticated" | "count_only">("authenticated");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -166,6 +167,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       contact_phone: contactPhone || null,
       max_attendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
       status,
+      visibility,
       attendees_visible: attendeesVisible,
       latitude: coords?.[0] ?? null,
       longitude: coords?.[1] ?? null,
@@ -380,17 +382,17 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="status" className="block text-sm font-medium mb-1">
-              Status
+            <label htmlFor="visibility" className="block text-sm font-medium mb-1">
+              Event Visibility
             </label>
             <select
-              id="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as "draft" | "published")}
+              id="visibility"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as "public" | "private")}
               className="w-full border rounded-md px-3 py-2 text-sm"
             >
-              <option value="published">Published — visible to everyone</option>
-              <option value="draft">Draft — only you can see this</option>
+              <option value="public">Public — visible to everyone</option>
+              <option value="private">Private — only invited members can see</option>
             </select>
           </div>
           <div>
