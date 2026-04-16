@@ -423,11 +423,14 @@ export default function EventMap({
         );
 
         popup.on("open", () => {
-          // Adjust popup position to follow deconflicted marker offset
+          // Adjust popup position to follow deconflicted marker offset.
+          // Subtracts 16px (the popup's base offset from the marker anchor)
+          // so the popup tip points at the displaced marker, not empty space.
           const markerData = evtMarkerDataRef.current.find((d) => d.marker === marker);
           if (markerData) {
             const offset = marker.getOffset();
-            popup.setOffset([offset.x, offset.y - 16]);
+            const POPUP_BASE_OFFSET = 16;
+            popup.setOffset([offset.x, offset.y - POPUP_BASE_OFFSET]);
           }
 
           const popupEl = popup.getElement();

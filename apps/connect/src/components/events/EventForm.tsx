@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
+import { validateImageFile, safeImageExtension } from "@/lib/validation";
 import type { EventCategory, Category } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
@@ -86,16 +87,9 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     if (file) {
-      // Validate MIME type — only allow safe image formats
-      const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
-      if (!allowedTypes.includes(file.type)) {
-        setError("Only JPEG, PNG, GIF, WebP, or SVG images are allowed.");
-        e.target.value = "";
-        return;
-      }
-      // Validate file size — max 5MB
-      if (file.size > 5 * 1024 * 1024) {
-        setError("Image must be smaller than 5 MB.");
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        setError(validationError);
         e.target.value = "";
         return;
       }
@@ -127,8 +121,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     // Upload image if provided
     let image_url: string | null = null;
     if (imageFile) {
-      const rawExt = (imageFile.name.split(".").pop() ?? "jpg").toLowerCase();
-      const safeExt = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(rawExt) ? rawExt : "jpg";
+      const safeExt = safeImageExtension(imageFile.name);
       const path = `${user.id}/${Date.now()}.${safeExt}`;
       const { error: uploadError } = await supabase.storage
         .from("event-images")
