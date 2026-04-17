@@ -90,13 +90,13 @@ describe("validateMediaFile", () => {
   });
 
   it("rejects oversized images", () => {
-    const big = makeFile("a.png", "image/png", 6 * 1024 * 1024);
-    expect(validateMediaFile(big)).toMatch(/5 MB/);
+    const big = makeFile("a.png", "image/png", 16 * 1024 * 1024);
+    expect(validateMediaFile(big)).toMatch(/15 MB/);
   });
 
   it("rejects oversized videos", () => {
-    const big = makeFile("a.mp4", "video/mp4", 51 * 1024 * 1024);
-    expect(validateMediaFile(big)).toMatch(/50 MB/);
+    const big = makeFile("a.mp4", "video/mp4", 101 * 1024 * 1024);
+    expect(validateMediaFile(big)).toMatch(/100 MB/);
   });
 
   it("rejects unsupported types", () => {

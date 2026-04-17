@@ -17,6 +17,7 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   equip: "Equip",
   weekend: "Weekend",
   "members-only": "Members Only",
+  care: "Care",
 };
 
 /** Shortened labels for constrained UI (e.g. cards). */
@@ -36,6 +37,7 @@ export const CATEGORY_LABELS_SHORT: Record<EventCategory, string> = {
   equip: "Equip",
   weekend: "Weekend",
   "members-only": "Members",
+  care: "Care",
 };
 
 /** Hex colour per category — used for calendar, map markers, badges. */
@@ -55,6 +57,8 @@ export const CATEGORY_HEX: Record<EventCategory, string> = {
   equip: "#27AE60",
   weekend: "#FF9800",
   "members-only": "#212121",
+  // Soft lilac — restorative, calming, distinct from Recovery's vivid purple.
+  care: "#B59CD9",
 };
 
 /** Tailwind class strings for category badges. */
@@ -74,6 +78,7 @@ export const CATEGORY_BADGE_CLASSES: Record<EventCategory, string> = {
   equip: "bg-[#27AE60]/15 text-[#1e8449]",
   weekend: "bg-[#FF9800]/15 text-[#e65100]",
   "members-only": "bg-[#212121]/10 text-[#212121]",
+  care: "bg-[#B59CD9]/20 text-[#5d3f8a]",
 };
 
 /**
@@ -97,6 +102,7 @@ export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
   { value: "mens", label: "Mens" },
   { value: "womens", label: "Womens" },
   { value: "kids", label: "Kids" },
+  { value: "care", label: "Care" },
   { value: "recovery", label: "Recovery" },
   { value: "equip", label: "Equip" },
   { value: "weekend", label: "Weekend" },

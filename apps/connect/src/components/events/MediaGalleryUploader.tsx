@@ -6,6 +6,7 @@ import {
   detectMediaKind,
   MAX_MEDIA_PER_UPLOAD,
 } from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
 
 export type SelectedMedia = {
   file: File;
@@ -41,7 +42,7 @@ export default function MediaGalleryUploader({
   const [error, setError] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -54,15 +55,17 @@ export default function MediaGalleryUploader({
 
     const toAdd: SelectedMedia[] = [];
     for (let i = 0; i < files.length && toAdd.length < remaining; i++) {
-      const file = files[i];
-      const err = validateMediaFile(file);
+      const raw = files[i];
+      const err = validateMediaFile(raw);
       if (err) {
         setError(err);
         e.target.value = "";
         return;
       }
-      const kind = detectMediaKind(file);
+      const kind = detectMediaKind(raw);
       if (!kind) continue;
+      // Compress large photos client-side; videos pass through unchanged.
+      const file = kind === "image" ? await compressImageIfNeeded(raw) : raw;
       toAdd.push({
         file,
         kind,

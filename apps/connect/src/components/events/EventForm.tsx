@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { EVENT_CATEGORIES } from "@/lib/categories";
+import { EVENT_CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { compressImageIfNeeded, SKIP_IF_SMALLER_THAN } from "@/lib/imageCompression";
+import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import type { EventCategory, Category } from "@/types/db";
@@ -23,6 +25,13 @@ type Props = {
   isVendor?: boolean;
   placeCategories?: Category[];
 };
+
+/** Shared input/select/textarea style — thin, rounded, minimal, matches the
+ *  glass design system. Keeps the form visually consistent across fields. */
+const CC_INPUT =
+  "w-full rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-sm " +
+  "placeholder:text-black/30 focus:outline-none focus:border-black/30 " +
+  "focus:bg-white transition";
 
 export default function EventForm({ isVendor = false, placeCategories = [] }: Props) {
   const [title, setTitle] = useState("");
@@ -56,6 +65,15 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [placePhone, setPlacePhone] = useState("");
   const [placeWebsite, setPlaceWebsite] = useState("");
 
+  // Has the user manually chosen a category? If so, stop auto-suggesting.
+  const categoryManuallySet = useRef(false);
+  // Has the user typed/edited the Location field manually? If so, never
+  // auto-overwrite from a map click — even if they clear it afterwards.
+  const locationManuallyEdited = useRef(false);
+  // Auto-suggested category (same as `category` when auto) — shown as a tiny
+  // "Suggested based on your description" hint.
+  const [suggestedCategory, setSuggestedCategory] = useState<EventCategory | null>(null);
+
 
 
   const router = useRouter();
@@ -80,6 +98,20 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
+  // Auto-category assessment — suggest a category from title + description.
+  // The organiser always keeps the final say; as soon as they pick one
+  // manually we stop overriding.
+  useEffect(() => {
+    if (categoryManuallySet.current) return;
+    const suggestion = suggestCategory(title, description, location, placeName);
+    if (suggestion) {
+      setSuggestedCategory(suggestion);
+      setCategory(suggestion);
+    } else {
+      setSuggestedCategory(null);
+    }
+  }, [title, description, location, placeName]);
+
   function handleCancel() {
     if (isDirty()) {
       if (!window.confirm("Booking in progress, cancel editing?")) return;
@@ -87,23 +119,29 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     router.push("/events");
   }
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    if (file) {
-      const validationError = validateImageFile(file);
-      if (validationError) {
-        setError(validationError);
-        e.target.value = "";
-        return;
-      }
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const rawFile = e.target.files?.[0] ?? null;
+    if (!rawFile) {
+      setError("");
+      setImageFile(null);
+      setImagePreview(null);
+      return;
     }
+
+    const validationError = validateImageFile(rawFile);
+    if (validationError) {
+      setError(validationError);
+      e.target.value = "";
+      return;
+    }
+
+    // Auto-compress oversized photos so phone camera originals (5–15 MB)
+    // land well under the bucket limit without any user effort.
+    const file = await compressImageIfNeeded(rawFile);
+
     setError("");
     setImageFile(file);
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
-    } else {
-      setImagePreview(null);
-    }
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -215,17 +253,22 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-lg">
-      <h1 className="text-2xl font-bold">Create Event</h1>
+    <form onSubmit={handleSubmit} className="space-y-5 w-full">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Create Event</h1>
+        <p className="mt-1 text-xs text-black/50">
+          Details are saved only when you press Create Event.
+        </p>
+      </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+        <div className="rounded-xl bg-red-50/90 text-red-700 p-3 text-sm border border-red-100">
           {error}
         </div>
       )}
 
       <div>
-        <label htmlFor="title" className="block text-sm font-medium mb-1">
+        <label htmlFor="title" className="block text-xs font-medium text-black/60 mb-1.5">
           Title
         </label>
         <input
@@ -235,57 +278,15 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           onChange={(e) => setTitle(e.target.value)}
           required
           maxLength={200}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          className={CC_INPUT}
           placeholder="Community Clean-Up Day"
         />
       </div>
 
       <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1">
-          Category
-        </label>
-        <select
-          id="category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value as EventCategory)}
-          required
-          className="w-full border rounded-md px-3 py-2 text-sm"
-        >
-          {EVENT_CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor="coverImage" className="block text-sm font-medium mb-1">
-          Cover Image <span className="text-gray-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="coverImage"
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-          onChange={handleImageChange}
-          className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        {imagePreview && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imagePreview}
-            alt="Preview"
-            className="mt-2 rounded-lg w-full max-h-48 object-cover"
-          />
-        )}
-      </div>
-
-      <MediaGalleryUploader items={galleryItems} onChange={setGalleryItems} />
-
-      <div>
         <label
           htmlFor="description"
-          className="block text-sm font-medium mb-1"
+          className="block text-xs font-medium text-black/60 mb-1.5"
         >
           Description
         </label>
@@ -296,113 +297,180 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           required
           rows={4}
           maxLength={5000}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          className={CC_INPUT}
           placeholder="Tell people what this event is about..."
         />
       </div>
 
       <div>
-        <label htmlFor="date" className="block text-sm font-medium mb-1">
-          Start Date & Time
+        <label htmlFor="category" className="block text-xs font-medium text-black/60 mb-1.5">
+          Category
         </label>
-        <input
-          id="date"
-          type="datetime-local"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
+        <select
+          id="category"
+          value={category}
+          onChange={(e) => {
+            categoryManuallySet.current = true;
+            setCategory(e.target.value as EventCategory);
+          }}
           required
-          className="w-full border rounded-md px-3 py-2 text-sm"
-        />
+          className={CC_INPUT}
+        >
+          {EVENT_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        {suggestedCategory && !categoryManuallySet.current && (
+          <p className="mt-1.5 text-[11px] text-black/50">
+            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-(--gold) align-middle mr-1.5" />
+            Suggested from your description: <strong className="font-medium">{CATEGORY_LABELS[suggestedCategory]}</strong>
+          </p>
+        )}
       </div>
 
       <div>
-        <label htmlFor="endTime" className="block text-sm font-medium mb-1">
-          End Date & Time <span className="text-gray-400 font-normal">(optional)</span>
+        <label htmlFor="coverImage" className="block text-xs font-medium text-black/60 mb-1.5">
+          Cover Image <span className="text-black/30 font-normal">(optional)</span>
         </label>
         <input
-          id="endTime"
-          type="datetime-local"
-          value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          min={date}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          id="coverImage"
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+          onChange={handleImageChange}
+          className="w-full text-sm text-black/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-black/5 file:text-black hover:file:bg-black/10"
+        />
+        <p className="mt-1 text-[11px] text-black/40">
+          Photos over {Math.round(SKIP_IF_SMALLER_THAN / (1024 * 1024) * 10) / 10} MB are auto-compressed in your browser before upload.
+        </p>
+        {imagePreview && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imagePreview}
+            alt="Preview"
+            className="mt-2 rounded-xl w-full max-h-48 object-cover"
+          />
+        )}
+      </div>
+
+      <MediaGalleryUploader items={galleryItems} onChange={setGalleryItems} />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="date" className="block text-xs font-medium text-black/60 mb-1.5">
+            Start Date & Time
+          </label>
+          <input
+            id="date"
+            type="datetime-local"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+            className={CC_INPUT}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="endTime" className="block text-xs font-medium text-black/60 mb-1.5">
+            End Date & Time <span className="text-black/30 font-normal">(optional)</span>
+          </label>
+          <input
+            id="endTime"
+            type="datetime-local"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            min={date}
+            className={CC_INPUT}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-black/60 mb-1.5">
+          Pin on Map
+        </label>
+        <LocationPicker
+          position={coords}
+          onSelect={(lat, lng) => setCoords([lat, lng])}
+          onAddress={(addr) => {
+            // Only auto-fill when the user hasn't typed or cleared the field
+            // themselves — we never silently overwrite intentional edits.
+            if (!locationManuallyEdited.current) setLocation(addr);
+          }}
         />
       </div>
 
       <div>
-        <label htmlFor="location" className="block text-sm font-medium mb-1">
+        <label htmlFor="location" className="block text-xs font-medium text-black/60 mb-1.5">
           Location
+          <span className="ml-1 text-black/30 font-normal">(auto-filled from map pin — edit as needed)</span>
         </label>
         <input
           id="location"
           type="text"
           value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          onChange={(e) => {
+            locationManuallyEdited.current = true;
+            setLocation(e.target.value);
+          }}
           required
           maxLength={300}
-          className="w-full border rounded-md px-3 py-2 text-sm"
-          placeholder="123 Main St, City"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Pin on Map</label>
-        <LocationPicker
-          position={coords}
-          onSelect={(lat, lng) => setCoords([lat, lng])}
+          className={CC_INPUT}
+          placeholder="Drop a pin above, or type the address"
         />
       </div>
 
       {/* Contact & details */}
-      <div className="border-t pt-4 mt-4 space-y-4">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Additional Details</h2>
+      <div className="border-t border-black/10 pt-5 mt-5 space-y-4">
+        <h2 className="text-[11px] font-semibold text-black/40 uppercase tracking-wider">Additional Details</h2>
 
         <div>
-          <label htmlFor="websiteUrl" className="block text-sm font-medium mb-1">
-            Website <span className="text-gray-400 font-normal">(optional)</span>
+          <label htmlFor="websiteUrl" className="block text-xs font-medium text-black/60 mb-1.5">
+            Website <span className="text-black/30 font-normal">(optional)</span>
           </label>
           <input
             id="websiteUrl"
             type="url"
             value={websiteUrl}
             onChange={(e) => setWebsiteUrl(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className={CC_INPUT}
             placeholder="https://example.com"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="contactEmail" className="block text-sm font-medium mb-1">
-              Contact Email <span className="text-gray-400 font-normal">(optional)</span>
+            <label htmlFor="contactEmail" className="block text-xs font-medium text-black/60 mb-1.5">
+              Contact Email <span className="text-black/30 font-normal">(optional)</span>
             </label>
             <input
               id="contactEmail"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm"
+              className={CC_INPUT}
               placeholder="info@church.org"
             />
           </div>
           <div>
-            <label htmlFor="contactPhone" className="block text-sm font-medium mb-1">
-              Contact Phone <span className="text-gray-400 font-normal">(optional)</span>
+            <label htmlFor="contactPhone" className="block text-xs font-medium text-black/60 mb-1.5">
+              Contact Phone <span className="text-black/30 font-normal">(optional)</span>
             </label>
             <input
               id="contactPhone"
               type="tel"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm"
+              className={CC_INPUT}
               placeholder="+27 31 123 4567"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="maxAttendees" className="block text-sm font-medium mb-1">
-            Max Attendees <span className="text-gray-400 font-normal">(optional — leave blank for unlimited)</span>
+          <label htmlFor="maxAttendees" className="block text-xs font-medium text-black/60 mb-1.5">
+            Max Attendees <span className="text-black/30 font-normal">(optional — leave blank for unlimited)</span>
           </label>
           <input
             id="maxAttendees"
@@ -410,35 +478,35 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
             min="1"
             value={maxAttendees}
             onChange={(e) => setMaxAttendees(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className={CC_INPUT}
             placeholder="100"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="visibility" className="block text-sm font-medium mb-1">
+            <label htmlFor="visibility" className="block text-xs font-medium text-black/60 mb-1.5">
               Event Visibility
             </label>
             <select
               id="visibility"
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as "public" | "private")}
-              className="w-full border rounded-md px-3 py-2 text-sm"
+              className={CC_INPUT}
             >
               <option value="public">Public — visible to everyone</option>
               <option value="private">Private — only invited members can see</option>
             </select>
           </div>
           <div>
-            <label htmlFor="attendeesVisible" className="block text-sm font-medium mb-1">
+            <label htmlFor="attendeesVisible" className="block text-xs font-medium text-black/60 mb-1.5">
               Who&apos;s Attending Visibility
             </label>
             <select
               id="attendeesVisible"
               value={attendeesVisible}
               onChange={(e) => setAttendeesVisible(e.target.value as "public" | "authenticated" | "count_only")}
-              className="w-full border rounded-md px-3 py-2 text-sm"
+              className={CC_INPUT}
             >
               <option value="authenticated">Logged-in users see names</option>
               <option value="public">Everyone sees names</option>
@@ -450,8 +518,8 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
 
       {/* ── Vendor-only: Place Booking ──────────────────── */}
       {isVendor && (
-        <div className="border-t pt-4 mt-4 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Event Venue</h2>
+        <div className="border-t border-black/10 pt-5 mt-5 space-y-4">
+          <h2 className="text-[11px] font-semibold text-black/40 uppercase tracking-wider">Event Venue</h2>
 
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -467,7 +535,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           </label>
 
           {bookAtPlace && (
-            <div className="space-y-3 rounded-lg border border-black/10 bg-black/2 p-3">
+            <div className="space-y-3 rounded-2xl border border-black/10 bg-white/60 p-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -482,9 +550,9 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
               </p>
 
               {addNewPlace && (
-                <div className="space-y-3 border-t border-black/8 pt-3">
+                <div className="space-y-3 border-t border-black/10 pt-3">
                   <div>
-                    <label htmlFor="placeName" className="block text-sm font-medium mb-1">
+                    <label htmlFor="placeName" className="block text-xs font-medium text-black/60 mb-1.5">
                       Place Name
                     </label>
                     <input
@@ -492,13 +560,13 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                       type="text"
                       value={placeName}
                       onChange={(e) => setPlaceName(e.target.value)}
-                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      className={CC_INPUT}
                       placeholder="Grace Community Church"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="placeCategory" className="block text-sm font-medium mb-1">
+                    <label htmlFor="placeCategory" className="block text-xs font-medium text-black/60 mb-1.5">
                       Place Category
                     </label>
                     <select
@@ -509,7 +577,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                         const cat = placeCategories.find((c) => c.id === e.target.value);
                         if (cat?.slug !== "other") setPlaceCustomCategory("");
                       }}
-                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      className={CC_INPUT}
                     >
                       <option value="">Select a category</option>
                       {placeCategories.map((c) => (
@@ -523,7 +591,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                         type="text"
                         value={placeCustomCategory}
                         onChange={(e) => setPlaceCustomCategory(e.target.value)}
-                        className="mt-2 w-full rounded-md border px-3 py-2 text-sm"
+                        className={`mt-2 ${CC_INPUT}`}
                         placeholder="Describe the category (e.g. Bookshop, Food Bank)"
                         maxLength={100}
                       />
@@ -531,7 +599,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                   </div>
 
                   <div>
-                    <label htmlFor="placeDescription" className="block text-sm font-medium mb-1">
+                    <label htmlFor="placeDescription" className="block text-xs font-medium text-black/60 mb-1.5">
                       Place Description
                     </label>
                     <textarea
@@ -539,13 +607,13 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                       value={placeDescription}
                       onChange={(e) => setPlaceDescription(e.target.value)}
                       rows={2}
-                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      className={CC_INPUT}
                       placeholder="A brief description of this place..."
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="placeAddress" className="block text-sm font-medium mb-1">
+                    <label htmlFor="placeAddress" className="block text-xs font-medium text-black/60 mb-1.5">
                       Place Address <span className="text-gray-400 font-normal">(defaults to event location)</span>
                     </label>
                     <input
@@ -553,14 +621,14 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                       type="text"
                       value={placeAddress}
                       onChange={(e) => setPlaceAddress(e.target.value)}
-                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      className={CC_INPUT}
                       placeholder="123 Main St, Durban"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="placePhone" className="block text-sm font-medium mb-1">
+                      <label htmlFor="placePhone" className="block text-xs font-medium text-black/60 mb-1.5">
                         Phone <span className="text-gray-400 font-normal">(optional)</span>
                       </label>
                       <input
@@ -568,12 +636,12 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                         type="tel"
                         value={placePhone}
                         onChange={(e) => setPlacePhone(e.target.value)}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        className={CC_INPUT}
                         placeholder="+27 31 000 0000"
                       />
                     </div>
                     <div>
-                      <label htmlFor="placeWebsite" className="block text-sm font-medium mb-1">
+                      <label htmlFor="placeWebsite" className="block text-xs font-medium text-black/60 mb-1.5">
                         Website <span className="text-gray-400 font-normal">(optional)</span>
                       </label>
                       <input
@@ -581,7 +649,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
                         type="url"
                         value={placeWebsite}
                         onChange={(e) => setPlaceWebsite(e.target.value)}
-                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        className={CC_INPUT}
                         placeholder="https://example.co.za"
                       />
                     </div>
@@ -593,21 +661,22 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-(--gold) text-black py-2 rounded-md hover:brightness-95 disabled:opacity-50 text-sm font-medium"
-      >
-        {loading ? "Creating..." : "Create Event"}
-      </button>
-
-      <button
-        type="button"
-        onClick={handleCancel}
-        className="w-full bg-black/8 text-black/60 py-2 rounded-md hover:bg-black/12 text-sm font-medium transition"
-      >
-        Cancel
-      </button>
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="flex-1 rounded-xl border border-black/10 bg-white/70 text-black/70 py-2.5 hover:bg-white text-sm font-medium transition"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex-1 rounded-xl bg-(--gold) text-black py-2.5 hover:brightness-95 disabled:opacity-50 text-sm font-semibold shadow-sm transition"
+        >
+          {loading ? "Creating…" : "Create Event"}
+        </button>
+      </div>
     </form>
   );
 }

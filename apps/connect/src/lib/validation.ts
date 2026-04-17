@@ -14,8 +14,15 @@ const ALLOWED_IMAGE_TYPES = [
   "image/svg+xml",
 ];
 
-/** Maximum image file size in bytes (5 MB). */
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/** Maximum image file size in bytes (15 MB).
+ *
+ * Raised from 5 MB so that modern phone photos (typically 5–12 MB JPEGs)
+ * can be submitted without manual resizing. Uploads that exceed 5 MB are
+ * auto-compressed in the browser by {@link compressImageIfNeeded} before
+ * hitting Supabase Storage. The 15 MB cap is a safety net only — files at
+ * that size will typically shrink to well under 2 MB after compression.
+ */
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024;
 
 /** Allowed file extensions for image uploads. */
 const SAFE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
@@ -29,7 +36,7 @@ export function validateImageFile(file: File): string | null {
     return "Only JPEG, PNG, GIF, WebP, or SVG images are allowed.";
   }
   if (file.size > MAX_IMAGE_SIZE) {
-    return "Image must be smaller than 5 MB.";
+    return "Image must be smaller than 15 MB.";
   }
   return null;
 }
@@ -49,8 +56,11 @@ export function safeImageExtension(filename: string): string {
 /** Allowed video MIME types for event media uploads. */
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
-/** Maximum video file size in bytes (50 MB). */
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
+/** Maximum video file size in bytes (100 MB).
+ *
+ * Raised from 50 MB so that short phone clips (which often land at 60–90 MB
+ * for 30–60 s of 1080p) go through on the first try. */
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 
 /** Allowed file extensions for video uploads. */
 const SAFE_VIDEO_EXTENSIONS = ["mp4", "webm", "mov"];
@@ -77,11 +87,11 @@ export function detectMediaKind(file: File): MediaKind | null {
 export function validateMediaFile(file: File): string | null {
   const kind = detectMediaKind(file);
   if (kind === "image") {
-    if (file.size > MAX_IMAGE_SIZE) return "Images must be smaller than 5 MB.";
+    if (file.size > MAX_IMAGE_SIZE) return "Images must be smaller than 15 MB.";
     return null;
   }
   if (kind === "video") {
-    if (file.size > MAX_VIDEO_SIZE) return "Videos must be smaller than 50 MB.";
+    if (file.size > MAX_VIDEO_SIZE) return "Videos must be smaller than 100 MB.";
     return null;
   }
   return "Only JPEG, PNG, GIF, WebP, SVG, MP4, WebM, or MOV files are allowed.";

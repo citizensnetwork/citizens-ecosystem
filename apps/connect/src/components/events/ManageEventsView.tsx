@@ -65,8 +65,60 @@ export default function ManageEventsView({ isVendor }: Props) {
     );
   }
 
+  // Aggregate analytics across all managed events.
+  const totals = events.reduce(
+    (acc, e) => {
+      acc.events += 1;
+      acc.views += e.view_count ?? 0;
+      acc.rsvps += e.attendee_count ?? 0;
+      acc.considers += e.consider_count ?? 0;
+      if (e.status === "published") acc.published += 1;
+      if (e.status === "draft") acc.drafts += 1;
+      if (e.status === "cancelled") acc.cancelled += 1;
+      const capacity = e.max_attendees;
+      if (capacity != null && (e.attendee_count ?? 0) >= capacity) acc.soldOut += 1;
+      return acc;
+    },
+    {
+      events: 0,
+      views: 0,
+      rsvps: 0,
+      considers: 0,
+      published: 0,
+      drafts: 0,
+      cancelled: 0,
+      soldOut: 0,
+    },
+  );
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* ── Vendor analytics summary ─────────────────────── */}
+      <section
+        aria-label="Analytics summary"
+        className="rounded-2xl border border-black/8 bg-white/80 backdrop-blur p-4 sm:p-5"
+      >
+        <div className="flex items-baseline justify-between gap-3 mb-3">
+          <h2 className="text-sm font-semibold tracking-tight">Your events at a glance</h2>
+          <span className="text-[11px] text-black/40">
+            {totals.published} published · {totals.drafts} draft · {totals.cancelled} cancelled
+          </span>
+        </div>
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <AnalyticStat label="Events" value={totals.events} />
+          <AnalyticStat label="Total views" value={totals.views} />
+          <AnalyticStat label="Total RSVPs" value={totals.rsvps} />
+          <AnalyticStat label="Considering" value={totals.considers} />
+        </dl>
+        {totals.soldOut > 0 && (
+          <p className="mt-3 text-[11px] text-black/50">
+            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle mr-1.5" />
+            {totals.soldOut} {totals.soldOut === 1 ? "event is" : "events are"} sold out — consider raising capacity.
+          </p>
+        )}
+      </section>
+
+      <div className="space-y-3">
       {events.map((event) => {
         const cat = event.category ?? "church";
         const isExpanded = expandedId === event.id;
@@ -198,6 +250,21 @@ export default function ManageEventsView({ isVendor }: Props) {
           </div>
         );
       })}
+      </div>
+    </div>
+  );
+}
+
+/** Small stat card used inside the analytics summary. */
+function AnalyticStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-black/[0.03] px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-black/40 font-medium">
+        {label}
+      </div>
+      <div className="text-xl font-semibold tabular-nums">
+        {value.toLocaleString()}
+      </div>
     </div>
   );
 }

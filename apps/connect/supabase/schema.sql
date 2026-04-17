@@ -67,7 +67,8 @@ create table if not exists public.events (
   category text check (category in (
     'entertainment', 'sport-fun', 'social-fun', 'community-upliftment',
     'education', 'church', 'missional', 'marriage-and-couples',
-    'mens', 'womens', 'kids', 'recovery', 'equip', 'weekend', 'members-only'
+    'mens', 'womens', 'kids', 'recovery', 'equip', 'weekend', 'members-only',
+    'care'
   )) default 'church',
   category_id uuid references public.categories(id),
   image_url text,

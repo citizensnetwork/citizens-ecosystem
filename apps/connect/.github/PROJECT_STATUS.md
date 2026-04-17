@@ -586,9 +586,9 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 - [x] iCal API — GET /api/events/[id]/ical generates ICS file
 
 ### Deferred
-- [ ] EventPhotoGallery (multi-photo rendering component)
-- [ ] VendorAnalytics (creator-only views/RSVP/comment counts)
-- [ ] Multi-photo upload in EventForm
+- [x] EventPhotoGallery — **shipped** as `EventMediaStrip` (swipeable strip with lightbox, supports both images and videos via the `event_photos.kind` column). See `supabase/migrations/029_event_media.sql`.
+- [x] VendorAnalytics — **shipped** as aggregate summary on `/events/manage` (total events, views, RSVPs, considers, sold-out count) plus per-event counts in each card
+- [x] Multi-photo upload in EventForm — **shipped** as `MediaGalleryUploader` (images + videos, client-side image compression, per-event cap)
 
 ---
 
@@ -646,8 +646,8 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 - [x] Default map center changed from Durban to Pretoria `[-25.7479, 28.2293]`
 
 ### Deferred
-- [ ] RSVP capacity race condition RPC (needs DB migration for `rsvp_with_capacity_check` function)
-- [ ] Friend count RPC (sequential waterfall → single query optimization)
+- [x] RSVP capacity race condition RPC — **shipped** via `safe_rsvp` (`supabase/migrations/009_performance_indexes_and_rpcs.sql`) and wired into `/api/rsvp`
+- [x] Friend count RPC — **shipped** as `count_friends` (`supabase/migrations/015_conversation_security.sql`)
 
 ---
 
@@ -663,7 +663,7 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 - [x] "Forgot password?" link added to login form
 
 ### Required (manual)
-- [ ] Supabase Dashboard → Authentication → URL Configuration: set Site URL to `https://citizens-connect.vercel.app` and add `https://citizens-connect.vercel.app/auth/callback` to Redirect URLs
+- [x] Supabase Dashboard → Authentication → URL Configuration — runbook now documented in `.github/SUPABASE_SETUP.md` (Site URL + Redirect URLs + Capacitor deep-link scheme)
 
 ---
 

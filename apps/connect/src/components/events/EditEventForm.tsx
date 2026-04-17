@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia } from "@/types/db";
@@ -31,6 +32,9 @@ export default function EditEventForm({ event }: Props) {
     event.end_time ? new Date(event.end_time).toISOString().slice(0, 16) : ""
   );
   const [location, setLocation] = useState(event.location);
+  // Track whether the user has manually edited Location so we don't
+  // overwrite their edits on a subsequent map click.
+  const locationManuallyEdited = useRef(false);
   const [category, setCategory] = useState<EventCategory>(
     event.category ?? "church"
   );
@@ -97,19 +101,23 @@ export default function EditEventForm({ event }: Props) {
 
 
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    if (file) {
-      const validationError = validateImageFile(file);
-      if (validationError) {
-        setError(validationError);
-        e.target.value = "";
-        return;
-      }
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0] ?? null;
+    if (!raw) {
+      setError("");
+      setImageFile(null);
+      return;
     }
+    const validationError = validateImageFile(raw);
+    if (validationError) {
+      setError(validationError);
+      e.target.value = "";
+      return;
+    }
+    const file = await compressImageIfNeeded(raw);
     setError("");
     setImageFile(file);
-    if (file) setImagePreview(URL.createObjectURL(file));
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -321,12 +329,18 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label htmlFor="location" className="block text-sm font-medium mb-1">Location</label>
-        <input id="location" type="text" value={location} onChange={(e) => setLocation(e.target.value)} required maxLength={300} className="w-full border rounded-md px-3 py-2 text-sm" />
+        <input id="location" type="text" value={location} onChange={(e) => { locationManuallyEdited.current = true; setLocation(e.target.value); }} required maxLength={300} className="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
 
       <div>
         <label className="block text-sm font-medium mb-1">Pin on Map</label>
-        <LocationPicker position={coords} onSelect={(lat, lng) => setCoords([lat, lng])} />
+        <LocationPicker
+          position={coords}
+          onSelect={(lat, lng) => setCoords([lat, lng])}
+          onAddress={(addr) => {
+            if (!locationManuallyEdited.current) setLocation(addr);
+          }}
+        />
       </div>
 
       {/* Additional details */}
