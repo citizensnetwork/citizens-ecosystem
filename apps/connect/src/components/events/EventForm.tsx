@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
-import { compressImageIfNeeded } from "@/lib/imageCompression";
+import { compressImageIfNeeded, SKIP_IF_SMALLER_THAN } from "@/lib/imageCompression";
 import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
@@ -67,6 +67,9 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
 
   // Has the user manually chosen a category? If so, stop auto-suggesting.
   const categoryManuallySet = useRef(false);
+  // Has the user typed/edited the Location field manually? If so, never
+  // auto-overwrite from a map click — even if they clear it afterwards.
+  const locationManuallyEdited = useRef(false);
   // Auto-suggested category (same as `category` when auto) — shown as a tiny
   // "Suggested based on your description" hint.
   const [suggestedCategory, setSuggestedCategory] = useState<EventCategory | null>(null);
@@ -339,7 +342,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           className="w-full text-sm text-black/60 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-black/5 file:text-black hover:file:bg-black/10"
         />
         <p className="mt-1 text-[11px] text-black/40">
-          Photos over 1.5 MB are auto-compressed in your browser before upload.
+          Photos over {Math.round(SKIP_IF_SMALLER_THAN / (1024 * 1024) * 10) / 10} MB are auto-compressed in your browser before upload.
         </p>
         {imagePreview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -391,8 +394,9 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           position={coords}
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => {
-            // Only auto-fill if the user hasn't typed their own location.
-            if (!location.trim()) setLocation(addr);
+            // Only auto-fill when the user hasn't typed or cleared the field
+            // themselves — we never silently overwrite intentional edits.
+            if (!locationManuallyEdited.current) setLocation(addr);
           }}
         />
       </div>
@@ -406,7 +410,10 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           id="location"
           type="text"
           value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          onChange={(e) => {
+            locationManuallyEdited.current = true;
+            setLocation(e.target.value);
+          }}
           required
           maxLength={300}
           className={CC_INPUT}

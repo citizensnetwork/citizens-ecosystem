@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -32,6 +32,9 @@ export default function EditEventForm({ event }: Props) {
     event.end_time ? new Date(event.end_time).toISOString().slice(0, 16) : ""
   );
   const [location, setLocation] = useState(event.location);
+  // Track whether the user has manually edited Location so we don't
+  // overwrite their edits on a subsequent map click.
+  const locationManuallyEdited = useRef(false);
   const [category, setCategory] = useState<EventCategory>(
     event.category ?? "church"
   );
@@ -326,7 +329,7 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label htmlFor="location" className="block text-sm font-medium mb-1">Location</label>
-        <input id="location" type="text" value={location} onChange={(e) => setLocation(e.target.value)} required maxLength={300} className="w-full border rounded-md px-3 py-2 text-sm" />
+        <input id="location" type="text" value={location} onChange={(e) => { locationManuallyEdited.current = true; setLocation(e.target.value); }} required maxLength={300} className="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
 
       <div>
@@ -335,7 +338,7 @@ export default function EditEventForm({ event }: Props) {
           position={coords}
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => {
-            if (!location.trim()) setLocation(addr);
+            if (!locationManuallyEdited.current) setLocation(addr);
           }}
         />
       </div>

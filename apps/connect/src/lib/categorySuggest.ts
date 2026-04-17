@@ -96,6 +96,12 @@ const KEYWORDS: CategoryKeywords = {
   ],
 };
 
+/** Weighting divisor for keyword length: longer needles win ties because
+ *  they're more discriminating (e.g. "marriage retreat" > "party"). The
+ *  value was tuned empirically: divide by 4 so a typical 12-character
+ *  phrase scores ~3× a 4-character one. */
+const KEYWORD_LENGTH_WEIGHT_DIVISOR = 4;
+
 /**
  * Suggest a category from free-text. Returns the best-scoring slug, or
  * `null` if nothing matches. Case-insensitive; longer keywords are weighted
@@ -113,7 +119,7 @@ export function suggestCategory(...parts: Array<string | null | undefined>): Eve
       const needle = word.toLowerCase();
       if (haystack.includes(needle)) {
         // Longer keywords are more discriminating — weight by length.
-        score += Math.max(1, needle.length / 4);
+        score += Math.max(1, needle.length / KEYWORD_LENGTH_WEIGHT_DIVISOR);
       }
     }
     if (score > 0 && (!best || score > best.score)) {

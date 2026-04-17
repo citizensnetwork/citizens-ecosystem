@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import EventFormWithIndemnity from "@/components/events/EventFormWithIndemnity";
+import MapBackdropLazy from "@/components/map/MapBackdropLazy";
 import { ORGANISER_ROLES, type Category, type UserRole } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +37,10 @@ export default async function NewEventPage() {
   }
 
   return (
-    <div className="map-bg min-h-[calc(100dvh-3.5rem)] px-4 py-6 sm:py-10">
-      <div className="mx-auto w-full max-w-2xl">
+    <div className="map-bg relative min-h-[calc(100dvh-3.5rem)] px-4 py-6 sm:py-10">
+      {/* Decorative live-map backdrop — behind the glass panel, non-interactive. */}
+      <MapBackdropLazy />
+      <div className="relative mx-auto w-full max-w-2xl">
         <div className="glass-panel px-5 py-6 sm:px-7 sm:py-7">
           <EventFormWithIndemnity isVendor={isVendor} placeCategories={placeCategories} />
         </div>

@@ -27,12 +27,19 @@ export type CompressImageOptions = {
   skipIfSmallerThan?: number;
 };
 
+/** Longest-edge cap in pixels used by default. HD + safety margin. */
+export const DEFAULT_MAX_DIMENSION = 2560;
+/** Default JPEG quality used when re-encoding (0–1). Near-lossless for photos. */
+export const DEFAULT_QUALITY = 0.85;
+/** Files smaller than this (in bytes) skip compression entirely to preserve
+ *  fidelity on already-small images. Exported so UI copy can reference the
+ *  same threshold without drifting. */
+export const SKIP_IF_SMALLER_THAN = 1.5 * 1024 * 1024;
+
 const DEFAULT_OPTIONS: Required<CompressImageOptions> = {
-  maxDimension: 2560,
-  quality: 0.85,
-  // 1.5 MB — below this size, compression gain rarely justifies the quality
-  // loss, so we skip to keep full fidelity.
-  skipIfSmallerThan: 1.5 * 1024 * 1024,
+  maxDimension: DEFAULT_MAX_DIMENSION,
+  quality: DEFAULT_QUALITY,
+  skipIfSmallerThan: SKIP_IF_SMALLER_THAN,
 };
 
 /** Skip these types (re-encoding would be lossy or change their behaviour). */
