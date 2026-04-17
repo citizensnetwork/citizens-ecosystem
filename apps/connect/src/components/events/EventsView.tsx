@@ -614,7 +614,7 @@ export default function EventsView({
         ref={featuredRef}
         role="dialog"
         aria-label="Trending content"
-        className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+        className={`absolute inset-x-0 bottom-0 z-1004 flex h-[40dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
           featuredOpen && !hasDetail && activeCategories.size === 0 && !activeQuickAccess ? "translate-y-0" : "translate-y-full"
         }`}
         onTouchStart={(e) => { panelSwipeStartY.current = e.touches[0].clientY; }}
@@ -681,7 +681,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               categoryPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label="Category filter results"
