@@ -359,6 +359,7 @@ body {
  */
 .maplibregl-popup {
   z-index: 10 !important;
+  /* Let touch drags over the popup pan the map (see block comment above). */
   pointer-events: none;
 }
 .maplibregl-popup-tip,
