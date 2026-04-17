@@ -19,6 +19,20 @@ type Props = {
 
 type AuthView = "idle" | "login" | "signup";
 
+/** Rotating taglines for the "Connecting …" scroller. Word "Connecting" stays fixed; phrase cycles every 2s. */
+const CONNECTING_PHRASES = [
+  "the Kingdom",
+  "the lonely to community",
+  "the youth to the fire",
+  "the family to growth",
+  "the energy to fun!",
+  "the fiery to service",
+  "the entrepreneur to opportunity",
+  "the student to material",
+  "the hurting to healing",
+  "the seeker to truth",
+];
+
 // Citizens platform channels — Connect is live, others are upcoming
 const PLATFORM_CHANNELS = [
   {
@@ -90,6 +104,15 @@ export default function LandingPage({ events, places }: Props) {
   // Swipe state
   const swipeStartY = useRef(0);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Rotating "Connecting …" phrase index
+  const [phraseIdx, setPhraseIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPhraseIdx((i) => (i + 1) % CONNECTING_PHRASES.length);
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -218,23 +241,44 @@ export default function LandingPage({ events, places }: Props) {
           WebkitBackdropFilter: "blur(12px) saturate(1.1)",
         }}
       >
-        {/* ── Top section: logo & crown ── */}
-        <div className="flex flex-1 flex-col items-center justify-center px-8">
+        {/* ── Top section: scripture excerpt, title, scrolling tagline ── */}
+        <div className="flex flex-1 flex-col items-center justify-center px-6 sm:px-8">
+          {/* Italicised verse excerpt (styled like the "Citizens platform" label: tiny uppercase gold) */}
+          <p
+            className="mb-3 max-w-md text-center text-[10px] font-semibold italic tracking-[0.14em] sm:text-[11px]"
+            style={{ color: "#000" }}
+          >
+            &ldquo;<sup className="mr-0.5 text-[8px] font-bold not-italic" style={{ color: "var(--gold)" }}>19</sup>
+            Now, therefore, you are no longer strangers and foreigners, but fellow —&rdquo;
+          </p>
+
+          {/* Citizens title (unchanged) */}
           <h1
             className="text-center text-5xl font-semibold uppercase tracking-widest sm:text-6xl"
             style={{ color: "var(--gold)" }}
           >
             Citizens
           </h1>
-          <p
-            className="mt-2 text-xs font-bold uppercase tracking-widest"
-            style={{ color: "#000" }}
-          >
-            CONNECTING THE KINGDOM
-          </p>
-          <p className="mt-1.5 text-[10px] font-semibold tracking-wider" style={{ color: "var(--gold)" }}>
+
+          {/* Scripture reference (kept where the logo sits) */}
+          <p className="mt-2 text-[10px] font-semibold tracking-wider" style={{ color: "var(--gold)" }}>
             Eph. 2:19-22
           </p>
+
+          {/* Rotating "Connecting …" tagline — word "Connecting" stays centred; right-hand phrase cycles every 2s */}
+          <div
+            className="mt-5 flex w-full max-w-md items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest sm:text-sm"
+            aria-live="polite"
+          >
+            <span style={{ color: "#000" }}>Connecting</span>
+            <span
+              key={phraseIdx}
+              className="cc-phrase-rotate inline-block text-left normal-case tracking-normal"
+              style={{ color: "var(--gold)" }}
+            >
+              {CONNECTING_PHRASES[phraseIdx]}
+            </span>
+          </div>
         </div>
 
         {/* ── Middle section: auth forms ── */}
@@ -263,61 +307,102 @@ export default function LandingPage({ events, places }: Props) {
               <div className="skeleton h-10 w-40 rounded-xl" />
             </div>
           ) : user ? (
-            /* Logged in — show Connect button */
-            <button
-              type="button"
-              onClick={handleConnect}
-              className="gold-glow w-full rounded-2xl border-2 border-(--gold) bg-white px-6 py-2.5 text-sm font-semibold uppercase tracking-widest text-(--gold) transition-all hover:bg-(--gold) hover:text-black active:scale-95"
-            >
-              Connect
-            </button>
+            /* Logged in — Connect button with Kingdom tagline */
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleConnect}
+                className="gold-glow w-full rounded-2xl border-2 border-(--gold) bg-white px-6 py-2.5 text-sm font-semibold uppercase tracking-widest text-(--gold) transition-all hover:bg-(--gold) hover:text-black active:scale-95"
+              >
+                Connect
+              </button>
+              <p
+                className="text-center text-[11px] font-medium tracking-[0.25em]"
+                style={{ color: "#4a2f1a" }}
+              >
+                By the Kingdom. &middot; With the Kingdom. &middot; For the Kingdom.
+              </p>
+            </div>
           ) : (
             /* Not logged in — show auth options */
             <div className="space-y-4">
               {authView === "idle" && (
                 <>
-                  {/* Continue with Google */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-black/20 bg-white/60 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#111"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#111"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#111"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#111"/>
-                    </svg>
-                    Continue with Google
-                  </button>
+                  {/* Two-column: Log in (left) / Sign up (right) separated by a thin vertical divider */}
+                  <div className="relative grid grid-cols-2 gap-3">
+                    {/* Vertical divider */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-1 left-1/2 w-px -translate-x-1/2 bg-black/15"
+                    />
 
-                  {/* Divider */}
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-black/20" />
-                    <span className="text-xs font-medium text-black/50">or</span>
-                    <div className="h-px flex-1 bg-black/20" />
+                    {/* Left — Log in */}
+                    <div className="flex flex-col items-stretch gap-2 pr-2">
+                      <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-black/60">
+                        Log in
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleGoogleAuth}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/20 bg-white/60 px-2 py-2 text-[11px] font-semibold text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
+                        aria-label="Log in with Google"
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#111"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#111"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#111"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#111"/>
+                        </svg>
+                        Google
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAuthView("login"); setError(""); setSuccess(""); }}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/20 bg-white/60 px-2 py-2 text-[11px] font-semibold text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="5" width="18" height="14" rx="2"/>
+                          <polyline points="3 7 12 13 21 7"/>
+                        </svg>
+                        Email
+                      </button>
+                    </div>
+
+                    {/* Right — Sign up */}
+                    <div className="flex flex-col items-stretch gap-2 pl-2">
+                      <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-black/60">
+                        Sign up
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleGoogleAuth}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white/40 px-2 py-2 text-[11px] font-medium text-black/80 backdrop-blur transition hover:bg-white/60 active:scale-[0.97]"
+                        aria-label="Sign up with Google"
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#111"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#111"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#111"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#111"/>
+                        </svg>
+                        Google
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAuthView("signup"); setError(""); setSuccess(""); }}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white/40 px-2 py-2 text-[11px] font-medium text-black/80 backdrop-blur transition hover:bg-white/60 active:scale-[0.97]"
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="5" width="18" height="14" rx="2"/>
+                          <polyline points="3 7 12 13 21 7"/>
+                        </svg>
+                        Email
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Email login / signup toggle */}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setAuthView("login"); setError(""); setSuccess(""); }}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-black/20 bg-white/60 px-3 py-2.5 text-xs font-semibold uppercase tracking-widest text-black backdrop-blur transition hover:bg-white/80 active:scale-[0.97]"
-                    >
-                      Log in
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setAuthView("signup"); setError(""); setSuccess(""); }}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white/40 px-3 py-2.5 text-xs font-medium uppercase tracking-widest text-black/70 backdrop-blur transition hover:bg-white/60 active:scale-[0.97]"
-                    >
-                      Sign up
-                    </button>
-                  </div>
-
-                  {/* Disabled Connect button with explanation */}
-                  <div className="space-y-1.5">
+                  {/* Connect button + Kingdom tagline */}
+                  <div className="space-y-2">
                     <button
                       type="button"
                       disabled
@@ -326,8 +411,12 @@ export default function LandingPage({ events, places }: Props) {
                     >
                       Connect
                     </button>
-                    <p id="connect-hint" className="text-center text-[11px] text-black/40">
-                      Log in or sign up to connect
+                    <p
+                      id="connect-hint"
+                      className="text-center text-[11px] font-medium tracking-[0.25em]"
+                      style={{ color: "#4a2f1a" }}
+                    >
+                      By the Kingdom. &middot; With the Kingdom. &middot; For the Kingdom.
                     </p>
                   </div>
 

@@ -140,7 +140,11 @@ describe("EventsView", () => {
 
   it("renders search input with proper aria-label", async () => {
     await renderView();
-    const input = screen.getByPlaceholderText(/search events or places/i);
+    // Bottom search starts collapsed as an icon button; open it first
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /open search/i }));
+    });
+    const input = screen.getByRole("searchbox", { name: /search events, places, or city/i });
     expect(input).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-label", "Search events, places, or city");
   });
@@ -180,7 +184,11 @@ describe("EventsView", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
     });
-    const input = screen.getByPlaceholderText(/search events or places/i);
+    // Bottom search starts collapsed; open it before typing
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /open search/i }));
+    });
+    const input = screen.getByRole("searchbox", { name: /search events, places, or city/i });
     await act(async () => {
       fireEvent.change(input, { target: { value: "Youth" } });
     });
@@ -195,7 +203,7 @@ describe("EventsView", () => {
   it("shows trending panel button", async () => {
     await renderView();
     expect(
-      screen.getByRole("button", { name: /open trending panel/i })
+      screen.getByRole("button", { name: /open trending events/i })
     ).toBeInTheDocument();
   });
 

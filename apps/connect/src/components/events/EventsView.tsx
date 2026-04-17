@@ -412,6 +412,93 @@ export default function EventsView({
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
 
+  // ── Bottom floating search: auto-expand/collapse behaviour ────────
+  // initial: collapsed icon button for 5s → expands to bar for 60s idle → collapses back.
+  // While the user is focused/typing, the bar stays open and the idle timer resets.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const clearSearchIdleTimer = useCallback(() => {
+    if (searchIdleTimerRef.current) {
+      clearTimeout(searchIdleTimerRef.current);
+      searchIdleTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleSearchCollapse = useCallback((ms: number) => {
+    clearSearchIdleTimer();
+    searchIdleTimerRef.current = setTimeout(() => {
+      // Only collapse if not focused and no text
+      setSearchOpen((open) => {
+        if (searchFocused) return open;
+        return false;
+      });
+    }, ms);
+  }, [clearSearchIdleTimer, searchFocused]);
+
+  // Initial reveal: after 5s show the expanded search bar once, then stay for 60s idle.
+  useEffect(() => {
+    const revealId = setTimeout(() => {
+      setSearchOpen(true);
+      // After initial reveal, schedule collapse after 60s if idle
+      scheduleSearchCollapse(60_000);
+    }, 5_000);
+    return () => {
+      clearTimeout(revealId);
+      clearSearchIdleTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset the 60s idle timer on any interaction (typing / focus).
+  useEffect(() => {
+    if (!searchOpen) return;
+    if (searchFocused || search.trim().length > 0) {
+      clearSearchIdleTimer(); // locked open while focused / text present
+      return;
+    }
+    scheduleSearchCollapse(60_000);
+    return clearSearchIdleTimer;
+  }, [searchOpen, searchFocused, search, scheduleSearchCollapse, clearSearchIdleTimer]);
+
+  function openSearchBar() {
+    setSearchOpen(true);
+    // focus once the input mounts
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+
+  // ── Rotating italic placeholder for bottom search bar ────────────
+  const SEARCH_SUGGESTIONS = useMemo(
+    () => [
+      "Homecells in my area",
+      "Good coffee places nearby",
+      "Christian businesses in my area",
+      "Any fitness events I can join?",
+      "Looking for new friends",
+      "I need counselling",
+      "Marriage advice",
+    ],
+    []
+  );
+  const [suggestionIdx, setSuggestionIdx] = useState(0);
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = setInterval(() => {
+      setSuggestionIdx((i) => (i + 1) % SEARCH_SUGGESTIONS.length);
+    }, 3_000);
+    return () => clearInterval(id);
+  }, [searchOpen, SEARCH_SUGGESTIONS.length]);
+
+  // ── Trending modal (replaces bottom slide-up panel) ──────────────
+  // Top 5 attended events (by RSVP count), falling back to most-recent if trending data is sparse.
+  const topAttendedEvents = useMemo(() => {
+    const list = trending ?? [];
+    // `trending` is already sorted by the API by popularity (see useBurgerMenuData).
+    return list.slice(0, 5);
+  }, [trending]);
+
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
     // South Africa center, zoom 5.5 shows full country
@@ -502,19 +589,9 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Floating top bar ────────────────────────────── */}
+      {/* ── Floating top bar (no search — search is a floating bottom control) ────── */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 p-3 sm:p-4">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
-          <input
-            type="search"
-            aria-label="Search events, places, or city"
-            placeholder="Search events or places — Enter to jump to city"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            className="pointer-events-auto w-full rounded-2xl border border-black/12 bg-white/95 px-4 py-2.5 text-sm shadow-lg outline-none backdrop-blur focus:border-black/30"
-          />
-
           <div className="flex items-center justify-between gap-3">
             <div className="pointer-events-auto flex items-center gap-2">
               <button
@@ -540,8 +617,21 @@ export default function EventsView({
             </div>
 
             <div className="pointer-events-auto flex items-center gap-2">
+              {/* Trending round floating button (gold icon) — opens centered glass modal */}
+              <button
+                type="button"
+                onClick={() => setFeaturedOpen(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/95 text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white"
+                aria-label="Open trending events"
+                aria-expanded={featuredOpen}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                  <polyline points="16 7 22 7 22 13"/>
+                </svg>
+              </button>
               {user && (
-                <div className="rounded-xl border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
+                <div className="rounded-full border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
                   <NotificationBell userId={user.id} />
                 </div>
               )}
@@ -597,64 +687,120 @@ export default function EventsView({
           </div>
         </div>
       )}
-      {/* ── Trending panel open button (only when panel is closed and no category selected) ────── */}
-      {!hasDetail && !featuredOpen && activeCategories.size === 0 && !activeQuickAccess && (
-        <button
-          type="button"
-          onClick={() => setFeaturedOpen(true)}
-          className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 border-(--gold)/20 bg-white/20 px-4 py-1.5 text-xs font-bold tracking-wider text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white/30"
-          aria-label="Open trending panel"
-        >
-          <span className="text-[10px]">TRENDING</span>
-        </button>
-      )}
-
-      {/* ── Trending panel slide-up from bottom ────────── */}
-      <aside
-        ref={featuredRef}
-        role="dialog"
-        aria-label="Trending content"
-        className={`absolute inset-x-0 bottom-0 z-1004 flex h-[40dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
-          featuredOpen && !hasDetail && activeCategories.size === 0 && !activeQuickAccess ? "translate-y-0" : "translate-y-full"
-        }`}
-        onTouchStart={(e) => { panelSwipeStartY.current = e.touches[0].clientY; }}
-        onTouchEnd={(e) => {
-          if (e.changedTouches[0].clientY - panelSwipeStartY.current > 60) setFeaturedOpen(false);
-        }}
-      >
-        {/* Title bar */}
-        <div className="flex-shrink-0 rounded-t-2xl bg-white/20 backdrop-blur-md">
-          <div className="flex justify-center">
+      {/* ── Bottom floating search — collapses to icon after 60s idle, re-expands on click ── */}
+      {!hasDetail && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-4 sm:bottom-6">
+          {searchOpen ? (
+            <div className="pointer-events-auto relative flex w-full max-w-md items-center">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="pointer-events-none absolute left-4 h-4 w-4 text-black/50"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="search"
+                aria-label="Search events, places, or city"
+                placeholder={search ? "" : SEARCH_SUGGESTIONS[suggestionIdx]}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                onKeyDown={handleSearchKeyDown}
+                className="cc-bottom-search w-full rounded-full border border-black/10 bg-white/95 px-11 py-3 text-sm italic font-light text-black placeholder:italic placeholder:font-light placeholder:text-black/50 shadow-lg outline-none backdrop-blur focus:not-italic focus:border-black/30"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); searchInputRef.current?.focus(); }}
+                  className="absolute right-3 rounded-full p-1 text-black/40 transition hover:bg-black/5 hover:text-black"
+                  aria-label="Clear search"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={() => setFeaturedOpen(false)}
-              aria-label="Close trending panel"
-              className="flex cursor-pointer items-center justify-center px-8 py-1.5 active:scale-95"
+              onClick={openSearchBar}
+              aria-label="Open search"
+              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/70 shadow-lg backdrop-blur transition hover:bg-white active:scale-95"
             >
-              <span className="block h-1 w-12 rounded-full bg-white/60 transition-colors hover:bg-white/80" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
             </button>
-          </div>
-          <div className="flex items-center justify-center gap-2 px-4 pb-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-              <polyline points="16 7 22 7 22 13"/>
-            </svg>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-(--gold)">
-              Trending
-            </h2>
-          </div>
+          )}
         </div>
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto bg-white/20 backdrop-blur-md">
-          <FeaturedPanel
-            trendingEvents={trending}
-            onSelectEvent={handleSelectEvent}
-            onSelectPlace={handleSelectPlace}
-            onQuickAction={handleQuickAction}
-            fallbackEvents={filtered}
+      )}
+
+      {/* ── Trending centered glass modal (replaces bottom slide-up panel) ───────────────── */}
+      {featuredOpen && !hasDetail && activeCategories.size === 0 && !activeQuickAccess && (
+        <div
+          className="absolute inset-0 z-1004 flex items-center justify-center p-4"
+          onClick={() => setFeaturedOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+            aria-hidden="true"
           />
+          <aside
+            ref={featuredRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Top attended events"
+            onClick={(e) => e.stopPropagation()}
+            className="glass-panel relative flex max-h-[78dvh] w-full max-w-lg flex-col overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.60)" }}
+          >
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                  <polyline points="16 7 22 7 22 13"/>
+                </svg>
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-(--gold)">
+                  Top Attended
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFeaturedOpen(false)}
+                aria-label="Close trending panel"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-black/60 transition hover:bg-black/5 hover:text-black active:scale-95"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-3">
+              <FeaturedPanel
+                trendingEvents={topAttendedEvents}
+                onSelectEvent={handleSelectEvent}
+                onSelectPlace={handleSelectPlace}
+                onQuickAction={handleQuickAction}
+                fallbackEvents={filtered}
+              />
+            </div>
+          </aside>
         </div>
-      </aside>
+      )}
 
       {/* ── Category selection panel (when categories are active via burger menu, not quick access) ── */}
       {activeCategories.size > 0 && !hasDetail && !activeQuickAccess && (
