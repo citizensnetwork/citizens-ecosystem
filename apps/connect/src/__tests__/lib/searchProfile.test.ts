@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseQuery, normaliseSearchProfile, describeIntent } from "@/lib/searchProfile";
+import { parseQuery, normaliseSearchProfile, describeIntent, deriveSearchProfile } from "@/lib/searchProfile";
 
 describe("parseQuery", () => {
   it("returns empty intent for empty input", () => {
@@ -124,5 +124,37 @@ describe("describeIntent", () => {
 
   it("returns empty string for empty intent", () => {
     expect(describeIntent(parseQuery(""))).toBe("");
+  });
+});
+
+describe("deriveSearchProfile", () => {
+  it("returns null for empty input", () => {
+    expect(deriveSearchProfile("", "", "")).toBeNull();
+    expect(deriveSearchProfile(null, null, null)).toBeNull();
+  });
+
+  it("returns null when no taxonomy keyword appears", () => {
+    expect(deriveSearchProfile("General meetup", "Just hanging out", "123 Main St")).toBeNull();
+  });
+
+  it("derives needs from title", () => {
+    const p = deriveSearchProfile("Weekly Homecell gathering", "", "");
+    expect(p?.needs).toContain("community");
+  });
+
+  it("derives audience + needs from a full description", () => {
+    const p = deriveSearchProfile(
+      "Marriage counselling night",
+      "For couples looking to strengthen their marriage through counselling.",
+      "Church hall",
+    );
+    expect(p?.needs).toEqual(expect.arrayContaining(["counselling", "marriage-advice"]));
+    expect(p?.audience).toContain("couples");
+  });
+
+  it("derives vibe from description", () => {
+    const p = deriveSearchProfile("Coffee chat", "A casual outdoor coffee hangout", "");
+    expect(p?.vibe).toEqual(expect.arrayContaining(["casual", "outdoor"]));
+    expect(p?.needs).toContain("food-coffee");
   });
 });

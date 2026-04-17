@@ -12,7 +12,7 @@ import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import SearchProfilePicker from "./SearchProfilePicker";
 import type { EventCategory, Category } from "@/types/db";
-import type { SearchProfile } from "@/lib/searchProfile";
+import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -225,7 +225,8 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       attendees_visible: attendeesVisible,
       latitude: coords?.[0] ?? null,
       longitude: coords?.[1] ?? null,
-      search_profile: searchProfile ?? null,
+      search_profile:
+        searchProfile ?? deriveSearchProfile(title, description, location) ?? null,
       created_by: user.id,
     }).select("id").single();
 

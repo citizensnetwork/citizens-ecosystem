@@ -19,6 +19,7 @@ import {
   type QueryIntent,
   type SearchProfile,
   ALL_TAGS,
+  deriveSearchProfile,
   normaliseSearchProfile,
   parseQuery,
 } from "./searchProfile";
@@ -33,9 +34,13 @@ export type RankedResult = {
 const W_NEEDS = 3.0;
 const W_AUDIENCE = 2.2;
 const W_VIBE = 1.4;
+/** Derived (auto-tagged) profile hits count less than explicitly-set ones. */
+const DERIVED_PENALTY = 0.6;
 const W_TEXT = 1.0;
 const W_CATEGORY = 0.8;
 const W_PROXIMITY = 1.5; // max boost when within 2km
+/** Small recency tie-break: events within the next 7 days get a tiny bonus. */
+const W_RECENCY = 0.25;
 
 /** Earth-radius haversine distance in km. */
 function distanceKm(a: [number, number], b: [number, number]): number {
@@ -128,6 +133,16 @@ export type SearchResults = {
   places: RankedResult[];
 };
 
+/** Small bonus for events in the next week; 0 otherwise. Expects ISO string. */
+function recencyBoost(dateStr: string | null | undefined): number {
+  if (!dateStr) return 0;
+  const t = Date.parse(dateStr);
+  if (!Number.isFinite(t)) return 0;
+  const days = (t - Date.now()) / (1000 * 60 * 60 * 24);
+  if (days < 0 || days > 7) return 0;
+  return W_RECENCY * (1 - days / 7);
+}
+
 /** Score a single event against the parsed intent. Returns null if no match. */
 export function scoreEvent(
   event: Event,
@@ -135,11 +150,14 @@ export function scoreEvent(
   userLocation?: UserLocation,
 ): RankedResult | null {
   // Safely coerce the jsonb search_profile column. Events saved before the
-  // AI search phase have no profile — they can still match via text/category.
+  // AI search phase have no profile — fall back to an auto-derived profile
+  // from the title + description so they still participate in tag scoring.
+  const stored = normaliseSearchProfile(
+    (event as unknown as { search_profile?: unknown }).search_profile,
+  );
   const profile: SearchProfile =
-    normaliseSearchProfile(
-      (event as unknown as { search_profile?: unknown }).search_profile,
-    ) ?? {};
+    stored ?? deriveSearchProfile(event.title, event.description, event.location) ?? {};
+  const isDerived = !stored;
 
   const pNeeds = new Set(profile.needs ?? []);
   const pAudience = new Set(profile.audience ?? []);
@@ -149,10 +167,12 @@ export function scoreEvent(
   const matchedAudience = [...pAudience].filter((s) => intent.audience.has(s));
   const matchedVibe = [...pVibe].filter((s) => intent.vibe.has(s));
 
+  const tagPenalty = isDerived ? DERIVED_PENALTY : 1;
+
   let score = 0;
-  score += tagOverlap(pNeeds, intent.needs, W_NEEDS);
-  score += tagOverlap(pAudience, intent.audience, W_AUDIENCE);
-  score += tagOverlap(pVibe, intent.vibe, W_VIBE);
+  score += tagOverlap(pNeeds, intent.needs, W_NEEDS) * tagPenalty;
+  score += tagOverlap(pAudience, intent.audience, W_AUDIENCE) * tagPenalty;
+  score += tagOverlap(pVibe, intent.vibe, W_VIBE) * tagPenalty;
 
   const haystack = `${event.title} ${event.description} ${event.location}`;
   const textScore = textOverlap(haystack, intent.tokens, W_TEXT);
@@ -171,6 +191,9 @@ export function scoreEvent(
     intent.nearMe,
   );
 
+  // Small tie-breaker so upcoming events surface ahead of far-future ones.
+  if (score > 0) score += recencyBoost(event.date);
+
   if (score <= 0) return null;
 
   return {
@@ -186,10 +209,15 @@ export function scorePlace(
   intent: QueryIntent,
   userLocation?: UserLocation,
 ): RankedResult | null {
+  const stored = normaliseSearchProfile(
+    (place as unknown as { search_profile?: unknown }).search_profile,
+  );
+  const catName = place.categories?.name ?? "";
   const profile: SearchProfile =
-    normaliseSearchProfile(
-      (place as unknown as { search_profile?: unknown }).search_profile,
-    ) ?? {};
+    stored ??
+    deriveSearchProfile(place.name, place.description, `${place.address} ${catName}`) ??
+    {};
+  const isDerived = !stored;
 
   const pNeeds = new Set(profile.needs ?? []);
   const pAudience = new Set(profile.audience ?? []);
@@ -199,12 +227,13 @@ export function scorePlace(
   const matchedAudience = [...pAudience].filter((s) => intent.audience.has(s));
   const matchedVibe = [...pVibe].filter((s) => intent.vibe.has(s));
 
-  let score = 0;
-  score += tagOverlap(pNeeds, intent.needs, W_NEEDS);
-  score += tagOverlap(pAudience, intent.audience, W_AUDIENCE);
-  score += tagOverlap(pVibe, intent.vibe, W_VIBE);
+  const tagPenalty = isDerived ? DERIVED_PENALTY : 1;
 
-  const catName = place.categories?.name ?? "";
+  let score = 0;
+  score += tagOverlap(pNeeds, intent.needs, W_NEEDS) * tagPenalty;
+  score += tagOverlap(pAudience, intent.audience, W_AUDIENCE) * tagPenalty;
+  score += tagOverlap(pVibe, intent.vibe, W_VIBE) * tagPenalty;
+
   const haystack = `${place.name} ${place.description} ${place.address} ${catName}`;
   const textScore = textOverlap(haystack, intent.tokens, W_TEXT);
   score += textScore;

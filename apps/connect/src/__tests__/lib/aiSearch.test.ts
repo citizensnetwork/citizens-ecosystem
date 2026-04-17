@@ -9,8 +9,8 @@ function makeEvent(over: Partial<Event> & { id: string }): Event {
     id: over.id,
     title: over.title ?? "",
     description: over.description ?? "",
-    date: "2030-01-01T00:00:00Z",
-    end_time: null,
+    date: over.date ?? "2030-01-01T00:00:00Z",
+    end_time: over.end_time ?? null,
     location: over.location ?? "",
     category: over.category ?? null,
     image_url: null,
@@ -143,5 +143,50 @@ describe("rankResults", () => {
     expect(events).toEqual([]);
     expect(places).toEqual([]);
     expect(intent.raw).toBe("");
+  });
+
+  it("auto-derives tags from title/description when no profile is set", () => {
+    const e = makeEvent({
+      id: "auto",
+      title: "Weekly homecell gathering",
+      description: "Come grow in community with us.",
+    });
+    // No explicit search_profile on the event, but the query asks for community:
+    const res = scoreEvent(e, parseQuery("homecells"));
+    expect(res).not.toBeNull();
+    expect(res!.reason).toContain("Community");
+  });
+
+  it("explicit tags score higher than auto-derived ones", () => {
+    const explicit = makeEvent({
+      id: "explicit",
+      title: "Event",
+      description: "",
+      search_profile: { needs: ["community"] },
+    });
+    const derived = makeEvent({
+      id: "derived",
+      title: "Homecell",
+      description: "Homecell gathering",
+    });
+    const intent = parseQuery("homecells");
+    const a = scoreEvent(explicit, intent)!;
+    const b = scoreEvent(derived, intent)!;
+    expect(a.score).toBeGreaterThan(b.score);
+  });
+
+  it("recency tie-break: sooner event ranks higher than far-future", () => {
+    const soon = makeEvent({
+      id: "soon",
+      search_profile: { needs: ["community"] },
+      date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const far = makeEvent({
+      id: "far",
+      search_profile: { needs: ["community"] },
+      date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const { events } = rankResults("homecells", [far, soon], []);
+    expect(events[0].id).toBe("soon");
   });
 });

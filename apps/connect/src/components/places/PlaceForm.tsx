@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Category } from "@/types/db";
-import type { SearchProfile } from "@/lib/searchProfile";
+import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
 import SearchProfilePicker from "@/components/events/SearchProfilePicker";
 
 const LocationPicker = dynamic(
@@ -107,7 +107,8 @@ export default function PlaceForm({ categories }: Props) {
       image_url,
       latitude: coords[0],
       longitude: coords[1],
-      search_profile: searchProfile ?? null,
+      search_profile:
+        searchProfile ?? deriveSearchProfile(name, description, address) ?? null,
       created_by: user.id,
     });
 

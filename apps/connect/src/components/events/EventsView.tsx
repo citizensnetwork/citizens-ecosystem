@@ -306,9 +306,32 @@ export default function EventsView({
   // intent ("near me"), we trust the ranker and surface a match-reason
   // chip. Otherwise we fall back to the existing substring search so that
   // very short queries (e.g. a person's name) still work.
+  //
+  // Browser geolocation is requested lazily — only when the user types a
+  // "near me" style query — so we never prompt on page load. The result
+  // is cached in state for the session.
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const geoRequestedRef = useRef(false);
+  const parsedNearMe = useMemo(() => {
+    const q = search.toLowerCase();
+    return /(near me|nearby|in my area|close to me|around me|close by|around here)/.test(q);
+  }, [search]);
+  useEffect(() => {
+    if (!parsedNearMe) return;
+    if (userLocation) return;
+    if (geoRequestedRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    geoRequestedRef.current = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => { /* user declined or error — we still rank without proximity */ },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+  }, [parsedNearMe, userLocation]);
+
   const ranked = useMemo(
-    () => rankResults(search, events, places),
-    [search, events, places],
+    () => rankResults(search, events, places, userLocation ?? undefined),
+    [search, events, places, userLocation],
   );
   const rankedEventIds = useMemo(() => {
     if (!ranked.intent.hasSignal) return null;

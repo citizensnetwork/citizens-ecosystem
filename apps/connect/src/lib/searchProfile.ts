@@ -220,3 +220,27 @@ export function describeIntent(intent: QueryIntent): string {
     .slice(0, 3);
   return labels.join(" · ");
 }
+
+/**
+ * Derive a `SearchProfile` from an event/place's title + description by
+ * running the same synonym scan used for user queries. Produces a "free"
+ * auto-tag pass so pre-existing content (and organisers who skip the
+ * picker) still match natural-language searches.
+ *
+ * Returns `null` when no tags could be inferred.
+ */
+export function deriveSearchProfile(
+  title: string | null | undefined,
+  description?: string | null,
+  extra?: string | null,
+): SearchProfile | null {
+  const text = [title ?? "", description ?? "", extra ?? ""].join(" ").trim();
+  if (!text) return null;
+  const intent = parseQuery(text);
+  if (!intent.hasSignal) return null;
+  const profile: SearchProfile = {};
+  if (intent.audience.size) profile.audience = [...intent.audience];
+  if (intent.needs.size) profile.needs = [...intent.needs];
+  if (intent.vibe.size) profile.vibe = [...intent.vibe];
+  return profile;
+}
