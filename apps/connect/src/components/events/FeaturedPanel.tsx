@@ -61,60 +61,26 @@ export default function FeaturedPanel({
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);
 
-  // ── Trending mode: show trending events as horizontal scrollable blocks ──
+  // ── Trending mode: show trending events as a vertical scrollable list ──
   const hasTrending = trendingEvents.length > 0;
   const trendingScrollRef = useRef<HTMLDivElement>(null);
-
-  const scrollTrending = useCallback((direction: "left" | "right") => {
-    const el = trendingScrollRef.current;
-    if (!el) return;
-    const scrollAmount = el.clientWidth * 0.7;
-    el.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
-  }, []);
 
   if (hasTrending) {
     return (
       <div className="flex h-full flex-col">
-        <div className="relative flex-1 px-2 pt-2">
-          {/* Left nav button */}
-          <button
-            type="button"
-            onClick={() => scrollTrending("left")}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-black backdrop-blur-sm transition hover:bg-black/20"
-            aria-label="Scroll left"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-
-          <div
-            ref={trendingScrollRef}
-            className="scrollbar-hide flex gap-3 overflow-x-auto px-8 pb-4 pt-1"
-            style={{ scrollSnapType: "x mandatory" }}
-          >
-            {trendingEvents.map((event) => (
-              <div key={event.id} className="trending-card">
-                <TrendingBlock
-                  event={event}
-                  onSelectEvent={onSelectEvent}
-                  onQuickAction={onQuickAction}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Right nav button */}
-          <button
-            type="button"
-            onClick={() => scrollTrending("right")}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-black backdrop-blur-sm transition hover:bg-black/20"
-            aria-label="Scroll right"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </button>
+        <div
+          ref={trendingScrollRef}
+          className="scrollbar-hide flex flex-1 flex-col gap-3 overflow-y-auto px-3 pb-4 pt-1"
+        >
+          {trendingEvents.map((event) => (
+            <div key={event.id} className="trending-card-v">
+              <TrendingBlock
+                event={event}
+                onSelectEvent={onSelectEvent}
+                onQuickAction={onQuickAction}
+              />
+            </div>
+          ))}
         </div>
       </div>
     );

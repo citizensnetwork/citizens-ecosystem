@@ -28,10 +28,17 @@ type Props = {
   autoLocate?: boolean;
   flyTo?: [number, number] | null;
   flyToZoom?: number;
+  /** Monotonically increases whenever a caller wants the map to re-fly to
+   *  `flyTo` even if the coordinates / zoom are unchanged. Lets a consumer
+   *  force the camera to revisit the same event on repeated taps. */
+  flyToToken?: number;
   activeCategories?: Set<EventCategory>;
   activePlaceCategories?: Set<PlaceCategory>;
   /** Override marker border colour (used by quick-access tools for unified colour). */
   markerOverrideColor?: string;
+  /** When true, skip rendering event markers so only place markers show.
+   *  Wired to the burger menu "Places" tab. */
+  placesMode?: boolean;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -76,9 +83,11 @@ export default function EventMap({
   autoLocate = false,
   flyTo = null,
   flyToZoom,
+  flyToToken,
   activeCategories,
   activePlaceCategories,
   markerOverrideColor,
+  placesMode = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -414,9 +423,11 @@ export default function EventMap({
       let hasPoints = false;
 
       // ── Event markers ──
-      const mappable = events.filter(
-        (e) => e.latitude != null && e.longitude != null
-      );
+      // When placesMode is true, skip creating event markers so only places
+      // show on the map (the burger menu "Places" tab sets this).
+      const mappable = placesMode
+        ? []
+        : events.filter((e) => e.latitude != null && e.longitude != null);
 
       mappable.forEach((event) => {
         const temporal = getTemporalStyle(event.date);
@@ -659,17 +670,26 @@ export default function EventMap({
     }
 
     return () => clearMarkers();
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
+  // `flyToToken` is included in the dependency array so that tapping the
+  // same card twice (identical lat/lng/zoom) still retriggers the camera.
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
+    const [lat, lng] = flyTo;
+    if (
+      typeof lat !== "number" ||
+      typeof lng !== "number" ||
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng)
+    ) return;
     mapRef.current.flyTo({
       center: toLngLat(flyTo),
       zoom: flyToZoom ?? 13,
       duration: 1200,
     });
-  }, [flyTo, flyToZoom]);
+  }, [flyTo, flyToZoom, flyToToken]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

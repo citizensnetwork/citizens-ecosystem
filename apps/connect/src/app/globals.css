@@ -536,3 +536,10 @@ body {
   scroll-snap-align: start;
   width: min(280px, 75vw);
 }
+
+/* Vertical trending-card list item — full width of the panel, used by the
+ * centered trending modal. Scrolling happens on the outer container. */
+.trending-card-v {
+  width: 100%;
+  flex-shrink: 0;
+}
