@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
+import { ORGANISER_ROLES } from "@/types/db";
 import {
   createCategoryMarkerEl,
   createCustomMarkerEl,
@@ -57,6 +58,13 @@ function zoomScale(z: number): number {
   if (z <= 4) return 0.55;
   return 0.55 + ((z - 4) / (10 - 4)) * (1 - 0.55);
 }
+
+/** Below this zoom, markers collapse to solid category-coloured dots so many
+ *  points across a province/country remain distinguishable without clutter. */
+const DOT_MODE_ZOOM = 7;
+
+/** Size (px) of a dot-mode marker regardless of base size — small and uniform. */
+const DOT_MODE_SIZE = 10;
 
 export default function EventMap({
   events,
@@ -235,13 +243,30 @@ export default function EventMap({
 
   /** Resize event marker elements based on current zoom level.
    *  Scales the outer container, the inner white circle, and the icon glyph
-   *  together so the ring-to-icon gap stays visually consistent. */
+   *  together so the ring-to-icon gap stays visually consistent.
+   *  Below DOT_MODE_ZOOM each marker collapses to a small solid category-
+   *  coloured dot (via the .cc-marker-dot CSS class). */
   const updateMarkerSizes = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const scale = zoomScale(map.getZoom());
+    const z = map.getZoom();
+    const scale = zoomScale(z);
+    const dotMode = z < DOT_MODE_ZOOM;
 
     const resize = (el: HTMLElement, baseSize: number, iconRatio: number) => {
+      if (dotMode) {
+        el.classList.add("cc-marker-dot");
+        el.style.width = `${DOT_MODE_SIZE}px`;
+        el.style.height = `${DOT_MODE_SIZE}px`;
+        const outer = el.querySelector<HTMLElement>(".cc-marker-outer");
+        if (outer) {
+          outer.style.width = `${DOT_MODE_SIZE}px`;
+          outer.style.height = `${DOT_MODE_SIZE}px`;
+        }
+        return;
+      }
+
+      el.classList.remove("cc-marker-dot");
       const newSize = Math.round(baseSize * scale);
       const iconSize = Math.round(newSize * iconRatio);
       el.style.width = `${newSize}px`;
@@ -400,6 +425,17 @@ export default function EventMap({
         const isHighlighted = activeCategories && activeCategories.size > 0 &&
           event.category !== null && event.category !== undefined && activeCategories.has(event.category);
 
+        // Phase B: auto-promote category markers to profile-photo markers when
+        // the creator is an organiser (ministry/organization/business/admin)
+        // with an avatar on file. This keeps organiser branding on the map
+        // without requiring every event to be opted-in manually.
+        const creator = event.creator;
+        const autoProfileMarker =
+          (!event.marker_type || event.marker_type === "category") &&
+          !!creator?.avatar_url &&
+          !!creator?.role &&
+          ORGANISER_ROLES.includes(creator.role);
+
         const el = event.marker_type && event.marker_type !== "category"
           ? createCustomMarkerEl({
               markerType: event.marker_type,
@@ -408,8 +444,18 @@ export default function EventMap({
               markerIcon: event.marker_icon,
               markerColor: event.marker_color,
               markerImageUrl: event.marker_image_url,
+              creatorAvatarUrl: creator?.avatar_url ?? null,
+              overrideColor: markerOverrideColor,
             })
-          : createCategoryMarkerEl(event.category, temporal, markerOverrideColor);
+          : autoProfileMarker
+            ? createCustomMarkerEl({
+                markerType: "profile",
+                category: event.category,
+                temporal,
+                creatorAvatarUrl: creator!.avatar_url!,
+                overrideColor: markerOverrideColor,
+              })
+            : createCategoryMarkerEl(event.category, temporal, markerOverrideColor);
 
         // Add glow class for highlighted markers (CSS animation)
         if (isHighlighted) {

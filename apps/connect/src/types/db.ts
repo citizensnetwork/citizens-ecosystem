@@ -58,6 +58,13 @@ export type Event = {
   category_id: string | null;
   created_by: string;
   created_at: string;
+  /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")`.
+   *  Used by the map to auto-render an organiser's avatar as the marker when
+   *  `marker_type === "category"`. */
+  creator?: {
+    avatar_url: string | null;
+    role: UserRole;
+  } | null;
 };
 
 export type EventMediaKind = "image" | "video";
@@ -245,6 +252,14 @@ export type NotificationType =
   | "new_follower"
   | "event_update"
   | "new_message";
+
+export type EventUpdate = {
+  id: string;
+  event_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+};
 
 export type NotificationDigest = "instant" | "daily" | "off";
 

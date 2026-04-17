@@ -18,7 +18,7 @@ export default async function EventsPage() {
   const [{ data: publicEvents }, { data: places }, { data: reviews }] = await Promise.all([
     supabase
       .from("events")
-      .select("*")
+      .select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")
       .eq("status", "published")
       .gte("date", now)
       .lte("date", cutoff)
