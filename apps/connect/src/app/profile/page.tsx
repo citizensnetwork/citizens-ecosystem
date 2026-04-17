@@ -11,6 +11,8 @@ import LinkedAccounts from "@/components/auth/LinkedAccounts";
 import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
 import ProfileInterests from "@/components/onboarding/ProfileInterests";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
+import QuickPanelPreferencesSection from "@/components/events/QuickPanelPreferencesSection";
+import { QUICK_ACCESS_ITEMS } from "@/lib/quickPanelOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +182,16 @@ export default async function ProfilePage() {
           notificationEmail={typedProfile.notification_email}
         />
       </section>
+
+      {/* ── Quick-panel Preferences (map quick filters) ─── */}
+      <QuickPanelPreferencesSection
+        options={QUICK_ACCESS_ITEMS.map((i) => ({
+          id: i.id,
+          label: i.label,
+          color: i.color,
+          svg: i.svg,
+        }))}
+      />
 
       {/* ── Social Platform Connections ─── */}
       <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">

@@ -46,10 +46,14 @@ const MIN_GAP_PX = 0;
 /** Number of force-simulation iterations for deconfliction. */
 const DECONFLICT_ITERATIONS = 10;
 
-/** Returns a scale factor [0.5 – 1.0] based on current zoom (higher zoom = bigger). */
+/** Returns a scale factor [0.55 – 1.0] based on current zoom.
+ *  Markers stay at their default size across normal viewing zooms and only
+ *  shrink when the user zooms far out (regional / country view). */
 function zoomScale(z: number): number {
-  // At zoom >= 14 markers are full size; at zoom <= 6 markers shrink to 50%.
-  return Math.min(1, Math.max(0.5, (z - 6) / 8));
+  // At zoom >= 10 markers are full size; at zoom <= 4 markers shrink to 55%.
+  if (z >= 10) return 1;
+  if (z <= 4) return 0.55;
+  return 0.55 + ((z - 4) / (10 - 4)) * (1 - 0.55);
 }
 
 export default function EventMap({
@@ -225,7 +229,9 @@ export default function EventMap({
     });
   }, []);
 
-  /** Resize event marker elements based on current zoom level. */
+  /** Resize event marker elements based on current zoom level.
+   *  Scales the outer container, the inner white circle, and the icon glyph
+   *  together so the ring-to-icon gap stays visually consistent. */
   const updateMarkerSizes = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -233,14 +239,20 @@ export default function EventMap({
     evtMarkerDataRef.current.forEach(({ marker, baseSize }) => {
       const el = marker.getElement() as HTMLElement;
       const newSize = Math.round(baseSize * scale);
+      const iconSize = Math.round(newSize * 0.48);
       el.style.width = `${newSize}px`;
       el.style.height = `${newSize}px`;
-      // Also scale the inner span
-      const inner = el.querySelector("span") as HTMLElement | null;
-      if (inner) {
-        inner.style.width = `${newSize}px`;
-        inner.style.height = `${newSize}px`;
-      }
+      // Resize every descendant span that was originally sized in pixels.
+      // Outer circle spans match newSize; inner icon span matches iconSize.
+      const spans = el.querySelectorAll("span");
+      spans.forEach((s) => {
+        const style = (s as HTMLElement).style;
+        // First span(s) = outer circle (keeps newSize); last = icon glyph.
+        const isIconSpan = s === spans[spans.length - 1] && spans.length > 1;
+        const px = isIconSpan ? iconSize : newSize;
+        if (style.width) style.width = `${px}px`;
+        if (style.height) style.height = `${px}px`;
+      });
     });
   }, []);
 
