@@ -284,6 +284,63 @@ body {
   animation: markerGlow 1.6s ease-in-out infinite !important;
 }
 
+/* ── Smooth size transitions ──
+ * Fluid resize on zoom changes (Google-style cross-fade feel). Skipped
+ * when the user prefers reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .cc-marker-outer {
+    transition:
+      width 180ms ease,
+      height 180ms ease,
+      transform 180ms ease,
+      box-shadow 220ms ease,
+      opacity 220ms ease;
+  }
+}
+
+/* ── Drop-in animation for freshly-added markers ──
+ * Mirrors Google Maps' subtle scale-in + fade-in when POIs appear as you
+ * pan. Kept very brief (240ms) and applied once — EventMap adds the
+ * .cc-marker-new class on creation and strips it after the animation. */
+@media (prefers-reduced-motion: no-preference) {
+  .cc-marker-new {
+    animation: markerDropIn 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}
+
+@keyframes markerDropIn {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── List → map sync highlight ──
+ * When the user scrolls / hovers a result in a side list, EventMap adds
+ * the .cc-marker-sync-highlight class to that marker. A gentle gold ring
+ * pulses around it without changing size so deconflicted layouts stay
+ * stable. */
+.cc-marker-sync-highlight .cc-marker-outer {
+  animation: markerSyncPulse 1.4s ease-in-out infinite;
+  z-index: 4;
+}
+
+@keyframes markerSyncPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.55), 0 2px 6px rgba(0, 0, 0, .25); }
+  50%      { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0), 0 0 14px rgba(212, 175, 55, .4), 0 2px 6px rgba(0, 0, 0, .25); }
+}
+
+/* ── Mid-tier marker style (z7 → z10) ──
+ * Between dot-mode and full markers, show a smaller pin where the inner
+ * glyph is partially faded so both the category colour and its icon read
+ * clearly without dominating. EventMap toggles this class based on zoom. */
+.cc-marker-mid .cc-marker-icon {
+  opacity: 0.55;
+}
+.cc-marker-mid .cc-marker-outer {
+  /* Thinner border for a lighter regional look. */
+  border-width: 1.5px !important;
+}
+
 /* ── Dot mode: at far zoom markers collapse to a solid category-coloured dot ──
  *  EventMap toggles the .cc-marker-dot class on marker roots when zoom is below
  *  DOT_MODE_ZOOM. The outer circle fills with the marker's category colour and
@@ -418,7 +475,26 @@ body {
   display: flex;
   gap: 2px;
   margin: 8px 0 0;
-  justify-content: center;
+  justify-content: flex-start;
+  /* Horizontally scrollable chip row — matches Google Maps' info-window
+   * action strip. When more actions are added than fit the popup width
+   * the extras scroll instead of wrapping to a second row. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Re-enable touch gestures on the scroll container so users can swipe
+   * through the chips without the parent popup `touch-action: none` rule
+   * swallowing the horizontal pan. */
+  touch-action: pan-x;
+}
+.cc-popup-actions::-webkit-scrollbar {
+  display: none;
+}
+.cc-popup-actions > * {
+  scroll-snap-align: start;
 }
 
 .cc-action-btn {
