@@ -62,7 +62,9 @@ export async function POST(request: Request) {
     userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null;
 
   const supabase = await createClient();
-  const nowIso = new Date().toISOString();
+  // Include events that started up to 2 hours ago so currently-running
+  // events still surface in a "now" natural-language search.
+  const windowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
   const [eventsRes, placesRes] = await Promise.all([
     supabase
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       .select("*")
       .eq("status", "published")
       .eq("visibility", "public")
-      .gte("date", nowIso)
+      .gte("date", windowStart)
       .order("date", { ascending: true })
       .limit(MAX_CANDIDATES),
     supabase
@@ -89,7 +91,7 @@ export async function POST(request: Request) {
     userLocation,
   );
 
-  const cap = (arr: RankedResult[]) => arr.slice(0, MAX_RESULTS);
+  const limit = (arr: RankedResult[]) => arr.slice(0, MAX_RESULTS);
 
   return NextResponse.json({
     intent: {
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
       nearMe: intent.nearMe,
       hasSignal: intent.hasSignal,
     },
-    events: cap(rankedEvents),
-    places: cap(rankedPlaces),
+    events: limit(rankedEvents),
+    places: limit(rankedPlaces),
   });
 }
