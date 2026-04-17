@@ -13,7 +13,7 @@ import {
 } from "@/lib/map/markers";
 import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
-import { PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
 
 type Props = {
   events: Event[];
@@ -27,6 +27,8 @@ type Props = {
   flyToZoom?: number;
   activeCategories?: Set<EventCategory>;
   activePlaceCategories?: Set<PlaceCategory>;
+  /** Override marker border colour (used by quick-access tools for unified colour). */
+  markerOverrideColor?: string;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -62,6 +64,7 @@ export default function EventMap({
   flyToZoom,
   activeCategories,
   activePlaceCategories,
+  markerOverrideColor,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -384,7 +387,7 @@ export default function EventMap({
               markerColor: event.marker_color,
               markerImageUrl: event.marker_image_url,
             })
-          : createCategoryMarkerEl(event.category, temporal);
+          : createCategoryMarkerEl(event.category, temporal, markerOverrideColor);
 
         // Add glow class for highlighted markers (CSS animation)
         if (isHighlighted) {
@@ -480,11 +483,16 @@ export default function EventMap({
 
         // Place category highlighting
         let placeIsHighlighted = false;
+        let placeHighlightColor: string | undefined;
         if (activePlaceCategories && activePlaceCategories.size > 0) {
           const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
-          placeIsHighlighted = [...activePlaceCategories].some((cat) =>
+          const matchedCat = [...activePlaceCategories].find((cat) =>
             PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
           );
+          if (matchedCat) {
+            placeIsHighlighted = true;
+            placeHighlightColor = PLACE_CATEGORY_HEX[matchedCat];
+          }
         }
 
         const placeEl = createPlaceMarkerEl({
@@ -492,6 +500,7 @@ export default function EventMap({
           isHighRated,
           isFlagged,
           highlighted: placeIsHighlighted,
+          highlightColor: markerOverrideColor ?? placeHighlightColor,
         });
 
         const ratingLabel =
@@ -574,7 +583,7 @@ export default function EventMap({
     }
 
     return () => clearMarkers();
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   useEffect(() => {
