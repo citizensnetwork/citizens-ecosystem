@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Category } from "@/types/db";
+import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
+import SearchProfilePicker from "@/components/events/SearchProfilePicker";
 
 const LocationPicker = dynamic(
   () => import("@/components/map/LocationPicker"),
@@ -33,6 +35,7 @@ export default function PlaceForm({ categories }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [coords, setCoords] = useState<[number, number] | null>(null);
+  const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -104,6 +107,8 @@ export default function PlaceForm({ categories }: Props) {
       image_url,
       latitude: coords[0],
       longitude: coords[1],
+      search_profile:
+        searchProfile ?? deriveSearchProfile(name, description, address) ?? null,
       created_by: user.id,
     });
 
@@ -270,6 +275,13 @@ export default function PlaceForm({ categories }: Props) {
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => setAddress(addr)}
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">
+          Discovery tags <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
       </div>
 
       <button

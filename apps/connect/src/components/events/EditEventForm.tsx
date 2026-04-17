@@ -9,7 +9,9 @@ import { validateImageFile, safeImageExtension } from "@/lib/validation";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
+import SearchProfilePicker from "./SearchProfilePicker";
 import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia } from "@/types/db";
+import type { SearchProfile } from "@/lib/searchProfile";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -62,6 +64,9 @@ export default function EditEventForm({ event }: Props) {
   );
   const [existingMedia, setExistingMedia] = useState<EventMedia[]>([]);
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
+  const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(
+    event.search_profile ?? null,
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -160,6 +165,7 @@ export default function EditEventForm({ event }: Props) {
         attendees_visible: attendeesVisible,
         latitude: coords?.[0] ?? null,
         longitude: coords?.[1] ?? null,
+        search_profile: searchProfile ?? null,
       })
       .eq("id", event.id);
 
@@ -346,6 +352,13 @@ export default function EditEventForm({ event }: Props) {
       {/* Additional details */}
       <div className="border-t pt-4 mt-4 space-y-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Additional Details</h2>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Discovery tags <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
+        </div>
 
         <div>
           <label htmlFor="websiteUrl" className="block text-sm font-medium mb-1">
