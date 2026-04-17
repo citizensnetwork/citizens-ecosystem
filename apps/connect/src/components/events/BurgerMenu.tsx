@@ -46,7 +46,6 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     activePlaceCategories,
     onTogglePlaceCategory,
     onClearPlaceCategories,
-    trending,
     favouriteOrgs,
     friends,
     menuProfile,
@@ -180,29 +179,6 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   );
                 })}
               </div>
-            </AccordionSection>
-
-            {/* Trending — only in events tab */}
-            <AccordionSection title="Trending" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} badge={trending.length || undefined}>
-              {menuLoading ? (
-                <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-              ) : trending.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-black/40">No trending events yet</p>
-              ) : (
-                <div className="space-y-1">
-                  {trending.map((te) => (
-                    <button
-                      key={te.id}
-                      type="button"
-                      onClick={() => selectAndClose(te)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
-                    >
-                      <span className="flex-1 truncate">{te.title}</span>
-                      <span className="text-xs text-black/40">{te.rsvp_count} attending</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </AccordionSection>
           </>
           ) : (
@@ -558,7 +534,7 @@ function BurgerConsiderSection({ user, onClose, considerVersion }: { user: User 
     const today = new Date().toISOString().split("T")[0];
     const { data: rsvps } = await supabase
       .from("rsvps")
-      .select("event_id, events(title, date)")
+      .select("event_id, events!inner(title, date)")
       .eq("user_id", user.id)
       .eq("status", "considering")
       .gte("events.date", today);

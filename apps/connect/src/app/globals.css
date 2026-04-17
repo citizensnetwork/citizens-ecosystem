@@ -266,11 +266,8 @@ body {
   animation: markerPulse 1.6s ease-in-out infinite;
 }
 
-.cc-marker-today span {
-  border-width: 3px !important;
-  /* Preserve category colour from inline style — add a gold outer glow instead */
-  box-shadow: 0 2px 6px rgba(0,0,0,.25), 0 0 0 2px rgba(212,175,55,0.45) !important;
-}
+/* Non-live markers retain the category-coloured icon design with no extra
+ * golden halo — only LIVE events get the gold pulsation. */
 
 /* Highlighted (category-selected) marker — pulsing glow ring */
 .cc-marker-highlighted > span:first-child {

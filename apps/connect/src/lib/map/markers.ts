@@ -123,11 +123,11 @@ export function createCategoryMarkerEl(
   const iconSize = Math.round(size * 0.48);
 
   const el = document.createElement("div");
-  el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}${temporal.isToday && !temporal.isLive ? " cc-marker-today" : ""}`;
+  el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}`;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
 
-  el.innerHTML = `<span style="
+  el.innerHTML = `<span class="cc-marker-outer" style="
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
     background:#fff;
@@ -137,7 +137,7 @@ export function createCategoryMarkerEl(
     box-shadow:0 2px 6px rgba(0,0,0,.25);
     cursor:pointer;
     transition:transform 180ms ease;
-  "><span style="
+  "><span class="cc-marker-icon" style="
     width:${iconSize}px;height:${iconSize}px;
     color:#111;
     display:flex;align-items:center;justify-content:center;
@@ -172,7 +172,7 @@ export function createCustomMarkerEl(
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
 
-    el.innerHTML = `<span style="
+    el.innerHTML = `<span class="cc-marker-outer" style="
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
@@ -192,7 +192,7 @@ export function createCustomMarkerEl(
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
 
-    el.innerHTML = `<span style="
+    el.innerHTML = `<span class="cc-marker-outer" style="
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
@@ -217,7 +217,7 @@ export function createCustomMarkerEl(
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
 
-    el.innerHTML = `<span style="
+    el.innerHTML = `<span class="cc-marker-outer" style="
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       background:#fff;
@@ -226,7 +226,7 @@ export function createCustomMarkerEl(
       border:2px solid ${escapeHtml(fillColor)};
       box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
-    "><span style="
+    "><span class="cc-marker-icon" style="
       width:${iconSize}px;height:${iconSize}px;
       color:${escapeHtml(fillColor)};
       display:flex;align-items:center;justify-content:center;
@@ -239,8 +239,40 @@ export function createCustomMarkerEl(
   return createCategoryMarkerEl(category, temporal);
 }
 
+/* ── Place category icons — solid minimalist glyphs used filled in gold ── */
+
+const PLACE_CATEGORY_ICONS: Record<string, string> = {
+  // Church building with cross
+  church:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M13 2h-2v3H8v2h3v3L4 14v8h6v-5h4v5h6v-8l-7-4V7h3V5h-3V2z"/></svg>',
+  // Coffee cup — relax
+  relax:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 19h14v2H4v-2zm14.5-15H17V2h-2v2H9V2H7v2H5.5A1.5 1.5 0 0 0 4 5.5V11a6 6 0 0 0 6 6h4a6 6 0 0 0 6-6V5.5A1.5 1.5 0 0 0 18.5 4zm0 7a4 4 0 0 1-.5 1.94V6h.5v5zm-2.5 3H8a4 4 0 0 1-4-4V6h12v5a4 4 0 0 1-2 3z"/></svg>',
+  // Trophy / dumbbell — exercise
+  exercise:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M20.57 14.86l-2.05-2.05-1.41 1.41-5.42-5.42 1.41-1.41-2.05-2.05-1.41 1.41-1.41-1.41-1.42 1.41 1.41 1.42-3.07 3.07-1.41-1.41-1.41 1.41 1.41 1.41-1.41 1.42 2.05 2.05 1.41-1.42 5.42 5.42-1.41 1.41 2.05 2.05 1.41-1.41 1.41 1.41 1.42-1.41-1.41-1.41 3.07-3.07 1.41 1.41 1.41-1.41-1.41-1.42 1.41-1.41z"/></svg>',
+  // Play triangle — media
+  media:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>',
+  // Shopping bag — shopping
+  shopping:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M19 6h-3a4 4 0 0 0-8 0H5a1 1 0 0 0-1 1v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a1 1 0 0 0-1-1zm-7-2a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2z"/></svg>',
+  // Heart pulse — health
+  health:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.5 5.5 0 0 1 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
+  // Open book — education
+  education:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1z"/></svg>',
+  // Palette — arts
+  arts:
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a6 6 0 0 0 6-6 10 10 0 0 0-10-10zM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>',
+};
+
+const DEFAULT_PLACE_ICON =
+  '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
+
 /**
- * Place marker — gold dot inside white circle with category-coloured outline.
+ * Place marker — minimalist solid-gold category icon with white outline.
  * Slightly smaller than event markers to avoid hiding events.
  */
 export function createPlaceMarkerEl(
@@ -250,15 +282,16 @@ export function createPlaceMarkerEl(
     isFlagged?: boolean;
     highlighted?: boolean;
     highlightColor?: string;
+    category?: string | null;
   }
 ): HTMLDivElement {
   const highlighted = options?.highlighted ?? false;
-  const highlightColor = options?.highlightColor ?? "#D4AF37";
-  const size = highlighted ? 42 : 28;
-  const iconSize = highlighted ? 28 : 18;
+  const size = highlighted ? 36 : 26;
+  const iconSize = highlighted ? 22 : 16;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;
+  const category = options?.category ?? null;
 
   const ratingBadge =
     avgRating != null
@@ -306,31 +339,34 @@ export function createPlaceMarkerEl(
     ? "drop-shadow(0 0 6px rgba(212,175,55,.6))"
     : isHighRated
       ? "drop-shadow(0 0 4px rgba(212,175,55,.5))"
-      : "drop-shadow(0 1px 3px rgba(0,0,0,.3))";
+      : "drop-shadow(0 1px 2px rgba(0,0,0,.35))";
 
   const opacity = isFlagged ? 0.62 : 1;
 
-  // Circle-dot place icon with category-coloured outline
-  const placeIcon =
-    `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="white" stroke="${escapeHtml(highlightColor)}" stroke-width="1"/><circle cx="12" cy="12" r="3.5" fill="${escapeHtml(highlightColor)}"/></svg>`;
+  // Solid gold category glyph — white stroke provides the outline against the map
+  const icon = (category && PLACE_CATEGORY_ICONS[category]) || DEFAULT_PLACE_ICON;
 
   const el = document.createElement("div");
-  el.className = "cc-marker";
+  el.className = "cc-marker cc-place-marker";
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
 
-  el.innerHTML = `<span style="
+  el.innerHTML = `<span class="cc-marker-outer" style="
     position:relative;
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
     opacity:${opacity};
     cursor:pointer;
     filter:${glow};
-  "><span style="
+  "><span class="cc-marker-icon" style="
     width:${iconSize}px;height:${iconSize}px;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
-  ">${placeIcon}</span>${ratingBadge}${warningBadge}</span>`;
+    color:#D4AF37;
+    stroke:#ffffff;
+    stroke-width:1.2px;
+    paint-order:stroke fill;
+  ">${icon}</span>${ratingBadge}${warningBadge}</span>`;
 
   return el;
 }

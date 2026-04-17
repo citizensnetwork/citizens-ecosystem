@@ -96,6 +96,7 @@ export default function QuickPanelSettings({ open, options, onClose, onSaved }: 
     >
       <div
         className="glass-panel relative w-full max-w-lg p-5"
+        style={{ background: "rgba(255,255,255,0.88)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close */}
@@ -175,7 +176,7 @@ export default function QuickPanelSettings({ open, options, onClose, onSaved }: 
                 className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-center transition hover:bg-white/50 active:scale-95"
               >
                 <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full border shadow-sm"
+                  className="flex h-6 w-6 items-center justify-center rounded-full border shadow-sm"
                   style={{
                     background: "rgba(255,255,255,0.6)",
                     borderColor: `${opt.color}55`,
@@ -183,9 +184,9 @@ export default function QuickPanelSettings({ open, options, onClose, onSaved }: 
                   }}
                   dangerouslySetInnerHTML={{ __html: opt.svg }}
                 />
-                <span className="text-[10px] font-medium text-black/70">{opt.label}</span>
+                <span className="text-[9px] font-medium text-black/70">{opt.label}</span>
                 <span
-                  className="h-0.5 w-8 rounded-full"
+                  className="h-0.5 w-6 rounded-full"
                   style={{ background: opt.color }}
                   aria-hidden
                 />
