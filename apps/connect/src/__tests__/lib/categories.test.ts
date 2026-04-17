@@ -25,6 +25,7 @@ const ALL_CATEGORIES: EventCategory[] = [
   "equip",
   "weekend",
   "members-only",
+  "care",
 ];
 
 describe("CATEGORY_LABELS", () => {
@@ -71,8 +72,8 @@ describe("CATEGORY_COLORS", () => {
 });
 
 describe("EVENT_CATEGORIES", () => {
-  it("contains all 15 categories", () => {
-    expect(EVENT_CATEGORIES).toHaveLength(15);
+  it("contains all 16 categories", () => {
+    expect(EVENT_CATEGORIES).toHaveLength(16);
   });
 
   it("has value and label for each entry", () => {
@@ -84,8 +85,8 @@ describe("EVENT_CATEGORIES", () => {
 });
 
 describe("CATEGORY_FILTERS", () => {
-  it("has 16 entries (all + 15 categories)", () => {
-    expect(CATEGORY_FILTERS).toHaveLength(16);
+  it("has 17 entries (all + 16 categories)", () => {
+    expect(CATEGORY_FILTERS).toHaveLength(17);
   });
 
   it("starts with 'all' sentinel", () => {
@@ -93,7 +94,7 @@ describe("CATEGORY_FILTERS", () => {
     expect(CATEGORY_FILTERS[0].label).toBe("All categories");
   });
 
-  it("includes all 15 real categories after 'all'", () => {
+  it("includes all 16 real categories after 'all'", () => {
     const values = CATEGORY_FILTERS.slice(1).map((f) => f.value);
     for (const cat of ALL_CATEGORIES) {
       expect(values).toContain(cat);

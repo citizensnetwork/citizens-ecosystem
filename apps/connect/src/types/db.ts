@@ -13,7 +13,8 @@ export type EventCategory =
   | "recovery"
   | "equip"
   | "weekend"
-  | "members-only";
+  | "members-only"
+  | "care";
 
 export type PlaceCategory =
   | "church"

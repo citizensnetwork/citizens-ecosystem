@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia } from "@/types/db";
@@ -97,19 +98,23 @@ export default function EditEventForm({ event }: Props) {
 
 
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    if (file) {
-      const validationError = validateImageFile(file);
-      if (validationError) {
-        setError(validationError);
-        e.target.value = "";
-        return;
-      }
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0] ?? null;
+    if (!raw) {
+      setError("");
+      setImageFile(null);
+      return;
     }
+    const validationError = validateImageFile(raw);
+    if (validationError) {
+      setError(validationError);
+      e.target.value = "";
+      return;
+    }
+    const file = await compressImageIfNeeded(raw);
     setError("");
     setImageFile(file);
-    if (file) setImagePreview(URL.createObjectURL(file));
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -326,7 +331,13 @@ export default function EditEventForm({ event }: Props) {
 
       <div>
         <label className="block text-sm font-medium mb-1">Pin on Map</label>
-        <LocationPicker position={coords} onSelect={(lat, lng) => setCoords([lat, lng])} />
+        <LocationPicker
+          position={coords}
+          onSelect={(lat, lng) => setCoords([lat, lng])}
+          onAddress={(addr) => {
+            if (!location.trim()) setLocation(addr);
+          }}
+        />
       </div>
 
       {/* Additional details */}

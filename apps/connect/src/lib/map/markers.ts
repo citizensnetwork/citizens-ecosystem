@@ -52,6 +52,9 @@ const CATEGORY_ICONS: Record<EventCategory, string> = {
   // Lock — members only / exclusive access
   "members-only":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  // Hand-held heart — counseling, mental-health, helps ministries, restorative
+  care:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6.5a3.5 3.5 0 0 0-6 2.4c0 2.7 3.3 5 6 6.6 2.7-1.6 6-3.9 6-6.6a3.5 3.5 0 0 0-6-2.4Z"/><path d="M3 18c1.5-1.5 3.5-2 5.5-2H15a2 2 0 0 1 0 4H9"/></svg>',
 };
 
 // Generic map-pin fallback for unknown categories
