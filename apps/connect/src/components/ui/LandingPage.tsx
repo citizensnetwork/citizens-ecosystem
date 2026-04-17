@@ -33,6 +33,9 @@ const CONNECTING_PHRASES = [
   "the seeker to truth",
 ];
 
+/** Kingdom subtitle shown beneath the Connect CTA. */
+const KINGDOM_TAGLINE = "By the Kingdom. · With the Kingdom. · For the Kingdom.";
+
 // Citizens platform channels — Connect is live, others are upcoming
 const PLATFORM_CHANNELS = [
   {
@@ -320,7 +323,7 @@ export default function LandingPage({ events, places }: Props) {
                 className="text-center text-[11px] font-medium tracking-[0.25em]"
                 style={{ color: "#4a2f1a" }}
               >
-                By the Kingdom. &middot; With the Kingdom. &middot; For the Kingdom.
+                {KINGDOM_TAGLINE}
               </p>
             </div>
           ) : (
@@ -416,7 +419,7 @@ export default function LandingPage({ events, places }: Props) {
                       className="text-center text-[11px] font-medium tracking-[0.25em]"
                       style={{ color: "#4a2f1a" }}
                     >
-                      By the Kingdom. &middot; With the Kingdom. &middot; For the Kingdom.
+                      {KINGDOM_TAGLINE}
                     </p>
                   </div>
 

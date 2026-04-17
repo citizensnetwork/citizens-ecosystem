@@ -430,11 +430,9 @@ export default function EventsView({
   const scheduleSearchCollapse = useCallback((ms: number) => {
     clearSearchIdleTimer();
     searchIdleTimerRef.current = setTimeout(() => {
-      // Only collapse if not focused and no text
-      setSearchOpen((open) => {
-        if (searchFocused) return open;
-        return false;
-      });
+      // Only collapse if not focused (searchFocused is captured fresh via effect re-binding)
+      if (searchFocused) return;
+      setSearchOpen(false);
     }, ms);
   }, [clearSearchIdleTimer, searchFocused]);
 
