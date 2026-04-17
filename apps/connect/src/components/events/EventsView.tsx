@@ -141,6 +141,7 @@ export default function EventsView({
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const panelSwipeStartY = useRef(0);
+  const panelSwipeStartX = useRef(0);
   const router = useRouter();
 
   // Lock document scroll while the full-screen map view is mounted.
@@ -407,6 +408,31 @@ export default function EventsView({
     []
   );
 
+  // City search / geocoding fly-to state (declared inline so the focus helper
+  // below can close over the setters). Kept in sync with the duplicate
+  // declaration removed further down.
+  const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+  const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
+
+  /**
+   * Temporal-panel tap handler: instead of opening the full detail sheet
+   * (`handleSelectEvent`), fly the map to the event's exact coordinates and
+   * leave the brief in-map popup to convey the details. Falls back to the
+   * full-detail behaviour when the event has no coordinates.
+   */
+  const handleFocusEventOnMap = useCallback((event: Event) => {
+    if (view !== "map") setView("map");
+    const lat = event.latitude;
+    const lng = event.longitude;
+    if (lat == null || lng == null) {
+      // No coordinates — open the detail sheet so the user isn't left with nothing.
+      handleSelectEvent(event);
+      return;
+    }
+    setMapFlyTo([lat, lng]);
+    setMapFlyToZoom(15);
+  }, [view, handleSelectEvent]);
+
   const handleQuickAction = useCallback(
     async (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => {
       try {
@@ -465,9 +491,7 @@ export default function EventsView({
     setSelectedPlace(null);
   }, []);
 
-  // City search / geocoding state
-  const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
-  const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
+  // City search / geocoding state is declared above next to handleFocusEventOnMap.
 
   // ── Bottom floating search: auto-expand/collapse behaviour ────────
   // initial: collapsed icon button for 5s → expands to bar for 60s idle → collapses back.
@@ -964,8 +988,25 @@ export default function EventsView({
                     </svg>
                   </button>
 
-                  {/* Cards row — CARDS_PER_PAGE per page */}
-                  <div className="overflow-hidden">
+                  {/* Cards row — CARDS_PER_PAGE per page. Horizontal touch
+                   *  swipe pages through the cards in addition to the
+                   *  chevron buttons; a tap on a card flies the map to the
+                   *  event and surfaces its in-map popup. */}
+                  <div
+                    className="overflow-hidden"
+                    onTouchStart={(e) => {
+                      panelSwipeStartX.current = e.touches[0].clientX;
+                    }}
+                    onTouchEnd={(e) => {
+                      const dx = e.changedTouches[0].clientX - panelSwipeStartX.current;
+                      const maxPage = Math.ceil(filtered.length / CARDS_PER_PAGE) - 1;
+                      if (dx < -40) {
+                        setCategoryPanelPage((p) => Math.min(maxPage, p + 1));
+                      } else if (dx > 40) {
+                        setCategoryPanelPage((p) => Math.max(0, p - 1));
+                      }
+                    }}
+                  >
                     <div
                       className="flex gap-3 transition-transform duration-300"
                       style={{ transform: `translateX(calc(-${categoryPanelPage * 100}% - ${categoryPanelPage * 12}px))` }}
@@ -977,7 +1018,7 @@ export default function EventsView({
                           <button
                             key={event.id}
                             type="button"
-                            onClick={() => handleSelectEvent(event)}
+                            onClick={() => handleFocusEventOnMap(event)}
                             className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
                             style={{
                               background: hexToRgba(hex, 0.35),
@@ -1117,8 +1158,23 @@ export default function EventsView({
                     </svg>
                   </button>
 
-                  {/* Cards row */}
-                  <div className="overflow-hidden">
+                  {/* Cards row — horizontal swipe + tap-to-fly-to-map */}
+                  <div
+                    className="overflow-hidden"
+                    onTouchStart={(e) => {
+                      panelSwipeStartX.current = e.touches[0].clientX;
+                    }}
+                    onTouchEnd={(e) => {
+                      const dx = e.changedTouches[0].clientX - panelSwipeStartX.current;
+                      const total = quickFilteredEvents.length + quickFilteredPlaces.length;
+                      const maxPage = Math.ceil(total / CARDS_PER_PAGE) - 1;
+                      if (dx < -40) {
+                        setQuickPanelPage((p) => Math.min(maxPage, p + 1));
+                      } else if (dx > 40) {
+                        setQuickPanelPage((p) => Math.max(0, p - 1));
+                      }
+                    }}
+                  >
                     <div
                       className="flex gap-3 transition-transform duration-300"
                       style={{ transform: `translateX(calc(-${quickPanelPage * 100}% - ${quickPanelPage * 12}px))` }}
@@ -1128,7 +1184,7 @@ export default function EventsView({
                         <button
                           key={`e-${event.id}`}
                           type="button"
-                          onClick={() => handleSelectEvent(event)}
+                          onClick={() => handleFocusEventOnMap(event)}
                           className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
                           style={{ background: hexToRgba(activeQuickItem.color, 0.35) }}
                         >

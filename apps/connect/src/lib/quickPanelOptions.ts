@@ -112,6 +112,16 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
   },
   {
+    // Hand-held heart — mirrors the "care" event category marker icon so the
+    // quick-access tool, burger category, and map marker share one visual.
+    id: "care",
+    label: "Care",
+    color: "#B59CD9",
+    eventCategories: ["care"],
+    placeCategories: ["health"],
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6.5a3.5 3.5 0 0 0-6 2.4c0 2.7 3.3 5 6 6.6 2.7-1.6 6-3.9 6-6.6a3.5 3.5 0 0 0-6-2.4Z"/><path d="M3 18c1.5-1.5 3.5-2 5.5-2H15a2 2 0 0 1 0 4H9"/></svg>',
+  },
+  {
     id: "equip",
     label: "Equip",
     color: "#27AE60",

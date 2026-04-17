@@ -291,11 +291,18 @@ body {
  *  place markers thanks to the shared --cc-marker-color CSS variable. */
 .cc-marker-dot .cc-marker-outer {
   background: var(--cc-marker-color, #D4AF37) !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-  border-width: 1px !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-radius: 50% !important;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4)) !important;
 }
 .cc-marker-dot .cc-marker-icon {
+  display: none !important;
+}
+/* Place markers' outer span normally has no background/border (they're just
+ * a filter-shadowed SVG), so dot-mode needs to additionally clear any
+ * rating/warning badges that would otherwise render as off-colour squares
+ * next to the tiny dot at regional zooms. */
+.cc-marker-dot.cc-place-marker .cc-marker-outer > span:not(.cc-marker-icon) {
   display: none !important;
 }
 .cc-marker-dot.cc-marker-highlighted > span:first-child {
@@ -332,8 +339,40 @@ body {
 }
 
 /* MapLibre popups render above all markers */
+/* ── MapLibre popup overrides ─────────────────────────── */
+
+/*
+ * Popup gesture pass-through.
+ *
+ * When the popup overflows the viewport (commonly at the screen edge) users
+ * instinctively drag with a finger over the popup to scroll the map into
+ * view — but MapLibre's popup container swallows the pointer/touch events.
+ *
+ * Strategy: let the popup root (`.maplibregl-popup`) be transparent to
+ * pointer events and ignore touch gestures, then re-enable pointer events
+ * on the inner `.maplibregl-popup-content` wrapper (so buttons, tip arrow
+ * and close button still work) but keep `touch-action: none` so finger
+ * drags *over* blank parts of the content still bubble up to the map.
+ * Interactive elements inside the popup explicitly opt back in via
+ * `touch-action: manipulation` so taps/scrolls inside action buttons
+ * remain reliable.
+ */
 .maplibregl-popup {
   z-index: 10 !important;
+  pointer-events: none;
+}
+.maplibregl-popup-tip,
+.maplibregl-popup-content {
+  pointer-events: auto;
+  /* Let one-finger pans fall through to the map; the popup itself does not
+   * scroll anyway (its content is sized to its children). */
+  touch-action: none;
+}
+.maplibregl-popup-content button,
+.maplibregl-popup-content a,
+.maplibregl-popup-close-button {
+  /* But taps on interactive controls should feel responsive. */
+  touch-action: manipulation;
 }
 
 @keyframes markerPulse {
@@ -346,7 +385,7 @@ body {
   }
 }
 
-/* ── MapLibre popup overrides ─────────────────────────── */
+/* ── MapLibre popup visual overrides ──────────────────── */
 
 .maplibregl-popup-content {
   border-radius: 10px;
