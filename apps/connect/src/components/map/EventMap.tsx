@@ -44,7 +44,7 @@ const DECONFLICT_MAX_ZOOM = 13;
 const MIN_GAP_PX = 0;
 
 /** Number of force-simulation iterations for deconfliction. */
-const DECONFLICT_ITERATIONS = 10;
+const DECONFLICT_ITERATIONS = 4;
 
 /** Returns a scale factor [0.55 – 1.0] based on current zoom.
  *  Markers stay at their default size across normal viewing zooms and only
@@ -184,6 +184,8 @@ export default function EventMap({
     });
 
     // Iterative force spread (DECONFLICT_ITERATIONS iterations)
+    // Damping factor reduces push per iteration to prevent overshoot
+    const DAMPING = 0.5;
     for (let iter = 0; iter < DECONFLICT_ITERATIONS; iter++) {
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
@@ -194,7 +196,7 @@ export default function EventMap({
           const dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0 && dist < minDist) {
-            const push = (minDist - dist) / 2;
+            const push = ((minDist - dist) / 2) * DAMPING;
             const nx = dx / dist;
             const ny = dy / dist;
             a.x -= nx * push;
