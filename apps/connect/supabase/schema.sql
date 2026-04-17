@@ -1076,3 +1076,40 @@ begin
   );
 end;
 $$;
+
+-- ══════════════════════════════════════════════
+-- Event Updates (migration 030)
+-- ══════════════════════════════════════════════
+
+create table if not exists public.event_updates (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.events(id) on delete cascade,
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists event_updates_event_created_idx
+  on public.event_updates (event_id, created_at desc);
+
+alter table public.event_updates enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'event_updates_select_all' and tablename = 'event_updates') then
+    create policy event_updates_select_all on public.event_updates for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'event_updates_insert_creator' and tablename = 'event_updates') then
+    create policy event_updates_insert_creator on public.event_updates for insert with check (
+      auth.uid() = author_id and (
+        exists (select 1 from public.events e where e.id = event_id and e.created_by = auth.uid())
+        or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+      )
+    );
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'event_updates_delete_author_or_admin' and tablename = 'event_updates') then
+    create policy event_updates_delete_author_or_admin on public.event_updates for delete using (
+      auth.uid() = author_id
+      or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+    );
+  end if;
+end $$;

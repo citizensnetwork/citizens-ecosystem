@@ -190,6 +190,9 @@ export default function ManageEventsView({ isVendor }: Props) {
                 ) : (
                   <p className="text-xs text-black/40">No attendees yet.</p>
                 )}
+
+                {/* Post an update — goes to all attendees + considerers */}
+                <EventUpdateComposer eventId={event.id} />
               </div>
             )}
           </div>
@@ -350,5 +353,88 @@ function InviteButton({ eventId, eventTitle }: { eventId: string; eventTitle: st
         </div>
       )}
     </div>
+  );
+}
+/* ── EventUpdateComposer: organiser posts an update to all RSVPed users ── */
+
+function EventUpdateComposer({ eventId }: { eventId: string }) {
+  const [body, setBody] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX = 1000;
+  const remaining = MAX - body.length;
+  const disabled = status === "sending" || body.trim().length === 0 || body.length > MAX;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (disabled) return;
+    setStatus("sending");
+    setError(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: "Failed to post" }));
+        setError(payload.error ?? "Failed to post update");
+        setStatus("error");
+        return;
+      }
+      setBody("");
+      setStatus("sent");
+      setTimeout(() => setStatus("idle"), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setStatus("error");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-5 border-t border-black/5 pt-4">
+      <label
+        htmlFor={`event-update-${eventId}`}
+        className="mb-2 block text-xs font-semibold uppercase tracking-wider text-black/50"
+      >
+        Post an update
+      </label>
+      <p className="text-[11px] text-black/50 mb-2">
+        Every attendee and considerer gets an in-app + push notification.
+      </p>
+      <textarea
+        id={`event-update-${eventId}`}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={3}
+        maxLength={MAX}
+        placeholder="e.g. Venue change — we're now meeting at…"
+        className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm focus:border-(--gold) focus:outline-none"
+        disabled={status === "sending"}
+      />
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <span className={`text-[11px] ${remaining < 50 ? "text-red-600" : "text-black/40"}`}>
+          {remaining} left
+        </span>
+        <div className="flex items-center gap-2">
+          {status === "sent" && (
+            <span className="text-[11px] font-medium text-green-700">Update sent</span>
+          )}
+          {status === "error" && error && (
+            <span className="text-[11px] font-medium text-red-700">{error}</span>
+          )}
+          <button
+            type="submit"
+            disabled={disabled}
+            className="rounded-lg bg-black px-4 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {status === "sending" ? "Sending…" : "Send update"}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }

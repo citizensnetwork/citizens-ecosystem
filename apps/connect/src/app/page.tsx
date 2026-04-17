@@ -15,7 +15,7 @@ export default async function Home() {
   const [{ data: rawEvents }, { data: places }] = await Promise.all([
     supabase
       .from("events")
-      .select("*")
+      .select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")
       .eq("status", "published")
       .gte("date", now)
       .lte("date", cutoff)

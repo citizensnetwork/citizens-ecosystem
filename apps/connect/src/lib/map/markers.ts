@@ -20,9 +20,11 @@ const CATEGORY_ICONS: Record<EventCategory, string> = {
   // Open book — education / learning
   education:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-  // Church building with cross
+  // Christian church — steepled roof, side walls, door, and unambiguous cross.
+  // Horizontal arm sits mid-way down the vertical bar so the cross reads clearly
+  // even when rendered small (prevents it reading as a crescent / dome / finial).
   church:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21H6a1 1 0 0 1-1-1v-7l7-5 7 5v7a1 1 0 0 1-1 1z"/><path d="M12 3v5"/><path d="M9 3h6"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M9 6h6"/><path d="M4 14l8-4 8 4"/><path d="M4 14v7h16v-7"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/></svg>',
   // Compass rose — navigation/direction, distinct from globe
   missional:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>',
@@ -128,6 +130,7 @@ export function createCategoryMarkerEl(
   el.style.height = `${size}px`;
 
   el.innerHTML = `<span class="cc-marker-outer" style="
+    --cc-marker-color:${borderColor};
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
     background:#fff;
@@ -160,10 +163,14 @@ export function createCustomMarkerEl(
     markerColor?: string | null;
     markerImageUrl?: string | null;
     creatorAvatarUrl?: string | null;
+    /** Colour used when dot-mode kicks in at far zoom. Defaults to category hex. */
+    overrideColor?: string;
   }
 ): HTMLDivElement {
   const { markerType, category, temporal, markerImageUrl, creatorAvatarUrl } = options;
   const size = Math.round(BASE_SIZE * temporal.scale);
+  const dotColor =
+    options.overrideColor ?? CATEGORY_HEX[category ?? "church"] ?? "#D4AF37";
 
   // Profile photo marker
   if (markerType === "profile" && creatorAvatarUrl) {
@@ -173,6 +180,7 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
+      --cc-marker-color:${dotColor};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
@@ -181,7 +189,8 @@ export function createCustomMarkerEl(
       box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
       overflow:hidden;
-    "><img src="${escapeHtml(creatorAvatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></span>`;
+      background:#fff;
+    "><img class="cc-marker-icon" src="${escapeHtml(creatorAvatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></span>`;
     return el;
   }
 
@@ -193,6 +202,7 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
+      --cc-marker-color:${dotColor};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
@@ -202,7 +212,7 @@ export function createCustomMarkerEl(
       cursor:pointer;
       overflow:hidden;
       background:#fff;
-    "><img src="${escapeHtml(markerImageUrl)}" alt="" style="width:80%;height:80%;object-fit:contain;" /></span>`;
+    "><img class="cc-marker-icon" src="${escapeHtml(markerImageUrl)}" alt="" style="width:80%;height:80%;object-fit:contain;" /></span>`;
     return el;
   }
 
@@ -218,6 +228,7 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
+      --cc-marker-color:${escapeHtml(fillColor)};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       background:#fff;
@@ -236,7 +247,7 @@ export function createCustomMarkerEl(
   }
 
   // Default: category marker
-  return createCategoryMarkerEl(category, temporal);
+  return createCategoryMarkerEl(category, temporal, options.overrideColor);
 }
 
 /* ── Place category icons — solid minimalist glyphs used filled in gold ── */
@@ -354,12 +365,19 @@ export function createPlaceMarkerEl(
   // Solid gold category glyph — white stroke provides the outline against the map
   const icon = (category && PLACE_CATEGORY_ICONS[category]) || DEFAULT_PLACE_ICON;
 
+  // Dot-mode colour: use highlighted colour, place-category hex, or gold fallback.
+  const dotColor =
+    options?.highlightColor ??
+    (category ? PLACE_CATEGORY_HEX_LOCAL[category] : undefined) ??
+    "#D4AF37";
+
   const el = document.createElement("div");
   el.className = "cc-marker cc-place-marker";
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
 
   el.innerHTML = `<span class="cc-marker-outer" style="
+    --cc-marker-color:${dotColor};
     position:relative;
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
@@ -378,6 +396,19 @@ export function createPlaceMarkerEl(
 
   return el;
 }
+
+/** Place-category hex (subset used for dot-mode colouring).
+ *  Kept local to avoid circular imports with lib/categories.ts. */
+const PLACE_CATEGORY_HEX_LOCAL: Record<string, string> = {
+  church: "#D4AF37",
+  relax: "#8B4513",
+  exercise: "#2ECC71",
+  media: "#9B59B6",
+  shopping: "#E91E63",
+  health: "#E74C3C",
+  education: "#3498DB",
+  arts: "#FF6B35",
+};
 
 /** Cluster badge element */
 export function createClusterEl(count: number): HTMLDivElement {
