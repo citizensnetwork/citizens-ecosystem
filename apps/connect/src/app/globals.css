@@ -300,7 +300,7 @@ body {
 
 /* ── Drop-in animation for freshly-added markers ──
  * Mirrors Google Maps' subtle scale-in + fade-in when POIs appear as you
- * pan. Kept very brief (240ms) and applied once — EventMap adds the
+ * pan. Kept very brief (~260ms) and applied once — EventMap adds the
  * .cc-marker-new class on creation and strips it after the animation. */
 @media (prefers-reduced-motion: no-preference) {
   .cc-marker-new {
@@ -475,10 +475,11 @@ body {
   display: flex;
   gap: 2px;
   margin: 8px 0 0;
-  justify-content: flex-start;
+  justify-content: center;
   /* Horizontally scrollable chip row — matches Google Maps' info-window
    * action strip. When more actions are added than fit the popup width
-   * the extras scroll instead of wrapping to a second row. */
+   * the extras scroll instead of wrapping to a second row; when everything
+   * fits, `justify-content: center` keeps the row visually centred. */
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
