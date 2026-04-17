@@ -162,6 +162,20 @@ export const STOP_WORDS: ReadonlySet<string> = new Set([
  * Next.js route handler without any LLM call. Phase 2 can optionally add
  * an LLM pre-pass that returns the same shape.
  */
+/**
+ * Pre-compiled regexes for single-word synonyms, built once at module load.
+ * Multi-word synonyms use plain `includes()` and don't need a regex.
+ * Saves ~hundreds of RegExp allocations per keystroke in the search bar.
+ */
+const SYNONYM_REGEX_CACHE = new Map<string, RegExp>();
+for (const def of [...AUDIENCES, ...NEEDS, ...VIBES]) {
+  for (const syn of def.synonyms) {
+    if (!syn.includes(" ") && !SYNONYM_REGEX_CACHE.has(syn)) {
+      SYNONYM_REGEX_CACHE.set(syn, new RegExp(`(^|[^a-z])${escapeRe(syn)}($|[^a-z])`));
+    }
+  }
+}
+
 export function parseQuery(query: string): QueryIntent {
   const raw = (query ?? "").toLowerCase().trim();
   const normalised = raw.replace(/\s+/g, " ");
@@ -180,8 +194,8 @@ export function parseQuery(query: string): QueryIntent {
         if (syn.includes(" ")) {
           if (normalised.includes(syn)) { target.add(def.slug); break; }
         } else {
-          const re = new RegExp(`(^|[^a-z])${escapeRe(syn)}($|[^a-z])`);
-          if (re.test(normalised)) { target.add(def.slug); break; }
+          const re = SYNONYM_REGEX_CACHE.get(syn);
+          if (re && re.test(normalised)) { target.add(def.slug); break; }
         }
       }
     }
