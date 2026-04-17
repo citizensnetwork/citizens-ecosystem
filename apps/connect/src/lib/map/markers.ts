@@ -271,6 +271,14 @@ const PLACE_CATEGORY_ICONS: Record<string, string> = {
 const DEFAULT_PLACE_ICON =
   '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
 
+/** Place marker sizing — exported so EventMap can use the same values for
+ * zoom-scaling the inner icon proportionally to the outer circle. */
+export const PLACE_MARKER_SIZE = 26;
+export const PLACE_MARKER_SIZE_HIGHLIGHTED = 36;
+export const PLACE_ICON_SIZE = 16;
+export const PLACE_ICON_SIZE_HIGHLIGHTED = 22;
+export const PLACE_ICON_RATIO = PLACE_ICON_SIZE / PLACE_MARKER_SIZE;
+
 /**
  * Place marker — minimalist solid-gold category icon with white outline.
  * Slightly smaller than event markers to avoid hiding events.
@@ -286,8 +294,8 @@ export function createPlaceMarkerEl(
   }
 ): HTMLDivElement {
   const highlighted = options?.highlighted ?? false;
-  const size = highlighted ? 36 : 26;
-  const iconSize = highlighted ? 22 : 16;
+  const size = highlighted ? PLACE_MARKER_SIZE_HIGHLIGHTED : PLACE_MARKER_SIZE;
+  const iconSize = highlighted ? PLACE_ICON_SIZE_HIGHLIGHTED : PLACE_ICON_SIZE;
   const avgRating = options?.avgRating ?? null;
   const isHighRated = options?.isHighRated ?? false;
   const isFlagged = options?.isFlagged ?? false;

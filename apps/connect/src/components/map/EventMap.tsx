@@ -10,6 +10,8 @@ import {
   createPlaceMarkerEl,
   getTemporalStyle,
   escapeHtml,
+  PLACE_MARKER_SIZE,
+  PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
 import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
@@ -565,14 +567,14 @@ export default function EventMap({
         });
 
         const lngLat: [number, number] = [place.longitude, place.latitude];
-        const baseSize = parseInt(placeEl.style.width || "26") || 26;
+        const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
           .addTo(map);
 
         placeMarkersRef.current.push(marker);
-        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 16 / 26 });
+        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO });
         bounds.extend(lngLat);
         hasPoints = true;
       });
