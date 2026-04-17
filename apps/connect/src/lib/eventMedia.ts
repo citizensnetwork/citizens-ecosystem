@@ -38,7 +38,10 @@ export async function uploadEventMedia(
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const ext = safeMediaExtension(item.file.name, item.kind);
-    const path = `${userId}/gallery/${eventId}/${Date.now()}-${i}.${ext}`;
+    // Include index + random suffix so concurrent uploads from the same user
+    // within the same millisecond still produce unique storage paths.
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `${userId}/gallery/${eventId}/${Date.now()}-${i}-${rand}.${ext}`;
 
     const { error: upErr } = await supabase.storage
       .from("event-images")

@@ -96,7 +96,7 @@ export default function MediaGalleryUploader({
     <div className="rounded-md border border-black/10 bg-white/60 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-sm font-medium">
-          Gallery <span className="text-gray-400 font-normal">(optional photos & videos)</span>
+          Gallery <span className="font-normal text-gray-400">(optional photos & videos)</span>
         </div>
         <span className="text-xs text-black/50">
           {total} / {maxTotal}
