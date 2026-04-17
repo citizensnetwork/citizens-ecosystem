@@ -324,7 +324,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
         </select>
         {suggestedCategory && !categoryManuallySet.current && (
           <p className="mt-1.5 text-[11px] text-black/50">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-(--gold) align-middle mr-1.5" />
+            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-(--gold) align-middle mr-1.5" />
             Suggested from your description: <strong className="font-medium">{CATEGORY_LABELS[suggestedCategory]}</strong>
           </p>
         )}

@@ -112,7 +112,7 @@ export default function ManageEventsView({ isVendor }: Props) {
         </dl>
         {totals.soldOut > 0 && (
           <p className="mt-3 text-[11px] text-black/50">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle mr-1.5" />
+            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle mr-1.5" />
             {totals.soldOut} {totals.soldOut === 1 ? "event is" : "events are"} sold out — consider raising capacity.
           </p>
         )}
