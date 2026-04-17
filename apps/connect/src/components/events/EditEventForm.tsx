@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
-import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility } from "@/types/db";
+import { uploadEventMedia } from "@/lib/eventMedia";
+import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
+import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -54,11 +56,44 @@ export default function EditEventForm({ event }: Props) {
   const [imagePreview, setImagePreview] = useState<string | null>(
     event.image_url ?? null
   );
+  const [existingMedia, setExistingMedia] = useState<EventMedia[]>([]);
+  const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Load existing gallery items
+  useEffect(() => {
+    let cancelled = false;
+    const client = createClient();
+    client
+      .from("event_photos")
+      .select("*")
+      .eq("event_id", event.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .then(({ data }: { data: EventMedia[] | null }) => {
+        if (!cancelled && data) setExistingMedia(data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id]);
+
+  async function handleRemoveExisting(id: string) {
+    if (!confirm("Remove this gallery item?")) return;
+    const { error: delErr } = await supabase
+      .from("event_photos")
+      .delete()
+      .eq("id", id);
+    if (delErr) {
+      setError("Failed to remove: " + delErr.message);
+      return;
+    }
+    setExistingMedia((prev) => prev.filter((m) => m.id !== id));
+  }
 
 
 
@@ -121,6 +156,25 @@ export default function EditEventForm({ event }: Props) {
       .eq("id", event.id);
 
     if (updateErr) { setError(updateErr.message); setLoading(false); return; }
+
+    // Append any newly-picked gallery items after the highest existing sort_order
+    if (galleryItems.length > 0) {
+      const startSortOrder =
+        existingMedia.length > 0
+          ? Math.max(...existingMedia.map((m) => m.sort_order)) + 1
+          : 0;
+      const galleryErr = await uploadEventMedia(supabase, {
+        eventId: event.id,
+        userId: user.id,
+        items: galleryItems,
+        startSortOrder,
+      });
+      if (galleryErr) {
+        setError(galleryErr);
+        setLoading(false);
+        return;
+      }
+    }
 
     router.push(`/events/${event.id}`);
     router.refresh();
@@ -206,6 +260,46 @@ export default function EditEventForm({ event }: Props) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imagePreview} alt="Preview" className="mt-2 rounded-lg w-full max-h-48 object-cover" />
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Gallery</label>
+        {existingMedia.length > 0 && (
+          <ul className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {existingMedia.map((m) => (
+              <li key={m.id} className="relative">
+                <div className="relative aspect-square w-full overflow-hidden rounded-md bg-black/5">
+                  {m.kind === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.url} alt={m.title ?? ""} className="h-full w-full object-cover" />
+                  ) : (
+                    <>
+                      <video src={m.url} className="h-full w-full object-cover" muted playsInline />
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3"><path d="M8 5v14l11-7z" /></svg>
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExisting(m.id)}
+                    aria-label="Remove existing gallery item"
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white shadow-sm transition hover:bg-black"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-3 w-3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <MediaGalleryUploader
+          items={galleryItems}
+          onChange={setGalleryItems}
+          existingCount={existingMedia.length}
+        />
       </div>
 
       <div>

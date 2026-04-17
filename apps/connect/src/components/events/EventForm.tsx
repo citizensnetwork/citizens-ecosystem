@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { uploadEventMedia } from "@/lib/eventMedia";
+import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import type { EventCategory, Category } from "@/types/db";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
@@ -38,6 +40,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [attendeesVisible, setAttendeesVisible] = useState<"public" | "authenticated" | "count_only">("authenticated");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -164,7 +167,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       }
     }
 
-    const { error } = await supabase.from("events").insert({
+    const { data: inserted, error } = await supabase.from("events").insert({
       title,
       description,
       date: new Date(date).toISOString(),
@@ -188,6 +191,23 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Upload gallery items (photos + videos) — fire after event insert so we
+    // have a valid event_id. Failures here are non-fatal to the event row;
+    // we surface the message but still navigate so the organiser can retry
+    // the gallery from the edit screen.
+    if (inserted?.id && galleryItems.length > 0) {
+      const galleryErr = await uploadEventMedia(supabase, {
+        eventId: inserted.id,
+        userId: user.id,
+        items: galleryItems,
+      });
+      if (galleryErr) {
+        setError(galleryErr);
+        setLoading(false);
+        return;
+      }
     }
 
     router.push("/events");
@@ -259,6 +279,8 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           />
         )}
       </div>
+
+      <MediaGalleryUploader items={galleryItems} onChange={setGalleryItems} />
 
       <div>
         <label

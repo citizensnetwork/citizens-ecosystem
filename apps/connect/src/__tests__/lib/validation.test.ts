@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { isValidUUID } from "@/lib/validation";
+import {
+  isValidUUID,
+  detectMediaKind,
+  validateMediaFile,
+  safeMediaExtension,
+} from "@/lib/validation";
+
+function makeFile(name: string, type: string, sizeBytes: number): File {
+  // Build a file with the requested size by padding an ArrayBuffer.
+  const buffer = new Uint8Array(sizeBytes);
+  return new File([buffer], name, { type });
+}
 
 describe("isValidUUID", () => {
   it("returns true for a valid v4 UUID", () => {
@@ -52,5 +63,62 @@ describe("isValidUUID", () => {
       // TypeScript should narrow `value` to `string`
       expect(value.toUpperCase()).toBe("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11");
     }
+  });
+});
+
+describe("detectMediaKind", () => {
+  it("classifies common image MIME types", () => {
+    expect(detectMediaKind(makeFile("a.jpg", "image/jpeg", 10))).toBe("image");
+    expect(detectMediaKind(makeFile("a.png", "image/png", 10))).toBe("image");
+    expect(detectMediaKind(makeFile("a.webp", "image/webp", 10))).toBe("image");
+  });
+
+  it("classifies common video MIME types", () => {
+    expect(detectMediaKind(makeFile("a.mp4", "video/mp4", 10))).toBe("video");
+    expect(detectMediaKind(makeFile("a.webm", "video/webm", 10))).toBe("video");
+    expect(detectMediaKind(makeFile("a.mov", "video/quicktime", 10))).toBe("video");
+  });
+
+  it("returns null for unsupported types", () => {
+    expect(detectMediaKind(makeFile("a.pdf", "application/pdf", 10))).toBe(null);
+  });
+});
+
+describe("validateMediaFile", () => {
+  it("accepts small images", () => {
+    expect(validateMediaFile(makeFile("a.png", "image/png", 10))).toBe(null);
+  });
+
+  it("rejects oversized images", () => {
+    const big = makeFile("a.png", "image/png", 6 * 1024 * 1024);
+    expect(validateMediaFile(big)).toMatch(/5 MB/);
+  });
+
+  it("rejects oversized videos", () => {
+    const big = makeFile("a.mp4", "video/mp4", 51 * 1024 * 1024);
+    expect(validateMediaFile(big)).toMatch(/50 MB/);
+  });
+
+  it("rejects unsupported types", () => {
+    expect(
+      validateMediaFile(makeFile("a.zip", "application/zip", 10))
+    ).toMatch(/allowed/i);
+  });
+});
+
+describe("safeMediaExtension", () => {
+  it("returns known image extensions", () => {
+    expect(safeMediaExtension("photo.png", "image")).toBe("png");
+    expect(safeMediaExtension("PHOTO.JPG", "image")).toBe("jpg");
+  });
+
+  it("returns known video extensions", () => {
+    expect(safeMediaExtension("clip.mp4", "video")).toBe("mp4");
+    expect(safeMediaExtension("clip.webm", "video")).toBe("webm");
+  });
+
+  it("falls back safely when extension is unknown", () => {
+    expect(safeMediaExtension("sneaky.exe", "image")).toBe("jpg");
+    expect(safeMediaExtension("sneaky.exe", "video")).toBe("mp4");
   });
 });
