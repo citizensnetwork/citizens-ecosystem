@@ -1,3 +1,5 @@
+import type { SearchProfile } from "@/lib/searchProfile";
+
 export type EventCategory =
   | "entertainment"
   | "sport-fun"
@@ -59,6 +61,8 @@ export type Event = {
   category_id: string | null;
   created_by: string;
   created_at: string;
+  /** Structured discovery tags used by the AI search engine (Phase 1). */
+  search_profile?: SearchProfile | null;
   /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")`.
    *  Used by the map to auto-render an organiser's avatar as the marker when
    *  `marker_type === "category"`. */
@@ -186,6 +190,8 @@ export type Place = {
   reviews_count?: number;
   negative_signals?: number;
   created_at: string;
+  /** Structured discovery tags used by the AI search engine (Phase 1). */
+  search_profile?: SearchProfile | null;
   categories?: Category;
 };
 

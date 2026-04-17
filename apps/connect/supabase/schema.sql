@@ -81,15 +81,20 @@ create table if not exists public.events (
   attendees_visible text not null default 'authenticated' check (attendees_visible in ('public', 'authenticated', 'count_only')),
   latitude double precision,
   longitude double precision,
+  search_profile jsonb,
   created_by uuid references public.profiles(id) on delete cascade not null,
   created_at timestamptz not null default now()
 );
+
+-- Ensure column exists for pre-existing databases (see migration 032).
+alter table public.events add column if not exists search_profile jsonb;
 
 alter table public.events enable row level security;
 
 create index if not exists events_status_date_idx on public.events(status, date);
 create index if not exists events_created_by_idx on public.events(created_by);
 create index if not exists events_visibility_idx on public.events(visibility);
+create index if not exists events_search_profile_gin_idx on public.events using gin (search_profile jsonb_path_ops);
 
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Published events visible to all, drafts to creator only' and tablename = 'events') then
@@ -249,13 +254,19 @@ create table if not exists public.places (
   website text,
   latitude double precision not null,
   longitude double precision not null,
+  search_profile jsonb,
   created_by uuid references public.profiles(id) on delete cascade not null,
   verified boolean not null default false,
   verification_flagged boolean not null default false,
   created_at timestamptz not null default now()
 );
 
+-- Ensure column exists for pre-existing databases (see migration 032).
+alter table public.places add column if not exists search_profile jsonb;
+
 alter table public.places enable row level security;
+
+create index if not exists places_search_profile_gin_idx on public.places using gin (search_profile jsonb_path_ops);
 
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Places are viewable by everyone' and tablename = 'places') then

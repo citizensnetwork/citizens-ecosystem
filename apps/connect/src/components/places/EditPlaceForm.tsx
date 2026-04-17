@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Category, Place } from "@/types/db";
+import type { SearchProfile } from "@/lib/searchProfile";
+import SearchProfilePicker from "@/components/events/SearchProfilePicker";
 
 const LocationPicker = dynamic(
   () => import("@/components/map/LocationPicker"),
@@ -41,6 +43,9 @@ export default function EditPlaceForm({ place, categories }: Props) {
     place.latitude,
     place.longitude,
   ]);
+  const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(
+    place.search_profile ?? null,
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -114,6 +119,7 @@ export default function EditPlaceForm({ place, categories }: Props) {
         image_url,
         latitude: coords[0],
         longitude: coords[1],
+        search_profile: searchProfile ?? null,
       })
       .eq("id", place.id);
 
@@ -308,6 +314,13 @@ export default function EditPlaceForm({ place, categories }: Props) {
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => setAddress(addr)}
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">
+          Discovery tags <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
       </div>
 
       <div className="flex gap-3">

@@ -10,7 +10,9 @@ import { compressImageIfNeeded, SKIP_IF_SMALLER_THAN } from "@/lib/imageCompress
 import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
+import SearchProfilePicker from "./SearchProfilePicker";
 import type { EventCategory, Category } from "@/types/db";
+import type { SearchProfile } from "@/lib/searchProfile";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -51,6 +53,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>(null);
+  const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -222,6 +225,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       attendees_visible: attendeesVisible,
       latitude: coords?.[0] ?? null,
       longitude: coords?.[1] ?? null,
+      search_profile: searchProfile ?? null,
       created_by: user.id,
     }).select("id").single();
 
@@ -424,6 +428,14 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       {/* Contact & details */}
       <div className="border-t border-black/10 pt-5 mt-5 space-y-4">
         <h2 className="text-[11px] font-semibold text-black/40 uppercase tracking-wider">Additional Details</h2>
+
+        {/* Discovery tags — power natural-language search (AI search) */}
+        <div>
+          <label className="block text-xs font-medium text-black/60 mb-1.5">
+            Discovery tags <span className="text-black/30 font-normal">(optional)</span>
+          </label>
+          <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
+        </div>
 
         <div>
           <label htmlFor="websiteUrl" className="block text-xs font-medium text-black/60 mb-1.5">

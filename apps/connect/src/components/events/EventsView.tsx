@@ -16,6 +16,8 @@ import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings"
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
 import { QUICK_ACCESS_ITEMS, type QuickAccessItem } from "@/lib/quickPanelOptions";
+import { rankResults, type RankedResult } from "@/lib/aiSearch";
+import { describeIntent } from "@/lib/searchProfile";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 
@@ -297,30 +299,56 @@ export default function EventsView({
     });
   }, [places, activeQuickItem]);
 
+  // ── Semantic (AI) search ranking ─────────────────────────────────
+  // Runs entirely client-side against the already-loaded events/places via
+  // the deterministic scoring engine in src/lib/aiSearch.ts. When the user
+  // query contains any taxonomy signal (needs/audience/vibe) or location
+  // intent ("near me"), we trust the ranker and surface a match-reason
+  // chip. Otherwise we fall back to the existing substring search so that
+  // very short queries (e.g. a person's name) still work.
+  const ranked = useMemo(
+    () => rankResults(search, events, places),
+    [search, events, places],
+  );
+  const rankedEventIds = useMemo(() => {
+    if (!ranked.intent.hasSignal) return null;
+    const m = new Map<string, RankedResult>();
+    for (const r of ranked.events) m.set(r.id, r);
+    return m;
+  }, [ranked]);
+  const rankedPlaceIds = useMemo(() => {
+    if (!ranked.intent.hasSignal) return null;
+    const m = new Map<string, RankedResult>();
+    for (const r of ranked.places) m.set(r.id, r);
+    return m;
+  }, [ranked]);
+  const intentLabel = useMemo(
+    () => (ranked.intent.hasSignal ? describeIntent(ranked.intent) : ""),
+    [ranked.intent],
+  );
+
   const filtered = useMemo(() => {
     return events.filter((e) => {
       const matchesCategory =
         activeCategories.size === 0 ||
         (e.category != null && activeCategories.has(e.category));
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
+      if (!matchesCategory) return false;
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      // Prefer the AI ranker when the query has taxonomy signal.
+      if (rankedEventIds) return rankedEventIds.has(e.id);
+      // Fallback: plain substring match (names, descriptions, locations).
+      return (
         e.title.toLowerCase().includes(q) ||
         e.location.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
+        e.description.toLowerCase().includes(q)
+      );
     });
-  }, [events, search, activeCategories]);
+  }, [events, search, activeCategories, rankedEventIds]);
 
   const filteredPlaces = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
     return places.filter((p) => {
-      const matchesSearch =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.address.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q);
-
       // Filter by place category keywords if any place categories are active
       if (activePlaceCategories.size > 0) {
         const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
@@ -330,9 +358,15 @@ export default function EventsView({
         if (!matchesPlaceCat) return false;
       }
 
-      return matchesSearch;
+      if (!q) return true;
+      if (rankedPlaceIds) return rankedPlaceIds.has(p.id);
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.address.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+      );
     });
-  }, [places, search, activePlaceCategories]);
+  }, [places, search, activePlaceCategories, rankedPlaceIds]);
 
   // Calendar province-filtered events (applies province filter on top of category/search filter)
   const calendarEvents = useMemo(() => {
@@ -507,6 +541,10 @@ export default function EventsView({
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter" || !search.trim() || view !== "map") return;
+    // If the ranker extracted any taxonomy intent, the user meant a
+    // semantic query ("homecells in my area", "I need counselling") — not
+    // a city name, so skip geocoding and let the in-memory filter drive.
+    if (ranked.intent.hasSignal) return;
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}&limit=1`,
@@ -689,45 +727,55 @@ export default function EventsView({
       {!hasDetail && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-4 sm:bottom-6">
           {searchOpen ? (
-            <div className="pointer-events-auto relative flex w-full max-w-md items-center">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="pointer-events-none absolute left-4 h-4 w-4 text-black/50"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                ref={searchInputRef}
-                type="search"
-                aria-label="Search events, places, or city"
-                placeholder={search ? "" : SEARCH_SUGGESTIONS[suggestionIdx]}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                onKeyDown={handleSearchKeyDown}
-                className="cc-bottom-search w-full rounded-full border border-black/10 bg-white/95 px-11 py-3 text-sm italic font-light text-black placeholder:italic placeholder:font-light placeholder:text-black/50 shadow-lg outline-none backdrop-blur focus:not-italic focus:border-black/30"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => { setSearch(""); searchInputRef.current?.focus(); }}
-                  className="absolute right-3 rounded-full p-1 text-black/40 transition hover:bg-black/5 hover:text-black"
-                  aria-label="Clear search"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
+            <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
+              {intentLabel && (
+                <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-black/70 shadow-md backdrop-blur">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-(--gold)" aria-hidden="true">
+                    <polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/>
                   </svg>
-                </button>
+                  <span>Matching: {intentLabel}</span>
+                </div>
               )}
+              <div className="relative flex w-full items-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="pointer-events-none absolute left-4 h-4 w-4 text-black/50"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  aria-label="Search events, places, or city"
+                  placeholder={search ? "" : SEARCH_SUGGESTIONS[suggestionIdx]}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="cc-bottom-search w-full rounded-full border border-black/10 bg-white/95 px-11 py-3 text-sm italic font-light text-black placeholder:italic placeholder:font-light placeholder:text-black/50 shadow-lg outline-none backdrop-blur focus:not-italic focus:border-black/30"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(""); searchInputRef.current?.focus(); }}
+                    className="absolute right-3 rounded-full p-1 text-black/40 transition hover:bg-black/5 hover:text-black"
+                    aria-label="Clear search"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <button
