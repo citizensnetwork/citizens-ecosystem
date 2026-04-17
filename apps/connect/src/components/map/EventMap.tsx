@@ -39,6 +39,21 @@ type Props = {
   /** When true, skip rendering event markers so only place markers show.
    *  Wired to the burger menu "Places" tab. */
   placesMode?: boolean;
+  /** Fires whenever the camera bearing changes. Used by the floating
+   *  compass button which only appears when the map is rotated. */
+  onBearingChange?: (deg: number) => void;
+  /** Monotonically-increasing token; when it increments the map resets
+   *  bearing and pitch to 0 (Google-Maps-style "north up" reset). */
+  resetBearingToken?: number;
+  /** Monotonically-increasing token; when it increments the map flies to
+   *  the user's current position (locate-me FAB). */
+  locateMeToken?: number;
+  /** Fires after the camera settles (moveend) so the parent can surface
+   *  the "Search this area" pill. */
+  onMoveEnd?: () => void;
+  /** When set, the marker with this event id gets a pulsing gold ring
+   *  (list-to-map sync). */
+  highlightedEventId?: string | null;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -70,8 +85,31 @@ function zoomScale(z: number): number {
  *  points across a province/country remain distinguishable without clutter. */
 const DOT_MODE_ZOOM = 7;
 
+/** Between DOT_MODE_ZOOM and this zoom, markers are shown at full size but
+ *  the inner glyph is slightly faded — a Google-Maps-style "mid tier" that
+ *  cross-fades between dot and full marker presentation. */
+const MID_MODE_ZOOM = 10;
+
 /** Size (px) of a dot-mode marker regardless of base size — small and uniform. */
 const DOT_MODE_SIZE = 10;
+
+/** Returns true when the user has opted into reduced motion. Used to bypass
+ *  cinematic fly curves and marker animations for accessibility. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Shared easing — ease-out quad. Gives motion a Google-Maps-like gentle
+ *  deceleration instead of MapLibre's default linear ramp. */
+const EASE_OUT_QUAD = (t: number): number => t * (2 - t);
+
+/** Shared flyTo options for cinematic camera moves. */
+const FLY_TO_OPTS: Pick<maplibregl.FlyToOptions, "curve" | "speed" | "easing"> = {
+  curve: 1.42,
+  speed: 0.9,
+  easing: EASE_OUT_QUAD,
+};
 
 export default function EventMap({
   events,
@@ -88,6 +126,11 @@ export default function EventMap({
   activePlaceCategories,
   markerOverrideColor,
   placesMode = false,
+  onBearingChange,
+  resetBearingToken,
+  locateMeToken,
+  onMoveEnd,
+  highlightedEventId = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -107,9 +150,13 @@ export default function EventMap({
   activeCategoriesRef.current = activeCategories;
   const activePlaceCategoriesRef = useRef(activePlaceCategories);
   activePlaceCategoriesRef.current = activePlaceCategories;
+  const onBearingChangeRef = useRef(onBearingChange);
+  onBearingChangeRef.current = onBearingChange;
+  const onMoveEndRef = useRef(onMoveEnd);
+  onMoveEndRef.current = onMoveEnd;
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number }[]>([]);
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string }[]>([]);
   const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number }[]>([]);
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
@@ -261,10 +308,12 @@ export default function EventMap({
     const z = map.getZoom();
     const scale = zoomScale(z);
     const dotMode = z < DOT_MODE_ZOOM;
+    const midMode = !dotMode && z < MID_MODE_ZOOM;
 
     const resize = (el: HTMLElement, baseSize: number, iconRatio: number) => {
       if (dotMode) {
         el.classList.add("cc-marker-dot");
+        el.classList.remove("cc-marker-mid");
         el.style.width = `${DOT_MODE_SIZE}px`;
         el.style.height = `${DOT_MODE_SIZE}px`;
         const outer = el.querySelector<HTMLElement>(".cc-marker-outer");
@@ -276,6 +325,11 @@ export default function EventMap({
       }
 
       el.classList.remove("cc-marker-dot");
+      if (midMode) {
+        el.classList.add("cc-marker-mid");
+      } else {
+        el.classList.remove("cc-marker-mid");
+      }
       const newSize = Math.round(baseSize * scale);
       const iconSize = Math.round(newSize * iconRatio);
       el.style.width = `${newSize}px`;
@@ -320,7 +374,30 @@ export default function EventMap({
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: false,
+      // ── Google-Maps-like gesture set ─────────────────────────────
+      // Two-finger twist to rotate the map and two-finger vertical drag
+      // to pitch (same gestures Google uses). Disabled by default in
+      // MapLibre; we enable them here so power users get the
+      // familiar 3-dimensional feel.
+      dragRotate: true,
+      pitchWithRotate: true,
+      // Higher max pitch lets users tilt further into a 3D perspective.
+      maxPitch: 75,
     });
+
+    // Smoother, finer wheel zoom — MapLibre's default (1/450) jumps by
+    // whole zoom steps on every wheel tick which feels coarse compared to
+    // Google's continuous zoom. 1/250 produces a slower, more granular feel.
+    try {
+      map.scrollZoom.setWheelZoomRate(1 / 250);
+    } catch { /* some MapLibre builds don't expose this — safe to ignore */ }
+
+    // Enable two-finger rotation on touch. MapLibre disables it by default
+    // because pinch-rotate can be accidental; we pair it with existing
+    // pinch-zoom so gestures feel identical to native map apps.
+    try {
+      map.touchZoomRotate.enableRotation();
+    } catch { /* ignore if unsupported */ }
 
     if (stored) hasRestoredView.current = true;
 
@@ -358,6 +435,17 @@ export default function EventMap({
     // After panning stops, do a final deconfliction pass
     map.on("moveend", () => {
       runDeconflictionRef.current();
+      onMoveEndRef.current?.();
+    });
+
+    // ── Bearing tracker for floating compass button ───────────────
+    // Fires whenever rotation changes so the parent can surface the
+    // compass button only when the map isn't north-up.
+    map.on("rotate", () => {
+      onBearingChangeRef.current?.(map.getBearing());
+    });
+    map.on("rotateend", () => {
+      onBearingChangeRef.current?.(map.getBearing());
     });
 
     /* Geolocation control */
@@ -384,7 +472,12 @@ export default function EventMap({
             .addTo(map);
 
           if (mapRef.current) {
-            map.flyTo({ center: lngLat, zoom: 8, duration: 1200 });
+            map.flyTo({
+              center: lngLat,
+              zoom: 8,
+              duration: prefersReducedMotion() ? 0 : 1200,
+              ...FLY_TO_OPTS,
+            });
           }
         })
         .catch(() => {
@@ -473,6 +566,11 @@ export default function EventMap({
           el.classList.add("cc-marker-highlighted");
         }
 
+        // One-shot drop-in animation on creation (stripped after the
+        // animation completes so it doesn't replay on the next re-render).
+        el.classList.add("cc-marker-new");
+        setTimeout(() => el.classList.remove("cc-marker-new"), 320);
+
         const dateStr = new Date(event.date).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -548,7 +646,7 @@ export default function EventMap({
           .setPopup(popup)
           .addTo(map);
         markersRef.current.push(marker);
-        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48 });
+        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -589,6 +687,10 @@ export default function EventMap({
           highlightColor: markerOverrideColor ?? placeHighlightColor,
           category: inferredCategory,
         });
+
+        // One-shot drop-in animation (same as event markers).
+        placeEl.classList.add("cc-marker-new");
+        setTimeout(() => placeEl.classList.remove("cc-marker-new"), 320);
 
         const ratingLabel =
           avgRating != null
@@ -644,7 +746,13 @@ export default function EventMap({
         if (userPositionRef.current) {
           bounds.extend(toLngLat(userPositionRef.current));
         }
-        map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 600 });
+        const reduce = prefersReducedMotion();
+        map.fitBounds(bounds, {
+          padding: 50,
+          maxZoom: 15,
+          duration: reduce ? 0 : 600,
+          easing: EASE_OUT_QUAD,
+        });
         hasRestoredView.current = true;
       }
 
@@ -684,12 +792,81 @@ export default function EventMap({
       !Number.isFinite(lat) ||
       !Number.isFinite(lng)
     ) return;
+    const reduce = prefersReducedMotion();
     mapRef.current.flyTo({
       center: toLngLat(flyTo),
       zoom: flyToZoom ?? 13,
-      duration: 1200,
+      duration: reduce ? 0 : 1200,
+      ...FLY_TO_OPTS,
     });
   }, [flyTo, flyToZoom, flyToToken]);
+
+  /* ── Reset bearing / pitch to 0 (compass button) ──────── */
+  useEffect(() => {
+    if (resetBearingToken === undefined) return;
+    const map = mapRef.current;
+    if (!map) return;
+    // Skip on first mount (token === initial value) to avoid an unwanted animation.
+    if (resetBearingToken === 0) return;
+    const reduce = prefersReducedMotion();
+    map.easeTo({
+      bearing: 0,
+      pitch: 0,
+      duration: reduce ? 0 : 500,
+      easing: EASE_OUT_QUAD,
+    });
+  }, [resetBearingToken]);
+
+  /* ── Locate-me FAB handler ────────────────────────────── */
+  useEffect(() => {
+    if (locateMeToken === undefined) return;
+    const map = mapRef.current;
+    if (!map) return;
+    if (locateMeToken === 0) return;
+    getCurrentPosition()
+      .then((pos) => {
+        const lngLat: [number, number] = [pos.longitude, pos.latitude];
+        userPositionRef.current = [pos.latitude, pos.longitude];
+
+        // Draw / refresh the gold pin marking the user's location.
+        if (!geoMarkerRef.current) {
+          const el = document.createElement("div");
+          el.style.cssText =
+            "width:14px;height:14px;background:#D4AF37;border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(212,175,55,.5);";
+          geoMarkerRef.current = new maplibregl.Marker({ element: el })
+            .setLngLat(lngLat)
+            .addTo(map);
+        } else {
+          geoMarkerRef.current.setLngLat(lngLat);
+        }
+
+        const reduce = prefersReducedMotion();
+        map.flyTo({
+          center: lngLat,
+          zoom: Math.max(map.getZoom(), 13),
+          duration: reduce ? 0 : 1200,
+          ...FLY_TO_OPTS,
+        });
+      })
+      .catch(() => {
+        /* geolocation denied — silent */
+      });
+  }, [locateMeToken]);
+
+  /* ── List → map highlight sync ─────────────────────────
+   * Applies a pulsing gold ring to whichever event marker matches
+   * `highlightedEventId`; clears the class on all others. No state
+   * change needed — this runs directly on the marker DOM. */
+  useEffect(() => {
+    evtMarkerDataRef.current.forEach(({ marker, eventId }) => {
+      const el = marker.getElement() as HTMLElement;
+      if (eventId === highlightedEventId) {
+        el.classList.add("cc-marker-sync-highlight");
+      } else {
+        el.classList.remove("cc-marker-sync-highlight");
+      }
+    });
+  }, [highlightedEventId, events]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
