@@ -259,9 +259,10 @@ const PLACE_CATEGORY_ICONS: Record<string, string> = {
   // Church building with cross
   church:
     '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M13 2h-2v3H8v2h3v3L4 14v8h6v-5h4v5h6v-8l-7-4V7h3V5h-3V2z"/></svg>',
-  // Coffee cup — relax
+  // Coffee mug — relax (outline style, matches the Coffee quick-access tool so
+  // the marker, burger filter, and quick-access button all read as one icon).
   relax:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 19h14v2H4v-2zm14.5-15H17V2h-2v2H9V2H7v2H5.5A1.5 1.5 0 0 0 4 5.5V11a6 6 0 0 0 6 6h4a6 6 0 0 0 6-6V5.5A1.5 1.5 0 0 0 18.5 4zm0 7a4 4 0 0 1-.5 1.94V6h.5v5zm-2.5 3H8a4 4 0 0 1-4-4V6h12v5a4 4 0 0 1-2 3z"/></svg>',
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
   // Trophy / dumbbell — exercise
   exercise:
     '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M20.57 14.86l-2.05-2.05-1.41 1.41-5.42-5.42 1.41-1.41-2.05-2.05-1.41 1.41-1.41-1.41-1.42 1.41 1.41 1.42-3.07 3.07-1.41-1.41-1.41 1.41 1.41 1.41-1.41 1.42 2.05 2.05 1.41-1.42 5.42 5.42-1.41 1.41 2.05 2.05 1.41-1.41 1.41 1.41 1.42-1.41-1.41-1.41 3.07-3.07 1.41 1.41 1.41-1.41-1.41-1.42 1.41-1.41z"/></svg>',

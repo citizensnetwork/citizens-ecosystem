@@ -77,6 +77,19 @@ export default function EventsView({
     new Set()
   );
 
+  // Burger menu Event / Place tab (lifted here so placesMode can be wired to
+  // the EventMap — when "places" is active, only place markers render).
+  const [burgerTab, setBurgerTab] = useState<"events" | "places">("events");
+
+  // Snapshot of the category/quick-access filters taken the moment the user
+  // begins a search. Restored when the search input is cleared so the
+  // previously-selected filters come back intact.
+  const searchFilterSnapshotRef = useRef<{
+    categories: Set<EventCategory>;
+    placeCategories: Set<PlaceCategory>;
+    quickAccess: string | null;
+  } | null>(null);
+
   // Category panel state (shows when categories are selected)
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [categoryPanelPage, setCategoryPanelPage] = useState(0);
@@ -351,9 +364,47 @@ export default function EventsView({
     [ranked.intent],
   );
 
+  // ── Search-vs-filter interplay ───────────────────────────────────
+  // When the user types into the search bar we want BOTH events and places
+  // to surface regardless of any currently-active category / quick-access
+  // filters, so the search is a true free-text lookup. The filters they had
+  // selected before searching are snapshotted and then silently restored the
+  // moment the search input is cleared, so the user never loses context.
+  const isSearching = search.trim().length > 0;
+  useEffect(() => {
+    if (isSearching) {
+      // Snapshot once, when the user first starts typing.
+      if (searchFilterSnapshotRef.current === null) {
+        searchFilterSnapshotRef.current = {
+          categories: new Set(activeCategories),
+          placeCategories: new Set(activePlaceCategories),
+          quickAccess: activeQuickAccess,
+        };
+      }
+    } else if (searchFilterSnapshotRef.current) {
+      // Search cleared — restore the previous filter configuration.
+      const snap = searchFilterSnapshotRef.current;
+      searchFilterSnapshotRef.current = null;
+      setActiveCategories(snap.categories);
+      setActivePlaceCategories(snap.placeCategories);
+      setActiveQuickAccess(snap.quickAccess);
+      if (snap.quickAccess) {
+        setQuickPanelOpen(true);
+        setQuickPanelPage(0);
+      }
+    }
+    // activeCategories / activePlaceCategories / activeQuickAccess are
+    // intentionally NOT in the dep list — we only want to snapshot once at
+    // the start of a search session, not on every subsequent filter tweak.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSearching]);
+
   const filtered = useMemo(() => {
     return events.filter((e) => {
+      // Bypass category filters while searching so search returns the full
+      // cross-category match set (plus places below).
       const matchesCategory =
+        isSearching ||
         activeCategories.size === 0 ||
         (e.category != null && activeCategories.has(e.category));
       if (!matchesCategory) return false;
@@ -368,13 +419,13 @@ export default function EventsView({
         e.description.toLowerCase().includes(q)
       );
     });
-  }, [events, search, activeCategories, rankedEventIds]);
+  }, [events, search, activeCategories, rankedEventIds, isSearching]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
     return places.filter((p) => {
-      // Filter by place category keywords if any place categories are active
-      if (activePlaceCategories.size > 0) {
+      // Bypass place-category filters while searching, mirroring events.
+      if (!isSearching && activePlaceCategories.size > 0) {
         const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
         const matchesPlaceCat = [...activePlaceCategories].some((cat) =>
           PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
@@ -390,7 +441,7 @@ export default function EventsView({
         p.description.toLowerCase().includes(q)
       );
     });
-  }, [places, search, activePlaceCategories, rankedPlaceIds]);
+  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching]);
 
   // Calendar province-filtered events (applies province filter on top of category/search filter)
   const calendarEvents = useMemo(() => {
@@ -413,6 +464,10 @@ export default function EventsView({
   // declaration removed further down.
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number | undefined>(undefined);
+  // Monotonically-increasing token forces EventMap to re-run its flyTo effect
+  // even when the lat/lng/zoom triplet is identical to the previous request
+  // (fixes the "tapping the same card again does nothing / drifts" behaviour).
+  const [mapFlyToToken, setMapFlyToToken] = useState(0);
 
   /**
    * Temporal-panel tap handler: instead of opening the full detail sheet
@@ -431,6 +486,7 @@ export default function EventsView({
     }
     setMapFlyTo([lat, lng]);
     setMapFlyToZoom(15);
+    setMapFlyToToken((t) => t + 1);
   }, [view, handleSelectEvent]);
 
   const handleQuickAction = useCallback(
@@ -583,6 +639,7 @@ export default function EventsView({
     // South Africa center, zoom 5.5 shows full country
     setMapFlyTo([-28.7, 25.5]);
     setMapFlyToZoom(5.5);
+    setMapFlyToToken((t) => t + 1);
     if (view !== "map") setView("map");
   }
 
@@ -601,6 +658,7 @@ export default function EventsView({
       if (Array.isArray(data) && data.length > 0) {
         setMapFlyTo([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
         setMapFlyToZoom(undefined); // let EventMap use its default
+        setMapFlyToToken((t) => t + 1);
       }
     } catch {
       /* geocoding failed — ignore */
@@ -622,9 +680,11 @@ export default function EventsView({
           autoLocate
           flyTo={mapFlyTo}
           flyToZoom={mapFlyToZoom}
+          flyToToken={mapFlyToToken}
           activeCategories={activeCategories}
           activePlaceCategories={activePlaceCategories}
           markerOverrideColor={activeQuickItem?.color}
+          placesMode={burgerTab === "places"}
         />
       </div>
 
@@ -771,8 +831,11 @@ export default function EventsView({
         </div>
       )}
       {/* ── Bottom floating search — collapses to icon after 60s idle, re-expands on click ── */}
+      {/* On mobile the outer container uses a 10% horizontal gutter so the
+       *  bar itself is 80% of the viewport width (user reported the bar felt
+       *  too wide on phones). Desktop keeps the previous px-4 gutter. */}
       {!hasDetail && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-4 sm:bottom-6">
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-[10%] sm:bottom-6 sm:px-4">
           {searchOpen ? (
             <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
               {intentLabel && (
@@ -843,7 +906,7 @@ export default function EventsView({
       {/* ── Trending centered glass modal (replaces bottom slide-up panel) ───────────────── */}
       {featuredOpen && !hasDetail && activeCategories.size === 0 && !activeQuickAccess && (
         <div
-          className="absolute inset-0 z-1004 flex items-center justify-center p-4"
+          className="absolute inset-0 z-1009 flex items-center justify-center p-4"
           onClick={() => setFeaturedOpen(false)}
           role="presentation"
         >
@@ -896,14 +959,17 @@ export default function EventsView({
       )}
 
       {/* ── Category selection panel (when categories are active via burger menu, not quick access) ── */}
-      {activeCategories.size > 0 && !hasDetail && !activeQuickAccess && (
+      {/* Hidden while the user is searching so search results aren't visually
+       *  overridden by a category-scoped panel. Panel returns automatically
+       *  when the search clears (category state is restored). */}
+      {activeCategories.size > 0 && !hasDetail && !activeQuickAccess && !isSearching && (
         <>
           {/* Re-open tab when panel is collapsed */}
           {!categoryPanelOpen && (
             <button
               type="button"
               onClick={() => setCategoryPanelOpen(true)}
-              className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
+              className="absolute bottom-0 left-1/2 z-1008 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
               style={{
                 borderColor: `${CATEGORY_HEX[[...activeCategories][0]]}60`,
                 background: `${CATEGORY_HEX[[...activeCategories][0]]}dd`,
@@ -920,7 +986,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1007 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               categoryPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label="Category filter results"
@@ -1063,14 +1129,14 @@ export default function EventsView({
       )}
 
       {/* ── Quick access panel (when quick-access tool is selected) ── */}
-      {activeQuickItem && !hasDetail && (
+      {activeQuickItem && !hasDetail && !isSearching && (
         <>
           {/* Re-open tab when panel is collapsed */}
           {!quickPanelOpen && (
             <button
               type="button"
               onClick={() => setQuickPanelOpen(true)}
-              className="absolute bottom-0 left-1/2 z-1005 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
+              className="absolute bottom-0 left-1/2 z-1008 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
               style={{
                 borderColor: `${activeQuickItem.color}60`,
                 background: `${activeQuickItem.color}dd`,
@@ -1083,7 +1149,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1007 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               quickPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label={`${activeQuickItem.label} filter results`}
@@ -1271,6 +1337,8 @@ export default function EventsView({
         filteredPlacesCount={filteredPlaces.length}
         onLogout={handleLogout}
         considerVersion={considerVersion}
+        activeTab={burgerTab}
+        onTabChange={setBurgerTab}
       />
 
       {/* ── Detail panel (event or place) ───────────────── */}

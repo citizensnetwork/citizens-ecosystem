@@ -32,6 +32,12 @@ type Props = {
   filteredPlacesCount: number;
   onLogout: () => void;
   considerVersion?: number;
+  /** Controlled tab value ("events" | "places"). When omitted, BurgerMenu
+   *  manages its own tab state. When provided, the parent owns the tab so it
+   *  can, for example, drive a places-only map mode. */
+  activeTab?: BurgerTab;
+  /** Fires whenever the user flips the Event / Place tab toggle. */
+  onTabChange?: (tab: BurgerTab) => void;
 };
 
 const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
@@ -55,10 +61,17 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     filteredPlacesCount,
     onLogout,
     considerVersion,
+    activeTab: controlledTab,
+    onTabChange,
   },
   ref
 ) {
-  const [activeTab, setActiveTab] = useState<BurgerTab>("events");
+  const [uncontrolledTab, setUncontrolledTab] = useState<BurgerTab>("events");
+  const activeTab = controlledTab ?? uncontrolledTab;
+  const setActiveTab = (tab: BurgerTab) => {
+    if (controlledTab === undefined) setUncontrolledTab(tab);
+    onTabChange?.(tab);
+  };
 
   function selectAndClose(event: Event) {
     onSelectEvent(event);
