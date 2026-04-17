@@ -347,10 +347,16 @@ create table if not exists public.event_photos (
   id uuid default gen_random_uuid() primary key,
   event_id uuid not null references public.events(id) on delete cascade,
   url text not null,
+  kind text not null default 'image' check (kind in ('image', 'video')),
+  thumbnail_url text,
+  title text,
   sort_order int not null default 0,
   uploaded_by uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+
+create index if not exists event_photos_event_sort_idx
+  on public.event_photos (event_id, sort_order);
 
 alter table public.event_photos enable row level security;
 

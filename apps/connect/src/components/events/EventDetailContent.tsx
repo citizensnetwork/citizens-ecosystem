@@ -12,9 +12,10 @@ import InlineEventRating from "@/components/reviews/InlineEventRating";
 import SocialShareButtons from "@/components/ui/SocialShareButtons";
 import MessageButton from "@/components/messaging/MessageButton";
 import LocationSharingToggle from "./LocationSharingToggle";
+import EventMediaStrip from "./EventMediaStrip";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
-import type { Event, AttendeesVisibility } from "@/types/db";
+import type { Event, AttendeesVisibility, EventMedia } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
 
 const MiniMap = dynamic(() => import("@/components/map/MiniMap"), {
@@ -39,6 +40,7 @@ type Props = {
   hasRsvped: boolean;
   attendees?: Attendee[];
   locationSharingEnabled?: boolean;
+  media?: EventMedia[];
 };
 
 export default function EventDetailContent({
@@ -48,6 +50,7 @@ export default function EventDetailContent({
   hasRsvped,
   attendees = [],
   locationSharingEnabled = false,
+  media = [],
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -140,6 +143,9 @@ export default function EventDetailContent({
           />
         </div>
       )}
+
+      {/* Organiser media gallery (photos + videos) */}
+      <EventMediaStrip media={media} />
 
       {event.category && (
         <div className="mb-1.5 flex items-center gap-2">

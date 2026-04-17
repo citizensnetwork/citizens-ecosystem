@@ -15,26 +15,33 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({
-    auth: { getUser: mockGetUser },
-    from: () => ({
-      update: mockUpdate,
-      delete: mockDeleteFn,
-      insert: vi.fn().mockResolvedValue({ error: null }),
-      select: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-    }),
-    storage: {
+  createClient: () => {
+    const mediaChain = {
+      order: vi.fn().mockReturnThis(),
+      then: (resolve: (v: { data: unknown[]; error: null }) => void) =>
+        Promise.resolve({ data: [], error: null }).then(resolve),
+    };
+    return {
+      auth: { getUser: mockGetUser },
       from: () => ({
-        upload: vi.fn().mockResolvedValue({ error: null }),
-        getPublicUrl: vi.fn().mockReturnValue({
-          data: { publicUrl: "https://example.com/img.jpg" },
+        update: mockUpdate,
+        delete: mockDeleteFn,
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        select: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          eq: vi.fn().mockReturnValue(mediaChain),
         }),
       }),
-    },
-  }),
+      storage: {
+        from: () => ({
+          upload: vi.fn().mockResolvedValue({ error: null }),
+          getPublicUrl: vi.fn().mockReturnValue({
+            data: { publicUrl: "https://example.com/img.jpg" },
+          }),
+        }),
+      },
+    };
+  },
 }));
 
 // Mock dynamic import for LocationPicker

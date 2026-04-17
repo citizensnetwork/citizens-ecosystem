@@ -60,14 +60,22 @@ export type Event = {
   created_at: string;
 };
 
-export type EventPhoto = {
+export type EventMediaKind = "image" | "video";
+
+export type EventMedia = {
   id: string;
   event_id: string;
   url: string;
+  kind: EventMediaKind;
+  thumbnail_url: string | null;
+  title: string | null;
   sort_order: number;
   uploaded_by: string;
   created_at: string;
 };
+
+/** @deprecated — kept for backwards compatibility; prefer `EventMedia`. */
+export type EventPhoto = EventMedia;
 
 export type RsvpStatus = "attending" | "considering";
 

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
-import type { Event } from "@/types/db";
+import type { Event, EventMedia } from "@/types/db";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -71,14 +71,22 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  // Fetch user and RSVP count in parallel
-  const [{ data: { user } }, { count }] = await Promise.all([
+  // Fetch user, RSVP count, and media gallery in parallel
+  const [{ data: { user } }, { count }, { data: mediaRows }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("rsvps")
       .select("*", { count: "exact", head: true })
       .eq("event_id", id),
+    supabase
+      .from("event_photos")
+      .select("*")
+      .eq("event_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
+
+  const media = (mediaRows ?? []) as EventMedia[];
 
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
@@ -157,6 +165,7 @@ export default async function EventDetailPage({
       hasRsvped={hasRsvped}
       attendees={attendees}
       locationSharingEnabled={locationSharingEnabled}
+      media={media}
     />
   );
 }

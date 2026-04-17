@@ -10,6 +10,8 @@ import {
   createPlaceMarkerEl,
   getTemporalStyle,
   escapeHtml,
+  PLACE_MARKER_SIZE,
+  PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
 import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
@@ -89,9 +91,9 @@ export default function EventMap({
   const activePlaceCategoriesRef = useRef(activePlaceCategories);
   activePlaceCategoriesRef.current = activePlaceCategories;
 
-  // Deconfliction data: stores each event/place marker + its lat/lng
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number }[]>([]);
-  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number }[]>([]);
+  // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number }[]>([]);
+  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number }[]>([]);
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
   const updateMarkerSizesRef = useRef<() => void>(() => {});
@@ -238,23 +240,29 @@ export default function EventMap({
     const map = mapRef.current;
     if (!map) return;
     const scale = zoomScale(map.getZoom());
-    evtMarkerDataRef.current.forEach(({ marker, baseSize }) => {
-      const el = marker.getElement() as HTMLElement;
+
+    const resize = (el: HTMLElement, baseSize: number, iconRatio: number) => {
       const newSize = Math.round(baseSize * scale);
-      const iconSize = Math.round(newSize * 0.48);
+      const iconSize = Math.round(newSize * iconRatio);
       el.style.width = `${newSize}px`;
       el.style.height = `${newSize}px`;
-      // Resize every descendant span that was originally sized in pixels.
-      // Outer circle spans match newSize; inner icon span matches iconSize.
-      const spans = el.querySelectorAll("span");
-      spans.forEach((s) => {
-        const style = (s as HTMLElement).style;
-        // First span(s) = outer circle (keeps newSize); last = icon glyph.
-        const isIconSpan = s === spans[spans.length - 1] && spans.length > 1;
-        const px = isIconSpan ? iconSize : newSize;
-        if (style.width) style.width = `${px}px`;
-        if (style.height) style.height = `${px}px`;
-      });
+      const outer = el.querySelector<HTMLElement>(".cc-marker-outer");
+      const icon = el.querySelector<HTMLElement>(".cc-marker-icon");
+      if (outer) {
+        outer.style.width = `${newSize}px`;
+        outer.style.height = `${newSize}px`;
+      }
+      if (icon) {
+        icon.style.width = `${iconSize}px`;
+        icon.style.height = `${iconSize}px`;
+      }
+    };
+
+    evtMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio }) => {
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio);
+    });
+    placeMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio }) => {
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio);
     });
   }, []);
 
@@ -483,7 +491,7 @@ export default function EventMap({
           .setPopup(popup)
           .addTo(map);
         markersRef.current.push(marker);
-        evtMarkerDataRef.current.push({ marker, lngLat, baseSize });
+        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48 });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -495,11 +503,18 @@ export default function EventMap({
         const isFlagged =
           !!place.verification_flagged || place.verified === false;
 
+        // Determine place category slug (either via filter highlight or keyword auto-match)
+        const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
+        const categoryKeys = Object.keys(PLACE_CATEGORY_KEYWORDS) as PlaceCategory[];
+        const inferredCategory =
+          categoryKeys.find((cat) =>
+            PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
+          ) ?? null;
+
         // Place category highlighting
         let placeIsHighlighted = false;
         let placeHighlightColor: string | undefined;
         if (activePlaceCategories && activePlaceCategories.size > 0) {
-          const text = `${place.name} ${place.description} ${place.address} ${place.categories?.name ?? ""}`.toLowerCase();
           const matchedCat = [...activePlaceCategories].find((cat) =>
             PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
           );
@@ -515,6 +530,7 @@ export default function EventMap({
           isFlagged,
           highlighted: placeIsHighlighted,
           highlightColor: markerOverrideColor ?? placeHighlightColor,
+          category: inferredCategory,
         });
 
         const ratingLabel =
@@ -551,14 +567,14 @@ export default function EventMap({
         });
 
         const lngLat: [number, number] = [place.longitude, place.latitude];
-        const baseSize = parseInt(placeEl.style.width || "28") || 28;
+        const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
           .addTo(map);
 
         placeMarkersRef.current.push(marker);
-        placeMarkerDataRef.current.push({ marker, lngLat, baseSize });
+        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO });
         bounds.extend(lngLat);
         hasPoints = true;
       });
