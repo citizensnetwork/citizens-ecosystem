@@ -12,7 +12,10 @@ import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import EventCalendar from "./EventCalendar";
 import FeaturedPanel from "./FeaturedPanel";
+import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { loadQuickIds } from "@/lib/quickPanelPrefs";
+import { QUICK_ACCESS_ITEMS, type QuickAccessItem } from "@/lib/quickPanelOptions";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 
@@ -51,61 +54,8 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-/** Glass-like inactive background for quick access buttons (silver, 80% opacity). */
-const QUICK_ACCESS_INACTIVE_BG = "rgba(192,192,192,0.80)";
-
-/** Quick access tool definitions — SVG icons, colour, and matching categories. */
-type QuickAccessItem = {
-  id: string;
-  label: string;
-  color: string;
-  eventCategories: EventCategory[];
-  placeCategories: PlaceCategory[];
-  svg: string;
-};
-
-const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
-  {
-    id: "bible-study",
-    label: "Bible Study",
-    color: "#FF6B35",
-    eventCategories: ["education"],
-    placeCategories: ["education"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-  },
-  {
-    id: "coffee",
-    label: "Coffee",
-    color: "#8B4513",
-    eventCategories: ["social-fun"],
-    placeCategories: ["relax"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
-  },
-  {
-    id: "runs",
-    label: "Runs",
-    color: "#2ECC71",
-    eventCategories: ["sport-fun"],
-    placeCategories: ["exercise"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="4" r="2"/><path d="M15.59 13.51l-3.45 4.95L8 15l-4 5"/><path d="M17.64 7.39L20 10l-2 2-3.5-2.5L11 13l-1.5-3L13 7l2.64.39z"/></svg>',
-  },
-  {
-    id: "churches",
-    label: "Churches",
-    color: "#D4AF37",
-    eventCategories: ["church"],
-    placeCategories: ["church"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21H6a1 1 0 0 1-1-1v-7l7-5 7 5v7a1 1 0 0 1-1 1z"/><path d="M12 3v5"/><path d="M9 3h6"/></svg>',
-  },
-  {
-    id: "outreaches",
-    label: "Outreach",
-    color: "#9B59B6",
-    eventCategories: ["community-upliftment"],
-    placeCategories: [],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg>',
-  },
-];
+/** Glass-like inactive background for quick access buttons (white 60%). */
+const QUICK_ACCESS_INACTIVE_BG = "rgba(255,255,255,0.60)";
 
 export default function EventsView({
   events,
@@ -134,6 +84,47 @@ export default function EventsView({
   // Derived: quick-access panel open state (auto-opens when quick access selected)
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickPanelPage, setQuickPanelPage] = useState(0);
+  // Quick-panel preferences (localStorage) — defaults to the first 4 tools
+  const [quickPrefIds, setQuickPrefIds] = useState<string[]>(() =>
+    QUICK_ACCESS_ITEMS.slice(0, 4).map((i) => i.id)
+  );
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+
+  // Load prefs on mount + listen for cross-tab updates (e.g. Profile page save)
+  useEffect(() => {
+    setQuickPrefIds(loadQuickIds());
+    function refresh() { setQuickPrefIds(loadQuickIds()); }
+    window.addEventListener("cc-quick-panel-prefs-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("cc-quick-panel-prefs-changed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  // Derive the visible quick-access items from saved preferences.
+  const visibleQuickItems = useMemo(() => {
+    const byId = new Map(QUICK_ACCESS_ITEMS.map((i) => [i.id, i]));
+    return quickPrefIds
+      .map((id) => byId.get(id))
+      .filter((i): i is QuickAccessItem => !!i);
+  }, [quickPrefIds]);
+
+  // If the active quick-access tool was removed from prefs, clear selection.
+  useEffect(() => {
+    if (activeQuickAccess && !quickPrefIds.includes(activeQuickAccess)) {
+      setActiveQuickAccess(null);
+      setQuickPanelOpen(false);
+      setActiveCategories(new Set());
+      setActivePlaceCategories(new Set());
+    }
+  }, [quickPrefIds, activeQuickAccess]);
+
+  // All quick-panel options (for the settings modal)
+  const quickSettingsOptions = useMemo<QuickPanelOption[]>(
+    () => QUICK_ACCESS_ITEMS.map((i) => ({ id: i.id, label: i.label, color: i.color, svg: i.svg })),
+    []
+  );
 
   // Province filter for calendar view
   const [calendarProvince, setCalendarProvince] = useState("");
@@ -575,11 +566,11 @@ export default function EventsView({
         </div>
       </div>
 
-      {/* ── Quick access tools (glass-like row below top bar) ── */}
-      {view === "map" && (
-        <div className="pointer-events-none absolute inset-x-0 top-[108px] z-999 flex justify-center px-3 sm:top-[116px] sm:px-4">
-          <div className="pointer-events-auto flex items-center gap-2">
-            {QUICK_ACCESS_ITEMS.map((item) => {
+      {/* ── Quick access tools (vertical stack under the burger button) ── */}
+      {view === "map" && visibleQuickItems.length > 0 && (
+        <div className="pointer-events-none absolute left-3 top-[108px] z-999 sm:left-4 sm:top-[116px]">
+          <div className="pointer-events-auto flex flex-col items-center gap-2">
+            {visibleQuickItems.map((item) => {
               const isActive = activeQuickAccess === item.id;
               return (
                 <button
@@ -836,7 +827,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[45dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1004 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               quickPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label={`${activeQuickItem.label} filter results`}
@@ -847,7 +838,7 @@ export default function EventsView({
           >
             {/* Title bar — same as trending dimensions, quick-item coloured */}
             <div
-              className="flex-shrink-0 rounded-t-2xl backdrop-blur-md"
+              className="relative flex-shrink-0 rounded-t-2xl backdrop-blur-md"
               style={{ background: hexToRgba(activeQuickItem.color, 0.6) }}
             >
               <div className="flex justify-center">
@@ -872,12 +863,25 @@ export default function EventsView({
                   {quickFilteredEvents.length + quickFilteredPlaces.length}
                 </span>
               </div>
+              {/* Settings gear (top-right) */}
+              <button
+                type="button"
+                onClick={() => setQuickSettingsOpen(true)}
+                aria-label="Edit quick-panel preferences"
+                title="Quick-panel preferences"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition hover:bg-white/35 active:scale-90"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
             </div>
 
-            {/* Scrollable cards — quick-item coloured translucent background */}
+            {/* Scrollable cards — quick-item coloured translucent background (30%) */}
             <div
               className="flex-1 overflow-y-auto backdrop-blur-md pb-4"
-              style={{ background: hexToRgba(activeQuickItem.color, 0.6) }}
+              style={{ background: hexToRgba(activeQuickItem.color, 0.3) }}
             >
               {quickFilteredEvents.length === 0 && quickFilteredPlaces.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-white/50">
@@ -1109,6 +1113,14 @@ export default function EventsView({
           </aside>
         </>
       )}
+
+      {/* ── Quick-panel settings modal (glass, centered) ────────────── */}
+      <QuickPanelSettings
+        open={quickSettingsOpen}
+        options={quickSettingsOptions}
+        onClose={() => setQuickSettingsOpen(false)}
+        onSaved={(next) => setQuickPrefIds(next)}
+      />
     </div>
   );
 }
