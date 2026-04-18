@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ITEMS_PER_PAGE, COVERAGE_LEVEL_COLOURS, COVERAGE_LEVEL_LABELS } from "@/lib/constants";
+import { Pagination } from "@/components/ui/Pagination";
 import type { CoverageLevel } from "@/types/db";
 
 interface BoundariesPageProps {
@@ -83,6 +84,15 @@ export default async function BoundariesPage({
   }
 
   const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE);
+
+  const paginationExtraParams = [
+    filters.search ? `search=${encodeURIComponent(filters.search)}` : null,
+    filters.active ? `active=${encodeURIComponent(filters.active)}` : null,
+  ]
+    .filter(Boolean)
+    .join("&");
+  const buildPaginationHref = (p: number) =>
+    `/${orgSlug}/boundaries?page=${p}${paginationExtraParams ? `&${paginationExtraParams}` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -190,29 +200,13 @@ export default async function BoundariesPage({
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          {page > 1 && (
-            <Link
-              href={`/${orgSlug}/boundaries?page=${page - 1}${filters.search ? `&search=${filters.search}` : ""}${filters.active ? `&active=${filters.active}` : ""}`}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-alt"
-            >
-              Previous
-            </Link>
-          )}
-          <span className="flex items-center px-2 text-sm text-text-secondary">
-            Page {page} of {totalPages}
-          </span>
-          {page < totalPages && (
-            <Link
-              href={`/${orgSlug}/boundaries?page=${page + 1}${filters.search ? `&search=${filters.search}` : ""}${filters.active ? `&active=${filters.active}` : ""}`}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-alt"
-            >
-              Next
-            </Link>
-          )}
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        buildHref={buildPaginationHref}
+        variant="centered"
+        ariaLabel="Boundaries pagination"
+      />
     </div>
   );
 }

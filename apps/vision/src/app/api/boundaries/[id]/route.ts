@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { isValidBoundaryGeoJSON, approximateAreaKm2 } from "@/lib/map/geo";
+import { requireOrgRole } from "@/lib/supabase/rbac";
 
 const HEX_COLOUR_RE = /^#[0-9a-f]{6}$/i;
 
@@ -76,16 +77,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   // Verify admin/manager
-  const { data: membership } = await supabase
-    .from("user_org_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("org_id", existing.org_id)
-    .single();
-
-  if (!membership || !["org_admin", "org_manager"].includes(membership.role)) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
-  }
+  const auth = await requireOrgRole(supabase, user.id, existing.org_id, [
+    "org_admin",
+    "org_manager",
+  ]);
+  if (!auth.ok) return auth.response;
 
   let body: {
     name?: string;
@@ -181,16 +177,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
 
   // Verify admin
-  const { data: membership } = await supabase
-    .from("user_org_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("org_id", existing.org_id)
-    .single();
-
-  if (!membership || membership.role !== "org_admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  }
+  const auth = await requireOrgRole(supabase, user.id, existing.org_id, [
+    "org_admin",
+  ]);
+  if (!auth.ok) return auth.response;
 
   const { error } = await supabase
     .from("geo_boundaries")

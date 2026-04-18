@@ -1,5 +1,6 @@
 import { ActivityCard } from "./ActivityCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Pagination } from "@/components/ui/Pagination";
 import Link from "next/link";
 import type { Activity, ActivityTag } from "@/types/db";
 
@@ -50,30 +51,14 @@ export function ActivityList({
         ))}
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between text-sm text-text-secondary">
-          <span>
-            Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
-          </span>
-          <div className="flex gap-2">
-            {pagination.page > 1 && (
-              <Link
-                href={`/${orgSlug}/activities?page=${pagination.page - 1}`}
-                className="rounded-md border border-border px-3 py-1 hover:bg-surface-alt"
-              >
-                Previous
-              </Link>
-            )}
-            {pagination.page < pagination.totalPages && (
-              <Link
-                href={`/${orgSlug}/activities?page=${pagination.page + 1}`}
-                className="rounded-md border border-border px-3 py-1 hover:bg-surface-alt"
-              >
-                Next
-              </Link>
-            )}
-          </div>
-        </div>
+      {pagination && (
+        <Pagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          buildHref={(p) => `/${orgSlug}/activities?page=${p}`}
+          ariaLabel="Activities pagination"
+        />
       )}
     </div>
   );

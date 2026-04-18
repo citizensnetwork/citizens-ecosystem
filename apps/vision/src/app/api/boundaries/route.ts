@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
 import { isValidBoundaryGeoJSON, approximateAreaKm2 } from "@/lib/map/geo";
+import { requireOrgRole } from "@/lib/supabase/rbac";
 
 const HEX_COLOUR_RE = /^#[0-9a-f]{6}$/i;
 
@@ -116,16 +117,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Verify admin/manager role
-  const { data: membership } = await supabase
-    .from("user_org_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("org_id", org_id)
-    .single();
-
-  if (!membership || !["org_admin", "org_manager"].includes(membership.role)) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
-  }
+  const auth = await requireOrgRole(supabase, user.id, org_id, [
+    "org_admin",
+    "org_manager",
+  ]);
+  if (!auth.ok) return auth.response;
 
   const area = approximateAreaKm2(boundary_geojson);
 
