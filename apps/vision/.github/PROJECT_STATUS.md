@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 14a Complete — Security Hardening
+## Current Phase: Phase 14b Complete — Architecture Foundation
 
 ## Phase Tracker
 
@@ -21,6 +21,7 @@
 | 12 | Mobile & Polish | ✅ Complete | 2026-04-13 | 2026-04-13 | B |
 | 13 | Hierarchical Federation Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A- |
 | 14a | Security Hardening | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
+| 14b | Architecture Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
 
 
 ## Phase 0 Deliverables
@@ -1708,3 +1709,45 @@ to 9.4/10). All changes are additive; no feature regressions.
 - Refactor settings pages from client to server components.
 - Materialized views / RPCs for alignment, dashboard overview, and
   cross-org metrics (current N+1 query fan-out).
+
+## Phase 14b Deliverables — Architecture Foundation
+
+**Trigger:** SE: Architect review (4.8/10) flagged scattered auth checks, duplicated org-resolution code, offset pagination in violation of project rules, and client-side pages doing multi-hop bootstrap that should be server-side.
+
+### Auth consolidation
+- [x] `src/lib/auth/require.ts` — new helpers `requireUser`, `requireOrgMember`, `requireOrgRoleForRequest`, `validateOrgId`. Replaces the copy-pasted `createClient → getUser → 401` + `isValidUUID → 400` + `requireOrgRole → 403` pattern across 30+ API routes.
+
+### Domain query layer
+- [x] `src/lib/queries/orgs.ts` — `getOrgBySlug`, `getUserMembership`, `listOrgMembers`, `listOrgDepartments`, `getOrgSettingsBundle` (parallel fetch).
+- [x] `src/lib/queries/activities.ts` — `listActivitiesCursor`, `listActivitiesOffset`, shared `applyFilters` helper with a typed `Filterable<T>` constraint.
+- [x] `server-only` guard on query modules (with Vitest stub at `src/__tests__/stubs/server-only.ts`).
+
+### Cursor pagination
+- [x] `src/lib/pagination/cursor.ts` — base64url-encoded `{k, i}` payloads, `parsePageSize` with MAX_PAGE_SIZE clamp, `buildCursorPage` with fetch-N+1 sentinel. Stable at scale (no OFFSET scans).
+- [x] `/api/activities` GET — opt-in via `?cursor=...` or `?paginate=cursor`; legacy offset response preserved for existing clients.
+
+### Server Components refactor
+- [x] `src/app/[orgSlug]/settings/members/page.tsx` — converted from `"use client"` to async Server Component. Single server-side bundle query replaces three-hop client bootstrap (`/api/orgs` → find match → `/api/orgs/{id}/members` → `/api/orgs/{id}/departments`). `currentUserId` now correctly populated from the server session.
+- [x] `src/app/[orgSlug]/settings/departments/page.tsx` — same treatment.
+- [x] `src/components/org/MembersSettingsClient.tsx`, `DepartmentsSettingsClient.tsx` — thin `"use client"` wrappers that invoke `router.refresh()` on mutation instead of re-fetching, so server RLS-filtered data remains the single source of truth.
+
+### Cache tag vocabulary
+- [x] `src/lib/cache/tags.ts` — `orgTags.{all,activities,projects,goals,members,departments,metrics}` plus `invalidateOrg`, `invalidateOrgResource`. Compatible with Next 16's `revalidateTag(tag, profile)` signature. Not yet wired into fetch calls — future phases can opt specific queries in without renaming the tag strings.
+
+### Tests (29 new)
+- [x] `src/__tests__/lib/pagination-cursor.test.ts` — 15 tests covering encode/decode roundtrip, malformed-input resilience, page-size clamping, sentinel-row detection.
+- [x] `src/__tests__/lib/auth-require.test.ts` — 11 tests for each helper's success/401/400/403 paths using the supabase chain-mock pattern.
+- [x] `src/__tests__/lib/cache-tags.test.ts` — 3 tests verifying distinct tags per resource and cross-tenant isolation.
+
+### Quality gate
+- [x] 801/801 tests passing (up from 772 after Phase 14a).
+- [x] `tsc --noEmit` clean.
+- [x] ESLint clean.
+- [x] `next build` compiled successfully, 76 routes.
+
+### Deferred to later phases
+- Cache-tag wiring into `fetch()` calls and server actions — additive, low-risk, can be done incrementally per resource.
+- Cursor pagination for `/api/projects`, `/api/goals`, `/api/timeline`, connect endpoints — helper is ready, rollout is opt-in.
+- Consolidation of the remaining ~25 API routes onto `requireOrgMember` / `requireOrgRoleForRequest` — mechanical, can be batched.
+- Server Component conversion of `[orgSlug]/page.tsx`, dashboard, timeline, map pages.
+

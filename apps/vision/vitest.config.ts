@@ -23,6 +23,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // `server-only` is a Next.js build-time guard that throws if
+      // imported from a client bundle. Under Vitest (node) it has no
+      // meaning, so we alias it to an empty module to keep the
+      // domain query layer importable from tests.
+      "server-only": path.resolve(__dirname, "./src/__tests__/stubs/server-only.ts"),
     },
   },
 });
