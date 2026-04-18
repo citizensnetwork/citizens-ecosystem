@@ -57,71 +57,39 @@ CREATE INDEX IF NOT EXISTS idx_geo_boundaries_geojson
 -- Activities with lat/lng within the bbox are counted.
 -- ============================================================
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_boundary_activity_coverage AS
-WITH boundary_bounds AS (
+WITH boundary_rings AS (
+  -- Pull the outer ring of the (Multi)Polygon as a single jsonb array
+  -- of [lng, lat] pairs. Anything else collapses to an empty ring.
   SELECT
-    b.id AS boundary_id,
+    b.id   AS boundary_id,
     b.org_id,
     b.name AS boundary_name,
-    -- Extract bounding box from GeoJSON coordinates
-    -- For simplicity, we scan all coordinate arrays
-    (
-      SELECT MIN(coord_val)
-      FROM jsonb_array_elements(
-        CASE
-          WHEN b.boundary_geojson->>'type' = 'Polygon'
-            THEN b.boundary_geojson->'coordinates'->0
-          WHEN b.boundary_geojson->>'type' = 'MultiPolygon'
-            THEN b.boundary_geojson->'coordinates'->0->0
-          ELSE '[]'::jsonb
-        END
-      ) AS coords,
-      jsonb_array_elements(coords) WITH ORDINALITY AS t(coord_val, ord)
-      WHERE t.ord = 1
-    ) AS min_lng,
-    (
-      SELECT MAX(coord_val)
-      FROM jsonb_array_elements(
-        CASE
-          WHEN b.boundary_geojson->>'type' = 'Polygon'
-            THEN b.boundary_geojson->'coordinates'->0
-          WHEN b.boundary_geojson->>'type' = 'MultiPolygon'
-            THEN b.boundary_geojson->'coordinates'->0->0
-          ELSE '[]'::jsonb
-        END
-      ) AS coords,
-      jsonb_array_elements(coords) WITH ORDINALITY AS t(coord_val, ord)
-      WHERE t.ord = 1
-    ) AS max_lng,
-    (
-      SELECT MIN(coord_val)
-      FROM jsonb_array_elements(
-        CASE
-          WHEN b.boundary_geojson->>'type' = 'Polygon'
-            THEN b.boundary_geojson->'coordinates'->0
-          WHEN b.boundary_geojson->>'type' = 'MultiPolygon'
-            THEN b.boundary_geojson->'coordinates'->0->0
-          ELSE '[]'::jsonb
-        END
-      ) AS coords,
-      jsonb_array_elements(coords) WITH ORDINALITY AS t(coord_val, ord)
-      WHERE t.ord = 2
-    ) AS min_lat,
-    (
-      SELECT MAX(coord_val)
-      FROM jsonb_array_elements(
-        CASE
-          WHEN b.boundary_geojson->>'type' = 'Polygon'
-            THEN b.boundary_geojson->'coordinates'->0
-          WHEN b.boundary_geojson->>'type' = 'MultiPolygon'
-            THEN b.boundary_geojson->'coordinates'->0->0
-          ELSE '[]'::jsonb
-        END
-      ) AS coords,
-      jsonb_array_elements(coords) WITH ORDINALITY AS t(coord_val, ord)
-      WHERE t.ord = 2
-    ) AS max_lat
+    CASE
+      WHEN b.boundary_geojson->>'type' = 'Polygon'
+        THEN b.boundary_geojson->'coordinates'->0
+      WHEN b.boundary_geojson->>'type' = 'MultiPolygon'
+        THEN b.boundary_geojson->'coordinates'->0->0
+      ELSE '[]'::jsonb
+    END AS ring
   FROM geo_boundaries b
   WHERE b.active = TRUE
+),
+boundary_bounds AS (
+  -- For each boundary, fold the [lng, lat] pairs in its ring into a
+  -- numeric bounding box. (->>0 / ->>1 give text; cast to numeric so
+  -- MIN/MAX have a real numeric type to aggregate over — MIN(jsonb)
+  -- does not exist in Postgres.)
+  SELECT
+    br.boundary_id,
+    br.org_id,
+    br.boundary_name,
+    MIN((coord->>0)::numeric) AS min_lng,
+    MAX((coord->>0)::numeric) AS max_lng,
+    MIN((coord->>1)::numeric) AS min_lat,
+    MAX((coord->>1)::numeric) AS max_lat
+  FROM boundary_rings br
+  CROSS JOIN LATERAL jsonb_array_elements(br.ring) AS coord
+  GROUP BY br.boundary_id, br.org_id, br.boundary_name
 )
 SELECT
   bb.boundary_id,

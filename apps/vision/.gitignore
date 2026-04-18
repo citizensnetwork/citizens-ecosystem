@@ -47,3 +47,7 @@ next-env.d.ts
 coverage_out.txt
 coverage_review.txt
 test_run*.txt
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

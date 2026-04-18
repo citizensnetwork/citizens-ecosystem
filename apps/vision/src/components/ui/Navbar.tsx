@@ -12,6 +12,28 @@ export function Navbar() {
   const orgSlug = params?.orgSlug as string | undefined;
   const currentOrg = useOrgStore((s) => s.currentOrg);
   const [criticalCount, setCriticalCount] = useState(0);
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+
+  // Reactively track auth state. null = unknown (first paint) so we render
+  // nothing auth-related until we have the answer — avoids the flash of
+  // "Sign Out" on a page where the user is not logged in.
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setIsAuthed(!!data.user);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthed(!!session?.user);
+    });
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -67,14 +89,23 @@ export function Navbar() {
             )}
           </Link>
         )}
-        <form action="/api/auth/signout" method="post">
-          <button
-            type="submit"
+        {isAuthed ? (
+          <form action="/api/auth/signout" method="post">
+            <button
+              type="submit"
+              className="rounded-md px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+            >
+              Sign Out
+            </button>
+          </form>
+        ) : isAuthed === false ? (
+          <Link
+            href="/auth/login"
             className="rounded-md px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-alt hover:text-text-primary"
           >
-            Sign Out
-          </button>
-        </form>
+            Sign In
+          </Link>
+        ) : null}
       </div>
     </header>
   );

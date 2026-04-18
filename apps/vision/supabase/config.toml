@@ -1,6 +1,4 @@
-[project]
-id = "citizens-vision"
-name = "Citizens Vision"
+project_id = "citizens-vision"
 
 [api]
 enabled = true

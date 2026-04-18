@@ -1,28 +1,16 @@
-import { SignupForm } from "@/components/auth/SignupForm";
-import Link from "next/link";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "Sign Up — Citizens Vision",
 };
 
+// Signup and login are functionally identical when using OAuth —
+// Google returns the same user id on every visit regardless of whether
+// it's their first time or not. Keep the route to avoid breaking old
+// links, but funnel everyone through /auth/login.
 export default function SignupPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md px-6">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-text-primary">Citizens Vision</h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            Create your account
-          </p>
-        </div>
-        <SignupForm />
-        <p className="mt-6 text-center text-sm text-text-secondary">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-accent hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
-  );
+  redirect("/auth/login");
+  // (unreachable, kept only so TS/Next infers a valid component)
+  return <GoogleAuthButton label="Continue with Google" />;
 }
