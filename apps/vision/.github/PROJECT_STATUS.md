@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 18 Complete — Tree-Aware RLS
+## Current Phase: Phase 19 Complete — Hierarchy Admin UI
 
 ## Phase Tracker
 
@@ -27,6 +27,9 @@
 | 15b | Trends Endpoint Aggregates | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 16  | Trigram Search | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 18  | Tree-Aware RLS | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 15c | Aggregate Triggers | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 16b | Global Search UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 19  | Hierarchy Admin UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1850,3 +1853,33 @@ to 9.4/10). All changes are additive; no feature regressions.
 - **TypeScript**: Clean
 - **ESLint**: Clean
 - **Build**: Compiled successfully in 23.9s
+
+## Phase 15c Deliverables (Aggregate Triggers)
+
+- [x] Migration 019_activity_aggregate_triggers.sql
+- [x] Statement-level AFTER INSERT/UPDATE/DELETE triggers on activities
+- [x] Trigger function refreshes every distinct (org_id, day) tuple touched
+- [x] Bulk-write friendly: collapses N rows into one refresh per (org, day)
+
+## Phase 16b Deliverables (Global Search UI)
+
+- [x] GlobalSearchBar client component with 250ms debounce + AbortController
+- [x] Wired into Navbar above advisory bell
+- [x] Calls /api/search?org_id&q with grouped activity/project/goal results
+- [x] Outside-click + escape close, deep-links to entity detail pages
+
+## Phase 19 Deliverables (Hierarchy Admin UI)
+
+- [x] PATCH /api/orgs/[orgId] accepts parent_org_id (admin-only, cycle-safe)
+- [x] members PATCH schema accepts is_founder
+- [x] /[orgSlug]/settings/hierarchy server page + HierarchySettingsClient
+- [x] Self + descendants excluded client-side; DB trigger enforces server-side
+- [x] Settings index gains Hierarchy tile
+- [x] 5 new tests covering invalid UUID, self-parent, role gating, success cases
+
+## Build Verification (Phase 15c + 16b + 19)
+
+- **Tests**: 843/843 passing (90 files, +5 new)
+- **TypeScript**: Clean
+- **ESLint**: Clean
+- **Build**: Compiled successfully in 30.3s

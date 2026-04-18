@@ -20,6 +20,12 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
       description: "Manage team members and roles",
       icon: "👥",
     },
+    {
+      label: "Hierarchy",
+      href: `/${orgSlug}/settings/hierarchy`,
+      description: "Place this org in the parent/child tree",
+      icon: "▲",
+    },
   ];
 
   return (

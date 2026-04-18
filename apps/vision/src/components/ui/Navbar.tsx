@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useOrgStore } from "@/stores/orgStore";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GlobalSearchBar } from "@/components/ui/GlobalSearchBar";
 
 export function Navbar() {
   const params = useParams();
@@ -38,6 +39,7 @@ export function Navbar() {
       )}
 
       <div className="ml-auto flex items-center gap-3">
+        {orgSlug && <GlobalSearchBar />}
         {orgSlug && (
           <Link
             href={`/${orgSlug}/advisory`}

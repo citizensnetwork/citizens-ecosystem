@@ -17,6 +17,7 @@ const updateMemberSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(["org_admin", "org_manager", "org_member", "org_viewer"]).optional(),
   department_id: z.string().uuid().nullable().optional(),
+  is_founder: z.boolean().optional(),
 });
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
