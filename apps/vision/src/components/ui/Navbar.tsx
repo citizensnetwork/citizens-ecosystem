@@ -6,6 +6,7 @@ import { useOrgStore } from "@/stores/orgStore";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GlobalSearchBar } from "@/components/ui/GlobalSearchBar";
+import type { User, Session, Subscription } from "@supabase/supabase-js";
 
 export function Navbar() {
   const params = useParams();
@@ -21,13 +22,18 @@ export function Navbar() {
     const supabase = createClient();
     let cancelled = false;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setIsAuthed(!!data.user);
-    });
+    supabase.auth
+      .getUser()
+      .then(({ data }: { data: { user: User | null } }) => {
+        if (!cancelled) setIsAuthed(!!data.user);
+      });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthed(!!session?.user);
-    });
+    const { data: sub }: { data: { subscription: Subscription } } =
+      supabase.auth.onAuthStateChange(
+        (_event: string, session: Session | null) => {
+          setIsAuthed(!!session?.user);
+        },
+      );
 
     return () => {
       cancelled = true;
