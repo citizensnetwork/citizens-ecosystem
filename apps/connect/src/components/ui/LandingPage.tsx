@@ -33,8 +33,13 @@ const CONNECTING_PHRASES = [
   "the seeker to truth",
 ];
 
-/** Kingdom subtitle shown beneath the Connect CTA. */
-const KINGDOM_TAGLINE = "By the Kingdom. · With the Kingdom. · For the Kingdom.";
+/**
+ * Kingdom subtitle shown beneath the Connect CTA.
+ * Middle dots already separate the three phrases, so per design feedback we
+ * dropped the trailing full stops to declutter the line and let the bullets
+ * carry the rhythm.
+ */
+const KINGDOM_TAGLINE = "By the Kingdom · With the Kingdom · For the Kingdom";
 
 // Citizens platform channels — Connect is live, others are upcoming
 const PLATFORM_CHANNELS = [
@@ -244,11 +249,15 @@ export default function LandingPage({ events, places }: Props) {
           WebkitBackdropFilter: "blur(12px) saturate(1.1)",
         }}
       >
-        {/* ── Top section: scripture excerpt, title, scrolling tagline ── */}
+        {/* ── Top section: scripture excerpt, title, scrolling tagline ──
+         *  Spacing widened (mb-3 → mb-5 on the verse, mt-2 → mt-3 on the
+         *  scripture ref, mt-5 → mt-7 on the rotating tagline) to give the
+         *  hero more breathing room and stop it reading as a tightly stacked
+         *  paragraph. */}
         <div className="flex flex-1 flex-col items-center justify-center px-6 sm:px-8">
           {/* Italicised verse excerpt (styled like the "Citizens platform" label: tiny uppercase gold) */}
           <p
-            className="mb-3 max-w-md text-center text-[10px] font-semibold italic tracking-[0.14em] sm:text-[11px]"
+            className="mb-5 max-w-md text-center text-[10px] font-semibold italic tracking-[0.14em] sm:text-[11px]"
             style={{ color: "#000" }}
           >
             &ldquo;<sup className="mr-0.5 text-[8px] font-bold not-italic" style={{ color: "var(--gold)" }}>19</sup>
@@ -264,13 +273,13 @@ export default function LandingPage({ events, places }: Props) {
           </h1>
 
           {/* Scripture reference (kept where the logo sits) */}
-          <p className="mt-2 text-[10px] font-semibold tracking-wider" style={{ color: "var(--gold)" }}>
+          <p className="mt-3 text-[10px] font-semibold tracking-wider" style={{ color: "var(--gold)" }}>
             Eph. 2:19-22
           </p>
 
           {/* Rotating "Connecting …" tagline — word "Connecting" stays centred; right-hand phrase cycles every 2s */}
           <div
-            className="mt-5 flex w-full max-w-md items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest sm:text-sm"
+            className="mt-7 flex w-full max-w-md items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest sm:text-sm"
             aria-live="polite"
           >
             <span style={{ color: "#000" }}>Connecting</span>
@@ -527,13 +536,15 @@ export default function LandingPage({ events, places }: Props) {
           )}
         </div>
 
-        {/* ── Bottom: platform channels + browse hint ── */}
-        <div className="w-full px-4 pb-6 pt-1">
+        {/* ── Bottom: platform channels + browse hint ──
+         *  The "Citizens Platform" caption that used to sit above this grid
+         *  was removed per design feedback — it doubled the labelling already
+         *  carried by the channel buttons themselves and made the bottom of
+         *  the panel feel cramped. The grid now breathes inside its own
+         *  region with a generous top pad. */}
+        <div className="w-full px-4 pb-6 pt-4">
           {/* Platform channels row */}
-          <div className="mb-3">
-            <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-black/40">
-              Citizens Platform
-            </p>
+          <div className="mb-4">
             <div className="grid grid-cols-4 gap-2">
               {PLATFORM_CHANNELS.map((ch) =>
                 ch.active ? (

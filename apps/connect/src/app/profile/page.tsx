@@ -89,7 +89,8 @@ export default async function ProfilePage() {
   const typedProfile: Profile = {
     id: profile?.id ?? user.id,
     email: profile?.email ?? user.email ?? "",
-    role: profile?.role ?? "individual",
+    role: profile?.role ?? "citizen",
+    contributor_kind: profile?.contributor_kind ?? null,
     full_name: profile?.full_name ?? "",
     avatar_url: profile?.avatar_url ?? null,
     onboarding_completed: profile?.onboarding_completed ?? false,
@@ -141,7 +142,7 @@ export default async function ProfilePage() {
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {ROLE_LABELS[(profile?.role as UserRole) ?? "individual"] ?? "Community Citizen"}
+            {ROLE_LABELS[(profile?.role as UserRole) ?? "citizen"] ?? "Citizen"}
           </span>
           <div className="mt-2 flex gap-4 text-sm text-black/70">
             <span>

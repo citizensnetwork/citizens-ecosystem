@@ -6,13 +6,20 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import VerificationPending from "./VerificationPending";
 import OAuthButtons from "./OAuthButtons";
-import type { UserRole } from "@/types/db";
+import type { UserRole, ContributorKind } from "@/types/db";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<UserRole>("individual");
+  // Two-stage role pick:
+  //   - `role`: citizen vs contributor (the only thing the trigger respects)
+  //   - `contributorKind`: ministry / organization / business (only meaningful
+  //     when role === "contributor"; ignored by the trigger otherwise)
+  // Defaults to citizen because the overwhelming majority of new accounts are
+  // attendees, not organisers — this matches the sign-up funnel we expect.
+  const [role, setRole] = useState<UserRole>("citizen");
+  const [contributorKind, setContributorKind] = useState<ContributorKind>("ministry");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -31,6 +38,10 @@ export default function SignupForm() {
         data: {
           full_name: fullName,
           role,
+          // Only forward the kind when it's actually relevant; the DB trigger
+          // will null it out for citizens but being explicit keeps the
+          // raw_user_meta_data clean.
+          ...(role === "contributor" ? { contributor_kind: contributorKind } : {}),
         },
       },
     });
@@ -150,20 +161,22 @@ export default function SignupForm() {
 
       <div className="space-y-2">
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75">
-          I am a
+          I am joining as
         </label>
+        {/* Primary pick: citizen vs contributor.  Two cards, side-by-side,
+            so the choice feels lightweight rather than four-way bureaucratic. */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
             <input
               type="radio"
               name="role"
-              value="individual"
-              checked={role === "individual"}
-              onChange={() => setRole("individual")}
+              value="citizen"
+              checked={role === "citizen"}
+              onChange={() => setRole("citizen")}
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Individual</span>
+              <span className="font-medium text-black">Citizen</span>
               <span className="block text-xs text-(--foreground-soft)">
                 Discover events, RSVP, review &amp; connect
               </span>
@@ -173,51 +186,52 @@ export default function SignupForm() {
             <input
               type="radio"
               name="role"
-              value="ministry"
-              checked={role === "ministry"}
-              onChange={() => setRole("ministry")}
+              value="contributor"
+              checked={role === "contributor"}
+              onChange={() => setRole("contributor")}
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-black">Ministry</span>
+              <span className="font-medium text-black">Contributor</span>
               <span className="block text-xs text-(--foreground-soft)">
-                Church or ministry — host events &amp; share content
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
-            <input
-              type="radio"
-              name="role"
-              value="organization"
-              checked={role === "organization"}
-              onChange={() => setRole("organization")}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="font-medium text-black">Organization</span>
-              <span className="block text-xs text-(--foreground-soft)">
-                Community org — create &amp; manage events
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
-            <input
-              type="radio"
-              name="role"
-              value="business"
-              checked={role === "business"}
-              onChange={() => setRole("business")}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="font-medium text-black">Business</span>
-              <span className="block text-xs text-(--foreground-soft)">
-                Promote events &amp; list your place
+                Host events, manage places &amp; share content
               </span>
             </span>
           </label>
         </div>
+
+        {/* Secondary pick (revealed only for contributors): which kind of
+            contributor.  Nesting it inside the same field group keeps it
+            visually subordinate to the primary choice. */}
+        {role === "contributor" && (
+          <div className="mt-2 space-y-1.5 rounded-xl border border-dashed border-black/15 bg-(--gold-soft)/40 p-3">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/65">
+              Contributing as
+            </span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(["ministry", "organization", "business"] as const).map((kind) => (
+                <label
+                  key={kind}
+                  className={`flex cursor-pointer items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+                    contributorKind === kind
+                      ? "border-black bg-black text-white"
+                      : "border-black/15 bg-white text-black/80 hover:border-black/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="contributor_kind"
+                    value={kind}
+                    checked={contributorKind === kind}
+                    onChange={() => setContributorKind(kind)}
+                    className="sr-only"
+                  />
+                  <span className="capitalize">{kind === "organization" ? "Org" : kind}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <button

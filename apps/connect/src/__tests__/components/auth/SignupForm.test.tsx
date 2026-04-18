@@ -38,22 +38,28 @@ describe("SignupForm", () => {
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("renders role selection with four role options", () => {
+  it("renders citizen vs contributor primary role pick", () => {
     render(<SignupForm />);
-    expect(screen.getByDisplayValue("individual")).toBeInTheDocument();
-    expect(screen.getByText("Individual")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("ministry")).toBeInTheDocument();
-    expect(screen.getByText("Ministry")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("organization")).toBeInTheDocument();
-    expect(screen.getByText("Organization")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("business")).toBeInTheDocument();
-    expect(screen.getByText("Business")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("citizen")).toBeInTheDocument();
+    expect(screen.getByText("Citizen")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("contributor")).toBeInTheDocument();
+    expect(screen.getByText("Contributor")).toBeInTheDocument();
+    // Secondary contributor_kind picker is hidden until contributor is chosen
+    expect(screen.queryByDisplayValue("ministry")).not.toBeInTheDocument();
   });
 
-  it("defaults to individual role", () => {
+  it("reveals contributor kind sub-picker when contributor is selected", () => {
     render(<SignupForm />);
-    const individualRadio = screen.getByDisplayValue("individual") as HTMLInputElement;
-    expect(individualRadio.checked).toBe(true);
+    fireEvent.click(screen.getByDisplayValue("contributor"));
+    expect(screen.getByDisplayValue("ministry")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("organization")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("business")).toBeInTheDocument();
+  });
+
+  it("defaults to citizen role", () => {
+    render(<SignupForm />);
+    const citizenRadio = screen.getByDisplayValue("citizen") as HTMLInputElement;
+    expect(citizenRadio.checked).toBe(true);
   });
 
   it("renders Sign Up button", () => {
@@ -87,13 +93,14 @@ describe("SignupForm", () => {
         email: "jane@test.com",
         password: "password123",
         options: {
-          data: { full_name: "Jane Doe", role: "individual" },
+          // Citizen sign-ups carry no contributor_kind in metadata
+          data: { full_name: "Jane Doe", role: "citizen" },
         },
       });
     });
   });
 
-  it("submits with ministry role when selected", async () => {
+  it("submits with contributor + kind when contributor is selected", async () => {
     mockSignUp.mockResolvedValue({ data: { session: null }, error: null });
 
     render(<SignupForm />);
@@ -106,17 +113,28 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "secure123" },
     });
-    fireEvent.click(screen.getByDisplayValue("ministry"));
+    fireEvent.click(screen.getByDisplayValue("contributor"));
+    // Default contributor_kind is ministry (the most common signup path)
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
       expect(mockSignUp).toHaveBeenCalledWith(
         expect.objectContaining({
-          options: { data: { full_name: "Pastor Bob", role: "ministry" } },
+          options: {
+            data: {
+              full_name: "Pastor Bob",
+              role: "contributor",
+              contributor_kind: "ministry",
+            },
+          },
         })
       );
     });
   });
+
+  // Removed: legacy "submits with ministry role" test — ministry is no longer
+  // a top-level role (migration 033).  Equivalent coverage now lives in the
+  // contributor + kind test directly above.
 
   it("redirects to /events when session is returned (no email confirmation)", async () => {
     mockSignUp.mockResolvedValue({

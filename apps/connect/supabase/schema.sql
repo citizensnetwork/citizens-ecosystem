@@ -20,11 +20,20 @@ $$;
 -- ══════════════════════════════════════════════
 -- 1. Profiles (extends Supabase Auth users)
 -- ══════════════════════════════════════════════
+-- Role model collapsed in migration 033 from a seven-way enum to a clean
+-- three-way model.  `contributor_kind` preserves the historical sub-type
+-- (ministry / organization / business) for contributors who want to
+-- declare it; it's nullable for citizens, admins, and contributors who
+-- haven't picked one.
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text not null,
   full_name text not null default '',
-  role text not null check (role in ('individual', 'ministry', 'organization', 'business', 'vendor', 'client', 'admin')) default 'individual',
+  role text not null
+    check (role in ('citizen', 'contributor', 'admin'))
+    default 'citizen',
+  contributor_kind text
+    check (contributor_kind is null or contributor_kind in ('ministry', 'organization', 'business')),
   avatar_url text,
   onboarding_completed boolean not null default false,
   notification_email text,
@@ -432,23 +441,40 @@ end $$;
 -- 10. Functions & Triggers
 -- ══════════════════════════════════════════════
 
--- Auto-create profile on signup
+-- Auto-create profile on signup.  Reflects the citizen / contributor /
+-- admin role model post-migration 033.  Both `role` and the optional
+-- `contributor_kind` are read from the user metadata supplied by the
+-- signup form; admin still requires manual elevation in the database.
 create or replace function public.handle_new_user()
 returns trigger as $$
 declare
   signup_role text;
+  signup_kind text;
 begin
-  signup_role := coalesce(new.raw_user_meta_data->>'role', 'individual');
-  -- Only allow self-assignable roles; admin requires manual DB update
-  if signup_role not in ('individual', 'ministry', 'organization', 'business') then
-    signup_role := 'individual';
+  signup_role := coalesce(new.raw_user_meta_data->>'role', 'citizen');
+  signup_kind := nullif(new.raw_user_meta_data->>'contributor_kind', '');
+
+  if signup_role not in ('citizen', 'contributor') then
+    signup_role := 'citizen';
   end if;
-  insert into public.profiles (id, email, full_name, role)
+
+  if signup_kind is not null
+     and signup_kind not in ('ministry', 'organization', 'business') then
+    signup_kind := null;
+  end if;
+
+  -- contributor_kind is only meaningful for contributors
+  if signup_role <> 'contributor' then
+    signup_kind := null;
+  end if;
+
+  insert into public.profiles (id, email, full_name, role, contributor_kind)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', ''),
-    signup_role
+    signup_role,
+    signup_kind
   );
   return new;
 end;
@@ -480,13 +506,15 @@ create trigger protect_role_trigger
   before update on public.profiles
   for each row execute function public.protect_role_column();
 
--- Helper: check if current user is an organiser role
+-- Helper: check if current user is an organiser-tier role.  The function
+-- name is preserved across the role rename (migration 033) so RLS
+-- policies on places, event_updates, etc. don't need to be updated.
 create or replace function public.is_organiser()
 returns boolean as $$
   select exists (
     select 1 from public.profiles
     where id = auth.uid()
-      and role in ('ministry', 'organization', 'business', 'admin')
+      and role in ('contributor', 'admin')
   );
 $$ language sql security definer stable;
 

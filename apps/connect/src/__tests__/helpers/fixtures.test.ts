@@ -17,13 +17,14 @@ describe("Test fixtures", () => {
   it("creates valid Profile with defaults", () => {
     const profile = makeProfile();
     expect(profile.id).toBe(TEST_USER_ID);
-    expect(profile.role).toBe("individual");
+    expect(profile.role).toBe("citizen");
     expect(profile.email).toContain("@");
   });
 
   it("allows overriding Profile fields", () => {
-    const profile = makeProfile({ role: "ministry", full_name: "Jane Doe" });
-    expect(profile.role).toBe("ministry");
+    const profile = makeProfile({ role: "contributor", contributor_kind: "ministry", full_name: "Jane Doe" });
+    expect(profile.role).toBe("contributor");
+    expect(profile.contributor_kind).toBe("ministry");
     expect(profile.full_name).toBe("Jane Doe");
   });
 

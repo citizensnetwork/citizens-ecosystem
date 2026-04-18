@@ -144,7 +144,7 @@ export default async function PublicProfilePage({
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {ROLE_LABELS[(profile.role as UserRole) ?? "individual"] ?? "Community Citizen"}
+            {ROLE_LABELS[(profile.role as UserRole) ?? "citizen"] ?? "Citizen"}
           </span>
 
           {/* Social counts */}

@@ -107,33 +107,63 @@ export type ConsiderJoin = {
   profiles?: { full_name: string; avatar_url: string | null };
 };
 
-export type UserRole =
-  | "individual"
-  | "ministry"
-  | "organization"
-  | "business"
-  | "vendor"   // legacy — migrated to individual
-  | "client"   // legacy — migrated to individual
-  | "admin";
+/**
+ * Canonical user role.
+ *
+ * Migration 033 collapsed the previous seven-way enum
+ * (individual / ministry / organization / business / vendor / client / admin)
+ * into a clean three-way model that mirrors the platform's vocabulary:
+ *
+ *   - "citizen"     — anyone who shows up to discover, RSVP, comment, follow
+ *   - "contributor" — anyone who creates events, manages places, or hosts gatherings
+ *   - "admin"       — operations / moderation
+ *
+ * The old "kind of contributor" (ministry / organization / business) is preserved
+ * on the profile via {@link ContributorKind} so we don't lose affiliation data.
+ */
+export type UserRole = "citizen" | "contributor" | "admin";
 
-/** Roles that can create & manage places (\"Book at Place\" in EventForm). */
-export const ORGANISER_ROLES: UserRole[] = ["ministry", "organization", "business", "admin"];
+/**
+ * Sub-type of contributor.  Only meaningful when {@link UserRole} is "contributor";
+ * always null for citizens and admins.  Used purely for display ("Contributor —
+ * Ministry") and downstream personalisation; carries no extra permissions.
+ */
+export type ContributorKind = "ministry" | "organization" | "business";
+
+/** Roles that can create & manage events / places.  Single source of truth. */
+export const CONTRIBUTOR_ROLES: UserRole[] = ["contributor", "admin"];
+
+/**
+ * Legacy alias for {@link CONTRIBUTOR_ROLES}.  Existing call sites import
+ * `ORGANISER_ROLES` from this module; we keep the alias to avoid a churn
+ * commit that touches a dozen unrelated files.  New code should prefer
+ * `CONTRIBUTOR_ROLES`.
+ *
+ * @deprecated Use {@link CONTRIBUTOR_ROLES} instead.
+ */
+export const ORGANISER_ROLES: UserRole[] = CONTRIBUTOR_ROLES;
 
 /** Human-readable label for each role. */
 export const ROLE_LABELS: Record<UserRole, string> = {
-  individual: "Community Citizen",
+  citizen: "Citizen",
+  contributor: "Contributor",
+  admin: "Admin",
+};
+
+/** Human-readable label for each contributor sub-type. */
+export const CONTRIBUTOR_KIND_LABELS: Record<ContributorKind, string> = {
   ministry: "Ministry",
   organization: "Organization",
   business: "Business",
-  vendor: "Community Citizen",  // legacy fallback
-  client: "Community Citizen",  // legacy fallback
-  admin: "Admin",
 };
 
 export type Profile = {
   id: string;
   email: string;
   role: UserRole;
+  /** Sub-type of contributor; null for citizens, admins, and contributors who
+   *  never picked one.  See {@link ContributorKind}. */
+  contributor_kind: ContributorKind | null;
   full_name: string;
   avatar_url: string | null;
   onboarding_completed: boolean;

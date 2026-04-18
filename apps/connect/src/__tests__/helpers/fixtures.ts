@@ -9,7 +9,8 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
   return {
     id: TEST_USER_ID,
     email: "testuser@example.com",
-    role: "individual",
+    role: "citizen",
+    contributor_kind: null,
     full_name: "Test User",
     avatar_url: null,
     created_at: "2025-01-01T00:00:00Z",

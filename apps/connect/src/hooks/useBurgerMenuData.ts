@@ -89,14 +89,16 @@ export function useBurgerMenuData(
         (f: { followee_id: string }) => f.followee_id
       );
 
-      // Batch 2: vendor profiles + mutual follows (both depend on followeeIds)
+      // Batch 2: contributor profiles + mutual follows (both depend on followeeIds)
+      // Surfaces the user's followed contributors as "Favourite Orgs" further
+      // down — see migration 033 (role rename: vendor → contributor).
       const [vendorProfilesResult, mutualsResult] = await Promise.all([
         followeeIds.length > 0
           ? supabase
               .from("profiles")
               .select("id, full_name, avatar_url, role")
               .in("id", followeeIds)
-              .eq("role", "vendor")
+              .eq("role", "contributor")
           : Promise.resolve({ data: [] as { id: string; full_name: string; avatar_url: string | null; role: string }[] }),
         followeeIds.length > 0
           ? supabase
