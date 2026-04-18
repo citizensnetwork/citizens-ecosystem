@@ -190,11 +190,50 @@ export type Profile = {
   instagram_handle: string | null;
   facebook_url: string | null;
   tiktok_handle: string | null;
-  /** Free-form per-user preference bag (migration 034).  Currently houses
-   *  Would-You-Rather answers under `preferences.wyr`; expected to grow as
-   *  new lightweight personalisation slices ship. */
-  preferences: Record<string, unknown>;
+  /** Demographic columns (migration 035).  All NULL by default — populated
+   *  opportunistically by Easter-egg micro-prompts.  Never required. */
+  gender: string | null;
+  age_range: string | null;
+  relationship_status: string | null;
+  stage_of_life: string | null;
+  energy_level: string | null;
+  /** Per-user preference bag (migrations 034 + 035).  Structure below is
+   *  enforced client-side; the DB just stores `jsonb`. */
+  preferences: Preferences;
   created_at: string;
+};
+
+/**
+ * Shape of `profiles.preferences`.  Kept flexible — every slice is optional
+ * so partial writes are safe.  See {@link PreferenceTag} for the tag-entry
+ * contract.  New keys can be added without a migration.
+ */
+export type Preferences = {
+  /** Legacy Would-You-Rather answers (migration 034). */
+  wyr?: Record<string, "left" | "right">;
+  /** Date-stamped Easter-egg answers keyed by tag slug (migration 035). */
+  tags?: Record<string, PreferenceTag>;
+  /** Server-cached per-category interest percentages (0..100).  Recomputed
+   *  on every `/api/preferences` write. */
+  percentages?: Partial<Record<EventCategory | PlaceCategory, number>>;
+  /** Unlocked when the user opts into the leadership Easter egg. */
+  leadership_interest?: boolean | null;
+  /** Timestamp of the last time the Rainbow "?" long-form sheet was shown. */
+  last_longform_asked_at?: string | null;
+  /** Any other forward-compatible keys clients may start writing. */
+  [key: string]: unknown;
+};
+
+/**
+ * A single Easter-egg answer stored under `preferences.tags[tagKey]`.
+ * `expires_at` is advisory — when in the past, the orchestrator treats the
+ * tag as "needs answer" and may re-ask.  `null` means the answer never
+ * expires (e.g. gender, a lifetime tag).
+ */
+export type PreferenceTag = {
+  value: unknown;
+  answered_at: string;
+  expires_at: string | null;
 };
 
 export type Comment = {

@@ -2,14 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import type { Event, Profile, InterestGroupWithItems, UserRole } from "@/types/db";
+import type { Event, Preferences, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
 import LinkedAccounts from "@/components/auth/LinkedAccounts";
 import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
-import ProfileInterests from "@/components/onboarding/ProfileInterests";
+import PersonalizationPanel from "@/components/profile/PersonalizationPanel";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 import QuickPanelPreferencesSection from "@/components/events/QuickPanelPreferencesSection";
 import { QUICK_ACCESS_ITEMS } from "@/lib/quickPanelOptions";
@@ -26,15 +26,14 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch profile, RSVPs, social counts, following list, and interests in parallel
+  // Fetch profile, RSVPs, social counts, and friends count in parallel.
+  // (Interest-group fetches were removed when the static onboarding was
+  // scrapped in favour of in-map Easter-egg personalization.)
   const [
     { data: profile },
     { data: rsvps },
     { count: followersCount },
     { count: followingCount },
-    { data: interestGroups },
-    { data: allInterests },
-    { data: userInterests },
     { data: friendsCount },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
@@ -51,18 +50,6 @@ export default async function ProfilePage() {
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("follower_id", user.id),
-    supabase
-      .from("interest_groups")
-      .select("*")
-      .order("sort_order"),
-    supabase
-      .from("interests")
-      .select("*")
-      .order("sort_order"),
-    supabase
-      .from("user_interests")
-      .select("interest_id")
-      .eq("user_id", user.id),
     supabase.rpc("count_friends", { target_user: user.id }),
   ]);
 
@@ -103,17 +90,19 @@ export default async function ProfilePage() {
     instagram_handle: profile?.instagram_handle ?? null,
     facebook_url: profile?.facebook_url ?? null,
     tiktok_handle: profile?.tiktok_handle ?? null,
-    preferences: (profile?.preferences ?? {}) as Record<string, unknown>,
+    gender: profile?.gender ?? null,
+    age_range: profile?.age_range ?? null,
+    relationship_status: profile?.relationship_status ?? null,
+    stage_of_life: profile?.stage_of_life ?? null,
+    energy_level: profile?.energy_level ?? null,
+    preferences: (profile?.preferences ?? {}) as Preferences,
     created_at: profile?.created_at ?? "",
   };
 
   // Build interest groups with items
-  const groups: InterestGroupWithItems[] = (interestGroups ?? []).map((g) => ({
-    ...g,
-    interests: (allInterests ?? []).filter((i) => i.group_id === g.id),
-  }));
-
-  const selectedInterestIds = (userInterests ?? []).map((ui) => ui.interest_id);
+  // (Interest-group / user-interest aggregation removed along with the static
+  // ProfileInterests section.  Interests now surface organically via the
+  // Easter-egg personalization engine.)
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
@@ -210,15 +199,9 @@ export default async function ProfilePage() {
       </section>
 
       {/* ── Interests & Location ─── */}
-      <ProfileInterests
-        groups={groups}
-        selectedInterestIds={selectedInterestIds}
-        homeLatitude={typedProfile.home_latitude}
-        homeLongitude={typedProfile.home_longitude}
-        notificationRadiusKm={typedProfile.notification_radius_km}
-        notificationEmail={typedProfile.notification_email}
+      <PersonalizationPanel
+        percentages={typedProfile.preferences.percentages}
       />
-
       {/* ── Management Links ─── */}
       <section className="mb-8 flex flex-wrap gap-3">
         <Link

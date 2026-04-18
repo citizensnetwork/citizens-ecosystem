@@ -83,4 +83,74 @@ describe("POST /api/preferences", () => {
     const body = await res.json();
     expect(body.preferences.theme).toBe("dark");
   });
+
+  it("merges a well-formed tags slice", async () => {
+    const res = await POST(
+      makeRequest({
+        tags: {
+          love_language: {
+            value: "words",
+            answered_at: "2026-04-18T12:00:00Z",
+            expires_at: "2027-04-18T12:00:00Z",
+          },
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.preferences.tags.love_language.value).toBe("words");
+  });
+
+  it("rejects a non-object tags slice", async () => {
+    const res = await POST(makeRequest({ tags: "nope" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("drops tag entries that don't match the PreferenceTag shape", async () => {
+    const res = await POST(
+      makeRequest({
+        tags: {
+          good: {
+            value: 1,
+            answered_at: "2026-04-18T12:00:00Z",
+            expires_at: null,
+          },
+          bad: "not-a-tag",
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.preferences.tags.good).toBeDefined();
+    expect(body.preferences.tags.bad).toBeUndefined();
+  });
+
+  it("deep-merges tags across multiple writes", async () => {
+    mockClient._chain._result.data = {
+      preferences: {
+        tags: {
+          existing: {
+            value: "foo",
+            answered_at: "2026-04-01T00:00:00Z",
+            expires_at: null,
+          },
+        },
+      },
+    };
+    const res = await POST(
+      makeRequest({
+        tags: {
+          newly_added: {
+            value: "bar",
+            answered_at: "2026-04-18T12:00:00Z",
+            expires_at: null,
+          },
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.preferences.tags.existing.value).toBe("foo");
+    expect(body.preferences.tags.newly_added.value).toBe("bar");
+  });
 });

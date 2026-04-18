@@ -1,8 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import EventsView from "@/components/events/EventsView";
-import OnboardingOverlay from "@/components/onboarding/OnboardingOverlay";
-import PreferencePickerGate from "@/components/onboarding/PreferencePickerGate";
-import type { Event, Place, Review } from "@/types/db";
+import EasterEggOrchestrator from "@/components/easter/EasterEggOrchestrator";
+import type { Event, Place, Preferences, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -104,25 +103,29 @@ export default async function EventsPage() {
 
   // Check if current user can create events
   let canCreateEvents = false;
-  let showOnboarding = false;
+  let userPreferences: Preferences | null = null;
+  let accountCreatedAt = "";
   if (currentUser) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, onboarding_completed")
+      .select("role, preferences, created_at")
       .eq("id", currentUser.id)
       .single();
     // All authenticated users can create events (open creation)
     canCreateEvents = !!profile;
-    showOnboarding = profile?.onboarding_completed === false;
+    userPreferences = (profile?.preferences as Preferences | null) ?? null;
+    accountCreatedAt = profile?.created_at ?? "";
   }
 
   return (
     <>
-      {showOnboarding && <OnboardingOverlay show />}
-      {/* Would-You-Rather picker — only shows once onboarding is done so the
-          two first-run UIs don't race; further gated by a localStorage flag
-          inside PreferencePickerGate so the user only sees it once. */}
-      <PreferencePickerGate enabled={!!currentUser && !showOnboarding} />
+      {currentUser && (
+        <EasterEggOrchestrator
+          userId={currentUser.id}
+          initialPreferences={userPreferences}
+          accountCreatedAt={accountCreatedAt}
+        />
+      )}
       <EventsView
         events={events ?? []}
         places={placesWithStats}

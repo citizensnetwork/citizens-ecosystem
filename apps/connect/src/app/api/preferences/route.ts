@@ -3,27 +3,45 @@
  *
  * Merges a partial preferences payload into `profiles.preferences` for the
  * current user.  We use a partial merge (rather than overwrite) so different
- * surfaces — onboarding, Would You Rather, future settings panels — can write
- * their slice without clobbering each other.
+ * surfaces — Easter-egg orchestrator, Would You Rather, future settings
+ * panels — can write their slice without clobbering each other.
  *
- * Body shape:
- *   { wyr?: Record<string, "left"|"right">, ...other slices }
+ * Body shape (all keys optional):
+ *   {
+ *     wyr?:  Record<string, "left"|"right">,
+ *     tags?: Record<string, { value, answered_at, expires_at }>,
+ *     leadership_interest?: boolean | null,
+ *     last_longform_asked_at?: string | null,
+ *     ...other slices          // forwarded verbatim
+ *   }
  *
  * Notes:
  *   - We treat `preferences` as a free-form bag.  Validation is intentionally
- *     light: we only enforce that the payload is a plain object and that the
- *     special `wyr` slice (currently the only consumer) only contains the
- *     literal strings "left" or "right" so a hostile client can't poison the
- *     bag with arbitrary nested data.
+ *     light: we only enforce shape on the `wyr` and `tags` slices so a
+ *     hostile client can't poison the bag with deeply nested arbitrary data.
  *   - Merge happens server-side via a single SELECT-then-UPDATE so we can
- *     deep-merge the `wyr` slice (per-question keys) without losing earlier
- *     answers when a user re-runs the picker.
+ *     deep-merge by key (per-question keys under `wyr`, per-tag keys under
+ *     `tags`) without losing earlier answers when a user re-runs a prompt.
  */
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 type WyrAnswer = "left" | "right";
+
+type PreferenceTagInput = {
+  value: unknown;
+  answered_at: string;
+  expires_at: string | null;
+};
+
+function isPreferenceTag(x: unknown): x is PreferenceTagInput {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return false;
+  const r = x as Record<string, unknown>;
+  if (typeof r.answered_at !== "string") return false;
+  if (r.expires_at !== null && typeof r.expires_at !== "string") return false;
+  return "value" in r;
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -63,9 +81,24 @@ export async function POST(request: Request) {
     }
   }
 
-  // Read existing preferences so we can deep-merge the wyr slice.  This is
-  // a single round-trip; concurrent writes are extremely unlikely on a
-  // single-user-driven settings flow.
+  // Normalise the tags slice: drop any entry that doesn't match the
+  // PreferenceTag contract.  Keys are free-form tag slugs.
+  let cleanTags: Record<string, PreferenceTagInput> | undefined;
+  if (payload.tags !== undefined) {
+    if (
+      payload.tags === null ||
+      typeof payload.tags !== "object" ||
+      Array.isArray(payload.tags)
+    ) {
+      return NextResponse.json({ error: "tags must be an object" }, { status: 400 });
+    }
+    cleanTags = {};
+    for (const [k, v] of Object.entries(payload.tags as Record<string, unknown>)) {
+      if (isPreferenceTag(v)) cleanTags[k] = v;
+    }
+  }
+
+  // Read existing preferences so we can deep-merge the structured slices.
   const { data: existing, error: readError } = await supabase
     .from("profiles")
     .select("preferences")
@@ -79,17 +112,22 @@ export async function POST(request: Request) {
   const current = (existing?.preferences ?? {}) as Record<string, unknown>;
   const next: Record<string, unknown> = { ...current };
 
-  // Only the wyr slice is currently structured; merge it deeply so we don't
-  // lose answers from a prior session.
+  // Deep-merge the wyr slice (per-question keys).
   if (cleanWyr) {
     const existingWyr = (current.wyr ?? {}) as Record<string, WyrAnswer>;
     next.wyr = { ...existingWyr, ...cleanWyr };
   }
 
+  // Deep-merge the tags slice (per-tag-slug keys).
+  if (cleanTags) {
+    const existingTags = (current.tags ?? {}) as Record<string, PreferenceTagInput>;
+    next.tags = { ...existingTags, ...cleanTags };
+  }
+
   // Forward any other top-level keys verbatim — future-proofing for new slices
   // (e.g. preferred_view, custom_panel_order) without code changes here.
   for (const [k, v] of Object.entries(payload)) {
-    if (k === "wyr") continue;
+    if (k === "wyr" || k === "tags") continue;
     next[k] = v;
   }
 

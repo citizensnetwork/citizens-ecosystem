@@ -24,6 +24,11 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
     instagram_handle: null,
     facebook_url: null,
     tiktok_handle: null,
+    gender: null,
+    age_range: null,
+    relationship_status: null,
+    stage_of_life: null,
+    energy_level: null,
     preferences: {},
     ...overrides,
   };
