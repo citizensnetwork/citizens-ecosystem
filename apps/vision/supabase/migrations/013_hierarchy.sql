@@ -97,8 +97,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   WITH RECURSIVE ancestors AS (
-    -- Seed with the target org at depth 0; excluded from the final
-    -- result below so callers only see strict ancestors.
+    -- Seed with the target org at depth 0; filtered out by the
+    -- `WHERE depth > 0` clause below so callers only see strict
+    -- ancestors (nearest first).
     SELECT o.id, o.parent_org_id, 0 AS depth
     FROM organisations o
     WHERE o.id = target_org_id
@@ -108,6 +109,7 @@ AS $$
     JOIN ancestors a ON o.id = a.parent_org_id
     WHERE a.depth < 50
   )
+  -- Exclude the seed row (depth 0) so the result is strict ancestors only.
   SELECT id, depth FROM ancestors WHERE depth > 0 ORDER BY depth ASC;
 $$;
 

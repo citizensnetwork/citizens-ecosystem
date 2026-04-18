@@ -41,9 +41,15 @@ export function buildOrgTree<T extends OrgNode>(orgs: readonly T[]): OrgTreeNode
   }
 
   // Stable sort by name at every level for deterministic rendering.
-  const sortNodesByNameRecursively = (nodes: OrgTreeNode<T>[]) => {
+  // Depth-guarded so a pathological tree (e.g. a malicious fixture) can
+  // never blow the JS stack, matching the posture of findAncestors/findDescendants.
+  const sortNodesByNameRecursively = (
+    nodes: OrgTreeNode<T>[],
+    depth = 0,
+  ) => {
+    if (depth > MAX_DEPTH) return;
     nodes.sort((a, b) => a.org.name.localeCompare(b.org.name));
-    for (const n of nodes) sortNodesByNameRecursively(n.children);
+    for (const n of nodes) sortNodesByNameRecursively(n.children, depth + 1);
   };
   sortNodesByNameRecursively(roots);
 

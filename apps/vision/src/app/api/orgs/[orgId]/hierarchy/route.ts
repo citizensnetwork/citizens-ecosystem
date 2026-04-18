@@ -55,9 +55,16 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Org not found" }, { status: 404 });
   }
 
-  // Fetch every org the caller can read in one shot; hierarchy is small
-  // enough (<< 1k rows per user in practice) that client-side traversal
-  // is simpler and cheaper than recursive SQL here.
+  // Fetch every org the caller can read in one shot and traverse in JS.
+  //
+  // Scaling note: this is appropriate while a caller's visible-org count
+  // stays modest (typical tenants sit well under 1k orgs with shallow
+  // hierarchies). If a deployment grows beyond that — e.g. a platform
+  // admin with visibility over thousands of tenants, or very deep
+  // trees — switch to the SECURITY DEFINER SQL helpers
+  // (get_org_ancestors / get_org_descendants) introduced in migration
+  // 013 and paginate children. Tracked as a TODO for the next phase
+  // that wires those helpers into RLS.
   const { data: visible, error: visibleError } = await supabase
     .from("organisations")
     .select("id, name, slug, parent_org_id");
