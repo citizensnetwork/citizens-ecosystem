@@ -41,11 +41,11 @@ export function buildOrgTree<T extends OrgNode>(orgs: readonly T[]): OrgTreeNode
   }
 
   // Stable sort by name at every level for deterministic rendering.
-  const sortRec = (nodes: OrgTreeNode<T>[]) => {
+  const sortNodesByNameRecursively = (nodes: OrgTreeNode<T>[]) => {
     nodes.sort((a, b) => a.org.name.localeCompare(b.org.name));
-    for (const n of nodes) sortRec(n.children);
+    for (const n of nodes) sortNodesByNameRecursively(n.children);
   };
-  sortRec(roots);
+  sortNodesByNameRecursively(roots);
 
   return roots;
 }

@@ -85,14 +85,14 @@ export default async function BoundariesPage({
 
   const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE);
 
-  const paginationExtraParams = [
+  const filterParams = [
     filters.search ? `search=${encodeURIComponent(filters.search)}` : null,
     filters.active ? `active=${encodeURIComponent(filters.active)}` : null,
   ]
     .filter(Boolean)
     .join("&");
   const buildPaginationHref = (p: number) =>
-    `/${orgSlug}/boundaries?page=${p}${paginationExtraParams ? `&${paginationExtraParams}` : ""}`;
+    `/${orgSlug}/boundaries?page=${p}${filterParams ? `&${filterParams}` : ""}`;
 
   return (
     <div className="space-y-6">

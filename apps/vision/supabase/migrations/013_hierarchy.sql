@@ -97,18 +97,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   WITH RECURSIVE ancestors AS (
-    SELECT o.id, o.parent_org_id, 1 AS depth
+    -- Seed with the target org at depth 0; excluded from the final
+    -- result below so callers only see strict ancestors.
+    SELECT o.id, o.parent_org_id, 0 AS depth
     FROM organisations o
-    WHERE o.id = (
-      SELECT parent_org_id FROM organisations WHERE id = target_org_id
-    )
+    WHERE o.id = target_org_id
     UNION ALL
     SELECT o.id, o.parent_org_id, a.depth + 1
     FROM organisations o
     JOIN ancestors a ON o.id = a.parent_org_id
     WHERE a.depth < 50
   )
-  SELECT id, depth FROM ancestors WHERE id IS NOT NULL ORDER BY depth ASC;
+  SELECT id, depth FROM ancestors WHERE depth > 0 ORDER BY depth ASC;
 $$;
 
 -- Returns every descendant of root_org_id (excluding the root),
