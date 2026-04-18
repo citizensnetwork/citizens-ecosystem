@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 15 Complete — Analytics Pre-Aggregation
+## Current Phase: Phase 18 Complete — Tree-Aware RLS
 
 ## Phase Tracker
 
@@ -24,6 +24,9 @@
 | 14b | Architecture Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
 | 14c | Query Layer Rollout | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 15  | Analytics Pre-Aggregation | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 15b | Trends Endpoint Aggregates | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 16  | Trigram Search | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 18  | Tree-Aware RLS | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1815,3 +1818,35 @@ to 9.4/10). All changes are additive; no feature regressions.
 - Incremental refresh path that skips days with no activity changes.
 - MV refresh on admin-triggered bulk import completion (currently waits for next cron tick).
 
+
+## Phase 15b Deliverables (Trends from Aggregates)
+
+- [x] /api/metrics/trends rewritten to read from activity_daily_aggregates
+- [x] readDailyAggregates query helper reused
+- [x] Same response contract preserved (trend, type_breakdown)
+- [x] Existing 8 trends tests updated to mock aggregate row shape
+- [x] Build/tsc/lint clean
+
+## Phase 16 Deliverables (Trigram Search)
+
+- [x] Migration 017_trigram_search.sql: pg_trgm extension + 6 GIN indexes
+- [x] Three SECURITY DEFINER RPCs: search_activities_similar, search_projects_similar, search_goals_similar
+- [x] Org-scoped via is_org_member; limit clamped 1..100
+- [x] src/lib/queries/search.ts wrapper with DEFAULT_LIMIT=20, MAX_LIMIT=100
+- [x] /api/search unified endpoint with types= filter
+- [x] 9 unit tests + 8 API tests (all passing)
+
+## Phase 18 Deliverables (Tree-Aware RLS)
+
+- [x] Migration 018_tree_aware_rls.sql
+- [x] Helper is_org_or_ancestor_member(target_org_id) STABLE SECURITY DEFINER
+- [x] Six new permissive SELECT policies for activities/projects/goals/departments/vision_statements/activity_daily_aggregates
+- [x] Reads widened to ancestor org members; writes still restricted to direct membership
+- [x] Existing _select_member policies preserved (PG OR-combines permissives)
+
+## Build Verification (Phase 15b + 16 + 18)
+
+- **Tests**: 838/838 passing (89 files, +16 new)
+- **TypeScript**: Clean
+- **ESLint**: Clean
+- **Build**: Compiled successfully in 23.9s

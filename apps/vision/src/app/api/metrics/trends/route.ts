@@ -1,7 +1,19 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import {
+  readDailyAggregates,
+  type DailyAggregateRow,
+} from "@/lib/queries/aggregates";
 
+/**
+ * GET /api/metrics/trends
+ *
+ * Returns time-series aggregates for an org. Phase 15b: reads from
+ * `activity_daily_aggregates` (pre-computed daily rollup) instead of
+ * scanning the raw `activities` table per request. Same response
+ * contract as before.
+ */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -18,55 +30,61 @@ export async function GET(request: NextRequest) {
   if (!orgId || !isValidUUID(orgId)) {
     return NextResponse.json(
       { error: "Valid org_id is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const dateFrom = searchParams.get("date_from") ?? new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
-  const dateTo = searchParams.get("date_to") ?? new Date().toISOString().split("T")[0];
+  const dateFrom =
+    searchParams.get("date_from") ??
+    new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+  const dateTo =
+    searchParams.get("date_to") ?? new Date().toISOString().split("T")[0];
   const granularity = (searchParams.get("granularity") ?? "day") as
     | "day"
     | "week"
     | "month";
 
-  // Validate granularity
   if (!["day", "week", "month"].includes(granularity)) {
     return NextResponse.json(
       { error: "granularity must be day, week, or month" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const { data: activities, error } = await supabase
-    .from("activities")
-    .select("date, participant_count, type")
-    .eq("org_id", orgId)
-    .gte("date", dateFrom)
-    .lte("date", dateTo)
-    .order("date", { ascending: true });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let rows: DailyAggregateRow[];
+  try {
+    rows = await readDailyAggregates(supabase, orgId, {
+      from: dateFrom,
+      to: dateTo,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // Aggregate by granularity
-  const buckets = new Map<
-    string,
-    { count: number; participants: number }
-  >();
+  const buckets = new Map<string, { count: number; participants: number }>();
+  const typeBuckets = new Map<string, Map<string, number>>();
 
-  for (const a of activities ?? []) {
-    const key = bucketKey(a.date, granularity);
+  for (const r of rows) {
+    const key = bucketKey(r.day, granularity);
+
     const existing = buckets.get(key);
     if (existing) {
-      existing.count++;
-      existing.participants += a.participant_count ?? 0;
+      existing.count += r.activity_count;
+      existing.participants += r.participant_total;
     } else {
       buckets.set(key, {
-        count: 1,
-        participants: a.participant_count ?? 0,
+        count: r.activity_count,
+        participants: r.participant_total,
       });
     }
+
+    if (!typeBuckets.has(key)) typeBuckets.set(key, new Map());
+    const inner = typeBuckets.get(key)!;
+    inner.set(
+      r.activity_type,
+      (inner.get(r.activity_type) ?? 0) + r.activity_count,
+    );
   }
 
   const trend = Array.from(buckets.entries())
@@ -77,18 +95,7 @@ export async function GET(request: NextRequest) {
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Type breakdown over time
-  const typeOverTime = new Map<string, Map<string, number>>();
-  for (const a of activities ?? []) {
-    const key = bucketKey(a.date, granularity);
-    if (!typeOverTime.has(key)) {
-      typeOverTime.set(key, new Map());
-    }
-    const inner = typeOverTime.get(key)!;
-    inner.set(a.type, (inner.get(a.type) ?? 0) + 1);
-  }
-
-  const typeBreakdown = Array.from(typeOverTime.entries())
+  const typeBreakdown = Array.from(typeBuckets.entries())
     .map(([date, types]) => ({
       date,
       ...Object.fromEntries(types),
@@ -106,12 +113,11 @@ export async function GET(request: NextRequest) {
 
 function bucketKey(
   dateStr: string,
-  granularity: "day" | "week" | "month"
+  granularity: "day" | "week" | "month",
 ): string {
+  if (granularity === "day") return dateStr;
+
   const d = new Date(dateStr);
-  if (granularity === "day") {
-    return dateStr;
-  }
   if (granularity === "week") {
     // ISO week start (Monday)
     const day = d.getUTCDay();

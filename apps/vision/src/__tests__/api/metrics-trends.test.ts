@@ -7,6 +7,8 @@ const mockGetUser = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: { getUser: () => mockGetUser() },
+    // Phase 15b: trends now reads from activity_daily_aggregates
+    // (org_id, day, activity_type, activity_count, participant_total).
     from: () => ({
       select: () => ({
         eq: () => ({
@@ -15,9 +17,33 @@ vi.mock("@/lib/supabase/server", () => ({
               order: () =>
                 Promise.resolve({
                   data: [
-                    { date: "2026-01-05", participant_count: 10, type: "event" },
-                    { date: "2026-01-05", participant_count: 5, type: "meeting" },
-                    { date: "2026-01-12", participant_count: 20, type: "event" },
+                    {
+                      org_id: "x",
+                      day: "2026-01-05",
+                      activity_type: "event",
+                      activity_count: 1,
+                      participant_total: 10,
+                      hours_total: 0,
+                      refreshed_at: "",
+                    },
+                    {
+                      org_id: "x",
+                      day: "2026-01-05",
+                      activity_type: "meeting",
+                      activity_count: 1,
+                      participant_total: 5,
+                      hours_total: 0,
+                      refreshed_at: "",
+                    },
+                    {
+                      org_id: "x",
+                      day: "2026-01-12",
+                      activity_type: "event",
+                      activity_count: 1,
+                      participant_total: 20,
+                      hours_total: 0,
+                      refreshed_at: "",
+                    },
                   ],
                   error: null,
                 }),
