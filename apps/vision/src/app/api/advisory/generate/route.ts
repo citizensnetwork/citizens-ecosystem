@@ -68,8 +68,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Use provided metrics or default empty
-  const metricValues: Record<string, number> = metrics ?? {};
+  // Use provided metrics or default empty. Validate that every
+  // submitted metric value is a finite number — metric slugs are
+  // admin-defined and matched against advisory_rules server-side,
+  // but values come from the client and must not smuggle NaN /
+  // Infinity / strings through rule evaluation.
+  const rawMetrics = metrics ?? {};
+  const metricValues: Record<string, number> = {};
+  for (const [slug, value] of Object.entries(rawMetrics)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      metricValues[slug] = value;
+    }
+  }
 
   const generated: unknown[] = [];
 

@@ -176,13 +176,13 @@ describe("PATCH /api/projects/[id]", () => {
       data: { user: { id: "u1" } },
     });
 
-    // First from() call: get current project
+    // 1. Fetch current project (status, org_id)
     const currentProject = chainMock({
       data: { status: "completed", org_id: "org1" },
+      error: null,
     });
-    // Second from() call: check admin role → not admin
-    const roleCheck = chainMock({ data: null });
-    // We expect it to reject before update
+    // 2. requireOrgRole → user_org_roles: role = org_member (non-admin)
+    const roleCheck = chainMock({ data: { role: "org_member" }, error: null });
 
     mockSupabase.from
       .mockReturnValueOnce(currentProject)
@@ -204,11 +204,23 @@ describe("PATCH /api/projects/[id]", () => {
       data: { user: { id: "u1" } },
     });
 
+    // 1. Fetch current project
+    const currentProject = chainMock({
+      data: { status: "active", org_id: "org1" },
+      error: null,
+    });
+    // 2. requireOrgRole → org_admin
+    const roleCheck = chainMock({ data: { role: "org_admin" }, error: null });
+    // 3. Perform update
     const updateChain = chainMock({
       data: { id: VALID_UUID, name: "Updated Name" },
       error: null,
     });
-    mockSupabase.from.mockReturnValue(updateChain);
+
+    mockSupabase.from
+      .mockReturnValueOnce(currentProject)
+      .mockReturnValueOnce(roleCheck)
+      .mockReturnValueOnce(updateChain);
 
     const res = await PATCH(
       createRequest("PATCH", `http://localhost/api/projects/${VALID_UUID}`, {
@@ -250,8 +262,17 @@ describe("DELETE /api/projects/[id]", () => {
       data: { user: { id: "u1" } },
     });
 
+    // 1. Fetch project (org_id)
+    const fetchChain = chainMock({ data: { org_id: "org1" }, error: null });
+    // 2. requireOrgRole → org_admin
+    const roleCheck = chainMock({ data: { role: "org_admin" }, error: null });
+    // 3. Delete
     const deleteChain = chainMock({ error: null });
-    mockSupabase.from.mockReturnValue(deleteChain);
+
+    mockSupabase.from
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(roleCheck)
+      .mockReturnValueOnce(deleteChain);
 
     const res = await DELETE(
       createRequest("DELETE", `http://localhost/api/projects/${VALID_UUID}`),
@@ -267,8 +288,17 @@ describe("DELETE /api/projects/[id]", () => {
       data: { user: { id: "u1" } },
     });
 
+    // 1. Fetch project (org_id)
+    const fetchChain = chainMock({ data: { org_id: "org1" }, error: null });
+    // 2. requireOrgRole → org_admin
+    const roleCheck = chainMock({ data: { role: "org_admin" }, error: null });
+    // 3. Delete fails
     const deleteChain = chainMock({ error: { message: "DB error" } });
-    mockSupabase.from.mockReturnValue(deleteChain);
+
+    mockSupabase.from
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(roleCheck)
+      .mockReturnValueOnce(deleteChain);
 
     const res = await DELETE(
       createRequest("DELETE", `http://localhost/api/projects/${VALID_UUID}`),

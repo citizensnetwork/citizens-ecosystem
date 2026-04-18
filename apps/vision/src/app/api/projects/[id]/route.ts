@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateProjectSchema } from "@/lib/schemas/project";
 import { isValidUUID } from "@/lib/validation";
 import { PROJECT_STATUS_TRANSITIONS } from "@/lib/constants";
+import { requireOrgRole } from "@/lib/supabase/rbac";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -102,32 +103,31 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // If status is being changed, validate transition
+  // Explicit authorization before mutation (defense in depth over RLS).
+  const { data: current, error: fetchErr } = await supabase
+    .from("projects")
+    .select("status, org_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !current) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const auth = await requireOrgRole(supabase, user.id, current.org_id, [
+    "org_admin",
+    "org_manager",
+    "org_member",
+    "platform_admin",
+  ]);
+  if (!auth.ok) return auth.response;
+
+  const isAdmin =
+    auth.membership.role === "org_admin" ||
+    auth.membership.role === "platform_admin";
+
+  // If status is being changed, validate transition.
   if (parsed.data.status) {
-    const { data: current } = await supabase
-      .from("projects")
-      .select("status, org_id")
-      .eq("id", id)
-      .single();
-
-    if (!current) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
-    const isAdmin =
-      (
-        await supabase
-          .from("user_org_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("org_id", current.org_id)
-          .in("role", ["org_admin", "platform_admin"])
-          .maybeSingle()
-      ).data !== null;
-
     // Non-admins can only move forward
     if (!isAdmin) {
       const allowed = PROJECT_STATUS_TRANSITIONS[current.status] ?? [];
@@ -187,6 +187,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       { status: 400 }
     );
   }
+
+  // Explicit admin-only check before DELETE.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("projects")
+    .select("org_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const auth = await requireOrgRole(supabase, user.id, existing.org_id, [
+    "org_admin",
+    "platform_admin",
+  ]);
+  if (!auth.ok) return auth.response;
 
   const { error } = await supabase.from("projects").delete().eq("id", id);
 

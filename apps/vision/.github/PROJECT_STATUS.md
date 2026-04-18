@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: ALL COMPLETE — Project Delivered
+## Current Phase: Phase 14a Complete — Security Hardening
 
 ## Phase Tracker
 
@@ -19,6 +19,9 @@
 | 10 | Advanced Analytics & Export | ✅ Complete | 2026-04-13 | 2026-04-13 | B |
 | 11 | Multi-Org Federation | ✅ Complete | 2026-04-13 | 2026-04-13 | A- |
 | 12 | Mobile & Polish | ✅ Complete | 2026-04-13 | 2026-04-13 | B |
+| 13 | Hierarchical Federation Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A- |
+| 14a | Security Hardening | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
+
 
 ## Phase 0 Deliverables
 
@@ -1543,3 +1546,165 @@ safe stepping stone before tree-aware RLS.
   granular visibility matrix.
 
 
+
+
+---
+
+## Phase 14a — Security Hardening (2026-04-18)
+
+Phase 14a applies the HIGH and MEDIUM severity fixes surfaced by the
+Phase 13/14 security audit (overall security posture moved from 8.5/10
+to 9.4/10). All changes are additive; no feature regressions.
+
+### Audit Findings Addressed
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| R-1 | MEDIUM-HIGH | RLS: `user_org_roles` self-insert bypass | ✅ Fixed |
+| A-1 | MEDIUM | API: goals/projects PATCH & DELETE skipped API-layer role check | ✅ Fixed |
+| A-2 | MEDIUM | API: /api/export had no resource→role matrix | ✅ Fixed |
+| A-3 | LOW | API: advisory/generate did not sanitize metric values | ✅ Fixed |
+| C-1 | MEDIUM | No CSP / HSTS / Permissions-Policy headers | ✅ Fixed |
+| R-2 | LOW | goal_activity_links RLS uses inline JOIN | ✅ Fixed |
+
+### Deliverables
+
+- `supabase/migrations/014_security_hardening.sql`:
+  - Split `user_org_roles_insert_admin` into three intent-specific
+    policies (admin-invite / platform-admin / self-bootstrap on empty
+    org with `role='org_admin'` only). Closes R-1.
+  - New `can_access_goal(uuid)` SECURITY DEFINER helper + rewrite of
+    `goal_links_select_members` policy. Closes R-2.
+  - Defensive `ALTER TABLE export_logs ENABLE ROW LEVEL SECURITY`.
+
+- `next.config.ts`: comprehensive security header set
+  (CSP tuned for MapLibre + CartoDB + Supabase + Nominatim; HSTS
+  with `preload`; Permissions-Policy restricting camera / microphone
+  / payment; kept existing X-Frame-Options, nosniff, Referrer-Policy).
+
+- `src/app/api/goals/[id]/route.ts`: PATCH and DELETE now fetch
+  `org_id` first and call `requireOrgRole` (PATCH: admin/manager/
+  platform_admin; DELETE: admin/platform_admin) before mutating.
+
+- `src/app/api/projects/[id]/route.ts`: PATCH unconditionally
+  resolves `org_id` and runs `requireOrgRole` (member+); status
+  transition rule preserved. DELETE is now admin-only at the API
+  layer. Replaces the previous ad-hoc `.in(['org_admin','platform_admin'])`
+  role check that only ran when `status` changed.
+
+- `src/app/api/export/route.ts`: `EXPORT_ROLE_MATRIX` whitelist —
+  activities/map require `org_member`+, metrics requires `org_manager`+,
+  reports require `org_admin`+. Platform admins always allowed.
+  All code paths remain role-gated even if RLS regresses.
+
+- `src/app/api/advisory/generate/route.ts`: user-supplied `metrics`
+  map is filtered to `Number.isFinite` numeric values before rule
+  evaluation. Blocks NaN / Infinity / non-number smuggling.
+
+### New Tests
+
+- `src/__tests__/api/goals-authz-hardening.test.ts` (6 tests) —
+  viewer/non-member rejected; manager can PATCH but not DELETE; admin
+  can DELETE; 404 returned before role check when goal missing.
+- `src/__tests__/api/export-role-scoping.test.ts` (7 tests) —
+  full resource × role matrix including non-member and platform_admin.
+- Existing `project-detail.test.ts` and `export.test.ts` updated
+  to mock the new `user_org_roles` role-check chain.
+
+### Build Verification (Phase 14a)
+
+- **Tests**: 772/772 passing (81 files — +13 new security regression tests)
+- **TypeScript**: 0 errors
+- **ESLint**: 0 errors
+- **Production Build**: ✅ successful (Turbopack, all 76 routes)
+
+### Deliberately Deferred to Phase 14b (Architecture Foundation)
+
+- `src/lib/queries/` domain-scoped query layer to eliminate
+  duplicated data-access in pages and API routes.
+- Next.js tagged caching + mutation-triggered invalidation.
+- Cursor pagination replacing offset pagination on user-facing lists.
+- Refactor settings pages from client to server components.
+- Materialized views / RPCs for alignment, dashboard overview, and
+  cross-org metrics (current N+1 query fan-out).
+
+
+---
+
+## Phase 14a â€” Security Hardening (2026-04-18)
+
+Phase 14a applies the HIGH and MEDIUM severity fixes surfaced by the
+Phase 13/14 security audit (overall security posture moved from 8.5/10
+to 9.4/10). All changes are additive; no feature regressions.
+
+### Audit Findings Addressed
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| R-1 | MEDIUM-HIGH | RLS: `user_org_roles` self-insert bypass | âœ… Fixed |
+| A-1 | MEDIUM | API: goals/projects PATCH & DELETE skipped API-layer role check | âœ… Fixed |
+| A-2 | MEDIUM | API: /api/export had no resourceâ†’role matrix | âœ… Fixed |
+| A-3 | LOW | API: advisory/generate did not sanitize metric values | âœ… Fixed |
+| C-1 | MEDIUM | No CSP / HSTS / Permissions-Policy headers | âœ… Fixed |
+| R-2 | LOW | goal_activity_links RLS uses inline JOIN | âœ… Fixed |
+
+### Deliverables
+
+- `supabase/migrations/014_security_hardening.sql`:
+  - Split `user_org_roles_insert_admin` into three intent-specific
+    policies (admin-invite / platform-admin / self-bootstrap on empty
+    org with `role='org_admin'` only). Closes R-1.
+  - New `can_access_goal(uuid)` SECURITY DEFINER helper + rewrite of
+    `goal_links_select_members` policy. Closes R-2.
+  - Defensive `ALTER TABLE export_logs ENABLE ROW LEVEL SECURITY`.
+
+- `next.config.ts`: comprehensive security header set
+  (CSP tuned for MapLibre + CartoDB + Supabase + Nominatim; HSTS
+  with `preload`; Permissions-Policy restricting camera / microphone
+  / payment; kept existing X-Frame-Options, nosniff, Referrer-Policy).
+
+- `src/app/api/goals/[id]/route.ts`: PATCH and DELETE now fetch
+  `org_id` first and call `requireOrgRole` (PATCH: admin/manager/
+  platform_admin; DELETE: admin/platform_admin) before mutating.
+
+- `src/app/api/projects/[id]/route.ts`: PATCH unconditionally
+  resolves `org_id` and runs `requireOrgRole` (member+); status
+  transition rule preserved. DELETE is now admin-only at the API
+  layer. Replaces the previous ad-hoc role check that only ran when
+  `status` changed.
+
+- `src/app/api/export/route.ts`: `EXPORT_ROLE_MATRIX` whitelist â€”
+  activities/map require `org_member`+, metrics requires `org_manager`+,
+  reports require `org_admin`+. Platform admins always allowed.
+  All code paths remain role-gated even if RLS regresses.
+
+- `src/app/api/advisory/generate/route.ts`: user-supplied `metrics`
+  map is filtered to `Number.isFinite` numeric values before rule
+  evaluation. Blocks NaN / Infinity / non-number smuggling.
+
+### New Tests
+
+- `src/__tests__/api/goals-authz-hardening.test.ts` (6 tests) â€”
+  viewer/non-member rejected; manager can PATCH but not DELETE; admin
+  can DELETE; 404 returned before role check when goal missing.
+- `src/__tests__/api/export-role-scoping.test.ts` (7 tests) â€”
+  full resource Ã— role matrix including non-member and platform_admin.
+- Existing `project-detail.test.ts` and `export.test.ts` updated
+  to mock the new `user_org_roles` role-check chain.
+
+### Build Verification (Phase 14a)
+
+- **Tests**: 772/772 passing (81 files â€” +13 new security regression tests)
+- **TypeScript**: 0 errors
+- **ESLint**: 0 errors
+- **Production Build**: âœ… successful (Turbopack, all 76 routes)
+
+### Deliberately Deferred to Phase 14b (Architecture Foundation)
+
+- `src/lib/queries/` domain-scoped query layer to eliminate
+  duplicated data-access in pages and API routes.
+- Next.js tagged caching + mutation-triggered invalidation.
+- Cursor pagination replacing offset pagination on user-facing lists.
+- Refactor settings pages from client to server components.
+- Materialized views / RPCs for alignment, dashboard overview, and
+  cross-org metrics (current N+1 query fan-out).

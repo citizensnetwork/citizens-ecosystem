@@ -20,6 +20,16 @@ vi.mock("@/lib/supabase/server", () => {
     return chain;
   }
 
+  // Chain terminating in .single() — used by requireOrgRole.
+  function makeRoleChain(role: string | null) {
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = () => chain;
+    chain.single = () =>
+      Promise.resolve({ data: role ? { role } : null, error: null });
+    return chain;
+  }
+
   return {
     createClient: vi.fn().mockResolvedValue({
       auth: { getUser: () => mockGetUser() },
@@ -31,6 +41,10 @@ vi.mock("@/lib/supabase/server", () => {
               return { error: null };
             },
           };
+        }
+        if (table === "user_org_roles") {
+          // Tests default to org_admin so all resource/role combos pass.
+          return makeRoleChain("org_admin");
         }
         return {
           select: () => makeChain(),

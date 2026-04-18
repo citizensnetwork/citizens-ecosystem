@@ -3,6 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { generateCSV } from "@/lib/metrics/analytics";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
+import { requireOrgRole, type OrgRole } from "@/lib/supabase/rbac";
+
+// Whitelist of (resource, export_type) combinations and the minimum
+// role required. Platform admins are always allowed (checked via
+// requireOrgRole membership list).
+const EXPORT_ROLE_MATRIX: Record<string, readonly OrgRole[]> = {
+  activities: ["org_member", "org_manager", "org_admin", "platform_admin"],
+  metrics: ["org_manager", "org_admin", "platform_admin"],
+  map: ["org_member", "org_manager", "org_admin", "platform_admin"],
+  report: ["org_admin", "platform_admin"],
+};
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -48,6 +59,13 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Explicit org membership + role-scoped authorization.
+  // Reports and metrics are manager/admin-only; activities and map
+  // are member+. Prevents data exfiltration even if RLS regresses.
+  const allowedRoles = EXPORT_ROLE_MATRIX[resource];
+  const auth = await requireOrgRole(supabase, user.id, orgId, allowedRoles);
+  if (!auth.ok) return auth.response;
 
   try {
     if (exportType === "csv" && resource === "activities") {

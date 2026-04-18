@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { updateGoalSchema } from "@/lib/schemas/goal";
 import { isValidUUID } from "@/lib/validation";
+import { requireOrgRole } from "@/lib/supabase/rbac";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -72,6 +73,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // Fetch goal's org_id for explicit API-layer authorization (defense in depth).
+  // Do not rely solely on RLS — if an RLS policy regresses, API layer still blocks.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("goals")
+    .select("org_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+  }
+
+  const auth = await requireOrgRole(supabase, user.id, existing.org_id, [
+    "org_admin",
+    "org_manager",
+    "platform_admin",
+  ]);
+  if (!auth.ok) return auth.response;
+
   const { data, error } = await supabase
     .from("goals")
     .update(parsed.data)
@@ -104,6 +124,23 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   if (!isValidUUID(id)) {
     return NextResponse.json({ error: "Invalid goal ID" }, { status: 400 });
   }
+
+  // Explicit org+role check before DELETE (defense in depth over RLS).
+  const { data: existing, error: fetchErr } = await supabase
+    .from("goals")
+    .select("org_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+  }
+
+  const auth = await requireOrgRole(supabase, user.id, existing.org_id, [
+    "org_admin",
+    "platform_admin",
+  ]);
+  if (!auth.ok) return auth.response;
 
   const { error } = await supabase.from("goals").delete().eq("id", id);
 
