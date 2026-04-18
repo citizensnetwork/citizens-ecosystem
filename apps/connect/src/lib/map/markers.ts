@@ -8,18 +8,23 @@ const CATEGORY_ICONS: Record<EventCategory, string> = {
   // Music note — entertainment covers concerts, arts, performances
   entertainment:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
-  // Trophy — unambiguous sport / competitive fun
+  // Running figure — "sport-fun" reads as athletic, active, on-the-move.
+  // Simplified stick-figure mid-stride: head, leaning torso, swinging arms,
+  // bent legs. More intuitive than a trophy (which could read as awards).
   "sport-fun":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="m4 22 5-5 2-3 4 1 2 2v5"/><path d="m17 22 2-5-3-4-3 1-2 4"/><path d="M7 13h3"/></svg>',
   // Coffee cup — casual social gatherings
   "social-fun":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
   // Hands holding (uplift / support) — community outreach
   "community-upliftment":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  // Open book — education / learning
+  // Glasses / spectacles — education reads clearly as study and reading.
+  // Two circular lenses joined by a bridge, with temple arms on each side.
+  // Chosen over the previous "open book" because it pairs more uniquely with
+  // church's open-book-style glyph elsewhere in the system.
   education:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="14" r="4"/><circle cx="18" cy="14" r="4"/><path d="M10 14h4"/><path d="M2 11l2-3"/><path d="M22 11l-2-3"/></svg>',
   // Christian church — steepled roof, side walls, door, and unambiguous cross.
   // Horizontal arm sits mid-way down the vertical bar so the cross reads clearly
   // even when rendered small (prevents it reading as a crescent / dome / finial).

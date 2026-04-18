@@ -6,8 +6,11 @@ import {
   CATEGORY_COLORS,
   EVENT_CATEGORIES,
   CATEGORY_FILTERS,
+  EVENT_CATEGORY_KEYWORDS,
+  PLACE_CATEGORY_KEYWORDS,
+  PLACE_CATEGORY_LABELS,
 } from "@/lib/categories";
-import type { EventCategory } from "@/types/db";
+import type { EventCategory, PlaceCategory } from "@/types/db";
 
 const ALL_CATEGORIES: EventCategory[] = [
   "entertainment",
@@ -99,5 +102,49 @@ describe("CATEGORY_FILTERS", () => {
     for (const cat of ALL_CATEGORIES) {
       expect(values).toContain(cat);
     }
+  });
+});
+
+describe("EVENT_CATEGORY_KEYWORDS", () => {
+  it("has an entry for every EventCategory", () => {
+    for (const cat of ALL_CATEGORIES) {
+      expect(EVENT_CATEGORY_KEYWORDS[cat]).toBeDefined();
+      expect(Array.isArray(EVENT_CATEGORY_KEYWORDS[cat])).toBe(true);
+    }
+  });
+
+  it("provides at least 50 keywords per category", () => {
+    for (const cat of ALL_CATEGORIES) {
+      expect(EVENT_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(50);
+    }
+  });
+
+  it("keywords are lowercase strings with no empty entries", () => {
+    for (const cat of ALL_CATEGORIES) {
+      for (const kw of EVENT_CATEGORY_KEYWORDS[cat]) {
+        expect(typeof kw).toBe("string");
+        expect(kw.length).toBeGreaterThan(0);
+        expect(kw).toBe(kw.toLowerCase());
+      }
+    }
+  });
+});
+
+describe("PLACE_CATEGORY_KEYWORDS", () => {
+  const ALL_PLACE_CATEGORIES: PlaceCategory[] = [
+    "church", "relax", "exercise", "media",
+    "shopping", "health", "education", "arts",
+  ];
+
+  it("provides at least 50 keywords per place category", () => {
+    for (const cat of ALL_PLACE_CATEGORIES) {
+      expect(PLACE_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(50);
+    }
+  });
+});
+
+describe("PLACE_CATEGORY_LABELS", () => {
+  it("renames shopping to 'Stores' (slug preserved)", () => {
+    expect(PLACE_CATEGORY_LABELS.shopping).toBe("Stores");
   });
 });

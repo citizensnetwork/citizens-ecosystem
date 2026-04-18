@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -80,6 +80,13 @@ export default function EventsView({
   // Burger menu Event / Place tab (lifted here so placesMode can be wired to
   // the EventMap — when "places" is active, only place markers render).
   const [burgerTab, setBurgerTab] = useState<"events" | "places">("events");
+
+  // "Search this area" pill + viewport-scope state. Declared up-front (rather
+  // than beside the floating-chrome state further down) because the filter
+  // memos below read `viewportScoped` to narrow results to the map bbox.
+  const [showSearchAreaPill, setShowSearchAreaPill] = useState(false);
+  const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
+  const [viewportScoped, setViewportScoped] = useState<[number, number, number, number] | null>(null);
 
   // Snapshot of the category/quick-access filters taken the moment the user
   // begins a search. Restored when the search input is cleared so the
@@ -404,7 +411,16 @@ export default function EventsView({
   }, [isSearching]);
 
   const filtered = useMemo(() => {
+    const bbox = viewportScoped;
+    const inBbox = (lat: number | null, lng: number | null) => {
+      if (!bbox || lat == null || lng == null) return true;
+      const [w, s, e, n] = bbox;
+      // Handle antimeridian-crossing viewports (west > east).
+      const lngInRange = w <= e ? lng >= w && lng <= e : lng >= w || lng <= e;
+      return lng != null && lat >= s && lat <= n && lngInRange;
+    };
     return events.filter((e) => {
+      if (!inBbox(e.latitude, e.longitude)) return false;
       // Bypass category filters while searching so search returns the full
       // cross-category match set (plus places below).
       const matchesCategory =
@@ -416,18 +432,39 @@ export default function EventsView({
       if (!q) return true;
       // Prefer the AI ranker when the query has taxonomy signal.
       if (rankedEventIds) return rankedEventIds.has(e.id);
-      // Fallback: plain substring match (names, descriptions, locations).
-      return (
+      // Text fallback: substring match across title / location / description
+      // PLUS the category keyword bank so queries like "home group" surface
+      // events in education / social-fun / church whose description mentions
+      // a home group, even if the word itself isn't in the title.
+      if (
         e.title.toLowerCase().includes(q) ||
         e.location.toLowerCase().includes(q) ||
         e.description.toLowerCase().includes(q)
-      );
+      ) {
+        return true;
+      }
+      if (e.category != null) {
+        const bank = EVENT_CATEGORY_KEYWORDS[e.category];
+        if (bank && bank.some((kw) => kw.includes(q) || q.includes(kw))) {
+          // Guard against tiny queries: require ≥3 chars before keyword-only matches
+          return q.length >= 3;
+        }
+      }
+      return false;
     });
-  }, [events, search, activeCategories, rankedEventIds, isSearching]);
+  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
+    const bbox = viewportScoped;
+    const inBbox = (lat: number | null, lng: number | null) => {
+      if (!bbox || lat == null || lng == null) return true;
+      const [w, s, e, n] = bbox;
+      const lngInRange = w <= e ? lng >= w && lng <= e : lng >= w || lng <= e;
+      return lng != null && lat >= s && lat <= n && lngInRange;
+    };
     return places.filter((p) => {
+      if (!inBbox(p.latitude, p.longitude)) return false;
       // Bypass place-category filters while searching, mirroring events.
       if (!isSearching && activePlaceCategories.size > 0) {
         const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
@@ -445,7 +482,7 @@ export default function EventsView({
         p.description.toLowerCase().includes(q)
       );
     });
-  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching]);
+  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped]);
 
   // Calendar province-filtered events (applies province filter on top of category/search filter)
   const calendarEvents = useMemo(() => {
@@ -560,20 +597,34 @@ export default function EventsView({
   // Locate-me FAB: increments a token the map watches.
   const [locateMeToken, setLocateMeToken] = useState(0);
   // "Search this area" pill: surfaces once the camera has moved since the
-  // last search/filter change. Tapping it re-centres search to the
-  // current viewport (implemented by simply hiding the pill — the map is
-  // already showing whatever's in view; the pill is a UX reassurance that
-  // matches Google's pattern so users know the results reflect the
-  // panned area).
-  const [showSearchAreaPill, setShowSearchAreaPill] = useState(false);
-  // Reset the pill whenever filters change (fresh search is implicit).
+  // last search/filter change. Tapping it toggles viewport-scoped results:
+  // the filter memos narrow events + places to those whose lat/lng sit
+  // inside the current map bbox. Filters and results auto-reset when the
+  // user changes search terms or category selection.
+  // (State itself is hoisted above the filter memos — see top of component.)
+  // Reset the pill + any active viewport scope whenever filters change
+  // (fresh search is implicit — the user is expressing new intent).
   useEffect(() => {
     setShowSearchAreaPill(false);
+    setViewportScoped(null);
   }, [activeCategories, activePlaceCategories, activeQuickAccess, search, burgerTab]);
   const handleMapMoveEnd = useCallback(() => {
     // Only surface the pill once per pan, not every moveend tick.
     setShowSearchAreaPill(true);
   }, []);
+  const handleMapBoundsChange = useCallback(
+    (bbox: [number, number, number, number]) => {
+      setMapBounds(bbox);
+      // If the user has viewport-scoping active, keep the scope in lock-step
+      // with the current view so panning continues to narrow the list.
+      setViewportScoped((prev) => (prev ? bbox : prev));
+    },
+    [],
+  );
+  const activateViewportScope = useCallback(() => {
+    if (mapBounds) setViewportScoped(mapBounds);
+    setShowSearchAreaPill(false);
+  }, [mapBounds]);
 
   // ── Bottom floating search: auto-expand/collapse behaviour ────────
   // initial: collapsed icon button for 5s → expands to bar for 60s idle → collapses back.
@@ -715,6 +766,7 @@ export default function EventsView({
           resetBearingToken={resetBearingToken}
           locateMeToken={locateMeToken}
           onMoveEnd={handleMapMoveEnd}
+          onBoundsChange={handleMapBoundsChange}
           highlightedEventId={hoveredEventId}
         />
       </div>
@@ -882,23 +934,39 @@ export default function EventsView({
 
       {/* ── "Search this area" pill (Phase D) ─────────────────────────
        *  Appears centred near the top after the user pans/zooms the map.
-       *  Matches Google Maps' pattern of reassuring users that the result
-       *  set reflects the current viewport. Tapping it dismisses the pill
-       *  (our results are already viewport-independent — they render
-       *  everywhere and cluster via zoom — so this is purely a UX affordance). */}
-      {view === "map" && !hasDetail && showSearchAreaPill && (
+       *  Tapping it narrows events + places to those whose lat/lng sit
+       *  within the current viewport bbox (scope persists until the user
+       *  changes search terms or category selection). When a scope is
+       *  already active the pill flips to "Showing this area" with a
+       *  dismiss chevron that returns to the full result set. */}
+      {view === "map" && !hasDetail && (showSearchAreaPill || viewportScoped) && (
         <div className="pointer-events-none absolute inset-x-0 top-24 z-1005 flex justify-center px-4">
-          <button
-            type="button"
-            onClick={() => setShowSearchAreaPill(false)}
-            className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            Search this area
-          </button>
+          {viewportScoped ? (
+            <button
+              type="button"
+              onClick={() => setViewportScoped(null)}
+              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/50 bg-(--gold)/15 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-(--gold)/25 active:scale-95 animate-[fadeRise_280ms_ease-out]"
+              aria-label="Clear viewport filter"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
+                <path d="M3 3h18l-7 8v6l-4 2v-8L3 3z" />
+              </svg>
+              Showing this area
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px]" aria-hidden="true">×</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={activateViewportScope}
+              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Search this area
+            </button>
+          )}
         </div>
       )}
 
