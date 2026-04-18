@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { createVisionSchema } from "@/lib/schemas/goal";
 import { isValidUUID } from "@/lib/validation";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -91,6 +92,8 @@ export async function POST(request: NextRequest) {
     console.error("[API vision POST]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+
+  invalidateOrgResource(orgId, "vision");
 
   return NextResponse.json({ data }, { status: 201 });
 }

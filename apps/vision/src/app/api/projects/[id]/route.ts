@@ -4,6 +4,7 @@ import { updateProjectSchema } from "@/lib/schemas/project";
 import { isValidUUID } from "@/lib/validation";
 import { PROJECT_STATUS_TRANSITIONS } from "@/lib/constants";
 import { requireOrgRole } from "@/lib/supabase/rbac";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -167,6 +168,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  invalidateOrgResource(current.org_id, "projects");
+
   return NextResponse.json({ data });
 }
 
@@ -214,6 +217,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       { status: 500 }
     );
   }
+
+  invalidateOrgResource(existing.org_id, "projects");
 
   return NextResponse.json({ success: true });
 }

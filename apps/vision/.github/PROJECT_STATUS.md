@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 21 Complete — Cache-Tag Wiring + Search UX + Founder UI
+## Current Phase: Phase 21b Complete — Cache-Tag Wiring Expansion
 
 ## Phase Tracker
 
@@ -34,6 +34,7 @@
 | 16c | Search Keyboard Nav | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 19b | Founder UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 21  | Cache-Tag Wiring | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 21b | Cache-Tag Expansion | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1927,4 +1928,22 @@ to 9.4/10). All changes are additive; no feature regressions.
 - **TypeScript**: Clean
 - **ESLint**: Clean
 - **Build**: Compiled successfully
+
+
+## Phase 21b Deliverables (Cache-Tag Expansion)
+
+- [x] orgTags vocabulary gains 'vision' resource
+- [x] projects POST/PATCH/DELETE invalidate org:projects
+- [x] goals PATCH/DELETE invalidate org:goals
+- [x] vision POST/PATCH/DELETE invalidate org:vision (DELETE captures org_id pre-delete)
+- [x] members PATCH/DELETE invalidate org:members
+- [x] departments POST/PATCH/DELETE invalidate org:departments
+- [x] All eight mutation routes flow through invalidateOrgResource without renaming tags or changing call signatures
+
+## Build Verification (Phase 21b)
+
+- **Tests**: 91/91 files passing (848 total)
+- **TypeScript**: Clean
+- **ESLint**: Clean
+- **Build**: Compiled successfully in 23.4s
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateGoalSchema } from "@/lib/schemas/goal";
 import { isValidUUID } from "@/lib/validation";
 import { requireOrgRole } from "@/lib/supabase/rbac";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -107,6 +108,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
+  invalidateOrgResource(existing.org_id, "goals");
+
   return NextResponse.json({ data });
 }
 
@@ -148,6 +151,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     console.error("[API goal DELETE]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+
+  invalidateOrgResource(existing.org_id, "goals");
 
   return NextResponse.json({ success: true });
 }

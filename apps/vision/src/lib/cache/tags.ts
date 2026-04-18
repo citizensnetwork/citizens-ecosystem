@@ -39,6 +39,9 @@ export const orgTags = {
   metrics(orgId: string): string {
     return `org:${orgId}:metrics`;
   },
+  vision(orgId: string): string {
+    return `org:${orgId}:vision`;
+  },
 };
 
 /**

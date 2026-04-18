@@ -8,6 +8,7 @@ import {
   listProjectsOffset,
 } from "@/lib/queries/projects";
 import { parsePageSize } from "@/lib/pagination/cursor";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -144,6 +145,8 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  invalidateOrgResource(orgId, "projects");
 
   return NextResponse.json({ data }, { status: 201 });
 }

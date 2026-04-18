@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { z } from "zod";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 interface RouteParams {
   params: Promise<{ orgId: string }>;
@@ -155,6 +156,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  invalidateOrgResource(orgId, "members");
+
   return NextResponse.json({ data });
 }
 
@@ -206,6 +209,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  invalidateOrgResource(orgId, "members");
 
   return NextResponse.json({ success: true });
 }
