@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import RSVPButton from "./RSVPButton";
 import CommentSection from "./CommentSection";
+import EventUpdatesList from "./EventUpdatesList";
 import WhoIsAttending from "./WhoIsAttending";
 import LiveTrackingPrompt from "./LiveTrackingPrompt";
 import InlineEventRating from "@/components/reviews/InlineEventRating";
@@ -320,6 +321,14 @@ export default function EventDetailContent({
           visibility={(event.attendees_visible as AttendeesVisibility) ?? "public"}
           isAuthenticated={!!user}
         />
+      </div>
+
+      {/* From the Organiser — read-only feed of organiser-authored
+          updates (composer lives in /events/manage).  Self-hides when
+          the event has no updates yet so it doesn't add visual noise to
+          the long tail of brand-new events. */}
+      <div className="mt-6 border-t pt-5">
+        <EventUpdatesList eventId={event.id} />
       </div>
 
       {/* Comments */}

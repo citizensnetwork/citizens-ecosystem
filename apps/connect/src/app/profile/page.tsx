@@ -103,6 +103,7 @@ export default async function ProfilePage() {
     instagram_handle: profile?.instagram_handle ?? null,
     facebook_url: profile?.facebook_url ?? null,
     tiktok_handle: profile?.tiktok_handle ?? null,
+    preferences: (profile?.preferences ?? {}) as Record<string, unknown>,
     created_at: profile?.created_at ?? "",
   };
 

@@ -176,6 +176,10 @@ export type Profile = {
   instagram_handle: string | null;
   facebook_url: string | null;
   tiktok_handle: string | null;
+  /** Free-form per-user preference bag (migration 034).  Currently houses
+   *  Would-You-Rather answers under `preferences.wyr`; expected to grow as
+   *  new lightweight personalisation slices ship. */
+  preferences: Record<string, unknown>;
   created_at: string;
 };
 

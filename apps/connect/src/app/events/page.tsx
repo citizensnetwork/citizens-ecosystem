@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import EventsView from "@/components/events/EventsView";
 import OnboardingOverlay from "@/components/onboarding/OnboardingOverlay";
+import PreferencePickerGate from "@/components/onboarding/PreferencePickerGate";
 import type { Event, Place, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,10 @@ export default async function EventsPage() {
   return (
     <>
       {showOnboarding && <OnboardingOverlay show />}
+      {/* Would-You-Rather picker — only shows once onboarding is done so the
+          two first-run UIs don't race; further gated by a localStorage flag
+          inside PreferencePickerGate so the user only sees it once. */}
+      <PreferencePickerGate enabled={!!currentUser && !showOnboarding} />
       <EventsView
         events={events ?? []}
         places={placesWithStats}

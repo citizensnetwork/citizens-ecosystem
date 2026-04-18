@@ -40,6 +40,9 @@ create table if not exists public.profiles (
   home_latitude double precision,
   home_longitude double precision,
   notification_radius_km int not null default 50,
+  -- Lightweight per-user preference bag (migration 034).  Houses the
+  -- Would-You-Rather answers under preferences.wyr.
+  preferences jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
