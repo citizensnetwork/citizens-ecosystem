@@ -21,7 +21,9 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#FF6B35",
     eventCategories: ["education"],
     placeCategories: ["education"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+    // Glasses — mirrors the EventMap `education` category marker so the
+    // quick-access tool, burger filter and map marker share one visual.
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="15" r="3.5"/><circle cx="18" cy="15" r="3.5"/><path d="M9.5 15h5"/><path d="M3 12l2-6"/><path d="M21 12l-2-6"/></svg>',
   },
   {
     id: "coffee",
@@ -29,7 +31,8 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#8B4513",
     eventCategories: ["social-fun"],
     placeCategories: ["relax"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+    // Coffee mug with steam \u2014 mirrors the EventMap `social-fun` marker.
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z"/><path d="M15 12h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M8 3c-.5 1 .5 2 0 3"/><path d="M12 3c-.5 1 .5 2 0 3"/></svg>',
   },
   {
     id: "runs",
@@ -37,7 +40,8 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#2ECC71",
     eventCategories: ["sport-fun"],
     placeCategories: ["exercise"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="4" r="2"/><path d="M15.59 13.51l-3.45 4.95L8 15l-4 5"/><path d="M17.64 7.39L20 10l-2 2-3.5-2.5L11 13l-1.5-3L13 7l2.64.39z"/></svg>',
+    // Running stick figure — mirrors the EventMap `sport-fun` marker icon.
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="4" r="2"/><path d="M14 7l-3 4 3 3v6"/><path d="M9 11l-3 1 1 4"/><path d="M14 14l4 1 1 4"/></svg>',
   },
   {
     id: "churches",
@@ -155,7 +159,7 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
   },
   {
     id: "shopping",
-    label: "Shopping",
+    label: "Stores",
     color: "#E91E63",
     eventCategories: [],
     placeCategories: ["shopping"],

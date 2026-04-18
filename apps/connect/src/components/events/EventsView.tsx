@@ -1140,7 +1140,7 @@ export default function EventsView({
             <button
               type="button"
               onClick={() => setCategoryPanelOpen(true)}
-              className="absolute bottom-0 left-1/2 z-1008 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
+              className="absolute bottom-0 left-1/2 z-1610 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
               style={{
                 borderColor: `${CATEGORY_HEX[[...activeCategories][0]]}60`,
                 background: `${CATEGORY_HEX[[...activeCategories][0]]}dd`,
@@ -1157,7 +1157,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1007 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1611 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               categoryPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label="Category filter results"
@@ -1309,7 +1309,7 @@ export default function EventsView({
             <button
               type="button"
               onClick={() => setQuickPanelOpen(true)}
-              className="absolute bottom-0 left-1/2 z-1008 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
+              className="absolute bottom-0 left-1/2 z-1610 -translate-x-1/2 rounded-t-xl border border-b-0 px-5 py-2 text-xs font-bold tracking-wider shadow-lg backdrop-blur transition-all active:scale-95 hover:brightness-110"
               style={{
                 borderColor: `${activeQuickItem.color}60`,
                 background: `${activeQuickItem.color}dd`,
@@ -1322,7 +1322,7 @@ export default function EventsView({
           )}
 
           <aside
-            className={`absolute inset-x-0 bottom-0 z-1007 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute inset-x-0 bottom-0 z-1611 flex h-[27dvh] flex-col rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out ${
               quickPanelOpen ? "translate-y-0" : "translate-y-full"
             }`}
             aria-label={`${activeQuickItem.label} filter results`}

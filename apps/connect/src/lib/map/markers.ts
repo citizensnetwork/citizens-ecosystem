@@ -13,9 +13,13 @@ const CATEGORY_ICONS: Record<EventCategory, string> = {
   // bent legs. More intuitive than a trophy (which could read as awards).
   "sport-fun":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="m4 22 5-5 2-3 4 1 2 2v5"/><path d="m17 22 2-5-3-4-3 1-2 4"/><path d="M7 13h3"/></svg>',
-  // Coffee cup — casual social gatherings
+  // Coffee mug with steam — casual social gatherings.
+  // Earlier outline (a wide flat-topped rectangle with a small handle) read
+  // as a "square" inside the round marker. This redraw uses a narrower mug
+  // body, a clear side handle, and three steam wisps so the silhouette
+  // reads unmistakably as coffee at small sizes.
   "social-fun":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z"/><path d="M15 12h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M8 3c-.5 1 .5 2 0 3"/><path d="M12 3c-.5 1 .5 2 0 3"/></svg>',
   // Hands holding (uplift / support) — community outreach
   "community-upliftment":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',

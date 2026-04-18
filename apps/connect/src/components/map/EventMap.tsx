@@ -110,10 +110,17 @@ const DOT_MODE_SIZE = 10;
  *     mode — clustering / dot-mode handles that case).
  */
 const RING_RADIUS_KM = 50;
-const RING_MIN_ZOOM = 10;
-/** Pixels inset from the viewport edge so edge-pinned markers remain
- *  tappable and don't clip behind the floating chrome (search bar, FABs). */
-const RING_EDGE_PADDING_PX = 56;
+/** Activation zoom — below this, markers behave naturally (no edge-pinning).
+ *  Lowered to 8 so the ring kicks in from a regional zoom rather than
+ *  requiring the user to be already zoomed deep into a city. */
+const RING_MIN_ZOOM = 8;
+/** Top-edge padding so edge-pinned markers don't sit behind the floating
+ *  search-this-area pill / top chrome. Bottom and side pads are 0 so the
+ *  pin only triggers when the marker is genuinely off-screen (matches the
+ *  user's spec — no "mid-air" activation). */
+const RING_EDGE_PADDING_TOP_PX = 96;
+const RING_EDGE_PADDING_SIDE_PX = 0;
+const RING_EDGE_PADDING_BOTTOM_PX = 0;
 
 /** Earth-radius haversine distance between two [lng, lat] tuples, in km. */
 function haversineKm(a: [number, number], b: [number, number]): number {
@@ -189,6 +196,11 @@ export default function EventMap({
   activeCategoriesRef.current = activeCategories;
   const activePlaceCategoriesRef = useRef(activePlaceCategories);
   activePlaceCategoriesRef.current = activePlaceCategories;
+  // When the burger menu "Locations" tab is active, the user has explicitly
+  // asked to see places — bypass the zoom-gate so place markers render at
+  // any zoom (otherwise the tab appears broken until the user zooms in).
+  const placesModeRef = useRef(placesMode);
+  placesModeRef.current = placesMode;
   const onBearingChangeRef = useRef(onBearingChange);
   onBearingChangeRef.current = onBearingChange;
   const onMoveEndRef = useRef(onMoveEnd);
@@ -241,12 +253,16 @@ export default function EventMap({
     const z = map.getZoom();
     const placeCats = activePlaceCategoriesRef.current;
     const hasPlaceCatsSelected = placeCats && placeCats.size > 0;
-    // Show places when: place categories are explicitly selected (any zoom), OR at high zoom with no event-category filter
-    const shouldShow = hasPlaceCatsSelected || z >= PLACE_ZOOM_MIN;
+    const inPlacesMode = placesModeRef.current;
+    // Show places when: the user is on the burger "Locations" tab (always),
+    // OR explicit place categories are selected, OR they've zoomed in deeply.
+    const shouldShow = inPlacesMode || hasPlaceCatsSelected || z >= PLACE_ZOOM_MIN;
     placeMarkersRef.current.forEach((m) => {
       (m.getElement() as HTMLElement).style.visibility = shouldShow ? "" : "hidden";
     });
-    // Hide event markers when place categories are selected (user is browsing places)
+    // Hide event markers when place categories are selected (user is browsing places).
+    // (Note: when `inPlacesMode` is true the event markers were never created in the
+    // first place — see the marker-build effect — so no extra hide is needed here.)
     markersRef.current.forEach((m) => {
       (m.getElement() as HTMLElement).style.visibility = hasPlaceCatsSelected ? "hidden" : "";
     });
@@ -402,7 +418,17 @@ export default function EventMap({
 
   /** Sticky 50 km nearby-event ring — see RING_* constants at top of file.
    *  Pins near-but-off-screen markers to the viewport edge with a directional
-   *  spike and scale/opacity falloff as they approach the 50 km horizon. */
+   *  spike and scale/opacity falloff as they approach the 50 km horizon.
+   *
+   *  Implementation note: we deliberately do NOT call `marker.setLngLat()`
+   *  per-frame — that would force MapLibre to re-project + re-render every
+   *  marker on every pan tick, killing pan smoothness. Instead, each
+   *  marker stays at its true lngLat (so MapLibre's normal translate handles
+   *  it) and we apply a CSS `transform: translate(...) scale(...)` on the
+   *  inner `.cc-marker-outer` span to shift it visually onto the viewport
+   *  edge. The CSS transition on `.cc-marker-outer` is also disabled while
+   *  ring-edge is active (see globals.css) so per-frame updates feel
+   *  immediate rather than tweening behind the user's finger. */
   const updateRingPins = useCallback(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
@@ -412,89 +438,92 @@ export default function EventMap({
     const h = canvas.clientHeight;
     if (w === 0 || h === 0) return;
 
-    // Below the activation zoom, always restore markers to their true
-    // position and clear any ring-pin state. This lets clustering / dot-mode
-    // operate normally at regional zooms.
+    // Below the activation zoom, clear any ring-pin state and let markers
+    // render naturally (clustering / dot-mode handles regional zooms).
     if (zoom < RING_MIN_ZOOM) {
       for (const entry of evtMarkerDataRef.current) {
-        if (!entry.ringPinned) continue;
-        entry.marker.setLngLat(entry.lngLat);
-        const el = entry.marker.getElement() as HTMLElement;
-        el.classList.remove("cc-ring-edge");
-        el.style.opacity = "";
-        el.style.display = "";
-        el.style.removeProperty("--cc-ring-scale");
-        el.style.removeProperty("--cc-ring-bearing");
-        entry.ringPinned = false;
+        const root = entry.marker.getElement() as HTMLElement;
+        if (entry.ringPinned || root.style.display === "none" || root.style.opacity) {
+          const outer = root.querySelector<HTMLElement>(".cc-marker-outer");
+          if (outer) {
+            outer.style.removeProperty("transform");
+            outer.style.removeProperty("--cc-ring-bearing");
+          }
+          root.classList.remove("cc-ring-edge");
+          root.style.removeProperty("opacity");
+          root.style.removeProperty("display");
+          entry.ringPinned = false;
+        }
       }
       return;
     }
 
     const centerLL = map.getCenter();
-    const centerPt = map.project(centerLL);
-    const halfW = w / 2 - RING_EDGE_PADDING_PX;
-    const halfH = h / 2 - RING_EDGE_PADDING_PX;
-    // Guard against extremely small viewports (padding > half-dimension):
-    // fall back to a minimal half-size so edge-pin math still resolves.
-    const safeHalfW = Math.max(halfW, 8);
-    const safeHalfH = Math.max(halfH, 8);
+    const left = RING_EDGE_PADDING_SIDE_PX;
+    const right = w - RING_EDGE_PADDING_SIDE_PX;
+    const top = RING_EDGE_PADDING_TOP_PX;
+    const bottom = h - RING_EDGE_PADDING_BOTTOM_PX;
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    const halfW = Math.max((right - left) / 2, 8);
+    const halfH = Math.max((bottom - top) / 2, 8);
 
     for (const entry of evtMarkerDataRef.current) {
       const [trueLng, trueLat] = entry.lngLat;
-      const el = entry.marker.getElement() as HTMLElement;
+      const root = entry.marker.getElement() as HTMLElement;
+      const outer = root.querySelector<HTMLElement>(".cc-marker-outer");
+      if (!outer) continue;
+
       const distKm = haversineKm([centerLL.lng, centerLL.lat], [trueLng, trueLat]);
 
-      // Past the ring — hide entirely.
+      // Beyond ring: hide entirely.
       if (distKm > RING_RADIUS_KM) {
-        el.style.display = "none";
+        root.style.display = "none";
         entry.ringPinned = false;
         continue;
       }
-      el.style.display = "";
+      root.style.display = "";
 
       // Linear falloff: 1.0 at centre → 0.4 at the ring edge.
       const t = Math.min(1, distKm / RING_RADIUS_KM);
       const falloff = 1 - t * 0.6;
-      el.style.setProperty("--cc-ring-scale", falloff.toFixed(3));
-      el.style.opacity = falloff.toFixed(3);
+      const falloffStr = falloff.toFixed(3);
+      root.style.opacity = falloffStr;
 
-      // Is the true position already visible inside the viewport (with padding)?
       const eventPt = map.project([trueLng, trueLat]);
-      const dx = eventPt.x - centerPt.x;
-      const dy = eventPt.y - centerPt.y;
       const insideViewport =
-        Math.abs(dx) <= safeHalfW && Math.abs(dy) <= safeHalfH;
+        eventPt.x >= left && eventPt.x <= right &&
+        eventPt.y >= top && eventPt.y <= bottom;
 
       if (insideViewport) {
-        // Restore the marker to its true geographic position.
+        // Inside viewport: clear any prior edge-pin state, apply scale only.
         if (entry.ringPinned) {
-          entry.marker.setLngLat(entry.lngLat);
-          el.classList.remove("cc-ring-edge");
-          el.style.removeProperty("--cc-ring-bearing");
+          outer.style.removeProperty("--cc-ring-bearing");
+          root.classList.remove("cc-ring-edge");
           entry.ringPinned = false;
         }
+        outer.style.transform = `scale(${falloffStr})`;
         continue;
       }
 
-      // Off-screen but inside the ring — pin to the nearest viewport edge.
-      // Compute the intersection of the centre→event ray with the padded
-      // viewport rectangle, then unproject back to a lngLat MapLibre can
-      // pin the marker to.
+      // Off-screen: clamp to viewport edge along the centre→event ray.
+      const dx = eventPt.x - cx;
+      const dy = eventPt.y - cy;
       const absDx = Math.abs(dx) || 1e-6;
       const absDy = Math.abs(dy) || 1e-6;
-      const scaleT = Math.min(safeHalfW / absDx, safeHalfH / absDy);
-      const edgeX = centerPt.x + dx * scaleT;
-      const edgeY = centerPt.y + dy * scaleT;
-      const edgeLL = map.unproject([edgeX, edgeY]);
-      entry.marker.setLngLat(edgeLL);
-      entry.ringPinned = true;
-      el.classList.add("cc-ring-edge");
-      // Spike bearing: use screen-space angle so the indicator always
-      // points back toward the true marker regardless of map rotation.
-      // CSS treats 0deg as pointing "up"; atan2(dy, dx) gives an angle
-      // with 0deg pointing right in screen space, so we add 90°.
+      const scaleT = Math.min(halfW / absDx, halfH / absDy);
+      const edgeX = cx + dx * scaleT;
+      const edgeY = cy + dy * scaleT;
+      const offsetX = edgeX - eventPt.x;
+      const offsetY = edgeY - eventPt.y;
+      outer.style.transform = `translate(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px) scale(${falloffStr})`;
+      // Spike bearing: screen-space angle so the indicator always points back
+      // toward the true marker regardless of map rotation. CSS treats 0deg as
+      // pointing "up"; atan2(dy, dx) returns 0deg pointing right, so we add 90°.
       const bearingDeg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-      el.style.setProperty("--cc-ring-bearing", `${bearingDeg.toFixed(1)}deg`);
+      outer.style.setProperty("--cc-ring-bearing", `${bearingDeg.toFixed(1)}deg`);
+      root.classList.add("cc-ring-edge");
+      entry.ringPinned = true;
     }
   }, []);
   updateRingPinsRef.current = updateRingPins;
@@ -659,7 +688,7 @@ export default function EventMap({
   /* ── Update place visibility when activeCategories or activePlaceCategories changes ── */
   useEffect(() => {
     updatePlaceVisibility();
-  }, [activeCategories, activePlaceCategories, updatePlaceVisibility]);
+  }, [activeCategories, activePlaceCategories, placesMode, updatePlaceVisibility]);
 
   /* ── Sync event + place markers ───────────────────────── */
   useEffect(() => {

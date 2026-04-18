@@ -286,13 +286,14 @@ body {
 
 /* ── Smooth size transitions ──
  * Fluid resize on zoom changes (Google-style cross-fade feel). Skipped
- * when the user prefers reduced motion. */
+ * when the user prefers reduced motion.
+ * Scoped to NOT include `transform` so per-frame ring-edge updates remain
+ * jitter-free (a 180ms transform tween would chase the user's finger). */
 @media (prefers-reduced-motion: no-preference) {
   .cc-marker-outer {
     transition:
       width 180ms ease,
       height 180ms ease,
-      transform 180ms ease,
       box-shadow 220ms ease,
       opacity 220ms ease;
   }
@@ -301,9 +302,16 @@ body {
 /* ── Drop-in animation for freshly-added markers ──
  * Mirrors Google Maps' subtle scale-in + fade-in when POIs appear as you
  * pan. Kept very brief (~260ms) and applied once — EventMap adds the
- * .cc-marker-new class on creation and strips it after the animation. */
+ * .cc-marker-new class on creation and strips it after the animation.
+ *
+ * IMPORTANT: the animation targets `.cc-marker-outer` (the inner span),
+ * NOT the marker root. MapLibre owns the root's `transform: translate(...)`
+ * for positioning; if we animate `transform: scale(...)` on the root the
+ * marker briefly snaps to the top-left corner before MapLibre reapplies its
+ * translate on the next frame, producing the "icons appear at top-left"
+ * glitch the user reported when toggling categories. */
 @media (prefers-reduced-motion: no-preference) {
-  .cc-marker-new {
+  .cc-marker-new .cc-marker-outer {
     animation: markerDropIn 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 }
@@ -370,18 +378,18 @@ body {
 /* ── Sticky 50 km ring: edge-pinned markers ──────────────────────────
  *  When an event lies inside the 50 km ring but outside the current
  *  viewport, EventMap pins it to the nearest viewport edge and adds
- *  .cc-ring-edge to the marker root. A small directional spike protrudes
- *  from the white of the icon toward the event's true geographic
- *  position (bearing supplied via the --cc-ring-bearing custom
- *  property). Scale and opacity falloff as the event nears the 50 km
- *  horizon use --cc-ring-scale (1.0 = centre, 0.4 = at the ring).
- *
- *  Note: we scale the inner .cc-marker-outer rather than the marker
- *  root — MapLibre owns the root's `transform: translate(...)` and
- *  overriding it would break marker positioning. */
+ *  .cc-ring-edge to the marker root. JS sets the inline transform on
+ *  `.cc-marker-outer` directly each frame; CSS just provides the spike
+ *  pseudo-element and ensures the otherwise-helpful 180ms transition on
+ *  `transform` is not in play here so per-frame updates feel immediate.
+ *  (A transform tween would chase the user's finger and produce the
+ *  "snap on release" lag we hit in the previous iteration.) */
 .cc-ring-edge .cc-marker-outer {
-  transform: scale(var(--cc-ring-scale, 1));
-  transition: transform 180ms ease-out, opacity 180ms ease-out;
+  position: relative;
+  /* No transform listed in transition — the parent `.cc-marker-outer`
+   * rule above already excludes transform, so per-frame inline transform
+   * updates apply instantly. We keep `will-change` to nudge the compositor
+   * into a separate layer for cheap GPU compositing during pan. */
   will-change: transform;
 }
 .cc-ring-edge .cc-marker-outer::after {
