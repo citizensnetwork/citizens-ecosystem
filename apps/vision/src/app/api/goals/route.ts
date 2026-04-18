@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createGoalSchema } from "@/lib/schemas/goal";
 import { isValidUUID } from "@/lib/validation";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
+import { listGoalsCursor, listGoalsOffset } from "@/lib/queries/goals";
+import { parsePageSize } from "@/lib/pagination/cursor";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -24,50 +26,50 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let query = supabase
-    .from("goals")
-    .select("*, vision_statements(title)", { count: "exact" })
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
+  const filters = {
+    orgId,
+    status: searchParams.get("status"),
+    visionId: searchParams.get("vision_id"),
+    search: searchParams.get("search"),
+  };
 
-  // Filters
-  const status = searchParams.get("status");
-  if (status) {
-    query = query.eq("status", status);
-  }
+  const cursorParam = searchParams.get("cursor");
+  const useCursor =
+    cursorParam !== null || searchParams.get("paginate") === "cursor";
 
-  const visionId = searchParams.get("vision_id");
-  if (visionId && isValidUUID(visionId)) {
-    query = query.eq("vision_id", visionId);
-  }
+  try {
+    if (useCursor) {
+      const pageSize = parsePageSize(
+        searchParams.get("limit") ?? String(ITEMS_PER_PAGE),
+      );
+      const page = await listGoalsCursor(supabase, filters, {
+        cursor: cursorParam,
+        pageSize,
+      });
+      return NextResponse.json(page);
+    }
 
-  const search = searchParams.get("search");
-  if (search) {
-    query = query.ilike("title", `%${search}%`);
-  }
-
-  // Pagination
-  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-  const limit = ITEMS_PER_PAGE;
-  const from = (page - 1) * limit;
-  query = query.range(from, from + limit - 1);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error("[API goals GET]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    data,
-    pagination: {
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+    const result = await listGoalsOffset(supabase, filters, {
       page,
-      limit,
-      total: count ?? 0,
-      totalPages: Math.ceil((count ?? 0) / limit),
-    },
-  });
+      pageSize: ITEMS_PER_PAGE,
+    });
+    return NextResponse.json({
+      data: result.data,
+      pagination: {
+        page: result.page,
+        limit: result.pageSize,
+        total: result.total,
+        totalPages: Math.ceil(result.total / result.pageSize),
+      },
+    });
+  } catch (err) {
+    console.error("[API goals GET]", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 14b Complete — Architecture Foundation
+## Current Phase: Phase 15 Complete — Analytics Pre-Aggregation
 
 ## Phase Tracker
 
@@ -22,6 +22,8 @@
 | 13 | Hierarchical Federation Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A- |
 | 14a | Security Hardening | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
 | 14b | Architecture Foundation | ✅ Complete | 2026-04-18 | 2026-04-18 | A |
+| 14c | Query Layer Rollout | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 15  | Analytics Pre-Aggregation | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1750,4 +1752,66 @@ to 9.4/10). All changes are additive; no feature regressions.
 - Cursor pagination for `/api/projects`, `/api/goals`, `/api/timeline`, connect endpoints — helper is ready, rollout is opt-in.
 - Consolidation of the remaining ~25 API routes onto `requireOrgMember` / `requireOrgRoleForRequest` — mechanical, can be batched.
 - Server Component conversion of `[orgSlug]/page.tsx`, dashboard, timeline, map pages.
+
+## Phase 14c Deliverables — Query Layer Rollout
+
+**Trigger:** Phase 14b shipped the query layer and cursor helper as opt-in scaffolding. 14c rolls them out to the remaining high-traffic list endpoints and introduces a materialized view for the `/api/metrics/overview` dashboard so repeated hits no longer re-scan the full `activities` / `projects` / `goals` tables.
+
+### Domain query layer expansion
+- [x] `src/lib/queries/projects.ts` — `listProjectsCursor`, `listProjectsOffset`, shared filter builder with UUID-validated `departmentId` and ilike search on `name`.
+- [x] `src/lib/queries/goals.ts` — `listGoalsCursor`, `listGoalsOffset`, same filter pattern keyed on `visionId` + ilike on `title`.
+
+### API routes
+- [x] `/api/projects` GET — opt-in cursor pagination via `?cursor=...` or `?paginate=cursor`; offset response preserved.
+- [x] `/api/goals` GET — same opt-in pattern. Both routes now route through the shared query layer and pick up consistent `try/catch` + logging.
+
+### Dashboard stats materialized view
+- [x] `supabase/migrations/015_dashboard_stats_mv.sql` — `mv_org_dashboard_stats` with per-org counts (activities, activities_last_30d, participants, projects by status, goals by status, departments, members, latest_activity_at).
+- [x] `refresh_org_dashboard_stats()` SECURITY DEFINER with CONCURRENTLY fallback on first refresh.
+- [x] `get_org_dashboard_stats(p_org_id)` SECURITY DEFINER reader with `is_org_member` guard (materialized views do not participate in RLS).
+- [x] pg_cron `*/10 * * * *` schedule, wrapped in `pg_extension` existence check so local dev stays portable.
+- [x] `src/lib/queries/dashboard-stats.ts` — thin TypeScript wrapper exposing `getOrgDashboardStats` + `refreshDashboardStats`.
+
+### Tests (11 new)
+- [x] `src/__tests__/lib/queries-projects-goals.test.ts` — 7 tests (filters, cursor predicate encoding, UUID rejection, error propagation).
+- [x] `src/__tests__/lib/dashboard-stats.test.ts` — 4 tests (RPC arguments, empty + null handling, error propagation).
+
+### Quality gate
+- [x] 822/822 tests passing.
+- [x] `tsc --noEmit` clean.
+- [x] ESLint clean.
+- [x] `next build` compiled successfully.
+
+## Phase 15 Deliverables — Analytics Pre-Aggregation
+
+**Trigger:** `/api/metrics/trends` and the comparison endpoint both reduce the full `activities` table per request. A pre-aggregated daily rollup keyed on `(org_id, day, activity_type)` lets the dashboard load without O(n) table scans, and lets future workers incrementally maintain per-day rows instead of rebuilding everything.
+
+### Aggregate table
+- [x] `supabase/migrations/016_activity_daily_aggregates.sql` — `activity_daily_aggregates` table with PK `(org_id, day, activity_type)`, columns `activity_count`, `participant_total`, `hours_total` (derived from `start_time/end_time` delta), `refreshed_at`.
+- [x] RLS: `select_members` via `is_org_member`; `FOR ALL USING (false)` to block direct writes. All writes flow through SECURITY DEFINER functions.
+- [x] Secondary index `(org_id, day DESC)` for dashboard range scans.
+
+### Refresh functions
+- [x] `refresh_activity_daily_aggregates(p_org_id uuid DEFAULT NULL)` — full rebuild or per-org rebuild via DELETE + INSERT in one transaction.
+- [x] `refresh_activity_day(p_org_id, p_day)` — single-day UPSERT for future incremental flows (e.g. post-insert triggers).
+- [x] Initial prime so the first reader gets a populated table.
+- [x] pg_cron `*/30 * * * *` schedule with pg_extension guard.
+
+### Query helper
+- [x] `src/lib/queries/aggregates.ts` — `readDailyAggregates` (with optional `types[]` filter), `collapseByDay` (sum across activity_type), `refreshOrgAggregates`, `refreshActivityDay`.
+
+### Tests (9 new)
+- [x] `src/__tests__/lib/aggregates.test.ts` — 9 tests: org/date-window filter propagation, optional types filter, error propagation, per-type day collapsing, ordering stability, empty-input handling, RPC argument verification for both refresh functions.
+
+### Quality gate
+- [x] 822/822 tests passing.
+- [x] `tsc --noEmit` clean.
+- [x] ESLint clean.
+- [x] `next build` compiled successfully.
+
+### Deferred to later phases
+- Wire `/api/metrics/trends` and `/api/metrics/comparison` to `readDailyAggregates` — needs API shape compatibility review first to avoid breaking consumers.
+- Post-insert/update trigger on `activities` to call `refresh_activity_day` for real-time aggregate freshness.
+- Incremental refresh path that skips days with no activity changes.
+- MV refresh on admin-triggered bulk import completion (currently waits for next cron tick).
 

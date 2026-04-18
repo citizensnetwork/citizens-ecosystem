@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createProjectSchema } from "@/lib/schemas/project";
 import { isValidUUID } from "@/lib/validation";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
+import {
+  listProjectsCursor,
+  listProjectsOffset,
+} from "@/lib/queries/projects";
+import { parsePageSize } from "@/lib/pagination/cursor";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -24,51 +29,53 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let query = supabase
-    .from("projects")
-    .select("*, departments(name)", { count: "exact" })
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
+  const filters = {
+    orgId,
+    status: searchParams.get("status"),
+    departmentId: searchParams.get("department_id"),
+    search: searchParams.get("search"),
+  };
 
-  const status = searchParams.get("status");
-  if (status) {
-    query = query.eq("status", status);
-  }
+  // Cursor pagination is opt-in — supplying `?cursor=` or
+  // `?paginate=cursor` switches to the new stable keyset response.
+  // Legacy `?page=` callers keep the `{data, pagination: {...}}` shape.
+  const cursorParam = searchParams.get("cursor");
+  const useCursor =
+    cursorParam !== null || searchParams.get("paginate") === "cursor";
 
-  const departmentId = searchParams.get("department_id");
-  if (departmentId && isValidUUID(departmentId)) {
-    query = query.eq("department_id", departmentId);
-  }
+  try {
+    if (useCursor) {
+      const pageSize = parsePageSize(
+        searchParams.get("limit") ?? String(ITEMS_PER_PAGE),
+      );
+      const page = await listProjectsCursor(supabase, filters, {
+        cursor: cursorParam,
+        pageSize,
+      });
+      return NextResponse.json(page);
+    }
 
-  const search = searchParams.get("search");
-  if (search) {
-    query = query.ilike("name", `%${search}%`);
-  }
-
-  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-  const limit = ITEMS_PER_PAGE;
-  const from = (page - 1) * limit;
-  query = query.range(from, from + limit - 1);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error("[API projects GET]", error);
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+    const result = await listProjectsOffset(supabase, filters, {
+      page,
+      pageSize: ITEMS_PER_PAGE,
+    });
+    return NextResponse.json({
+      data: result.data,
+      pagination: {
+        page: result.page,
+        limit: result.pageSize,
+        total: result.total,
+        totalPages: Math.ceil(result.total / result.pageSize),
+      },
+    });
+  } catch (err) {
+    console.error("[API projects GET]", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    data,
-    pagination: {
-      page,
-      limit,
-      total: count ?? 0,
-      totalPages: Math.ceil((count ?? 0) / limit),
-    },
-  });
 }
 
 export async function POST(request: NextRequest) {
