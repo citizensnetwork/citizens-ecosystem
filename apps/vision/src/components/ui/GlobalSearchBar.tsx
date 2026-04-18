@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useOrgStore } from "@/stores/orgStore";
+
+type FlatHit = {
+  href: string;
+  title: string;
+  subtitle?: string;
+  group: "Activities" | "Projects" | "Goals";
+};
 
 interface ActivityHit {
   id: string;
@@ -46,6 +53,7 @@ const DEBOUNCE_MS = 250;
  */
 export function GlobalSearchBar() {
   const params = useParams();
+  const router = useRouter();
   const orgSlug = params?.orgSlug as string | undefined;
   const currentOrg = useOrgStore((s) => s.currentOrg);
 
@@ -54,6 +62,7 @@ export function GlobalSearchBar() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -118,12 +127,67 @@ export function GlobalSearchBar() {
     };
   }, [query, currentOrg]);
 
+  // Flatten hits in render order so keyboard nav can step through them.
+  const flatHits = useMemo<FlatHit[]>(() => {
+    if (!results || !orgSlug) return [];
+    const acc: FlatHit[] = [];
+    for (const a of results.activities ?? []) {
+      acc.push({
+        href: `/${orgSlug}/activities/${a.id}`,
+        title: a.title,
+        subtitle: a.date ?? a.type ?? undefined,
+        group: "Activities",
+      });
+    }
+    for (const p of results.projects ?? []) {
+      acc.push({
+        href: `/${orgSlug}/projects/${p.id}`,
+        title: p.name,
+        subtitle: p.status ?? undefined,
+        group: "Projects",
+      });
+    }
+    for (const g of results.goals ?? []) {
+      acc.push({
+        href: `/${orgSlug}/goals/${g.id}`,
+        title: g.title,
+        subtitle: g.status ?? undefined,
+        group: "Goals",
+      });
+    }
+    return acc;
+  }, [results, orgSlug]);
+
+  // Reset highlight whenever the result set changes.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [results]);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (!open || flatHits.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % flatHits.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i - 1 + flatHits.length) % flatHits.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const hit = flatHits[activeIndex];
+      if (hit) {
+        setOpen(false);
+        router.push(hit.href);
+      }
+    }
+  }
+
   if (!orgSlug || !currentOrg) return null;
 
-  const totalHits =
-    (results?.activities?.length ?? 0) +
-    (results?.projects?.length ?? 0) +
-    (results?.goals?.length ?? 0);
+  const totalHits = flatHits.length;
 
   return (
     <div ref={containerRef} className="relative w-72">
@@ -132,8 +196,16 @@ export function GlobalSearchBar() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => results && setOpen(true)}
+        onKeyDown={handleKeyDown}
         placeholder="Search activities, projects, goals…"
         aria-label="Global search"
+        aria-autocomplete="list"
+        aria-controls="gsearch-listbox"
+        aria-activedescendant={
+          open && flatHits[activeIndex]
+            ? `gsearch-hit-${activeIndex}`
+            : undefined
+        }
         className="w-full rounded-md border border-border bg-surface px-3 py-1.5 pl-8 text-sm text-text-primary placeholder:text-text-secondary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       />
       <span
@@ -166,6 +238,7 @@ export function GlobalSearchBar() {
       {open && (results || error) && (
         <div
           role="listbox"
+          id="gsearch-listbox"
           aria-label="Search results"
           className="absolute right-0 z-50 mt-1 max-h-[70vh] w-[28rem] overflow-y-auto rounded-md border border-border bg-surface shadow-xl"
         >
@@ -182,45 +255,30 @@ export function GlobalSearchBar() {
               No matches for &ldquo;{results.q}&rdquo;.
             </p>
           )}
-          {results && results.activities && results.activities.length > 0 && (
-            <SearchGroup label="Activities">
-              {results.activities.map((a) => (
-                <SearchLink
-                  key={a.id}
-                  href={`/${orgSlug}/activities/${a.id}`}
-                  title={a.title}
-                  subtitle={a.date ?? a.type ?? undefined}
-                  onSelect={() => setOpen(false)}
-                />
-              ))}
-            </SearchGroup>
-          )}
-          {results && results.projects && results.projects.length > 0 && (
-            <SearchGroup label="Projects">
-              {results.projects.map((p) => (
-                <SearchLink
-                  key={p.id}
-                  href={`/${orgSlug}/projects/${p.id}`}
-                  title={p.name}
-                  subtitle={p.status ?? undefined}
-                  onSelect={() => setOpen(false)}
-                />
-              ))}
-            </SearchGroup>
-          )}
-          {results && results.goals && results.goals.length > 0 && (
-            <SearchGroup label="Goals">
-              {results.goals.map((g) => (
-                <SearchLink
-                  key={g.id}
-                  href={`/${orgSlug}/goals/${g.id}`}
-                  title={g.title}
-                  subtitle={g.status ?? undefined}
-                  onSelect={() => setOpen(false)}
-                />
-              ))}
-            </SearchGroup>
-          )}
+          {(
+            ["Activities", "Projects", "Goals"] as FlatHit["group"][]
+          ).map((group) => {
+            const groupHits = flatHits
+              .map((h, idx) => ({ h, idx }))
+              .filter(({ h }) => h.group === group);
+            if (groupHits.length === 0) return null;
+            return (
+              <SearchGroup key={group} label={group}>
+                {groupHits.map(({ h, idx }) => (
+                  <SearchLink
+                    key={`${group}-${idx}`}
+                    id={`gsearch-hit-${idx}`}
+                    href={h.href}
+                    title={h.title}
+                    subtitle={h.subtitle}
+                    active={idx === activeIndex}
+                    onSelect={() => setOpen(false)}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                  />
+                ))}
+              </SearchGroup>
+            );
+          })}
         </div>
       )}
     </div>
@@ -245,22 +303,34 @@ function SearchGroup({
 }
 
 function SearchLink({
+  id,
   href,
   title,
   subtitle,
+  active,
   onSelect,
+  onMouseEnter,
 }: {
+  id?: string;
   href: string;
   title: string;
   subtitle?: string;
+  active?: boolean;
   onSelect: () => void;
+  onMouseEnter?: () => void;
 }) {
   return (
     <li>
       <Link
+        id={id}
         href={href}
         onClick={onSelect}
-        className="block px-3 py-2 text-sm text-text-primary hover:bg-surface-alt"
+        onMouseEnter={onMouseEnter}
+        role="option"
+        aria-selected={active}
+        className={`block px-3 py-2 text-sm text-text-primary hover:bg-surface-alt ${
+          active ? "bg-surface-alt" : ""
+        }`}
       >
         <span className="block truncate font-medium">{title}</span>
         {subtitle && (

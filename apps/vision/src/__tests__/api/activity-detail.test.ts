@@ -218,11 +218,20 @@ describe("DELETE /api/activities/[id]", () => {
       data: { user: { id: "user-1" } },
     });
 
-    const chain = {
+    const selectChain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi
+        .fn()
+        .mockResolvedValue({ data: { org_id: "org-1" }, error: null }),
+    };
+    const deleteChain = {
       delete: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    mockSupabase.from.mockReturnValue(chain);
+    mockSupabase.from
+      .mockReturnValueOnce(selectChain)
+      .mockReturnValueOnce(deleteChain);
 
     const req = new NextRequest(
       new URL(`http://localhost/api/activities/${ACT_ID}`),

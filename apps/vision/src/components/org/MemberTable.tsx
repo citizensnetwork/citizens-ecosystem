@@ -62,6 +62,15 @@ export function MemberTable({
     onRefresh();
   }
 
+  async function handleFounderToggle(memberId: string, isFounder: boolean) {
+    await fetch(`/api/orgs/${orgId}/members`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: memberId, is_founder: isFounder }),
+    });
+    onRefresh();
+  }
+
   async function handleRemove(memberId: string) {
     await fetch(`/api/orgs/${orgId}/members?id=${memberId}`, {
       method: "DELETE",
@@ -88,6 +97,9 @@ export function MemberTable({
               </th>
               <th className="px-4 py-2 text-left font-medium text-text-secondary">
                 Role
+              </th>
+              <th className="px-4 py-2 text-left font-medium text-text-secondary">
+                Founder
               </th>
               <th className="px-4 py-2 text-left font-medium text-text-secondary">
                 Department
@@ -125,6 +137,24 @@ export function MemberTable({
                       </option>
                     ))}
                   </select>
+                </td>
+                <td className="px-4 py-2">
+                  <label className="flex items-center gap-1 text-xs text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={!!member.is_founder}
+                      onChange={(e) =>
+                        handleFounderToggle(member.id, e.target.checked)
+                      }
+                      aria-label={`Mark ${member.user_id.slice(0, 8)} as founder`}
+                      className="h-3.5 w-3.5 rounded border-border bg-surface accent-accent"
+                    />
+                    {member.is_founder ? (
+                      <span className="font-medium text-accent">Founder</span>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </label>
                 </td>
                 <td className="px-4 py-2 text-text-secondary">
                   {member.departments?.name ?? "—"}

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { updateActivitySchema } from "@/lib/schemas/activity";
 import { isValidUUID } from "@/lib/validation";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -114,6 +115,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (data?.org_id) {
+    invalidateOrgResource(data.org_id, "activities");
+    invalidateOrgResource(data.org_id, "metrics");
+  }
+
   return NextResponse.json({ data });
 }
 
@@ -132,10 +138,22 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
   }
 
+  // Capture org_id before delete so we can invalidate the right tag.
+  const { data: existing } = await supabase
+    .from("activities")
+    .select("org_id")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase.from("activities").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (existing?.org_id) {
+    invalidateOrgResource(existing.org_id, "activities");
+    invalidateOrgResource(existing.org_id, "metrics");
   }
 
   return NextResponse.json({ success: true });

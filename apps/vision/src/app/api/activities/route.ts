@@ -8,6 +8,7 @@ import {
   listActivitiesOffset,
 } from "@/lib/queries/activities";
 import { parsePageSize } from "@/lib/pagination/cursor";
+import { invalidateOrgResource } from "@/lib/cache/tags";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -160,6 +161,9 @@ export async function POST(request: NextRequest) {
     .select("*, activity_tags(tag)")
     .eq("id", activity.id)
     .single();
+
+  invalidateOrgResource(orgId, "activities");
+  invalidateOrgResource(orgId, "metrics");
 
   return NextResponse.json({ data: result }, { status: 201 });
 }

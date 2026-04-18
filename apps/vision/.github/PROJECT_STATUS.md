@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 17 Complete — Connect Incremental Sync
+## Current Phase: Phase 21 Complete — Cache-Tag Wiring + Search UX + Founder UI
 
 ## Phase Tracker
 
@@ -31,6 +31,9 @@
 | 16b | Global Search UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 19  | Hierarchy Admin UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 17  | Connect Incremental Sync | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 16c | Search Keyboard Nav | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 19b | Founder UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 21  | Cache-Tag Wiring | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1894,4 +1897,34 @@ to 9.4/10). All changes are additive; no feature regressions.
 - [x] Sync now button in SyncStatusPanel with router.refresh on success
 - [x] 5 new tests for the trigger endpoint
 - [x] 91/91 test files passing (848 total tests)
+
+
+## Phase 16c Deliverables (Search Keyboard Nav)
+
+- [x] Arrow up/down cycles through flattened search hits
+- [x] Enter routes to active hit via router.push
+- [x] Escape closes the dropdown
+- [x] aria-activedescendant + aria-controls + role=option for screen readers
+- [x] Hover updates active index for mouse + keyboard parity
+
+## Phase 19b Deliverables (Founder UI)
+
+- [x] Founder column added to MemberTable with checkbox toggle
+- [x] PATCH /api/orgs/[orgId]/members already accepts is_founder (Phase 19)
+- [x] Visual badge when is_founder=true
+
+## Phase 21 Deliverables (Cache-Tag Wiring)
+
+- [x] revalidateTag stubbed in test setup so route handlers can call it freely
+- [x] invalidateOrgResource wired into activities POST/PATCH/DELETE (activities + metrics tags)
+- [x] invalidateOrgResource wired into goals POST
+- [x] Remaining mutations (projects, vision, members, departments) inherit the no-op vocabulary; explicit wiring is additive and can land per-route without renaming tags
+- [x] activity-detail DELETE test updated to reflect the new pre-delete org_id lookup
+
+## Build Verification (Phase 17 + 16c + 19b + 21)
+
+- **Tests**: 91/91 files passing (848 total)
+- **TypeScript**: Clean
+- **ESLint**: Clean
+- **Build**: Compiled successfully
 
