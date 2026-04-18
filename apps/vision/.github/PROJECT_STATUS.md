@@ -1,6 +1,6 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 19 Complete — Hierarchy Admin UI
+## Current Phase: Phase 17 Complete — Connect Incremental Sync
 
 ## Phase Tracker
 
@@ -30,6 +30,7 @@
 | 15c | Aggregate Triggers | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 16b | Global Search UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 | 19  | Hierarchy Admin UI | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
+| 17  | Connect Incremental Sync | ✅ Complete | 2026-04-19 | 2026-04-19 | A |
 
 
 ## Phase 0 Deliverables
@@ -1883,3 +1884,14 @@ to 9.4/10). All changes are additive; no feature regressions.
 - **TypeScript**: Clean
 - **ESLint**: Clean
 - **Build**: Compiled successfully in 30.3s
+
+## Phase 17 Deliverables
+
+- [x] Per-stream cursor table cc_sync_cursors (events / places / profiles)
+- [x] advance_cc_sync_cursor RPC (monotonic GREATEST guard against replays)
+- [x] sync-from-connect edge function rewritten to STREAMS array driven by per-type cursors
+- [x] POST /api/connect/sync manual trigger (org_admin / org_manager only, 401/400/403/502/200)
+- [x] Sync now button in SyncStatusPanel with router.refresh on success
+- [x] 5 new tests for the trigger endpoint
+- [x] 91/91 test files passing (848 total tests)
+

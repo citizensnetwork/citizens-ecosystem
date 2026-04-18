@@ -23,6 +23,16 @@ export default async function SyncPage({ params }: SyncPageProps) {
 
   if (!org) redirect("/");
 
+  const { data: membership } = await supabase
+    .from("user_org_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("org_id", org.id)
+    .single();
+
+  const canTrigger =
+    !!membership && ["org_admin", "org_manager"].includes(membership.role);
+
   // Fetch sync logs
   const { data: logs } = await supabase
     .from("cc_sync_log")
@@ -48,6 +58,8 @@ export default async function SyncPage({ params }: SyncPageProps) {
       <h1 className="text-2xl font-semibold text-text-primary">Sync Status</h1>
       <SyncStatusPanel
         logs={logs ?? []}
+        orgId={org.id}
+        canTrigger={canTrigger}
         stats={{
           claimed_events: eventsResult.count ?? 0,
           claimed_places: placesResult.count ?? 0,

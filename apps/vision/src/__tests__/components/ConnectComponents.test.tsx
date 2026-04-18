@@ -10,6 +10,11 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock next/navigation (SyncStatusPanel uses useRouter for refresh after sync)
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
+
 const baseEvent: CCEvent = {
   cc_event_id: "e1",
   title: "Community Cleanup",
