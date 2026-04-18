@@ -727,7 +727,7 @@ export class MemoryWearStore implements WearStore {
         // The initiator is always accepted on their own side. The recipient
         // is auto-accepted only if they already follow the sender — otherwise
         // the conversation lands in their requests inbox.
-        const otherState: ConversationRequestState = followsOtherToActor
+        const recipientRequestState: ConversationRequestState = followsOtherToActor
           ? 'accepted'
           : 'requested';
         const ts = this._now().toISOString();
@@ -755,7 +755,7 @@ export class MemoryWearStore implements WearStore {
           joinedAt: ts,
           lastReadAt: null,
           mutedUntil: null,
-          requestState: otherState,
+          requestState: recipientRequestState,
           role: 'member',
         });
         return conv;
