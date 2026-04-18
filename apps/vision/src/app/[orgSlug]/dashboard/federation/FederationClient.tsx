@@ -4,21 +4,23 @@ import { useState } from "react";
 import { PartnershipManager } from "@/components/dashboard/PartnershipManager";
 import { CrossOrgDashboard } from "@/components/dashboard/CrossOrgDashboard";
 import { CommunityView } from "@/components/dashboard/CommunityView";
+import { HierarchyTree } from "@/components/dashboard/HierarchyTree";
 
 interface FederationClientProps {
   orgId: string;
   isAdmin: boolean;
 }
 
-type FederationTab = "partners" | "cross-org" | "community";
+type FederationTab = "hierarchy" | "partners" | "cross-org" | "community";
 
 export default function FederationClient({
   orgId,
   isAdmin,
 }: FederationClientProps) {
-  const [activeTab, setActiveTab] = useState<FederationTab>("partners");
+  const [activeTab, setActiveTab] = useState<FederationTab>("hierarchy");
 
   const tabs: { key: FederationTab; label: string }[] = [
+    { key: "hierarchy", label: "Hierarchy" },
     { key: "partners", label: "Partnerships" },
     { key: "cross-org", label: "Cross-Org Metrics" },
     { key: "community", label: "Community" },
@@ -53,6 +55,8 @@ export default function FederationClient({
           </button>
         ))}
       </div>
+
+      {activeTab === "hierarchy" && <HierarchyTree orgId={orgId} />}
 
       {activeTab === "partners" && (
         <PartnershipManager orgId={orgId} isAdmin={isAdmin} />
