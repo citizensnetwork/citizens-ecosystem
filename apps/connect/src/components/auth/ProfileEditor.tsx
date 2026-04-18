@@ -3,7 +3,11 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile } from "@/types/db";
+import {
+  CONTRIBUTOR_KIND_LABELS,
+  type ContributorKind,
+  type Profile,
+} from "@/types/db";
 
 type Props = {
   profile: Profile;
@@ -24,6 +28,16 @@ export default function ProfileEditor({ profile, email }: Props) {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSuccess, setNameSuccess] = useState(false);
   const [nameError, setNameError] = useState("");
+
+  // ── Contributor kind state ─────────────────
+  const [contributorKind, setContributorKind] = useState<ContributorKind | null>(
+    profile.contributor_kind
+  );
+  const [kindSaving, setKindSaving] = useState(false);
+  const [kindMessage, setKindMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // ── Password state ────────────────────────
   const [newPassword, setNewPassword] = useState("");
@@ -146,6 +160,29 @@ export default function ProfileEditor({ profile, email }: Props) {
     }
   }
 
+  async function handleContributorKindSave(nextKind: ContributorKind) {
+    if (profile.role !== "contributor") return;
+    setKindSaving(true);
+    setKindMessage(null);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ contributor_kind: nextKind })
+        .eq("id", profile.id);
+      if (error) throw error;
+      setContributorKind(nextKind);
+      setKindMessage({ type: "success", text: "Contributor type updated." });
+    } catch (err) {
+      console.error("Contributor kind update failed:", err);
+      setKindMessage({
+        type: "error",
+        text: "Could not update contributor type. Please try again.",
+      });
+    } finally {
+      setKindSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* ── Avatar section ──────────────────────── */}
@@ -227,6 +264,45 @@ export default function ProfileEditor({ profile, email }: Props) {
           {email}
         </p>
       </section>
+
+      {profile.role === "contributor" && (
+        <section>
+          <h3 className="mb-2 text-sm font-medium text-black/70">
+            Contributor Type
+          </h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(
+              Object.entries(CONTRIBUTOR_KIND_LABELS) as [
+                ContributorKind,
+                string,
+              ][]
+            ).map(([kind, label]) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={kindSaving || contributorKind === kind}
+                onClick={() => handleContributorKindSave(kind)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  contributorKind === kind
+                    ? "border-black bg-black text-white"
+                    : "border-black/12 bg-white text-black/80 hover:border-black/30"
+                } disabled:cursor-default disabled:opacity-75`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {kindMessage && (
+            <p
+              className={`mt-2 text-xs ${
+                kindMessage.type === "error" ? "text-red-600" : "text-green-700"
+              }`}
+            >
+              {kindMessage.text}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* ── Password change ────────────────────── */}
       <section>

@@ -109,7 +109,7 @@ describe("EventForm", () => {
     });
   });
 
-  it("submits event and redirects on success", async () => {
+  it("submits event and shows Published success screen", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
     });
@@ -136,9 +136,12 @@ describe("EventForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /create event/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/events");
-      expect(mockRefresh).toHaveBeenCalled();
+      expect(screen.getByText("Published!")).toBeInTheDocument();
     });
+    expect(mockRefresh).toHaveBeenCalled();
+    expect(
+      screen.getByRole("link", { name: /view event/i })
+    ).toHaveAttribute("href", "/events/new-event-1");
   });
 
   it("shows error message on DB insert failure", async () => {

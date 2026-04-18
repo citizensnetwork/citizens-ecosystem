@@ -13,6 +13,8 @@ import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader
 import SearchProfilePicker from "./SearchProfilePicker";
 import type { EventCategory, Category } from "@/types/db";
 import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
+import Link from "next/link";
+import { share } from "@/lib/capacitor/share";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -56,6 +58,12 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // After a successful publish we transition the form into a celebratory
+  // success state instead of redirecting straight to the map.  Holding the
+  // new event id locally keeps the share UX working on slow connections
+  // (no need to refetch).
+  const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Vendor-only: place booking
   const [bookAtPlace, setBookAtPlace] = useState(false);
@@ -253,8 +261,162 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       }
     }
 
+    // Transition to the success state instead of redirecting.  The organiser
+    // gets a moment to share the event before navigating away — the single
+    // biggest determinant of an event's reach is whether the creator shares
+    // it within the first 60 seconds of publishing.
+    if (inserted?.id) {
+      setPublishedId(inserted.id);
+      setLoading(false);
+      // Refresh in the background so the events list is fresh by the time
+      // the organiser navigates back.
+      router.refresh();
+      return;
+    }
+
     router.push("/events");
     router.refresh();
+  }
+
+  // ── Success state ───────────────────────────────────────────────────
+  // After a successful insert we bail out of the form and render a compact
+  // celebratory panel with share affordances.  Sharing within the first
+  // minute or two of publishing is the biggest determinant of an event's
+  // reach, so we make it the most prominent action before any navigation.
+  if (publishedId) {
+    const shareUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/events/${publishedId}`
+        : `/events/${publishedId}`;
+    // Short, value-forward message that reads well in WhatsApp and SMS
+    // previews.  The URL is appended by the platform (or copied via
+    // clipboard fallback), so we don't duplicate it in the body.
+    const shareText = `You're invited to ${title || "a gathering"} on Citizens Connect.`;
+
+    async function handleShare() {
+      try {
+        const opened = await share({
+          title: title || "New event on Citizens Connect",
+          text: shareText,
+          url: shareUrl,
+        });
+        // `share()` returns false when it fell back to clipboard — surface a
+        // brief "Copied" confirmation so the organiser knows something happened.
+        if (!opened) {
+          setShareCopied(true);
+          window.setTimeout(() => setShareCopied(false), 2200);
+        }
+      } catch {
+        // User dismissed the share sheet.  Nothing to do — this is a
+        // normal interaction and shouldn't surface as an error.
+      }
+    }
+
+    async function handleCopyLink() {
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+          await navigator.clipboard.writeText(shareUrl);
+          setShareCopied(true);
+          window.setTimeout(() => setShareCopied(false), 2200);
+        }
+      } catch {
+        // Clipboard permissions can be blocked in some browsers; we
+        // intentionally keep this silent — the native share button
+        // remains available as a fallback.
+      }
+    }
+
+    return (
+      <div className="space-y-5 w-full">
+        {/* Celebratory header.  Gold ring + pulse keeps the moment feeling
+            like an achievement rather than a bland confirmation toast. */}
+        <div className="surface-card rounded-2xl p-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-(--gold-soft) ring-2 ring-(--gold)">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-7 w-7 text-black"
+              aria-hidden
+            >
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+            Published!
+          </h1>
+          <p className="mt-1.5 text-sm text-black/60">
+            Share it now — most attendees decide within the first hour.
+          </p>
+        </div>
+
+        {/* Primary action: share.  Gold-filled, takes full width so it
+            dominates the layout and is unmissable on touch targets. */}
+        <button
+          type="button"
+          onClick={handleShare}
+          className="w-full rounded-xl bg-(--gold) py-3 text-sm font-semibold text-black shadow-sm transition hover:brightness-95"
+        >
+          <span className="inline-flex items-center justify-center gap-2">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
+            >
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            Share event
+          </span>
+        </button>
+
+        {/* Secondary: copy link, for orgs that share into channels where the
+            native sheet isn't useful (Slack, Discord, email drafts). */}
+        <button
+          type="button"
+          onClick={handleCopyLink}
+          className="w-full rounded-xl border border-black/10 bg-white/80 py-2.5 text-sm font-medium text-black/80 transition hover:bg-white"
+        >
+          {shareCopied ? "Link copied ✓" : "Copy link"}
+        </button>
+
+        {/* Nav links.  Kept visually quieter than the share CTAs on purpose
+            — we want the organiser to share before they navigate away. */}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <Link
+            href="/events"
+            className="flex-1 rounded-xl border border-black/10 bg-white/70 py-2.5 text-center text-sm font-medium text-black/70 transition hover:bg-white"
+          >
+            Back to map
+          </Link>
+          <Link
+            href={`/events/${publishedId}`}
+            className="flex-1 rounded-xl border border-black bg-black py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black/85"
+          >
+            View event
+          </Link>
+        </div>
+
+        <p className="text-center text-[11px] text-black/40">
+          You can edit details anytime from{" "}
+          <Link href="/events/manage" className="underline hover:text-black/70">
+            Manage Events
+          </Link>
+          .
+        </p>
+      </div>
+    );
   }
 
   return (

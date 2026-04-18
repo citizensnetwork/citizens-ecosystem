@@ -157,6 +157,20 @@ export const CONTRIBUTOR_KIND_LABELS: Record<ContributorKind, string> = {
   business: "Business",
 };
 
+/**
+ * Returns a human-readable role label, expanding contributors to include
+ * their sub-type when available (e.g. "Contributor - Ministry").
+ */
+export function getRoleDisplayLabel(
+  role: UserRole,
+  contributorKind?: ContributorKind | null
+): string {
+  if (role === "contributor" && contributorKind) {
+    return `Contributor - ${CONTRIBUTOR_KIND_LABELS[contributorKind]}`;
+  }
+  return ROLE_LABELS[role] ?? "Citizen";
+}
+
 export type Profile = {
   id: string;
   email: string;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import type { Event, Profile, UserRole } from "@/types/db";
-import { ORGANISER_ROLES, ROLE_LABELS } from "@/types/db";
+import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -144,7 +144,10 @@ export default async function PublicProfilePage({
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {ROLE_LABELS[(profile.role as UserRole) ?? "citizen"] ?? "Citizen"}
+            {getRoleDisplayLabel(
+              (profile.role as UserRole) ?? "citizen",
+              profile.contributor_kind ?? null
+            )}
           </span>
 
           {/* Social counts */}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Event, Profile, InterestGroupWithItems, UserRole } from "@/types/db";
-import { ORGANISER_ROLES, ROLE_LABELS } from "@/types/db";
+import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
@@ -143,7 +143,10 @@ export default async function ProfilePage() {
                 : "bg-black/5 text-black/70"
             }`}
           >
-            {ROLE_LABELS[(profile?.role as UserRole) ?? "citizen"] ?? "Citizen"}
+            {getRoleDisplayLabel(
+              (profile?.role as UserRole) ?? "citizen",
+              profile?.contributor_kind ?? null
+            )}
           </span>
           <div className="mt-2 flex gap-4 text-sm text-black/70">
             <span>
