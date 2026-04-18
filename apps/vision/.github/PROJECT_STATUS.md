@@ -1435,3 +1435,111 @@ Phase 0–9 complete. Phase 9 adds geo_boundaries table, mv_boundary_activity_co
 - **TypeScript**: 0 errors
 - **ESLint**: 0 errors
 - **Documentation**: ARCHITECTURE.md, API.md, USER_GUIDE.md, ADMIN_GUIDE.md
+
+---
+
+## Post-Release Maintenance — Redundancy Cleanup (2026-04-18)
+
+Scoped, behaviour-preserving refactor in response to a redundancy audit.
+
+**Delivered**
+- **R1 (scoped)** — Extracted `<Pagination>` primitive (`src/components/ui/Pagination.tsx`).
+  Adopted in `ActivityList`, `ConnectEventList`, `ConnectPlaceList`, `ProjectList`,
+  and `[orgSlug]/boundaries/page.tsx`. Removed ~100 lines of copy-pasted prev/next
+  markup. Also tightened `boundaries/page.tsx` pagination to `encodeURIComponent`
+  search/active query params.
+- **R5** — Added `requireOrgRole()` helper (`src/lib/supabase/rbac.ts`) with a
+  discriminated `{ ok, membership | response }` result. Adopted in 6 API routes:
+  `api/advisory/generate`, `api/advisory/[id]`, `api/boundaries` (POST),
+  `api/boundaries/[id]` (PATCH + DELETE), `api/connect/events/[id]` (PATCH),
+  `api/connect/places/[id]` (PATCH).
+  Minor consistency change: the DELETE-boundary 403 message was unified from
+  `"Admin access required"` to `"Insufficient permissions"` to match every other
+  route (no test or docs depended on the former string).
+
+**Dropped from original plan (not actually redundant on closer inspection)**
+- **R2** — `/boundaries` is a CRUD/list surface with coverage stats; `/map`
+  already renders the boundary layer via `LayerToggle`. They are complementary.
+- **R3** — There is no duplicated metric-slug resolver; `/api/shared-metrics`
+  is a thin CRUD wrapper over the `shared_metrics` table.
+
+**Verification**
+- **Tests**: 732/732 passing (76 files, +12 new tests: Pagination + rbac)
+- **TypeScript**: 0 errors
+- **ESLint**: 0 errors
+- **Build**: not verified in this sandbox (Google Fonts unreachable — same
+  failure occurs on unmodified HEAD, so unrelated to this refactor)
+
+**Deferred (require their own phase under the Review Gate)**
+- Hierarchical parent/child orgs (`parent_org_id` + recursive RLS helpers). → **Foundation delivered in Phase 13 below; RLS wiring remains deferred.**
+- Role rename/remap to Founder / CEO / Admin / Employee + `title` and
+  `is_founder` on `user_org_roles`. → **UI label mapping + schema fields delivered in Phase 13 below; no RBAC rename.**
+- Seed script producing 3 parent orgs × 5 children × (CEO + admin + ≤10 members).
+- Scoped Connect "pull" (`{entity, org_id, since}`) and bidirectional "push".
+- AI-generated insights inside the existing Advisory tab (not a separate
+  feature — upgrades Phase 8's rule engine with LLM-backed recommendations).
+- Connect-side AI search activity surfaced as a Vision analytics data source.
+- Granular visibility matrix (who / how much timeline / which source).
+
+---
+
+## Phase 13 — Hierarchical Federation Foundation (2026-04-18)
+
+Additive, non-breaking foundation for the parent/child organisation
+model and the Founder / CEO / Admin / Employee vocabulary described
+in the product brief. Existing RLS policies, role CHECK constraint and
+the 732-test baseline are deliberately untouched so this can ship as a
+safe stepping stone before tree-aware RLS.
+
+**Delivered**
+- **Migration `013_hierarchy.sql`** (idempotent, `IF NOT EXISTS` /
+  `DO $$ BEGIN ... END $$` throughout):
+  - `organisations.parent_org_id UUID REFERENCES organisations(id) ON DELETE SET NULL`
+    + `organisations_no_self_parent` CHECK + `idx_organisations_parent_org_id`.
+  - `organisations_prevent_hierarchy_cycle` BEFORE INSERT/UPDATE trigger
+    using a depth-capped recursive CTE.
+  - `user_org_roles.title TEXT` (nullable job title) and
+    `user_org_roles.is_founder BOOLEAN NOT NULL DEFAULT false`
+    + partial index on `is_founder = true`.
+  - SECURITY DEFINER helpers `get_org_ancestors(uuid)`,
+    `get_org_descendants(uuid)`, `is_in_org_tree(uuid, uuid)` — defined
+    but **not yet wired into RLS**; future phases can adopt them.
+- **Types**: `Organisation.parent_org_id?`, `UserOrgRole.title?`,
+  `UserOrgRole.is_founder?` (all optional to preserve backwards
+  compatibility with existing projections and test fixtures).
+- **`src/lib/roles/labels.ts`** — UI-only role label map
+  (platform_admin → Platform Admin, org_admin → CEO, org_manager → Admin,
+  org_member → Employee, org_viewer → Viewer), plus
+  `getRoleDisplayLabel(role, isFounder)` (Founder override) and
+  `getRoleAndTitle(role, title, isFounder)`.
+- **`src/lib/orgs/hierarchy.ts`** — `buildOrgTree`, `findAncestors`,
+  `findDescendants`, `findSiblings` with a hard `MAX_DEPTH = 50` guard
+  so malformed data never infinite-loops the client.
+- **`GET /api/orgs/[orgId]/hierarchy`** — returns
+  `{ self, ancestors, siblings, children, descendants }`, scoped by the
+  caller's existing RLS read access on `organisations`.
+- **UI — new "Hierarchy" tab** on `/dashboard/federation` with the
+  read-only `<HierarchyTree>` component. Admin controls for reassigning
+  `parent_org_id` are deferred to a later phase.
+
+**Verification**
+- **Tests**: 759/759 passing (79 files; +27 new across
+  `role-labels.test.ts`, `org-hierarchy.test.ts`, `orgs-hierarchy.test.ts`).
+- **TypeScript**: 0 errors.
+- **ESLint**: 0 errors.
+- **Build**: not verified in this sandbox (Google Fonts unreachable — same
+  failure on unmodified HEAD, unrelated).
+
+**Deliberately still deferred**
+- Wiring `get_org_*` helpers into existing RLS so members of a parent
+  org can read child-org data (needs architect sign-off on the
+  visibility semantics for Activities, Projects, Goals, Advisory,
+  Metrics).
+- Admin UI for assigning `parent_org_id` and editing `title`/`is_founder`.
+- Seed script producing 3×5 orgs with a realistic role mix (needs
+  `SUPABASE_SERVICE_ROLE_KEY` and a reachable Supabase instance).
+- AI-upgraded advisory; Connect scoped-pull + bidirectional push;
+  Connect-side AI-search activity as an analytics data source;
+  granular visibility matrix.
+
+

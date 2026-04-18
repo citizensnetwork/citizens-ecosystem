@@ -31,6 +31,8 @@ export interface Organisation {
   created_by: string;
   created_at: string;
   updated_at: string;
+  /** Parent organisation (Phase 13). Null for top-level/flat orgs. */
+  parent_org_id?: string | null;
 }
 
 export interface Department {
@@ -49,6 +51,10 @@ export interface UserOrgRole {
   role: OrgRole;
   department_id: string | null;
   created_at: string;
+  /** Optional human-readable job title, e.g. "Head of Operations" (Phase 13). */
+  title?: string | null;
+  /** Display/semantic marker; overrides `role` label to "Founder" (Phase 13). */
+  is_founder?: boolean;
 }
 
 export interface UserOrgRoleWithOrg extends UserOrgRole {

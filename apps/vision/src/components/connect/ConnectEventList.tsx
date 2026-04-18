@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { ConnectEventCard } from "./ConnectEventCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Pagination } from "@/components/ui/Pagination";
 import type { CCEvent } from "@/types/db";
 
 interface ConnectEventListProps {
@@ -87,29 +88,13 @@ export function ConnectEventList({
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between text-sm text-text-secondary">
-          <span>
-            Page {page} of {totalPages} ({total} total)
-          </span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <a
-                href={`/${orgSlug}/connect?tab=events&page=${page - 1}`}
-                className="rounded-md border border-border px-3 py-1 hover:bg-surface-alt"
-              >
-                Previous
-              </a>
-            )}
-            {page < totalPages && (
-              <a
-                href={`/${orgSlug}/connect?tab=events&page=${page + 1}`}
-                className="rounded-md border border-border px-3 py-1 hover:bg-surface-alt"
-              >
-                Next
-              </a>
-            )}
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          buildHref={(p) => `/${orgSlug}/connect?tab=events&page=${p}`}
+          ariaLabel="Connect events pagination"
+        />
       )}
     </div>
   );

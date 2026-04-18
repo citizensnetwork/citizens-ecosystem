@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { requireOrgRole } from "@/lib/supabase/rbac";
 
 export async function PATCH(
   request: NextRequest,
@@ -50,16 +51,11 @@ export async function PATCH(
   }
 
   // Verify admin/manager role
-  const { data: membership } = await supabase
-    .from("user_org_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("org_id", org_id)
-    .single();
-
-  if (!membership || !["org_admin", "org_manager"].includes(membership.role)) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
-  }
+  const auth = await requireOrgRole(supabase, user.id, org_id, [
+    "org_admin",
+    "org_manager",
+  ]);
+  if (!auth.ok) return auth.response;
 
   if (action === "claim") {
     // Claim the event for the org
