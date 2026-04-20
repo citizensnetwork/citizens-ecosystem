@@ -27,47 +27,48 @@ describe("getTemporalStyle", () => {
     expect(result.scale).toBe(isToday ? 1.1 : 1);
   });
 
-  it("returns reduced opacity for events 3 days away", () => {
+  it("keeps full opacity + smaller scale for events 3 days away", () => {
+    // Brightness is constant — scale still encodes temporal distance.
     const now = new Date();
     const start = new Date(now.getTime() + 3 * 86_400_000);
 
     const result = getTemporalStyle(start.toISOString());
 
     expect(result.isLive).toBe(false);
-    expect(result.opacity).toBe(0.9);
+    expect(result.opacity).toBe(1);
     expect(result.scale).toBe(0.95);
   });
 
-  it("returns lower opacity for events 2 weeks away", () => {
+  it("keeps full opacity + smaller scale for events 2 weeks away", () => {
     const now = new Date();
     const start = new Date(now.getTime() + 14 * 86_400_000);
 
     const result = getTemporalStyle(start.toISOString());
 
     expect(result.isLive).toBe(false);
-    expect(result.opacity).toBe(0.7);
+    expect(result.opacity).toBe(1);
     expect(result.scale).toBe(0.9);
   });
 
-  it("returns further reduced opacity for events 60 days away", () => {
+  it("keeps full opacity + smaller scale for events 60 days away", () => {
     const now = new Date();
     const start = new Date(now.getTime() + 60 * 86_400_000);
 
     const result = getTemporalStyle(start.toISOString());
 
     expect(result.isLive).toBe(false);
-    expect(result.opacity).toBe(0.55);
+    expect(result.opacity).toBe(1);
     expect(result.scale).toBe(0.85);
   });
 
-  it("returns minimum opacity for events over 90 days away", () => {
+  it("keeps full opacity + minimum scale for events over 90 days away", () => {
     const now = new Date();
     const start = new Date(now.getTime() + 120 * 86_400_000);
 
     const result = getTemporalStyle(start.toISOString());
 
     expect(result.isLive).toBe(false);
-    expect(result.opacity).toBe(0.35);
+    expect(result.opacity).toBe(1);
     expect(result.scale).toBe(0.8);
   });
 

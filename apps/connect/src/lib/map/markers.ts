@@ -106,11 +106,15 @@ export function getTemporalStyle(
   const abs = Math.abs(start - now);
   const DAY = 86_400_000;
 
+  // Brightness is now constant at full opacity — users preferred the
+  // "illuminous" look of the bright-flash state over time-decayed icons.
+  // Scale still encodes temporal proximity (today/week/month) so time is
+  // communicated by size, not dimness.
   if (abs < DAY) return { opacity: 1, scale: isToday ? 1.1 : 1, isLive: false, isToday, isInSession: false };
-  if (abs < 7 * DAY) return { opacity: 0.9, scale: 0.95, isLive: false, isToday: false, isInSession: false };
-  if (abs < 30 * DAY) return { opacity: 0.7, scale: 0.9, isLive: false, isToday: false, isInSession: false };
-  if (abs < 90 * DAY) return { opacity: 0.55, scale: 0.85, isLive: false, isToday: false, isInSession: false };
-  return { opacity: 0.35, scale: 0.8, isLive: false, isToday: false, isInSession: false };
+  if (abs < 7 * DAY) return { opacity: 1, scale: 0.95, isLive: false, isToday: false, isInSession: false };
+  if (abs < 30 * DAY) return { opacity: 1, scale: 0.9, isLive: false, isToday: false, isInSession: false };
+  if (abs < 90 * DAY) return { opacity: 1, scale: 0.85, isLive: false, isToday: false, isInSession: false };
+  return { opacity: 1, scale: 0.8, isLive: false, isToday: false, isInSession: false };
 }
 
 /* ── MapLibre marker element builders ────────────────────── */

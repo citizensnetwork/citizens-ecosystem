@@ -1056,14 +1056,18 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── "Search this area" pill (Phase D) ─────────────────────────
-       *  Appears centred near the top after the user pans/zooms the map.
-       *  Tapping it narrows events + places to those whose lat/lng sit
-       *  within the current viewport bbox (scope persists until the user
-       *  changes search terms or category selection). When a scope is
-       *  already active the pill flips to "Showing this area" with a
-       *  dismiss chevron that returns to the full result set. */}
-      {view === "map" && !hasDetail && (showSearchAreaPill || viewportScoped) && (
+      {/* ── Top-centre context pill ────────────────────────────────
+       *  Only ONE of these three variants is shown at a time (priority
+       *  order top to bottom):
+       *    1. "Showing this area"  — when the user has an active
+       *       viewport-bbox filter.  Tap the × to clear.
+       *    2. "For me in this area" — when personalisation has a clear
+       *       signal (≥60% in some category).  Replaces the Google-
+       *       style search-this-area pill entirely so we don't double
+       *       up on nearly-identical top chrome.
+       *    3. "Search this area"   — fallback when the user has panned
+       *       the map and no personalised signal exists.                  */}
+      {view === "map" && !hasDetail && (viewportScoped || personalised.hasSignal || showSearchAreaPill) && (
         <div className="pointer-events-none absolute inset-x-0 top-24 z-1005 flex justify-center px-4">
           {viewportScoped ? (
             <button
@@ -1078,6 +1082,24 @@ export default function EventsView({
               Showing this area
               <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px]" aria-hidden="true">×</span>
             </button>
+          ) : personalised.hasSignal ? (
+            <button
+              type="button"
+              onClick={toggleForMe}
+              className={
+                forMeActive
+                  ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
+                  : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
+              }
+              aria-pressed={forMeActive}
+              aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
+            >
+              <span aria-hidden="true">✨</span>
+              {forMeActive ? "For me — tap to clear" : "For me in this area"}
+              {forMeActive && (
+                <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
+              )}
+            </button>
           ) : (
             <button
               type="button"
@@ -1091,32 +1113,6 @@ export default function EventsView({
               Search this area
             </button>
           )}
-        </div>
-      )}
-
-      {/* ── "For me in this area" hard-filter pill (Easter-egg personalisation)
-       *  Renders below the Search-this-area pill, only when the user has at
-       *  least one category at ≥60% in their cached preferences. Toggling on
-       *  snapshots and clears all other filters; toggling off restores them. */}
-      {view === "map" && !hasDetail && personalised.hasSignal && (
-        <div className="pointer-events-none absolute inset-x-0 top-36 z-1004 flex justify-center px-4">
-          <button
-            type="button"
-            onClick={toggleForMe}
-            className={
-              forMeActive
-                ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
-                : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
-            }
-            aria-pressed={forMeActive}
-            aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
-          >
-            <span aria-hidden="true">✨</span>
-            {forMeActive ? "For me — tap to clear" : "For me in this area"}
-            {forMeActive && (
-              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
-            )}
-          </button>
         </div>
       )}
 
