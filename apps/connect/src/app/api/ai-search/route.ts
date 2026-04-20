@@ -62,6 +62,13 @@ export async function POST(request: Request) {
     userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null;
 
   const supabase = await createClient();
+  // Resolve the user up-front so we can both (a) snapshot their preferences
+  // for the rolling log and (b) decide whether to log at all (anonymous
+  // visitors don't get logged — RLS would reject the insert anyway).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // Include events that started up to 2 hours ago so currently-running
   // events still surface in a "now" natural-language search.
   const windowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -93,6 +100,47 @@ export async function POST(request: Request) {
 
   const limit = (arr: RankedResult[]) => arr.slice(0, MAX_RESULTS);
 
+  const responseEvents = limit(rankedEvents);
+  const responsePlaces = limit(rankedPlaces);
+
+  // Fire-and-forget: log this search for signed-in users so we can power the
+  // Rainbow "?" long-form sheet and downstream analytics. Non-blocking and
+  // never surfaces errors to the client — search results take precedence.
+  if (user) {
+    void (async () => {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("preferences")
+          .eq("id", user.id)
+          .single();
+        const prefs = (profile?.preferences ?? {}) as Record<string, unknown>;
+        const snapshot = {
+          percentages: prefs.percentages ?? null,
+          tags: prefs.tags ?? null,
+        };
+        const resultIds: string[] = [];
+        for (const r of responseEvents) resultIds.push(r.id);
+        for (const r of responsePlaces) resultIds.push(r.id);
+        await supabase.from("ai_search_queries").insert({
+          user_id: user.id,
+          query,
+          intent: {
+            audience: [...intent.audience],
+            needs: [...intent.needs],
+            vibe: [...intent.vibe],
+            nearMe: intent.nearMe,
+            hasSignal: intent.hasSignal,
+          },
+          result_ids: resultIds,
+          preferences_snapshot: snapshot,
+        });
+      } catch (err) {
+        console.error("[ai-search log]", err);
+      }
+    })();
+  }
+
   return NextResponse.json({
     intent: {
       audience: [...intent.audience],
@@ -101,7 +149,7 @@ export async function POST(request: Request) {
       nearMe: intent.nearMe,
       hasSignal: intent.hasSignal,
     },
-    events: limit(rankedEvents),
-    places: limit(rankedPlaces),
+    events: responseEvents,
+    places: responsePlaces,
   });
 }
