@@ -572,6 +572,16 @@ body {
   pointer-events: none;
 }
 
+/* Reflects a completed action (joined / considering) — simple gold swap,
+   no border, no chip, so the change reads as a state toggle rather than a
+   new button appearing. */
+.cc-action-done {
+  color: #b8901a;
+}
+.cc-action-done svg {
+  stroke: #b8901a;
+}
+
 .cc-popup-warning {
   font-size: 11px;
   color: #b45309;

@@ -31,8 +31,8 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#8B4513",
     eventCategories: ["social-fun"],
     placeCategories: ["relax"],
-    // Coffee mug with steam \u2014 mirrors the EventMap `social-fun` marker.
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z"/><path d="M15 12h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M8 3c-.5 1 .5 2 0 3"/><path d="M12 3c-.5 1 .5 2 0 3"/></svg>',
+    // Coffee mug with three steam lines — mirrors the EventMap `social-fun` marker.
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z"/><path d="M15 12h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M7 3c-.5 1 .5 2 0 3"/><path d="M10 3c-.5 1 .5 2 0 3"/><path d="M13 3c-.5 1 .5 2 0 3"/></svg>',
   },
   {
     id: "runs",
@@ -40,8 +40,8 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#2ECC71",
     eventCategories: ["sport-fun"],
     placeCategories: ["exercise"],
-    // Running stick figure — mirrors the EventMap `sport-fun` marker icon.
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="4" r="2"/><path d="M14 7l-3 4 3 3v6"/><path d="M9 11l-3 1 1 4"/><path d="M14 14l4 1 1 4"/></svg>',
+    // Simple running stick figure — head, tilted torso, swinging arms, striding legs.
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4.5" r="2"/><path d="M14 6.5L11 11l3 3"/><path d="M14 14l-3 6"/><path d="M14 14l3 3 2 4"/><path d="M11 11L7.5 12l.5 3"/><path d="M11 11l4 1"/></svg>',
   },
   {
     id: "churches",
@@ -49,7 +49,8 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: "#D4AF37",
     eventCategories: ["church"],
     placeCategories: ["church"],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21H6a1 1 0 0 1-1-1v-7l7-5 7 5v7a1 1 0 0 1-1 1z"/><path d="M12 3v5"/><path d="M9 3h6"/></svg>',
+    // Church silhouette with a proper cross (vertical stem + horizontal crossbar).
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21H6a1 1 0 0 1-1-1v-7l7-5 7 5v7a1 1 0 0 1-1 1z"/><path d="M12 2v7"/><path d="M10 4.5h4"/></svg>',
   },
   {
     id: "outreaches",

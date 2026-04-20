@@ -14,6 +14,10 @@ type Props = {
   totalCount: number;
   visibility: AttendeesVisibility;
   isAuthenticated: boolean;
+  /** Hides the "N people attending" lead line above the list.  Used by the
+   *  event detail panel which surfaces the aggregate count near the rating
+   *  so a second copy beneath a "Friends attending" header is redundant. */
+  hideCountHeader?: boolean;
 };
 
 export default function WhoIsAttending({
@@ -21,6 +25,7 @@ export default function WhoIsAttending({
   totalCount,
   visibility,
   isAuthenticated,
+  hideCountHeader = false,
 }: Props) {
   if (totalCount === 0) {
     return (
@@ -68,11 +73,13 @@ export default function WhoIsAttending({
 
   return (
     <div>
-      <p className="mb-3 text-sm text-black/70">
-        <strong className="text-black">{totalCount}</strong>{" "}
-        {totalCount === 1 ? "person" : "people"} attending
-      </p>
-      <ul className="space-y-2">
+      {!hideCountHeader && (
+        <p className="mb-3 text-sm text-black/70">
+          <strong className="text-black">{totalCount}</strong>{" "}
+          {totalCount === 1 ? "person" : "people"} attending
+        </p>
+      )}
+      <ul className="space-y-1.5">
         {sorted.map((a) => (
           <li key={a.user_id}>
             <Link

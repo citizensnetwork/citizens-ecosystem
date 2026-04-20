@@ -178,6 +178,7 @@ export default function EventsView({
   // User state for auth section in burger menu
   const [user, setUser] = useState<User | null>(null);
   const [rsvpEventIds, setRsvpEventIds] = useState<Set<string>>(new Set());
+  const [considerEventIds, setConsiderEventIds] = useState<Set<string>>(new Set());
   const [considerVersion, setConsiderVersion] = useState(0);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
@@ -206,10 +207,24 @@ export default function EventsView({
       if (user) {
         supabase
           .from("rsvps")
-          .select("event_id")
+          .select("event_id,status")
           .eq("user_id", user.id)
           .then(({ data }) => {
-            if (data) setRsvpEventIds(new Set(data.map((r) => r.event_id)));
+            if (!data) return;
+            setRsvpEventIds(
+              new Set(
+                data
+                  .filter((r) => (r as { status?: string }).status !== "considering")
+                  .map((r) => r.event_id)
+              )
+            );
+            setConsiderEventIds(
+              new Set(
+                data
+                  .filter((r) => (r as { status?: string }).status === "considering")
+                  .map((r) => r.event_id)
+              )
+            );
           });
       }
     });
@@ -217,7 +232,10 @@ export default function EventsView({
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (!session?.user) setRsvpEventIds(new Set());
+      if (!session?.user) {
+        setRsvpEventIds(new Set());
+        setConsiderEventIds(new Set());
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -266,9 +284,20 @@ export default function EventsView({
     const pcts = prefs?.percentages ?? {};
     const eventCats = new Set<EventCategory>();
     const placeCats = new Set<PlaceCategory>();
-    for (const [slug, pct] of Object.entries(pcts)) {
-      if (typeof pct !== "number" || pct < 60) continue;
-      // Try both maps; only the matching one will accept the slug.
+    // Lower bar (>=40) PLUS a top-3 fallback ensures the filter always has a
+    // meaningful match pool — previously the >=60 threshold combined with
+    // few events per top category surfaced a blank map.
+    const sorted = Object.entries(pcts)
+      .filter(([, pct]) => typeof pct === "number")
+      .sort((a, b) => (b[1] as number) - (a[1] as number));
+    const selected = new Set<string>();
+    for (const [slug, pct] of sorted) {
+      if ((pct as number) >= 40) selected.add(slug);
+    }
+    // Fallback: include the top 3 categories even if none clear 40, so the
+    // pill is useful for brand-new users whose signals are still shallow.
+    for (const [slug] of sorted.slice(0, 3)) selected.add(slug);
+    for (const slug of selected) {
       if (slug in EVENT_CATEGORY_KEYWORDS) eventCats.add(slug as EventCategory);
       if (slug in PLACE_CATEGORY_KEYWORDS) placeCats.add(slug as PlaceCategory);
     }
@@ -499,10 +528,21 @@ export default function EventsView({
     return events.filter((e) => {
       if (!inBbox(e.latitude, e.longitude)) return false;
       // "For me" hard filter: applied before category logic so it always
-      // wins. When active and the user has personalised categories, only
-      // events whose category sits in that set survive.
+      // wins. When active and the user has personalised categories, an
+      // event matches if its category is in the set OR its text hits any
+      // of those categories' keyword banks — this keeps the pill useful
+      // for events that were seeded with broad categories (e.g. "church")
+      // but belong thematically to "marriage-and-couples" via their title.
       if (forMeActive && personalised.hasSignal) {
-        if (e.category == null || !personalised.eventCats.has(e.category)) return false;
+        const categoryHit =
+          e.category != null && personalised.eventCats.has(e.category);
+        if (!categoryHit) {
+          const text = `${e.title} ${e.description} ${e.location}`.toLowerCase();
+          const keywordHit = [...personalised.eventCats].some((cat) =>
+            (EVENT_CATEGORY_KEYWORDS[cat] ?? []).some((kw) => text.includes(kw))
+          );
+          if (!keywordHit) return false;
+        }
       }
       // Bypass category filters while searching so search returns the full
       // cross-category match set (plus places below).
@@ -661,8 +701,23 @@ export default function EventsView({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ event_id: event.id }),
             });
-            if (res.status === 401) router.push("/login");
-            if (res.ok) setConsiderVersion((v) => v + 1);
+            if (res.status === 401) { router.push("/login"); return; }
+            if (res.ok) {
+              const json = (await res
+                .json()
+                .catch(() => null)) as { action?: string } | null;
+              const action = json?.action;
+              if (action === "added") {
+                setConsiderEventIds((prev) => new Set([...prev, event.id]));
+              } else if (action === "removed") {
+                setConsiderEventIds((prev) => {
+                  const next = new Set(prev);
+                  next.delete(event.id);
+                  return next;
+                });
+              }
+              setConsiderVersion((v) => v + 1);
+            }
             break;
           }
           case "visit":
@@ -869,6 +924,8 @@ export default function EventsView({
           onMoveEnd={handleMapMoveEnd}
           onBoundsChange={handleMapBoundsChange}
           highlightedEventId={hoveredEventId}
+          rsvpEventIds={rsvpEventIds}
+          considerEventIds={considerEventIds}
         />
       </div>
 
@@ -962,7 +1019,7 @@ export default function EventsView({
                   <NotificationBell userId={user.id} />
                 </div>
               )}
-              {user && (
+              {user && !menuProfile?.preferences?.last_longform_asked_at && (
                 <button
                   type="button"
                   onClick={() => setLongFormOpen(true)}

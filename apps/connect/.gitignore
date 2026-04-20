@@ -79,4 +79,5 @@ next-env.d.ts
 
 # Copilot artifacts
 # Code Citations.md
-.testagent/
+.testagent/vitest.log
+.vscode/settings.json

@@ -23,6 +23,13 @@ type Props = {
   places?: Place[];
   onSelectPlace?: (place: Place) => void;
   onQuickAction?: (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => void;
+  /** Events the current user has an 'attending' RSVP on.  Used by the
+   *  map marker popup to swap the Join button to a gold "Joined" state
+   *  with a tick so the popup reflects existing attendance. */
+  rsvpEventIds?: Set<string>;
+  /** Events the current user is 'considering'.  Swaps the Consider
+   *  button into a gold "Considering" state when set. */
+  considerEventIds?: Set<string>;
   center?: [number, number];
   zoom?: number;
   autoLocate?: boolean;
@@ -177,6 +184,8 @@ export default function EventMap({
   onMoveEnd,
   onBoundsChange,
   highlightedEventId = null,
+  rsvpEventIds,
+  considerEventIds,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -207,6 +216,13 @@ export default function EventMap({
   onMoveEndRef.current = onMoveEnd;
   const onBoundsChangeRef = useRef(onBoundsChange);
   onBoundsChangeRef.current = onBoundsChange;
+  // RSVP / consider membership sets — kept in refs so the popup HTML picks
+  // up the freshest value each time a marker is clicked instead of baking
+  // in a stale snapshot at marker-creation time.
+  const rsvpEventIdsRef = useRef(rsvpEventIds);
+  rsvpEventIdsRef.current = rsvpEventIds;
+  const considerEventIdsRef = useRef(considerEventIds);
+  considerEventIdsRef.current = considerEventIds;
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
   const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; ringPinned?: boolean }[]>([]);
@@ -594,12 +610,15 @@ export default function EventMap({
       updateRingPinsRef.current();
     });
 
-    // Continuously re-run deconfliction during panning/zooming so markers stay spread
+    // Continuously re-run deconfliction and marker sizing during panning so
+    // markers animate/float along with the camera instead of snapping only
+    // once the user releases the drag.
     let deconflictRaf = 0;
     map.on("move", () => {
       if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
       deconflictRaf = requestAnimationFrame(() => {
         runDeconflictionRef.current();
+        updateMarkerSizesRef.current();
         updateRingPinsRef.current();
       });
     });
@@ -772,8 +791,31 @@ export default function EventMap({
           offset: 16,
           closeButton: true,
           maxWidth: "280px",
-        }).setHTML(
-          `<div class="cc-popup">
+        });
+
+        // Build popup HTML lazily on open so the Join/Consider buttons
+        // reflect the user's *current* RSVP / consider state instead of a
+        // stale snapshot from marker creation. This is what makes the Join
+        // button switch to a gold "Joined" tick after the user RSVPs.
+        const renderPopupHtml = () => {
+          const isJoined = !!rsvpEventIdsRef.current?.has(event.id);
+          const isConsidering = !!considerEventIdsRef.current?.has(event.id);
+
+          const joinIcon = isJoined
+            ? // Person + tick
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>'
+            : // Person + plus
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>';
+
+          const considerIcon = isConsidering
+            ? // Circle + tick
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12.5 11 15 16 9.5"/></svg>'
+            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
+
+          const joinClass = `cc-action-btn${hasStarted ? " cc-action-disabled" : ""}${isJoined ? " cc-action-done" : ""}`;
+          const considerClass = `cc-action-btn${isConsidering ? " cc-action-done" : ""}`;
+
+          return `<div class="cc-popup">
             <strong>${escapeHtml(event.title)}</strong>
             <p>${dateStr}</p>
             <p>${escapeHtml(event.location)}</p>
@@ -782,27 +824,28 @@ export default function EventMap({
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 <span>View</span>
               </button>
-              <button class="cc-action-btn${hasStarted ? " cc-action-disabled" : ""}" data-action="join" title="${hasStarted ? "Event started" : "Join event"}"${hasStarted ? " disabled" : ""}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                <span>Join</span>
+              <button class="${joinClass}" data-action="join" title="${hasStarted ? "Event started" : isJoined ? "You're going" : "Join event"}"${hasStarted ? " disabled" : ""}>
+                ${joinIcon}
+                <span>${isJoined ? "Joined" : "Join"}</span>
               </button>
               <button class="cc-action-btn" data-action="share" title="Share event">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 <span>Share</span>
               </button>
-              <button class="cc-action-btn" data-action="consider" title="Consider">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                <span>Consider</span>
+              <button class="${considerClass}" data-action="consider" title="${isConsidering ? "Considering" : "Consider"}">
+                ${considerIcon}
+                <span>${isConsidering ? "Considering" : "Consider"}</span>
               </button>
               <button class="cc-action-btn${hasWebsite ? "" : " cc-action-disabled"}" data-action="visit" title="${hasWebsite ? "Visit website" : "No website"}"${hasWebsite ? "" : " disabled"}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                 <span>Visit</span>
               </button>
             </div>
-          </div>`
-        );
+          </div>`;
+        };
 
         popup.on("open", () => {
+          popup.setHTML(renderPopupHtml());
           // Adjust popup position to follow deconflicted marker offset.
           // Subtracts 16px (the popup's base offset from the marker anchor)
           // so the popup tip points at the displaced marker, not empty space.

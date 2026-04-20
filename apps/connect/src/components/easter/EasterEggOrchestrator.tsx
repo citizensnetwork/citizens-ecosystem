@@ -260,7 +260,6 @@ export default function EasterEggOrchestrator({
           options={[
             { label: "Male", emoji: "♂️", value: "male" },
             { label: "Female", emoji: "♀️", value: "female" },
-            { label: "Prefer not to say", emoji: "🤝", value: "prefer_not_to_say" },
           ]}
           prefs={prefs}
           onDone={(next) => {

@@ -50,7 +50,12 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [maxAttendees, setMaxAttendees] = useState("");
   const [status] = useState<"draft" | "published">("published");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [attendeesVisible, setAttendeesVisible] = useState<"public" | "authenticated" | "count_only">("authenticated");
+  // Attendee visibility has been simplified to a single behaviour: attendee
+  // names are private by default — only the aggregate count plus the
+  // current user's own friends are surfaced ("Friends attending"). This
+  // removes a confusing field from the create-event form while keeping the
+  // existing DB column populated for back-compat.
+  const attendeesVisible: "public" | "authenticated" | "count_only" = "count_only";
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
@@ -84,6 +89,15 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   // Auto-suggested category (same as `category` when auto) — shown as a tiny
   // "Suggested based on your description" hint.
   const [suggestedCategory, setSuggestedCategory] = useState<EventCategory | null>(null);
+
+  // Location autocomplete (MapTiler forward geocoding). Lets the user type a
+  // place name and drop the pin / coords via suggestion without touching the
+  // map. Falls back to a plain text input when the MapTiler key is missing.
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    { label: string; lat: number; lng: number }[]
+  >([]);
+  const [locationSuggestOpen, setLocationSuggestOpen] = useState(false);
+  const suppressSuggestRef = useRef(false);
 
 
 
@@ -122,6 +136,56 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       setSuggestedCategory(null);
     }
   }, [title, description, location, placeName]);
+
+  // MapTiler forward geocoding — surfaces address suggestions as the user
+  // types in the Location field, so picking a suggestion drops the map pin
+  // and sets coords without needing a second interaction. Debounced by
+  // 300ms to avoid hammering the API on every keystroke.
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+    if (!key) return;
+    if (suppressSuggestRef.current) {
+      suppressSuggestRef.current = false;
+      return;
+    }
+    const q = location.trim();
+    if (q.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(
+          q
+        )}.json?key=${key}&limit=5&language=en`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          features?: Array<{
+            place_name?: string;
+            text?: string;
+            center?: [number, number];
+          }>;
+        };
+        const next = (json.features ?? [])
+          .filter((f) => Array.isArray(f.center) && f.center.length === 2)
+          .map((f) => ({
+            label: f.place_name ?? f.text ?? "",
+            lng: f.center![0],
+            lat: f.center![1],
+          }))
+          .filter((s) => s.label);
+        setLocationSuggestions(next);
+      } catch {
+        /* network / abort — ignore */
+      }
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [location]);
 
   function handleCancel() {
     if (isDirty()) {
@@ -571,21 +635,59 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       <div>
         <label htmlFor="location" className="block text-xs font-medium text-black/60 mb-1.5">
           Location
-          <span className="ml-1 text-black/30 font-normal">(auto-filled from map pin — edit as needed)</span>
+          <span className="ml-1 text-black/30 font-normal">(type to search, or drop a pin above)</span>
         </label>
-        <input
-          id="location"
-          type="text"
-          value={location}
-          onChange={(e) => {
-            locationManuallyEdited.current = true;
-            setLocation(e.target.value);
-          }}
-          required
-          maxLength={300}
-          className={CC_INPUT}
-          placeholder="Drop a pin above, or type the address"
-        />
+        <div className="relative">
+          <input
+            id="location"
+            type="text"
+            value={location}
+            onChange={(e) => {
+              locationManuallyEdited.current = true;
+              setLocation(e.target.value);
+              setLocationSuggestOpen(true);
+            }}
+            onFocus={() => setLocationSuggestOpen(true)}
+            onBlur={() => {
+              // Small delay so click on a suggestion registers before the list hides.
+              setTimeout(() => setLocationSuggestOpen(false), 150);
+            }}
+            required
+            maxLength={300}
+            className={CC_INPUT}
+            placeholder="Start typing an address, suburb or landmark"
+            autoComplete="off"
+          />
+          {locationSuggestOpen && locationSuggestions.length > 0 && (
+            <ul
+              role="listbox"
+              className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-black/10 bg-white/95 p-1 text-sm shadow-lg backdrop-blur"
+            >
+              {locationSuggestions.map((s, i) => (
+                <li key={`${s.lat},${s.lng},${i}`}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      suppressSuggestRef.current = true;
+                      setLocation(s.label);
+                      setCoords([s.lat, s.lng]);
+                      setLocationSuggestions([]);
+                      setLocationSuggestOpen(false);
+                    }}
+                    className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition hover:bg-black/5"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-(--gold)">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <span className="text-black/80">{s.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Contact & details */}
@@ -658,10 +760,10 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
           <div>
             <label htmlFor="visibility" className="block text-xs font-medium text-black/60 mb-1.5">
-              Event Visibility
+              Who can see this event?
             </label>
             <select
               id="visibility"
@@ -671,21 +773,6 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
             >
               <option value="public">Public — visible to everyone</option>
               <option value="private">Private — only invited members can see</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="attendeesVisible" className="block text-xs font-medium text-black/60 mb-1.5">
-              Who&apos;s Attending Visibility
-            </label>
-            <select
-              id="attendeesVisible"
-              value={attendeesVisible}
-              onChange={(e) => setAttendeesVisible(e.target.value as "public" | "authenticated" | "count_only")}
-              className={CC_INPUT}
-            >
-              <option value="authenticated">Logged-in users see names</option>
-              <option value="public">Everyone sees names</option>
-              <option value="count_only">Count only — no names</option>
             </select>
           </div>
         </div>

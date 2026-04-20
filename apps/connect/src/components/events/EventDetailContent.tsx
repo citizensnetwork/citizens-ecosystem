@@ -16,7 +16,7 @@ import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
-import type { Event, AttendeesVisibility, EventMedia } from "@/types/db";
+import type { Event, EventMedia } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
 
 const MiniMap = dynamic(() => import("@/components/map/MiniMap"), {
@@ -173,6 +173,22 @@ export default function EventDetailContent({
         <InlineEventRating eventId={event.id} isAuthenticated={!!user} />
       </div>
 
+      {/* Aggregate attendee count — lives right under the rating in light
+          text as a subtle social-proof signal, intentionally small so it
+          doesn't compete with the event title. */}
+      <p className="mt-0.5 text-xs font-medium text-black/40">
+        {count === 0
+          ? "No one attending yet"
+          : `${count} attending${
+              event.max_attendees ? ` / ${event.max_attendees}` : ""
+            }`}
+        {isFull && (
+          <span className="ml-1.5 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+            Sold Out
+          </span>
+        )}
+      </p>
+
       {/* Social sharing */}
       <div className="mt-2">
         <SocialShareButtons
@@ -189,19 +205,6 @@ export default function EventDetailContent({
         <div className="flex items-center gap-2 text-black/60 text-xs">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span>{event.location}</span>
-        </div>
-        <div className="flex items-center gap-2 text-black/60 text-xs">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>
-            {event.max_attendees
-              ? `${count} / ${event.max_attendees} attending`
-              : `${count} attending`}
-            {isFull && (
-              <span className="ml-1.5 inline-block bg-red-100 text-red-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                Sold Out
-              </span>
-            )}
-          </span>
         </div>
 
         {/* Contact info */}
@@ -312,16 +315,28 @@ export default function EventDetailContent({
         </div>
       )}
 
-      {/* Who's Attending */}
-      <div className="mt-6 border-t pt-5">
-        <h2 className="text-sm font-semibold mb-3">Who&apos;s Attending</h2>
-        <WhoIsAttending
-          attendees={attendees}
-          totalCount={count}
-          visibility={(event.attendees_visible as AttendeesVisibility) ?? "public"}
-          isAuthenticated={!!user}
-        />
-      </div>
+      {/* Friends attending — intentionally compact (friends only, no full
+          attendee roster). The aggregate count lives directly beneath the
+          rating at the top of the panel; this section only surfaces when
+          at least one friend is going so it never adds empty visual noise. */}
+      {(() => {
+        const friendAttendees = attendees.filter((a) => a.isFriend);
+        if (friendAttendees.length === 0) return null;
+        return (
+          <div className="mt-5 border-t pt-4">
+            <h2 className="mb-2 text-xs font-semibold text-black/60">
+              Friends attending
+            </h2>
+            <WhoIsAttending
+              attendees={friendAttendees}
+              totalCount={friendAttendees.length}
+              visibility="public"
+              isAuthenticated={!!user}
+              hideCountHeader
+            />
+          </div>
+        );
+      })()}
 
       {/* From the Organiser — read-only feed of organiser-authored
           updates (composer lives in /events/manage).  Self-hides when

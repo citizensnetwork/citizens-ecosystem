@@ -371,13 +371,12 @@ export function createPlaceMarkerEl(
     ">!</span>`
     : "";
 
-  const glow = highlighted
-    ? "drop-shadow(0 0 6px rgba(212,175,55,.6))"
-    : isHighRated
-      ? "drop-shadow(0 0 4px rgba(212,175,55,.5))"
-      : "drop-shadow(0 1px 2px rgba(0,0,0,.35))";
+  // Place markers keep a subtle 1px drop-shadow only — never the halo/glow
+  // rectangles that previously surrounded highlighted or high-rated icons,
+  // which read as "blocks around the place icons" on the map.
+  const glow = "drop-shadow(0 1px 1px rgba(0,0,0,.25))";
 
-  const opacity = isFlagged ? 0.62 : 1;
+  const opacity = 1;
 
   // Solid gold category glyph — white stroke provides the outline against the map
   const icon = (category && PLACE_CATEGORY_ICONS[category]) || DEFAULT_PLACE_ICON;
