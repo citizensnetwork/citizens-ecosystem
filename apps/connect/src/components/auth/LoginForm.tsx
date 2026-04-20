@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import OAuthButtons from "./OAuthButtons";
 import PhoneAuthForm from "./PhoneAuthForm";
+import {
+  Alert,
+  Badge,
+  Button,
+  Input,
+  Label,
+} from "@/components/ui/shadcn";
 
 type AuthMode = "email" | "phone";
 
@@ -46,54 +53,62 @@ export default function LoginForm() {
       className="surface-card fade-rise w-full max-w-md rounded-3xl p-5 sm:p-7 space-y-5"
     >
       <div className="space-y-2 text-center">
-        <p className="inline-flex items-center rounded-full border border-black/10 bg-(--gold-soft) px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/80">
-          Welcome Back
-        </p>
+        <Badge variant="eyebrow">Welcome Back</Badge>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-black">
           Log in to Connect
         </h1>
-        <p className="text-sm text-(--foreground-soft)">
+        <p className="text-sm text-[var(--foreground-soft)]">
           Continue discovering community events near you.
         </p>
       </div>
 
       {needsConfirmation && (
-        <div className="rounded-xl border border-(--gold)/50 bg-(--gold-soft) px-3 py-2.5 text-sm text-black/85">
+        <Alert variant="gold">
           ✉️ Account created! Please check your email to confirm your address,
           then log in below.
-        </div>
+        </Alert>
       )}
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <Alert variant="destructive">{error}</Alert>}
 
       <OAuthButtons />
 
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-(--border)" />
-        <span className="text-xs font-medium text-black/40 uppercase tracking-wider">or</span>
-        <div className="h-px flex-1 bg-(--border)" />
+        <div className="h-px flex-1 bg-[var(--border)]" />
+        <span className="text-xs font-medium uppercase tracking-wider text-black/40">
+          or
+        </span>
+        <div className="h-px flex-1 bg-[var(--border)]" />
       </div>
 
-      {/* Auth mode toggle */}
-      <div className="flex rounded-xl border border-black/10 overflow-hidden">
+      {/* Auth mode toggle.  Two buttons sharing a rounded-xl pill container —
+          kept as a bespoke segment because shadcn Tabs would introduce a
+          heavier Radix pattern than warranted here. */}
+      <div className="flex overflow-hidden rounded-xl border border-black/10">
         <button
           type="button"
-          onClick={() => { setAuthMode("email"); setError(""); }}
+          onClick={() => {
+            setAuthMode("email");
+            setError("");
+          }}
           className={`flex-1 py-2 text-xs font-semibold transition ${
-            authMode === "email" ? "bg-black text-white" : "bg-white text-black/60 hover:bg-black/5"
+            authMode === "email"
+              ? "bg-black text-white"
+              : "bg-white text-black/60 hover:bg-black/5"
           }`}
         >
           Email
         </button>
         <button
           type="button"
-          onClick={() => { setAuthMode("phone"); setError(""); }}
+          onClick={() => {
+            setAuthMode("phone");
+            setError("");
+          }}
           className={`flex-1 py-2 text-xs font-semibold transition ${
-            authMode === "phone" ? "bg-black text-white" : "bg-white text-black/60 hover:bg-black/5"
+            authMode === "phone"
+              ? "bg-black text-white"
+              : "bg-white text-black/60 hover:bg-black/5"
           }`}
         >
           Phone
@@ -104,66 +119,57 @@ export default function LoginForm() {
         <PhoneAuthForm />
       ) : (
         <>
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@example.com"
+            />
+          </div>
 
-      <div className="space-y-1.5">
-        <label
-          htmlFor="email"
-          className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75"
-        >
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
-          placeholder="you@example.com"
-        />
-      </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              placeholder="••••••••"
+            />
+            <div className="flex justify-end pt-0.5">
+              <Link
+                href="/login/forgot-password"
+                className="text-xs text-[var(--foreground-soft)] transition hover:text-black"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          </div>
 
-      <div className="space-y-1.5">
-        <label
-          htmlFor="password"
-          className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75"
-        >
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
-          placeholder="••••••••"
-        />
-        <div className="flex justify-end pt-0.5">
-          <Link
-            href="/login/forgot-password"
-            className="text-xs text-(--foreground-soft) hover:text-black transition"
+          <Button
+            type="submit"
+            variant="gold"
+            size="lg"
+            disabled={loading}
+            className="w-full"
           >
-            Forgot password?
-          </Link>
-        </div>
-      </div>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="gold-glow w-full rounded-xl bg-(--gold) px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Logging in..." : "Log In"}
-      </button>
-
+            {loading ? "Logging in..." : "Log In"}
+          </Button>
         </>
       )}
 
-      <p className="text-center text-sm text-(--foreground-soft)">
+      <p className="text-center text-sm text-[var(--foreground-soft)]">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-semibold text-black underline-offset-4 hover:underline">
+        <Link
+          href="/signup"
+          className="font-semibold text-black underline-offset-4 hover:underline"
+        >
           Sign Up
         </Link>
       </p>

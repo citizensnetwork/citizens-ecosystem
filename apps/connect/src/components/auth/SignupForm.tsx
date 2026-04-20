@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import VerificationPending from "./VerificationPending";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import OAuthButtons from "./OAuthButtons";
+import VerificationPending from "./VerificationPending";
 import type { UserRole, ContributorKind } from "@/types/db";
+import {
+  Alert,
+  Badge,
+  Button,
+  Input,
+  Label,
+} from "@/components/ui/shadcn";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -15,11 +22,11 @@ export default function SignupForm() {
   // Two-stage role pick:
   //   - `role`: citizen vs contributor (the only thing the trigger respects)
   //   - `contributorKind`: ministry / organization / business (only meaningful
-  //     when role === "contributor"; ignored by the trigger otherwise)
-  // Defaults to citizen because the overwhelming majority of new accounts are
-  // attendees, not organisers — this matches the sign-up funnel we expect.
+  //     when role === "contributor"; ignored otherwise)
+  // Defaults to citizen — most new accounts are attendees, not organisers.
   const [role, setRole] = useState<UserRole>("citizen");
-  const [contributorKind, setContributorKind] = useState<ContributorKind>("ministry");
+  const [contributorKind, setContributorKind] =
+    useState<ContributorKind>("ministry");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -38,10 +45,10 @@ export default function SignupForm() {
         data: {
           full_name: fullName,
           role,
-          // Only forward the kind when it's actually relevant; the DB trigger
-          // will null it out for citizens but being explicit keeps the
-          // raw_user_meta_data clean.
-          ...(role === "contributor" ? { contributor_kind: contributorKind } : {}),
+          // Only forward the kind when relevant; keeps raw_user_meta_data clean.
+          ...(role === "contributor"
+            ? { contributor_kind: contributorKind }
+            : {}),
         },
       },
     });
@@ -52,14 +59,12 @@ export default function SignupForm() {
       return;
     }
 
-    // If a session exists, email confirmation is disabled → auto sign-in
     if (data.session) {
       router.push("/events");
       router.refresh();
       return;
     }
 
-    // Email confirmation is required → show in-app verification polling screen
     setLoading(false);
     setPendingVerification(true);
   }
@@ -79,92 +84,66 @@ export default function SignupForm() {
       className="surface-card fade-rise w-full max-w-md rounded-3xl p-5 sm:p-7 space-y-5"
     >
       <div className="space-y-2 text-center">
-        <p className="inline-flex items-center rounded-full border border-black/10 bg-(--gold-soft) px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/80">
-          Join Citizens Connect
-        </p>
+        <Badge variant="eyebrow">Join Citizens Connect</Badge>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-black">
           Create your account
         </h1>
-        <p className="text-sm text-(--foreground-soft)">
+        <p className="text-sm text-[var(--foreground-soft)]">
           Discover and share faith-centered events in your city.
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <Alert variant="destructive">{error}</Alert>}
 
       <OAuthButtons />
 
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-(--border)" />
-        <span className="text-xs font-medium text-black/40 uppercase tracking-wider">or</span>
-        <div className="h-px flex-1 bg-(--border)" />
+        <div className="h-px flex-1 bg-[var(--border)]" />
+        <span className="text-xs font-medium uppercase tracking-wider text-black/40">
+          or
+        </span>
+        <div className="h-px flex-1 bg-[var(--border)]" />
       </div>
 
       <div className="space-y-1.5">
-        <label
-          htmlFor="fullName"
-          className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75"
-        >
-          Full Name
-        </label>
-        <input
+        <Label htmlFor="fullName">Full Name</Label>
+        <Input
           id="fullName"
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
-          className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
           placeholder="John Doe"
         />
       </div>
 
       <div className="space-y-1.5">
-        <label
-          htmlFor="email"
-          className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75"
-        >
-          Email
-        </label>
-        <input
+        <Label htmlFor="email">Email</Label>
+        <Input
           id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
           placeholder="you@example.com"
         />
       </div>
 
       <div className="space-y-1.5">
-        <label
-          htmlFor="password"
-          className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75"
-        >
-          Password
-        </label>
-        <input
+        <Label htmlFor="password">Password</Label>
+        <Input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
           placeholder="••••••••"
         />
       </div>
 
       <div className="space-y-2">
-        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-black/75">
-          I am joining as
-        </label>
-        {/* Primary pick: citizen vs contributor.  Two cards, side-by-side,
-            so the choice feels lightweight rather than four-way bureaucratic. */}
+        <Label>I am joining as</Label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm transition hover:border-black/50">
             <input
@@ -177,7 +156,7 @@ export default function SignupForm() {
             />
             <span>
               <span className="font-medium text-black">Citizen</span>
-              <span className="block text-xs text-(--foreground-soft)">
+              <span className="block text-xs text-[var(--foreground-soft)]">
                 Discover events, RSVP, review &amp; connect
               </span>
             </span>
@@ -193,58 +172,64 @@ export default function SignupForm() {
             />
             <span>
               <span className="font-medium text-black">Contributor</span>
-              <span className="block text-xs text-(--foreground-soft)">
+              <span className="block text-xs text-[var(--foreground-soft)]">
                 Host events, manage places &amp; share content
               </span>
             </span>
           </label>
         </div>
 
-        {/* Secondary pick (revealed only for contributors): which kind of
-            contributor.  Nesting it inside the same field group keeps it
-            visually subordinate to the primary choice. */}
         {role === "contributor" && (
-          <div className="mt-2 space-y-1.5 rounded-xl border border-dashed border-black/15 bg-(--gold-soft)/40 p-3">
+          <div className="mt-2 space-y-1.5 rounded-xl border border-dashed border-black/15 bg-[var(--gold-soft)]/40 p-3">
             <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/65">
               Contributing as
             </span>
             <div className="grid grid-cols-3 gap-1.5">
-              {(["ministry", "organization", "business"] as const).map((kind) => (
-                <label
-                  key={kind}
-                  className={`flex cursor-pointer items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
-                    contributorKind === kind
-                      ? "border-black bg-black text-white"
-                      : "border-black/15 bg-white text-black/80 hover:border-black/40"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="contributor_kind"
-                    value={kind}
-                    checked={contributorKind === kind}
-                    onChange={() => setContributorKind(kind)}
-                    className="sr-only"
-                  />
-                  <span className="capitalize">{kind === "organization" ? "Org" : kind}</span>
-                </label>
-              ))}
+              {(["ministry", "organization", "business"] as const).map(
+                (kind) => (
+                  <label
+                    key={kind}
+                    className={`flex cursor-pointer items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+                      contributorKind === kind
+                        ? "border-black bg-black text-white"
+                        : "border-black/15 bg-white text-black/80 hover:border-black/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="contributor_kind"
+                      value={kind}
+                      checked={contributorKind === kind}
+                      onChange={() => setContributorKind(kind)}
+                      className="sr-only"
+                    />
+                    <span className="capitalize">
+                      {kind === "organization" ? "Org" : kind}
+                    </span>
+                  </label>
+                )
+              )}
             </div>
           </div>
         )}
       </div>
 
-      <button
+      <Button
         type="submit"
+        variant="gold"
+        size="lg"
         disabled={loading}
-        className="gold-glow w-full rounded-xl bg-(--gold) px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full"
       >
         {loading ? "Creating account..." : "Sign Up"}
-      </button>
+      </Button>
 
-      <p className="text-center text-sm text-(--foreground-soft)">
+      <p className="text-center text-sm text-[var(--foreground-soft)]">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-black underline-offset-4 hover:underline">
+        <Link
+          href="/login"
+          className="font-semibold text-black underline-offset-4 hover:underline"
+        >
           Log In
         </Link>
       </p>

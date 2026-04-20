@@ -81,3 +81,7 @@ next-env.d.ts
 # Code Citations.md
 .testagent/vitest.log
 .vscode/settings.json
+
+build.log
+vitest.log
+.testagent/

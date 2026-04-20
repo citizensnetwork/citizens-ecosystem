@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
   --background: #FFFFFF;
@@ -16,11 +17,53 @@
   --glass-60: rgba(255,255,255,0.60);
   --glass-20: rgba(255,255,255,0.20);
   --glass-10: rgba(255,255,255,0.10);
+
+  /* ── shadcn-compat aliases (additive; wired to Citizens palette) ──
+   * These names are what shadcn primitives reach for. Pointing them at
+   * the Citizens tokens means a single source of truth — if `--gold`
+   * moves, every shadcn surface moves with it. */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);            /* Ink = primary action (outline/ink variants) */
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--foreground-soft);
+  --accent: var(--gold);                   /* Gold is always the accent */
+  --accent-foreground: #000000;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --input: var(--border);
+  --radius: 0.75rem;                       /* rounded-xl — matches existing Connect forms */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --font-sans: "Montserrat", var(--font-montserrat), "Segoe UI", sans-serif;
   --font-mono: var(--font-mono);
 }
