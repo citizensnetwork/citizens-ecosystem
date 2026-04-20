@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import Navbar from "@/components/ui/Navbar";
 import type { User } from "@supabase/supabase-js";
 
@@ -146,6 +147,7 @@ describe("Navbar", () => {
       user_metadata: { full_name: "John" },
     } as unknown as User;
     mockGetUser.mockResolvedValue({ data: { user } });
+    const ue = userEvent.setup();
 
     render(<Navbar />);
 
@@ -153,10 +155,12 @@ describe("Navbar", () => {
       expect(screen.getByText("J")).toBeInTheDocument();
     });
 
-    // Click the user button (contains the initial "J" and dropdown arrow)
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    // Radix DropdownMenu opens on pointerdown — use userEvent for proper pointer events.
+    await ue.click(screen.getByLabelText("Account menu"));
 
-    expect(screen.getByText("My Profile")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("My Profile")).toBeInTheDocument();
+    });
     expect(screen.getByText("My Events")).toBeInTheDocument();
     expect(screen.getByText("Log Out")).toBeInTheDocument();
   });
@@ -167,6 +171,7 @@ describe("Navbar", () => {
       user_metadata: { full_name: "John" },
     } as unknown as User;
     mockGetUser.mockResolvedValue({ data: { user } });
+    const ue = userEvent.setup();
 
     render(<Navbar />);
 
@@ -174,8 +179,11 @@ describe("Navbar", () => {
       expect(screen.getByText("J")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
-    fireEvent.click(screen.getByText("Log Out"));
+    await ue.click(screen.getByLabelText("Account menu"));
+    await waitFor(() => {
+      expect(screen.getByText("Log Out")).toBeInTheDocument();
+    });
+    await ue.click(screen.getByText("Log Out"));
 
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalled();

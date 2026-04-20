@@ -81,7 +81,7 @@ export default function Navbar() {
             className="h-8 w-8 rounded-full"
             title="Events"
           >
-            <Link href={{ pathname: "/events", query: { view: "calendar" } }}>
+            <Link href="/events?view=calendar">
               <CalendarDays className="h-4 w-4" />
               <span className="sr-only">Events</span>
             </Link>
