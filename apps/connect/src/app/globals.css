@@ -418,42 +418,10 @@ body {
   animation-duration: 2.2s !important;
 }
 
-/* ── Sticky 50 km ring: edge-pinned markers ──────────────────────────
- *  When an event lies inside the 50 km ring but outside the current
- *  viewport, EventMap pins it to the nearest viewport edge and adds
- *  .cc-ring-edge to the marker root. JS sets the inline transform on
- *  `.cc-marker-outer` directly each frame; CSS just provides the spike
- *  pseudo-element and ensures the otherwise-helpful 180ms transition on
- *  `transform` is not in play here so per-frame updates feel immediate.
- *  (A transform tween would chase the user's finger and produce the
- *  "snap on release" lag we hit in the previous iteration.) */
-.cc-ring-edge .cc-marker-outer {
-  position: relative;
-  /* No transform listed in transition — the parent `.cc-marker-outer`
-   * rule above already excludes transform, so per-frame inline transform
-   * updates apply instantly. We keep `will-change` to nudge the compositor
-   * into a separate layer for cheap GPU compositing during pan. */
-  will-change: transform;
-}
-.cc-ring-edge .cc-marker-outer::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  margin-top: -5px;
-  background: var(--cc-marker-color, #D4AF37);
-  /* Triangular spike, pointing "up" by default. The marker root
-   * rotates it via --cc-ring-bearing so it always points at the
-   * event's true lat/lng, regardless of map rotation. */
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  transform-origin: 50% 50%;
-  transform: rotate(var(--cc-ring-bearing, 0deg)) translateY(-22px);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
-  pointer-events: none;
-}
+/* The "sticky 50 km ring" (cc-ring-edge) edge-pinning feature was removed
+ * because it dimmed markers at low zoom, drifted during pans, and only
+ * reconciled on drag-release. Markers now render at their true lat/lng at
+ * every zoom level; clustering handles density. */
 
 @keyframes markerGlow {
   0%, 100% {

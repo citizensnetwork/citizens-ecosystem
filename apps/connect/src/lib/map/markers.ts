@@ -301,10 +301,10 @@ const DEFAULT_PLACE_ICON =
 
 /** Place marker sizing — exported so EventMap can use the same values for
  * zoom-scaling the inner icon proportionally to the outer circle. */
-export const PLACE_MARKER_SIZE = 26;
-export const PLACE_MARKER_SIZE_HIGHLIGHTED = 36;
-export const PLACE_ICON_SIZE = 16;
-export const PLACE_ICON_SIZE_HIGHLIGHTED = 22;
+export const PLACE_MARKER_SIZE = 40;
+export const PLACE_MARKER_SIZE_HIGHLIGHTED = 54;
+export const PLACE_ICON_SIZE = 24;
+export const PLACE_ICON_SIZE_HIGHLIGHTED = 32;
 export const PLACE_ICON_RATIO = PLACE_ICON_SIZE / PLACE_MARKER_SIZE;
 
 /**
