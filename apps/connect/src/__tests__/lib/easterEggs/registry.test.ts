@@ -120,4 +120,16 @@ describe("EASTER_EGGS registry", () => {
     expect(egg("time_availability").shouldFire(baseCtx({ mapEntryCount: 4 }), undefined)).toBe(false);
     expect(egg("time_availability").shouldFire(baseCtx({ mapEntryCount: 5 }), undefined)).toBe(true);
   });
+
+  it("WYR: honours an active cooldown tag and does NOT fire on the first entry", () => {
+    // Simulates "user dismissed the quiz → 48h soft-skip written".
+    const cooldown: PreferenceTag = {
+      value: "skipped",
+      answered_at: PAST,
+      expires_at: FUTURE,
+    };
+    expect(egg("wyr_pool").shouldFire(baseCtx({ mapEntryCount: 1 }), cooldown)).toBe(false);
+    expect(egg("wyr_pool").shouldFire(baseCtx({ mapEntryCount: 2 }), cooldown)).toBe(false);
+    expect(egg("wyr_pool").shouldFire(baseCtx({ mapEntryCount: 4 }), cooldown)).toBe(false);
+  });
 });

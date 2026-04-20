@@ -217,6 +217,19 @@ type WyrFlowProps = {
   onFinish: () => void;
 };
 
+/**
+ * Multi-step "Would You Rather" flow.
+ *
+ * Design (per user feedback April 20):
+ *   - All picks are held in local state and advance the step *immediately*
+ *     — no network round-trip between questions.  This removes the delay +
+ *     click-blocked bug that made the quiz feel broken.
+ *   - A single POST to /api/preferences persists every answer + a
+ *     `wyr_progress` soft-cooldown tag at the very end of the batch.
+ *   - If the user dismisses the flow early (skip / Escape / overlay tap),
+ *     we write a 48h soft-skip so the quiz does NOT re-surface on every
+ *     login.  This is the fix for "it keeps popping up".
+ */
 function WyrPromptFlow({ userId, prefs, onAdvancePrefs, onFinish }: WyrFlowProps) {
   const batch: WyrQuestion[] = useMemo(() => {
     const answered = (prefs.wyr ?? {}) as Record<string, WyrSide>;
@@ -226,7 +239,8 @@ function WyrPromptFlow({ userId, prefs, onAdvancePrefs, onFinish }: WyrFlowProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
   const [index, setIndex] = useState(0);
-  const [saving, setSaving] = useState(false);
+  // Picks collected in-memory — persisted in one shot at the end.
+  const [picks, setPicks] = useState<Record<string, WyrSide>>({});
 
   if (!batch.length) {
     // Nothing to ask — mark done and bail out.
@@ -236,30 +250,56 @@ function WyrPromptFlow({ userId, prefs, onAdvancePrefs, onFinish }: WyrFlowProps
 
   const q = batch[index];
 
-  async function persistPick(side: WyrSide) {
-    setSaving(true);
+  /** Persist all collected picks + a cooldown tag, then close the flow. */
+  async function flushAndFinish(finalPicks: Record<string, WyrSide>, completed: boolean) {
+    const answeredAt = new Date();
+    // 30-day cooldown if they completed the batch; 48h if they bailed
+    // early.  Either way we stop re-surfacing on every login.
+    const cooldownMs = completed ? 30 * 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
+    const progressTag = {
+      value: completed ? "completed" : "skipped",
+      answered_at: answeredAt.toISOString(),
+      expires_at: new Date(answeredAt.getTime() + cooldownMs).toISOString(),
+    };
     try {
-      const res = await fetch("/api/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wyr: { [q.id]: side } }),
-      });
-      if (res.ok) {
-        const json = await res.json().catch(() => null);
-        const next: Preferences = {
-          ...prefs,
-          wyr: { ...(prefs.wyr ?? {}), [q.id]: side },
-          ...(json?.preferences ? { percentages: json.preferences.percentages } : {}),
-        };
-        onAdvancePrefs(next);
+      const hasPicks = Object.keys(finalPicks).length > 0;
+      if (hasPicks || !completed) {
+        const res = await fetch("/api/preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wyr: finalPicks,
+            tags: { wyr_progress: progressTag },
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json().catch(() => null);
+          const next: Preferences = {
+            ...prefs,
+            wyr: { ...(prefs.wyr ?? {}), ...finalPicks },
+            tags: { ...(prefs.tags ?? {}), wyr_progress: progressTag },
+            ...(json?.preferences?.percentages
+              ? { percentages: json.preferences.percentages }
+              : {}),
+          };
+          onAdvancePrefs(next);
+        }
       }
     } catch (err) {
       console.warn("[WyrPromptFlow] save failed", err);
-    } finally {
-      setSaving(false);
     }
-    if (index + 1 >= batch.length) onFinish();
-    else setIndex((i) => i + 1);
+    onFinish();
+  }
+
+  function recordPick(side: WyrSide) {
+    const nextPicks = { ...picks, [q.id]: side };
+    if (index + 1 >= batch.length) {
+      // Last question — flush everything in one POST.
+      void flushAndFinish(nextPicks, true);
+    } else {
+      setPicks(nextPicks);
+      setIndex((i) => i + 1);
+    }
   }
 
   return (
@@ -271,9 +311,8 @@ function WyrPromptFlow({ userId, prefs, onAdvancePrefs, onFinish }: WyrFlowProps
         { label: q.left.label, emoji: q.left.emoji, value: "left" },
         { label: q.right.label, emoji: q.right.emoji, value: "right" },
       ]}
-      onPick={(v) => void persistPick(v)}
-      onSkip={onFinish}
-      busy={saving}
+      onPick={recordPick}
+      onSkip={() => void flushAndFinish(picks, false)}
     />
   );
 }

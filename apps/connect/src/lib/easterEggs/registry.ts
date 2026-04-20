@@ -70,16 +70,22 @@ export const EASTER_EGGS: EasterEggDefinition[] = [
     // Fires on map entry #1 for a brand-new user (per user decision
     // April 18 — "Yes, A is perfect").  Afterwards, re-surfaces every
     // second map entry until the user has answered 6+ in a 30-day window.
+    //
+    // `existing` maps to `preferences.tags.wyr_progress`: written when the
+    // user completes a batch (30-day cooldown) OR dismisses a batch
+    // (48-hour cooldown).  `needsAnswer` returns false while that cooldown
+    // is still active, so the quiz no longer re-surfaces every login.
     id: "wyr_pool",
     tagKey: "wyr_progress",
     expiryDays: 30,
     shouldFire: (ctx, existing) => {
+      // Honour the cooldown regardless of map-entry count — if the user
+      // just dismissed it, don't nag.
+      if (!needsAnswer(existing, ctx.nowIso)) return false;
       // First ever map entry: ALWAYS surface (new-account path).
-      if (ctx.mapEntryCount === 1 && !existing) return true;
+      if (ctx.mapEntryCount === 1) return true;
       // Subsequent entries: show every 2nd entry until satisfied.
-      if (ctx.mapEntryCount >= 2 && ctx.mapEntryCount % 2 === 0) {
-        return needsAnswer(existing, ctx.nowIso);
-      }
+      if (ctx.mapEntryCount >= 2 && ctx.mapEntryCount % 2 === 0) return true;
       return false;
     },
   },

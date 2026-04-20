@@ -52,6 +52,14 @@ export default function EasterEggPrompt<T = unknown>({
   const [pending, setPending] = useState<number | null>(null);
   const dialogRef = useFocusTrap<HTMLDivElement>(true);
 
+  // Reset the "pending" pulse whenever the options list changes identity —
+  // e.g. the parent advanced to the next question in a multi-step flow.
+  // Without this reset, `pending !== null` would block every click after
+  // the first one since the component instance is reused between steps.
+  useEffect(() => {
+    setPending(null);
+  }, [options]);
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onSkip();

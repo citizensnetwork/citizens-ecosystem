@@ -8,6 +8,13 @@
 import type { StyleSpecification } from "maplibre-gl";
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
+/**
+ * MapTiler map/style identifier.  Defaults to the "Dataviz Light" preset
+ * used historically.  Can be swapped to a custom Cloud style (e.g. the
+ * Citizens Connect gold-tinted skin) by setting NEXT_PUBLIC_MAPTILER_STYLE
+ * to that style's UUID or slug — no code change required.
+ */
+const MAPTILER_STYLE = process.env.NEXT_PUBLIC_MAPTILER_STYLE ?? "dataviz-light";
 
 /**
  * Light/neutral raster fallback using CartoDB Positron.
@@ -31,11 +38,12 @@ const NEUTRAL_RASTER_STYLE: StyleSpecification = {
 };
 
 /**
- * MapTiler "Dataviz Light" style (requires valid API key).
- * Clean, minimal, data-focused — lets markers and clusters stand out.
+ * MapTiler vector style URL (requires valid API key).
+ * Uses NEXT_PUBLIC_MAPTILER_STYLE to target either a preset slug
+ * (e.g. "dataviz-light") or a custom Cloud style UUID.
  */
 function maptilerStyleUrl(): string {
-  return `https://api.maptiler.com/maps/dataviz-light/style.json?key=${MAPTILER_KEY}`;
+  return `https://api.maptiler.com/maps/${MAPTILER_STYLE}/style.json?key=${MAPTILER_KEY}`;
 }
 
 /**
