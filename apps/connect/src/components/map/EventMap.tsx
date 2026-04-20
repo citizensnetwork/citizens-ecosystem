@@ -500,27 +500,33 @@ export default function EventMap({
       }
       root.style.display = "";
 
-      // Linear falloff: 1.0 at centre → 0.4 at the ring edge.
-      const t = Math.min(1, distKm / RING_RADIUS_KM);
-      const falloff = 1 - t * 0.6;
-      const falloffStr = falloff.toFixed(3);
-      root.style.opacity = falloffStr;
-
       const eventPt = map.project([trueLng, trueLat]);
       const insideViewport =
         eventPt.x >= left && eventPt.x <= right &&
         eventPt.y >= top && eventPt.y <= bottom;
 
       if (insideViewport) {
-        // Inside viewport: clear any prior edge-pin state, apply scale only.
+        // Inside viewport: markers stay at full brightness and true scale.
+        // Any previous ring-edge / falloff state is cleared so toggling
+        // filters (e.g. "For me in this area") doesn't leave stale dim
+        // styles on markers that are now on-screen.
         if (entry.ringPinned) {
           outer.style.removeProperty("--cc-ring-bearing");
           root.classList.remove("cc-ring-edge");
           entry.ringPinned = false;
         }
-        outer.style.transform = `scale(${falloffStr})`;
+        outer.style.removeProperty("transform");
+        root.style.removeProperty("opacity");
         continue;
       }
+
+      // Off-screen (but within ring): linear falloff toward the 50 km edge
+      // so distance is still communicated visually when markers are pinned
+      // to the viewport border.
+      const t = Math.min(1, distKm / RING_RADIUS_KM);
+      const falloff = 1 - t * 0.6;
+      const falloffStr = falloff.toFixed(3);
+      root.style.opacity = falloffStr;
 
       // Off-screen: clamp to viewport edge along the centre→event ray.
       const dx = eventPt.x - cx;

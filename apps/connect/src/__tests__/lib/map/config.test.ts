@@ -50,7 +50,11 @@ describe("map/config", () => {
       const style = getMapStyle();
 
       expect(typeof style).toBe("string");
-      expect(style).toContain("https://api.maptiler.com/maps/dataviz-light/style.json");
+      // Default style is the Citizens Connect gold-tinted Cloud style UUID
+      // so the brand skin ships even without NEXT_PUBLIC_MAPTILER_STYLE set.
+      expect(style).toContain(
+        "https://api.maptiler.com/maps/019da63f-f3d4-7958-a9e3-e7c4e61e1f37/style.json",
+      );
       expect(style).toContain("key=test-key-123");
 
       // Cleanup

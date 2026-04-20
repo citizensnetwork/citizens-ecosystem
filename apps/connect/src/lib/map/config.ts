@@ -9,12 +9,15 @@ import type { StyleSpecification } from "maplibre-gl";
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
 /**
- * MapTiler map/style identifier.  Defaults to the "Dataviz Light" preset
- * used historically.  Can be swapped to a custom Cloud style (e.g. the
- * Citizens Connect gold-tinted skin) by setting NEXT_PUBLIC_MAPTILER_STYLE
- * to that style's UUID or slug — no code change required.
+ * MapTiler map/style identifier.  Defaults to the Citizens Connect
+ * gold-tinted Cloud style so the map ships with the brand skin even when
+ * `NEXT_PUBLIC_MAPTILER_STYLE` is not set in the deploy environment.
+ * Override with any preset slug (e.g. `"dataviz-light"`) or a different
+ * Cloud style UUID by setting that env var — no code change required.
  */
-const MAPTILER_STYLE = process.env.NEXT_PUBLIC_MAPTILER_STYLE ?? "dataviz-light";
+const MAPTILER_STYLE =
+  process.env.NEXT_PUBLIC_MAPTILER_STYLE ??
+  "019da63f-f3d4-7958-a9e3-e7c4e61e1f37";
 
 /**
  * Light/neutral raster fallback using CartoDB Positron.
