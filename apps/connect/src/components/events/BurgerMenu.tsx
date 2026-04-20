@@ -318,6 +318,37 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   My Events
                 </Link>
                 <Link
+                  href="/messages"
+                  onClick={onClose}
+                  className="mt-2 block rounded-xl bg-black/5 px-3 py-2 text-center font-medium text-black hover:bg-black/10 transition"
+                >
+                  Messages
+                </Link>
+                {/* Contributor-only shortcuts */}
+                {menuProfile?.role === "contributor" &&
+                  menuProfile?.contributor_status === "approved" && (
+                    <Link
+                      href="/places/new"
+                      onClick={onClose}
+                      className="mt-2 block rounded-xl bg-black/5 px-3 py-2 text-center font-medium text-black hover:bg-black/10 transition"
+                    >
+                      + Add Place
+                    </Link>
+                  )}
+                {/* Citizens without an application see the apply CTA */}
+                {menuProfile?.role === "citizen" &&
+                  (!menuProfile?.contributor_status ||
+                    menuProfile?.contributor_status === "not_applied" ||
+                    menuProfile?.contributor_status === "rejected") && (
+                    <Link
+                      href="/contributor/apply"
+                      onClick={onClose}
+                      className="mt-2 block rounded-xl border border-(--gold) px-3 py-2 text-center font-semibold text-black hover:bg-(--gold-soft) transition"
+                    >
+                      ★ Apply to Contribute
+                    </Link>
+                  )}
+                <Link
                   href="/events/new"
                   onClick={() => {
                     // Signal the leadership-interest Easter egg — tapped
@@ -332,6 +363,12 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 >
                   + Create Event
                 </Link>
+                {menuProfile?.role === "citizen" && (
+                  <p className="mt-1 px-1 text-center text-[11px] leading-tight text-black/55">
+                    Citizens can publish 1 community event / month. Apply to
+                    contribute for unlimited publishing.
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -364,14 +401,33 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   <p className="truncate text-xs text-black/50">{user.email}</p>
                 </div>
               </Link>
+              {menuProfile?.role === "contributor" &&
+                menuProfile?.contributor_status === "approved" && (
+                  <Link
+                    href="/profile/contributor"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    Edit public profile
+                  </Link>
+                )}
               {menuProfile?.role === "admin" && (
-                <Link
-                  href="/admin/categories"
-                  onClick={onClose}
-                  className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                >
-                  Manage Categories
-                </Link>
+                <>
+                  <Link
+                    href="/admin/contributors"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    Contributor applications
+                  </Link>
+                  <Link
+                    href="/admin/categories"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    Manage Categories
+                  </Link>
+                </>
               )}
               <button
                 type="button"

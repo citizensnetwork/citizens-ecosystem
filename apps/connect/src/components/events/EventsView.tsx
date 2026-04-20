@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { ContributorChip } from "@/components/ui/ContributorChip";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -1745,9 +1746,14 @@ export default function EventsView({
 
             {selectedEvent && (
               <div className="space-y-2 pt-1">
-                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
-                  {CATEGORY_LABELS[selectedEvent.category ?? "church"]}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
+                    {CATEGORY_LABELS[selectedEvent.category ?? "church"]}
+                  </span>
+                  {selectedEvent.community_contributor && (
+                    <ContributorChip variant="community" />
+                  )}
+                </div>
                 <h2 className="text-base font-bold text-black leading-tight">
                   {selectedEvent.title}
                 </h2>

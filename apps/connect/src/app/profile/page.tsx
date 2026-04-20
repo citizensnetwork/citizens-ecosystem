@@ -12,6 +12,7 @@ import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
 import PersonalizationPanel from "@/components/profile/PersonalizationPanel";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 import QuickPanelPreferencesSection from "@/components/events/QuickPanelPreferencesSection";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { QUICK_ACCESS_ITEMS } from "@/lib/quickPanelOptions";
 
 export const dynamic = "force-dynamic";
@@ -105,8 +106,10 @@ export default async function ProfilePage() {
   // Easter-egg personalization engine.)
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
+    <>
+      <PageHeader title="My Profile" fallbackHref="/events" />
+      <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
+        <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8">
         {typedProfile.avatar_url ? (
@@ -317,7 +320,8 @@ export default async function ProfilePage() {
         </p>
         <DeleteAccountButton />
       </section>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import ChatView from "@/components/messaging/ChatView";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export const metadata = {
   title: "Chat — Citizens Connect",
@@ -22,10 +23,13 @@ export default async function ConversationPage({
   }
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel flex h-full max-h-[calc(100dvh-6.5rem)] w-full max-w-2xl flex-col overflow-hidden">
-        <ChatView conversationId={id} userId={user.id} />
+    <>
+      <PageHeader title="Chat" fallbackHref="/messages" />
+      <div className="flex h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
+        <div className="glass-panel flex h-full max-h-[calc(100dvh-9.5rem)] w-full max-w-2xl flex-col overflow-hidden">
+          <ChatView conversationId={id} userId={user.id} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Event, EventMedia } from "@/types/db";
 import type { Metadata } from "next";
 
@@ -158,14 +159,17 @@ export default async function EventDetailPage({
   }
 
   return (
-    <EventDetailContent
-      event={event}
-      count={count ?? 0}
-      user={user}
-      hasRsvped={hasRsvped}
-      attendees={attendees}
-      locationSharingEnabled={locationSharingEnabled}
-      media={media}
-    />
+    <>
+      <PageHeader title={event.title} fallbackHref="/events" />
+      <EventDetailContent
+        event={event}
+        count={count ?? 0}
+        user={user}
+        hasRsvped={hasRsvped}
+        attendees={attendees}
+        locationSharingEnabled={locationSharingEnabled}
+        media={media}
+      />
+    </>
   );
 }

@@ -15,6 +15,7 @@ import MessageButton from "@/components/messaging/MessageButton";
 import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { ContributorChip } from "@/components/ui/ContributorChip";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import type { Event, EventMedia } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
@@ -104,10 +105,7 @@ export default function EventDetailContent({
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
       <div className="glass-panel w-full max-w-2xl px-5 py-6 sm:px-6">
-      <div className="flex items-center justify-between mb-3">
-        <Link href="/events" className="text-(--gold) hover:underline text-xs">
-          ← Back to Events
-        </Link>
+      <div className="flex items-center justify-end mb-3">
         {user?.id === event.created_by && (
           <Link
             href={`/events/${event.id}/edit`}
@@ -148,13 +146,16 @@ export default function EventDetailContent({
       {/* Organiser media gallery (photos + videos) */}
       <EventMediaStrip media={media} />
 
-      {event.category && (
-        <div className="mb-1.5 flex items-center gap-2">
-          <span
-            className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
-          >
-            {CATEGORY_LABELS[cat]}
-          </span>
+      {(event.category || event.community_contributor) && (
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          {event.category && (
+            <span
+              className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
+            >
+              {CATEGORY_LABELS[cat]}
+            </span>
+          )}
+          {event.community_contributor && <ContributorChip variant="community" />}
           {isLive && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />

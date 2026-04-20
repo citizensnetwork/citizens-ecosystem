@@ -6,6 +6,7 @@ import ShareButton from "@/components/ui/ShareButton";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Place, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -71,14 +72,10 @@ export default async function PlaceDetailPage({
       : null;
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
-      <Link
-        href="/events"
-        className="mb-4 inline-block text-sm text-black/60 hover:text-black"
-      >
-        ← Back to map
-      </Link>
+    <>
+      <PageHeader title={place.name} subtitle={place.categories?.name} fallbackHref="/events" />
+      <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
+        <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
 
       <div className="space-y-4 rounded-2xl p-6">
         {place.image_url && (
@@ -179,7 +176,8 @@ export default async function PlaceDetailPage({
       <div className="mt-6">
         <ReviewList placeId={place.id} title="Place Reviews" />
       </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

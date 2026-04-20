@@ -3,9 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Event, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import type { Metadata } from "next";
+import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -128,8 +130,66 @@ export default async function PublicProfilePage({
   const isOrganiser = ORGANISER_ROLES.includes(profile.role as UserRole);
   const displayName = profile.full_name || profile.email;
 
+  // Branch: approved Contributors get the richer public profile.
+  if (
+    profile.role === "contributor" &&
+    profile.contributor_status === "approved"
+  ) {
+    const now = new Date().toISOString();
+    const allEvents = createdEvents ?? [];
+    const upcoming = allEvents.filter((e) => e.date >= now);
+    const past = allEvents.filter((e) => e.date < now).reverse();
+
+    // Fetch aggregate ratings for past events in one go.
+    let pastWithRatings: Array<
+      Event & { avg_rating?: number | null; reviews_count?: number }
+    > = past;
+    if (past.length > 0) {
+      const { data: reviewRows } = await supabase
+        .from("reviews")
+        .select("event_id, rating")
+        .in(
+          "event_id",
+          past.map((e) => e.id),
+        );
+      const byEvent = new Map<string, number[]>();
+      for (const r of reviewRows ?? []) {
+        const key = r.event_id as string;
+        if (!byEvent.has(key)) byEvent.set(key, []);
+        byEvent.get(key)!.push(r.rating as number);
+      }
+      pastWithRatings = past.map((e) => {
+        const arr = byEvent.get(e.id);
+        if (!arr || arr.length === 0) return e;
+        const avg = arr.reduce((s, n) => s + n, 0) / arr.length;
+        return { ...e, avg_rating: avg, reviews_count: arr.length };
+      });
+    }
+
+    return (
+      <>
+        <PageHeader
+          title={profile.full_name ?? "Contributor"}
+          fallbackHref="/events"
+        />
+        <ContributorPublicProfile
+          profile={profile}
+          viewer={user ? { id: user.id } : null}
+          isFollowing={isFollowing}
+          isFriend={isFriend}
+          followersCount={followersCount ?? 0}
+          followingCount={followingCount ?? 0}
+          upcomingEvents={upcoming}
+          pastEvents={pastWithRatings}
+        />
+      </>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <>
+      <PageHeader title={displayName as string} fallbackHref="/events" />
+      <div className="mx-auto max-w-2xl px-4 py-8">
       {/* Profile header */}
       <div className="flex items-start gap-4">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-(--gold-soft) text-2xl font-bold uppercase text-black">
@@ -242,6 +302,7 @@ export default async function PublicProfilePage({
           connect.
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

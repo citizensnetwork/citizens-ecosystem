@@ -273,7 +273,7 @@ describe("EventDetailContent", () => {
     expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
-  it("renders Back to Events link", () => {
+  it("no longer renders an inline back link (handled by PageHeader at page level)", () => {
     render(
       <EventDetailContent
         event={baseEvent}
@@ -282,8 +282,7 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    const back = screen.getByText(/back to events/i);
-    expect(back.closest("a")).toHaveAttribute("href", "/events");
+    expect(screen.queryByText(/back to events/i)).not.toBeInTheDocument();
   });
 
   it("renders CommentSection", () => {

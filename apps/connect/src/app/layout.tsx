@@ -3,6 +3,7 @@ import { Montserrat, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/ui/Navbar";
 import CapacitorInit from "@/components/ui/CapacitorInit";
+import ApplicationPendingBannerServer from "@/components/ui/ApplicationPendingBannerServer";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -47,6 +48,7 @@ export default function RootLayout({
       <body className="map-bg min-h-full flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <CapacitorInit />
         <Navbar />
+        <ApplicationPendingBannerServer />
         <main className="flex-1">{children}</main>
       </body>
     </html>

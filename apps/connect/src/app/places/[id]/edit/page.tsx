@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import EditPlaceForm from "@/components/places/EditPlaceForm";
-import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Place, Category } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -50,16 +50,17 @@ export default async function EditPlacePage({
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
-        <Link
-          href={`/places/${id}`}
-          className="mb-4 inline-block text-sm text-black/60 hover:text-black"
-        >
-          ← Back to place
-        </Link>
-        <EditPlaceForm place={place} categories={categoriesRes.data ?? []} />
+    <>
+      <PageHeader
+        title="Edit Place"
+        subtitle={place.name}
+        fallbackHref={`/places/${id}`}
+      />
+      <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
+        <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
+          <EditPlaceForm place={place} categories={categoriesRes.data ?? []} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -61,6 +61,11 @@ export type Event = {
   category_id: string | null;
   created_by: string;
   created_at: string;
+  /** True when this event was created by a Citizen (not an approved
+   *  Contributor).  UI renders a "Community-organised" chip so viewers
+   *  can distinguish editorially-curated events from community ones.
+   *  Added in migration 036; force-tagged by a DB trigger in 037. */
+  community_contributor?: boolean;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
   /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")`.
@@ -190,6 +195,23 @@ export type Profile = {
   instagram_handle: string | null;
   facebook_url: string | null;
   tiktok_handle: string | null;
+  /** Contributor application status — "not_applied" for citizens who haven't
+   *  applied; flipped to "pending" on submission; set by admin RPCs to
+   *  "approved" or "rejected".  Added in migration 036. */
+  contributor_status?: "not_applied" | "pending" | "approved" | "rejected";
+  /** Public Contributor profile fields.  All NULL for citizens.  Added in
+   *  migration 036.  `gallery_urls` is a JSONB array of image URLs. */
+  bio?: string | null;
+  website_url?: string | null;
+  physical_address?: string | null;
+  physical_latitude?: number | null;
+  physical_longitude?: number | null;
+  logo_url?: string | null;
+  gallery_urls?: string[];
+  youtube_url?: string | null;
+  contributor_slug?: string | null;
+  needs_re_review?: boolean;
+  community_contributor_score?: number;
   /** Demographic columns (migration 035).  All NULL by default — populated
    *  opportunistically by Easter-egg micro-prompts.  Never required. */
   gender: string | null;

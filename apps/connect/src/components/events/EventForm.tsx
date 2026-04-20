@@ -303,7 +303,17 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     }).select("id").single();
 
     if (error) {
-      setError(error.message);
+      // DB trigger raises this when a Citizen tries to create more
+      // public community events than the rate-limit allows (default:
+      // 1 per 30 days). Surface a friendly message instead of the
+      // raw SQL exception.
+      if (error.message.includes("community_event_rate_limited")) {
+        setError(
+          "As a Citizen you can only create one public community event every 30 days. Apply to become a Contributor to publish regularly.",
+        );
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }

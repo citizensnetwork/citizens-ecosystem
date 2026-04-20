@@ -816,6 +816,7 @@ export default function EventMap({
           const considerClass = `cc-action-btn${isConsidering ? " cc-action-done" : ""}`;
 
           return `<div class="cc-popup">
+            ${event.community_contributor ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
             <strong>${escapeHtml(event.title)}</strong>
             <p>${dateStr}</p>
             <p>${escapeHtml(event.location)}</p>

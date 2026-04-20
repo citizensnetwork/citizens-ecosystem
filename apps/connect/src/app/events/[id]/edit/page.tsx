@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import EditEventForm from "@/components/events/EditEventForm";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Event } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -44,10 +45,17 @@ export default async function EditEventPage({
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
-        <EditEventForm event={event} />
+    <>
+      <PageHeader
+        title="Edit Event"
+        subtitle={event.title}
+        fallbackHref={`/events/${id}`}
+      />
+      <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
+        <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
+          <EditEventForm event={event} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
