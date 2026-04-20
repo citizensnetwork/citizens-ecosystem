@@ -24,7 +24,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Citizens Connect",
-  description: "Discover faith-based events, places, and community near you. Connecting the Kingdom.",
+  description:
+    "Citizens Connect helps YOU find YOUR place in the Kingdom. Discover faith-based events, places, and community near you.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

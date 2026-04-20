@@ -302,6 +302,13 @@ export default function LandingPage({ events, places }: Props) {
                 Continue with Google
               </button>
 
+              {/* Slogan — the product promise. Sits directly under the
+               *  Google CTA so every visitor reads it during the auth pause. */}
+              <p className="text-center text-[12px] font-semibold leading-snug text-black/75">
+                Citizens Connect helps <span className="text-[var(--gold)]">YOU</span>{" "}
+                find <span className="text-[var(--gold)]">YOUR</span> place in the Kingdom.
+              </p>
+
               {/* "Connect" in its dormant state: gray, labelled "Browse as Guest",\n               *  still clickable so curious visitors can explore the map without\n               *  signing in. Once the user signs in this button lights up gold\n               *  and switches to "Connect" (see the user-branch above). */}
               <div className="space-y-2">
                 <button

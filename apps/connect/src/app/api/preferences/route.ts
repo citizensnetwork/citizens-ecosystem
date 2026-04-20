@@ -26,6 +26,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { computeInterestPercentages } from "@/lib/personalization/percentages";
+import type { Preferences, PreferenceTag } from "@/types/db";
 
 type WyrAnswer = "left" | "right";
 
@@ -98,10 +100,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // Read existing preferences so we can deep-merge the structured slices.
+  // Read existing preferences + demographic columns so we can deep-merge and
+  // recompute the cached percentages in a single round-trip.
   const { data: existing, error: readError } = await supabase
     .from("profiles")
-    .select("preferences")
+    .select(
+      "preferences, gender, age_range, relationship_status, stage_of_life, energy_level",
+    )
     .eq("id", user.id)
     .single();
   if (readError) {
@@ -130,6 +135,22 @@ export async function POST(request: Request) {
     if (k === "wyr" || k === "tags") continue;
     next[k] = v;
   }
+
+  // Recompute the cached percentages from the merged state.  Doing this
+  // server-side (rather than client-side before POST) guarantees every
+  // surface sees the same snapshot and prevents tampering.
+  const prefsForCompute: Pick<Preferences, "wyr" | "tags"> = {
+    wyr: (next.wyr ?? undefined) as Preferences["wyr"],
+    tags: (next.tags ?? undefined) as Record<string, PreferenceTag> | undefined,
+  };
+  next.percentages = computeInterestPercentages({
+    gender: existing?.gender ?? null,
+    age_range: existing?.age_range ?? null,
+    relationship_status: existing?.relationship_status ?? null,
+    stage_of_life: existing?.stage_of_life ?? null,
+    energy_level: existing?.energy_level ?? null,
+    preferences: prefsForCompute,
+  });
 
   const { error: writeError } = await supabase
     .from("profiles")
