@@ -97,6 +97,19 @@ export default function EventsView({
     quickAccess: string | null;
   } | null>(null);
 
+  // ── "For me in this area" hard-filter pill (Easter-egg personalisation) ──
+  // When toggled on, restricts visible events + places to those whose
+  // category sits at ≥60% in the user's preferences.percentages roll-up.
+  // Stashes the prior filter / search state into a ref so toggling off
+  // returns the user to exactly where they were.
+  const [forMeActive, setForMeActive] = useState(false);
+  const forMeSnapshotRef = useRef<{
+    categories: Set<EventCategory>;
+    placeCategories: Set<PlaceCategory>;
+    quickAccess: string | null;
+    search: string;
+  } | null>(null);
+
   // Category panel state (shows when categories are selected)
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [categoryPanelPage, setCategoryPanelPage] = useState(0);
@@ -235,6 +248,25 @@ export default function EventsView({
     loading: menuLoading,
   } = useBurgerMenuData(user?.id ?? null, true);
 
+  // ── Personalisation: derive the categories the user is "into" ────
+  // Anything ≥60% in their cached preferences.percentages roll-up. Split
+  // into event-cat + place-cat sets so we can apply the right filter to
+  // each list. If the user has no signal yet, both sets are empty and the
+  // "For me" pill is hidden.
+  const personalised = useMemo(() => {
+    const prefs = menuProfile?.preferences as { percentages?: Record<string, number> } | undefined;
+    const pcts = prefs?.percentages ?? {};
+    const eventCats = new Set<EventCategory>();
+    const placeCats = new Set<PlaceCategory>();
+    for (const [slug, pct] of Object.entries(pcts)) {
+      if (typeof pct !== "number" || pct < 60) continue;
+      // Try both maps; only the matching one will accept the slug.
+      if (slug in EVENT_CATEGORY_KEYWORDS) eventCats.add(slug as EventCategory);
+      if (slug in PLACE_CATEGORY_KEYWORDS) placeCats.add(slug as PlaceCategory);
+    }
+    return { eventCats, placeCats, hasSignal: eventCats.size > 0 || placeCats.size > 0 };
+  }, [menuProfile]);
+
   async function handleLogout() {
     await supabaseRef.current!.auth.signOut();
     setUser(null);
@@ -246,6 +278,43 @@ export default function EventsView({
   function clearQuickAccess() {
     setActiveQuickAccess(null);
     setQuickPanelOpen(false);
+  }
+
+  /**
+   * Toggle the "For me in this area" hard-filter pill. Activating it
+   * snapshots the current filter state and clears the active filters so
+   * the personalised filter is the only one in effect.  Deactivating
+   * restores the snapshot exactly.
+   */
+  function toggleForMe() {
+    if (forMeActive) {
+      const snap = forMeSnapshotRef.current;
+      forMeSnapshotRef.current = null;
+      setForMeActive(false);
+      if (snap) {
+        setActiveCategories(snap.categories);
+        setActivePlaceCategories(snap.placeCategories);
+        setActiveQuickAccess(snap.quickAccess);
+        setSearch(snap.search);
+        if (snap.quickAccess) {
+          setQuickPanelOpen(true);
+          setQuickPanelPage(0);
+        }
+      }
+    } else {
+      forMeSnapshotRef.current = {
+        categories: new Set(activeCategories),
+        placeCategories: new Set(activePlaceCategories),
+        quickAccess: activeQuickAccess,
+        search,
+      };
+      setActiveCategories(new Set());
+      setActivePlaceCategories(new Set());
+      setActiveQuickAccess(null);
+      setQuickPanelOpen(false);
+      setSearch("");
+      setForMeActive(true);
+    }
   }
 
   function toggleCategory(cat: EventCategory) {
@@ -421,6 +490,12 @@ export default function EventsView({
     };
     return events.filter((e) => {
       if (!inBbox(e.latitude, e.longitude)) return false;
+      // "For me" hard filter: applied before category logic so it always
+      // wins. When active and the user has personalised categories, only
+      // events whose category sits in that set survive.
+      if (forMeActive && personalised.hasSignal) {
+        if (e.category == null || !personalised.eventCats.has(e.category)) return false;
+      }
       // Bypass category filters while searching so search returns the full
       // cross-category match set (plus places below).
       const matchesCategory =
@@ -452,7 +527,7 @@ export default function EventsView({
       }
       return false;
     });
-  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped]);
+  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -465,6 +540,17 @@ export default function EventsView({
     };
     return places.filter((p) => {
       if (!inBbox(p.latitude, p.longitude)) return false;
+      // "For me" hard filter: applied before category logic. Uses the same
+      // keyword-bank text match as the existing place filter so a place
+      // with category "church" surfaces for users into church-service, etc.
+      if (forMeActive && personalised.hasSignal) {
+        if (personalised.placeCats.size === 0) return false;
+        const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
+        const matches = [...personalised.placeCats].some((cat) =>
+          PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
+        );
+        if (!matches) return false;
+      }
       // Bypass place-category filters while searching, mirroring events.
       if (!isSearching && activePlaceCategories.size > 0) {
         const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
@@ -482,7 +568,7 @@ export default function EventsView({
         p.description.toLowerCase().includes(q)
       );
     });
-  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped]);
+  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
 
   // Calendar province-filtered events (applies province filter on top of category/search filter)
   const calendarEvents = useMemo(() => {
@@ -967,6 +1053,32 @@ export default function EventsView({
               Search this area
             </button>
           )}
+        </div>
+      )}
+
+      {/* ── "For me in this area" hard-filter pill (Easter-egg personalisation)
+       *  Renders below the Search-this-area pill, only when the user has at
+       *  least one category at ≥60% in their cached preferences. Toggling on
+       *  snapshots and clears all other filters; toggling off restores them. */}
+      {view === "map" && !hasDetail && personalised.hasSignal && (
+        <div className="pointer-events-none absolute inset-x-0 top-36 z-1004 flex justify-center px-4">
+          <button
+            type="button"
+            onClick={toggleForMe}
+            className={
+              forMeActive
+                ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
+                : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
+            }
+            aria-pressed={forMeActive}
+            aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
+          >
+            <span aria-hidden="true">✨</span>
+            {forMeActive ? "For me — tap to clear" : "For me in this area"}
+            {forMeActive && (
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
+            )}
+          </button>
         </div>
       )}
 
