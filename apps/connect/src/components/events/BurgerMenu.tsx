@@ -319,7 +319,15 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 </Link>
                 <Link
                   href="/events/new"
-                  onClick={onClose}
+                  onClick={() => {
+                    // Signal the leadership-interest Easter egg — tapped
+                    // Create counts as a contributor-action attempt.  Import
+                    // lazily so we never block the menu open animation.
+                    void import("@/lib/easterEggs/bus").then(({ publishEasterEggEvent }) => {
+                      publishEasterEggEvent({ type: "contributor_action_attempted" });
+                    });
+                    onClose();
+                  }}
                   className="mt-2 block rounded-xl bg-(--gold) px-3 py-2 text-center font-semibold text-black"
                 >
                   + Create Event

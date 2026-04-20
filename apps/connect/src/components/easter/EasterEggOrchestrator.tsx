@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Preferences, PreferenceTag } from "@/types/db";
 import { EASTER_EGGS } from "@/lib/easterEggs/registry";
 import { sampleWyrBatch, type WyrQuestion, type WyrSide } from "@/lib/easterEggs/wyr";
+import { subscribeEasterEggBus } from "@/lib/easterEggs/bus";
 import EasterEggPrompt, { type EasterEggOption } from "./EasterEggPrompt";
 import { useEasterEgg } from "@/hooks/useEasterEgg";
 
@@ -84,6 +85,11 @@ export default function EasterEggOrchestrator({
   const [mapEntryCount, setMapEntryCount] = useState(0);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [prefs, setPrefs] = useState<Preferences>(initialPreferences ?? {});
+  // Ambient trigger state fed by the bus — tapped categories + whether the
+  // user has just tried a contributor action (e.g. tapped Create while not
+  // yet opted-in for leadership).
+  const [tappedCats, setTappedCats] = useState<Set<string>>(new Set());
+  const [contributorAttempted, setContributorAttempted] = useState(false);
 
   // Snapshot map entries once per mount — don't tick this up on hot-reload.
   useEffect(() => {
@@ -91,15 +97,33 @@ export default function EasterEggOrchestrator({
     setDismissed(readDismissed());
   }, []);
 
+  // Subscribe to the bus so map/detail interactions can light up triggers.
+  useEffect(() => {
+    if (!enabled) return;
+    const unsub = subscribeEasterEggBus((evt) => {
+      if (evt.type === "category_tapped") {
+        setTappedCats((prev) => {
+          if (prev.has(evt.category)) return prev;
+          const next = new Set(prev);
+          next.add(evt.category);
+          return next;
+        });
+      } else if (evt.type === "contributor_action_attempted") {
+        setContributorAttempted(true);
+      }
+    });
+    return unsub;
+  }, [enabled]);
+
   // Pick the first egg whose trigger fires AND that hasn't been dismissed
   // this session.  Evaluated lazily so answering one egg can promote the next.
   const activeEgg = useMemo(() => {
     if (!enabled || mapEntryCount === 0) return null;
     const ctx = {
       mapEntryCount,
-      tappedEventCategories: new Set<string>(),
+      tappedEventCategories: tappedCats,
       hasLeadershipInterest: prefs.leadership_interest === true,
-      contributorActionAttempted: false,
+      contributorActionAttempted: contributorAttempted,
       nowIso: new Date().toISOString(),
       accountCreatedAtIso: accountCreatedAt,
     };
@@ -109,7 +133,7 @@ export default function EasterEggOrchestrator({
       if (egg.shouldFire(ctx, existing)) return egg;
     }
     return null;
-  }, [enabled, mapEntryCount, dismissed, prefs, accountCreatedAt]);
+  }, [enabled, mapEntryCount, dismissed, prefs, accountCreatedAt, tappedCats, contributorAttempted]);
 
   if (!activeEgg) return null;
 
@@ -198,6 +222,91 @@ export default function EasterEggOrchestrator({
           onSkip={() => {
             markDismissed("time_availability");
             setDismissed((s) => new Set([...s, "time_availability"]));
+          }}
+        />
+      );
+    case "relationship_stance":
+      return (
+        <SingleTagPrompt
+          headline="Quick one —"
+          question="What best describes where you're at?"
+          tagKey="relationship_stance"
+          expiryDays={365}
+          options={[
+            { label: "Single", emoji: "🙋", value: "single" },
+            { label: "Dating", emoji: "💞", value: "dating" },
+            { label: "Engaged", emoji: "💍", value: "engaged" },
+            { label: "Married", emoji: "💒", value: "married" },
+          ]}
+          prefs={prefs}
+          onDone={(next) => {
+            setPrefs(next);
+            markDismissed("relationship_stance");
+            setDismissed((s) => new Set([...s, "relationship_stance"]));
+          }}
+          onSkip={() => {
+            markDismissed("relationship_stance");
+            setDismissed((s) => new Set([...s, "relationship_stance"]));
+          }}
+        />
+      );
+    case "gender":
+      return (
+        <SingleTagPrompt
+          headline="Before we go on —"
+          question="Which side fits you?"
+          tagKey="gender"
+          expiryDays={null}
+          options={[
+            { label: "Male", emoji: "♂️", value: "male" },
+            { label: "Female", emoji: "♀️", value: "female" },
+            { label: "Prefer not to say", emoji: "🤝", value: "prefer_not_to_say" },
+          ]}
+          prefs={prefs}
+          onDone={(next) => {
+            setPrefs(next);
+            markDismissed("gender");
+            setDismissed((s) => new Set([...s, "gender"]));
+          }}
+          onSkip={() => {
+            markDismissed("gender");
+            setDismissed((s) => new Set([...s, "gender"]));
+          }}
+        />
+      );
+    case "leadership_interest":
+      return (
+        <SingleTagPrompt
+          headline="A nudge —"
+          question="Could you see yourself helping lead something in this community?"
+          tagKey="leadership_interest"
+          expiryDays={365}
+          options={[
+            { label: "Yes, intrigued", emoji: "⭐", value: "yes" },
+            { label: "Maybe later", emoji: "🤔", value: "maybe" },
+            { label: "Not my thing", emoji: "🙅", value: "no" },
+          ]}
+          prefs={prefs}
+          onDone={(next) => {
+            setPrefs({
+              ...next,
+              // When the user opts in, cache the leadership_interest flag at
+              // the top level of `preferences` so the trigger predicate in
+              // the registry can check it without reading the tag blob.
+              leadership_interest: (
+                next.tags?.leadership_interest?.value === "yes"
+                  ? true
+                  : next.tags?.leadership_interest?.value === "no"
+                    ? false
+                    : null
+              ),
+            });
+            markDismissed("leadership_interest");
+            setDismissed((s) => new Set([...s, "leadership_interest"]));
+          }}
+          onSkip={() => {
+            markDismissed("leadership_interest");
+            setDismissed((s) => new Set([...s, "leadership_interest"]));
           }}
         />
       );

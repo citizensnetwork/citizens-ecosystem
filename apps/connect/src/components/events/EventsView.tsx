@@ -26,6 +26,13 @@ const EventMap = dynamic(() => import("@/components/map/EventMap"), {
   loading: () => <div className="skeleton h-full w-full" />,
 });
 
+// Lazy-loaded: only ever needed when a signed-in user taps the rainbow "?"
+// control, so we keep it out of the main bundle.
+const LongFormPersonalizationSheet = dynamic(
+  () => import("@/components/easter/LongFormPersonalizationSheet"),
+  { ssr: false }
+);
+
 type Props = {
   events: Event[];
   places?: Place[];
@@ -70,6 +77,7 @@ export default function EventsView({
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [featuredOpen, setFeaturedOpen] = useState(false);
+  const [longFormOpen, setLongFormOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set()
   );
@@ -582,6 +590,13 @@ export default function EventsView({
       setSelectedPlace(null);
       setSelectedEvent(event);
       setFeaturedOpen(false);
+      // Let the Easter-egg orchestrator know which category was just
+      // engaged with — powers the couples / gender-bucket prompts.
+      if (event.category) {
+        void import("@/lib/easterEggs/bus").then(({ publishEasterEggEvent }) => {
+          publishEasterEggEvent({ type: "category_tapped", category: event.category as string });
+        });
+      }
     },
     []
   );
@@ -946,6 +961,29 @@ export default function EventsView({
                 <div className="rounded-full border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
                   <NotificationBell userId={user.id} />
                 </div>
+              )}
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => setLongFormOpen(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/95 shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white"
+                  aria-label="Personalise your feed"
+                  title="Tell us about you"
+                >
+                  <span
+                    className="text-xl font-extrabold leading-none"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #ff4d4d 0%, #ffb400 25%, #3dd598 50%, #2f80ed 75%, #9b51e0 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                      color: "transparent",
+                    }}
+                  >
+                    ?
+                  </span>
+                </button>
               )}
               <button
                 type="button"
@@ -1747,6 +1785,11 @@ export default function EventsView({
         onClose={() => setQuickSettingsOpen(false)}
         onSaved={(next) => setQuickPrefIds(next)}
       />
+
+      {/* ── Long-form personalisation sheet (rainbow "?" entry-point) ── */}
+      {longFormOpen && (
+        <LongFormPersonalizationSheet onClose={() => setLongFormOpen(false)} />
+      )}
     </div>
   );
 }
