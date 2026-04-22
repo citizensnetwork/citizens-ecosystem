@@ -22,8 +22,26 @@ export default async function InterceptedChatPanel({
 
   if (!user) redirect("/login");
 
+  // Fetch the counterparty's name for the drawer title so the header
+  // shows who you're chatting with instead of a generic "Chat".
+  const { data: others } = await supabase
+    .from("conversation_participants")
+    .select("profiles(full_name)")
+    .eq("conversation_id", id)
+    .neq("user_id", user.id)
+    .limit(1);
+  const other = others?.[0]?.profiles as
+    | { full_name: string | null }
+    | { full_name: string | null }[]
+    | null
+    | undefined;
+  const otherName = Array.isArray(other)
+    ? other[0]?.full_name
+    : other?.full_name;
+  const title = otherName ?? "Chat";
+
   return (
-    <SidePanel title="Chat" fallbackHref="/messages">
+    <SidePanel title={title} fallbackHref="/messages">
       {/* ChatView manages its own internal scroll region — we just
           need to give it a flex column to fill. */}
       <div className="flex flex-1 flex-col overflow-hidden p-4 sm:p-6">

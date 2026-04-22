@@ -88,7 +88,7 @@ export default function SidePanel({
   }, [handleClose]);
 
   return (
-    <div className="fixed inset-0 z-[1700]">
+    <div className="fixed inset-0 z-1700">
       {/* Backdrop — full opacity on mobile (covers the whole screen),
           translucent on desktop so the exposed 40vw of map stays
           readable and the drawer reads as an overlay, not a modal. */}
@@ -106,7 +106,7 @@ export default function SidePanel({
         role="dialog"
         aria-modal="true"
         aria-label={title ?? "Details"}
-        className={`absolute right-0 top-0 flex h-[100dvh] w-full max-w-[860px] flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out md:w-[60vw] md:rounded-l-2xl md:border-l md:border-(--gold)/40 ${
+        className={`absolute right-0 top-0 flex h-dvh w-full max-w-215 flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out md:w-[60vw] md:rounded-l-2xl md:border-l md:border-(--gold)/40 ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
