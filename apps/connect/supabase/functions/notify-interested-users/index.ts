@@ -7,6 +7,7 @@ import { sendNotifications } from "../_shared/push.ts";
 import { haversineKm } from "../_shared/geo.ts";
 import { CATEGORY_INTEREST_MAP } from "../_shared/category-interests.ts";
 import { createServiceClient, DEFAULT_NOTIFICATION_RADIUS_KM } from "../_shared/client.ts";
+import { prefEnabled } from "../_shared/prefs.ts";
 
 serve(async (req) => {
   try {
@@ -71,17 +72,23 @@ serve(async (req) => {
       home_latitude: number | null;
       home_longitude: number | null;
       notification_radius_km: number | null;
+      notification_prefs: Record<string, unknown> | null;
     }> = [];
 
     for (let i = 0; i < matchedUserIds.length; i += 500) {
       const batch = matchedUserIds.slice(i, i + 500);
       const { data } = await supabase
         .from("profiles")
-        .select("id, home_latitude, home_longitude, notification_radius_km")
+        .select("id, home_latitude, home_longitude, notification_radius_km, notification_prefs")
         .in("id", batch)
         .eq("notification_digest", "instant");
       if (data) profiles.push(...data);
     }
+
+    // Honour per-user announcements toggle (migration 049).
+    const allowedProfiles = profiles.filter((p) => prefEnabled(p, "announcements"));
+    profiles.length = 0;
+    profiles.push(...allowedProfiles);
 
     if (profiles.length === 0) {
       return new Response(JSON.stringify({ notified: 0, reason: "all_users_opted_out" }), { status: 200 });

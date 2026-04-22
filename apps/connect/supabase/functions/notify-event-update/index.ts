@@ -5,6 +5,7 @@
 import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { createServiceClient } from "../_shared/client.ts";
+import { filterUserIdsByPref } from "../_shared/prefs.ts";
 
 serve(async (req) => {
   try {
@@ -43,8 +44,15 @@ serve(async (req) => {
       .select("user_id")
       .eq("event_id", eventId);
 
-    const userIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
+    const rawUserIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
       .filter((id) => id !== authorId); // author shouldn't ping themselves
+
+    // Honour per-user contributor_updates toggle (migration 049).
+    const userIds = await filterUserIdsByPref(
+      supabase,
+      rawUserIds,
+      "contributor_updates",
+    );
 
     if (userIds.length === 0) {
       return new Response(JSON.stringify({ notified: 0 }), { status: 200 });

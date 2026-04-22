@@ -192,6 +192,9 @@ export type Profile = {
   home_longitude: number | null;
   notification_radius_km: number;
   notification_digest: NotificationDigest;
+  /** Per-type notification toggles. Missing keys default to true. Added in
+   *  migration 049. Cancellation notices are not gated — always delivered. */
+  notification_prefs?: NotificationPrefs;
   location_sharing: boolean;
   instagram_handle: string | null;
   facebook_url: string | null;
@@ -379,6 +382,28 @@ export type EventUpdate = {
 };
 
 export type NotificationDigest = "instant" | "daily" | "off";
+
+/**
+ * Per-type notification toggles stored in `profiles.notification_prefs`
+ * (jsonb). All keys are optional — missing keys default to `true` (opt-out
+ * model). See migration 049. Cancellation notices are never gated.
+ */
+export type NotificationPrefKey =
+  | "friends_activity"
+  | "event_reminders"
+  | "contributor_updates"
+  | "announcements"
+  | "weekly_digest";
+
+export type NotificationPrefs = Partial<Record<NotificationPrefKey, boolean>>;
+
+export const NOTIFICATION_PREF_DEFAULTS: Required<NotificationPrefs> = {
+  friends_activity: true,
+  event_reminders: true,
+  contributor_updates: true,
+  announcements: true,
+  weekly_digest: true,
+};
 
 export type Notification = {
   id: string;

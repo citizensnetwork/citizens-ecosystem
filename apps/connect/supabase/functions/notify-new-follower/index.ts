@@ -5,12 +5,27 @@
 import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { createServiceClient } from "../_shared/client.ts";
+import { prefEnabled } from "../_shared/prefs.ts";
 
 serve(async (req) => {
   try {
     const { record } = await req.json();
 
     const supabase = createServiceClient();
+
+    // Respect the followee's friends_activity toggle (see migration 049).
+    const { data: followee } = await supabase
+      .from("profiles")
+      .select("id, notification_prefs")
+      .eq("id", record.followee_id)
+      .single();
+
+    if (!prefEnabled(followee, "friends_activity")) {
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "pref_off" }),
+        { status: 200 },
+      );
+    }
 
     // Get follower's profile name
     const { data: follower } = await supabase

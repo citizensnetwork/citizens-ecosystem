@@ -8,18 +8,23 @@ import { sendNotifications } from "../_shared/push.ts";
 import { haversineKm } from "../_shared/geo.ts";
 import { CATEGORY_INTEREST_MAP } from "../_shared/category-interests.ts";
 import { createServiceClient, DEFAULT_NOTIFICATION_RADIUS_KM } from "../_shared/client.ts";
+import { prefEnabled } from "../_shared/prefs.ts";
 
 serve(async () => {
   try {
     const supabase = createServiceClient();
 
-    // Get users with daily digest preference
-    const { data: dailyUsers } = await supabase
+    // Get users with daily digest preference (and weekly_digest toggle on).
+    const { data: dailyUsersRaw } = await supabase
       .from("profiles")
-      .select("id, home_latitude, home_longitude, notification_radius_km")
+      .select("id, home_latitude, home_longitude, notification_radius_km, notification_prefs")
       .eq("notification_digest", "daily");
 
-    if (!dailyUsers || dailyUsers.length === 0) {
+    const dailyUsers = (dailyUsersRaw ?? []).filter((u) =>
+      prefEnabled(u, "weekly_digest"),
+    );
+
+    if (dailyUsers.length === 0) {
       return new Response(JSON.stringify({ digests: 0 }), { status: 200 });
     }
 

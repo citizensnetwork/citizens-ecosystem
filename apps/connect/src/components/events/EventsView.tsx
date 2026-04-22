@@ -7,6 +7,7 @@ import type { Event, EventCategory, PlaceCategory, Place, Profile } from "@/type
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
+import EventStatusBadge from "@/components/events/EventStatusBadge";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -1813,6 +1814,12 @@ export default function EventsView({
                   {selectedEvent.community_contributor && (
                     <ContributorChip variant="community" />
                   )}
+                  <EventStatusBadge
+                    status={selectedEvent.status}
+                    date={selectedEvent.date}
+                    endTime={selectedEvent.end_time}
+                    size="sm"
+                  />
                 </div>
                 <h2 className="text-base font-bold text-black leading-tight">
                   {selectedEvent.title}

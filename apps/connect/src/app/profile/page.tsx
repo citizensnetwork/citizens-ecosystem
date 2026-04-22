@@ -183,6 +183,7 @@ export default async function ProfilePage() {
         <NotificationPreferences
           currentDigest={typedProfile.notification_digest}
           notificationEmail={typedProfile.notification_email}
+          currentPrefs={typedProfile.notification_prefs ?? null}
         />
       </section>
 

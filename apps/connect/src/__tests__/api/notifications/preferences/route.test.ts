@@ -20,8 +20,26 @@ function makeRequest(body: Record<string, unknown>) {
   });
 }
 
+function authed() {
+  mockClient.auth.getUser.mockResolvedValueOnce({
+    data: { user: { id: USER_ID } },
+    error: null,
+  });
+}
+
+// Reset any row returned by maybeSingle() between tests so prefs-merge tests
+// don't inherit state.
+function resetChain() {
+  mockClient._chain._result.data = null;
+  mockClient._chain._result.error = null;
+  mockClient._chain._result.count = 0;
+}
+
 describe("PATCH /api/notifications/preferences", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetChain();
+  });
 
   it("returns 401 when user is not authenticated", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({
@@ -34,11 +52,7 @@ describe("PATCH /api/notifications/preferences", () => {
   });
 
   it("returns 400 for malformed JSON", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+    authed();
     const req = new NextRequest("http://localhost:3000/api/notifications/preferences", {
       method: "PATCH",
       body: "bad json",
@@ -49,69 +63,131 @@ describe("PATCH /api/notifications/preferences", () => {
   });
 
   it("returns 400 for invalid digest value", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+    authed();
     const response = await PATCH(makeRequest({ notification_digest: "weekly" }));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Invalid digest preference" });
   });
 
-  it("returns 400 when notification_digest is missing", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+  it("returns 400 when no preference fields are provided", async () => {
+    authed();
     const response = await PATCH(makeRequest({}));
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "No preference fields provided" });
   });
 
   it("returns 200 with 'instant' digest", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+    authed();
     const response = await PATCH(makeRequest({ notification_digest: "instant" }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true });
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.updated).toEqual({ notification_digest: "instant" });
   });
 
   it("returns 200 with 'daily' digest", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+    authed();
     const response = await PATCH(makeRequest({ notification_digest: "daily" }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true });
   });
 
   it("returns 200 with 'off' digest", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-
+    authed();
     const response = await PATCH(makeRequest({ notification_digest: "off" }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true });
   });
 
   it("returns 500 on database error", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
-    mockClient._chain._result = { data: null, error: { message: "DB error" }, count: 0 };
+    authed();
+    mockClient._chain._result.error = { message: "DB error" };
 
     const response = await PATCH(makeRequest({ notification_digest: "instant" }));
     expect(response.status).toBe(500);
+  });
 
-    mockClient._chain._result = { data: null, error: null, count: 0 };
+  // ---- notification_prefs ----
+
+  it("returns 400 when notification_prefs is not an object", async () => {
+    authed();
+    const response = await PATCH(makeRequest({ notification_prefs: "nope" }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/object/i);
+  });
+
+  it("returns 400 when notification_prefs has an unknown key", async () => {
+    authed();
+    const response = await PATCH(
+      makeRequest({ notification_prefs: { bogus_key: true } }),
+    );
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/bogus_key/);
+  });
+
+  it("returns 400 when notification_prefs value is not a boolean", async () => {
+    authed();
+    const response = await PATCH(
+      makeRequest({ notification_prefs: { announcements: "yes" } }),
+    );
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/boolean/);
+  });
+
+  it("merges a single pref toggle with existing prefs", async () => {
+    authed();
+    // RPC returns the merged jsonb from the DB.
+    mockClient.rpc.mockResolvedValueOnce({
+      data: {
+        friends_activity: false,
+        event_reminders: true,
+        announcements: false,
+      },
+      error: null,
+    });
+
+    const response = await PATCH(
+      makeRequest({ notification_prefs: { announcements: false } }),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(mockClient.rpc).toHaveBeenCalledWith("update_notification_prefs", {
+      delta: { announcements: false },
+    });
+    expect(body.updated.notification_prefs).toEqual({
+      friends_activity: false,
+      event_reminders: true,
+      announcements: false,
+    });
+  });
+
+  it("accepts digest and prefs simultaneously", async () => {
+    authed();
+    mockClient.rpc.mockResolvedValueOnce({
+      data: { weekly_digest: false },
+      error: null,
+    });
+
+    const response = await PATCH(
+      makeRequest({
+        notification_digest: "daily",
+        notification_prefs: { weekly_digest: false },
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.updated.notification_digest).toBe("daily");
+    expect(body.updated.notification_prefs).toEqual({ weekly_digest: false });
+  });
+
+  it("returns 500 when the RPC fails", async () => {
+    authed();
+    mockClient.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "rpc failed" },
+    });
+
+    const response = await PATCH(
+      makeRequest({ notification_prefs: { announcements: false } }),
+    );
+    expect(response.status).toBe(500);
   });
 });

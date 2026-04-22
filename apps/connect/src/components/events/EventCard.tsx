@@ -4,6 +4,7 @@ import type { Event } from "@/types/db";
 import { CATEGORY_LABELS_SHORT, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import { VerifiedBadge, isVerifiedContributor } from "@/components/ui/VerifiedBadge";
+import EventStatusBadge from "@/components/events/EventStatusBadge";
 
 export default function EventCard({ event }: { event: Event }) {
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
@@ -31,6 +32,14 @@ export default function EventCard({ event }: { event: Event }) {
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 360px"
           />
+          <div className="absolute right-2 top-2">
+            <EventStatusBadge
+              status={event.status}
+              date={event.date}
+              endTime={event.end_time}
+              size="sm"
+            />
+          </div>
         </div>
       )}
       <div className="p-4">
@@ -43,6 +52,14 @@ export default function EventCard({ event }: { event: Event }) {
             </span>
           )}
           {event.community_contributor && <ContributorChip variant="community" />}
+          {!event.image_url && (
+            <EventStatusBadge
+              status={event.status}
+              date={event.date}
+              endTime={event.end_time}
+              size="sm"
+            />
+          )}
         </div>
         <h3 className="text-lg font-semibold text-black">
           {isVerifiedContributor(event.creator) && (

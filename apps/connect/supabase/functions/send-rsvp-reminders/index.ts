@@ -5,6 +5,7 @@
 import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { createServiceClient } from "../_shared/client.ts";
+import { filterUserIdsByPref } from "../_shared/prefs.ts";
 
 serve(async () => {
   try {
@@ -43,7 +44,15 @@ serve(async () => {
     let totalReminders = 0;
 
     for (const event of events) {
-      const userIds = rsvpsByEvent.get(event.id) ?? [];
+      const rawUserIds = rsvpsByEvent.get(event.id) ?? [];
+      if (rawUserIds.length === 0) continue;
+
+      // Honour per-user event_reminders toggle (migration 049).
+      const userIds = await filterUserIdsByPref(
+        supabase,
+        rawUserIds,
+        "event_reminders",
+      );
       if (userIds.length === 0) continue;
 
       const eventDate = new Date(event.date);
