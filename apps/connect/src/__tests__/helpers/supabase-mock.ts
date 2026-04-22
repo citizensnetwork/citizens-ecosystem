@@ -14,6 +14,7 @@ type MockChain = {
   lte: ReturnType<typeof vi.fn>;
   gte: ReturnType<typeof vi.fn>;
   single: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
   order: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
   returns: ReturnType<typeof vi.fn>;
@@ -36,6 +37,7 @@ function createQueryChain(result?: Partial<MockChain["_result"]>): MockChain {
     lte: vi.fn(),
     gte: vi.fn(),
     single: vi.fn(),
+    maybeSingle: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
     returns: vi.fn(),
@@ -49,6 +51,7 @@ function createQueryChain(result?: Partial<MockChain["_result"]>): MockChain {
 
   // Terminal methods resolve to _result
   chain.single.mockResolvedValue(chain._result);
+  chain.maybeSingle.mockResolvedValue(chain._result);
 
   // Make the chain itself thenable so `await supabase.from(...).select(...)` works
   (chain as unknown as Record<string, unknown>).then = (

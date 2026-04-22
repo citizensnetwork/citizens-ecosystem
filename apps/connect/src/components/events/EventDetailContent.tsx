@@ -16,6 +16,7 @@ import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
+import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import type { Event, EventMedia } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
@@ -105,7 +106,14 @@ export default function EventDetailContent({
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
       <div className="glass-panel w-full max-w-2xl px-5 py-6 sm:px-6">
-      <div className="flex items-center justify-end mb-3">
+      <div className="flex items-center justify-end gap-2 mb-3">
+        {user && user.id !== event.created_by && (
+          <ReportButton
+            targetType="event"
+            targetId={event.id}
+            isAuthenticated={!!user}
+          />
+        )}
         {user?.id === event.created_by && (
           <Link
             href={`/events/${event.id}/edit`}

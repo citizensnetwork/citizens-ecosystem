@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
+import { ReportButton } from "@/components/ui/ReportButton";
 import MutualFriends from "@/components/social/MutualFriends";
 import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
 import type { Event, Profile, UserRole } from "@/types/db";
@@ -213,6 +214,13 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
               isFollowing={isFollowing}
               isFriend={isFriend}
             />
+            {user.id !== id && (
+              <ReportButton
+                targetType="user"
+                targetId={id}
+                isAuthenticated={true}
+              />
+            )}
           </div>
         )}
       </div>

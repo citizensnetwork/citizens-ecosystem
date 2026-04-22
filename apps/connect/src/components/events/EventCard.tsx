@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Event } from "@/types/db";
 import { CATEGORY_LABELS_SHORT, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
+import { VerifiedBadge, isVerifiedContributor } from "@/components/ui/VerifiedBadge";
 
 export default function EventCard({ event }: { event: Event }) {
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
@@ -43,7 +44,12 @@ export default function EventCard({ event }: { event: Event }) {
           )}
           {event.community_contributor && <ContributorChip variant="community" />}
         </div>
-        <h3 className="text-lg font-semibold text-black">{event.title}</h3>
+        <h3 className="text-lg font-semibold text-black">
+          {isVerifiedContributor(event.creator) && (
+            <VerifiedBadge className="mr-1.5 align-[-2px]" />
+          )}
+          {event.title}
+        </h3>
         <p className="mt-1 text-sm text-(--foreground-soft)">{dateStr}</p>
         <p className="text-sm text-(--foreground-soft)">{event.location}</p>
       </div>

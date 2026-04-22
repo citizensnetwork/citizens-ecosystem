@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import type { Comment } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
+import { ReportButton } from "@/components/ui/ReportButton";
 
 type Props = {
   eventId: string;
@@ -102,14 +103,22 @@ export default function CommentSection({ eventId, user }: Props) {
                       minute: "2-digit",
                     })}
                   </span>
-                  {user?.id === c.user_id && (
+                  {user?.id === c.user_id ? (
                     <button
                       onClick={() => handleDelete(c.id)}
                       className="ml-auto text-xs text-red-400 hover:text-red-600"
                     >
                       Delete
                     </button>
-                  )}
+                  ) : user ? (
+                    <span className="ml-auto">
+                      <ReportButton
+                        targetType="comment"
+                        targetId={c.id}
+                        isAuthenticated={true}
+                      />
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">
                   {c.body}

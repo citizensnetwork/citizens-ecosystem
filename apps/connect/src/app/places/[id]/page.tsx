@@ -6,6 +6,7 @@ import ShareButton from "@/components/ui/ShareButton";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
+import { ReportButton } from "@/components/ui/ReportButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { Place, Review } from "@/types/db";
 
@@ -119,6 +120,13 @@ export default async function PlaceDetailPage({
                 followerCount={followerCount}
               />
               <ShareButton title={place.name} />
+              {user && user.id !== place.created_by && (
+                <ReportButton
+                  targetType="place"
+                  targetId={place.id}
+                  isAuthenticated={true}
+                />
+              )}
             </div>
           </div>
         </div>

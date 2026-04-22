@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 import type { Event, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
+import { ReportButton } from "@/components/ui/ReportButton";
 import { getRoleDisplayLabel } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
@@ -125,6 +126,13 @@ export function ContributorPublicProfile({
                 isFollowing={isFollowing}
                 isFriend={isFriend}
               />
+              {viewer.id !== profile.id && (
+                <ReportButton
+                  targetType="user"
+                  targetId={profile.id}
+                  isAuthenticated={true}
+                />
+              )}
             </div>
           )}
         </div>

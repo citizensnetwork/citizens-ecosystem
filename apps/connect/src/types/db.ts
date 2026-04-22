@@ -68,12 +68,13 @@ export type Event = {
   community_contributor?: boolean;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
-  /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")`.
+  /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role, contributor_status)")`.
    *  Used by the map to auto-render an organiser's avatar as the marker when
-   *  `marker_type === "category"`. */
+   *  `marker_type === "category"`, and by the verified-contributor crown. */
   creator?: {
     avatar_url: string | null;
     role: UserRole;
+    contributor_status?: string | null;
   } | null;
 };
 
