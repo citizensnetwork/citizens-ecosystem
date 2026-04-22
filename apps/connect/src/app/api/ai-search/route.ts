@@ -13,7 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { Event, Place } from "@/types/db";
+import type { Event, Place, Profile } from "@/types/db";
 import { rankResults, type RankedResult } from "@/lib/aiSearch";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
   // events still surface in a "now" natural-language search.
   const windowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-  const [eventsRes, placesRes] = await Promise.all([
+  const [eventsRes, placesRes, contributorsRes] = await Promise.all([
     supabase
       .from("events")
       .select("*")
@@ -134,22 +134,30 @@ export async function POST(request: Request) {
       .from("places")
       .select("*, categories(*)")
       .limit(MAX_CANDIDATES),
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "contributor")
+      .eq("contributor_status", "approved")
+      .limit(MAX_CANDIDATES),
   ]);
 
   const events = (eventsRes.data ?? []) as unknown as Event[];
   const places = (placesRes.data ?? []) as unknown as Place[];
+  const contributors = (contributorsRes.data ?? []) as unknown as Profile[];
 
-  const { intent, events: rankedEvents, places: rankedPlaces } = rankResults(
-    query,
-    events,
-    places,
-    userLocation,
-  );
+  const {
+    intent,
+    events: rankedEvents,
+    places: rankedPlaces,
+    contributors: rankedContributors,
+  } = rankResults(query, events, places, userLocation, contributors);
 
   const limit = (arr: RankedResult[]) => arr.slice(0, MAX_RESULTS);
 
   const responseEvents = limit(rankedEvents);
   const responsePlaces = limit(rankedPlaces);
+  const responseContributors = limit(rankedContributors);
 
   // Fire-and-forget: log this search for signed-in users so we can power the
   // Rainbow "?" long-form sheet and downstream analytics. Non-blocking and
@@ -170,6 +178,7 @@ export async function POST(request: Request) {
         const resultIds: string[] = [];
         for (const r of responseEvents) resultIds.push(r.id);
         for (const r of responsePlaces) resultIds.push(r.id);
+        for (const r of responseContributors) resultIds.push(r.id);
         await supabase.from("ai_search_queries").insert({
           user_id: user.id,
           query,
@@ -199,5 +208,6 @@ export async function POST(request: Request) {
     },
     events: responseEvents,
     places: responsePlaces,
+    contributors: responseContributors,
   });
 }

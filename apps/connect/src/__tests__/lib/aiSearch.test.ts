@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { rankResults, scoreEvent, scorePlace } from "@/lib/aiSearch";
+import {
+  rankResults,
+  scoreContributor,
+  scoreEvent,
+  scorePlace,
+} from "@/lib/aiSearch";
 import { parseQuery } from "@/lib/searchProfile";
-import type { Event, Place } from "@/types/db";
+import type { Event, Place, Profile } from "@/types/db";
 
 /** Build a minimal Event fixture — only fields the ranker reads. */
 function makeEvent(over: Partial<Event> & { id: string }): Event {
@@ -139,9 +144,10 @@ describe("rankResults", () => {
   });
 
   it("returns empty arrays for empty queries", () => {
-    const { events, places, intent } = rankResults("", [], []);
+    const { events, places, contributors, intent } = rankResults("", [], []);
     expect(events).toEqual([]);
     expect(places).toEqual([]);
+    expect(contributors).toEqual([]);
     expect(intent.raw).toBe("");
   });
 
@@ -188,5 +194,98 @@ describe("rankResults", () => {
     });
     const { events } = rankResults("homecells", [far, soon], []);
     expect(events[0].id).toBe("soon");
+  });
+});
+
+describe("scoreContributor", () => {
+  function makeContributor(over: Partial<Profile> & { id: string }): Profile {
+    return {
+      id: over.id,
+      email: "x@example.com",
+      role: "contributor",
+      contributor_kind: over.contributor_kind ?? null,
+      full_name: over.full_name ?? "",
+      avatar_url: null,
+      onboarding_completed: true,
+      notification_email: null,
+      home_latitude: null,
+      home_longitude: null,
+      notification_radius_km: 50,
+      notification_digest: "instant",
+      location_sharing: false,
+      instagram_handle: null,
+      facebook_url: null,
+      tiktok_handle: null,
+      contributor_status: "approved",
+      bio: over.bio ?? null,
+      website_url: null,
+      physical_address: over.physical_address ?? null,
+      physical_latitude: over.physical_latitude ?? null,
+      physical_longitude: over.physical_longitude ?? null,
+      logo_url: null,
+      gallery_urls: [],
+      youtube_url: null,
+      gender: null,
+      age_range: null,
+      relationship_status: null,
+      stage_of_life: null,
+    } as unknown as Profile;
+  }
+
+  it("returns null when no signal matches", () => {
+    const c = makeContributor({
+      id: "c1",
+      full_name: "Chess Club",
+      bio: "We play chess",
+    });
+    expect(scoreContributor(c, parseQuery("ministry"))).toBeNull();
+  });
+
+  it("matches on bio text tokens", () => {
+    const c = makeContributor({
+      id: "c1",
+      full_name: "Rooted Pretoria",
+      bio: "A homecell ministry planting community across Pretoria.",
+    });
+    const r = scoreContributor(c, parseQuery("homecell"));
+    expect(r).not.toBeNull();
+    expect(r!.score).toBeGreaterThan(0);
+  });
+
+  it("boosts when contributor_kind keyword is in the query", () => {
+    const ministry = makeContributor({
+      id: "m",
+      full_name: "Faith Works",
+      bio: "Serving the city",
+      contributor_kind: "ministry",
+    });
+    const business = makeContributor({
+      id: "b",
+      full_name: "Faith Works",
+      bio: "Serving the city",
+      contributor_kind: "business",
+    });
+    const intent = parseQuery("ministry in the city");
+    const a = scoreContributor(ministry, intent);
+    const b = scoreContributor(business, intent);
+    expect(a).not.toBeNull();
+    // ministry gets a W_CATEGORY boost the business doesn't
+    if (b) expect(a!.score).toBeGreaterThan(b.score);
+  });
+
+  it("rankResults returns contributors bucket sorted by score", () => {
+    const weak = makeContributor({
+      id: "weak",
+      full_name: "Chess Club",
+      bio: "We play chess weekly",
+    });
+    const strong = makeContributor({
+      id: "strong",
+      full_name: "Community Builders",
+      bio: "Community outreach and community gatherings weekly",
+    });
+    const res = rankResults("community", [], [], undefined, [weak, strong]);
+    expect(res.contributors.length).toBeGreaterThanOrEqual(1);
+    expect(res.contributors[0].id).toBe("strong");
   });
 });

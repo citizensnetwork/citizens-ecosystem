@@ -14,7 +14,7 @@
  * additional signal combined via a simple weighted sum in `combineScores`.
  */
 
-import type { Event, Place } from "@/types/db";
+import type { Event, Place, Profile } from "@/types/db";
 import {
   type QueryIntent,
   type SearchProfile,
@@ -131,6 +131,9 @@ export type SearchResults = {
   intent: QueryIntent;
   events: RankedResult[];
   places: RankedResult[];
+  /** Approved contributors matching the query. Empty when the caller
+   *  did not pass a contributor list to `rankResults`. */
+  contributors: RankedResult[];
 };
 
 /** Small bonus for events in the next week; 0 otherwise. Expects ISO string. */
@@ -255,24 +258,99 @@ export function scorePlace(
   };
 }
 
+/** Score a single Contributor (profile) against the parsed intent.
+ *  Returns null if no match.
+ *
+ *  Contributors don't yet carry a structured `search_profile`, so we
+ *  always derive tags from their bio + full_name + physical_address
+ *  and apply the same derived-tag penalty we use for untagged events.
+ *  Proximity uses `physical_latitude` / `physical_longitude`.
+ */
+export function scoreContributor(
+  profile: Profile,
+  intent: QueryIntent,
+  userLocation?: UserLocation,
+): RankedResult | null {
+  const derived =
+    deriveSearchProfile(
+      profile.full_name ?? "",
+      profile.bio ?? "",
+      profile.physical_address ?? "",
+    ) ?? {};
+
+  const pNeeds = new Set(derived.needs ?? []);
+  const pAudience = new Set(derived.audience ?? []);
+  const pVibe = new Set(derived.vibe ?? []);
+
+  const matchedNeeds = [...pNeeds].filter((s) => intent.needs.has(s));
+  const matchedAudience = [...pAudience].filter((s) => intent.audience.has(s));
+  const matchedVibe = [...pVibe].filter((s) => intent.vibe.has(s));
+
+  let score = 0;
+  score += tagOverlap(pNeeds, intent.needs, W_NEEDS) * DERIVED_PENALTY;
+  score += tagOverlap(pAudience, intent.audience, W_AUDIENCE) * DERIVED_PENALTY;
+  score += tagOverlap(pVibe, intent.vibe, W_VIBE) * DERIVED_PENALTY;
+
+  const haystack = [
+    profile.full_name ?? "",
+    profile.bio ?? "",
+    profile.physical_address ?? "",
+    profile.contributor_kind ?? "",
+  ].join(" ");
+  const textScore = textOverlap(haystack, intent.tokens, W_TEXT);
+  score += textScore;
+
+  // Kind keyword boost — e.g. searching "ministry" should surface
+  // ministries even when their bio doesn't contain that literal word.
+  if (
+    profile.contributor_kind &&
+    intent.tokens.some((t) => profile.contributor_kind!.includes(t))
+  ) {
+    score += W_CATEGORY;
+  }
+
+  score += proximityBoost(
+    profile.physical_latitude ?? null,
+    profile.physical_longitude ?? null,
+    userLocation?.lat,
+    userLocation?.lng,
+    intent.nearMe,
+  );
+
+  if (score <= 0) return null;
+
+  return {
+    id: profile.id,
+    score,
+    reason: explainMatch(matchedNeeds, matchedAudience, matchedVibe, textScore > 0),
+  };
+}
+
 /**
- * Rank a batch of events + places against a free-text query.
+ * Rank a batch of events + places + contributors against a free-text
+ * query.
  *
  * Results are sorted descending by score. Use the returned `intent` to
  * render "Why this matched" chips or to fall back to geocoding when
  * `intent.hasSignal` is false.
+ *
+ * `contributors` is optional and defaults to `[]` so existing callers
+ * (e.g. the client-side EventsView) don't need to change. The API
+ * layer passes contributors in so ecosystem search surfaces them
+ * alongside events and places.
  */
 export function rankResults(
   query: string,
   events: Event[],
   places: Place[],
   userLocation?: UserLocation,
+  contributors: Profile[] = [],
 ): SearchResults {
   const intent = parseQuery(query);
 
   // Early-exit on empty query — the caller should render all items.
   if (!intent.raw) {
-    return { intent, events: [], places: [] };
+    return { intent, events: [], places: [], contributors: [] };
   }
 
   const rankedEvents: RankedResult[] = [];
@@ -285,9 +363,20 @@ export function rankResults(
     const r = scorePlace(p, intent, userLocation);
     if (r) rankedPlaces.push(r);
   }
+  const rankedContributors: RankedResult[] = [];
+  for (const c of contributors) {
+    const r = scoreContributor(c, intent, userLocation);
+    if (r) rankedContributors.push(r);
+  }
 
   rankedEvents.sort((a, b) => b.score - a.score);
   rankedPlaces.sort((a, b) => b.score - a.score);
+  rankedContributors.sort((a, b) => b.score - a.score);
 
-  return { intent, events: rankedEvents, places: rankedPlaces };
+  return {
+    intent,
+    events: rankedEvents,
+    places: rankedPlaces,
+    contributors: rankedContributors,
+  };
 }
