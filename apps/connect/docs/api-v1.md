@@ -120,6 +120,139 @@ a future `/api/v1/contributors/{slug}/events?before=…` endpoint.
 
 ---
 
+## GET /api/v1/events
+
+Paginated feed of published public events.
+
+### Query parameters
+
+| Param         | Type    | Default | Notes                                           |
+| ------------- | ------- | ------- | ----------------------------------------------- |
+| `category`    | slug    | —       | Event category slug (e.g. `worship`)            |
+| `from`        | ISO-8601| —       | Earliest event date (inclusive)                 |
+| `to`          | ISO-8601| —       | Latest event date (inclusive)                   |
+| `lat`, `lng`  | number  | —       | Centre point for proximity filter               |
+| `radius_km`   | integer | 25      | 1..500, only used when `lat`+`lng` present      |
+| `created_by`  | uuid    | —       | Filter to one contributor                       |
+| `limit`       | integer | 50      | 1..100                                          |
+| `offset`      | integer | 0       | 0..10000                                        |
+
+Only `status = 'published'` AND `visibility = 'public'` events are
+returned. Draft, private and cancelled events are never exposed.
+
+### Example
+
+```bash
+curl "https://citizens-connect.app/api/v1/events?category=worship&lat=-25.7479&lng=28.2293&radius_km=15"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "…uuid…",
+      "title": "Night of Worship",
+      "date": "2026-03-12T18:30:00+00:00",
+      "end_time": null,
+      "location": "Pretoria CBD",
+      "category": "worship",
+      "image_url": "https://…",
+      "latitude": -25.7479,
+      "longitude": 28.2293,
+      "created_by": "…uuid…",
+      "community_contributor": false
+    }
+  ],
+  "meta": { "count": 17, "limit": 50, "offset": 0 }
+}
+```
+
+---
+
+## GET /api/v1/events/{id}
+
+Full public view of a single event with aggregated stats.
+
+```json
+{
+  "data": {
+    "id": "…",
+    "title": "Night of Worship",
+    "description": "…",
+    "date": "2026-…",
+    "stats": {
+      "going": 128,
+      "considering": 34,
+      "views": 2104,
+      "average_rating": 4.7,
+      "review_count": 22
+    }
+  },
+  "meta": { "generated_at": "2026-…" }
+}
+```
+
+404 when the event does not exist, is private, or is not published.
+
+---
+
+## GET /api/v1/categories
+
+Lists event/place categories plus a denormalised `event_count` per slug.
+
+### Query parameters
+
+| Param        | Type | Default | Notes                                   |
+| ------------ | ---- | ------- | --------------------------------------- |
+| `applies_to` | enum | —       | `events` \| `places` \| `both`          |
+
+```json
+{
+  "data": [
+    {
+      "id": "…",
+      "name": "Worship",
+      "slug": "worship",
+      "emoji": "🎵",
+      "color": "#c8a24f",
+      "applies_to": "both",
+      "sort_order": 4,
+      "event_count": 32
+    }
+  ],
+  "meta": { "count": 8 }
+}
+```
+
+Cached for 5 minutes at the edge (`s-maxage=300`).
+
+---
+
+## GET /api/v1/analytics/community
+
+Platform-wide aggregated analytics (no PII). Individual contributor
+analytics stay private; only `org_id IS NULL` rows are returned here.
+
+### Query parameters
+
+| Param    | Type    | Default | Notes                              |
+| -------- | ------- | ------- | ---------------------------------- |
+| `metric` | string  | —       | Filter to a single `metric_key`    |
+| `days`   | integer | 30      | Lookback window, 1..365            |
+
+```json
+{
+  "data": [
+    { "day": "2026-03-11", "metric_key": "events_published", "metric_value": 14 }
+  ],
+  "meta": { "days": 30, "from": "2026-02-10", "to": "2026-03-12" }
+}
+```
+
+Cached for 5 minutes at the edge.
+
+---
+
 ## Stability policy
 
 - Additive changes (new fields, new endpoints) are **not** a breaking

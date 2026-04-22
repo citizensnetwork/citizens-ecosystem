@@ -427,6 +427,20 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   >
                     Manage Categories
                   </Link>
+                  <Link
+                    href="/admin/users"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    Manage Users
+                  </Link>
+                  <Link
+                    href="/admin/api-keys"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    API Keys
+                  </Link>
                 </>
               )}
               <button
