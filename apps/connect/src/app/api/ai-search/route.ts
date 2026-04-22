@@ -15,12 +15,19 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Event, Place } from "@/types/db";
 import { rankResults, type RankedResult } from "@/lib/aiSearch";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /** Upper bound on how many events/places we rank per request. */
 const MAX_CANDIDATES = 500;
 
 /** Upper bound on how many ranked results we return. */
 const MAX_RESULTS = 100;
+
+/** Abuse guard for this public, unauthenticated endpoint. Each POST fans out
+ *  to two DB queries returning up to 500 rows each, so we cap callers well
+ *  below what a keystroke-driven client can produce with a 200ms debounce
+ *  (~5 req/s) while staying generous enough for normal typing bursts. */
+const AI_SEARCH_LIMIT = { limit: 30, windowMs: 60_000 } as const;
 
 export const runtime = "nodejs";
 // Per-user proximity boosts + live event data => always dynamic.
@@ -35,6 +42,15 @@ type Body = {
 function parseCoord(v: unknown): number | undefined {
   const n = typeof v === "string" ? parseFloat(v) : (v as number);
   return typeof n === "number" && Number.isFinite(n) ? n : undefined;
+}
+
+/** Best-effort client IP for rate-limit keying on an unauthenticated
+ *  endpoint. Falls back to a constant bucket so a misconfigured proxy can't
+ *  silently disable the limiter entirely. */
+function getClientIp(request: Request): string {
+  const fwd = request.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return request.headers.get("x-real-ip") ?? "unknown";
 }
 
 export async function POST(request: Request) {
@@ -56,6 +72,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Query too long" }, { status: 400 });
   }
 
+  // Rate-limit by IP first (cheapest key; applies to anonymous callers).
+  const ip = getClientIp(request);
+  const ipRl = checkRateLimit(`ai-search:ip:${ip}`, AI_SEARCH_LIMIT);
+  if (!ipRl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": Math.ceil(ipRl.resetMs / 1000).toString(),
+        },
+      },
+    );
+  }
+
   const userLat = parseCoord(body.userLat);
   const userLng = parseCoord(body.userLng);
   const userLocation =
@@ -68,6 +99,23 @@ export async function POST(request: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Second layer of rate-limiting keyed on user id when available — defeats
+  // attackers who rotate IPs but share a single stolen session cookie.
+  if (user) {
+    const userRl = checkRateLimit(`ai-search:user:${user.id}`, AI_SEARCH_LIMIT);
+    if (!userRl.success) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": Math.ceil(userRl.resetMs / 1000).toString(),
+          },
+        },
+      );
+    }
+  }
 
   // Include events that started up to 2 hours ago so currently-running
   // events still surface in a "now" natural-language search.
