@@ -141,14 +141,20 @@ export default async function ProfilePage() {
             )}
           </span>
           <div className="mt-2 flex gap-4 text-sm text-black/70">
-            <span>
+            <Link
+              href={`/profile/${user.id}/followers`}
+              className="hover:underline focus:underline focus:outline-none"
+            >
               <strong className="text-black">{followersCount ?? 0}</strong>{" "}
               {followersCount === 1 ? "follower" : "followers"}
-            </span>
-            <span>
+            </Link>
+            <Link
+              href={`/profile/${user.id}/following`}
+              className="hover:underline focus:underline focus:outline-none"
+            >
               <strong className="text-black">{followingCount ?? 0}</strong>{" "}
               following
-            </span>
+            </Link>
             {(friendsCount ?? 0) > 0 && (
               <span>
                 <strong className="text-black">{friendsCount}</strong>{" "}

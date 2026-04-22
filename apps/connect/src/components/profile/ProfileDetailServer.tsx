@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
+import MutualFriends from "@/components/social/MutualFriends";
 import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
 import type { Event, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
@@ -171,14 +172,20 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
           </span>
 
           <div className="mt-2 flex gap-4 text-sm text-black/70">
-            <span>
+            <Link
+              href={`/profile/${id}/followers`}
+              className="hover:underline focus:underline focus:outline-none"
+            >
               <strong className="text-black">{followersCount ?? 0}</strong>{" "}
               {followersCount === 1 ? "follower" : "followers"}
-            </span>
-            <span>
+            </Link>
+            <Link
+              href={`/profile/${id}/following`}
+              className="hover:underline focus:underline focus:outline-none"
+            >
               <strong className="text-black">{followingCount ?? 0}</strong>{" "}
               following
-            </span>
+            </Link>
             {mutualFriendsCount > 0 && (
               <span>
                 <strong className="text-black">{mutualFriendsCount}</strong>{" "}
@@ -209,6 +216,14 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {user && user.id !== id && (
+        <MutualFriends
+          viewerId={user.id}
+          profileId={id}
+          totalCount={mutualFriendsCount}
+        />
+      )}
 
       {(createdEvents ?? []).length > 0 && (
         <section className="mt-8">
