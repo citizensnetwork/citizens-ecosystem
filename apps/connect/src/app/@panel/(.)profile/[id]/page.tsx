@@ -3,7 +3,9 @@
 // render the full /profile/[id]/page.tsx.
 
 import SidePanel from "@/components/ui/SidePanel";
-import ProfileDetailServer from "@/components/profile/ProfileDetailServer";
+import ProfileDetailServer, {
+  getProfileById,
+} from "@/components/profile/ProfileDetailServer";
 import { Suspense } from "react";
 
 export default async function InterceptedProfilePanel({
@@ -12,8 +14,10 @@ export default async function InterceptedProfilePanel({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const profile = await getProfileById(id);
+  const title = profile?.full_name || "Profile";
   return (
-    <SidePanel title="Profile" fallbackHref="/events">
+    <SidePanel title={title} fallbackHref="/events">
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <Suspense
           fallback={

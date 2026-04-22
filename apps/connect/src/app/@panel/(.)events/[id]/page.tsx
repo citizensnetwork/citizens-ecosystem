@@ -4,7 +4,9 @@
 // and refreshes fall through to /events/[id]/page.tsx unchanged.
 
 import SidePanel from "@/components/ui/SidePanel";
-import EventDetailServer from "@/components/events/EventDetailServer";
+import EventDetailServer, {
+  getEventById,
+} from "@/components/events/EventDetailServer";
 import { Suspense } from "react";
 
 export default async function InterceptedEventPanel({
@@ -13,8 +15,12 @@ export default async function InterceptedEventPanel({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Cached by React — the inner EventDetailServer re-uses this
+  // exact query result instead of hitting the DB again.
+  const event = await getEventById(id);
+  const title = event?.title ?? "Event";
   return (
-    <SidePanel title="Event" fallbackHref="/events">
+    <SidePanel title={title} fallbackHref="/events">
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <Suspense
           fallback={

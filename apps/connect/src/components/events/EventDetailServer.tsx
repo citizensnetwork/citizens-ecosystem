@@ -2,20 +2,31 @@
 // body (without any page chrome). Used by both the standalone
 // `/events/[id]` page and the intercepted `@panel/(.)events/[id]`
 // drawer so the two stay in sync with zero duplication.
+//
+// `cache()` wraps the top-level fetch so if Next.js renders both
+// the `children` and `@panel` slots in the same request, we share
+// one DB round-trip instead of two.
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
 import type { Event, EventMedia } from "@/types/db";
 
-export default async function EventDetailServer({ id }: { id: string }) {
+export const getEventById = cache(async (id: string) => {
   const supabase = await createClient();
-
-  const { data: event } = await supabase
+  const { data } = await supabase
     .from("events")
     .select("*")
     .eq("id", id)
-    .single<Event>();
+    .maybeSingle<Event>();
+  return data;
+});
+
+export default async function EventDetailServer({ id }: { id: string }) {
+  const supabase = await createClient();
+
+  const event = await getEventById(id);
 
   if (!event) {
     notFound();
@@ -41,6 +52,13 @@ export default async function EventDetailServer({ id }: { id: string }) {
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
   let locationSharingEnabled = false;
 
+  // `rsvps.user_id` is a belongs-to FK to `profiles`, so Supabase
+  // returns a single embedded object (or null), not an array.
+  type RsvpRow = {
+    user_id: string;
+    profiles: { full_name: string | null } | null;
+  };
+
   if (user) {
     const [{ data: rsvp }, { data: rsvpRows }, { data: myFollowing }, { data: profile }] =
       await Promise.all([
@@ -49,7 +67,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
           .select("id")
           .eq("user_id", user.id)
           .eq("event_id", id)
-          .single(),
+          .maybeSingle(),
         supabase
           .from("rsvps")
           .select("user_id, profiles(full_name)")
@@ -62,7 +80,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
           .from("profiles")
           .select("location_sharing")
           .eq("id", user.id)
-          .single(),
+          .maybeSingle(),
       ]);
 
     hasRsvped = !!rsvp;
@@ -79,26 +97,22 @@ export default async function EventDetailServer({ id }: { id: string }) {
       friendSet = new Set((theyFollowBack ?? []).map((f) => f.follower_id));
     }
 
-    attendees = (rsvpRows ?? []).map(
-      (r: { user_id: string; profiles: { full_name: string }[] }) => ({
-        user_id: r.user_id,
-        full_name: r.profiles?.[0]?.full_name ?? "Anonymous",
-        isFriend: friendSet.has(r.user_id),
-      }),
-    );
+    attendees = ((rsvpRows as RsvpRow[] | null) ?? []).map((r) => ({
+      user_id: r.user_id,
+      full_name: r.profiles?.full_name ?? "Anonymous",
+      isFriend: friendSet.has(r.user_id),
+    }));
   } else {
     const { data: rsvpRows } = await supabase
       .from("rsvps")
       .select("user_id, profiles(full_name)")
       .eq("event_id", id);
 
-    attendees = (rsvpRows ?? []).map(
-      (r: { user_id: string; profiles: { full_name: string }[] }) => ({
-        user_id: r.user_id,
-        full_name: r.profiles?.[0]?.full_name ?? "Anonymous",
-        isFriend: false,
-      }),
-    );
+    attendees = ((rsvpRows as RsvpRow[] | null) ?? []).map((r) => ({
+      user_id: r.user_id,
+      full_name: r.profiles?.full_name ?? "Anonymous",
+      isFriend: false,
+    }));
   }
 
   return (

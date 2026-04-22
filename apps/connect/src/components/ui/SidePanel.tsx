@@ -45,20 +45,21 @@ export default function SidePanel({
   }, []);
 
   // Lock body scroll and mark siblings inert while mounted so
-  // screen readers and keyboards stay inside the drawer.
+  // screen readers and keyboards stay inside the drawer. We inert
+  // every immediate child of <body> except this drawer itself.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const main = document.querySelector("main");
-    const nav = document.querySelector("nav");
-    main?.setAttribute("inert", "");
-    nav?.setAttribute("inert", "");
+    const drawerRoot = panelRef.current?.closest("[data-sidepanel-root]");
+    const siblings = Array.from(document.body.children).filter(
+      (el) => el !== drawerRoot && !el.hasAttribute("inert"),
+    );
+    siblings.forEach((el) => el.setAttribute("inert", ""));
     return () => {
       document.body.style.overflow = prev;
-      main?.removeAttribute("inert");
-      nav?.removeAttribute("inert");
+      siblings.forEach((el) => el.removeAttribute("inert"));
     };
-  }, []);
+  }, [panelRef]);
 
   const handleClose = useCallback(() => {
     setVisible(false);
@@ -88,7 +89,7 @@ export default function SidePanel({
   }, [handleClose]);
 
   return (
-    <div className="fixed inset-0 z-1700">
+    <div data-sidepanel-root className="fixed inset-0 z-1700">
       {/* Backdrop — full opacity on mobile (covers the whole screen),
           translucent on desktop so the exposed 40vw of map stays
           readable and the drawer reads as an overlay, not a modal. */}
@@ -110,36 +111,44 @@ export default function SidePanel({
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* Close button — floats over content so inner pages don't
-            need to reserve space for it. Respects iOS safe-area. */}
-        <button
-          type="button"
-          onClick={handleClose}
-          aria-label="Close panel"
-          style={{
-            top: "max(0.75rem, env(safe-area-inset-top))",
-          }}
-          className="absolute right-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black/70 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition hover:bg-white hover:text-(--gold) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
+        {/* Header strip — shows the detail title (event name, profile
+            name, counterparty) with the close button on the right.
+            Sticky so it stays visible while the body scrolls. Uses a
+            gold bottom border to match the brand's 60/30/10 palette. */}
+        <header
+          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+          className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-(--gold)/30 bg-white/95 px-4 pb-3 backdrop-blur-sm"
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            className="h-4 w-4"
+          <h2
+            id="sidepanel-title"
+            className="flex-1 truncate text-base font-semibold text-black"
           >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+            {title ?? "Details"}
+          </h2>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close panel"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black/70 shadow-sm ring-1 ring-black/10 transition hover:bg-(--gold-soft) hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              className="h-4 w-4"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </header>
 
         {/* Body wrapper — flex column with overflow-hidden so inner
             pages (chat, long lists) can manage their own scrolling
             regions via flex-1 + overflow-y-auto. */}
-        <div className="flex flex-1 flex-col overflow-hidden pt-[env(safe-area-inset-top)]">
-          {children}
-        </div>
+        <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </aside>
     </div>
   );

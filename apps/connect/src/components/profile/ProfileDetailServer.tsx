@@ -2,7 +2,12 @@
 // (contributor or standard) without page chrome. Shared by the
 // standalone `/profile/[id]` page and the intercepted
 // `@panel/(.)profile/[id]` drawer.
+//
+// `cache()` wraps the profile fetch so if Next.js renders both slots
+// in the same request (standalone page + drawer), we share one
+// DB round-trip instead of two.
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -12,14 +17,20 @@ import { ContributorPublicProfile } from "@/components/contributor/ContributorPu
 import type { Event, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 
-export default async function ProfileDetailServer({ id }: { id: string }) {
+export const getProfileById = cache(async (id: string) => {
   const supabase = await createClient();
-
-  const { data: profile } = await supabase
+  const { data } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", id)
-    .single<Profile>();
+    .maybeSingle<Profile>();
+  return data;
+});
+
+export default async function ProfileDetailServer({ id }: { id: string }) {
+  const supabase = await createClient();
+
+  const profile = await getProfileById(id);
 
   if (!profile) notFound();
 
@@ -34,8 +45,6 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
   const [
     { count: followersCount },
     { count: followingCount },
-    currentUserFollows,
-    theyFollowBack,
     { data: createdEvents },
     myFollowingResult,
     theirFollowingResult,
@@ -48,22 +57,6 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("follower_id", id),
-    user
-      ? supabase
-          .from("follows")
-          .select("id")
-          .eq("follower_id", user.id)
-          .eq("followee_id", id)
-          .single()
-      : Promise.resolve({ data: null }),
-    user
-      ? supabase
-          .from("follows")
-          .select("id")
-          .eq("follower_id", id)
-          .eq("followee_id", user.id)
-          .single()
-      : Promise.resolve({ data: null }),
     supabase
       .from("events")
       .select("*")
@@ -85,14 +78,21 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       : Promise.resolve({ data: null }),
   ]);
 
-  const isFollowing = !!currentUserFollows.data;
-  const isFriend = isFollowing && !!theyFollowBack.data;
+  // Derive follow/friend state from the follow lists we already have —
+  // avoids two extra single-row queries.
+  const myFollowingIds = new Set(
+    (myFollowingResult.data ?? []).map((f) => f.followee_id),
+  );
+  const theirFollowingIds = new Set(
+    (theirFollowingResult.data ?? []).map((f) => f.followee_id),
+  );
+  const isFollowing = !!user && myFollowingIds.has(id);
+  const isFriend = isFollowing && theirFollowingIds.has(user!.id);
 
   let mutualFriendsCount = 0;
-  if (myFollowingResult.data && theirFollowingResult.data) {
-    const mySet = new Set(myFollowingResult.data.map((f) => f.followee_id));
-    mutualFriendsCount = theirFollowingResult.data.filter((f) =>
-      mySet.has(f.followee_id),
+  if (user && myFollowingResult.data && theirFollowingResult.data) {
+    mutualFriendsCount = [...theirFollowingIds].filter((fid) =>
+      myFollowingIds.has(fid),
     ).length;
   }
 
