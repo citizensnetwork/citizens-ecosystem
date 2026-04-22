@@ -1,13 +1,44 @@
-// /c/[slug] — friendly vanity URL alias for Contributor public
-// profiles.  Redirects to /profile/[id] which handles the actual
-// render.  Defined here so we never have to duplicate the render
-// logic, and so the canonical URL for any profile stays UUID-based
-// in the DB.
+// /c/[slug] — canonical vanity URL for approved Contributors.
+//
+// Previously this redirected to /profile/[id], which broke the
+// @panel drawer intercept on soft navigations (the server redirect
+// fires before the interceptor can match). We now resolve the slug
+// to a profile id server-side and render ProfileDetailServer
+// in-place, matching the /profile/[id] page. The @panel intercept
+// at @panel/(.)c/[slug] handles drawer presentation on soft nav.
 
-import { redirect, notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "@/components/ui/PageHeader";
+import ProfileDetailServer from "@/components/profile/ProfileDetailServer";
+import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const profile = await resolveContributorSlug(slug);
+  if (!profile) return { title: "Contributor not found" };
+  const title = `${profile.full_name ?? slug} · Citizens Connect`;
+  const description =
+    profile.bio && profile.bio.length > 0
+      ? profile.bio.slice(0, 155)
+      : `${profile.full_name}'s public profile on Citizens Connect.`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+    },
+  };
+}
 
 export default async function ContributorSlugPage({
   params,
@@ -15,15 +46,20 @@ export default async function ContributorSlugPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const profile = await resolveContributorSlug(slug);
+  if (!profile) notFound();
+
+  // Self-view → route to the owner's editable profile page.
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id === profile.id) redirect("/profile");
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("contributor_slug", slug)
-    .eq("contributor_status", "approved")
-    .maybeSingle();
-
-  if (!data?.id) notFound();
-  redirect(`/profile/${data.id}`);
+  return (
+    <>
+      <PageHeader title={profile.full_name ?? "Contributor"} fallbackHref="/events" />
+      <ProfileDetailServer id={profile.id} />
+    </>
+  );
 }
