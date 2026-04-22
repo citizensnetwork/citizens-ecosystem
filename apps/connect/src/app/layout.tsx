@@ -4,6 +4,9 @@ import "./globals.css";
 import Navbar from "@/components/ui/Navbar";
 import CapacitorInit from "@/components/ui/CapacitorInit";
 import ApplicationPendingBannerServer from "@/components/ui/ApplicationPendingBannerServer";
+import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
+import BetaBanner from "@/components/ui/BetaBanner";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -49,6 +52,8 @@ export default function RootLayout({
     >
       <body className="map-bg min-h-full flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <CapacitorInit />
+        <ServiceWorkerRegister />
+        {Object.values(FEATURE_FLAGS).some(Boolean) && <BetaBanner />}
         <Navbar />
         <ApplicationPendingBannerServer />
         <main className="flex-1">{children}</main>
