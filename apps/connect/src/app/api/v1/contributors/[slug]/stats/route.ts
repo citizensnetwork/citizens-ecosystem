@@ -14,18 +14,10 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { gateV1 } from "@/lib/v1Gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const RL = { limit: 60, windowMs: 60_000 } as const;
-
-function getClientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
-}
 
 export async function GET(
   request: Request,
@@ -37,17 +29,14 @@ export async function GET(
     return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }
 
-  const ip = getClientIp(request);
-  const rl = checkRateLimit(`v1-contributor-stats:ip:${ip}`, RL);
-  if (!rl.success) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      {
-        status: 429,
-        headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() },
-      },
-    );
-  }
+  // Gate: key-scoped tier if authenticated, else IP + per-slug combo.
+  // The per-slug secondary cap is the fix for Architect audit M2 — an
+  // attacker rotating IPs can no longer DoS a single contributor.
+  const gate = await gateV1(request, {
+    bucket: "v1-contributor-stats",
+    resourceId: slug,
+  });
+  if (gate.deny) return gate.deny;
 
   const supabase = await createClient();
 

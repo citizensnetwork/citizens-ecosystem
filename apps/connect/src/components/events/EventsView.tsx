@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
+import type { Event, EventCategory, PlaceCategory, Place, Profile } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
@@ -37,6 +37,10 @@ const LongFormPersonalizationSheet = dynamic(
 type Props = {
   events: Event[];
   places?: Place[];
+  /** Approved contributors fed into the free-text search ranker so the
+   *  search bar can surface ministries / orgs / businesses alongside
+   *  events + places. Kept optional so existing call sites don't break. */
+  contributors?: Profile[];
   isVendor?: boolean;
 };
 
@@ -70,6 +74,7 @@ const QUICK_ACCESS_INACTIVE_BG = "rgba(255,255,255,0.60)";
 export default function EventsView({
   events,
   places = [],
+  contributors = [],
   isVendor = false,
 }: Props) {
   const searchParams = useSearchParams();
@@ -462,8 +467,8 @@ export default function EventsView({
   }, [parsedNearMe, userLocation]);
 
   const ranked = useMemo(
-    () => rankResults(search, events, places, userLocation ?? undefined),
-    [search, events, places, userLocation],
+    () => rankResults(search, events, places, userLocation ?? undefined, contributors),
+    [search, events, places, userLocation, contributors],
   );
   const rankedEventIds = useMemo(() => {
     if (!ranked.intent.hasSignal) return null;
@@ -481,6 +486,18 @@ export default function EventsView({
     () => (ranked.intent.hasSignal ? describeIntent(ranked.intent) : ""),
     [ranked.intent],
   );
+
+  // Top contributors matching the current search — only shown while
+  // searching, capped at 3 so the search bar doesn't get busy. Each chip
+  // deep-links to /c/[slug] (which opens in a drawer on the map).
+  const topContributorMatches = useMemo(() => {
+    if (!ranked.intent.hasSignal) return [];
+    const byId = new Map(contributors.map((c) => [c.id, c]));
+    return ranked.contributors
+      .slice(0, 3)
+      .map((r) => byId.get(r.id))
+      .filter((p): p is Profile => !!p && !!p.contributor_slug);
+  }, [ranked.contributors, ranked.intent.hasSignal, contributors]);
 
   // ── Search-vs-filter interplay ───────────────────────────────────
   // When the user types into the search bar we want BOTH events and places
@@ -1213,6 +1230,49 @@ export default function EventsView({
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-[10%] sm:bottom-6 sm:px-4">
           {searchOpen ? (
             <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
+              {topContributorMatches.length > 0 && (
+                <div
+                  className="flex max-w-full flex-wrap items-center justify-center gap-1.5"
+                  role="list"
+                  aria-label="Matching contributors"
+                >
+                  {topContributorMatches.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/c/${encodeURIComponent(p.contributor_slug!)}`}
+                      role="listitem"
+                      className="flex items-center gap-1.5 rounded-full border border-(--gold,#D4AF37) bg-white/95 px-2.5 py-1 text-[11px] font-medium text-black shadow-md backdrop-blur transition hover:bg-white"
+                      title={`Open ${p.full_name}`}
+                    >
+                      {p.logo_url || p.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.logo_url || p.avatar_url || ""}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-4 w-4 rounded-full object-cover"
+                        />
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-3 w-3 text-(--gold)"
+                          aria-hidden="true"
+                        >
+                          <polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2" />
+                        </svg>
+                      )}
+                      <span className="max-w-35 truncate">
+                        {p.full_name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
               {intentLabel && (
                 <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-black/70 shadow-md backdrop-blur">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-(--gold)" aria-hidden="true">

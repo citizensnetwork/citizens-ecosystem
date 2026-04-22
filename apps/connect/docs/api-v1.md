@@ -14,14 +14,30 @@ Error responses:
 { "error": "human readable message" }
 ```
 
-Rate limits: **60 requests / minute / IP** per endpoint. Cache headers
-(`s-maxage=60, stale-while-revalidate=120`) are set so CDN edges and
-polling consumers don't hammer the origin.
+Rate limits:
 
-Authentication: none. These endpoints surface only approved,
-public-facing data (contributors with `contributor_status = 'approved'`,
-events with `visibility = 'public'` and `status = 'published'`).
-Authenticated / scoped API keys will be layered on in a future phase.
+- Anonymous: **60 requests / minute / IP** per endpoint.
+- With a valid API key: **600 requests / minute / key** by default; per-key overrides available.
+- Per-resource secondary cap (anonymous only): 120 req/min/slug on detail endpoints, so a rotating-IP DoS can't target a single contributor.
+
+Cache headers (`s-maxage=60, stale-while-revalidate=120`) are set so CDN edges and polling consumers don't hammer the origin.
+
+Authentication (optional): pass an API key via either header:
+
+```
+Authorization: Bearer cck_live_...
+X-API-Key: cck_live_...
+```
+
+API keys start with `cck_live_` and are minted via the `create_api_key`
+Supabase RPC (admins or approved contributors). Keys can be scoped
+(currently only `read:public`) and revoked via `revoke_api_key`. The raw
+token is shown exactly once at creation; only its SHA-256 hash is
+stored. Provide no header to stay on the anonymous tier.
+
+These endpoints surface only approved, public-facing data (contributors
+with `contributor_status = 'approved'`, events with `visibility = 'public'`
+and `status = 'published'`).
 
 ---
 

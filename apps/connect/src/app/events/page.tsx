@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import EventsView from "@/components/events/EventsView";
 import EasterEggOrchestrator from "@/components/easter/EasterEggOrchestrator";
-import type { Event, Place, Preferences, Review } from "@/types/db";
+import type { Event, Place, Preferences, Profile, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +14,16 @@ export default async function EventsPage() {
   sixMonths.setMonth(sixMonths.getMonth() + 6);
   const cutoff = sixMonths.toISOString();
 
-  // Fetch public events, user's private events (RSVPed or created), places, and reviews in parallel
-  const [{ data: publicEvents }, { data: places }, { data: reviews }] = await Promise.all([
+  // Fetch public events, user's private events (RSVPed or created), places,
+  // approved contributors (for search bucket), and reviews in parallel.
+  // Contributor list stays small (bounded at 200) since it only powers
+  // client-side search ranking — never the map itself.
+  const [
+    { data: publicEvents },
+    { data: places },
+    { data: reviews },
+    { data: contributors },
+  ] = await Promise.all([
     supabase
       .from("events")
       .select("*, creator:profiles!events_created_by_fkey(avatar_url, role)")
@@ -34,7 +42,19 @@ export default async function EventsPage() {
       .select("place_id, rating, still_exists")
       .not("place_id", "is", null)
       .returns<Pick<Review, "place_id" | "rating" | "still_exists">[]>(),
+    supabase
+      .from("profiles")
+      .select(
+        "id, email, role, full_name, avatar_url, contributor_kind, contributor_status, contributor_slug, bio, website_url, physical_address, physical_latitude, physical_longitude, logo_url",
+      )
+      .eq("role", "contributor")
+      .eq("contributor_status", "approved")
+      .not("contributor_slug", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .returns<Profile[]>(),
   ]);
+
 
   // Filter: show public events to everyone; show private events only to creator or RSVPed users
   const {
@@ -129,6 +149,7 @@ export default async function EventsPage() {
       <EventsView
         events={events ?? []}
         places={placesWithStats}
+        contributors={contributors ?? []}
         isVendor={canCreateEvents}
       />
     </>

@@ -30,7 +30,7 @@ function cleanup(windowMs: number) {
   }
 }
 
-interface RateLimitConfig {
+export interface RateLimitConfig {
   /** Maximum requests allowed in the time window */
   limit: number;
   /** Time window in milliseconds */

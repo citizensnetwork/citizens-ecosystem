@@ -21,20 +21,13 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { gateV1 } from "@/lib/v1Gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
-const RL = { limit: 60, windowMs: 60_000 } as const;
-
-function getClientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
-}
 
 function clampInt(raw: string | null, def: number, min: number, max: number) {
   if (!raw) return def;
@@ -44,17 +37,8 @@ function clampInt(raw: string | null, def: number, min: number, max: number) {
 }
 
 export async function GET(request: Request) {
-  const ip = getClientIp(request);
-  const rl = checkRateLimit(`v1-contributors:ip:${ip}`, RL);
-  if (!rl.success) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      {
-        status: 429,
-        headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() },
-      },
-    );
-  }
+  const gate = await gateV1(request, { bucket: "v1-contributors" });
+  if (gate.deny) return gate.deny;
 
   const url = new URL(request.url);
   const kindParam = url.searchParams.get("kind");
@@ -100,7 +84,11 @@ export async function GET(request: Request) {
   if (kind) query = query.eq("contributor_kind", kind);
   if (q) {
     // escape % and , for Postgres ilike + supabase or()
-    const safe = q.replace(/[%,()]/g, " ");
+    // Allowlist: letters, digits, spaces, hyphens, apostrophes. Strips
+    // PostgREST operator metacharacters (`%`, `,`, `(`, `)`, `*`, `?`,
+    // `.`) so `or()` can't be steered into unintended match behaviour.
+    // (Architect audit L6.)
+    const safe = q.replace(/[^a-zA-Z0-9 \-']/g, " ").trim();
     query = query.or(`full_name.ilike.%${safe}%,bio.ilike.%${safe}%`);
   }
 
