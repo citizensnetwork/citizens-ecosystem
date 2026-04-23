@@ -23,10 +23,43 @@ type ManagedEvent = {
 
 type Props = {
   isVendor?: boolean;
+  /**
+   * When true, groups events into sections: Happening now, Upcoming, Past,
+   * Cancelled. Used by the contributor dashboard ({@link /profile/contributor/dashboard})
+   * to give contributors an at-a-glance view of their lifecycle pipeline.
+   */
+  groupByLifecycle?: boolean;
+};
+
+type Lifecycle = "live" | "upcoming" | "past" | "cancelled";
+
+// ~2 hour fallback when an event has no end_time (mirrors EventStatusBadge).
+export const MANAGE_LIVE_FALLBACK_MS = 2 * 60 * 60 * 1000;
+
+export function lifecycleOf(
+  e: Pick<ManagedEvent, "status" | "date" | "end_time">,
+  now: number,
+): Lifecycle {
+  if (e.status === "cancelled") return "cancelled";
+  const start = new Date(e.date).getTime();
+  const end = e.end_time
+    ? new Date(e.end_time).getTime()
+    : start + MANAGE_LIVE_FALLBACK_MS;
+  if (now < start) return "upcoming";
+  if (now <= end) return "live";
+  return "past";
+}
+
+const LIFECYCLE_ORDER: Lifecycle[] = ["live", "upcoming", "past", "cancelled"];
+const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
+  live: "Happening now",
+  upcoming: "Upcoming",
+  past: "Past",
+  cancelled: "Cancelled",
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function ManageEventsView({ isVendor }: Props) {
+export default function ManageEventsView({ isVendor, groupByLifecycle = false }: Props) {
   const [events, setEvents] = useState<ManagedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -119,12 +152,43 @@ export default function ManageEventsView({ isVendor }: Props) {
       </section>
 
       <div className="space-y-3">
-      {events.map((event) => {
-        const cat = event.category ?? "church";
-        const isExpanded = expandedId === event.id;
-        const isFull = event.max_attendees != null && event.attendee_count >= event.max_attendees;
+      {(() => {
+        if (!groupByLifecycle) {
+          return events.map((event) => renderEventRow(event));
+        }
+        // Group once per render — events list is small (per-organiser),
+        // so the O(n) sort is cheap vs. useMemo complexity.
+        const now = Date.now();
+        const grouped: Record<Lifecycle, ManagedEvent[]> = {
+          live: [],
+          upcoming: [],
+          past: [],
+          cancelled: [],
+        };
+        for (const e of events) grouped[lifecycleOf(e, now)].push(e);
+        // Upcoming: soonest first; past: most recent first.
+        grouped.upcoming.sort((a, b) => +new Date(a.date) - +new Date(b.date));
+        grouped.past.sort((a, b) => +new Date(b.date) - +new Date(a.date));
 
-        return (
+        return LIFECYCLE_ORDER.filter((k) => grouped[k].length > 0).map((k) => (
+          <section key={k} className="space-y-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45">
+              {LIFECYCLE_LABELS[k]} · {grouped[k].length}
+            </h3>
+            {grouped[k].map((event) => renderEventRow(event))}
+          </section>
+        ));
+      })()}
+      </div>
+    </div>
+  );
+
+  function renderEventRow(event: ManagedEvent) {
+    const cat = event.category ?? "church";
+    const isExpanded = expandedId === event.id;
+    const isFull = event.max_attendees != null && event.attendee_count >= event.max_attendees;
+
+    return (
           <div
             key={event.id}
             className="rounded-xl border border-black/8 bg-white overflow-hidden"
@@ -248,17 +312,14 @@ export default function ManageEventsView({ isVendor }: Props) {
               </div>
             )}
           </div>
-        );
-      })}
-      </div>
-    </div>
-  );
+    );
+  }
 }
 
 /** Small stat card used inside the analytics summary. */
 function AnalyticStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-black/[0.03] px-3 py-2">
+    <div className="rounded-xl bg-black/3 px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-black/40 font-medium">
         {label}
       </div>

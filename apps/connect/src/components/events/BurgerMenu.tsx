@@ -403,12 +403,62 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
               </Link>
               {menuProfile?.role === "contributor" &&
                 menuProfile?.contributor_status === "approved" && (
+                  <>
+                    {menuProfile?.contributor_slug && (
+                      <Link
+                        href={`/c/${encodeURIComponent(menuProfile.contributor_slug)}`}
+                        onClick={onClose}
+                        className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                      >
+                        View my public page
+                      </Link>
+                    )}
+                    <Link
+                      href="/profile/contributor"
+                      onClick={onClose}
+                      className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                    >
+                      Edit public profile
+                    </Link>
+                    <Link
+                      href="/profile/contributor/dashboard"
+                      onClick={onClose}
+                      className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                    >
+                      My contributions
+                    </Link>
+                  </>
+                )}
+              {menuProfile?.role === "contributor" &&
+                menuProfile?.contributor_status === "pending" && (
+                  <div className="rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-xs leading-snug text-black/70">
+                    <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-(--gold)" />
+                    Application under review
+                    <p className="mt-1 text-black/50">
+                      We&apos;ll email you once it&apos;s been looked at.
+                    </p>
+                  </div>
+                )}
+              {/* Citizens flip to pending on apply while role stays 'citizen' */}
+              {/* until approval — surface the same pill so they get feedback. */}
+              {menuProfile?.role === "citizen" &&
+                menuProfile?.contributor_status === "pending" && (
+                  <div className="rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-xs leading-snug text-black/70">
+                    <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-(--gold)" />
+                    Contributor application under review
+                    <p className="mt-1 text-black/50">
+                      We&apos;ll email you once it&apos;s been looked at.
+                    </p>
+                  </div>
+                )}
+              {menuProfile?.role === "contributor" &&
+                menuProfile?.contributor_status === "rejected" && (
                   <Link
-                    href="/profile/contributor"
+                    href="/contributor/apply"
                     onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                    className="block rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 transition hover:bg-red-100"
                   >
-                    Edit public profile
+                    Application not approved — apply again
                   </Link>
                 )}
               {menuProfile?.role === "admin" && (
