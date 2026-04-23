@@ -9,6 +9,8 @@ import {
   createCategoryMarkerEl,
   createCustomMarkerEl,
   createPlaceMarkerEl,
+  createGeoClusterBubbleEl,
+  updateGeoClusterBubbleEl,
   getTemporalStyle,
   escapeHtml,
   PLACE_MARKER_SIZE,
@@ -17,6 +19,15 @@ import {
 import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
+import {
+  bucketPoints,
+  tierOpacityAt,
+  markerOpacityAt,
+  bubbleSizeForCount,
+  visibleTiersAt,
+  type ClusterBubble,
+  type ClusterPoint,
+} from "@/lib/map/clustering";
 
 type Props = {
   events: Event[];
@@ -210,6 +221,207 @@ export default function EventMap({
     const svg = svgOverlayRef.current;
     if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
   }, []);
+
+  /* ── Progressive geo-clustering (see lib/map/clustering.ts) ──
+   * Per-tier bubble markers keyed by `tier:gridX:gridY` so re-renders
+   * reuse MapLibre marker elements instead of remounting every frame.
+   * Populated by `rebuildGeoClusters`, opacity adjusted by `updateGeoClusterOpacity`. */
+  const geoClusterMarkersRef = useRef<
+    Map<string, { marker: maplibregl.Marker; el: HTMLDivElement; bubble: ClusterBubble }>
+  >(new Map());
+
+  const clearGeoClusters = useCallback(() => {
+    geoClusterMarkersRef.current.forEach(({ marker }) => marker.remove());
+    geoClusterMarkersRef.current.clear();
+  }, []);
+
+  /**
+   * Fade-fn helper — composes the individual marker's zoom-based opacity
+   * crossfade (`markerOpacityAt`) with the temporal styling already
+   * baked in at marker creation (`temporal.opacity`), which we stash on
+   * `data-temporal-opacity` so we can recover it without recomputing.
+   * Without this multiply, past-event dimming is lost during tier handover.
+   */
+  const applyComposedOpacity = (el: HTMLElement, markerOp: number) => {
+    const raw = el.dataset.temporalOpacity;
+    const temporal = raw ? parseFloat(raw) : 1;
+    const t = Number.isFinite(temporal) ? temporal : 1;
+    // When both are at their natural max, clear the override so any other
+    // code paths (future highlights, etc.) can keep acting on opacity.
+    if (markerOp >= 1 && t >= 1) {
+      el.style.opacity = "";
+    } else {
+      el.style.opacity = String(t * markerOp);
+    }
+  };
+
+  /**
+   * Apply zoom-driven opacity to bubble markers + individual event/place
+   * markers.  Called on every zoom change so tiers crossfade smoothly.
+   * Pure presentation — does not add/remove markers.
+   */
+  const updateGeoClusterOpacity = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const z = map.getZoom();
+
+    geoClusterMarkersRef.current.forEach(({ el, bubble }) => {
+      const o = tierOpacityAt(bubble.tier, z);
+      el.style.opacity = String(o);
+      // Hide entirely when fully invisible so pointer events don't block
+      // the individual markers that have taken over.
+      el.style.pointerEvents = o > 0.02 ? "auto" : "none";
+      el.style.visibility = o > 0.01 ? "visible" : "hidden";
+    });
+
+    // When filters / placesMode are active, clustering is off and the user
+    // should see their filtered markers at every zoom.  Skip the fade.
+    const filtersActive =
+      placesModeRef.current ||
+      (activeCategoriesRef.current && activeCategoriesRef.current.size > 0) ||
+      (activePlaceCategoriesRef.current &&
+        activePlaceCategoriesRef.current.size > 0);
+    if (filtersActive) {
+      markersRef.current.forEach((m) => {
+        const el = m.getElement() as HTMLElement;
+        applyComposedOpacity(el, 1);
+      });
+      placeMarkersRef.current.forEach((m) => {
+        const el = m.getElement() as HTMLElement;
+        applyComposedOpacity(el, 1);
+      });
+      return;
+    }
+
+    // Fade individual markers in as bubbles fade out.  Composed with the
+    // temporal opacity so past/live dimming still reads during handover.
+    const markerOp = markerOpacityAt(z);
+    markersRef.current.forEach((m) => {
+      const el = m.getElement() as HTMLElement;
+      applyComposedOpacity(el, markerOp);
+    });
+    placeMarkersRef.current.forEach((m) => {
+      const el = m.getElement() as HTMLElement;
+      applyComposedOpacity(el, markerOp);
+    });
+  }, []);
+
+  /**
+   * Attach click + keyboard handlers that drill the camera down by two
+   * zoom levels.  Shared between the add-new and update-count branches
+   * of `rebuildGeoClusters` so bubbles stay interactive across rebuilds.
+   */
+  const attachBubbleHandlers = (
+    el: HTMLElement,
+    map: maplibregl.Map,
+    b: ClusterBubble,
+  ) => {
+    const drillIn = () => {
+      map.easeTo({
+        center: [b.lng, b.lat],
+        zoom: Math.min(map.getZoom() + 2, 16),
+        duration: 450,
+      });
+    };
+    el.addEventListener("click", drillIn);
+    el.addEventListener("keydown", (ev) => {
+      const e = ev as KeyboardEvent;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        drillIn();
+      }
+    });
+  };
+
+  /**
+   * Rebuild bubble markers from the current event + place set.  Bubbles
+   * are computed for every tier with non-zero opacity at the current
+   * zoom, so we don't waste work on tiers that would be invisible.
+   * Re-uses existing markers by key to avoid DOM churn when the user is
+   * just zooming around with the same data.
+   */
+  const rebuildGeoClusters = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Skip bubbles when the user has filtered or is in "Places" mode —
+    // clustering is a discovery affordance, not a filter UI.  When off,
+    // `updateGeoClusterOpacity` restores marker opacity (filtersActive branch).
+    if (placesModeRef.current) {
+      clearGeoClusters();
+      updateGeoClusterOpacityRef.current();
+      return;
+    }
+    const activeCats = activeCategoriesRef.current;
+    const activePlaceCats = activePlaceCategoriesRef.current;
+    if ((activeCats && activeCats.size > 0) || (activePlaceCats && activePlaceCats.size > 0)) {
+      clearGeoClusters();
+      updateGeoClusterOpacityRef.current();
+      return;
+    }
+
+    const points: ClusterPoint[] = [];
+    for (const e of events) {
+      if (e.latitude == null || e.longitude == null) continue;
+      points.push({ id: e.id, lat: e.latitude, lng: e.longitude });
+    }
+    for (const p of places) {
+      points.push({ id: `place:${p.id}`, lat: p.latitude, lng: p.longitude });
+    }
+
+    const z = map.getZoom();
+    const tiers = visibleTiersAt(z);
+    const wantedKeys = new Set<string>();
+    const wantedBubbles: ClusterBubble[] = [];
+    for (const tier of tiers) {
+      const buckets = bucketPoints(points, tier);
+      for (const b of buckets) {
+        // Note: we keep singleton buckets (count === 1) too.  If we
+        // suppressed them, isolated rural events would disappear at
+        // zoom 12–14 where `markerOpacityAt` has already faded them out.
+        wantedKeys.add(b.key);
+        wantedBubbles.push(b);
+      }
+    }
+
+    // Remove bubbles no longer wanted.
+    for (const [key, rec] of geoClusterMarkersRef.current) {
+      if (!wantedKeys.has(key)) {
+        rec.marker.remove();
+        geoClusterMarkersRef.current.delete(key);
+      }
+    }
+
+    // Add / update bubbles.
+    for (const b of wantedBubbles) {
+      const size = bubbleSizeForCount(b.count);
+      const existing = geoClusterMarkersRef.current.get(b.key);
+      if (existing) {
+        if (existing.bubble.count !== b.count) {
+          // In-place update preserves the attached listeners + marker binding.
+          updateGeoClusterBubbleEl(existing.el, b.count, size);
+          // Refresh the stored bubble so next count-diff sees the new count.
+          existing.bubble = b;
+        }
+        continue;
+      }
+      const el = createGeoClusterBubbleEl(b.count, size);
+      attachBubbleHandlers(el, map, b);
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: "center",
+      })
+        .setLngLat([b.lng, b.lat])
+        .addTo(map);
+      geoClusterMarkersRef.current.set(b.key, { marker, el, bubble: b });
+    }
+
+    updateGeoClusterOpacityRef.current();
+  }, [events, places, clearGeoClusters]);
+
+  const rebuildGeoClustersRef = useRef<() => void>(() => {});
+  rebuildGeoClustersRef.current = rebuildGeoClusters;
+  const updateGeoClusterOpacityRef = useRef<() => void>(() => {});
+  updateGeoClusterOpacityRef.current = updateGeoClusterOpacity;
 
   const saveMapView = useCallback(() => {
     const map = mapRef.current;
@@ -487,6 +699,19 @@ export default function EventMap({
       updatePlaceVisibility();
       updateMarkerSizesRef.current();
       runDeconflictionRef.current();
+      // Recompute bubbles (tiers come in / out of play) and re-apply
+      // opacity crossfade.
+      rebuildGeoClustersRef.current();
+    });
+
+    // Smooth-crossfade bubble opacity during the zoom animation, not just
+    // at zoomend, so the tier handover reads as gradual.
+    let zoomOpacityRaf = 0;
+    map.on("zoom", () => {
+      if (zoomOpacityRaf) cancelAnimationFrame(zoomOpacityRaf);
+      zoomOpacityRaf = requestAnimationFrame(() => {
+        updateGeoClusterOpacityRef.current();
+      });
     });
 
     // Continuously re-run deconfliction and marker sizing during panning so
@@ -570,6 +795,7 @@ export default function EventMap({
     return () => {
       readyRef.current = false;
       if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
+      if (zoomOpacityRaf) cancelAnimationFrame(zoomOpacityRaf);
       saveMapView();
       map.remove();
       mapRef.current = null;
@@ -749,6 +975,11 @@ export default function EventMap({
 
         const lngLat: [number, number] = [event.longitude!, event.latitude!];
         const baseSize = parseInt(el.style.width || "40") || 40;
+        // Stash the temporal opacity + register a fade transition once so
+        // the geo-clustering fade layer can multiply (not clobber) it and
+        // we don't rewrite `transition` on every zoom frame.
+        el.dataset.temporalOpacity = String(temporal.opacity);
+        el.style.transition = "opacity 160ms linear";
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
@@ -835,6 +1066,10 @@ export default function EventMap({
 
         const lngLat: [number, number] = [place.longitude, place.latitude];
         const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
+        // Places don't have temporal dimming today — keep attribute for
+        // symmetry so the clustering fade multiplies by 1 not by NaN.
+        placeEl.dataset.temporalOpacity = "1";
+        placeEl.style.transition = "opacity 160ms linear";
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
@@ -848,6 +1083,9 @@ export default function EventMap({
 
       // Apply zoom-based visibility to freshly placed place markers
       updatePlaceVisibility();
+
+      // Build progressive geo-clustering bubbles over the fresh point set.
+      rebuildGeoClustersRef.current();
 
       // ── Fit bounds (skip if user had a stored viewpoint) ──
       if (hasPoints && !hasRestoredView.current) {
@@ -885,11 +1123,15 @@ export default function EventMap({
       return () => {
         map.off("load", handler);
         clearMarkers();
+        clearGeoClusters();
       };
     }
 
-    return () => clearMarkers();
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode]);
+    return () => {
+      clearMarkers();
+      clearGeoClusters();
+    };
+  }, [events, places, clearMarkers, clearGeoClusters, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   // `flyToToken` is included in the dependency array so that tapping the
@@ -996,7 +1238,7 @@ function MapStyleDebugBadge() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute left-2 bottom-16 z-[5] rounded-md bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-white/90 shadow"
+      className="pointer-events-none absolute left-2 bottom-16 z-5 rounded-md bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-white/90 shadow"
       data-testid="map-style-debug"
     >
       <div>style: {info.source}</div>

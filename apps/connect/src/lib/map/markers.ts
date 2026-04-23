@@ -119,7 +119,11 @@ export function getTemporalStyle(
 
 /* ── MapLibre marker element builders ────────────────────── */
 
-const BASE_SIZE = 40;
+// Event marker base diameter in CSS pixels.  Reduced from 40→32 (−20%)
+// on 2026-04-23 to lower visual dominance on the map and make room for the
+// progressive geo-clustering bubbles that now replace individual markers
+// at lower zoom levels.
+const BASE_SIZE = 32;
 
 export function getCategoryIcon(category: EventCategory | null): string {
   return CATEGORY_ICONS[category ?? "church"] ?? DEFAULT_ICON;
@@ -301,10 +305,13 @@ const DEFAULT_PLACE_ICON =
 
 /** Place marker sizing — exported so EventMap can use the same values for
  * zoom-scaling the inner icon proportionally to the outer circle. */
-export const PLACE_MARKER_SIZE = 40;
-export const PLACE_MARKER_SIZE_HIGHLIGHTED = 54;
-export const PLACE_ICON_SIZE = 24;
-export const PLACE_ICON_SIZE_HIGHLIGHTED = 32;
+// Reduced from 40→32 / 54→44 / 24→20 / 32→26 (−20%) on 2026-04-23 so place
+// markers stay visually balanced against the now-smaller event markers and
+// the new progressive geo-clustering bubbles.
+export const PLACE_MARKER_SIZE = 32;
+export const PLACE_MARKER_SIZE_HIGHLIGHTED = 44;
+export const PLACE_ICON_SIZE = 20;
+export const PLACE_ICON_SIZE_HIGHLIGHTED = 26;
 export const PLACE_ICON_RATIO = PLACE_ICON_SIZE / PLACE_MARKER_SIZE;
 
 /**
@@ -454,6 +461,76 @@ export function createClusterEl(count: number): HTMLDivElement {
   ">${count}</div></div>`;
 
   return el;
+}
+
+/**
+ * Progressive geo-clustering bubble — white fill, 2px gold border, count
+ * centred in gold/black.  Used by the map's zoom-driven aggregation layer
+ * (see `lib/map/clustering.ts`) to render capital/city/town/suburb tiers.
+ *
+ * Opacity is set by the caller on the returned element's style so that
+ * the crossfade between tiers at overlapping zoom levels stays smooth.
+ *
+ * Accessibility: rendered as `role="button"` with a readable `aria-label`
+ * and `tabindex="0"` so keyboard users can drill through tiers via the
+ * same press-to-zoom behaviour attached by callers.
+ */
+export function createGeoClusterBubbleEl(
+  count: number,
+  size: number,
+): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "cc-geo-cluster";
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  el.style.cursor = "pointer";
+  el.style.willChange = "opacity, transform";
+  el.style.transition = "opacity 160ms linear";
+  el.setAttribute("role", "button");
+  el.setAttribute("tabindex", "0");
+  el.setAttribute(
+    "aria-label",
+    `${count} items in this area. Activate to zoom in.`,
+  );
+  // Safe because `count` and `size` are typed numbers (not user-controlled
+  // strings) — template has no injection surface.
+  el.innerHTML = `<div data-cc-bubble-body style="
+    width:${size}px;height:${size}px;
+    display:flex;align-items:center;justify-content:center;
+    background:#ffffff;
+    border:2px solid #D4AF37;
+    border-radius:50%;
+    color:#111111;
+    font-weight:700;
+    font-size:${Math.max(11, Math.round(size * 0.34))}px;
+    line-height:1;
+    box-shadow:0 2px 6px rgba(0,0,0,.22);
+  ">${count}</div>`;
+  return el;
+}
+
+/**
+ * Update a bubble's inner text + size in place without recreating the
+ * outer element.  Keeps any attached listeners / MapLibre marker binding
+ * intact when the underlying count changes between re-renders.
+ */
+export function updateGeoClusterBubbleEl(
+  el: HTMLDivElement,
+  count: number,
+  size: number,
+): void {
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  el.setAttribute(
+    "aria-label",
+    `${count} items in this area. Activate to zoom in.`,
+  );
+  const body = el.querySelector<HTMLDivElement>("[data-cc-bubble-body]");
+  if (!body) return;
+  body.style.width = `${size}px`;
+  body.style.height = `${size}px`;
+  body.style.fontSize = `${Math.max(11, Math.round(size * 0.34))}px`;
+  body.textContent = String(count);
 }
 
 /* ── HTML escaping for popup content ─────────────────────── */
