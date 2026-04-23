@@ -3,7 +3,9 @@
 // ContributorApplicationForm
 //
 // Form used by a Citizen to apply to become a Contributor. Submits to
-// /api/contributor/apply which proxies to the Supabase Edge Function.
+// /api/contributor/apply which inserts the application directly
+// (Edge Function was previously required but was a fragile hop that
+// surfaced deploy/email failures to end users).
 //
 // The form intentionally mirrors the fields a Contributor can set on
 // their public profile — so the application is a preview of how they

@@ -204,6 +204,20 @@
 - [x] vibe-security audit — clean across all 4 surfaces (ILIKE escape, UUID validation, ownership/admin guards, mass-assignment whitelist, RLS layered)
 - [x] Pushed to origin/main as commit `4532b37`
 
+### Batch L — My Events Tabs + Contributor Apply Reliability + Side Panel Polish (COMPLETE)
+- [x] **L1 Contributor apply reliability** — `src/app/api/contributor/apply/route.ts` rewritten to insert `contributor_applications` directly via the caller's RLS-scoped client, removing the `submit-contributor-application` Edge Function proxy that was masking deploy skew / missing secrets as a generic "Something went wrong". Rate-limited (`RATE_LIMITS.heavy`, 5/min/user), strict input trimming + length caps, `contributor_kind` allow-set (`ministry`/`organization`/`business`), 409 on `23505` race, follow-up `profiles.contributor_status` flip.
+- [x] **L2 My Events tabs (Created + Joined)** — New `src/app/api/manage/joined/route.ts` reads caller's RSVPs via PostgREST embed (`event:events(...)`) filtered to `attending`/`considering`, flattened + null-event filtered. New `src/components/events/JoinedEventsView.tsx` (cancellation-safe fetch, explicit error state with `role="alert"`, cancelled/upcoming/past bucketing, upcoming asc / past desc). New `src/components/events/MyEventsTabs.tsx` (WAI-ARIA tablist: `role="tab/tablist/tabpanel"`, roving `tabIndex`, `ArrowLeft`/`ArrowRight`/`Home`/`End` keyboard nav + focus, hash sync `#created`/`#joined` via `replaceState`, lazy-mounted panels). `/events/manage` page re-titled **My Events** with subtitle.
+- [x] **L3 Side panel entrance glitch** — `src/app/events/loading.tsx` now returns a neutral `aria-hidden` full-bleed backdrop instead of a shimmering skeleton, eliminating the fade-rise pulse that played under the sliding `@panel` slot while still preventing a white flash on cold deep-links.
+- [x] New tests: `src/__tests__/api/contributor-apply.test.ts` (6 cases — 401 unauth, 409 already_approved, 409 already_pending, 400 short display_name, 200 success, `contributor_kind` coercion) and `src/__tests__/api/manage/joined.test.ts` (3 cases — 401 unauth, flatten + null-event filter, 500 on query error).
+
+### Latest validation (Batch L — My Events + Contributor Apply + Side Panel)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **575 tests, 68 files, 0 failures** ✅ (+9 from Batch L: 6 contributor-apply + 3 manage/joined)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — 5 Should-fix items, all applied: (1) stale docstring refresh, (2) admin notification regression documented in route + DECISIONS, (3) tablist keyboard nav + roving tabIndex, (4) JoinedEventsView fetch error surfaced as `role="alert"`, (5) `events/loading.tsx` neutral backdrop for cold deep-links.
+- [x] vibe-security skill audit — clean. Both new routes are auth-gated with RLS-scoped clients (no service role), apply route is rate-limited + input-validated + mass-assignment-safe, error payloads are generic. No new attack surface introduced.
+- [x] Supabase security advisors — no schema/SQL changes in this batch, baseline unchanged (MCP tool not surfaced in this session; no advisor delta expected since Batch K).
+
 ---
 
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)

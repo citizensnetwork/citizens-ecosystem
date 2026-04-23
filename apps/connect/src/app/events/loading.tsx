@@ -1,20 +1,27 @@
+/**
+ * Events-segment loading boundary.
+ *
+ * Renders a neutral full-bleed backdrop — no shimmer, no fade-rise.
+ *
+ * Why: when a user clicks through to `/events/[id]`, the `@panel`
+ * parallel slot intercepts with `SidePanel`, which owns its own
+ * slide-in. A full-viewport skeleton with a `fade-rise` animation
+ * used to play here at the same time, which read as "something
+ * drawing up from the bottom" a beat before the panel finished
+ * sliding — the glitch reported in the session notes.
+ *
+ * We still need *some* placeholder so cold loads (direct deep-link
+ * into `/events/[id]` without a previously painted map) don't flash
+ * white. A flat backdrop matching the page's canvas colour is
+ * effectively invisible behind the side panel slide but hides the
+ * empty paint on cold loads.
+ */
 export default function EventsLoading() {
   return (
-    <div className="relative h-dvh w-full overflow-hidden">
-      <div className="skeleton h-full w-full" />
-
-      <div className="absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
-          <div className="skeleton h-11 w-full rounded-2xl" />
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="skeleton h-10 w-10 rounded-xl" />
-              <div className="skeleton h-10 w-44 rounded-xl" />
-            </div>
-            <div className="skeleton h-10 w-12 rounded-xl" />
-          </div>
-        </div>
-      </div>
-    </div>
+    <div
+      aria-hidden
+      className="h-dvh w-full bg-white"
+      data-testid="events-loading-backdrop"
+    />
   );
 }

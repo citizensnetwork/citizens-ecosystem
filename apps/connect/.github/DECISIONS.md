@@ -2,6 +2,25 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Contributor Applications & My Events (Batch L)
+
+### Direct insert on `/api/contributor/apply` instead of Edge Function proxy
+**Decision:** `POST /api/contributor/apply` inserts the `contributor_applications` row directly through the caller's RLS-scoped Supabase client, then flips `profiles.contributor_status` to `pending`. The `submit-contributor-application` Edge Function is no longer invoked synchronously from this route.
+**Why:** Previously the route proxied the full insert through the Edge Function so it could attach an admin email. Any deploy skew, missing Resend/HMAC secret, or Edge cold-start error surfaced to users as a generic "Something went wrong" and — critically — left no DB row, so applications were silently lost. Route latency and visible success should not be coupled to an external email provider.
+**Trade-off / gap:** Admin email notification is **deferred** in this batch. Pending applications are still reviewable in the `/admin/contributors` inbox (reads `contributor_applications WHERE status='pending'`). When email notification returns, it should be wired as a Supabase DB webhook on insert (or a cron sweep), not reintroduced inline on the request path.
+**Date:** Batch L.
+
+### `events/loading.tsx` = neutral backdrop, not skeleton
+**Decision:** The events-segment loading boundary renders an `aria-hidden` full-bleed `bg-white` div (no shimmer, no fade-rise) instead of a fade-rise skeleton or `return null`.
+**Why:** On `/events/[id]` navigation the `@panel` parallel slot intercepts with `SidePanel`, which owns its own right-edge slide-in. A fade-rise skeleton played at the same time read as "a window drawing up from the bottom mid-way before settling into a side panel" — the exact glitch flagged in the Batch L bug list. `return null` fixed the glitch on intercepted navigation but flashed white on cold deep-links (no prior map paint). A neutral backdrop hides the cold-load flash while being visually inert behind the sliding panel.
+**Date:** Batch L.
+
+### Hash-based tab persistence on `/events/manage`
+**Decision:** `MyEventsTabs` mirrors the active tab to `window.location.hash` (`#created` / `#joined`) via `history.replaceState` and reads it back lazily in `useState` initialisation + on `hashchange`.
+**Why:** Deep-links to "show me the events I RSVPed to" are shareable without server-side routing changes, and `replaceState` keeps the browser back-stack clean (no per-tab-click history entry). Lazy state initialiser paints the right tab on first render, avoiding a hydration flicker from `"created"` → `"joined"`.
+**Keyboard a11y:** Roving `tabIndex` (active=0, inactive=-1) + `ArrowLeft`/`ArrowRight`/`Home`/`End` move focus and activate, per WAI-ARIA tab pattern.
+**Date:** Batch L.
+
 ## Tags & Discovery
 
 ### 5-tag cap per event, enforced at DB trigger level
