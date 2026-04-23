@@ -334,6 +334,29 @@
 
 ---
 
+## Batch O.1 — Bubble tier retune + hide markers below zoom 12 (COMPLETE)
+
+Follow-up to Batch O: the original model faded individual markers in
+from 11→12 which, at city zooms, showed them as ghosted smudges behind
+the totalling bubbles.  User requested the totalling bubbles own the
+view below zoom 12 and markers reveal only when a suburb is expanded.
+
+- [x] **New tier bands** in `src/lib/map/clustering.ts` — capital 4–7, town 8–10, suburb 11, markers 12+.
+- [x] **Hard marker threshold** — `MARKER_FADE_IN_START = MARKER_FADE_IN_END = 12`; `markerOpacityAt` returns 0 below 12, 1 at/above 12.  No more crossfade.
+- [x] **Authoritative visibility gate** in `updatePlaceVisibility` (now owns both event + place markers): below zoom 12 markers are `visibility: hidden` unless lifted by an open suburb expansion (or filters / places-mode active).  At zoom ≥ 12 visibility is cleared.
+- [x] **Opacity pass** in `updateGeoClusterOpacity` sets `visibility: hidden` on unlifted event markers at `markerOp === 0`, matching the gate.  Place markers defer visibility to the authoritative controller.
+- [x] **Band tracker** `bandFor()` updated to `< 8 capital, < 11 town, < 12 suburb, else marker`.
+- [x] **Tests** — `clustering.test.ts` rewritten for new bands + hard threshold (28 tests from 26).
+
+### Latest validation (Batch O.1)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **612 tests, 69 files, 0 failures** ✅ (+2 marker-threshold assertions)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — **Approved.** No Should-fix. Nice-to-haves logged: suburb fade-out width (#1), threshold-literal consolidation (#2), world-view minZoom (#4); nice-to-have #3 (docstring) applied inline.
+- [x] Supabase security advisors — unchanged vs. Batch O (no schema changes).
+
+---
+
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
 
 ### Expanded Roles

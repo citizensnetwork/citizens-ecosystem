@@ -8,16 +8,20 @@
  * hand over to individual markers as the user zooms in.
  *
  * Tiers (user-confirmed zoom thresholds — see DECISIONS, batch "bubble
- * split/recouple"):
- *   capital  zooms 0–5    (capital cities)
- *   town     zooms 6–8    (towns)
- *   suburb   zooms 9–11   (suburbs)
- *   markers  zooms 12+    (individual events / places)
+ * split/recouple retune"):
+ *   capital  zooms 4–7     (capital cities)
+ *   town     zooms 8–10    (towns)
+ *   suburb   zoom  11       (suburbs)
+ *   markers  zooms 12+     (individual events / places)
  *
  * Tiers crossfade with a 1-zoom overlap so the transitions feel smooth
- * instead of snap-swapping between grouping levels.  Below zoom 12 there
- * is always exactly one "active" bubble tier visible; from zoom 12 onward
- * no bubbles render — only individual markers.
+ * instead of snap-swapping between grouping levels.  From zoom 12 onward
+ * no bubbles render and individual markers take over as a hard handover
+ * (no crossfade) — at city zooms the underlying events / places are
+ * deliberately kept hidden so they don't clutter the map behind the
+ * totalling bubbles.  They only become visible when the user either
+ * zooms to ≥ 12 or opens a suburb expansion which lifts the points
+ * inside that specific cell.
  *
  * Each tier also supports an interactive "split / recouple" model layered
  * by EventMap: a click on a bubble splits it into the child tier (or into
@@ -76,15 +80,16 @@ const GRID_SIZE_DEG: Record<ClusterTier, number> = {
  */
 const TIER_BANDS: Record<ClusterTier, { fullStart: number; fullEnd: number }> =
   {
-    capital: { fullStart: 0, fullEnd: 5 },
-    town: { fullStart: 6, fullEnd: 8 },
-    suburb: { fullStart: 9, fullEnd: 11 },
+    capital: { fullStart: 4, fullEnd: 7 },
+    town: { fullStart: 8, fullEnd: 10 },
+    suburb: { fullStart: 11, fullEnd: 11 },
   };
 
-/** Zoom levels below which markers are invisible / above which fully visible.
- *  Markers fade in across the suburb tier's fade-out so the handover
- *  reads as a single smooth crossfade. */
-export const MARKER_FADE_IN_START = 11;
+/** Zoom levels at which individual event/place markers become visible.
+ *  Hard threshold (no crossfade): at zoom < 12 markers are fully hidden
+ *  so the totalling bubbles own the view, at zoom ≥ 12 they are fully
+ *  visible.  See `markerOpacityAt`. */
+export const MARKER_FADE_IN_START = 12;
 export const MARKER_FADE_IN_END = 12;
 
 /** Width (in zoom levels) of the crossfade ramp on either side of a tier
@@ -197,12 +202,14 @@ export function tierOpacityAt(tier: ClusterTier, zoom: number): number {
 }
 
 /**
- * Opacity (0–1) for the individual marker layer at a given zoom.  Fades
- * in from `MARKER_FADE_IN_START` → `MARKER_FADE_IN_END` so markers appear
- * underneath the last bubble tier (`suburb`) before it fully fades out.
+ * Opacity (0–1) for the individual marker layer at a given zoom.  Hard
+ * threshold: 0 below zoom 12, 1 at zoom ≥ 12.  The tier-bubble layer
+ * owns everything below 12 — individual markers are suppressed so they
+ * don't clutter the map behind the totalling bubbles.  Suburb expansions
+ * override this locally by lifting specific markers in `EventMap`.
  */
 export function markerOpacityAt(zoom: number): number {
-  return smoothstep(MARKER_FADE_IN_START, MARKER_FADE_IN_END, zoom);
+  return zoom >= MARKER_FADE_IN_END ? 1 : 0;
 }
 
 /**

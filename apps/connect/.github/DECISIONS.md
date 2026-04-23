@@ -2,6 +2,16 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch O.1 — Hide individual markers below zoom 12 (hard threshold)
+
+**Decision:** `markerOpacityAt(z) = z >= 12 ? 1 : 0` — a hard threshold with no crossfade. Below zoom 12 every individual event + place marker is `visibility: hidden` unless either (a) the point sits inside a currently-expanded suburb cell (lift bypass), or (b) filters / places-mode are active (explicit user intent). At zoom ≥ 12 markers are fully visible and bubble tiers fade to 0.
+
+**Why:** The original smooth-crossfade model (markers fading in 11→12 while the suburb tier faded out) made individual markers read as ghosted smudges behind the totalling bubbles at city zooms, even when no expansion was open. Users reported the feature "works well, but only after activating decoupling and recoupling" — i.e. the implicit visibility was cluttering the map. A hard threshold gives the totalling bubbles unambiguous ownership of city zooms, matches the mental model of "zoom in to see individual pins", and keeps suburb-expansion as the single well-understood mechanism to reveal specific markers before the natural zoom threshold.
+
+**Tier bands:** capital 4–7, town 8–10, suburb 11, markers 12+. Suburb collapses to a single-zoom core because the spec calls for suburbs at exactly zoom 11.
+
+**Trade-off:** Below zoom 3 the map shows no tiers and no markers (capital fade-in begins at 3). Acceptable because the default initial zoom is 12 and restored-view / flyTo paths never land below 8. A `minZoom: 3` on the map config would make this unreachable; logged as a follow-up nice-to-have.
+
 ## Batch O — Map bubble split / recouple model (3 tiers)
 
 **Decision:** Map clustering uses three tiers (capital 4° / town 0.4° / suburb 0.05°) bound to zoom bands (capital 0–5, town 6–8, suburb 9–11) with markers fading in 11→12. Clicking a bubble splits it into its child tier in place rather than zooming the camera. Capital/town clicks single-expand (close prior siblings of the same tier); suburb clicks multi-expand (stack). Suburb expansions do not spawn child bubbles — they "lift" the underlying event/place markers within the suburb cell to full opacity / `z-index: 20`. Recouple is triggered by outside map-click, document-level Escape, zoom-band crossing, or clicking the same expanded bubble.

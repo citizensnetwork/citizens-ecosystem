@@ -64,40 +64,46 @@ describe("bucketPoints", () => {
 });
 
 describe("tierOpacityAt", () => {
-  it("capital tier is fully opaque inside its core band (zoom 0–5)", () => {
-    expect(tierOpacityAt("capital", 0)).toBe(1);
-    expect(tierOpacityAt("capital", 3)).toBe(1);
-    expect(tierOpacityAt("capital", 5)).toBe(1);
+  it("capital tier is fully opaque inside its core band (zoom 4–7)", () => {
+    expect(tierOpacityAt("capital", 4)).toBe(1);
+    expect(tierOpacityAt("capital", 6)).toBe(1);
+    expect(tierOpacityAt("capital", 7)).toBe(1);
   });
 
-  it("capital tier fades out between zoom 5 and 6", () => {
-    const a = tierOpacityAt("capital", 5.3);
-    const b = tierOpacityAt("capital", 5.8);
+  it("capital tier fades out between zoom 7 and 8", () => {
+    const a = tierOpacityAt("capital", 7.3);
+    const b = tierOpacityAt("capital", 7.8);
     expect(a).toBeGreaterThan(b);
-    expect(tierOpacityAt("capital", 6)).toBe(0);
+    expect(tierOpacityAt("capital", 8)).toBe(0);
   });
 
-  it("town tier crossfades with capital around zoom 5–6", () => {
-    const before = tierOpacityAt("town", 5);
-    const core = tierOpacityAt("town", 7);
-    const after = tierOpacityAt("town", 9);
+  it("capital tier fades in between zoom 3 and 4", () => {
+    expect(tierOpacityAt("capital", 3)).toBe(0);
+    expect(tierOpacityAt("capital", 3.5)).toBeGreaterThan(0);
+    expect(tierOpacityAt("capital", 3.5)).toBeLessThan(1);
+    expect(tierOpacityAt("capital", 4)).toBe(1);
+  });
+
+  it("town tier crossfades with capital around zoom 7–8", () => {
+    const before = tierOpacityAt("town", 7);
+    const core = tierOpacityAt("town", 9);
+    const after = tierOpacityAt("town", 11);
     expect(before).toBeLessThan(core);
     expect(after).toBeLessThan(core);
     expect(core).toBe(1);
   });
 
-  it("suburb tier is active in its 9–11 core", () => {
-    expect(tierOpacityAt("suburb", 9)).toBe(1);
+  it("suburb tier is active at its single-zoom core (11)", () => {
     expect(tierOpacityAt("suburb", 11)).toBe(1);
-    // Fade-in side
-    expect(tierOpacityAt("suburb", 8.5)).toBeGreaterThan(0);
-    expect(tierOpacityAt("suburb", 8.5)).toBeLessThan(1);
+    // Fade-in side (10 → 11)
+    expect(tierOpacityAt("suburb", 10.5)).toBeGreaterThan(0);
+    expect(tierOpacityAt("suburb", 10.5)).toBeLessThan(1);
     // Fully out by zoom 12 (markers take over)
     expect(tierOpacityAt("suburb", 12)).toBe(0);
   });
 
-  it("every zoom from 0 to 12 has at least one tier visible", () => {
-    for (let z = 0; z <= 12; z += 0.5) {
+  it("every zoom from 4 to 12 has at least one tier / marker visible", () => {
+    for (let z = 4; z <= 12; z += 0.5) {
       const any =
         tierOpacityAt("capital", z) +
         tierOpacityAt("town", z) +
@@ -109,8 +115,10 @@ describe("tierOpacityAt", () => {
 });
 
 describe("markerOpacityAt", () => {
-  it("is 0 well below fade-in", () => {
-    expect(markerOpacityAt(8)).toBe(0);
+  it("is 0 at every zoom below 12", () => {
+    for (const z of [0, 4, 8, 10, 11, 11.5, 11.9]) {
+      expect(markerOpacityAt(z)).toBe(0);
+    }
   });
 
   it("is 1 at and above zoom 12", () => {
@@ -118,12 +126,10 @@ describe("markerOpacityAt", () => {
     expect(markerOpacityAt(15)).toBe(1);
   });
 
-  it("ramps monotonically across the 11–12 fade-in band", () => {
-    const a = markerOpacityAt(11.2);
-    const b = markerOpacityAt(11.5);
-    const c = markerOpacityAt(11.8);
-    expect(a).toBeLessThan(b);
-    expect(b).toBeLessThan(c);
+  it("hard-threshold — no crossfade below 12", () => {
+    // The tier-bubble layer owns city zooms; markers appear cleanly at 12.
+    expect(markerOpacityAt(11.99)).toBe(0);
+    expect(markerOpacityAt(12)).toBe(1);
   });
 });
 
@@ -147,13 +153,18 @@ describe("bubbleSizeForCount", () => {
 });
 
 describe("visibleTiersAt", () => {
-  it("returns only capital at zoom 0", () => {
-    expect(visibleTiersAt(0)).toEqual(["capital"]);
+  it("returns capital at zoom 5 (inside capital core)", () => {
+    expect(visibleTiersAt(5)).toEqual(["capital"]);
   });
 
-  it("returns suburb (plus fade-in/out neighbours) near zoom 10", () => {
+  it("returns no tiers below the capital fade-in (zoom 0–2)", () => {
+    expect(visibleTiersAt(0)).toEqual([]);
+    expect(visibleTiersAt(2)).toEqual([]);
+  });
+
+  it("returns town (plus suburb fade-in) around zoom 10", () => {
     const tiers = visibleTiersAt(10);
-    expect(tiers).toContain("suburb");
+    expect(tiers).toContain("town");
   });
 
   it("returns no bubble tiers from zoom 12 onward", () => {
@@ -161,8 +172,8 @@ describe("visibleTiersAt", () => {
     expect(visibleTiersAt(14)).toEqual([]);
   });
 
-  it("returns at least one tier for every integer zoom 0-11", () => {
-    for (let z = 0; z <= 11; z++) {
+  it("returns at least one tier for every integer zoom 4–11", () => {
+    for (let z = 4; z <= 11; z++) {
       expect(visibleTiersAt(z).length).toBeGreaterThan(0);
     }
   });

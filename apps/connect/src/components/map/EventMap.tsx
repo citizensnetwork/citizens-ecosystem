@@ -29,6 +29,7 @@ import {
   childTierOf,
   pointsInBubble,
   bucketKeyOf,
+  MARKER_FADE_IN_END,
   type ClusterBubble,
   type ClusterPoint,
 } from "@/lib/map/clustering";
@@ -369,14 +370,27 @@ export default function EventMap({
     // Fade individual markers in as bubbles fade out.  Composed with the
     // temporal opacity so past/live dimming still reads during handover.
     // Markers lifted by an expanded suburb skip the fade and force-show.
+    //
+    // NOTE on visibility: below zoom 12 `markerOp === 0`, which clears
+    // opacity but leaves the DOM element hit-testable and prone to
+    // clutter the view behind the totalling bubbles.  We explicitly
+    // flip `visibility` so events + places are truly hidden at city
+    // zooms — only lifted (suburb-expansion) or filter-active markers
+    // bypass the gate.
     const markerOp = markerOpacityAt(z);
+    const hideBelowMarkerZoom = markerOp === 0;
     evtMarkerDataRef.current.forEach(({ marker, lngLat }) => {
       const el = marker.getElement() as HTMLElement;
       const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
       if (lifted) {
+        el.style.visibility = "";
         el.style.opacity = "1";
         el.style.zIndex = "20";
+      } else if (hideBelowMarkerZoom) {
+        el.style.visibility = "hidden";
+        el.style.zIndex = "";
       } else {
+        el.style.visibility = "";
         el.style.zIndex = "";
         applyComposedOpacity(el, markerOp);
       }
@@ -385,8 +399,16 @@ export default function EventMap({
       const el = marker.getElement() as HTMLElement;
       const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
       if (lifted) {
+        el.style.visibility = "";
         el.style.opacity = "1";
         el.style.zIndex = "20";
+      } else if (hideBelowMarkerZoom) {
+        // `updatePlaceVisibility` owns the authoritative visibility for
+        // places (it factors in placesMode + category filters + the
+        // PLACE_ZOOM_MIN threshold).  Defer to it rather than stomping
+        // visibility here.
+        el.style.zIndex = "";
+        applyComposedOpacity(el, 0);
       } else {
         el.style.zIndex = "";
         applyComposedOpacity(el, markerOp);
@@ -700,9 +722,14 @@ export default function EventMap({
     } catch { return null; }
   }, []);
 
-  /** Show or hide place markers based on zoom + active category state.
-   *  Honours the bubble-expansion lift: place markers whose lat/lng falls
-   *  inside an expanded suburb are forced visible regardless of zoom. */
+  /** Authoritative visibility gate for event + place markers.
+   *  Below zoom 12 the totalling bubbles own the view, so individual
+   *  markers are hidden except when (a) lifted by an open suburb
+   *  expansion, or (b) filters / places-mode are active.  Above zoom 12
+   *  markers become visible and the bubble tiers fade out.
+   *
+   *  Name is kept for historical reasons (place-visibility was added
+   *  first); the function now owns both layers' visibility. */
   const updatePlaceVisibility = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -718,11 +745,22 @@ export default function EventMap({
       const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
       el.style.visibility = lifted || shouldShow ? "" : "hidden";
     });
-    // Hide event markers when place categories are selected (user is browsing places).
-    // (Note: when `inPlacesMode` is true the event markers were never created in the
-    // first place — see the marker-build effect — so no extra hide is needed here.)
-    markersRef.current.forEach((m) => {
-      (m.getElement() as HTMLElement).style.visibility = hasPlaceCatsSelected ? "hidden" : "";
+    // Hide event markers when place categories are selected (user is
+    // browsing places), OR when we're at a city zoom where the totalling
+    // bubbles own the view.  Suburb-expansion lifts override both gates.
+    const hideEventsForZoom = z < MARKER_FADE_IN_END;
+    evtMarkerDataRef.current.forEach(({ marker, lngLat }) => {
+      const el = marker.getElement() as HTMLElement;
+      const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
+      if (lifted) {
+        el.style.visibility = "";
+        return;
+      }
+      if (hasPlaceCatsSelected || hideEventsForZoom) {
+        el.style.visibility = "hidden";
+      } else {
+        el.style.visibility = "";
+      }
     });
   }, [isPointLiftedBySuburb]);
   const updatePlaceVisibilityRef = useRef<() => void>(() => {});
@@ -966,8 +1004,8 @@ export default function EventMap({
      * Tracked via the band a zoom level falls into; ignores intra-band
      * zooming. */
     const bandFor = (z: number): "capital" | "town" | "suburb" | "marker" => {
-      if (z < 6) return "capital";
-      if (z < 9) return "town";
+      if (z < 8) return "capital";
+      if (z < 11) return "town";
       if (z < 12) return "suburb";
       return "marker";
     };
