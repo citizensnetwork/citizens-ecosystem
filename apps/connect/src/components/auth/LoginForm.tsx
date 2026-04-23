@@ -25,6 +25,7 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const needsConfirmation = searchParams.get("confirmed") === "false";
+  const reauthRequired = searchParams.get("reauth") === "1";
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -66,6 +67,13 @@ export default function LoginForm() {
         <Alert variant="gold">
           ✉️ Account created! Please check your email to confirm your address,
           then log in below.
+        </Alert>
+      )}
+
+      {reauthRequired && (
+        <Alert variant="gold">
+          For security, please sign in again. Your role was updated, so a fresh
+          login is required.
         </Alert>
       )}
 

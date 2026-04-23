@@ -688,6 +688,52 @@ Edge Functions are scaffolded but require Supabase deployment + DB webhook confi
 
 ### Deferred
 - [x] EventPhotoGallery — **shipped** as `EventMediaStrip` (swipeable strip with lightbox, supports both images and videos via the `event_photos.kind` column). See `supabase/migrations/029_event_media.sql`.
+
+---
+
+## Batch E — Admin SAVE UX + Force-Reauth + Contributor Bio Gate (COMPLETE)
+
+### Delivered
+- [x] Migration `057_force_reauth_and_bio_setup.sql` — adds `profiles.force_reauth_at timestamptz` + `profiles.bio_setup_required bool` + `on_role_change_side_effects()` BEFORE UPDATE OF role trigger (search_path set to public)
+- [x] Migration `059_enforce_one_admin.sql` — DB-level trigger preventing last-admin demotion (closes TOCTOU race; maps to P0001)
+- [x] `src/types/db.ts` — Profile type fields added
+- [x] `src/middleware.ts` rewrite — force-reauth gate (JWT iat vs force_reauth_at, **fail-closed** on JWT parse/profile-lookup error) + bio-setup gate (contributor+flag → /contributor/setup). Uses Buffer base64url.
+- [x] Login page `reauth=1` notice (via LoginForm)
+- [x] `AdminUserManager.tsx` rewritten — staged per-row edits, explicit SAVE button (disabled when clean), flash messages for reauth/pending/noop
+- [x] `/api/contributor/setup` + `/contributor/setup` page + form — minimum bio gate clears the flag
+- [x] API error mapping: trigger P0001 → 400 on last-admin demotion
+- [x] Middleware tests: +5 (force-reauth redirect, fail-closed JWT, fail-closed DB, bio-setup redirect, bio-setup allow-list exemption)
+
+### Latest Validation
+- tsc: 0 errors
+- vitest: 599/599 passing (up from 594 baseline)
+- lint: clean
+- advisor: 20 lints, unchanged vs baseline
+
+---
+
+## Batch F — Dual-Admin Approval for role=admin (COMPLETE)
+
+### Delivered
+- [x] Migration `058_pending_admin_elevations.sql` — `pending_admin_elevations` table with unique partial index `where status='pending'`; `approve_admin_elevation(uuid)` + `reject_admin_elevation(uuid,text)` RPCs enforcing different-approver OR solo-admin 24h cooling-off at the DB layer (errcodes P0001/P0002/42501/28000); extends `notifications.type` CHECK with `admin_elevation_request`
+- [x] `PATCH /api/admin/users` for role='admin' queues into pending_admin_elevations (23505 → 409), notifies all other admins via bulk `notifications` insert, logs admin action. Never hardcodes a bypass.
+- [x] `GET /api/admin/pending-elevations` — admin-only list with target+requester joins
+- [x] `POST /api/admin/pending-elevations/[id]/approve` + `[id]/reject` — shared POST handler mapping P0002→404 else→400 with DB message (so dual-admin rule violation surfaces cleanly)
+- [x] AdminUserManager surfaces pending elevations with Approve/Reject buttons and "you" badge on own requests
+- [x] Rate limits: separate `RATE_LIMITS.read` bucket for admin GETs (120/min) vs `mutation` (30/min)
+
+### Latest Validation
+- Same as Batch E — shipped together on main.
+- Advisors: no NEW lints from migrations 057/058/059.
+
+---
+
+## Batch G — Deferred Contributor Email + Advisor Rebaseline (docs-only)
+
+### Delivered
+- [x] DECISIONS entry documenting why the contributor admin-notification email is deferred to a DB webhook / pg_cron job rather than inline on the contributor-apply path.
+- [x] Advisor rebaseline captured: 20 lints (unchanged), all pre-existing and documented.
+
 - [x] VendorAnalytics — **shipped** as aggregate summary on `/events/manage` (total events, views, RSVPs, considers, sold-out count) plus per-event counts in each card
 - [x] Multi-photo upload in EventForm — **shipped** as `MediaGalleryUploader` (images + videos, client-side image compression, per-event cap)
 

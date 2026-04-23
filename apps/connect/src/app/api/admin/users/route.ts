@@ -6,6 +6,9 @@
  *   - admin-only (server role check)
  *   - block self-demotion from admin (avoid org lockout)
  *   - validates role + contributor_status against the canonical enums
+ *   - role=admin elevations go through dual-admin approval (Batch F) —
+ *     the PATCH returns `{ pending: true, request_id }` rather than
+ *     applying the change directly.
  *
  * Every mutation writes an `admin_actions` row for audit.
  */
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
 
   // Light read cap — defence-in-depth for admin session compromise
   // (Architect audit L3).
-  const rl = checkRateLimit(`admin-users-get:${guard.user.id}`, RATE_LIMITS.mutation);
+  const rl = checkRateLimit(`admin-users-get:${guard.user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -153,6 +156,86 @@ export async function PATCH(request: NextRequest) {
         );
       }
     }
+
+    // Dual-admin approval gate (Batch F). Only role=admin goes through
+    // the queue; every other role is applied inline. If the target is
+    // already an admin, this is a no-op (skip the queue).
+    if (body.role === "admin") {
+      const { data: target } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", body.user_id)
+        .maybeSingle();
+      if (target?.role === "admin") {
+        return NextResponse.json({
+          success: true,
+          noop: true,
+        });
+      }
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("pending_admin_elevations")
+        .insert({
+          target_user_id: body.user_id,
+          requested_by: guard.user.id,
+          reason: null,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (insErr) {
+        // 23505 → pending row already exists for this target.
+        if (insErr.code === "23505") {
+          return NextResponse.json(
+            { error: "An admin elevation is already pending for this user." },
+            { status: 409 },
+          );
+        }
+        console.error("[admin/users PATCH insert pending]", insErr);
+        return NextResponse.json(
+          { error: "Failed to queue admin elevation" },
+          { status: 500 },
+        );
+      }
+
+      // Notify every OTHER admin (not the requester) in-app.
+      try {
+        const { data: otherAdmins } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("role", "admin")
+          .neq("id", guard.user.id);
+        if (otherAdmins && otherAdmins.length > 0 && inserted?.id) {
+          await supabase.from("notifications").insert(
+            otherAdmins.map((a) => ({
+              user_id: a.id,
+              type: "admin_elevation_request",
+              title: "Admin elevation awaiting approval",
+              body: "A new admin elevation request needs a second admin's approval.",
+              link_url: "/admin/users#admin-elevations",
+              metadata: { request_id: inserted.id },
+            })),
+          );
+        }
+      } catch (err) {
+        console.warn("[admin/users PATCH notify]", err);
+      }
+
+      await logAdminAction(supabase, {
+        actorId: guard.user.id,
+        action: "user.admin_elevation.requested",
+        targetType: "profile",
+        targetId: body.user_id,
+        metadata: { request_id: inserted?.id },
+      });
+
+      return NextResponse.json({
+        success: true,
+        pending: true,
+        request_id: inserted?.id,
+      });
+    }
+
     patch.role = body.role;
   }
 
@@ -200,6 +283,16 @@ export async function PATCH(request: NextRequest) {
     .eq("id", body.user_id);
 
   if (updErr) {
+    // Trigger `enforce_at_least_one_admin` raises P0001 with a
+    // friendly message if the update would leave zero admins. Surface
+    // it as 400 so concurrent demotions are rejected cleanly even
+    // when the JS preflight missed the race.
+    if (updErr.code === "P0001") {
+      return NextResponse.json(
+        { error: updErr.message ?? "Cannot remove the last admin." },
+        { status: 400 },
+      );
+    }
     console.error("[admin/users PATCH]", updErr);
     return NextResponse.json(
       { error: "Failed to update user" },

@@ -2,6 +2,42 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch E — Force-Reauth on Role Change (migration 057)
+
+**Decision:** A DB trigger (`on_role_change_side_effects`) stamps `profiles.force_reauth_at = now()` on every role mutation. Middleware compares this timestamp against the access-token `iat`; if the token predates the bump (or we cannot establish `iat` at all), we `auth.signOut()` and redirect to `/login?reauth=1`.
+
+**Why:** Role claims live in the JWT. Without forcing a fresh login, a demoted admin keeps their privileged session until natural expiry. We chose DB trigger + middleware check (rather than server-side revocation) because it requires no Supabase Admin API access from the runtime and no realtime channel — every authenticated request already touches middleware. Fail-closed on parse/lookup errors is deliberate: an unverifiable state must not leak privilege.
+
+**Trade-off:** Every authenticated request pays one `profiles` row read. Acceptable for current scale; if latency becomes a concern we will cache via JWT `app_metadata` refresh or a signed cookie invalidation scheme.
+
+## Batch E — Contributor Bio-Setup Gate (middleware allow-list)
+
+**Decision:** When a citizen is promoted to contributor, `bio_setup_required` is set to `true` by the same trigger. Middleware enforces a redirect to `/contributor/setup` for any path NOT in `BIO_SETUP_ALLOW`. The setup API clears the flag on success.
+
+**Why:** We want every new contributor to have a minimum-viable public profile before they can browse or create. Enforcing at middleware (not per-page) makes it impossible to route around. Keeping the flag on `profiles` (not a separate table) avoids an extra join and lets the trigger set it atomically with the role change.
+
+## Batch E — Last-Admin Lockout in SQL (migration 059)
+
+**Decision:** Added a `BEFORE UPDATE OF role / BEFORE DELETE` trigger `enforce_at_least_one_admin` that raises `P0001` if the change would leave zero admins. The JS preflight in `PATCH /api/admin/users` stays as a UX-friendly preflight; the trigger is the authoritative race-proof guard.
+
+**Why:** The JS-layer check was TOCTOU-racy under concurrent demotion. Moving the invariant to the database closes the race regardless of caller (API route, future migration, admin CLI, service-role misuse).
+
+## Batch F — Dual-Admin Approval Enforced in SQL (migration 058)
+
+**Decision:** Elevating any user to `role='admin'` no longer happens inline. `PATCH /api/admin/users` inserts a row into `pending_admin_elevations`; a *different* admin (or the same admin after a 24-hour cooling-off when they are the sole admin) must call `approve_admin_elevation(uuid)` to flip the role. The rule is enforced inside the RPC (not in JS). Rejection is via `reject_admin_elevation(uuid, text)`.
+
+**Why:** Admin is the highest-privilege role. A hardcoded JS bypass ("allow if env var X is set") has been explicitly rejected — it would re-introduce exactly the class of backdoor this batch is meant to eliminate. RPCs raise `P0001` for rule violations, `P0002` for not-found, `42501` for non-admin caller, `28000` for unauthenticated. The API maps these to `400`/`404`/`403`/`401`. A unique partial index `where status='pending'` guarantees idempotent queueing (duplicate → `23505` → 409).
+
+**Trade-off:** A solo admin must wait 24 hours to elevate a second admin. This is intentional — it gives time for an alert to be noticed if the admin account was compromised. Emergency escape hatch if needed in future: a superuser-only SQL migration, which leaves an audit trail.
+
+## Batch G — Contributor Admin-Notification Email: Deferred to DB Webhook
+
+**Decision:** When a user applies to become a contributor, we do NOT send an email to admins inline on the request path. The email delivery is deferred to a future Supabase DB webhook (or pg_cron job) listening on `contributor_applications` inserts.
+
+**Why:** Inline email sending couples the contributor-apply API's success to an external SMTP dependency, increases tail latency, and requires the server to hold SMTP credentials. A webhook/cron pattern (a) keeps the user-facing API fast and reliable, (b) centralises SMTP credential scope in a single Edge Function, and (c) gives us natural batching/retry semantics. The in-app admin notification is already delivered synchronously.
+
+**Trade-off:** Admins are notified in-app immediately but may see the email with a few minutes of delay once the webhook ships. Acceptable — this is not a user-facing latency.
+
 ## Progressive Geo-Clustering (Batch C)
 
 ### Client-side clustering v1 with fixed lat/lng grid; server RPC deferred to v2

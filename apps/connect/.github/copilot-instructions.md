@@ -153,3 +153,32 @@ See `.github/AGENTS.md` for the full agent registry, invocation guide, and multi
 - `.github/SUPABASE_RECOVERY.md` — Fast reconnect + validation runbook for Supabase issues
 
 If a future request conflicts with these standards, follow explicit user direction for that request and then update the files above to keep the baseline current.
+
+## Default session workflow (user standard — do not re-ask)
+
+For every multi-batch session the user's standing expectations are:
+
+1. **Thoroughness over speed.** No time pressure. Never rush.
+2. **A-grade quality gate on every batch** before moving on:
+   - `npx tsc --noEmit` → 0 errors
+   - `npx vitest run` → full suite passes
+   - `npx next lint --dir src` → clean
+   - Architect subagent audit with a detailed diff summary → apply every
+     Should-fix inline, note Nice-to-haves, then re-run tsc + vitest
+   - `mcp_supabase_get_advisors type:"security"` → no NEW warnings vs baseline
+3. **Push after each batch** (not only at end). Update `.github/PROJECT_STATUS.md`
+   and `.github/DECISIONS.md` in the same push cadence.
+4. **Implement as much as capacity allows, in order.** When capacity ends,
+   persist important context before the conversation is deleted:
+   - Update `/memories/session/plan.md` batch table with `✅ SHIPPED <sha>`
+   - Record shipped invariants in `/memories/repo/batch-*.md`
+   - Leave PROJECT_STATUS + DECISIONS current on `origin/main`
+5. **Final report** lists what shipped + what remains + resume instructions.
+6. **Windows env reminder:** prepend `$env:PATH = "C:\\Program Files\\nodejs;" + $env:PATH`
+   to every terminal command; never use `&&` in PowerShell, use `;`.
+7. **When something is missing or blocked,** ask the user with a single
+   concise question rather than guessing.
+
+This standing workflow is the canonical "quality, refining and pushing
+procedure" the user references. Follow it silently unless the user
+explicitly overrides it for a specific request.

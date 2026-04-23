@@ -226,6 +226,14 @@ export type Profile = {
   /** Per-user preference bag (migrations 034 + 035).  Structure below is
    *  enforced client-side; the DB just stores `jsonb`. */
   preferences: Preferences;
+  /** Bumped to `now()` by a DB trigger whenever `role` changes (Batch E,
+   *  migration 057). Middleware invalidates sessions whose `iat` is older
+   *  than this, forcing re-login so JWT + RLS pick up the new role. */
+  force_reauth_at?: string | null;
+  /** Set to TRUE on citizen→contributor promotion. Cleared by
+   *  `/api/contributor/setup`. Middleware routes contributors with this
+   *  flag to `/contributor/setup` before any other protected page. */
+  bio_setup_required?: boolean;
   created_at: string;
 };
 

@@ -92,4 +92,6 @@ export const RATE_LIMITS = {
   auth: { limit: 10, windowMs: 60_000 },
   /** Heavy operations: 5 per minute */
   heavy: { limit: 5, windowMs: 60_000 },
+  /** Read endpoints (admin lists, preference reads): 120/min */
+  read: { limit: 120, windowMs: 60_000 },
 } as const;
