@@ -220,6 +220,33 @@
 
 ---
 
+## Batch C — Icon Shrink + Progressive Geo-Clustering (COMPLETE)
+
+### C1 Marker icon shrink −20%
+- [x] `src/lib/map/markers.ts` — `BASE_SIZE` 40 → 32, `PLACE_MARKER_SIZE` 40 → 32, `PLACE_MARKER_SIZE_HIGHLIGHTED` 54 → 44, `PLACE_ICON_SIZE` 24 → 20, `PLACE_ICON_SIZE_HIGHLIGHTED` 32 → 26. Rebalances visual weight against the new cluster bubbles at mid zoom.
+
+### C2 Progressive geo-clustering (capital → city → town → suburb → markers)
+- [x] NEW `src/lib/map/clustering.ts` (~180 LoC, fully pure module). Four tiers with fixed degree-grid (`GRID_SIZE_DEG = {capital:4, city:1, town:0.2, suburb:0.05}`) and smoothstep crossfade bands 0–5 / 6–8 / 9–11 / 12–14. `markerOpacityAt` fades individual event/place markers in over zoom 14 → 15.5 so bubbles hand off cleanly to pins. Exports `bucketPoints`, `tierOpacityAt`, `markerOpacityAt`, `bubbleSizeForCount`, `visibleTiersAt`.
+- [x] NEW `src/__tests__/lib/map/clustering.test.ts` — 19 unit tests covering bucketing invariants (single-cell determinism, centroid correctness), fade monotonicity across bands, size bounds (28..56 px), and the "no zoom level is ever empty" invariant.
+- [x] `src/lib/map/markers.ts` — added `createGeoClusterBubbleEl(count, size)` (white fill + 2 px gold border, drop-shadow, `role="button"`, `tabindex="0"`, `aria-label`, `transition` set once at creation) and `updateGeoClusterBubbleEl(el, count, size)` (in-place mutation so listeners + MapLibre binding survive count changes).
+- [x] `src/components/map/EventMap.tsx` — wires clustering:
+  - `geoClusterMarkersRef` keyed by `tier:gridX:gridY`.
+  - `rebuildGeoClusters()` iterates `visibleTiersAt(zoom)`, diff-patches marker map by key (reuses existing, mutates on count change, removes stale). Every bucket (including singletons) becomes a bubble so no point vanishes at zoom 12–14 where individual markers are faded.
+  - `updateGeoClusterOpacity()` composes temporal opacity (`el.dataset.temporalOpacity`) × `markerOpacityAt(zoom)` via `applyComposedOpacity(el, markerOp)` so past-event dimming survives tier handover.
+  - Filter/placesMode bail-out restores marker opacity to unfiltered state before returning.
+  - `attachBubbleHandlers(el, map, b)` adds click + `keydown` (Enter / Space) → `map.easeTo({zoom: min(z+2, 16)})`.
+  - `zoom` event RAF-debounces opacity updates; `zoomend` rebuilds. Both `zoomOpacityRaf` and `deconflictRaf` cancelled on unmount.
+  - Event + place markers stamp `dataset.temporalOpacity` and `style.transition = "opacity 160ms linear"` once at creation; update loop only writes `opacity`.
+
+### Latest validation (Batch C)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **594 tests, 69 files, 0 failures** ✅ (+19 from Batch M baseline)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — initial review flagged 4 criticals + 3 warnings; re-audit after fixes confirmed **all 7 Should-Fix items PASS**. Commit: `731bdf1`.
+- [ ] Supabase security advisors — no schema/SQL changes in this batch; advisor re-baseline deferred to Batch G.
+
+---
+
 ## Batch M — Logout Redirect + MapTiler Style Swap (COMPLETE)
 
 ### M1 Logout returns to landing

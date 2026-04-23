@@ -2,6 +2,39 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Progressive Geo-Clustering (Batch C)
+
+### Client-side clustering v1 with fixed lat/lng grid; server RPC deferred to v2
+**Decision:** `src/lib/map/clustering.ts` is a pure client module. Events + places are bucketed into fixed-degree grids per tier (`capital=4°`, `city=1°`, `town=0.2°`, `suburb=0.05°`) computed on the client from the already-fetched event/place lists. `bucketPoints` is O(n) over the current dataset.
+**Why:** v1 is delivered against the current scale (dozens–hundreds of points) with zero backend work, zero new queries, and no migration. A server-side RPC (e.g., PostGIS `ST_SnapToGrid` aggregated by zoom) would add round-trip latency and require a new fetch on every zoom band change. For current data volume, the client bucketing cost is well under a frame (<1 ms in tests). When the map starts surfacing thousands of points across SA we will add a Supabase RPC variant and swap the call-site in `rebuildGeoClusters` behind a size threshold; the pure module's interface (`ClusterPoint[] → ClusterBubble[]`) is designed for that drop-in.
+**Trade-off:** Fixed-origin grid means a point near a cell boundary (e.g., Johannesburg straddling a `capital` cell edge) can split across two bubbles. Acceptable for v1; the server variant will use offset grids or admin-region snapping.
+**Date:** Batch C.
+
+### Zoom thresholds 0–6 / 6–9 / 9–12 / 12–15 / 15–16 (user-selected "Stretched" option)
+**Decision:** `TIER_BANDS` in `clustering.ts` uses `capital 0–5`, `city 6–8`, `town 9–11`, `suburb 12–14`, markers fade in 14 → 15.5 (full by 15.5). Each band has a 1.5-zoom smoothstep crossfade.
+**Why:** User explicitly chose the "Stretched" option (vs. "Tight" or "Dense") because most organic exploration in SA happens between zoom 10–14 (town + suburb), so those bands are the widest. The crossfade width (1.5) matches the shortest band, preventing any band from being invisible even briefly.
+**Date:** Batch C.
+
+### Every bucket becomes a bubble, even singletons
+**Decision:** `rebuildGeoClusters` does NOT skip `count === 1` buckets. A lone event in its own grid cell still renders a bubble.
+**Why:** Initial design suppressed singletons (reads like "why is there a '1' badge on a single marker?"). Review found a severe bug: at zoom 12–14, individual markers are already faded out by `markerOpacityAt`, so a suppressed-singleton bubble left the point **invisible** — an isolated rural event literally disappeared from the map for three zoom levels. Ugly bubble > missing point. At zoom ≥14.5 both the bubble and the underlying marker are crossfading, the bubble is nearly transparent, and the effect reads fine.
+**Date:** Batch C.
+
+### Composed opacity: `temporal × markerOp`, stashed on `data-temporal-opacity`
+**Decision:** At marker creation (event + place), EventMap writes `el.dataset.temporalOpacity = String(temporal.opacity)` and `el.style.transition = "opacity 160ms linear"`. `applyComposedOpacity(el, markerOp)` reads the dataset value back and writes `String(t * markerOp)` (or clears to `""` when both are 1).
+**Why:** Without this, the clustering layer's marker-fade clobbered the temporal style (past events rendered at the same opacity as live ones during tier handover zoom 14 → 15.5). Stashing on a data attribute avoids a recompute on every zoom frame. Writing `transition` once at creation (rather than per RAF) kills style-churn and removes a subtle latency source where deconfliction tried to mutate opacity inside a 160 ms transition.
+**Date:** Batch C.
+
+### Clustering disabled when filters or placesMode active
+**Decision:** `rebuildGeoClusters` early-returns and clears all bubbles when `placesModeRef.current` or any `activeCategoriesRef.current` / `activePlaceCategoriesRef.current` is non-empty. `updateGeoClusterOpacity` mirrors this: when filters are active it resets marker opacity to unfiltered state and returns before applying `markerOp`.
+**Why:** Clustering is a **discovery** affordance — "where in the country is stuff happening?". Filters are an **intent** affordance — "show me exactly these." Composing them produces confusing UI (bubble counts that don't match filtered marker counts; hidden markers users expected to see). The bail-out in `updateGeoClusterOpacity` is the fix for the first-attempt bug where opacity fade ran regardless of whether bubbles existed, hiding all filtered markers at zoom ≤14.
+**Date:** Batch C.
+
+### Icon shrink −20% paired with clustering
+**Decision:** `BASE_SIZE` 40 → 32, all place marker + icon sizes scaled to match.
+**Why:** With clustering bubbles now taking over at mid-zoom (28–56 px), the old 40 px pins felt redundant and crowded. 32 px keeps individual markers readable at high zoom without competing visually with cluster bubbles at mid zoom. 20 % was the user-requested quantum.
+**Date:** Batch C.
+
 ## MapTiler Style Verification & Logout Flow (Batch M)
 
 ### Dev-only `MapStyleDebugBadge` gated by `NODE_ENV === "development"`
