@@ -1472,8 +1472,15 @@ export default function EventsView({
               }}
             >
               {filtered.length === 0 ? (
-                <div className="flex h-24 items-center justify-center text-sm text-white/50">
-                  No events found
+                <div className="flex h-24 flex-col items-center justify-center gap-1 px-6 text-center text-sm text-white/60">
+                  <p className="font-medium text-white/80">
+                    {activeCategories.size === 1
+                      ? `Nothing in ${CATEGORY_LABELS[[...activeCategories][0]] ?? "this category"} nearby yet`
+                      : "No events match your filters"}
+                  </p>
+                  <p className="text-xs text-white/50">
+                    Try widening your radius, clearing filters, or exploring a new area.
+                  </p>
                 </div>
               ) : (
                 <div className="relative px-10 py-3">

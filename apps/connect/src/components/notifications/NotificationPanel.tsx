@@ -291,7 +291,10 @@ export default function NotificationPanel({
         {notifications.length === 0 && pendingReviews.filter((r) => !dismissedReviews.has(r.id)).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl text-black/30">●</span>
-            <p className="mt-2 text-sm text-black/50">No notifications yet</p>
+            <p className="mt-2 text-sm font-medium text-black/60">You&apos;re all caught up</p>
+            <p className="mt-1 text-xs text-black/40">
+              New activity from events and friends will show up here.
+            </p>
           </div>
         ) : (
           <ul>

@@ -86,7 +86,12 @@ export default function ReviewList({ placeId, eventId, title = "Reviews" }: Prop
       {loading ? (
         <p className="text-sm text-black/50">Loading reviews...</p>
       ) : reviews.length === 0 ? (
-        <p className="text-sm text-black/50">No reviews yet.</p>
+        <div className="surface-card rounded-2xl py-10 text-center text-(--foreground-soft)">
+          <p className="text-sm font-medium text-black">No reviews yet</p>
+          <p className="mt-1 text-xs">
+            Share your experience to help others decide.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {reviews.map((review) => (

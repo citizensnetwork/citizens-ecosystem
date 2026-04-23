@@ -23,9 +23,25 @@ vi.mock("next/image", () => ({
 describe("EventList", () => {
   it("renders empty state when no events", () => {
     render(<EventList events={[]} />);
-    expect(screen.getByText("No events yet.")).toBeInTheDocument();
+    expect(screen.getByText("No events here yet")).toBeInTheDocument();
     expect(
-      screen.getByText("Be the first to create one!")
+      screen.getByText(
+        "Be the first to create one — or widen your filters to see more."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("renders custom empty state via props", () => {
+    render(
+      <EventList
+        events={[]}
+        emptyTitle="No community groups nearby"
+        emptyHint="Try expanding your radius or explore a new area."
+      />
+    );
+    expect(screen.getByText("No community groups nearby")).toBeInTheDocument();
+    expect(
+      screen.getByText("Try expanding your radius or explore a new area.")
     ).toBeInTheDocument();
   });
 

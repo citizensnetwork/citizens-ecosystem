@@ -55,7 +55,10 @@ describe("ReviewList", () => {
     render(<ReviewList eventId="e1" />);
 
     await waitFor(() => {
-      expect(screen.getByText("No reviews yet.")).toBeInTheDocument();
+      expect(screen.getByText("No reviews yet")).toBeInTheDocument();
+      expect(
+        screen.getByText("Share your experience to help others decide.")
+      ).toBeInTheDocument();
     });
   });
 
