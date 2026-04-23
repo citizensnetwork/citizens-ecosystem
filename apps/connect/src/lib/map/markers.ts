@@ -466,14 +466,14 @@ export function createClusterEl(count: number): HTMLDivElement {
 /**
  * Progressive geo-clustering bubble — white fill, 2px gold border, count
  * centred in gold/black.  Used by the map's zoom-driven aggregation layer
- * (see `lib/map/clustering.ts`) to render capital/city/town/suburb tiers.
+ * (see `lib/map/clustering.ts`) to render capital/town/suburb tiers.
  *
  * Opacity is set by the caller on the returned element's style so that
  * the crossfade between tiers at overlapping zoom levels stays smooth.
  *
  * Accessibility: rendered as `role="button"` with a readable `aria-label`
  * and `tabindex="0"` so keyboard users can drill through tiers via the
- * same press-to-zoom behaviour attached by callers.
+ * same press-to-split behaviour attached by callers.
  */
 export function createGeoClusterBubbleEl(
   count: number,
@@ -488,9 +488,11 @@ export function createGeoClusterBubbleEl(
   el.style.transition = "opacity 160ms linear";
   el.setAttribute("role", "button");
   el.setAttribute("tabindex", "0");
+  el.setAttribute("aria-expanded", "false");
+  el.dataset.ccBubbleCount = String(count);
   el.setAttribute(
     "aria-label",
-    `${count} items in this area. Activate to zoom in.`,
+    `${count} items in this area. Activate to split into smaller groups.`,
   );
   // Safe because `count` and `size` are typed numbers (not user-controlled
   // strings) — template has no injection surface.
@@ -510,6 +512,43 @@ export function createGeoClusterBubbleEl(
 }
 
 /**
+ * Toggle the visual "expanded" state of a parent bubble — when a user
+ * clicks a bubble it splits into children, and the parent itself is
+ * dimmed/hidden so the children read clearly above the rest of the map.
+ *
+ * `expanded === true`  → fade parent out, disable pointer events on it.
+ * `expanded === false` → restore parent to normal opacity (recouple).
+ *
+ * The opacity here is multiplied with the tier crossfade applied by
+ * EventMap; the easing transition is already set on element creation.
+ */
+export function setBubbleExpanded(
+  el: HTMLElement,
+  expanded: boolean,
+): void {
+  el.setAttribute("aria-expanded", expanded ? "true" : "false");
+  const count = el.dataset.ccBubbleCount ?? "";
+  if (expanded) {
+    el.setAttribute(
+      "aria-label",
+      `${count} items expanded — press Escape or click the map to collapse.`,
+    );
+    el.style.opacity = "0";
+    el.style.pointerEvents = "none";
+    el.style.visibility = "hidden";
+  } else {
+    el.setAttribute(
+      "aria-label",
+      `${count} items in this area. Activate to split into smaller groups.`,
+    );
+    // Defer to the next tier-opacity pass to restore the correct value.
+    el.style.opacity = "";
+    el.style.visibility = "";
+    el.style.pointerEvents = "";
+  }
+}
+
+/**
  * Update a bubble's inner text + size in place without recreating the
  * outer element.  Keeps any attached listeners / MapLibre marker binding
  * intact when the underlying count changes between re-renders.
@@ -521,9 +560,13 @@ export function updateGeoClusterBubbleEl(
 ): void {
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
+  el.dataset.ccBubbleCount = String(count);
+  const isExpanded = el.getAttribute("aria-expanded") === "true";
   el.setAttribute(
     "aria-label",
-    `${count} items in this area. Activate to zoom in.`,
+    isExpanded
+      ? `${count} items expanded — press Escape or click the map to collapse.`
+      : `${count} items in this area. Activate to split into smaller groups.`,
   );
   const body = el.querySelector<HTMLDivElement>("[data-cc-bubble-body]");
   if (!body) return;
