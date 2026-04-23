@@ -83,7 +83,48 @@
 **Why:** `router.refresh()` alone re-renders the current segment (`/events`) with a now-signed-out session; the user briefly sees an authenticated shell frame before middleware resolves, and has no visible path back to login / guest landing. Push-then-refresh navigates first (queued client-side transition) and refresh invalidates the RSC cache so the landing page renders with the new session. `window.location.assign("/")` was considered as a hammer but rejected for now — it's a full reload and only worth it if stale singleton subscriptions (e.g., NotificationBell realtime channel) are observed leaking.
 **Date:** Batch M.
 
-## Contributor Applications & My Events (Batch L)
+## Batch N — Event → Organiser Flow, Multi-venue Profiles, 6-org Seed (migrations 060, 061, 062)
+
+### Multi-venue contributor profiles are additive, not a replacement for `profiles.physical_*`
+**Decision:** `contributor_locations` (migration 060) is an additive table. The profile's own `physical_address` / `physical_latitude` / `physical_longitude` remain authoritative for the **primary** venue; `contributor_locations` holds any **additional** venues (e.g. U-Turn's Roeland Street café + Claremont charity shop). The UI ("Find us" block in `ContributorPublicProfile`) renders the primary first, then the extras by `sort_order`.
+**Why:** Most contributors have a single venue; forcing a join for every profile page would regress read latency and cost an extra RLS check. Making the new table additive keeps the common case on a single row and avoids a destructive migration of `profiles.physical_*` data. `ON DELETE CASCADE` on `profile_id` means extras disappear with the profile; no orphaned venues.
+**Date:** Batch N.
+
+### Seed via direct `auth.users` insert with bcrypt'd random password
+**Decision:** Migration 061 inserts six seed organisations directly into `auth.users` with `encrypted_password = crypt(gen_random_uuid()::text, gen_salt('bf'))` and `email_confirmed_at = now()`. The `handle_new_user` trigger creates matching `profiles` rows. Profile enrichment happens in a subsequent UPDATE block.
+**Why:** Alternatives (Supabase Admin API from a server route, or an Edge Function) couple seed data to runtime availability of service-role keys — unsuitable for a migration that must run on every environment (dev, CI, prod). Bcrypt of a random UUID nobody retains makes the account completely inert: cannot email-login, cannot password-reset to anything usable. Email domain `citizens.local` is RFC 6761 reserved (cannot collide with real inboxes or leak magic-link attempts). `is_super_admin=false`, `raw_app_meta_data` holds no elevated claims — the only app-level privilege is `contributor`.
+**Date:** Batch N.
+
+### Seed uses `ALTER TABLE … DISABLE TRIGGER USER` to set role/contributor_status directly
+**Decision:** The profile-enrichment UPDATE block in migration 061 is wrapped in `ALTER TABLE public.profiles DISABLE TRIGGER USER; … ENABLE TRIGGER USER;`. Each UPDATE then explicitly sets `role = 'contributor'`, `contributor_kind`, `contributor_status = 'approved'`, slug, bio, socials.
+**Why:** Two triggers block this path: (1) `handle_new_user` hardcodes `role = 'citizen'` and ignores `raw_user_meta_data.role`, so the initial profile row is always a citizen; (2) `protect_role_column` only allows `not_applied → pending` and `rejected → pending` transitions for non-admin / non-service-role callers, which rules out `not_applied → approved`. Disabling user triggers for the seed block is the narrowest possible bypass: transactional (rolls back with the migration), scoped to this block, and works because the Supabase MCP runs as the `postgres` superuser. A `SECURITY DEFINER` helper (e.g. `admin_set_profile_role`) was considered as a more portable alternative and logged as a nice-to-have for any future non-superuser migration runner.
+**Date:** Batch N.
+
+### Organiser link routes to `/c/<slug>` for approved contributors, else `/profile/<id>`
+**Decision:** The "Organised by" link under event titles (`EventDetailContent`) resolves the destination from the `EventOrganiser` view-model: if `role === 'contributor' && contributor_status === 'approved' && contributor_slug`, route to `/c/<slug>`; otherwise route to `/profile/<id>`. `full_name` falls back to the string `"Organiser"` when null.
+**Why:** The public contributor hub (`/c/<slug>`) is the richer experience (bio, socials, locations, past/current/future events). Non-contributors and unapproved contributors don't have a `/c` page yet, so falling back to the generic profile page is the only correct target. Gating on `contributor_status === 'approved'` prevents leaking a `/c/<slug>` URL for a rejected or pending contributor whose slug may have been reserved but whose public page may hide information.
+**Date:** Batch N.
+
+### Rating widget hidden for upcoming events
+**Decision:** `EventDetailContent` wraps `<InlineEventRating />` in `{hasStarted && (…)}`. Reviews are only solicited after the event has started.
+**Why:** Rating an event before it's happened is meaningless and was confusing attendees planning to come. Keeping the gate UI-only (not in the API) means a misbehaving client cannot surface the widget early but real ratings can still be written from moderation tooling if ever needed.
+**Date:** Batch N.
+
+### Seed `image_url` left NULL
+**Decision:** All 30 seed events have `image_url = NULL`.
+**Why:** Seeding real images would either (a) bake URLs into the migration pointing at a specific host, requiring that host to stay alive and widening CSP `img-src`, or (b) require populating the Supabase Storage bucket at migration time, which is brittle. `EventDetailContent` already handles `image_url = null` via conditional rendering; the feed card and map popup accept nulls too. No CSP change needed.
+**Date:** Batch N.
+
+### Split `FOR ALL` policy and add coord CHECK constraints (migration 062)
+**Decision:** Migration 062 replaces the owner `FOR ALL` policy on `contributor_locations` with explicit `INSERT / UPDATE / DELETE` policies (public `SELECT` is a separate policy and unchanged), and adds `CHECK` constraints on `latitude` (±90) and `longitude` (±180).
+**Why:** Applied inline from the Batch N architect review. Splitting the policy makes intent explicit — future work to make some locations private only needs to narrow the SELECT policy, not reason about an overlapping FOR-ALL. Coord CHECKs prevent garbage data from poisoning the map even if a non-UI caller writes through the owner write policy.
+**Date:** Batch N.
+
+### Note: live migration name mismatch for 061
+**Decision:** On the live DB, migration 061 is recorded as `061_seed_testing_contributors_v2` because the first apply attempt aborted mid-way before the trigger-disable pattern was finalised. The canonical file on disk is `061_seed_testing_contributors.sql` and is idempotent (DELETE-then-INSERT), so re-applying under either name is safe. Future environments will use the disk name.
+**Date:** Batch N.
+
+
 
 ### Direct insert on `/api/contributor/apply` instead of Edge Function proxy
 **Decision:** `POST /api/contributor/apply` inserts the `contributor_applications` row directly through the caller's RLS-scoped Supabase client, then flips `profiles.contributor_status` to `pending`. The `submit-contributor-application` Edge Function is no longer invoked synchronously from this route.

@@ -21,6 +21,7 @@ import { ContributorChip } from "@/components/ui/ContributorChip";
 import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import type { Event, EventMedia, EventTag } from "@/types/db";
+import type { EventOrganiser } from "@/components/events/EventDetailServer";
 import type { User } from "@supabase/supabase-js";
 
 const MiniMap = dynamic(() => import("@/components/map/MiniMap"), {
@@ -47,6 +48,7 @@ type Props = {
   locationSharingEnabled?: boolean;
   media?: EventMedia[];
   tags?: EventTag[];
+  organiser?: EventOrganiser | null;
 };
 
 export default function EventDetailContent({
@@ -58,6 +60,7 @@ export default function EventDetailContent({
   locationSharingEnabled = false,
   media = [],
   tags = [],
+  organiser = null,
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -186,16 +189,42 @@ export default function EventDetailContent({
         <h1 className="text-xl font-bold leading-tight">{event.title}</h1>
       </div>
 
+      {/* Organised by — links to the contributor/citizen profile of the
+          event's creator. Hidden if we don't know who the organiser is
+          (e.g. deleted profile). */}
+      {organiser && (
+        <p className="mt-1 text-xs text-black/60">
+          Organised by{" "}
+          <Link
+            href={
+              organiser.role === "contributor" &&
+              organiser.contributor_status === "approved" &&
+              organiser.contributor_slug
+                ? `/c/${organiser.contributor_slug}`
+                : `/profile/${organiser.id}`
+            }
+            prefetch={false}
+            className="font-semibold text-(--gold) hover:underline focus:underline focus:outline-none"
+          >
+            {organiser.full_name || "Organiser"}
+          </Link>
+        </p>
+      )}
+
       {tags.length > 0 && (
         <div className="mt-1.5">
           <TagChipList tags={tags} />
         </div>
       )}
 
-      {/* Inline star rating */}
-      <div className="mt-0.5">
-        <InlineEventRating eventId={event.id} isAuthenticated={!!user} autoFocus={autoFocusReview} />
-      </div>
+      {/* Inline star rating — only shown once the event has started.
+          Ratings are for past / live experiences; showing them on
+          upcoming events biases the signal and confuses attendees. */}
+      {hasStarted && (
+        <div className="mt-0.5">
+          <InlineEventRating eventId={event.id} isAuthenticated={!!user} autoFocus={autoFocusReview} />
+        </div>
+      )}
 
       {/* Aggregate attendee count — lives right under the rating in light
           text as a subtle social-proof signal, intentionally small so it

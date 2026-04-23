@@ -20,7 +20,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import type { Event, Profile } from "@/types/db";
+import type { ContributorLocation, Event, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
@@ -42,6 +42,9 @@ export interface ContributorPublicProfileProps {
   followingCount: number;
   upcomingEvents: Event[];
   pastEvents: Array<Event & { avg_rating?: number | null; reviews_count?: number }>;
+  /** Additional venues (migration 060). Primary venue still uses
+   *  `profile.physical_address` + lat/lng. */
+  locations?: ContributorLocation[];
 }
 
 export function ContributorPublicProfile({
@@ -53,6 +56,7 @@ export function ContributorPublicProfile({
   followingCount,
   upcomingEvents,
   pastEvents,
+  locations = [],
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
@@ -152,10 +156,24 @@ export function ContributorPublicProfile({
         )}
 
         {/* ── 3. Find us ────────────────────────────────── */}
-        {(profile.physical_address || hasCoords) && (
-          <Section title="Find us">
+        {(profile.physical_address || hasCoords || locations.length > 0) && (
+          <Section
+            title={
+              locations.length > 0 ? "Find us" : "Find us"
+            }
+          >
+            {/* Primary venue (from the profile row). */}
             {profile.physical_address && (
-              <p className="text-sm text-black/70">{profile.physical_address}</p>
+              <div>
+                {locations.length > 0 && (
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
+                    Main
+                  </p>
+                )}
+                <p className="text-sm text-black/70">
+                  {profile.physical_address}
+                </p>
+              </div>
             )}
             {hasCoords && (
               <div className="mt-3 h-48 w-full overflow-hidden rounded-xl">
@@ -164,6 +182,31 @@ export function ContributorPublicProfile({
                   longitude={profile.physical_longitude as number}
                 />
               </div>
+            )}
+
+            {/* Additional venues (migration 060). */}
+            {locations.length > 0 && (
+              <ul className="mt-4 space-y-3 border-t border-black/5 pt-4">
+                {locations.map((loc) => (
+                  <li key={loc.id}>
+                    {loc.label && (
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
+                        {loc.label}
+                      </p>
+                    )}
+                    <p className="text-sm text-black/70">{loc.address}</p>
+                    {typeof loc.latitude === "number" &&
+                      typeof loc.longitude === "number" && (
+                        <div className="mt-2 h-40 w-full overflow-hidden rounded-xl">
+                          <MiniMap
+                            latitude={loc.latitude}
+                            longitude={loc.longitude}
+                          />
+                        </div>
+                      )}
+                  </li>
+                ))}
+              </ul>
             )}
           </Section>
         )}

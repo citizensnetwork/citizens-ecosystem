@@ -16,7 +16,7 @@ import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MutualFriends from "@/components/social/MutualFriends";
 import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
-import type { Event, Profile, UserRole } from "@/types/db";
+import type { ContributorLocation, Event, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 
 export const getProfileById = cache(async (id: string) => {
@@ -111,6 +111,16 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
     const upcoming = allEvents.filter((e) => e.date >= now);
     const past = allEvents.filter((e) => e.date < now).reverse();
 
+    // Secondary venues (migration 060). Primary address still lives
+    // on the profile row; these are appended in display order.
+    const { data: locationRows } = await supabase
+      .from("contributor_locations")
+      .select("*")
+      .eq("profile_id", id)
+      .order("sort_order", { ascending: true })
+      .returns<ContributorLocation[]>();
+    const locations = locationRows ?? [];
+
     let pastWithRatings: Array<
       Event & { avg_rating?: number | null; reviews_count?: number }
     > = past;
@@ -146,6 +156,7 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
         followingCount={followingCount ?? 0}
         upcomingEvents={upcoming}
         pastEvents={pastWithRatings}
+        locations={locations}
       />
     );
   }

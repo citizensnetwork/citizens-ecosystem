@@ -309,4 +309,84 @@ describe("EventDetailContent", () => {
     );
     expect(screen.getByTestId("social-share-btns")).toBeInTheDocument();
   });
+
+  // ── Organiser link + rating-gate (Batch N) ─────────────────────────
+  it("renders 'Organised by' link to /c/<slug> for approved contributor", () => {
+    render(
+      <EventDetailContent
+        event={baseEvent}
+        count={0}
+        user={null}
+        hasRsvped={false}
+        organiser={{
+          id: "org-1",
+          full_name: "Every Nation Mooikloof",
+          role: "contributor",
+          contributor_status: "approved",
+          contributor_slug: "every-nation-mooikloof",
+          logo_url: null,
+          avatar_url: null,
+        }}
+      />
+    );
+    const link = screen.getByRole("link", { name: "Every Nation Mooikloof" });
+    expect(link).toHaveAttribute("href", "/c/every-nation-mooikloof");
+  });
+
+  it("falls back to /profile/<id> when organiser has no slug", () => {
+    render(
+      <EventDetailContent
+        event={baseEvent}
+        count={0}
+        user={null}
+        hasRsvped={false}
+        organiser={{
+          id: "uid-123",
+          full_name: "Jane Citizen",
+          role: "citizen",
+          contributor_status: null,
+          contributor_slug: null,
+          logo_url: null,
+          avatar_url: null,
+        }}
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: "Jane Citizen" }),
+    ).toHaveAttribute("href", "/profile/uid-123");
+  });
+
+  it("hides the inline rating widget for upcoming events", () => {
+    const upcoming = {
+      ...baseEvent,
+      date: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      end_time: new Date(Date.now() + 7 * 24 * 3600 * 1000 + 2 * 3600 * 1000).toISOString(),
+    };
+    render(
+      <EventDetailContent
+        event={upcoming}
+        count={0}
+        user={null}
+        hasRsvped={false}
+      />
+    );
+    expect(screen.queryByTestId("inline-rating")).not.toBeInTheDocument();
+  });
+
+  it("shows the inline rating widget once the event has started", () => {
+    const started = {
+      ...baseEvent,
+      date: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      end_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    };
+    render(
+      <EventDetailContent
+        event={started}
+        count={0}
+        user={null}
+        hasRsvped={false}
+      />
+    );
+    expect(screen.getByTestId("inline-rating")).toBeInTheDocument();
+  });
 });

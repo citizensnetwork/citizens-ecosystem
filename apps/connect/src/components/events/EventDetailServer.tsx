@@ -11,7 +11,22 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
-import type { Event, EventMedia, EventTag } from "@/types/db";
+import type { Event, EventMedia, EventTag, UserRole } from "@/types/db";
+
+/**
+ * Slim organiser summary shown on the event detail page (click to open
+ * the organiser's public profile / contributor page). Kept tiny so the
+ * payload stays small — the full profile is fetched lazily on nav.
+ */
+export type EventOrganiser = {
+  id: string;
+  full_name: string;
+  role: UserRole;
+  contributor_status: string | null;
+  contributor_slug: string | null;
+  logo_url: string | null;
+  avatar_url: string | null;
+};
 
 export const getEventById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -32,7 +47,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
     notFound();
   }
 
-  const [{ data: { user } }, { count }, { data: mediaRows }, { data: tagRows }] = await Promise.all([
+  const [{ data: { user } }, { count }, { data: mediaRows }, { data: tagRows }, { data: organiserRow }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("rsvps")
@@ -48,7 +63,26 @@ export default async function EventDetailServer({ id }: { id: string }) {
       .from("event_tag_assignments")
       .select("tag:event_tags(id, slug, label, is_official, is_hidden, usage_count, created_by, created_at)")
       .eq("event_id", id),
+    supabase
+      .from("profiles")
+      .select("id, full_name, role, contributor_status, contributor_slug, logo_url, avatar_url")
+      .eq("id", event.created_by)
+      .maybeSingle(),
   ]);
+
+  const organiser: EventOrganiser | null = organiserRow
+    ? {
+        id: organiserRow.id as string,
+        full_name: (organiserRow.full_name as string) ?? "",
+        role: (organiserRow.role as UserRole) ?? "citizen",
+        contributor_status:
+          (organiserRow.contributor_status as string | null) ?? null,
+        contributor_slug:
+          (organiserRow.contributor_slug as string | null) ?? null,
+        logo_url: (organiserRow.logo_url as string | null) ?? null,
+        avatar_url: (organiserRow.avatar_url as string | null) ?? null,
+      }
+    : null;
 
   const media = (mediaRows ?? []) as EventMedia[];
   const tagRowsTyped = (tagRows ?? []) as unknown as Array<{
@@ -135,6 +169,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       locationSharingEnabled={locationSharingEnabled}
       media={media}
       tags={tags}
+      organiser={organiser}
     />
   );
 }

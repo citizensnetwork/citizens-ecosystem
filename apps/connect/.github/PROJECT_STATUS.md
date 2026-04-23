@@ -267,6 +267,47 @@
 
 ---
 
+## Batch N — Event → Organiser flow + Multi-venue contributor profiles + 6-org seed (COMPLETE)
+
+### N1 Event → Organiser discovery UX (shipped in prior segment, finalised here)
+- [x] `src/components/events/EventDetailServer.tsx` — added 5th parallel fetch of organiser profile; exports `EventOrganiser`; passes `organiser` prop.
+- [x] `src/components/events/EventDetailContent.tsx` — "Organised by `<name>`" link under title routes to `/c/<slug>` for approved contributors with slug, else `/profile/<id>`. `<InlineEventRating />` wrapped in `{hasStarted && (…)}` so upcoming events no longer show a ratings prompt.
+- [x] `src/components/profile/ProfileDetailServer.tsx` + `src/components/contributor/ContributorPublicProfile.tsx` — "Find us" renders primary `physical_address` + any additional `contributor_locations` with sort_order.
+- [x] `src/types/db.ts` — added `ContributorLocation` type.
+- [x] Tests: `src/__tests__/components/events/EventDetailContent.test.tsx` — 4 new cases (organiser link variants + rating gate).
+
+### N2 Multi-venue contributor profiles — migration 060
+- [x] `supabase/migrations/060_contributor_locations.sql` — new `public.contributor_locations` table (id, profile_id FK profiles ON DELETE CASCADE, label, address, latitude, longitude, sort_order, created_at). Index on `(profile_id, sort_order)`. RLS enabled.
+
+### N3 Seed 6 real-world contributor organisations + 30 events — migration 061
+- [x] `supabase/migrations/061_seed_testing_contributors.sql` — fixed UUIDs `11111111-1111-4111-8111-00000000000[1-6]`:
+  - **CRC Cape Town** (ministry, Bloubergstrand + Durbanville campuses)
+  - **Every Nation Mooikloof** (ministry, Pretoria)
+  - **Lynnwood Farmers Market** (business, Pretoria)
+  - **Ellel Ministries SA** (ministry, Hartbeespoort)
+  - **POPUP Skills Development** (organization, Pretoria Central)
+  - **U-Turn Homeless Ministries** (organization, Cape Town: Roeland Street + Claremont)
+- [x] Seed users inserted into `auth.users` with `crypt(gen_random_uuid()::text, gen_salt('bf'))` as encrypted_password — unusable, inert. Email domain `citizens.local` (RFC 6761 reserved). `handle_new_user` trigger creates matching profile rows.
+- [x] Profile-enrichment UPDATE block wrapped in `ALTER TABLE public.profiles DISABLE/ENABLE TRIGGER USER` so seed rows can be promoted `role=citizen → contributor` and `contributor_status=not_applied → approved` (otherwise blocked by `protect_role_column`). Transactional, superuser-only; no runtime impact.
+- [x] 30 events (5 per org) across past/present/future, `status='published'`, categories strictly from the `events_category_check` allowlist (`church`, `kids`, `marriage-and-couples`, `equip`, `mens`, `missional`, `social-fun`, `entertainment`, `care`, `education`, `community-upliftment`, `recovery`). `category_id` linked by slug; DO-block NOTICE guard warns if any seed event lacks a category match.
+- [x] 4 additional `contributor_locations` (CRC ×2 campuses, U-Turn ×2 venues).
+- [x] `image_url` NULL on all seed events — no CSP widening.
+
+### N4 Tighten 060 per architect review — migration 062
+- [x] `supabase/migrations/062_tighten_contributor_locations.sql` — replaces `FOR ALL` owner policy with explicit `INSERT / UPDATE / DELETE` policies (public `SELECT` unchanged); adds `CHECK` constraints on `latitude` (±90) and `longitude` (±180).
+
+### Latest validation (Batch N)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **603 tests, 69 files, 0 failures** ✅
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — **Grade A.** Two Should-fixes applied inline (split `FOR ALL` policy + lat/lng CHECK constraints in migration 062; NOTICE guard for missing `category_id` in migration 061). Nice-to-haves logged.
+- [x] Supabase security advisors — unchanged vs. baseline (same ERRORs on `directory_contributors` security_definer_view + `app_settings` RLS, same WARN function_search_path_mutable set, same WARN public_bucket_allows_listing on `place-images`, same WARN auth_leaked_password_protection). **No new warnings.**
+
+### Notes
+- Migration 061 is present on the live DB under migration name `061_seed_testing_contributors_v2` (first apply attempt aborted mid-way before the trigger-disable pattern was finalised; canonical file re-applied under _v2). File on disk is idempotent (DELETE-then-INSERT), so re-applying under either name is safe.
+
+---
+
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
 
 ### Expanded Roles

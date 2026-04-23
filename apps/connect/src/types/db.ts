@@ -279,6 +279,24 @@ export type Comment = {
   profiles?: { full_name: string };
 };
 
+/**
+ * Additional physical venues for a Contributor profile (migration 060).
+ * The primary venue still lives on `profiles.physical_address` + lat/lng;
+ * this table captures zero-or-more secondary venues (e.g. U-Turn
+ * operates a head-office shop in Roeland Street AND a Life-Change Centre
+ * in Claremont). Public-read via RLS.
+ */
+export type ContributorLocation = {
+  id: string;
+  profile_id: string;
+  label: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export type CategoryAppliesTo = "events" | "places" | "both";
 
 export type Category = {
