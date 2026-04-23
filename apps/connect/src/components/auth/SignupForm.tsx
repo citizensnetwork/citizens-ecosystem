@@ -27,6 +27,7 @@ export default function SignupForm() {
   const [role, setRole] = useState<UserRole>("citizen");
   const [contributorKind, setContributorKind] =
     useState<ContributorKind>("ministry");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -36,6 +37,14 @@ export default function SignupForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!termsAccepted) {
+      setError(
+        "Please accept the Terms & Community Agreement to create an account.",
+      );
+      return;
+    }
+
     setLoading(true);
 
     const { data, error } = await supabase.auth.signUp({
@@ -60,6 +69,18 @@ export default function SignupForm() {
     }
 
     if (data.session) {
+      // Instant session (e.g. email confirmation disabled) — record acceptance
+      // immediately. For the email-verify flow the TermsAcceptanceGate picks it
+      // up on first authenticated visit.
+      try {
+        await fetch("/api/terms/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ full_name: fullName }),
+        });
+      } catch {
+        // Non-blocking: gate will retry on first visit.
+      }
       router.push("/events");
       router.refresh();
       return;
@@ -214,11 +235,33 @@ export default function SignupForm() {
         )}
       </div>
 
+      <label className="flex items-start gap-2.5 rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm text-black/80 transition hover:border-black/30">
+        <input
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(e) => setTermsAccepted(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-black"
+          aria-describedby="terms-help"
+          required
+        />
+        <span id="terms-help" className="leading-snug">
+          I have read and agree to the{" "}
+          <Link
+            href="/terms"
+            target="_blank"
+            className="font-semibold text-black underline-offset-4 hover:underline"
+          >
+            Terms &amp; Community Agreement
+          </Link>
+          .
+        </span>
+      </label>
+
       <Button
         type="submit"
         variant="gold"
         size="lg"
-        disabled={loading}
+        disabled={loading || !termsAccepted}
         className="w-full"
       >
         {loading ? "Creating account..." : "Sign Up"}

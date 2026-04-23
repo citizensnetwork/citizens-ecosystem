@@ -26,9 +26,20 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
+// Mock fetch for /api/terms/accept post-signup call
+const mockFetch = vi.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).fetch = mockFetch;
+
+function tickTerms() {
+  const checkbox = screen.getByRole("checkbox", { name: /terms & community/i });
+  fireEvent.click(checkbox);
+}
+
 describe("SignupForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ message: "Accepted" }) });
   });
 
   it("renders all required fields", () => {
@@ -86,6 +97,7 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "password123" },
     });
+    tickTerms();
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
@@ -114,6 +126,7 @@ describe("SignupForm", () => {
       target: { value: "secure123" },
     });
     fireEvent.click(screen.getByDisplayValue("contributor"));
+    tickTerms();
     // Default contributor_kind is ministry (the most common signup path)
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
@@ -152,6 +165,7 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "pass123" },
     });
+    tickTerms();
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
@@ -175,6 +189,7 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "pass123" },
     });
+    tickTerms();
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
@@ -199,6 +214,7 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "pass123" },
     });
+    tickTerms();
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     await waitFor(() => {
@@ -219,8 +235,57 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "pass123" },
     });
+    tickTerms();
     fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
 
     expect(screen.getByText("Creating account...")).toBeInTheDocument();
+  });
+
+  it("refuses to submit when Terms checkbox is not ticked", async () => {
+    render(<SignupForm />);
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: "Test" },
+    });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "t@t.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "pass123" },
+    });
+    // Intentionally skip tickTerms()
+    fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
+
+    // signUp must not have been called
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it("calls /api/terms/accept after instant-session signup", async () => {
+    mockSignUp.mockResolvedValue({
+      data: { session: { user: { id: "u1" } } },
+      error: null,
+    });
+
+    render(<SignupForm />);
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: "Jane Doe" },
+    });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "jane@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "pass123" },
+    });
+    tickTerms();
+    fireEvent.click(screen.getByRole("button", { name: /sign up/i }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/terms/accept",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ full_name: "Jane Doe" }),
+        }),
+      );
+    });
   });
 });

@@ -6,6 +6,7 @@ import CapacitorInit from "@/components/ui/CapacitorInit";
 import ApplicationPendingBannerServer from "@/components/ui/ApplicationPendingBannerServer";
 import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
 import BetaBanner from "@/components/ui/BetaBanner";
+import TermsAcceptanceGate from "@/components/ui/TermsAcceptanceGate";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const montserrat = Montserrat({
@@ -61,6 +62,7 @@ export default function RootLayout({
             (event, profile, messages) as a right-side drawer without
             leaving the underlying page. */}
         {panel}
+        <TermsAcceptanceGate />
       </body>
     </html>
   );

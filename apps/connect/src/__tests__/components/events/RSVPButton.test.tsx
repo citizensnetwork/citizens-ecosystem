@@ -22,6 +22,23 @@ describe("RSVPButton", () => {
     vi.clearAllMocks();
   });
 
+  /**
+   * Helper: queue a "waiver already signed" response as the first fetch call
+   * so that the pre-flight template lookup passes and the test moves straight
+   * on to the POST /api/rsvp call.
+   */
+  function queueWaiverSigned() {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          template: { id: "tpl-1", slug: "attendee-participation-waiver" },
+          hasSigned: true,
+        }),
+    });
+  }
+
   it("renders 'RSVP / Attend' when user has not RSVPed", () => {
     render(<RSVPButton eventId="event-1" hasRsvped={false} />);
     expect(screen.getByText("RSVP / Attend")).toBeInTheDocument();
@@ -33,6 +50,7 @@ describe("RSVPButton", () => {
   });
 
   it("redirects to login when user is not authenticated", async () => {
+    queueWaiverSigned();
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
 
     render(<RSVPButton eventId="event-1" hasRsvped={false} />);
@@ -44,6 +62,7 @@ describe("RSVPButton", () => {
   });
 
   it("calls POST /api/rsvp to create RSVP", async () => {
+    queueWaiverSigned();
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ success: true, needsProfileSetup: false }),
@@ -85,13 +104,63 @@ describe("RSVPButton", () => {
   });
 
   it("shows Processing... while loading", async () => {
-    // Don't resolve immediately to keep loading state
+    // Don't resolve the pre-flight waiver lookup to keep the loading state
     mockFetch.mockReturnValueOnce(new Promise(() => {}));
 
     render(<RSVPButton eventId="event-1" hasRsvped={false} />);
     fireEvent.click(screen.getByRole("button"));
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
+  });
+
+  it("opens the participation waiver modal on first RSVP (not yet signed)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          template: {
+            id: "tpl-1",
+            slug: "attendee-participation-waiver",
+            title: "Event Participation Waiver",
+            body: "Waiver body text.",
+            version: 1,
+          },
+          hasSigned: false,
+        }),
+    });
+
+    render(<RSVPButton eventId="event-1" hasRsvped={false} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: /event participation waiver/i }),
+      ).toBeInTheDocument();
+    });
+    // /api/rsvp must NOT have been called yet
+    const rsvpCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === "/api/rsvp",
+    );
+    expect(rsvpCalls).toHaveLength(0);
+  });
+
+  it("skips waiver and RSVPs immediately when template is missing (graceful degrade)", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    render(<RSVPButton eventId="event-1" hasRsvped={false} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/rsvp",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
   });
 
   it("applies gold styling when not RSVPed", () => {

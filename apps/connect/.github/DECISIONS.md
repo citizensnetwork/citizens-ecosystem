@@ -2,6 +2,25 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Legal & Indemnity
+
+### Platform-terms acceptance: client-side gate (not server-side blocker)
+**Decision:** `TermsAcceptanceGate` is a client-mounted modal in the root layout that blocks UI until `profiles.terms_accepted_at` is set. API mutation routes (`/api/rsvp`, `/api/events`, `/api/places`, `/api/conversations`, etc.) **do NOT** additionally enforce terms acceptance server-side.
+**Why:** Acceptance is treated as an onboarding UX step + audit artefact, not a hard precondition for every mutation. All mutations already require auth, and the gate intercepts on first authed visit. Adding a shared `requireTermsAccepted()` wrapper would bloat every route for a theoretical attacker who bypasses JS and accepts Supabase-auth-only access — but they still produce a `platform-terms-v1` signature row audit gap, not a legal exposure, because we hold the terms agreement gate as evidence of notice on first visit.
+**Revisit if:** Legal counsel requires proof of acceptance timestamp preceding every event creation / RSVP — in which case promote to server-side middleware.
+**Date:** Batch J (legal acceptance wiring).
+
+### Partial unique indexes for platform-scope indemnity signatures
+**Decision:** `indemnity_signatures` uniqueness is enforced via three partial unique indexes, not a single `UNIQUE(template_id, user_id, event_id, place_id)` constraint.
+**Why:** Postgres defaults to `NULLS DISTINCT`, meaning a composite UNIQUE with nullable columns permits multiple rows where the nullable columns are NULL. The platform terms signature has both `event_id` and `place_id` NULL, so the blunt UNIQUE would allow duplicate platform acceptances. Partial indexes scoped by `WHERE event_id IS NULL AND place_id IS NULL`, `WHERE event_id IS NOT NULL`, and `WHERE place_id IS NOT NULL` produce the correct semantics.
+**Date:** Migration 055.
+
+### Attendee participation waiver: `required=false`, UI-enforced per-user
+**Decision:** `attendee-participation-waiver` template is seeded with `required=false` so it does not appear in the organiser's `EventFormWithIndemnity` gate (which filters `applies_to=events AND required=true`). Instead, `RSVPButton` calls `/api/indemnity/template?slug=attendee-participation-waiver` before the first RSVP and opens `AttendeeWaiverModal` if `hasSigned=false`.
+**Why:** Attendees should sign once across all events, not be prompted every RSVP; organisers should not see the attendee waiver in their creation flow.
+**Note:** `hasSigned` in `/api/indemnity/template` is intentionally scoped globally per (template_id, user_id) — ignoring event/place — to support this once-per-user semantics.
+**Date:** Batch J.
+
 ## Architecture
 
 ### Raw Leaflet API (not react-leaflet)

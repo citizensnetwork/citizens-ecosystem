@@ -159,10 +159,31 @@
 - [x] `EventFormWithIndemnity.tsx` — wrapper: shows IndemnityForm gate, then EventForm after all signed
 - [x] `/events/new` updated to render `EventFormWithIndemnity`
 
+### Batch J — Legal Acceptance Wiring (COMPLETE)
+- [x] Migration `055_legal_acceptance_wiring.sql` — self-contained rewrite consolidating 024; creates tables from scratch with `CREATE TABLE IF NOT EXISTS`, drops blunt `UNIQUE(template_id,user_id,event_id)` / `(…,place_id)` constraints, replaces with 3 partial unique indexes (`_platform_unique` scoped `WHERE event_id IS NULL AND place_id IS NULL`, `_event_unique`, `_place_unique`) — fixes NULLS-DISTINCT loophole that allowed duplicate platform acceptance rows
+- [x] Adds `'platform'` and `'both'` to `applies_to` check; adds `profiles.terms_accepted_at timestamptz`
+- [x] Seeds 4 templates as plain prose (no markdown): `platform-terms-v1` (platform, required), `organiser-event-liability` (events, required), `attendee-participation-waiver` (events, NOT required — UI-enforced once-per-user), `venue-listing-waiver` (places, required)
+- [x] `POST /api/terms/accept` — auth-gated, rate-limited (10/min/user), writes `indemnity_signatures` row + race-free conditional `profiles.terms_accepted_at` update via `.is("terms_accepted_at", null)`; captures `x-forwarded-for` (first hop, 64-char cap) as `ip_address`; idempotent (23505 → "Already accepted")
+- [x] `GET /api/indemnity/template?slug=…` — public template read; returns `hasSigned` (global per user/template, event/place-agnostic) when authenticated
+- [x] `/terms` — public server-rendered Terms & Community Agreement page with version and updated_at
+- [x] `TermsAcceptanceGate.tsx` — global client-mounted blocking modal in root layout, triggers on first authed visit when `terms_accepted_at IS NULL`; focus trap, autofocus, body-scroll lock, aria-describedby
+- [x] `SignupForm.tsx` — required T&Cs checkbox linked to `/terms`, submit-guarded, hits `/api/terms/accept` on instant-session signup (email-verify path caught by gate on first visit)
+- [x] `AttendeeWaiverModal.tsx` + `RSVPButton` pre-flight — fetches attendee-participation-waiver, if `hasSigned=false` opens modal before RSVP; graceful 404 degrade; signed users RSVP silently
+- [x] `PlaceFormWithIndemnity.tsx` — wraps place creation behind `venue-listing-waiver` gate
+- [x] Architect review applied: a11y hardening (focus trap, scroll lock, autofocus, aria-describedby), race-free profile update, ip_address capped, doc comment on global `hasSigned` scope, seeds rewritten as plain prose (dropped `prose` class from /terms)
+- [x] Decisions logged in `.github/DECISIONS.md` (client-side gate vs server enforcement; partial unique indexes; required=false attendee waiver)
+- [x] 19 new tests (550 total, all passing)
+
 ### Build & Test Verification
 - [x] `npx tsc --noEmit` — 0 errors (3 type assertion fixes applied)
 - [x] `next build` — all routes compiled, new routes `/events/manage`, `/places/manage` included
 - [x] `npx vitest run` — **335 tests, 37 files, 0 failures** ✅
+
+### Latest validation (Batch J — Legal Acceptance Wiring)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **550 tests, 64 files, 0 failures** ✅ (+19 from Batch J)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] `mcp_supabase_get_advisors type:security` — no new warnings introduced by Batch J
 
 ---
 

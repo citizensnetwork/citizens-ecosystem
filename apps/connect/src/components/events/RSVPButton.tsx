@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AttendeeWaiverModal from "./AttendeeWaiverModal";
 
 export default function RSVPButton({
   eventId,
@@ -14,19 +15,40 @@ export default function RSVPButton({
   const [rsvped, setRsvped] = useState(hasRsvped);
   const [loading, setLoading] = useState(false);
   const [showProfileHint, setShowProfileHint] = useState(false);
+  const [waiverOpen, setWaiverOpen] = useState(false);
   const router = useRouter();
 
-  async function handleClick() {
+  async function performRsvp() {
     setLoading(true);
+    const res = await fetch("/api/rsvp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_id: eventId }),
+    });
 
+    if (res.ok) {
+      setRsvped(true);
+      const data = await res.json();
+      if (data.needsProfileSetup) {
+        setShowProfileHint(true);
+      }
+    } else if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+
+    setLoading(false);
+    router.refresh();
+  }
+
+  async function handleClick() {
     if (rsvped) {
-      // Cancel RSVP via API
+      setLoading(true);
       const res = await fetch("/api/rsvp", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event_id: eventId }),
       });
-
       if (res.ok) {
         setRsvped(false);
         setShowProfileHint(false);
@@ -34,28 +56,37 @@ export default function RSVPButton({
         router.push("/login");
         return;
       }
-    } else {
-      // Create RSVP via API
-      const res = await fetch("/api/rsvp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_id: eventId }),
-      });
-
-      if (res.ok) {
-        setRsvped(true);
-        const data = await res.json();
-        if (data.needsProfileSetup) {
-          setShowProfileHint(true);
-        }
-      } else if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
+      setLoading(false);
+      router.refresh();
+      return;
     }
 
-    setLoading(false);
-    router.refresh();
+    // New RSVP: check whether the attendee waiver has been signed
+    setLoading(true);
+    try {
+      const res = await fetch(
+        "/api/indemnity/template?slug=attendee-participation-waiver",
+      );
+      if (res.status === 404) {
+        // Waiver template missing — degrade gracefully rather than blocking RSVPs.
+        setLoading(false);
+        await performRsvp();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.hasSigned) {
+        setLoading(false);
+        await performRsvp();
+      } else {
+        // Show the modal; RSVP happens after signature is recorded.
+        setLoading(false);
+        setWaiverOpen(true);
+      }
+    } catch {
+      // Network error: show modal so the user can still agree and retry.
+      setLoading(false);
+      setWaiverOpen(true);
+    }
   }
 
   return (
@@ -91,6 +122,16 @@ export default function RSVPButton({
             ✕
           </button>
         </p>
+      )}
+      {waiverOpen && (
+        <AttendeeWaiverModal
+          eventId={eventId}
+          onAccepted={async () => {
+            setWaiverOpen(false);
+            await performRsvp();
+          }}
+          onCancel={() => setWaiverOpen(false)}
+        />
       )}
     </div>
   );
