@@ -308,6 +308,32 @@
 
 ---
 
+## Batch O — Map bubble split / recouple (COMPLETE)
+
+- [x] **3-tier model** in `src/lib/map/clustering.ts` — capital (4° grid, zoom 0–5), town (0.4° grid, zoom 6–8), suburb (0.05° grid, zoom 9–11). Markers fade in 11→12; no bubbles past zoom 12. New pure helpers: `childTierOf`, `bucketKeyOf`, `pointsInBubble`. `FADE_WIDTH` tightened from 1.5 to 1 for snappier crossfades.
+- [x] **Click-to-split-in-place** in `src/components/map/EventMap.tsx`. `expansionsRef` keys open splits by parent bucket. Capital/town clicks single-expand (close prior siblings) and spawn child bubbles via `bucketPoints` with a fly-out transform animation from the parent's screen position. Suburb clicks multi-expand (stack) and "lift" the underlying event/place markers within the suburb cell to full opacity / `z-index: 20` instead of spawning child bubbles.
+- [x] **Recouple triggers**: outside map-canvas click, document-level Escape keypress, zoom-band crossing (capital↔town↔suburb↔marker), and clicking the same expanded bubble again (toggle off).
+- [x] **Bubble a11y** in `src/lib/map/markers.ts`. New `setBubbleExpanded` helper toggles `aria-expanded` and swaps in a tier-aware label ("…expanded — press Escape or click the map to collapse"). Bubble counts mirrored on `data-cc-bubble-count` so in-place updates regenerate the label correctly.
+- [x] **Layering** in `src/app/globals.css` — `.cc-geo-cluster { z-index: 5 }`, `.cc-geo-cluster-child { z-index: 25 }` so opened splits sit above sibling parents and lifted markers without conflicting with `.cc-marker-sync-highlight` (different stacking context).
+- [x] **Test rewrite** — `src/__tests__/lib/map/clustering.test.ts` rebuilt around the new tier model + helpers (26 tests).
+
+### Architect Should-fix items applied inline (Batch O)
+- [x] **C1** Stale child bubbles after data refresh — collapse non-suburb expansions whenever `events`/`places` identity changes (suburb expansions self-heal via the lifted-marker pass).
+- [x] **W1** `aria-expanded` set on the bubble; `aria-label` swaps when expanded.
+- [x] **W2** Document-level `Escape` keydown listener for keyboard recouple, removed on unmount.
+- [x] **W3** Removed dead `data-cc-expanded-hidden` attribute (`expansionsRef` is the single source of truth).
+- [x] **W5** Memoised `liftedSuburbKeysRef: Set<string>` invalidated on every expansion mutation; replaces O(markers × open-suburbs) per-frame iteration with `Set.has` lookup.
+
+### Latest validation (Batch O)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **610 tests, 69 files, 0 failures** ✅ (+7 from Batch N: clustering tier rewrite)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — Should-fix verdict; all C1 + W1–W3 + W5 applied inline before push. W4 (Capacitor touch reliability) noted for device verification; nice-to-haves (count==1 short-circuit flyTo, `collapseExpansion` opacity-refresh contract, timeout guarding on rapid toggles) logged for follow-up.
+- [x] Supabase security advisors — unchanged vs. Batch N baseline (no schema changes).
+- [x] Pushed to `origin/main` as commit `e3e41c6`.
+
+---
+
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
 
 ### Expanded Roles

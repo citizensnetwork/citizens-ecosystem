@@ -2,6 +2,16 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch O — Map bubble split / recouple model (3 tiers)
+
+**Decision:** Map clustering uses three tiers (capital 4° / town 0.4° / suburb 0.05°) bound to zoom bands (capital 0–5, town 6–8, suburb 9–11) with markers fading in 11→12. Clicking a bubble splits it into its child tier in place rather than zooming the camera. Capital/town clicks single-expand (close prior siblings of the same tier); suburb clicks multi-expand (stack). Suburb expansions do not spawn child bubbles — they "lift" the underlying event/place markers within the suburb cell to full opacity / `z-index: 20`. Recouple is triggered by outside map-click, document-level Escape, zoom-band crossing, or clicking the same expanded bubble.
+
+**Why:** "Click bubble = camera ease in 2 zoom levels" was disorienting on dense maps and poorly matched user mental models for "what's actually inside this group?". Split-in-place keeps spatial context, lets users compare neighbouring groups without losing their place, and reads as a direct manipulation. Single-expand at capital/town avoids visual chaos when the whole map is dotted with parents; multi-expand at suburb is fine because suburbs are local. The lifted-marker path at suburb tier (rather than spawning yet another bubble layer) is cheaper and matches the "close enough to read individual pins" intent of zoom 9–11.
+
+**Source of truth:** `expansionsRef: Map<bucketKey, ExpansionState>` in `EventMap.tsx`. Bucket keys come from `bucketKeyOf(tier, lat, lng)` in `clustering.ts` — pure grid math, stable across re-renders.
+
+**Trade-off:** Capital/town child bubbles are computed once at expand time, so a Supabase data refresh while an expansion is open would leave them stale. Mitigated by collapsing all non-suburb expansions whenever the `events` / `places` identity changes (suburb expansions self-heal via the lifted-marker pass that re-runs over the fresh marker refs). Cheap and correct; trades a brief recouple animation against the complexity of diffing child markers against a fresh point set.
+
 ## Batch E — Force-Reauth on Role Change (migration 057)
 
 **Decision:** A DB trigger (`on_role_change_side_effects`) stamps `profiles.force_reauth_at = now()` on every role mutation. Middleware compares this timestamp against the access-token `iat`; if the token predates the bump (or we cannot establish `iat` at all), we `auth.signOut()` and redirect to `/login?reauth=1`.
