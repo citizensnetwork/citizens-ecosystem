@@ -371,7 +371,36 @@ export type NotificationType =
   | "event_cancelled"
   | "new_follower"
   | "event_update"
-  | "new_message";
+  | "new_message"
+  | "review_prompt";
+
+/**
+ * Reusable event tag (migration 056). Tags are a flat namespace distinct
+ * from the curated {@link EventCategory}: any authenticated user can
+ * propose one. `is_official` marks admin-seeded tags; `is_hidden` is a
+ * moderation flag that suppresses the tag from public surfaces without
+ * deleting existing assignment rows.
+ */
+export type EventTag = {
+  id: string;
+  slug: string;
+  label: string;
+  is_official: boolean;
+  is_hidden: boolean;
+  usage_count: number;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type EventTagAssignment = {
+  event_id: string;
+  tag_id: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+/** Max tags allowed per event (DB-enforced by trigger in migration 056). */
+export const EVENT_TAG_LIMIT = 5;
 
 export type EventUpdate = {
   id: string;

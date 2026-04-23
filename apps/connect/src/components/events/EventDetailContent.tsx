@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,11 +15,12 @@ import SocialShareButtons from "@/components/ui/SocialShareButtons";
 import MessageButton from "@/components/messaging/MessageButton";
 import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
+import TagChipList from "./TagChipList";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
-import type { Event, EventMedia } from "@/types/db";
+import type { Event, EventMedia, EventTag } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
 
 const MiniMap = dynamic(() => import("@/components/map/MiniMap"), {
@@ -44,6 +46,7 @@ type Props = {
   attendees?: Attendee[];
   locationSharingEnabled?: boolean;
   media?: EventMedia[];
+  tags?: EventTag[];
 };
 
 export default function EventDetailContent({
@@ -54,6 +57,7 @@ export default function EventDetailContent({
   attendees = [],
   locationSharingEnabled = false,
   media = [],
+  tags = [],
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -102,6 +106,11 @@ export default function EventDetailContent({
   useEffect(() => {
     fetch(`/api/events/${event.id}/view`, { method: "POST" }).catch(() => {});
   }, [event.id]);
+
+  // Deep-link ?review=1 from post-event review-prompt notifications —
+  // when present we ask the rating widget to auto-focus itself.
+  const searchParams = useSearchParams();
+  const autoFocusReview = searchParams?.get("review") === "1";
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
@@ -177,9 +186,15 @@ export default function EventDetailContent({
         <h1 className="text-xl font-bold leading-tight">{event.title}</h1>
       </div>
 
+      {tags.length > 0 && (
+        <div className="mt-1.5">
+          <TagChipList tags={tags} />
+        </div>
+      )}
+
       {/* Inline star rating */}
       <div className="mt-0.5">
-        <InlineEventRating eventId={event.id} isAuthenticated={!!user} />
+        <InlineEventRating eventId={event.id} isAuthenticated={!!user} autoFocus={autoFocusReview} />
       </div>
 
       {/* Aggregate attendee count — lives right under the rating in light

@@ -105,3 +105,45 @@ export function safeMediaExtension(filename: string, kind: MediaKind): string {
   }
   return SAFE_VIDEO_EXTENSIONS.includes(rawExt) ? rawExt : "mp4";
 }
+
+/* ────────────────────────────────────────────────────────── */
+/* Event tags (Batch K)                                       */
+/* ────────────────────────────────────────────────────────── */
+
+/** Mirrors the CHECK constraint in migration 056. Up to 40 chars, lower-
+ *  case alphanumeric + hyphen, must start and end with [a-z0-9]. */
+const TAG_SLUG_RE = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
+
+/** Maximum characters for a tag label (UI display). Matches DB CHECK. */
+export const TAG_LABEL_MAX = 40;
+
+/**
+ * Normalise an arbitrary label to a DB-safe tag slug.
+ * Returns `null` if the resulting slug is empty or otherwise invalid.
+ */
+export function slugifyTag(label: string): string | null {
+  const slug = label
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // strip combining diacritics
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, ""); // re-trim after truncation
+  return TAG_SLUG_RE.test(slug) ? slug : null;
+}
+
+/** Validate a tag label: 1..40 chars after trim. */
+export function isValidTagLabel(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length >= 1 &&
+    value.trim().length <= TAG_LABEL_MAX
+  );
+}
+
+/** Validate a tag slug (already normalised). */
+export function isValidTagSlug(value: unknown): value is string {
+  return typeof value === "string" && TAG_SLUG_RE.test(value);
+}

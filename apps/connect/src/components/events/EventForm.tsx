@@ -11,7 +11,8 @@ import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import SearchProfilePicker from "./SearchProfilePicker";
-import type { EventCategory, Category } from "@/types/db";
+import TagPicker from "./TagPicker";
+import type { EventCategory, Category, EventTag } from "@/types/db";
 import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
 import Link from "next/link";
 import { share } from "@/lib/capacitor/share";
@@ -61,6 +62,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>(null);
   const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
+  const [tags, setTags] = useState<EventTag[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // After a successful publish we transition the form into a celebratory
@@ -333,6 +335,21 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
         setLoading(false);
         return;
       }
+    }
+
+    // Assign selected tags to the newly created event. Failures here are
+    // non-fatal — organisers can re-try from the edit screen. We fire
+    // them in parallel to keep the publish path fast.
+    if (inserted?.id && tags.length > 0) {
+      await Promise.allSettled(
+        tags.map((tag) =>
+          fetch(`/api/events/${inserted.id}/tags`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tag_id: tag.id }),
+          }),
+        ),
+      );
     }
 
     // Transition to the success state instead of redirecting.  The organiser
@@ -710,6 +727,14 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
             Discovery tags <span className="text-black/30 font-normal">(optional)</span>
           </label>
           <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
+        </div>
+
+        {/* Custom tags — up to 5 free-form labels, used for faceted filters */}
+        <div>
+          <label className="block text-xs font-medium text-black/60 mb-1.5">
+            Tags <span className="text-black/30 font-normal">(optional, up to 5)</span>
+          </label>
+          <TagPicker value={tags} onChange={setTags} />
         </div>
 
         <div>

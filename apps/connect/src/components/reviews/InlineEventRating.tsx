@@ -6,10 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 type Props = {
   eventId: string;
   isAuthenticated: boolean;
+  /** When true, scroll this widget into view + pulse + focus first star.
+   *  Used by the post-event review-prompt deep link (`?review=1`). */
+  autoFocus?: boolean;
 };
 
-export default function InlineEventRating({ eventId, isAuthenticated }: Props) {
+export default function InlineEventRating({ eventId, isAuthenticated, autoFocus = false }: Props) {
   const supabaseRef = useRef(createClient());
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const firstStarRef = useRef<HTMLButtonElement | null>(null);
+  const [pulse, setPulse] = useState(false);
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [userRating, setUserRating] = useState<number | null>(null);
@@ -48,6 +54,20 @@ export default function InlineEventRating({ eventId, isAuthenticated }: Props) {
     fetchRatings();
   }, [fetchRatings]);
 
+  // Deep-link focus: when routed here via ?review=1 (post-event review
+  // prompt), scroll the widget into view, briefly pulse the gold ring,
+  // and focus the first star for keyboard users.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const t = window.setTimeout(() => {
+      containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      firstStarRef.current?.focus();
+      setPulse(true);
+      window.setTimeout(() => setPulse(false), 2200);
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [autoFocus]);
+
   async function handleRate(star: number) {
     if (!isAuthenticated || saving) return;
 
@@ -81,7 +101,12 @@ export default function InlineEventRating({ eventId, isAuthenticated }: Props) {
   const displayRating = hoverRating || userRating || 0;
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      ref={containerRef}
+      className={`flex items-center gap-2 rounded-lg px-1.5 py-1 transition ${
+        pulse ? "bg-(--gold-soft,#f5ecd3) ring-2 ring-(--gold,#c9a348)" : ""
+      }`}
+    >
       {/* Interactive stars */}
       <div
         className="flex items-center gap-0.5"
@@ -91,6 +116,7 @@ export default function InlineEventRating({ eventId, isAuthenticated }: Props) {
           <button
             key={star}
             type="button"
+            ref={star === 1 ? firstStarRef : undefined}
             disabled={!isAuthenticated || saving}
             onClick={() => handleRate(star)}
             onMouseEnter={() => isAuthenticated && setHoverRating(star)}

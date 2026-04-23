@@ -10,7 +10,8 @@ import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import SearchProfilePicker from "./SearchProfilePicker";
-import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia } from "@/types/db";
+import TagPicker from "./TagPicker";
+import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia, EventTag } from "@/types/db";
 import type { SearchProfile } from "@/lib/searchProfile";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
@@ -67,6 +68,8 @@ export default function EditEventForm({ event }: Props) {
   const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(
     event.search_profile ?? null,
   );
+  const [tags, setTags] = useState<EventTag[]>([]);
+  const [initialTagIds, setInitialTagIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -85,6 +88,30 @@ export default function EditEventForm({ event }: Props) {
       .order("created_at", { ascending: true })
       .then(({ data }: { data: EventMedia[] | null }) => {
         if (!cancelled && data) setExistingMedia(data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id]);
+
+  // Load existing tag assignments so the picker hydrates with the
+  // current state.  The join-through query returns nested tag rows,
+  // which we flatten for the picker's `EventTag[]` contract.
+  useEffect(() => {
+    let cancelled = false;
+    const client = createClient();
+    client
+      .from("event_tag_assignments")
+      .select("tag:event_tags(id, slug, label, is_official, is_hidden, usage_count, created_by, created_at)")
+      .eq("event_id", event.id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const rows = data as unknown as Array<{ tag: EventTag | EventTag[] | null }>;
+        const flat = rows
+          .map((r) => (Array.isArray(r.tag) ? r.tag[0] : r.tag))
+          .filter((t): t is EventTag => t !== null && t !== undefined && !t.is_hidden);
+        setTags(flat);
+        setInitialTagIds(new Set(flat.map((t) => t.id)));
       });
     return () => {
       cancelled = true;
@@ -188,6 +215,28 @@ export default function EditEventForm({ event }: Props) {
         setLoading(false);
         return;
       }
+    }
+
+    // Sync tag assignments: POST additions, DELETE removals.  Failures
+    // here are non-fatal — the event update has already persisted.
+    const currentIds = new Set(tags.map((t) => t.id));
+    const toAdd = tags.filter((t) => !initialTagIds.has(t.id));
+    const toRemove = Array.from(initialTagIds).filter((id) => !currentIds.has(id));
+    if (toAdd.length > 0 || toRemove.length > 0) {
+      await Promise.allSettled([
+        ...toAdd.map((t) =>
+          fetch(`/api/events/${event.id}/tags`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tag_id: t.id }),
+          }),
+        ),
+        ...toRemove.map((id) =>
+          fetch(`/api/events/${event.id}/tags?tagId=${encodeURIComponent(id)}`, {
+            method: "DELETE",
+          }),
+        ),
+      ]);
     }
 
     router.push(`/events/${event.id}`);
@@ -358,6 +407,13 @@ export default function EditEventForm({ event }: Props) {
             Discovery tags <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Tags <span className="text-gray-400 font-normal">(optional, up to 5)</span>
+          </label>
+          <TagPicker value={tags} onChange={setTags} />
         </div>
 
         <div>

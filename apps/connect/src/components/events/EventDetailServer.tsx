@@ -11,7 +11,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
-import type { Event, EventMedia } from "@/types/db";
+import type { Event, EventMedia, EventTag } from "@/types/db";
 
 export const getEventById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -32,7 +32,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
     notFound();
   }
 
-  const [{ data: { user } }, { count }, { data: mediaRows }] = await Promise.all([
+  const [{ data: { user } }, { count }, { data: mediaRows }, { data: tagRows }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("rsvps")
@@ -44,9 +44,19 @@ export default async function EventDetailServer({ id }: { id: string }) {
       .eq("event_id", id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
+    supabase
+      .from("event_tag_assignments")
+      .select("tag:event_tags(id, slug, label, is_official, is_hidden, usage_count, created_by, created_at)")
+      .eq("event_id", id),
   ]);
 
   const media = (mediaRows ?? []) as EventMedia[];
+  const tagRowsTyped = (tagRows ?? []) as unknown as Array<{
+    tag: EventTag | EventTag[] | null;
+  }>;
+  const tags = tagRowsTyped
+    .map((r) => (Array.isArray(r.tag) ? r.tag[0] : r.tag))
+    .filter((t): t is EventTag => t !== null && t !== undefined && !t.is_hidden);
 
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
@@ -124,6 +134,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       attendees={attendees}
       locationSharingEnabled={locationSharingEnabled}
       media={media}
+      tags={tags}
     />
   );
 }

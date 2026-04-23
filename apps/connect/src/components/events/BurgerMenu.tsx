@@ -485,6 +485,13 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     Manage Categories
                   </Link>
                   <Link
+                    href="/admin/tags"
+                    onClick={onClose}
+                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
+                  >
+                    Manage Tags
+                  </Link>
+                  <Link
                     href="/admin/users"
                     onClick={onClose}
                     className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"

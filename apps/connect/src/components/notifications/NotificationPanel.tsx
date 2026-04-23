@@ -26,6 +26,7 @@ const TYPE_ICONS: Record<string, string> = {
   event_cancelled: "✕",
   new_follower: "○",
   event_update: "▸",
+  review_prompt: "★",
 };
 
 /** Safely read dismissed review IDs from localStorage. */
@@ -178,6 +179,11 @@ export default function NotificationPanel({
   function getNotificationLink(n: Notification): string | null {
     const data = n.data;
     if (data?.event_id && typeof data.event_id === "string") {
+      // Post-event review prompts deep-link into the event detail page
+      // with ?review=1 so the rating widget auto-focuses itself.
+      if (n.type === "review_prompt") {
+        return `/events/${data.event_id}?review=1`;
+      }
       return `/events/${data.event_id}`;
     }
     if (data?.user_id && typeof data.user_id === "string") {
