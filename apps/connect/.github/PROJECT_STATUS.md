@@ -185,6 +185,25 @@
 - [x] `npx next lint --dir src` — No ESLint warnings or errors
 - [x] `mcp_supabase_get_advisors type:security` — no new warnings introduced by Batch J
 
+### Batch K — Tag Taxonomy + Quota Banner + Review Prompt + Tag Moderation (COMPLETE)
+- [x] **K1 Tag taxonomy** — Migration `056_tags_and_review_prompt.sql` (event_tags + event_tag_assignments, 5-cap trigger raising `event_tag_cap_reached`, usage_count maintenance, RLS layered: select public/insert auth/admin update+delete, slug regex `^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$`, label CHECK 1-40)
+- [x] Validation helpers `slugifyTag` / `isValidTagSlug` / `isValidTagLabel` (NFKD diacritic strip, length cap, null on empty)
+- [x] API routes: `GET/POST /api/tags` (ilike escaped, limit clamped to 25, idempotent on slug + 23505 race), `POST/DELETE /api/events/[id]/tags` (`requireOwnerOrAdmin()` + UUID validation + 409 hidden + 409 cap), `PATCH /api/admin/tags/[id]` (admin guard + mass-assignment whitelist + audit log)
+- [x] UI: `TagPicker.tsx` (180ms debounce + AbortController, max 5 chips, Backspace remove, Enter create), `TagChipList.tsx` (links to `/events?tag=<slug>`)
+- [x] Wired into EventForm (Promise.allSettled POST after insert) + EditEventForm (load-via-join + diff-sync)
+- [x] EventDetailServer parallel fetch + EventDetailContent embedding
+- [x] **K2 Citizen quota pre-check banner** — server-side 30d window check on `/events/new`, glass-panel CTA to `/contributor/apply` when limit hit
+- [x] **K3 Post-event review prompt** — Edge Function `prompt-post-event-reviews/index.ts` (daily cron, 1-25h window, RSVP+review-exclude join, `event_reminders` pref filter), notifications.type extended with `'review_prompt'`, NotificationPanel deep link `/events/[id]?review=1`, InlineEventRating `autoFocus` prop (scrollIntoView + focus first star + 2.2s gold pulse)
+- [x] **K4 Admin tag moderation** — `/admin/tags` page + TagModerator.tsx (toggle official/hidden, search filter), BurgerMenu link, admin_actions audit logging
+
+### Latest validation (Batch K — Tags + Review Prompt + Moderation)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **566 tests, 66 files, 0 failures** ✅ (+16 from Batch K: 10 validation-tags + 6 tags route)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] `next build` — `/api/tags`, `/admin/tags`, all routes shipped clean
+- [x] vibe-security audit — clean across all 4 surfaces (ILIKE escape, UUID validation, ownership/admin guards, mass-assignment whitelist, RLS layered)
+- [x] Pushed to origin/main as commit `4532b37`
+
 ---
 
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)

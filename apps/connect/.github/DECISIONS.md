@@ -2,6 +2,33 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Tags & Discovery
+
+### 5-tag cap per event, enforced at DB trigger level
+**Decision:** Each event may have at most 5 `event_tag_assignments`. Enforced by a `BEFORE INSERT` trigger raising `event_tag_cap_reached` (P0001), surfaced as HTTP 409 by `/api/events/[id]/tags`.
+**Why:** UX hygiene — encourages curation over hashtag spam. Trigger-based enforcement is race-safe vs. application-level pre-count which can be defeated by parallel requests.
+**Date:** Batch K (migration 056).
+
+### Tag hide vs delete: soft-hide only
+**Decision:** Admin moderation toggles `event_tags.is_hidden=true` rather than deleting rows. Hidden tags are filtered from `GET /api/tags` and from public chip rendering, but historical `event_tag_assignments` rows persist.
+**Why:** Preserves attribution history and avoids cascading deletion across past events. Reversible — un-hiding restores discoverability without backfill.
+**Date:** Batch K.
+
+### Tag slug regex: `^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$`
+**Decision:** Slugs are 1-40 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphens. `slugifyTag()` performs NFKD diacritic strip → lowercase → non-alnum→`-` → trim hyphens → 40-char slice → re-trim trailing hyphen.
+**Why:** Matches PostgREST URL safety, avoids accidental empty/leading-hyphen slugs from punctuation-only input, normalises diacritics so `Café` and `Cafe` collide cleanly.
+**Date:** Batch K.
+
+### Post-event review prompt window: 1-25 hours after end
+**Decision:** Daily cron `prompt-post-event-reviews` selects events whose end-time (or `date + 2h` fallback for date-only events) falls in `(now - 25h, now - 1h)`. Excludes attendees who already reviewed via Set-keyed `${event_id}::${user_id}`. Honours `event_reminders` notification preference.
+**Why:** Single daily window catches every event exactly once with safety margin (1h post-end avoids in-progress events; 25h cap allows the cron to slip up to an hour without missing events). Pref filter respects user opt-out.
+**Date:** Batch K.
+
+### Citizen event quota: 30-day rolling window (UX banner)
+**Decision:** `/events/new` server-component performs a server-side pre-check querying events created in last 30 days for the citizen and renders a glass-panel banner with the next-allowed date + CTA to `/contributor/apply` when limit hit. DB-level enforcement was already shipped in migration 037.
+**Why:** Rolling window matches user mental model better than calendar month (which would let someone post 30 Jan + 1 Feb back-to-back). Pre-check is UX-only — RLS / server validation remains the security boundary.
+**Date:** Batch K.
+
 ## Legal & Indemnity
 
 ### Platform-terms acceptance: client-side gate (not server-side blocker)
