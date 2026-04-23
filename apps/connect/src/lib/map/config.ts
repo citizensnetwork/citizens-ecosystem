@@ -17,7 +17,7 @@ const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
  */
 const MAPTILER_STYLE =
   process.env.NEXT_PUBLIC_MAPTILER_STYLE ??
-  "019da63f-f3d4-7958-a9e3-e7c4e61e1f37";
+  "019dba0f-b49b-73bb-bf6a-f9d820f43be8";
 
 /**
  * Light/neutral raster fallback using CartoDB Positron.
@@ -57,6 +57,27 @@ function maptilerStyleUrl(): string {
 export function getMapStyle(): string | StyleSpecification {
   if (MAPTILER_KEY) return maptilerStyleUrl();
   return NEUTRAL_RASTER_STYLE;
+}
+
+/**
+ * Dev-only description of the currently active basemap style, used by
+ * the on-screen overlay in EventMap so QA can visually confirm that a
+ * newly-configured MapTiler Cloud style/ENV change is actually applied
+ * and not overridden by caching or build artefacts.
+ */
+export function getMapStyleInfo(): {
+  source: "maptiler" | "carto-raster";
+  styleId: string | null;
+  url: string | null;
+} {
+  if (MAPTILER_KEY) {
+    return {
+      source: "maptiler",
+      styleId: MAPTILER_STYLE,
+      url: maptilerStyleUrl(),
+    };
+  }
+  return { source: "carto-raster", styleId: null, url: null };
 }
 
 /** Default map center: Pretoria, South Africa [lat, lng]. */

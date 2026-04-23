@@ -14,7 +14,7 @@ import {
   PLACE_MARKER_SIZE,
   PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
-import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
+import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
 
@@ -979,5 +979,28 @@ export default function EventMap({
     });
   }, [highlightedEventId, events]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div ref={containerRef} className="relative h-full w-full">
+      {process.env.NODE_ENV === "development" ? <MapStyleDebugBadge /> : null}
+    </div>
+  );
+}
+
+/**
+ * Dev-only badge rendered over the map showing the active basemap style
+ * source and ID.  Helps QA confirm a new MapTiler Cloud style (or env
+ * override) has actually been applied after cache-busted rebuilds.
+ */
+function MapStyleDebugBadge() {
+  const info = getMapStyleInfo();
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-2 bottom-16 z-[5] rounded-md bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-white/90 shadow"
+      data-testid="map-style-debug"
+    >
+      <div>style: {info.source}</div>
+      {info.styleId ? <div>id: {info.styleId.slice(0, 8)}…</div> : null}
+    </div>
+  );
 }

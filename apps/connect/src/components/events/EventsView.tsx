@@ -315,6 +315,7 @@ export default function EventsView({
     await supabaseRef.current!.auth.signOut();
     setUser(null);
     setFiltersOpen(false);
+    router.push("/");
     router.refresh();
   }
 

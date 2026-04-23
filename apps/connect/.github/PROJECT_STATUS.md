@@ -220,6 +220,26 @@
 
 ---
 
+## Batch M — Logout Redirect + MapTiler Style Swap (COMPLETE)
+
+### M1 Logout returns to landing
+- [x] `src/components/events/EventsView.tsx` — `handleLogout()` now calls `router.push("/")` before `router.refresh()` so signing out from the full-screen shell always bounces to `/` (landing page with guest-browse affordance + login CTA). Previously `router.refresh()` alone left the user on a stale authenticated `/events` frame pending middleware resolution. The Navbar-based logout path already pushed `/` — this aligns both flows.
+
+### M2 New MapTiler Cloud style + dev-only verification overlay
+- [x] `.env.local` — rotated to `NEXT_PUBLIC_MAPTILER_KEY=vopPYlm4eVtmPRVUBjK8` and `NEXT_PUBLIC_MAPTILER_STYLE=019dba0f-b49b-73bb-bf6a-f9d820f43be8` (user-supplied custom Cloud style). Old key remains in MapTiler dashboard for rotation.
+- [x] `src/lib/map/config.ts` — updated hardcoded default UUID to match new ENV; added `getMapStyleInfo()` helper returning `{ source, styleId, url }` for QA instrumentation.
+- [x] `src/components/map/EventMap.tsx` — container `<div>` gained `relative`; in `NODE_ENV === "development"` only (tree-shaken in prod via Next DefinePlugin), a small bottom-left `MapStyleDebugBadge` renders the active basemap source + style UUID prefix so QA can visually confirm style application after cache-busted rebuilds. Badge is `aria-hidden` + `pointer-events-none`.
+- [x] `src/__tests__/lib/map/config.test.ts` — assertion updated to new UUID. All 6 config tests pass.
+
+### Latest validation (Batch M)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **575 tests, 68 files, 0 failures** ✅
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect agent audit — **no Should-Fix**. Nice-to-haves applied: stricter `NODE_ENV === "development"` gate (avoids test-env badge render), `aria-hidden` on dev badge.
+- [x] Supabase security advisors — no schema/SQL changes in this batch, baseline unchanged (MCP advisor tool still deferred in this session; flagged for next batch).
+
+---
+
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
 
 ### Expanded Roles

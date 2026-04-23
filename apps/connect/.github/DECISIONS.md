@@ -2,6 +2,18 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MapTiler Style Verification & Logout Flow (Batch M)
+
+### Dev-only `MapStyleDebugBadge` gated by `NODE_ENV === "development"`
+**Decision:** `src/components/map/EventMap.tsx` renders a small bottom-left overlay with the active MapTiler source + style UUID, visible only in dev (`process.env.NODE_ENV === "development"`). Production and test environments render nothing.
+**Why:** Previous attempts to swap the MapTiler Cloud style had "no visible effect" reports. Cache-busted rebuilds, `.env.local` reloads, and MapLibre style-loading order all make silent-fallback bugs hard to detect by eye. The badge reads directly from `getMapStyleInfo()` (pure function over the same ENV used by `getMapStyle()`), so if the badge says `maptiler / 019dba0f…` the runtime is unambiguously using that Cloud style. If it says `carto-raster`, MapTiler failed to load (key/network). The `=== "development"` gate (rather than `!== "production"`) is the stricter form: it excludes `"test"` and avoids polluting Vitest component snapshots. Next.js 15 DefinePlugin inlines `process.env.NODE_ENV`, so the badge + `MapStyleDebugBadge` component are dead-code-eliminated from the production client bundle.
+**Date:** Batch M.
+
+### Logout from `/events` shell pushes `/` before refreshing
+**Decision:** `EventsView.handleLogout` calls `router.push("/")` **then** `router.refresh()`. Navbar's `handleLogout` already did this; the events-shell path did not.
+**Why:** `router.refresh()` alone re-renders the current segment (`/events`) with a now-signed-out session; the user briefly sees an authenticated shell frame before middleware resolves, and has no visible path back to login / guest landing. Push-then-refresh navigates first (queued client-side transition) and refresh invalidates the RSC cache so the landing page renders with the new session. `window.location.assign("/")` was considered as a hammer but rejected for now — it's a full reload and only worth it if stale singleton subscriptions (e.g., NotificationBell realtime channel) are observed leaking.
+**Date:** Batch M.
+
 ## Contributor Applications & My Events (Batch L)
 
 ### Direct insert on `/api/contributor/apply` instead of Edge Function proxy
