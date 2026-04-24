@@ -38,7 +38,7 @@ export function ApplicationPendingBanner({
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 10 10"
               className="h-2.5 w-2.5"
-              aria-hidden
+              aria-hidden={true}
             >
               <path
                 d="M2 2l6 6M8 2l-6 6"
@@ -50,7 +50,7 @@ export function ApplicationPendingBanner({
           </button>
           <span className="flex flex-1 items-center gap-2">
             <span
-              aria-hidden
+              aria-hidden={true}
               className="inline-block h-2 w-2 animate-pulse rounded-full bg-(--gold,#D4AF37)"
             />
             <span>
@@ -86,7 +86,7 @@ export function ApplicationPendingBanner({
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 10 10"
             className="h-2.5 w-2.5"
-            aria-hidden
+            aria-hidden={true}
           >
             <path
               d="M2 2l6 6M8 2l-6 6"

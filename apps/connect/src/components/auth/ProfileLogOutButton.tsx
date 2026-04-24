@@ -11,13 +11,13 @@ import { createClient } from "@/lib/supabase/client";
  */
 export default function ProfileLogOutButton() {
   const router = useRouter();
-  const supabase = createClient();
 
   const handleLogout = useCallback(async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
-  }, [router, supabase]);
+  }, [router]);
 
   return (
     <button
