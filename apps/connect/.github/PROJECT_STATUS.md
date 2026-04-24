@@ -355,6 +355,20 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Architect agent audit — **Approved.** No Should-fix. Nice-to-haves logged: suburb fade-out width (#1), threshold-literal consolidation (#2), world-view minZoom (#4); nice-to-have #3 (docstring) applied inline.
 - [x] Supabase security advisors — unchanged vs. Batch O (no schema changes).
 
+### Batch P — Admin profile updates fix + admin/users polish + map cluster UX (COMPLETE — `8fc86f4`)
+- [x] **Admin profile role/contributor mutations now persist** — root cause was a missing `update` RLS policy on `public.profiles`; PostgREST returned zero rows on cross-user PATCHes with NO error. Migration `063_admin_profile_updates.sql` adds an `Admins can update any profile` policy gated by `public.is_admin()`; mirrored into `supabase/schema.sql`. Defense-in-depth: `PATCH /api/admin/users` now calls `.select('id')` after update and returns HTTP 500 (generic body, detailed server log) on zero rows.
+- [x] **Pagination polish on `/admin/users`** — Prev/Next nav hidden when `totalPages === 1` (was always rendered + always disabled).
+- [x] **Pending Contributor applications surfaced on `/admin/users`** — server fetches `contributor_applications` (status=pending) using the same FK alias + `ContributorReviewCard` component as `/admin/contributors`. Visible red banner + console.error when the fetch errors so a "nothing to review" empty state never masks an RLS regression.
+- [x] **Map cluster regroup UX** — all tier clusters now multi-expand (capital + town no longer collapse siblings). Outside map-canvas click stages collapse one tier at a time (suburb → town → capital) via new `collapseInnermostTier()`. Event + place markers attach `stopPropagation` listeners so interacting with a marker inside an open cluster never collapses it. Zoom-band changes only collapse on zoom-OUT across a tier boundary using a `bandRank` record.
+
+### Latest validation (Batch P — Admin + Map UX)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **612 tests, 69 files, 0 failures** ✅
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] vibe-security skill review — no critical/high issues
+- [x] Architect audit — A- / A / A / A- / A / B+ — Should-fix S1/S2/S3 + N2 applied inline (`maybeSingle`, captured+logged appsError + alert banner, generic 500 body, refreshed multi-expand spec comment). N1 (hoist `bandRank`), N3 (`swallowMapCanvasClick` helper), N5 (`collapseInnermostTier` single-pass), and `useClusterExpansion` hook deferred to follow-up tidy-up batch.
+- [x] `mcp_supabase_get_advisors type:security` — baseline unchanged (DDL-only RLS policy, no new functions or views)
+
 ---
 
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)

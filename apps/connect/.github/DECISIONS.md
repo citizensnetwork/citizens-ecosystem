@@ -2,6 +2,24 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch P — Admin profile RLS + staged cluster collapse
+
+**Decision 1 — Admin UPDATE RLS policy on `public.profiles`.** Admin role/contributor mutations going through `PATCH /api/admin/users` were silently no-op'ing because `public.profiles` only had a self-update policy (`auth.uid() = id`). PostgREST returns success with zero rows updated when RLS filters every row, with **no error**. Migration 063 adds an explicit `Admins can update any profile` policy gated by the existing `public.is_admin()` SECURITY DEFINER STABLE function. The PATCH endpoint also now selects the updated row id and returns HTTP 500 on zero rows as defense-in-depth, with a generic client message and a detailed `console.error` so the regression cannot recur silently.
+
+**Why not service role?** The codebase has a hard rule: never use service-role keys on server routes when an RLS policy can express the intent. `is_admin()` already exists; adding the policy is the correct minimal fix and keeps every admin mutation auditable through Supabase's regular auth/RLS pipeline.
+
+**Decision 2 — Staged one-tier-per-click cluster collapse + universal multi-expand.** Original behaviour: capital and town tiers were single-expand (opening one collapsed siblings); outside map-click collapsed everything. This conflicted with the new "all clusters multi-expand" spec and produced a UX bug where interacting with an event marker inside an open suburb collapsed the whole drill-down stack.
+
+Resolution:
+- Every tier (capital / town / suburb) now multi-expands. The user explicitly drilled in; the platform should not undo their work.
+- Outside map-canvas click no longer calls `collapseAllExpansions`; it calls `collapseInnermostTier()` which collapses only the tier closest to the user's most recent decision (priority `suburb → town → capital`). One click per tier, mirroring the way they drilled in.
+- Event and place marker DOM elements `stopPropagation` on `click`, so interacting with a marker never bubbles to the canvas-click handler.
+- Zoom-band changes only collapse on **zoom-OUT** across a tier boundary (rank comparison via `bandRank`). Zooming further IN keeps expansions intact since they remain valid context.
+
+This makes recoupling deterministic and reversible: the user always knows what one map-click will close.
+
+---
+
 ## Batch O.1 — Hide individual markers below zoom 12 (hard threshold)
 
 **Decision:** `markerOpacityAt(z) = z >= 12 ? 1 : 0` — a hard threshold with no crossfade. Below zoom 12 every individual event + place marker is `visibility: hidden` unless either (a) the point sits inside a currently-expanded suburb cell (lift bypass), or (b) filters / places-mode are active (explicit user intent). At zoom ≥ 12 markers are fully visible and bubble tiers fade to 0.
