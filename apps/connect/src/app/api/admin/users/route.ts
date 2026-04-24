@@ -274,13 +274,20 @@ export async function PATCH(request: NextRequest) {
 
   // Role column is protected by a DB trigger so self-escalation is
   // blocked at the database level. Admin updates use the RPC-
-  // equivalent `is_admin()` check in the policy; service_role is not
-  // needed here because admins can bypass the protect_role_column
-  // trigger via is_admin().
-  const { error: updErr } = await supabase
+  // equivalent `is_admin()` check in the policy (migration 063);
+  // service_role is not needed here because admins can bypass the
+  // protect_role_column trigger via is_admin().
+  //
+  // `.select()` forces PostgREST to echo the affected rows, which we
+  // use below to detect the silent-zero-row case — if RLS ever stops
+  // admins from updating profiles again (e.g. someone drops the
+  // policy), the API surfaces a clear 500 instead of pretending the
+  // change landed.
+  const { data: updatedRows, error: updErr } = await supabase
     .from("profiles")
     .update(patch)
-    .eq("id", body.user_id);
+    .eq("id", body.user_id)
+    .select("id");
 
   if (updErr) {
     // Trigger `enforce_at_least_one_admin` raises P0001 with a
@@ -294,6 +301,21 @@ export async function PATCH(request: NextRequest) {
       );
     }
     console.error("[admin/users PATCH]", updErr);
+    return NextResponse.json(
+      { error: "Failed to update user" },
+      { status: 500 },
+    );
+  }
+
+  if (!updatedRows || updatedRows.length === 0) {
+    // RLS filtered out every row — either the target user vanished
+    // between preflight + update, or the admin update policy was
+    // revoked. Surface it loudly in server logs; return a generic
+    // message to the client to avoid leaking internal scaffolding.
+    console.error(
+      "[admin/users PATCH] zero rows updated — RLS or missing target",
+      { target: body.user_id },
+    );
     return NextResponse.json(
       { error: "Failed to update user" },
       { status: 500 },

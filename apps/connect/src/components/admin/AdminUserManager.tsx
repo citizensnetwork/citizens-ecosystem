@@ -488,35 +488,37 @@ export default function AdminUserManager({
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-black/60">
-        <button
-          type="button"
-          disabled={page <= 1 || loading}
-          onClick={() => {
-            const p = page - 1;
-            setPage(p);
-            void fetchPage(p, q, statusFilter);
-          }}
-          className="rounded-xl border border-black/10 bg-white px-3 py-1.5 font-medium text-black transition hover:bg-black/5 disabled:opacity-40"
-        >
-          ← Prev
-        </button>
-        <span>
-          Page {meta.page} of {totalPages}
-        </span>
-        <button
-          type="button"
-          disabled={page >= totalPages || loading}
-          onClick={() => {
-            const p = page + 1;
-            setPage(p);
-            void fetchPage(p, q, statusFilter);
-          }}
-          className="rounded-xl border border-black/10 bg-white px-3 py-1.5 font-medium text-black transition hover:bg-black/5 disabled:opacity-40"
-        >
-          Next →
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-black/60">
+          <button
+            type="button"
+            disabled={page <= 1 || loading}
+            onClick={() => {
+              const p = page - 1;
+              setPage(p);
+              void fetchPage(p, q, statusFilter);
+            }}
+            className="rounded-xl border border-black/10 bg-white px-3 py-1.5 font-medium text-black transition hover:bg-black/5 disabled:opacity-40"
+          >
+            ← Prev
+          </button>
+          <span>
+            Page {meta.page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages || loading}
+            onClick={() => {
+              const p = page + 1;
+              setPage(p);
+              void fetchPage(p, q, statusFilter);
+            }}
+            className="rounded-xl border border-black/10 bg-white px-3 py-1.5 font-medium text-black transition hover:bg-black/5 disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

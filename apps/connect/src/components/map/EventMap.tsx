@@ -246,13 +246,11 @@ export default function EventMap({
    * hidden while expanded, and child markers are spawned with a fly-out
    * animation that originates from the parent's screen position.
    *
-   * Single / multi rules (per spec):
-   *   - capital + town clicks  → single-expand: opening another collapses
-   *                              the previous so the map stays uncluttered.
-   *   - suburb clicks          → multi-expand: opening additional suburbs
-   *                              keeps the previous ones open.  Only a map
-   *                              click outside, or a zoom out across the
-   *                              suburb tier boundary, recouples them.
+   * Expand rules (April 2026 spec):
+   *   - ALL tiers multi-expand. Opening another bubble at any tier
+   *     never auto-collapses an already-open one. A staged outside
+   *     map-click (see `collapseInnermostTier`) or a zoom-OUT across
+   *     a tier band boundary are the only triggers that recouple.
    *
    * For non-suburb expansions `childMarkers` holds the spawned bubble
    * markers.  For suburb expansions `childMarkers` is empty — the visual
@@ -508,6 +506,50 @@ export default function EventMap({
   collapseAllExpansionsRef.current = collapseAllExpansions;
 
   /**
+   * Staged recouple — collapses only the *innermost* open tier.
+   *
+   * Tier nesting (outer → inner): capital ⟶ town ⟶ suburb ⟶ marker.
+   * Opening a town bubble reveals suburb bubbles; opening a suburb
+   * bubble lifts the underlying event / place markers. So if the user
+   * has expanded a capital (→ towns) and then one of those towns
+   * (→ suburbs) and then one of those suburbs (→ lifted markers), a
+   * single outside map click should collapse the suburb expansion
+   * first (re-show the suburb bubbles), the next click collapses the
+   * town expansion (re-show the town bubble), and so on — reversing
+   * the drill-down one level at a time.
+   *
+   * This replaces the prior "one map click collapses everything"
+   * behaviour that the user found too aggressive (it also killed
+   * suburb expansions when the user just clicked an event marker that
+   * happened to have its MapLibre canvas click bubble up).
+   *
+   * Returns true if any collapse happened.
+   */
+  const collapseInnermostTier = useCallback((): boolean => {
+    const exp = expansionsRef.current;
+    if (exp.size === 0) return false;
+    // Priority: suburb expansions are "innermost" (they lift markers),
+    // then town, then capital.
+    const priority: Array<ClusterBubble["tier"]> = ["suburb", "town", "capital"];
+    for (const tier of priority) {
+      const keysAtTier: string[] = [];
+      for (const [k, s] of exp) {
+        if (s.parent.tier === tier) keysAtTier.push(k);
+      }
+      if (keysAtTier.length > 0) {
+        for (const k of keysAtTier) collapseExpansion(k);
+        updateGeoClusterOpacityRef.current();
+        updatePlaceVisibilityRef.current();
+        return true;
+      }
+    }
+    return false;
+  }, [collapseExpansion]);
+
+  const collapseInnermostTierRef = useRef<() => boolean>(() => false);
+  collapseInnermostTierRef.current = collapseInnermostTier;
+
+  /**
    * Open a bubble — split it into its child tier (or into individual
    * events/places at the suburb tier).  Enforces the single-expand /
    * multi-expand rules from the spec.
@@ -535,12 +577,11 @@ export default function EventMap({
         return;
       }
 
-      // Single-expand for capital/town: collapse every other open bubble
-      // first.  Suburb expansions stack instead.
-      if (parent.tier !== "suburb") {
-        const openKeys = [...expansionsRef.current.keys()];
-        for (const k of openKeys) collapseExpansion(k);
-      }
+      // Multi-expand across every tier (spec change, April 2026):
+      // opening another cluster should NEVER auto-collapse an already
+      // open one. Only an outside map-click or a zoom-out across a
+      // tier boundary triggers recouple, and even then it's staged
+      // one level at a time.
 
       const childTier = childTierOf(parent.tier);
       const allPoints = collectAllPoints();
@@ -1011,13 +1052,16 @@ export default function EventMap({
     };
     let lastBand = bandFor(map.getZoom());
 
-    // Map-canvas click anywhere outside a bubble (MapLibre's `click`
-    // event fires only for the canvas, not for marker DOM, because
-    // bubble handlers call `stopPropagation()`).  Recouples every open
-    // expansion so the user gets a clean view back.
+    // Map-canvas click anywhere outside a bubble — staged recouple.
+     // MapLibre's `click` event fires only for the canvas, not for
+     // marker DOM, because bubble + marker handlers call
+     // `stopPropagation()`. Each click collapses one tier at a time
+     // (innermost first) so the user drills back out the way they
+     // drilled in, rather than having a single click vaporise a deep
+     // expansion tree.
     map.on("click", () => {
       if (expansionsRef.current.size === 0) return;
-      collapseAllExpansionsRef.current();
+      collapseInnermostTierRef.current();
     });
 
     // Zoom-gate place visibility, resize markers, and run deconfliction on zoom changes.
@@ -1025,11 +1069,21 @@ export default function EventMap({
       updatePlaceVisibility();
       updateMarkerSizesRef.current();
       runDeconflictionRef.current();
-      // Crossing into a new tier band recouples open expansions.
+      // Crossing into a new tier band on *zoom-out* recouples open
+      // expansions (the prior tier no longer owns the view). Zooming
+      // *in* never collapses — the user is drilling deeper into the
+      // data and their expansions should stay put.
       const newBand = bandFor(map.getZoom());
       if (newBand !== lastBand) {
+        const bandRank: Record<typeof newBand, number> = {
+          capital: 0,
+          town: 1,
+          suburb: 2,
+          marker: 3,
+        };
+        const zoomedOut = bandRank[newBand] < bandRank[lastBand];
         lastBand = newBand;
-        if (expansionsRef.current.size > 0) {
+        if (zoomedOut && expansionsRef.current.size > 0) {
           collapseAllExpansionsRef.current();
         }
       }
@@ -1326,6 +1380,10 @@ export default function EventMap({
         // we don't rewrite `transition` on every zoom frame.
         el.dataset.temporalOpacity = String(temporal.opacity);
         el.style.transition = "opacity 160ms linear";
+        // Prevent the marker click from bubbling up to the map canvas's
+        // `click` handler (which would collapse open cluster expansions).
+        // See `collapseInnermostTier` wiring in the map-init effect.
+        el.addEventListener("click", (e) => e.stopPropagation());
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
@@ -1416,6 +1474,8 @@ export default function EventMap({
         // symmetry so the clustering fade multiplies by 1 not by NaN.
         placeEl.dataset.temporalOpacity = "1";
         placeEl.style.transition = "opacity 160ms linear";
+        // Same cluster-collapse guard as event markers.
+        placeEl.addEventListener("click", (e) => e.stopPropagation());
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)

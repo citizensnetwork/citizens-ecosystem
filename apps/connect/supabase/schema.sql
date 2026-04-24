@@ -61,6 +61,12 @@ do $$ begin
 end $$;
 
 do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Admins can update any profile' and tablename = 'profiles') then
+    create policy "Admins can update any profile" on public.profiles for update using (public.is_admin()) with check (public.is_admin());
+  end if;
+end $$;
+
+do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Users can insert own profile' and tablename = 'profiles') then
     create policy "Users can insert own profile" on public.profiles for insert with check (auth.uid() = id);
   end if;
