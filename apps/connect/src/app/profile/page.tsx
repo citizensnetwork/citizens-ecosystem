@@ -9,6 +9,7 @@ import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
 import LinkedAccounts from "@/components/auth/LinkedAccounts";
 import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
+import ProfileLogOutButton from "@/components/auth/ProfileLogOutButton";
 import PersonalizationPanel from "@/components/profile/PersonalizationPanel";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 import QuickPanelPreferencesSection from "@/components/events/QuickPanelPreferencesSection";
@@ -318,6 +319,11 @@ export default async function ProfilePage() {
           )}
         </section>
       )}
+
+      {/* ── Log Out ─── */}
+      <section className="mb-8">
+        <ProfileLogOutButton />
+      </section>
 
       {/* ── Danger Zone (always last) ─── */}
       <section className="mb-8 rounded-xl border border-red-100 bg-white/50 p-5">
