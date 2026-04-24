@@ -86,8 +86,13 @@ type Props = {
 /* ── Persist map viewpoint across navigations ── */
 const MAP_VIEW_KEY = "cc-map-viewpoint";
 
-/** Minimum zoom level to show place markers (~30% of a single city). */
-const PLACE_ZOOM_MIN = 14;
+/** Minimum zoom level at which place markers become freely visible.
+ *  Aligned with `MARKER_FADE_IN_END` (12) so events and places light up
+ *  together at the bubble→marker handover.  Below this zoom places (and
+ *  events) stay hidden behind the totalling bubble layers and only
+ *  appear when the user "decouples" a suburb cluster (lifted-marker
+ *  path in `updateGeoClusterOpacity` / `updatePlaceVisibility`). */
+const PLACE_ZOOM_MIN = 12;
 
 /** Below this zoom, run marker deconfliction with leader lines. */
 const DECONFLICT_MAX_ZOOM = 13;
@@ -467,6 +472,27 @@ export default function EventMap({
     return out;
   }, [events, places]);
 
+  /** Look up a bubble element by its `ClusterBubble.key` across both the
+   *  top-level `geoClusterMarkersRef` (built by `rebuildGeoClusters`) and
+   *  any open expansion's `childMarkers` (spawned by `expandBubble`).
+   *
+   *  Why both? When the user clicks a child bubble (e.g. a town's
+   *  spawned suburb child) to expand it further, that child only lives
+   *  in its parent's `expansionsRef` state — it is NOT a key in
+   *  `geoClusterMarkersRef`. Without this lookup, `setBubbleExpanded`
+   *  could never hide it and the parent number stayed plastered over
+   *  the lifted markers it had just released. */
+  const findBubbleEl = useCallback((key: string): HTMLDivElement | null => {
+    const rec = geoClusterMarkersRef.current.get(key);
+    if (rec) return rec.el;
+    for (const exp of expansionsRef.current.values()) {
+      for (const child of exp.childMarkers) {
+        if (child.el.dataset.ccBubbleKey === key) return child.el;
+      }
+    }
+    return null;
+  }, []);
+
   /** Tear down a single expansion: remove its child markers, restore the
    *  parent bubble's natural state.  Safe to call with an unknown key. */
   const collapseExpansion = useCallback((key: string) => {
@@ -487,10 +513,12 @@ export default function EventMap({
     }
     expansionsRef.current.delete(key);
     liftedSuburbKeysRef.current = null;
-    // Restore parent bubble visibility on next opacity pass.
-    const rec = geoClusterMarkersRef.current.get(key);
-    if (rec) setBubbleExpanded(rec.el, false);
-  }, []);
+    // Restore parent bubble visibility on next opacity pass — works for
+    // both top-level bubbles and bubbles that were spawned as children
+    // of another expansion (see `findBubbleEl`).
+    const parentEl = findBubbleEl(key);
+    if (parentEl) setBubbleExpanded(parentEl, false);
+  }, [findBubbleEl]);
 
   /** Tear down every expansion (used by outside-click recouple + zoom
    *  band changes). */
@@ -597,6 +625,11 @@ export default function EventMap({
           const size = bubbleSizeForCount(child.count);
           const el = createGeoClusterBubbleEl(child.count, size);
           el.classList.add("cc-geo-cluster-child");
+          // Stamp the bucket key so `findBubbleEl` can resolve this
+          // spawned child later — without it, expanding a spawned
+          // sub-bubble (e.g. a town's child suburb) leaves the
+          // bubble plastered on top of its lifted children. */
+          el.dataset.ccBubbleKey = child.key;
           attachBubbleClickHandlerRef.current(el, child);
           const marker = new maplibregl.Marker({
             element: el,
@@ -615,13 +648,16 @@ export default function EventMap({
       expansionsRef.current.set(parent.key, state);
       liftedSuburbKeysRef.current = null;
 
-      // Hide the parent bubble + repaint dependent layers.
-      const rec = geoClusterMarkersRef.current.get(parent.key);
-      if (rec) setBubbleExpanded(rec.el, true);
+      // Hide the parent bubble + repaint dependent layers. The bubble
+      // element may live in `geoClusterMarkersRef` (top-level) OR in
+      // another expansion's `childMarkers` (when this parent is itself
+      // a spawned child). `findBubbleEl` checks both.
+      const parentEl = findBubbleEl(parent.key);
+      if (parentEl) setBubbleExpanded(parentEl, true);
       updateGeoClusterOpacityRef.current();
       updatePlaceVisibilityRef.current();
     },
-    [collapseExpansion, collectAllPoints],
+    [collapseExpansion, collectAllPoints, findBubbleEl],
   );
 
   /**
@@ -1053,14 +1089,23 @@ export default function EventMap({
     let lastBand = bandFor(map.getZoom());
 
     // Map-canvas click anywhere outside a bubble — staged recouple.
-     // MapLibre's `click` event fires only for the canvas, not for
-     // marker DOM, because bubble + marker handlers call
-     // `stopPropagation()`. Each click collapses one tier at a time
-     // (innermost first) so the user drills back out the way they
-     // drilled in, rather than having a single click vaporise a deep
-     // expansion tree.
-    map.on("click", () => {
+    // We can't rely on bubble/marker `stopPropagation()` to gate this
+    // (markers must NOT stop propagation, otherwise MapLibre's own
+    // `_onMapClick` popup toggle never fires — see marker creation
+    // notes). Instead we inspect the click's DOM target: if it landed
+    // inside a marker, cluster bubble, or popup, leave the open
+    // expansions alone. Each "real" canvas click collapses one tier
+    // (innermost first) so the user drills back out the way they
+    // drilled in, rather than having a single click vaporise a deep
+    // expansion tree.
+    const SKIP_COLLAPSE_SELECTOR =
+      ".cc-marker, .cc-place-marker, .cc-geo-cluster, .maplibregl-popup";
+    map.on("click", (e) => {
       if (expansionsRef.current.size === 0) return;
+      const target = e.originalEvent?.target as Element | null;
+      if (target && typeof target.closest === "function" && target.closest(SKIP_COLLAPSE_SELECTOR)) {
+        return;
+      }
       collapseInnermostTierRef.current();
     });
 
@@ -1380,10 +1425,15 @@ export default function EventMap({
         // we don't rewrite `transition` on every zoom frame.
         el.dataset.temporalOpacity = String(temporal.opacity);
         el.style.transition = "opacity 160ms linear";
-        // Prevent the marker click from bubbling up to the map canvas's
-        // `click` handler (which would collapse open cluster expansions).
-        // See `collapseInnermostTier` wiring in the map-init effect.
-        el.addEventListener("click", (e) => e.stopPropagation());
+        // NOTE: We deliberately do NOT call `e.stopPropagation()` on the
+        // marker click here. MapLibre's marker→popup toggle is wired via
+        // `map.on('click', ...)` and depends on the click bubbling up the
+        // DOM to the canvas container (see maplibre-gl marker.ts:347 +
+        // `_onMapClick`). Stopping propagation kills the popup. Instead,
+        // the map-click handler itself inspects `e.originalEvent.target`
+        // and skips the staged collapse when the click landed on a
+        // marker / bubble / popup. See the `map.on("click", ...)` block
+        // in the map-init effect.
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
@@ -1474,8 +1524,10 @@ export default function EventMap({
         // symmetry so the clustering fade multiplies by 1 not by NaN.
         placeEl.dataset.temporalOpacity = "1";
         placeEl.style.transition = "opacity 160ms linear";
-        // Same cluster-collapse guard as event markers.
-        placeEl.addEventListener("click", (e) => e.stopPropagation());
+        // See the matching note on event markers above: do NOT stop
+        // propagation here, or MapLibre's `_onMapClick` (popup toggle)
+        // never fires. The map-click handler filters out marker hits
+        // by inspecting `e.originalEvent.target`.
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
           .setPopup(popup)
