@@ -56,6 +56,7 @@ describe("PlaceForm", () => {
     expect(screen.getByLabelText(/address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/phone/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/website/i)).toBeInTheDocument();
+    expect(screen.getByText(/gallery/i)).toBeInTheDocument();
   });
 
   it("renders category options from props", () => {

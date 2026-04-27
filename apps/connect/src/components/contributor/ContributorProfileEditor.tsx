@@ -167,7 +167,7 @@ export function ContributorProfileEditor({ profile }: { profile: Profile }) {
       </Section>
 
       <Section title="Gallery">
-        <Field label="Image URLs (one per line, up to 6 shown)">
+        <Field label="Public image URLs (one per line, up to 6)">
           <textarea
             value={form.gallery}
             onChange={(e) => set("gallery", e.target.value)}

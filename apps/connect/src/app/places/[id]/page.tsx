@@ -8,7 +8,8 @@ import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import { PageHeader } from "@/components/ui/PageHeader";
-import type { Place, Review } from "@/types/db";
+import MediaStrip from "@/components/media/MediaStrip";
+import type { Place, PlaceMedia, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +37,21 @@ export default async function PlaceDetailPage({
 
   const isOwner = !!user && user.id === place.created_by;
 
-  // Fetch reviews, follow data, and profile in parallel
-  const [reviewsRes, followerCountRes, userFollowRes, profileRes] = await Promise.all([
+  // Fetch reviews, media, follow data, and profile in parallel
+  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
       .eq("place_id", id)
       .order("created_at", { ascending: false })
       .returns<Review[]>(),
+    supabase
+      .from("place_media")
+      .select("*")
+      .eq("place_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .returns<PlaceMedia[]>(),
     supabase
       .from("place_follows")
       .select("id", { count: "exact", head: true })
@@ -62,6 +70,7 @@ export default async function PlaceDetailPage({
   ]);
 
   const reviews = reviewsRes.data;
+  const media = mediaRes.data ?? [];
   const followerCount = followerCountRes.count ?? 0;
   const isFollowing = !!userFollowRes.data;
   const isAdmin = profileRes.data?.role === "admin";
@@ -90,6 +99,8 @@ export default async function PlaceDetailPage({
             />
           </div>
         )}
+
+        <MediaStrip media={media} ariaLabel="Place media gallery" />
 
         <div className="flex items-start justify-between gap-3">
           <div>

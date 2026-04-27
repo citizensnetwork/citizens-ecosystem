@@ -2,6 +2,30 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch R — Category Icons + Media Gallery Architecture
+
+**Decision — Category/search icons live in one typed registry.** `src/lib/categoryIcons.ts` is the canonical SVG source for map event markers, place markers, quick-access buttons, and AI search intent groups. The registry maps concepts, not every synonym: canonical event/place categories get direct icon IDs, quick-access items reuse those IDs, and `SEARCH_INTENT_ICON_IDS` maps every `ALL_TAGS` slug to the nearest icon intent.
+
+**Why:** Duplicating inline SVG strings across marker builders and quick panels made icons drift and left AI search taxonomy coverage untestable. A single registry keeps visual language consistent while coverage tests catch future category/search-tag additions that forget an icon.
+
+**Decision — Media galleries are entity-generic, with event compatibility wrappers.** Shared upload/view components live under `src/lib/mediaUpload.ts` and `src/components/media/*`. Existing event imports remain stable through thin wrappers in `src/components/events/MediaGalleryUploader.tsx` and `src/components/events/EventMediaStrip.tsx`.
+
+**Why:** Events already had gallery behavior, while places needed the same capability. Generalising at the entity/table/bucket boundary avoids two diverging implementations and keeps future entities able to adopt the same pattern without rewriting preview, compression, lightbox, or upload code.
+
+**Decision — Place media uses `place_media` + `place-images`; storage paths are owner-scoped.** Place covers upload to `place-images/{user.id}/covers/...`; gallery media uploads to `{user.id}/gallery/places/{placeId}/...`. `place_media` stores public object URLs and metadata. The bucket is public, but the broad `storage.objects` SELECT policy is dropped; public object URLs do not require enabling bucket listing.
+
+**Why:** Place covers previously used the event image bucket, which blurred ownership and policy intent. Storing public URLs in `place_media` lets the app render galleries without listing storage objects, and avoiding a broad storage SELECT policy removes the public-bucket listing advisory.
+
+**Decision — Event media writes are owner/admin scoped; legacy uploader delete is preserved.** `event_photos` INSERT/UPDATE require the event owner or admin. DELETE allows event owner/admin or `uploaded_by = auth.uid()`.
+
+**Why:** The previous insert policy let any authenticated user attach media rows to any event by setting themselves as uploader. Owner/admin-scoped writes close that hole. Delete retains an escape hatch for legacy uploader-owned rows without granting uploaders UPDATE rights that could retarget media metadata to another event.
+
+**Decision — Contributor gallery remains URL-array based for now.** Contributor public profile galleries still come from `profiles.gallery_urls`, but the API now validates http/https URLs, normalises, dedupes, caps at six unique entries, and renders via `MediaStrip` in `plainImages` mode.
+
+**Why:** Contributor galleries currently point at external public images and are not storage-managed by this app. Keeping the storage model unchanged avoids scope creep while still improving validation, UX, and display consistency.
+
+---
+
 ## Batch Q — MapLibre marker click bubbling MUST be preserved
 
 **Decision (permanent invariant) — Never call `e.stopPropagation()` on marker DOM elements.** Batch P introduced a `swallowMapCanvasClick(el)` helper that attached a click listener to every event/place marker calling `stopPropagation`, intending to keep the canvas-click handler from collapsing a cluster the user just drilled into. This silently broke marker popups: MapLibre's `Marker._onMapClick` (in `maplibre-gl/src/ui/marker.ts`) wires the popup toggle through the canvas-click handler. Stopping propagation on the marker means the popup toggle never runs.

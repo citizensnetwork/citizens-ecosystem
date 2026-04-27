@@ -46,6 +46,7 @@
 | 17 | Indemnity Forms | **Complete** | indemnity_templates + indemnity_signatures tables, IndemnityForm gate before event creation |
 | 25 | Expanded Roles & Data Model | **Complete** | 7-role system (individual/ministry/org/business), category_id FK, place-images bucket, RLS hardening |
 | — | Auth Hardening Sprint | **Complete** | Google OAuth callback fix, phone SMS 2FA, Google account linking, account deletion, 5 SE agent reviews |
+| — | Category Icons & Media Galleries | **Complete** | Shared SVG registry, AI-search icon coverage, reusable media galleries, place media table/RLS |
 
 ---
 
@@ -386,6 +387,23 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] vibe-security skill review — clean
 - [x] `mcp_supabase_get_advisors type:security` — 20 lints, identical to Batch P baseline (no schema change)
 - [x] Rebase against `origin/main` (`85a8456` PR #31 merge) — accepted upstream version of `EventMap.tsx`; re-applied N1 + N5 on top; deleted dead helper
+
+### Batch R — Category Icons + Event/Place Media Galleries (COMPLETE)
+- [x] **Shared category icon registry** — `src/lib/categoryIcons.ts` is now the single source for event markers, place markers, quick-access buttons, and AI search intent icon mapping. Coverage tests ensure every event category, place category, quick-access item, and `ALL_TAGS` search taxonomy slug resolves to an SVG.
+- [x] **Map/quick panel icon cleanup** — `markers.ts` and `quickPanelOptions.ts` no longer duplicate inline SVG maps; marker colors source from canonical category hex maps.
+- [x] **Reusable media layer** — generic `uploadEntityMedia`, `MediaGalleryUploader`, and `MediaStrip` support image/video galleries while preserving event import paths through compatibility wrappers.
+- [x] **Place media module** — migration `20260427185151_media_galleries_and_category_icons.sql` adds `place_media` with public read + owner/admin write RLS, applies owner/admin-scoped place storage policies, and drops the broad `place-images` storage SELECT policy so public object URLs remain usable without bucket listing.
+- [x] **Place create/edit/detail wiring** — `PlaceForm` and `EditPlaceForm` upload covers/galleries to `place-images`, place detail renders the shared strip/lightbox, and edit pages load/delete existing place media.
+- [x] **Event media RLS hardening** — `event_photos` insert/update now require event owner/admin. Delete allows event owner/admin or the original uploader so legacy uploader-owned rows are not stranded.
+- [x] **Contributor gallery hardening** — profile API validates, normalises, dedupes, and caps external gallery URLs at six; public contributor profiles render them through the shared strip in plain image mode.
+
+### Latest validation (Batch R — Icons + Media Galleries)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **617 tests, 71 files, 0 failures** ✅ (+5 tests / +2 files from Batch Q baseline)
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect audit — 3 Should-fix findings applied inline: legacy uploader delete fallback for event photos, explicit missing-ID guard in `PlaceForm`, contributor gallery dedupe before max-count validation. Update remains owner/admin-scoped to prevent media row retargeting.
+- [x] Supabase migration applied via MCP — `place_media` and media policies verified in `pg_policies`.
+- [x] `mcp_supabase_get_advisors type:security` — **79 lints**, no `place_media`/`event_photos`/storage findings for this batch; previous `place-images` public-bucket listing warning removed by dropping the broad storage SELECT policy.
 
 ---
 

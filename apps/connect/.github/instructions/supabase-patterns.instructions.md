@@ -70,9 +70,11 @@ The anon key is safe to expose — RLS enforces access. Never bypass RLS with th
 
 ## Storage
 
-- Bucket `event-images` is public
-- Upload path convention: `${user.id}/${Date.now()}.${ext}`
-- Get URLs via: `supabase.storage.from("event-images").getPublicUrl(path)`
+- Buckets `event-images` and `place-images` are public.
+- Cover upload path convention: `${user.id}/covers/${timestamp}.${ext}`.
+- Gallery upload path convention: `${user.id}/gallery/${entity}/${entityId}/${timestamp}-${index}-${rand}.${ext}`.
+- Store public URLs in app tables (`event_photos`, `place_media`) via `getPublicUrl(path)`; do not list storage objects to build galleries.
+- Public buckets do not need a broad `storage.objects` SELECT policy for object URL access; avoid one because it enables bucket listing and triggers Supabase security advisors.
 - Supabase storage domain is registered in `next.config.ts` for `next/image`
 
 ## Security Definer RPCs

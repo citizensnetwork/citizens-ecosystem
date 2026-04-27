@@ -7,6 +7,10 @@ import dynamic from "next/dynamic";
 import type { Category } from "@/types/db";
 import { deriveSearchProfile, type SearchProfile } from "@/lib/searchProfile";
 import SearchProfilePicker from "@/components/events/SearchProfilePicker";
+import MediaGalleryUploader, { type SelectedMedia } from "@/components/media/MediaGalleryUploader";
+import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
+import { uploadPlaceMedia } from "@/lib/placeMedia";
 
 const LocationPicker = dynamic(
   () => import("@/components/map/LocationPicker"),
@@ -34,6 +38,7 @@ export default function PlaceForm({ categories }: Props) {
   const [website, setWebsite] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>(null);
   const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
   const [error, setError] = useState("");
@@ -42,14 +47,26 @@ export default function PlaceForm({ categories }: Props) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setImageFile(file);
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
-    } else {
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const rawFile = e.target.files?.[0] ?? null;
+    if (!rawFile) {
+      setError("");
+      setImageFile(null);
       setImagePreview(null);
+      return;
     }
+
+    const validationError = validateImageFile(rawFile);
+    if (validationError) {
+      setError(validationError);
+      e.target.value = "";
+      return;
+    }
+
+    const file = await compressImageIfNeeded(rawFile);
+    setError("");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,10 +92,10 @@ export default function PlaceForm({ categories }: Props) {
 
     let image_url: string | null = null;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
+      const safeExt = safeImageExtension(imageFile.name);
+      const path = `${user.id}/covers/${Date.now()}.${safeExt}`;
       const { error: uploadError } = await supabase.storage
-        .from("event-images")
+        .from("place-images")
         .upload(path, imageFile, { upsert: true });
 
       if (uploadError) {
@@ -88,7 +105,7 @@ export default function PlaceForm({ categories }: Props) {
       }
 
       const { data: urlData } = supabase.storage
-        .from("event-images")
+        .from("place-images")
         .getPublicUrl(path);
       image_url = urlData.publicUrl;
     }
@@ -96,21 +113,25 @@ export default function PlaceForm({ categories }: Props) {
     const selectedCategory = categories.find((c) => c.id === categoryId);
     const isOther = selectedCategory?.slug === "other";
 
-    const { error: insertError } = await supabase.from("places").insert({
-      name,
-      description,
-      address,
-      category_id: categoryId || null,
-      custom_category: isOther && customCategory.trim() ? customCategory.trim() : null,
-      phone: phone || null,
-      website: website || null,
-      image_url,
-      latitude: coords[0],
-      longitude: coords[1],
-      search_profile:
-        searchProfile ?? deriveSearchProfile(name, description, address) ?? null,
-      created_by: user.id,
-    });
+    const { data: inserted, error: insertError } = await supabase
+      .from("places")
+      .insert({
+        name,
+        description,
+        address,
+        category_id: categoryId || null,
+        custom_category: isOther && customCategory.trim() ? customCategory.trim() : null,
+        phone: phone || null,
+        website: website || null,
+        image_url,
+        latitude: coords[0],
+        longitude: coords[1],
+        search_profile:
+          searchProfile ?? deriveSearchProfile(name, description, address) ?? null,
+        created_by: user.id,
+      })
+      .select("id")
+      .single<{ id: string }>();
 
     if (insertError) {
       setError(insertError.message);
@@ -118,7 +139,26 @@ export default function PlaceForm({ categories }: Props) {
       return;
     }
 
-    router.push("/events");
+    if (!inserted?.id) {
+      setError("Failed to create place: no ID was returned.");
+      setLoading(false);
+      return;
+    }
+
+    if (galleryItems.length > 0) {
+      const galleryError = await uploadPlaceMedia(supabase, {
+        placeId: inserted.id,
+        userId: user.id,
+        items: galleryItems,
+      });
+      if (galleryError) {
+        setError(galleryError);
+        setLoading(false);
+        return;
+      }
+    }
+
+    router.push(`/places/${inserted.id}`);
     router.refresh();
   }
 
@@ -188,9 +228,9 @@ export default function PlaceForm({ categories }: Props) {
         <input
           id="coverImage"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
           onChange={handleImageChange}
-          className="w-full text-sm text-gray-500 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+          className="w-full text-sm text-black/60 file:mr-3 file:rounded-full file:border-0 file:bg-black/5 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-black hover:file:bg-black/10"
         />
         {imagePreview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -201,6 +241,12 @@ export default function PlaceForm({ categories }: Props) {
           />
         )}
       </div>
+
+      <MediaGalleryUploader
+        items={galleryItems}
+        onChange={setGalleryItems}
+        entityLabel="place"
+      />
 
       <div>
         <label

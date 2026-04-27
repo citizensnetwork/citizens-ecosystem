@@ -4,9 +4,13 @@ import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import type { Category, Place } from "@/types/db";
+import type { Category, Place, PlaceMedia } from "@/types/db";
 import type { SearchProfile } from "@/lib/searchProfile";
 import SearchProfilePicker from "@/components/events/SearchProfilePicker";
+import MediaGalleryUploader, { type SelectedMedia } from "@/components/media/MediaGalleryUploader";
+import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
+import { uploadPlaceMedia } from "@/lib/placeMedia";
 
 const LocationPicker = dynamic(
   () => import("@/components/map/LocationPicker"),
@@ -23,9 +27,10 @@ const LocationPicker = dynamic(
 type Props = {
   place: Place;
   categories: Category[];
+  media?: PlaceMedia[];
 };
 
-export default function EditPlaceForm({ place, categories }: Props) {
+export default function EditPlaceForm({ place, categories, media = [] }: Props) {
   const [name, setName] = useState(place.name);
   const [description, setDescription] = useState(place.description);
   const [address, setAddress] = useState(place.address);
@@ -39,6 +44,8 @@ export default function EditPlaceForm({ place, categories }: Props) {
   const [imagePreview, setImagePreview] = useState<string | null>(
     place.image_url ?? null
   );
+  const [existingMedia, setExistingMedia] = useState<PlaceMedia[]>(media);
+  const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>([
     place.latitude,
     place.longitude,
@@ -53,12 +60,38 @@ export default function EditPlaceForm({ place, categories }: Props) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setImageFile(file);
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0] ?? null;
+    if (!raw) {
+      setError("");
+      setImageFile(null);
+      return;
     }
+    const validationError = validateImageFile(raw);
+    if (validationError) {
+      setError(validationError);
+      e.target.value = "";
+      return;
+    }
+    const file = await compressImageIfNeeded(raw);
+    setError("");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleRemoveExistingMedia(id: string) {
+    if (!confirm("Remove this gallery item?")) return;
+    const { error: deleteError } = await supabase
+      .from("place_media")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      setError("Failed to remove: " + deleteError.message);
+      return;
+    }
+
+    setExistingMedia((prev) => prev.filter((item) => item.id !== id));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,10 +117,10 @@ export default function EditPlaceForm({ place, categories }: Props) {
 
     let image_url: string | null = place.image_url;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
+      const safeExt = safeImageExtension(imageFile.name);
+      const path = `${user.id}/covers/${Date.now()}.${safeExt}`;
       const { error: uploadError } = await supabase.storage
-        .from("event-images")
+        .from("place-images")
         .upload(path, imageFile, { upsert: true });
 
       if (uploadError) {
@@ -97,7 +130,7 @@ export default function EditPlaceForm({ place, categories }: Props) {
       }
 
       const { data: urlData } = supabase.storage
-        .from("event-images")
+        .from("place-images")
         .getPublicUrl(path);
       image_url = urlData.publicUrl;
     }
@@ -127,6 +160,24 @@ export default function EditPlaceForm({ place, categories }: Props) {
       setError(updateError.message);
       setLoading(false);
       return;
+    }
+
+    if (galleryItems.length > 0) {
+      const startSortOrder =
+        existingMedia.length > 0
+          ? Math.max(...existingMedia.map((item) => item.sort_order)) + 1
+          : 0;
+      const galleryError = await uploadPlaceMedia(supabase, {
+        placeId: place.id,
+        userId: user.id,
+        items: galleryItems,
+        startSortOrder,
+      });
+      if (galleryError) {
+        setError(galleryError);
+        setLoading(false);
+        return;
+      }
     }
 
     router.push(`/places/${place.id}`);
@@ -231,9 +282,9 @@ export default function EditPlaceForm({ place, categories }: Props) {
         <input
           id="coverImage"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
           onChange={handleImageChange}
-          className="w-full text-sm text-gray-500 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+          className="w-full text-sm text-black/60 file:mr-3 file:rounded-full file:border-0 file:bg-black/5 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-black hover:file:bg-black/10"
         />
         {imagePreview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -243,6 +294,47 @@ export default function EditPlaceForm({ place, categories }: Props) {
             className="mt-2 max-h-48 w-full rounded-lg object-cover"
           />
         )}
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Gallery</label>
+        {existingMedia.length > 0 && (
+          <ul className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {existingMedia.map((item) => (
+              <li key={item.id} className="relative">
+                <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-black/5">
+                  {item.kind === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.url} alt={item.title ?? ""} className="h-full w-full object-cover" />
+                  ) : (
+                    <>
+                      <video src={item.url} className="h-full w-full object-cover" muted playsInline />
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3"><path d="M8 5v14l11-7z" /></svg>
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExistingMedia(item.id)}
+                    aria-label="Remove existing gallery item"
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white shadow-sm transition hover:bg-black"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-3 w-3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <MediaGalleryUploader
+          items={galleryItems}
+          onChange={setGalleryItems}
+          existingCount={existingMedia.length}
+          entityLabel="place"
+        />
       </div>
 
       <div>

@@ -31,6 +31,22 @@ const ALLOWED_KEYS = [
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];
 
+const MAX_GALLERY_URLS = 6;
+const MAX_URL_LENGTH = 2_000;
+
+function normalisePublicUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > MAX_URL_LENGTH) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -75,15 +91,28 @@ export async function POST(request: Request) {
   }
 
   // Basic shape guards.
-  if (
-    update.gallery_urls !== undefined &&
-    update.gallery_urls !== null &&
-    !Array.isArray(update.gallery_urls)
-  ) {
-    return NextResponse.json(
-      { error: "gallery_urls must be an array" },
-      { status: 400 },
-    );
+  if (update.gallery_urls !== undefined && update.gallery_urls !== null) {
+    if (!Array.isArray(update.gallery_urls)) {
+      return NextResponse.json(
+        { error: "gallery_urls must be an array" },
+        { status: 400 },
+      );
+    }
+    const normalised = update.gallery_urls.map(normalisePublicUrl);
+    if (normalised.some((url) => url === null)) {
+      return NextResponse.json(
+        { error: "gallery_urls must contain valid public URLs" },
+        { status: 400 },
+      );
+    }
+    const unique = Array.from(new Set(normalised as string[]));
+    if (unique.length > MAX_GALLERY_URLS) {
+      return NextResponse.json(
+        { error: `gallery_urls can include at most ${MAX_GALLERY_URLS} URLs` },
+        { status: 400 },
+      );
+    }
+    update.gallery_urls = unique;
   }
   if (
     update.physical_latitude !== undefined &&

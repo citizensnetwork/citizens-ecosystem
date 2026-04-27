@@ -397,16 +397,121 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can upload event photos' and tablename = 'event_photos') then
-    create policy "Authenticated users can upload event photos" on public.event_photos for insert with check (auth.uid() = uploaded_by);
+  if not exists (select 1 from pg_policies where policyname = 'Event owners or admins can upload event photos' and tablename = 'event_photos') then
+    create policy "Event owners or admins can upload event photos" on public.event_photos
+      for insert with check (
+        auth.uid() = uploaded_by
+        and exists (
+          select 1 from public.events e
+          where e.id = event_id
+            and (e.created_by = auth.uid() or public.is_admin())
+        )
+      );
   end if;
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Photo uploader or admin can delete photos' and tablename = 'event_photos') then
-    create policy "Photo uploader or admin can delete photos" on public.event_photos for delete using (
-      auth.uid() = uploaded_by or public.is_admin()
-    );
+  if not exists (select 1 from pg_policies where policyname = 'Event owners or admins can update event photos' and tablename = 'event_photos') then
+    create policy "Event owners or admins can update event photos" on public.event_photos
+      for update using (
+        exists (
+          select 1 from public.events e
+          where e.id = event_id
+            and (e.created_by = auth.uid() or public.is_admin())
+        )
+      ) with check (
+        exists (
+          select 1 from public.events e
+          where e.id = event_id
+            and (e.created_by = auth.uid() or public.is_admin())
+        )
+      );
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Event owners, admins, or uploaders can delete event photos' and tablename = 'event_photos') then
+    create policy "Event owners, admins, or uploaders can delete event photos" on public.event_photos
+      for delete using (
+        auth.uid() = uploaded_by
+        or exists (
+          select 1 from public.events e
+          where e.id = event_id
+            and (e.created_by = auth.uid() or public.is_admin())
+        )
+      );
+  end if;
+end $$;
+
+-- ══════════════════════════════════════════════
+-- 8b. Place Media
+-- ══════════════════════════════════════════════
+create table if not exists public.place_media (
+  id uuid default gen_random_uuid() primary key,
+  place_id uuid not null references public.places(id) on delete cascade,
+  url text not null,
+  kind text not null default 'image' check (kind in ('image', 'video')),
+  thumbnail_url text,
+  title text,
+  sort_order int not null default 0,
+  uploaded_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists place_media_place_sort_idx
+  on public.place_media (place_id, sort_order);
+
+alter table public.place_media enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Place media are viewable by everyone' and tablename = 'place_media') then
+    create policy "Place media are viewable by everyone" on public.place_media for select using (true);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Place owners or admins can upload place media' and tablename = 'place_media') then
+    create policy "Place owners or admins can upload place media" on public.place_media
+      for insert with check (
+        auth.uid() = uploaded_by
+        and exists (
+          select 1 from public.places p
+          where p.id = place_id
+            and (p.created_by = auth.uid() or public.is_admin())
+        )
+      );
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Place owners or admins can update place media' and tablename = 'place_media') then
+    create policy "Place owners or admins can update place media" on public.place_media
+      for update using (
+        exists (
+          select 1 from public.places p
+          where p.id = place_id
+            and (p.created_by = auth.uid() or public.is_admin())
+        )
+      ) with check (
+        exists (
+          select 1 from public.places p
+          where p.id = place_id
+            and (p.created_by = auth.uid() or public.is_admin())
+        )
+      );
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Place owners or admins can delete place media' and tablename = 'place_media') then
+    create policy "Place owners or admins can delete place media" on public.place_media
+      for delete using (
+        exists (
+          select 1 from public.places p
+          where p.id = place_id
+            and (p.created_by = auth.uid() or public.is_admin())
+        )
+      );
   end if;
 end $$;
 

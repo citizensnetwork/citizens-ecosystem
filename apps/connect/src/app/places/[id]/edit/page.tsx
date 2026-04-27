@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import EditPlaceForm from "@/components/places/EditPlaceForm";
 import { PageHeader } from "@/components/ui/PageHeader";
-import type { Place, Category } from "@/types/db";
+import type { Place, Category, PlaceMedia } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function EditPlacePage({
     redirect("/login");
   }
 
-  const [placeRes, profileRes, categoriesRes] = await Promise.all([
+  const [placeRes, profileRes, categoriesRes, mediaRes] = await Promise.all([
     supabase
       .from("places")
       .select("*, categories(*)")
@@ -35,6 +35,13 @@ export default async function EditPlacePage({
       .in("applies_to", ["places", "both"])
       .order("sort_order")
       .returns<Category[]>(),
+    supabase
+      .from("place_media")
+      .select("*")
+      .eq("place_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .returns<PlaceMedia[]>(),
   ]);
 
   const place = placeRes.data;
@@ -58,7 +65,11 @@ export default async function EditPlacePage({
       />
       <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
         <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
-          <EditPlaceForm place={place} categories={categoriesRes.data ?? []} />
+          <EditPlaceForm
+            place={place}
+            categories={categoriesRes.data ?? []}
+            media={mediaRes.data ?? []}
+          />
         </div>
       </div>
     </>

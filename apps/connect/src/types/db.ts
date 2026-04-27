@@ -78,18 +78,27 @@ export type Event = {
   } | null;
 };
 
-export type EventMediaKind = "image" | "video";
+export type MediaKind = "image" | "video";
 
-export type EventMedia = {
+export type EventMediaKind = MediaKind;
+
+export type EntityMedia = {
   id: string;
-  event_id: string;
   url: string;
-  kind: EventMediaKind;
+  kind: MediaKind;
   thumbnail_url: string | null;
   title: string | null;
   sort_order: number;
   uploaded_by: string;
   created_at: string;
+};
+
+export type EventMedia = EntityMedia & {
+  event_id: string;
+};
+
+export type PlaceMedia = EntityMedia & {
+  place_id: string;
 };
 
 /** @deprecated — kept for backwards compatibility; prefer `EventMedia`. */

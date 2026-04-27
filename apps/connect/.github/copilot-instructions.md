@@ -66,7 +66,7 @@ No `tailwind.config` file. Configured via `@import "tailwindcss"` and `@theme in
 
 ### Supabase Storage
 
-Bucket `event-images` is public. Upload path: `${user.id}/${timestamp}.ext`. Use `getPublicUrl()` for URLs. The Supabase storage domain is configured in `next.config.ts` for `next/image`.
+Buckets `event-images` and `place-images` are public. Cover upload path: `${user.id}/covers/${timestamp}.ext`; gallery upload path: `${user.id}/gallery/${entity}/${entityId}/${timestamp}-${index}-${rand}.ext`. Use `getPublicUrl()` for URLs and store gallery metadata in `event_photos` / `place_media`. Do not add broad storage `SELECT` policies for public buckets; public object URLs do not require bucket listing. The Supabase storage domain is configured in `next.config.ts` for `next/image`.
 
 ### Event Categories
 
@@ -76,11 +76,11 @@ Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categor
 
 Schema in `supabase/schema.sql` (idempotent — safe to re-run). Migrations in `supabase/migrations/`.
 
-Tables: `profiles` (extends auth.users, roles: individual/ministry/organization/business/admin), `events` (with lat/lng, category, category_id FK, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
+Tables: `profiles` (extends auth.users, roles: individual/ministry/organization/business/admin), `events` (with lat/lng, category, category_id FK, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `place_media`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
 
 Trigger `on_auth_user_created` auto-creates a profile row from auth metadata on signup.
 
-Storage bucket `event-images` is public. Upload path: `${user.id}/${timestamp}.ext`. Use `getPublicUrl()` for URLs.
+Storage buckets `event-images` and `place-images` are public. Use `getPublicUrl()` for URLs and table-backed gallery metadata; avoid storage object listing for public galleries.
 
 ## Images
 

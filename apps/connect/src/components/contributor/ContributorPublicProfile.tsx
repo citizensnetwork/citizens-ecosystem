@@ -24,6 +24,7 @@ import type { ContributorLocation, Event, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
+import MediaStrip from "@/components/media/MediaStrip";
 import { getRoleDisplayLabel } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
@@ -60,8 +61,16 @@ export function ContributorPublicProfile({
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
-  const gallery = Array.isArray(profile.gallery_urls)
+  const galleryMedia = Array.isArray(profile.gallery_urls)
     ? profile.gallery_urls.slice(0, 6)
+        .filter((url): url is string => typeof url === "string" && url.trim().length > 0)
+        .map((url, index) => ({
+          id: `${profile.id}-gallery-${index}`,
+          url,
+          kind: "image" as const,
+          thumbnail_url: null,
+          title: null,
+        }))
     : [];
   const hasCoords =
     typeof profile.physical_latitude === "number" &&
@@ -212,24 +221,13 @@ export function ContributorPublicProfile({
         )}
 
         {/* ── 4. Gallery ────────────────────────────────── */}
-        {gallery.length > 0 && (
+        {galleryMedia.length > 0 && (
           <Section title="Gallery">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {gallery.map((url, i) => (
-                <div
-                  key={`${url}-${i}`}
-                  className="relative aspect-square overflow-hidden rounded-lg"
-                >
-                  <Image
-                    src={url}
-                    alt=""
-                    fill
-                    sizes="(max-width: 640px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
+            <MediaStrip
+              media={galleryMedia}
+              ariaLabel="Contributor media gallery"
+              plainImages
+            />
           </Section>
         )}
 

@@ -1,74 +1,7 @@
-import type { EventCategory } from "@/types/db";
+import type { EventCategory, PlaceCategory } from "@/types/db";
 import type { MarkerType } from "@/types/db";
-import { CATEGORY_HEX } from "@/lib/categories";
-
-/* ── Minimal SVG icons per category (monochrome, no emoji) ── */
-
-const CATEGORY_ICONS: Record<EventCategory, string> = {
-  // Music note — entertainment covers concerts, arts, performances
-  entertainment:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
-  // Running figure — "sport-fun" reads as athletic, active, on-the-move.
-  // Simplified stick-figure mid-stride: head, leaning torso, swinging arms,
-  // bent legs. More intuitive than a trophy (which could read as awards).
-  "sport-fun":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="m4 22 5-5 2-3 4 1 2 2v5"/><path d="m17 22 2-5-3-4-3 1-2 4"/><path d="M7 13h3"/></svg>',
-  // Coffee mug with steam — casual social gatherings.
-  // Earlier outline (a wide flat-topped rectangle with a small handle) read
-  // as a "square" inside the round marker. This redraw uses a narrower mug
-  // body, a clear side handle, and three steam wisps so the silhouette
-  // reads unmistakably as coffee at small sizes.
-  "social-fun":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z"/><path d="M15 12h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M8 3c-.5 1 .5 2 0 3"/><path d="M12 3c-.5 1 .5 2 0 3"/></svg>',
-  // Hands holding (uplift / support) — community outreach
-  "community-upliftment":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  // Glasses / spectacles — education reads clearly as study and reading.
-  // Two circular lenses joined by a bridge, with temple arms on each side.
-  // Chosen over the previous "open book" because it pairs more uniquely with
-  // church's open-book-style glyph elsewhere in the system.
-  education:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="14" r="4"/><circle cx="18" cy="14" r="4"/><path d="M10 14h4"/><path d="M2 11l2-3"/><path d="M22 11l-2-3"/></svg>',
-  // Christian church — steepled roof, side walls, door, and unambiguous cross.
-  // Horizontal arm sits mid-way down the vertical bar so the cross reads clearly
-  // even when rendered small (prevents it reading as a crescent / dome / finial).
-  church:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M9 6h6"/><path d="M4 14l8-4 8 4"/><path d="M4 14v7h16v-7"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/></svg>',
-  // Compass rose — navigation/direction, distinct from globe
-  missional:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>',
-  // Two interlinked rings — marriage / couples
-  "marriage-and-couples":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>',
-  // Mars symbol ♂ — circle with upward-right arrow
-  mens:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="14" r="5"/><line x1="19" y1="5" x2="13.65" y2="10.35"/><polyline points="15 5 19 5 19 9"/></svg>',
-  // Venus symbol ♀ — circle with cross below
-  womens:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"/><line x1="12" y1="14" x2="12" y2="21"/><line x1="9" y1="18" x2="15" y2="18"/></svg>',
-  // 4-point sparkle star — child wonder / playful
-  kids:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3z"/></svg>',
-  // Refresh / rotate arrows — healing, renewal, recovery
-  recovery:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
-  // Wrench / tool — equip, training, practical skills
-  equip:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-  // Calendar — weekend / scheduled event
-  weekend:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
-  // Lock — members only / exclusive access
-  "members-only":
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
-  // Hand-held heart — counseling, mental-health, helps ministries, restorative
-  care:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6.5a3.5 3.5 0 0 0-6 2.4c0 2.7 3.3 5 6 6.6 2.7-1.6 6-3.9 6-6.6a3.5 3.5 0 0 0-6-2.4Z"/><path d="M3 18c1.5-1.5 3.5-2 5.5-2H15a2 2 0 0 1 0 4H9"/></svg>',
-};
-
-// Generic map-pin fallback for unknown categories
-const DEFAULT_ICON =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+import { CATEGORY_HEX, PLACE_CATEGORY_HEX } from "@/lib/categories";
+import { getEventCategoryIcon, getPlaceCategoryIcon } from "@/lib/categoryIcons";
 
 /* ── Temporal encoding ───────────────────────────────────── */
 
@@ -126,7 +59,7 @@ export function getTemporalStyle(
 const BASE_SIZE = 32;
 
 export function getCategoryIcon(category: EventCategory | null): string {
-  return CATEGORY_ICONS[category ?? "church"] ?? DEFAULT_ICON;
+  return getEventCategoryIcon(category ?? "church");
 }
 
 /**
@@ -239,7 +172,7 @@ export function createCustomMarkerEl(
   // Custom icon with color
   if (markerType === "icon" && options.markerIcon) {
     const fillColor = options.markerColor ?? "#D4AF37";
-    const iconSvg = CATEGORY_ICONS[options.markerIcon as EventCategory] ?? DEFAULT_ICON;
+    const iconSvg = getEventCategoryIcon(options.markerIcon as EventCategory);
     const iconSize = Math.round(size * 0.48);
 
     const el = document.createElement("div");
@@ -269,39 +202,6 @@ export function createCustomMarkerEl(
   // Default: category marker
   return createCategoryMarkerEl(category, temporal, options.overrideColor);
 }
-
-/* ── Place category icons — solid minimalist glyphs used filled in gold ── */
-
-const PLACE_CATEGORY_ICONS: Record<string, string> = {
-  // Church building with cross
-  church:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M13 2h-2v3H8v2h3v3L4 14v8h6v-5h4v5h6v-8l-7-4V7h3V5h-3V2z"/></svg>',
-  // Coffee mug — relax (outline style, matches the Coffee quick-access tool so
-  // the marker, burger filter, and quick-access button all read as one icon).
-  relax:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
-  // Trophy / dumbbell — exercise
-  exercise:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M20.57 14.86l-2.05-2.05-1.41 1.41-5.42-5.42 1.41-1.41-2.05-2.05-1.41 1.41-1.41-1.41-1.42 1.41 1.41 1.42-3.07 3.07-1.41-1.41-1.41 1.41 1.41 1.41-1.41 1.42 2.05 2.05 1.41-1.42 5.42 5.42-1.41 1.41 2.05 2.05 1.41-1.41 1.41 1.41 1.42-1.41-1.41-1.41 3.07-3.07 1.41 1.41 1.41-1.41-1.41-1.42 1.41-1.41z"/></svg>',
-  // Play triangle — media
-  media:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>',
-  // Shopping bag — shopping
-  shopping:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M19 6h-3a4 4 0 0 0-8 0H5a1 1 0 0 0-1 1v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a1 1 0 0 0-1-1zm-7-2a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2z"/></svg>',
-  // Heart pulse — health
-  health:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.5 5.5 0 0 1 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
-  // Open book — education
-  education:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1z"/></svg>',
-  // Palette — arts
-  arts:
-    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a6 6 0 0 0 6-6 10 10 0 0 0-10-10zM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>',
-};
-
-const DEFAULT_PLACE_ICON =
-  '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
 
 /** Place marker sizing — exported so EventMap can use the same values for
  * zoom-scaling the inner icon proportionally to the outer circle. */
@@ -386,12 +286,12 @@ export function createPlaceMarkerEl(
   const opacity = 1;
 
   // Solid gold category glyph — white stroke provides the outline against the map
-  const icon = (category && PLACE_CATEGORY_ICONS[category]) || DEFAULT_PLACE_ICON;
+  const icon = getPlaceCategoryIcon(category as PlaceCategory | null);
 
   // Dot-mode colour: use highlighted colour, place-category hex, or gold fallback.
   const dotColor =
     options?.highlightColor ??
-    (category ? PLACE_CATEGORY_HEX_LOCAL[category] : undefined) ??
+    (category ? PLACE_CATEGORY_HEX[category as PlaceCategory] : undefined) ??
     "#D4AF37";
 
   const el = document.createElement("div");
@@ -419,19 +319,6 @@ export function createPlaceMarkerEl(
 
   return el;
 }
-
-/** Place-category hex (subset used for dot-mode colouring).
- *  Kept local to avoid circular imports with lib/categories.ts. */
-const PLACE_CATEGORY_HEX_LOCAL: Record<string, string> = {
-  church: "#D4AF37",
-  relax: "#8B4513",
-  exercise: "#2ECC71",
-  media: "#9B59B6",
-  shopping: "#E91E63",
-  health: "#E74C3C",
-  education: "#3498DB",
-  arts: "#FF6B35",
-};
 
 /** Cluster badge element */
 export function createClusterEl(count: number): HTMLDivElement {

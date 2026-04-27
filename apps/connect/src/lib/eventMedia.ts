@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { safeMediaExtension } from "@/lib/validation";
-import type { SelectedMedia } from "@/components/events/MediaGalleryUploader";
+import { uploadEntityMedia, type SelectedMedia } from "@/lib/mediaUpload";
 
 export type UploadedMediaRow = {
   event_id: string;
@@ -30,48 +29,14 @@ export async function uploadEventMedia(
     startSortOrder?: number;
   }
 ): Promise<string | null> {
-  const { eventId, userId, items, startSortOrder = 0 } = opts;
-  if (items.length === 0) return null;
-
-  const rows: UploadedMediaRow[] = [];
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const ext = safeMediaExtension(item.file.name, item.kind);
-    // Include index + random suffix so concurrent uploads from the same user
-    // within the same millisecond still produce unique storage paths.
-    const rand = Math.random().toString(36).slice(2, 8);
-    const path = `${userId}/gallery/${eventId}/${Date.now()}-${i}-${rand}.${ext}`;
-
-    const { error: upErr } = await supabase.storage
-      .from("event-images")
-      .upload(path, item.file, {
-        upsert: true,
-        contentType: item.file.type || undefined,
-      });
-    if (upErr) {
-      return `Gallery upload failed: ${upErr.message}`;
-    }
-
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("event-images").getPublicUrl(path);
-
-    rows.push({
-      event_id: eventId,
-      url: publicUrl,
-      kind: item.kind,
-      thumbnail_url: null,
-      title: item.title.trim() ? item.title.trim() : null,
-      sort_order: startSortOrder + i,
-      uploaded_by: userId,
-    });
-  }
-
-  const { error: insertErr } = await supabase.from("event_photos").insert(rows);
-  if (insertErr) {
-    return `Gallery metadata save failed: ${insertErr.message}`;
-  }
-
-  return null;
+  return uploadEntityMedia(supabase, {
+    bucket: "event-images",
+    table: "event_photos",
+    entityIdColumn: "event_id",
+    entityId: opts.eventId,
+    userId: opts.userId,
+    items: opts.items,
+    startSortOrder: opts.startSortOrder,
+    storageFolder: "events",
+  });
 }
