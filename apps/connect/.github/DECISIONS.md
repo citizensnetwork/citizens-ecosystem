@@ -2,6 +2,31 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch Q — MapLibre marker click bubbling MUST be preserved
+
+**Decision (permanent invariant) — Never call `e.stopPropagation()` on marker DOM elements.** Batch P introduced a `swallowMapCanvasClick(el)` helper that attached a click listener to every event/place marker calling `stopPropagation`, intending to keep the canvas-click handler from collapsing a cluster the user just drilled into. This silently broke marker popups: MapLibre's `Marker._onMapClick` (in `maplibre-gl/src/ui/marker.ts`) wires the popup toggle through the canvas-click handler. Stopping propagation on the marker means the popup toggle never runs.
+
+**Correct pattern.** Inspect the click target inside the canvas handler instead:
+
+```ts
+const SKIP_COLLAPSE_SELECTOR =
+  ".cc-marker, .cc-place-marker, .cc-geo-cluster, .maplibregl-popup";
+map.on("click", (e) => {
+  if (expansionsRef.current.size === 0) return;
+  const target = e.originalEvent?.target as Element | null;
+  if (target?.closest?.(SKIP_COLLAPSE_SELECTOR)) return;
+  collapseInnermostTierRef.current();
+});
+```
+
+This was shipped by remote PR #31 (`21cee62`, merged as `85a8456`) which superseded Batch P's `swallowMapCanvasClick` helper. The helper has been removed from `src/lib/map/markers.ts` and Batch P invariant #4 ("Marker elements must `stopPropagation` on click") is **retracted**. Future agents: if you re-introduce stopPropagation on marker DOM, popups will silently stop working everywhere (markers, places, contributor pins, future POI types).
+
+**Decision (refactor) — `fetchPendingApplications` shared helper.** `/admin/users` and `/admin/contributors` both query `contributor_applications` with the same FK alias (`profile:profiles!contributor_applications_user_id_fkey(...)`) and map to the same `PendingApplication` view. Drift between them caused the original bug Batch P fixed (one used `.single()`, the other `.maybeSingle()`). Helper centralises the select string + row mapping in `src/lib/contributors/pendingApplications.ts`. Returns `{message}` only — never leaks the Supabase error shape across the route boundary.
+
+**Decision — Migration 063 reshape to `do $$ … if not exists … end $$;`.** The original `drop policy if exists … create policy …` form was correct but technically dropped/recreated the policy each migration apply on a clean DB. Reshape makes the migration a strict no-op when the policy already exists, matching how Supabase's `db push` is expected to be re-runnable.
+
+---
+
 ## Batch P — Admin profile RLS + staged cluster collapse
 
 **Decision 1 — Admin UPDATE RLS policy on `public.profiles`.** Admin role/contributor mutations going through `PATCH /api/admin/users` were silently no-op'ing because `public.profiles` only had a self-update policy (`auth.uid() = id`). PostgREST returns success with zero rows updated when RLS filters every row, with **no error**. Migration 063 adds an explicit `Admins can update any profile` policy gated by the existing `public.is_admin()` SECURITY DEFINER STABLE function. The PATCH endpoint also now selects the updated row id and returns HTTP 500 on zero rows as defense-in-depth, with a generic client message and a detailed `console.error` so the regression cannot recur silently.
@@ -13,8 +38,8 @@
 Resolution:
 - Every tier (capital / town / suburb) now multi-expands. The user explicitly drilled in; the platform should not undo their work.
 - Outside map-canvas click no longer calls `collapseAllExpansions`; it calls `collapseInnermostTier()` which collapses only the tier closest to the user's most recent decision (priority `suburb → town → capital`). One click per tier, mirroring the way they drilled in.
-- Event and place marker DOM elements `stopPropagation` on `click`, so interacting with a marker never bubbles to the canvas-click handler.
-- Zoom-band changes only collapse on **zoom-OUT** across a tier boundary (rank comparison via `bandRank`). Zooming further IN keeps expansions intact since they remain valid context.
+- ~~Event and place marker DOM elements `stopPropagation` on `click`, so interacting with a marker never bubbles to the canvas-click handler.~~ **Retracted in Batch Q.** See top entry — stopPropagation breaks MapLibre's popup toggle. The canvas handler now filters via `e.originalEvent.target.closest(SKIP_COLLAPSE_SELECTOR)` instead.
+- Zoom-band changes only collapse on **zoom-OUT** across a tier boundary (rank comparison via `BAND_RANK` module const, hoisted in Batch Q).
 
 This makes recoupling deterministic and reversible: the user always knows what one map-click will close.
 

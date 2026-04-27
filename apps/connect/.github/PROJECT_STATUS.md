@@ -369,6 +369,24 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Architect audit — A- / A / A / A- / A / B+ — Should-fix S1/S2/S3 + N2 applied inline (`maybeSingle`, captured+logged appsError + alert banner, generic 500 body, refreshed multi-expand spec comment). N1 (hoist `bandRank`), N3 (`swallowMapCanvasClick` helper), N5 (`collapseInnermostTier` single-pass), and `useClusterExpansion` hook deferred to follow-up tidy-up batch.
 - [x] `mcp_supabase_get_advisors type:security` — baseline unchanged (DDL-only RLS policy, no new functions or views)
 
+### Batch Q — Tidy-up of Batch P deferred items (COMPLETE — `d5abffc`)
+- [x] **Shared `fetchPendingApplications` helper** (`src/lib/contributors/pendingApplications.ts`) — `/admin/users` and `/admin/contributors` now share one loader; FK alias select + row→`PendingApplication` mapping cannot drift. Returns `{message}` only — never leaks Supabase error shape.
+- [x] **`.maybeSingle()` drift fix on `/admin/contributors`** — admin role check now matches `/admin/users` (no false 500 when admin row is missing).
+- [x] **N1 `BAND_RANK` hoisted to module scope** in `EventMap.tsx` — zoom-band rank record no longer reallocates per `zoomend` event.
+- [x] **N5 `collapseInnermostTier` single-pass** — tier-priority loop replaced with one Map iteration tracking innermost rank + key bucket.
+- [x] **N4 migration 063 reshape** — switched from `drop policy if exists … create policy …` to a `do $$ … if not exists … end $$;` block so the migration is a strict no-op on a DB that already has the policy.
+- [x] **S4 doc comment** above last-admin preflight in `PATCH /api/admin/users` — clarifies the non-transactional check is advisory; the authoritative guard is the `enforce_at_least_one_admin` BEFORE trigger raising P0001.
+- [x] **N3 abandoned (superseded by remote PR #31).** Batch P added `swallowMapCanvasClick` to stop marker clicks bubbling to the canvas. PR #31 (`21cee62`, merged as `85a8456`) reverted that approach because calling `e.stopPropagation()` on marker DOM breaks MapLibre's internal `_onMapClick` popup-toggle wiring (no popup ever opens). The correct pattern is now in the canvas click handler: filter via `e.originalEvent.target.closest('.cc-marker, .cc-place-marker, .cc-geo-cluster, .maplibregl-popup')` before calling `collapseInnermostTier`. Helper deleted from `markers.ts`. **Permanent invariant logged in `.github/DECISIONS.md`** so future agents don't re-introduce stopPropagation on marker DOM.
+
+### Latest validation (Batch Q — Tidy-up)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **612 tests, 69 files, 0 failures** ✅
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [x] Architect audit — verdict ship (A/A/A/A/A/A−). Should-fix nits applied inline (extra-blank-line removed, `Pick<>` pivot in helper).
+- [x] vibe-security skill review — clean
+- [x] `mcp_supabase_get_advisors type:security` — 20 lints, identical to Batch P baseline (no schema change)
+- [x] Rebase against `origin/main` (`85a8456` PR #31 merge) — accepted upstream version of `EventMap.tsx`; re-applied N1 + N5 on top; deleted dead helper
+
 ---
 
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)
