@@ -135,6 +135,14 @@ export async function PATCH(request: NextRequest) {
     }
     // Last-admin lockout guard: refuse to demote the final admin.
     // (Architect audit L1.)
+    //
+    // NOTE: The count + target-role fetches below are non-transactional
+    // so two admins demoting each other concurrently could both pass
+    // this preflight. The authoritative guard is the
+    // `enforce_at_least_one_admin` BEFORE trigger which raises P0001
+    // (handled by the 400 branch lower in this route). This preflight
+    // is UX-only — it gives the caller a clear, fast 400 in the common
+    // single-admin-clicks-demote case before we hit the DB constraint.
     if (body.role !== "admin") {
       const { count: adminCount } = await supabase
         .from("profiles")

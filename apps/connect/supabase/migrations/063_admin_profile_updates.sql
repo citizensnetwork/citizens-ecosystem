@@ -14,19 +14,25 @@
 -- `force_reauth_at` + `bio_setup_required` on role transitions — we
 -- are only unblocking the row-level authorisation.
 --
--- Idempotent.
+-- Idempotent. Uses the same `do $$ begin if not exists ... end $$`
+-- shape as supabase/schema.sql so a `db reset` followed by
+-- `db diff` against schema.sql stays clean.
 
 begin;
 
--- Drop the legacy policy (if present under a prior, non-admin name) so
--- this migration can re-run cleanly.
-drop policy if exists "Admins can update any profile" on public.profiles;
-
-create policy "Admins can update any profile"
-  on public.profiles
-  for update
-  using (public.is_admin())
-  with check (public.is_admin());
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'Admins can update any profile'
+      and tablename = 'profiles'
+  ) then
+    create policy "Admins can update any profile"
+      on public.profiles
+      for update
+      using (public.is_admin())
+      with check (public.is_admin());
+  end if;
+end $$;
 
 -- Also allow admins to SELECT the columns the list endpoint needs
 -- (the existing "Profiles are viewable by everyone" policy already

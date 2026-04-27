@@ -103,6 +103,22 @@ const MIN_GAP_PX = 0;
 /** Number of force-simulation iterations for deconfliction. */
 const DECONFLICT_ITERATIONS = 4;
 
+/**
+ * Tier ordering for zoom-band collapse decisions. Lower rank = more
+ * outward (capital is the broadest tier; marker is the most zoomed-in
+ * presentation). Used by the `zoomend` handler to decide whether a
+ * band crossing is a zoom-OUT (rank decreased) and therefore should
+ * collapse open expansions, or a zoom-IN (rank increased) which keeps
+ * them. Hoisted to module scope so the handler doesn't reallocate the
+ * record on every zoom event.
+ */
+const BAND_RANK = {
+  capital: 0,
+  town: 1,
+  suburb: 2,
+  marker: 3,
+} as const;
+
 /** Returns a scale factor [0.55 – 1.0] based on current zoom.
  *  Markers stay at their default size across normal viewing zooms and only
  *  shrink when the user zooms far out (regional / country view). */
@@ -557,21 +573,32 @@ export default function EventMap({
     const exp = expansionsRef.current;
     if (exp.size === 0) return false;
     // Priority: suburb expansions are "innermost" (they lift markers),
-    // then town, then capital.
-    const priority: Array<ClusterBubble["tier"]> = ["suburb", "town", "capital"];
-    for (const tier of priority) {
-      const keysAtTier: string[] = [];
-      for (const [k, s] of exp) {
-        if (s.parent.tier === tier) keysAtTier.push(k);
-      }
-      if (keysAtTier.length > 0) {
-        for (const k of keysAtTier) collapseExpansion(k);
-        updateGeoClusterOpacityRef.current();
-        updatePlaceVisibilityRef.current();
-        return true;
+    // then town, then capital. Single pass: track the innermost tier
+    // seen so far + the keys at that tier; if a more-inner tier is
+    // encountered, restart the bucket.
+    const priority: Record<ClusterBubble["tier"], number> = {
+      suburb: 0,
+      town: 1,
+      capital: 2,
+    };
+    let innermostRank = Infinity;
+    const innermostKeys: string[] = [];
+    for (const [k, s] of exp) {
+      const rank = priority[s.parent.tier];
+      if (rank === undefined) continue;
+      if (rank < innermostRank) {
+        innermostRank = rank;
+        innermostKeys.length = 0;
+        innermostKeys.push(k);
+      } else if (rank === innermostRank) {
+        innermostKeys.push(k);
       }
     }
-    return false;
+    if (innermostKeys.length === 0) return false;
+    for (const k of innermostKeys) collapseExpansion(k);
+    updateGeoClusterOpacityRef.current();
+    updatePlaceVisibilityRef.current();
+    return true;
   }, [collapseExpansion]);
 
   const collapseInnermostTierRef = useRef<() => boolean>(() => false);
@@ -1120,13 +1147,7 @@ export default function EventMap({
       // data and their expansions should stay put.
       const newBand = bandFor(map.getZoom());
       if (newBand !== lastBand) {
-        const bandRank: Record<typeof newBand, number> = {
-          capital: 0,
-          town: 1,
-          suburb: 2,
-          marker: 3,
-        };
-        const zoomedOut = bandRank[newBand] < bandRank[lastBand];
+        const zoomedOut = BAND_RANK[newBand] < BAND_RANK[lastBand];
         lastBand = newBand;
         if (zoomedOut && expansionsRef.current.size > 0) {
           collapseAllExpansionsRef.current();

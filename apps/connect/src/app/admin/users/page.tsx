@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import AdminUserManager from "@/components/admin/AdminUserManager";
-import {
-  ContributorReviewCard,
-  type PendingApplication,
-} from "@/components/admin/ContributorReviewCard";
+import { ContributorReviewCard } from "@/components/admin/ContributorReviewCard";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { fetchPendingApplications } from "@/lib/contributors/pendingApplications";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users — Admin · Citizens Connect" };
@@ -46,45 +44,16 @@ export default async function AdminUsersPage({
 
   // Pending Contributor applications — surfaced directly on the users
   // page as a secondary elevation pipeline next to admin elevations.
-  const { data: appsRows, error: appsError } = await supabase
-    .from("contributor_applications")
-    .select(
-      "id, user_id, display_name, contributor_kind, bio, website_url, instagram_handle, facebook_url, tiktok_handle, youtube_url, physical_address, logo_url, motivation_text, submitted_at, profiles:contributor_applications_user_id_fkey(email, full_name)",
-    )
-    .eq("status", "pending")
-    .order("submitted_at", { ascending: true });
+  // Shared loader (also used by /admin/contributors) keeps the FK
+  // alias + row mapping in lockstep across the two admin panes.
+  const { applications, error: appsError } =
+    await fetchPendingApplications(supabase);
   if (appsError) {
     // Don't silently render "nothing to review" when a real DB/RLS
     // error occurred — that's exactly the failure mode migration 063
     // fixed on the users list. Log + show a visible banner below.
     console.error("[admin/users pending applications]", appsError);
   }
-
-  const applications: PendingApplication[] = (appsRows ?? []).map((r) => {
-    const prof = r.profiles as
-      | { email?: string; full_name?: string }
-      | { email?: string; full_name?: string }[]
-      | null;
-    const profObj = Array.isArray(prof) ? prof[0] : prof;
-    return {
-      id: r.id as string,
-      user_id: r.user_id as string,
-      display_name: r.display_name as string,
-      contributor_kind: (r.contributor_kind as string) ?? null,
-      bio: (r.bio as string) ?? null,
-      website_url: (r.website_url as string) ?? null,
-      instagram_handle: (r.instagram_handle as string) ?? null,
-      facebook_url: (r.facebook_url as string) ?? null,
-      tiktok_handle: (r.tiktok_handle as string) ?? null,
-      youtube_url: (r.youtube_url as string) ?? null,
-      physical_address: (r.physical_address as string) ?? null,
-      logo_url: (r.logo_url as string) ?? null,
-      motivation_text: (r.motivation_text as string) ?? null,
-      submitted_at: r.submitted_at as string,
-      applicant_email: profObj?.email ?? null,
-      applicant_name: profObj?.full_name ?? null,
-    };
-  });
 
   return (
     <>
