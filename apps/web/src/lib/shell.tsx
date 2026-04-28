@@ -10,6 +10,12 @@ import type { WearSession } from './session';
  *
  * Server component; the mobile nav drawer is lifted to its own client
  * component so the rest of the shell stays server-rendered.
+ * Shared page chrome (logo, nav, search, footer). Kept here so profile,
+ * settings, feed, and discovery pages stay visually aligned without
+ * extracting a client component — everything here is server-rendered.
+ *
+ * The header search posts to `/search` via a plain GET form, so it works
+ * without JavaScript and benefits from browser history out of the box.
  */
 export function PageShell({
   session,
@@ -50,6 +56,31 @@ export function PageShell({
             <span className="cw-wordmark text-lg">
               Citizens <span className="cw-wordmark-accent">Wear</span>
             </span>
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12">
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <Link href="/" className="flex items-center gap-3">
+          <CrownMark className="h-7 w-9 text-gold" />
+          <span className="cw-wordmark text-xl">
+            Citizens <span className="cw-wordmark-accent">Wear</span>
+          </span>
+        </Link>
+        <nav className="flex flex-wrap items-center gap-4 text-sm text-ink-soft">
+          <Link href="/feed" className="hover:text-ink">
+            Feed
+          </Link>
+          <Link href="/explore" className="hover:text-ink">
+            Explore
+          </Link>
+          {session ? (
+            <Link href="/messages" className="hover:text-ink">
+              Messages
+            </Link>
+          ) : null}
+          <Link
+            href="/api/connect/status"
+            className="underline decoration-gold decoration-1 underline-offset-4 hover:text-ink"
+          >
+            Connect status
           </Link>
 
           <nav className="hidden items-center gap-2 md:flex" aria-label="Primary">
@@ -94,6 +125,32 @@ export function PageShell({
           </span>
           <span>Connecting the Kingdom · Ephesians 2:19–22</span>
         </div>
+      <form role="search" action="/search" method="get" className="mt-6 flex items-center gap-2">
+        <label htmlFor="cw-header-search" className="sr-only">
+          Search Citizens Wear
+        </label>
+        <input
+          id="cw-header-search"
+          name="q"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          maxLength={100}
+          placeholder="Search citizens, brands, hashtags, drops…"
+          className="flex-1 rounded-md border border-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:border-gold focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-border bg-paper px-3 py-2 text-sm text-ink hover:border-gold"
+        >
+          Search
+        </button>
+      </form>
+
+      <div className="flex-1">{children}</div>
+      <footer className="border-t border-border pt-6 text-xs text-ink-soft">
+        © {new Date().getFullYear()} Citizens Network · Citizens Wear is built on the Citizens
+        Connect contract.
       </footer>
     </div>
   );

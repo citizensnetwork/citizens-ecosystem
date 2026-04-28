@@ -129,6 +129,33 @@ export default async function HomePage({
               </CardContent>
             </Card>
           </aside>
+    <PageShell session={session}>
+      <section className="my-16">
+        <h1 className="font-display text-5xl leading-tight md:text-6xl">
+          By the Kingdom.
+          <br />
+          With the Kingdom.
+          <br />
+          <span className="text-gold">For the Kingdom.</span>
+        </h1>
+        <p className="mt-6 max-w-xl text-base text-ink-soft md:text-lg">
+          Citizens Wear is a social platform for Christian clothing brands, citizens, and
+          communities. It extends <span className="font-medium text-ink">Citizens Connect</span>,
+          bringing the Kingdom to where brands and their followers meet.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <Link
+            href="/explore"
+            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-soft"
+          >
+            Explore Citizens Wear →
+          </Link>
+          <span className="inline-flex items-center rounded-md border border-border bg-paper-soft px-3 py-1 text-xs uppercase tracking-wide text-ink-soft">
+            Phase 5 · Discovery, search, brand catalog
+          </span>
+          <span className="inline-flex items-center rounded-md bg-gold-muted px-3 py-1 text-xs uppercase tracking-wide text-gold-deep">
+            Mock Connect
+          </span>
         </div>
       </section>
 

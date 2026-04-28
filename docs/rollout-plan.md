@@ -43,31 +43,40 @@ Post-ARCH-GATE 1 review applied:
 - CI gained a final `pnpm audit --audit-level moderate` gate.
 
 ### Phase 3 — Real Citizens Connect wiring
+### Phase 3 — Real Citizens Connect wiring _(landed — ADR-0004)_
 
-- Replace `MockConnectClient` with HTTP/OIDC client (or keep mock + add webhook receiver if Connect is still unavailable).
-- SSO parity across Wear and Connect.
-- Idempotent, replay-safe webhook receiver.
+- `HttpConnectClient` implements the `ConnectClient` contract against a live HTTP service; `createConnectClient()` factory selects mock vs. live from `CONNECT_MODE` / `CONNECT_BASE_URL` / `CONNECT_API_KEY`.
+- SSO parity: Auth.js-shaped `/api/auth/callback/connect` route completes a Connect-issued token into the Wear session cookie; `/sign-in` mock form remains for local dev.
+- Idempotent, replay-safe webhook receiver at `/api/connect/webhook` (HMAC-SHA256 signature, ≤5-min skew, `x-connect-delivery-id` dedupe) that fans into `ConnectClient.events`.
 
-### Phase 4 — Posts & the feed
+### Phase 4 — Posts & the feed _(landed — ADR-0004)_
 
-- `Post`, `PostMedia`, `Like`, `Comment`, `CommentLike`, `SaveCollection`.
-- Brand post composer with product tagging.
-- Chronological feed; "For You" ranker stub behind a feature flag.
-- Post detail, threaded comments, activity tab.
+- `@citizens-wear/db` extended with `Post`, `PostMedia`, `Like`, `Comment`, `CommentLike`, `SaveCollection`, `SavedPost` (schema + TS contract + memory impl + contract tests).
+- `/compose` brand post composer with opt-in "publish as brand" and product tagging scoped to that brand.
+- `/feed` chronological feed; "For You" ranker stub behind the `CW_FOR_YOU_RANKER` feature flag (freshness + follow boost).
+- `/p/[id]` post detail with threaded comments, comment likes, saves.
+- `/u/[handle]/activity` activity tab aggregating posts, likes, comments, and saves.
 
-**🧭 ARCH-GATE 2** — ADR-0004. Feed query performance, N+1 audit, image pipeline, moderation hooks, Lighthouse ≥ 90, Playwright e2e green.
+**🧭 ARCH-GATE 2** — ADR-0004 (this repo). Feed query plan, N+1 audit, image pipeline, moderation hooks, Connect live/mock parity, webhook contract. Lighthouse ≥ 90 and Playwright e2e land with Phase 5 when the discovery surfaces give them a meaningful baseline to measure against.
 
-### Phase 5 — Discovery, search, brand catalog
+### Phase 5 — Discovery, search, brand catalog _(landed — ADR-0005)_
 
-- Explore page, search (users/brands/hashtags/products), brand "Shop" tab auto-populated from Connect.
+- Connect contract gains `BrandDirectory.search` and `ProductCatalog.search`; `MockConnectClient` and `HttpConnectClient` both implement, with contract tests for each.
+- `@citizens-wear/db` extends `PostRepo` with `searchByText`, `listByHashtag`, and `trendingHashtags`, plus a shared Unicode-aware `extractHashtags` / `normaliseHashtag` helper module.
+- `/explore` discovery hub (trending hashtags, featured brands, suggested citizens, fresh drops, from-the-feed strip).
+- `/search?q=…&kind=…` unified search across citizens / brands / hashtags / posts / drops; query length capped, `kind` validated as a closed enum.
+- `/h/[tag]` hashtag feed; `PostCard` linkifies hashtags with React-escaped text segments (XSS-safe).
+- Brand profile gains Drops + Posts tabs; product descriptions surfaced.
+- `PageShell` adds Explore link + header search box that works without JavaScript.
 
-### Phase 6 — Stories & DMs
+### Phase 6 — Stories & DMs _(landed — ADR-0006)_
 
-- 24h stories, viewers, reactions, highlights.
-- 1:1 and group DMs with message requests, typing/read receipts, block/report.
-- Realtime layer finalised.
+- 24h ephemeral stories with views, five-emoji reactions, and per-author highlights; followers-only audience supported. Stories tray on `/feed`, viewer at `/stories/[id]`, composer at `/compose/story`.
+- 1:1 and group conversations with message requests for non-mutuals, soft-delete of own messages, mark-read, accept/decline. Inbox at `/messages`, thread at `/messages/[id]`, new-DM at `/messages/new`.
+- Block (symmetric, also unfollows) and report (open subjects: post, comment, message, story, user). Block surfaced on profile pages.
+- `RealtimeBus` interface seam in `@citizens-wear/db` with an in-process `MemoryRealtimeBus` adapter; server actions publish typed events that a Phase 9 broker can fan out across nodes without changing call sites.
 
-**🧭 ARCH-GATE 3** — ADR-0005. Realtime scalability, media retention, privacy controls, rate-limiting, encryption-at-rest, legal pages.
+**🧭 ARCH-GATE 3** — ADR-0006 (this repo). Realtime scalability seam, message-request flow, story retention/expiry, block-symmetry guarantees, report queue shape.
 
 ### Phase 7 — Notifications, saves, settings depth
 
