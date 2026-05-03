@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { CrownMark } from '@citizens-wear/ui/CrownMark';
 import {
+  MOCK_ADMIN_SIGN_IN_TOKEN,
   MOCK_SIGN_IN_TOKEN,
   clearSessionCookie,
   getSession,
@@ -36,8 +37,25 @@ async function signOutAction(): Promise<void> {
   redirect('/sign-in');
 }
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  readonly searchParams?: Promise<{ readonly as?: string | string[] }>;
+}) {
   const current = await getSession();
+  const resolved = (await searchParams) ?? {};
+  const asParam = Array.isArray(resolved.as) ? resolved.as[0] : resolved.as;
+  // Mock-mode escape hatch: never expose the moderator preset in production.
+  // The mock Connect client is also used in production builds today, so an
+  // attacker reaching `/sign-in?as=admin` could otherwise mint moderator
+  // sessions trivially. Hard-gate at the UI surface.
+  const allowMockPresets = process.env.NODE_ENV !== 'production';
+  const presetAdmin = allowMockPresets && asParam === 'admin';
+  const presetToken = allowMockPresets
+    ? presetAdmin
+      ? MOCK_ADMIN_SIGN_IN_TOKEN
+      : MOCK_SIGN_IN_TOKEN
+    : '';
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
       <header className="mb-8 flex items-center gap-3">
@@ -49,7 +67,8 @@ export default async function SignInPage() {
       <h1 className="font-display text-3xl">Sign in</h1>
       <p className="mt-2 text-sm text-ink-soft">
         Phase 2 uses a mock Citizens Connect token. Paste the fixture token below, or use the
-        pre-filled value, to sign in as <span className="font-medium text-ink">@hannah</span>.
+        pre-filled value, to sign in
+        {presetAdmin ? ' as a moderator' : ' as @hannah'}.
       </p>
 
       {current ? (
@@ -80,12 +99,24 @@ export default async function SignInPage() {
             id="token"
             name="token"
             type="text"
-            defaultValue={MOCK_SIGN_IN_TOKEN}
+            defaultValue={presetToken}
             className="rounded-md border border-border bg-paper px-3 py-2 font-mono text-sm focus:border-gold focus:outline-none"
             aria-describedby="token-help"
           />
           <p id="token-help" className="text-xs text-ink-soft">
             In Phase 3 this form is replaced by a Connect OIDC redirect.
+            {allowMockPresets && !presetAdmin ? (
+              <>
+                {' '}
+                <Link
+                  href={{ pathname: '/sign-in', query: { as: 'admin' } }}
+                  className="underline decoration-gold underline-offset-2"
+                >
+                  Sign in as moderator
+                </Link>
+                .
+              </>
+            ) : null}
           </p>
           <button
             type="submit"

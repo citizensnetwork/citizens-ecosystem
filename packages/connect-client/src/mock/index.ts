@@ -18,7 +18,9 @@ import type {
 } from '../contract';
 import { ConnectError } from '../contract';
 import {
+  FIXTURE_ADMIN_TOKEN,
   FIXTURE_VALID_TOKEN,
+  fixtureAdminSession,
   fixtureBrands,
   fixtureProducts,
   fixtureSession,
@@ -56,6 +58,12 @@ export interface MockConnectClientOptions {
   readonly products?: readonly ConnectProduct[];
   readonly validToken?: string;
   readonly session?: ConnectSession;
+  /**
+   * Additional token → session pairs accepted by `auth.verifyToken`. Used in
+   * Phase 4 to expose a deterministic moderator/admin session in mock mode.
+   * The default token from `validToken`/`session` always remains accepted.
+   */
+  readonly additionalTokens?: Readonly<Record<string, ConnectSession>>;
   /** Override `Date.now` (useful for deterministic tests). */
   readonly now?: () => Date;
 }
@@ -70,8 +78,7 @@ export class MockConnectClient implements ConnectClient {
   private readonly _users: ConnectUser[];
   private readonly _brands: ConnectBrand[];
   private readonly _products: ConnectProduct[];
-  private readonly _validToken: string;
-  private readonly _session: ConnectSession;
+  private readonly _tokens: Map<string, ConnectSession>;
   private readonly _now: () => Date;
   private readonly _handlers = new Set<ConnectEventHandler>();
 
@@ -79,16 +86,28 @@ export class MockConnectClient implements ConnectClient {
     this._users = [...(options.users ?? fixtureUsers)];
     this._brands = [...(options.brands ?? fixtureBrands)];
     this._products = [...(options.products ?? fixtureProducts)];
-    this._validToken = options.validToken ?? FIXTURE_VALID_TOKEN;
-    this._session = options.session ?? fixtureSession;
+    const defaultToken = options.validToken ?? FIXTURE_VALID_TOKEN;
+    const defaultSession = options.session ?? fixtureSession;
+    this._tokens = new Map<string, ConnectSession>();
+    this._tokens.set(defaultToken, defaultSession);
+    // Seed the admin token by default so mock admin gating works without
+    // every caller having to wire it explicitly. Tests can override by
+    // passing their own `additionalTokens` (which take precedence).
+    if (!this._tokens.has(FIXTURE_ADMIN_TOKEN)) {
+      this._tokens.set(FIXTURE_ADMIN_TOKEN, fixtureAdminSession);
+    }
+    for (const [token, session] of Object.entries(options.additionalTokens ?? {})) {
+      this._tokens.set(token, session);
+    }
     this._now = options.now ?? (() => new Date());
 
     this.auth = {
       verifyToken: async (token) => {
-        if (token !== this._validToken) {
+        const session = this._tokens.get(token);
+        if (!session) {
           throw new ConnectError('invalid_token', 'Token was not issued by Connect.', 401);
         }
-        return this._session;
+        return session;
       },
       getCurrentUser: async (session) => {
         return this._users.find((u) => u.id === session.userId) ?? null;

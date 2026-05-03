@@ -33,3 +33,6 @@ coverage/
 
 # Next.js
 # Note: next-env.d.ts is committed so `typecheck` works without a prior `next build`.
+
+# Legacy reference (pre-monorepo prototype kept locally for cross-checking, not shipped)
+Old version/

@@ -10,12 +10,13 @@ import { followUser, unfollowUser } from '@/lib/actions';
 export const dynamic = 'force-dynamic';
 
 interface Params {
-  readonly params: { readonly handle: string };
+  readonly params: Promise<{ readonly handle: string }>;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { handle } = await params;
   const client = getConnectClient();
-  const user = await client.users.getByHandle(params.handle);
+  const user = await client.users.getByHandle(handle);
   if (!user) return { title: 'Not found — Citizens Wear' };
   return {
     title: `${user.displayName} (@${user.handle}) — Citizens Wear`,
@@ -24,18 +25,23 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 export default async function UserProfilePage({ params }: Params) {
+  const { handle } = await params;
   const client = getConnectClient();
   const store = getWearStore();
   const session = await getSession();
 
-  const user = await client.users.getByHandle(params.handle);
+  const user = await client.users.getByHandle(handle);
   if (!user) notFound();
 
-  const [profile, counts, ownedBrands, isFollowing] = await Promise.all([
+  const [profile, counts, ownedBrands, isFollowing, postsPage] = await Promise.all([
     store.profiles.getOrCreate(user.id),
     store.follows.counts(user.id),
     client.brands.listForOwner(user.id),
     session ? store.follows.isFollowing(session.user.id, user.id) : Promise.resolve(false),
+    store.posts.listForAuthor(user.id, {
+      limit: 12,
+      viewerUserId: session?.user.id,
+    }),
   ]);
 
   const viewingOwnProfile = session?.user.id === user.id;
@@ -142,6 +148,31 @@ export default async function UserProfilePage({ params }: Params) {
                 </ul>
               </section>
             ) : null}
+
+            <section className="mt-10">
+              <h2 className="text-xs uppercase tracking-wide text-ink-soft">Activity</h2>
+              {postsPage.items.length === 0 ? (
+                <p className="mt-3 text-sm text-ink-soft">No posts yet.</p>
+              ) : (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {postsPage.items.map((post) => (
+                    <li key={post.id}>
+                      <Link
+                        href={{ pathname: '/p/[id]', query: { id: post.id } }}
+                        className="flex items-center gap-2 rounded-md border border-border bg-paper-soft px-3 py-2 text-sm hover:border-gold"
+                      >
+                        <span className="line-clamp-1 text-ink">
+                          {post.caption.slice(0, 120)}
+                        </span>
+                        <span className="ml-auto text-xs text-ink-soft">
+                          {post.authorKind === 'brand' ? 'Brand' : 'Citizen'}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </>
         )}
       </section>

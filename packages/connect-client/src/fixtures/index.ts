@@ -92,5 +92,25 @@ export const fixtureSession: ConnectSession = {
   scopes: ['profile', 'brands.read', 'products.read'],
 };
 
+/**
+ * A second fixture session bound to the moderator/admin user. Mirrors the
+ * shape Connect will deliver in Phase 3 once role-bearing OIDC claims land.
+ * The mock admin user is a distinct fixture citizen (`usr_002`) so admin
+ * power is never silently fused with brand-owner power in tests or local dev.
+ */
+export const fixtureAdminSession: ConnectSession = {
+  userId: 'usr_002',
+  issuedAt: '2026-04-10T12:00:00.000Z',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  scopes: ['profile', 'brands.read', 'products.read', 'admin.moderation'],
+};
+
 /** The token the `MockConnectClient` will accept in `verifyToken`. */
 export const FIXTURE_VALID_TOKEN = 'mock-valid-token';
+
+/**
+ * Token that resolves to {@link fixtureAdminSession}. Only the server-side
+ * sign-in handler ever holds this string; it is never embedded in client
+ * bundles. Used exclusively for Phase 4 mock admin gating.
+ */
+export const FIXTURE_ADMIN_TOKEN = 'mock-admin-token';

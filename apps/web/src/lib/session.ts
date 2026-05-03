@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import type { ConnectSession, ConnectUser } from '@citizens-wear/connect-client';
-import { FIXTURE_VALID_TOKEN } from '@citizens-wear/connect-client';
+import { FIXTURE_ADMIN_TOKEN, FIXTURE_VALID_TOKEN } from '@citizens-wear/connect-client';
 import { getConnectClient } from './connect';
 
 /**
@@ -68,3 +68,23 @@ export async function clearSessionCookie(): Promise<void> {
  * sign-in flow; Phase 3 replaces this with an OIDC redirect.
  */
 export const MOCK_SIGN_IN_TOKEN = FIXTURE_VALID_TOKEN;
+
+/**
+ * Mock moderator/admin token. Held only by server-side sign-in code; never
+ * embedded in client bundles. In Phase 3 admin scope is delivered as an OIDC
+ * claim instead of a separate token.
+ */
+export const MOCK_ADMIN_SIGN_IN_TOKEN = FIXTURE_ADMIN_TOKEN;
+
+/** Scope name granting access to the moderation queue. */
+export const ADMIN_MODERATION_SCOPE = 'admin.moderation';
+
+/**
+ * Whether the active session carries the moderation scope. Wear never trusts
+ * cookies or form input for this — only the verified `ConnectSession.scopes`
+ * resolved by `getSession()`.
+ */
+export function isAdmin(session: WearSession | null): boolean {
+  if (!session) return false;
+  return session.session.scopes.includes(ADMIN_MODERATION_SCOPE);
+}

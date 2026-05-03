@@ -1,8 +1,54 @@
 # Citizens Wear Project Status
 
-## Current Batch: Social-Commerce Foundation
+## Current Batch: Phase 4 — Posts & Feed (Slice C, full)
 
 Status: validated locally, ready to ship.
+
+Implemented:
+
+- New consumer/creator/admin surfaces:
+  - [/feed](../apps/web/src/app/feed/page.tsx) — dark, image-first chronological feed (12/page).
+  - [/p/[id]](../apps/web/src/app/p/[id]/page.tsx) — post detail + threaded comments.
+  - [/compose](../apps/web/src/app/compose/page.tsx) — citizen + brand composer with product tagging (only owned brands selectable).
+  - [/admin/moderation](../apps/web/src/app/admin/moderation/page.tsx) — moderator queue with in-page 401/403 surfaces and `noindex`.
+- Shared dark-tone PostCard component at [apps/web/src/components/post-card.tsx](../apps/web/src/components/post-card.tsx).
+- Profile augmentations: `/u/[handle]` Activity list of published posts; `/b/[slug]` posts list, follower count, and Follow toggle.
+- 9 server actions in [apps/web/src/lib/actions.ts](../apps/web/src/lib/actions.ts): `createPost`, `togglePostLike`, `togglePostSave`, `addComment`, `addToCart`, `followBrand`, `unfollowBrand`, `reportPost`, `resolveModeration`. Authz invariants:
+  - Every mutation re-authenticates via `getSession()`; cookies are never trusted for scopes.
+  - `createPost` accepts a `brandId` only when `client.brands.listForOwner(session.user.id)` confirms ownership.
+  - Product tags are filtered by brand membership: brand posts must tag the same brand; citizen posts may only tag products of brands the citizen owns.
+  - Media URLs validated by `isSafeMediaUrl` (URL parseable, http/https only, no embedded credentials, ≤2048 chars).
+  - `resolveModeration` throws `Forbidden` (does not redirect) when `isAdmin(session)` is false, so admins are not pushed through the citizen sign-in loop.
+  - `addToCart` revalidates only paths matching a small allowlist (`/feed`, `/p/[id]`, `/b/[slug]`, `/u/[handle]`).
+- Mock admin scope: new `FIXTURE_ADMIN_TOKEN` + `fixtureAdminSession` (scope `admin.moderation`) in [packages/connect-client/src/fixtures/index.ts](../packages/connect-client/src/fixtures/index.ts); seeded automatically by `MockConnectClient`. Sign-in `?as=admin` preset for the moderator token is gated by `process.env.NODE_ENV !== 'production'`.
+- `PageShell` gained `tone: 'paper' | 'dark'` and the nav now exposes `/feed` always, `/compose` when signed in, and `/admin/moderation` when the session has the admin scope.
+- `Next 15.5` async `params` contract applied to `/p/[id]`, `/u/[handle]`, `/b/[slug]` (Promise + `await`).
+- Seed data: 3 posts (post_001 brand brd_001 + tag prd_001; post_002 citizen usr_002; post_003 brand brd_001 + tag prd_002), 3 media URLs, 2 likes, 1 brand follow.
+
+## Latest Validation
+
+Run from workspace root on Windows PowerShell.
+
+- `pnpm typecheck`: passed (turbo, 7 successful).
+- `pnpm test`: passed. `@citizens-wear/connect-client` 14 tests, `@citizens-wear/db` 27 tests, `@citizens-wear/web` 22 tests (3 files; 18 → 22 covers new authz + returnPath allowlist + citizen-tag filter).
+- `npx next lint --dir src`: 0 warnings/errors. `next lint` deprecation notice only (non-blocking).
+- Architect review: passed after applying SHOULD-FIX items — async `params`, production-gate on mock moderator preset, citizen-post tag ownership filter, `addToCart.returnPath` allowlist, `noindex` on draft/hidden post detail metadata.
+- Supabase security advisors: this slice did not apply Supabase migrations or add new Supabase DDL; baseline of 53 warnings is unchanged by inspection.
+
+## Review Gates
+
+- Architecture review: passed after fixing async-params regression and admin-token production-reach surface.
+- Security/vibe review: passed after tightening citizen product-tag ownership, gating mock admin token by NODE_ENV, allowlisting cart returnPath revalidation, and `noindex` on non-published post metadata.
+
+## Known Non-Blocking Warnings
+
+- Full-repo `pnpm format:check` is not currently a clean gate because legacy/reference files have pre-existing formatting drift. Changed files from this batch are Prettier-clean.
+- Next 15 still emits the `next lint` deprecation notice.
+- `<img>` is used in `PostCard` instead of `next/image` because in-memory mock URLs aren't pre-configured in `images.remotePatterns`. Mitigation: `referrerPolicy="no-referrer"`, lazy loading, async decoding.
+
+## Previous Batch: Social-Commerce Foundation
+
+Status: shipped.
 
 Implemented:
 
@@ -14,32 +60,13 @@ Implemented:
 - Remediated the PostCSS audit finding by pinning PostCSS to `8.5.10` and refreshing [pnpm-lock.yaml](../pnpm-lock.yaml).
 - Updated [apps/web/next.config.js](../apps/web/next.config.js) to use top-level `typedRoutes` for Next 15.
 
-## Latest Validation
+Supabase advisors baseline (carried forward, unchanged this batch):
 
-Run from workspace root on Windows PowerShell.
-
-- `pnpm exec prettier --check docs/social-commerce-vertical-slice.md packages/db/src/contract.ts packages/db/src/memory.ts packages/db/test/contract.test.ts package.json apps/web/package.json apps/web/next.config.js pnpm-lock.yaml`: passed.
-- `pnpm typecheck`: passed.
-- `pnpm test`: passed. `@citizens-wear/connect-client` 14 tests, `@citizens-wear/db` 27 tests, `@citizens-wear/web` 2 tests.
-- `pnpm lint`: passed. Next.js `next lint` deprecation notice only.
-- `pnpm build`: passed. Node `url.parse()` deprecation warning only.
-- `pnpm audit --audit-level moderate`: passed. No known vulnerabilities found.
-- Changed-file secret scan: passed. No matches for common secret/private-key patterns.
-- Supabase security advisors: reachable; existing linked-project baseline has 53 warnings. This slice did not apply Supabase migrations or add new Supabase DDL. Baseline groups:
-  - `anon_security_definer_function_executable`: 20 warnings. Remediation: <https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable>
-  - `authenticated_security_definer_function_executable`: 20 warnings. Remediation: <https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable>
-  - `function_search_path_mutable`: 6 warnings. Remediation: <https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable>
-  - `materialized_view_in_api`: 5 warnings. Remediation: <https://supabase.com/docs/guides/database/database-linter?lint=0016_materialized_view_in_api>
-  - `extension_in_public`: 1 warning. Remediation: <https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public>
-  - `auth_leaked_password_protection`: 1 warning. Remediation: <https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection>
-
-## Review Gates
-
-- Architecture review: passed after fixing post visibility/status filtering, author kind invariants, Prisma brand relation behavior, and moderation auditability.
-- Security/vibe review: passed after replacing public restricted-list bypass with branded trusted access, enforcing cart item ownership on update/remove, and requiring readable published posts for likes/saves/comments.
-
-## Known Non-Blocking Warnings
-
-- Full-repo `pnpm format:check` is not currently a clean gate because legacy/reference files have pre-existing formatting drift. Changed files from this batch are Prettier-clean.
-- Next 15 still emits the `next lint` deprecation notice.
-- Build emits a Node `url.parse()` deprecation warning from the toolchain path.
+- `anon_security_definer_function_executable`: 20 warnings.
+- `authenticated_security_definer_function_executable`: 20 warnings.
+- `function_search_path_mutable`: 6 warnings.
+- `materialized_view_in_api`: 5 warnings.
+- `extension_in_public`: 1 warning.
+- `auth_leaked_password_protection`: 1 warning.
+</content>
+</invoke>
