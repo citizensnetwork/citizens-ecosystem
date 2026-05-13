@@ -15,7 +15,7 @@
 
 ## 2. What just shipped
 
-**Batch S1 — Category Refinement v2 (taxonomy refactor only).** Code shipped on `main`. See `.github/PROJECT_STATUS.md` for the full validation block and `.github/DECISIONS.md` (Batch S1 entry) for the rationale.
+**Batch S1 — Category Refinement v2 (taxonomy refactor only).** Code committed locally on `main` as **`8fbd2ce`** but **not yet pushed to `origin/main`** (push to `https://github.com/citizensnetwork/citizens-connect.git` returned `Repository not found` — credential / auth issue from this session, not a remote problem; the same URL succeeded at the previous commit `c9ad2e2`). First action next session: `git push origin main` from a credentialed shell. See `.github/PROJECT_STATUS.md` for the full validation block and `.github/DECISIONS.md` (Batch S1 entry) for the rationale.
 
 Highlights:
 - Event taxonomy: 16 slugs → **17 canonical slugs** (`worship-prayer`, `church-services`, `outreach-missions`, `markets-expos`, `sport-recreation`, `arts-culture`, `social-gatherings`, `community-upliftment`, `education-equipping`, `marriage-family`, `mens-community`, `womens-community`, `youth-students`, `kids`, `care-recovery`, `members-only`, `conferences-summits`).
@@ -40,11 +40,12 @@ mcp_supabase_apply_migration  name:"refine_categories_v2"
 
 ## 4. Next batches queued (in order)
 
-1. **Apply migration 064** — `mcp_supabase_apply_migration name:"refine_categories_v2"`. Run `mcp_supabase_get_advisors type:"security"` immediately after; compare to baseline (no NEW warnings).
-2. **Architect audit on Batch S1 diff** — invoke Architect subagent with the diff covering `src/types/db.ts`, `src/lib/categories.ts`, `src/lib/categoryIcons.ts`, `src/lib/categorySuggest.ts`, `src/lib/quickPanelOptions.ts`, `src/lib/personalization/percentages.ts`, `src/lib/easterEggs/*`, `src/lib/map/markers.ts`, `supabase/functions/_shared/category-interests.ts`, `supabase/migrations/064_refine_categories_v2.sql`, `supabase/schema.sql`, all 4 affected components, and the 13 updated tests. Apply Should-fix findings inline; note Nice-to-haves.
-3. **Batch S2 — Lucide redraw.** Replace remaining emoji icons with Lucide-extracted inline SVGs as source-of-truth. Add 3 custom SVGs: `praying-hands`, `soccer-ball`, `lollipop`. Add one tag icon: `weekend-tag`. Spec section in `.github/QUEUED_BATCH_S_categories_v2.md`.
-4. **Batch S3 — Weekend derived tag.** New `src/lib/weekendTag.ts` (`isWeekendEvent(event)`), `<WeekendChip />` component, Weekend toggle in `EventsView` filter drawer, `weekendTag` unit tests. Note: `src/lib/personalization/percentages.ts` currently routes `time_availability=weekends` → `conferences-summits` with a TODO comment — flip back to a derived signal when S3 lands.
-5. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
+1. **`git push origin main`** — local commit `8fbd2ce` carrying all Batch S1 changes is staged for push. Re-auth GitHub credentials if needed.
+2. **Apply migration 064** — `mcp_supabase_apply_migration name:"refine_categories_v2"`. Run `mcp_supabase_get_advisors type:"security"` immediately after; compare to baseline (no NEW warnings).
+3. **Architect audit on Batch S1 diff** — invoke Architect subagent with the diff covering `src/types/db.ts`, `src/lib/categories.ts`, `src/lib/categoryIcons.ts`, `src/lib/categorySuggest.ts`, `src/lib/quickPanelOptions.ts`, `src/lib/personalization/percentages.ts`, `src/lib/easterEggs/*`, `src/lib/map/markers.ts`, `supabase/functions/_shared/category-interests.ts`, `supabase/migrations/064_refine_categories_v2.sql`, `supabase/schema.sql`, all 4 affected components, and the 13 updated tests. Apply Should-fix findings inline; note Nice-to-haves.
+4. **Batch S2 — Lucide redraw.** Replace remaining emoji icons with Lucide-extracted inline SVGs as source-of-truth. Add 3 custom SVGs: `praying-hands`, `soccer-ball`, `lollipop`. Add one tag icon: `weekend-tag`. Spec section in `.github/QUEUED_BATCH_S_categories_v2.md`.
+5. **Batch S3 — Weekend derived tag.** New `src/lib/weekendTag.ts` (`isWeekendEvent(event)`), `<WeekendChip />` component, Weekend toggle in `EventsView` filter drawer, `weekendTag` unit tests. Note: `src/lib/personalization/percentages.ts` currently routes `time_availability=weekends` → `conferences-summits` with a TODO comment — flip back to a derived signal when S3 lands.
+6. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
 
 ## 5. Open questions / deferred items
 
