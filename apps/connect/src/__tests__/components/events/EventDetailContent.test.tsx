@@ -71,11 +71,13 @@ vi.mock("@/components/events/WhoIsAttending", () => ({
   default: () => <div data-testid="who-attending">Attendees</div>,
 }));
 
+// 30 days in the future so RSVP-availability branches render without flake.
+// Tests that need a past/in-session event override `date` explicitly below.
 const baseEvent = makeEvent({
   id: "evt-detail-1",
   title: "Worship Night",
   description: "A night of praise",
-  date: "2026-05-10T18:00:00Z",
+  date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
   location: "City Hall",
   category: "church-services",
   image_url: "https://example.com/worship.jpg",
@@ -111,8 +113,15 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    // Date should include May 10, 2026 (formatted)
-    expect(screen.getByText(/may/i)).toBeInTheDocument();
+    // Date should be formatted as the long month name of baseEvent.date.
+    // We derive the expected month from the fixture so the assertion stays
+    // stable when the fixture's relative date crosses month boundaries.
+    const expectedMonth = new Date(baseEvent.date).toLocaleString("en-US", {
+      month: "long",
+    });
+    expect(
+      screen.getByText(new RegExp(expectedMonth, "i"))
+    ).toBeInTheDocument();
   });
 
   it("renders location", () => {

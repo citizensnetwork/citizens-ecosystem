@@ -2,6 +2,16 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch 2 (post-S3) — EventDetailContent baseline-failure fix
+
+**Decision — Fixture dates in test files that exercise temporal UI branches must be relative to `Date.now()`, not hardcoded ISO strings.** Applied to `src/__tests__/components/events/EventDetailContent.test.tsx`: `baseEvent.date` is now `new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()`. The two tests that need a past / in-session event already override `date` explicitly.
+
+**Why:** The previous hardcoded `"2026-05-10T18:00:00Z"` quietly degraded into a past date once the wall-clock crossed it, routing every test that depends on the RSVP-availability branch into the "already started" copy. Relative-future fixtures self-correct as the calendar advances; explicit overrides handle the inverse case where a past date is the assertion under test.
+
+**Decision — Locale assertions on rendered dates derive expected values from the same fixture instant, not from literal substrings.** The `"renders formatted date"` test now derives the expected month name via `new Date(baseEvent.date).toLocaleString("en-US", { month: "long" })` and matches against a case-insensitive RegExp.
+
+**Why:** A literal `/may/i` check only happened to pass because the hardcoded fixture date fell in May. Deriving the expected month from the fixture itself keeps the assertion stable across relative dates, month rollovers, and any future renaming of the fixture window — and is strictly stronger than the substring check it replaces.
+
 ## Batch S3 — Weekend Derived Tag
 
 **Decision — A weekend event is one whose UTC span overlaps Saturday (any time), Sunday (any time), or Friday from 17:00 UTC onwards.** Implemented in `src/lib/weekendTag.ts` as a UTC-deterministic per-calendar-day walk with a 366-day defensive guard.

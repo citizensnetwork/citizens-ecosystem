@@ -429,6 +429,22 @@ Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md` Phase D plus the pers
 - [x] Architect subagent — A across all axes; two Should-fix items applied inline.
 - [x] `mcp_supabase_get_advisors type:"security"` — ERROR 2 / WARN 77, identical shape to pre-S3 baseline (no DB changes in this batch).
 
+### Batch 2 (post-S3) — EventDetailContent baseline test fix (COMPLETE)
+
+Closes the 2 pre-existing baseline failures flagged in `RESUME_HERE.md` after Batch S3.
+
+**What shipped:**
+- `src/__tests__/components/events/EventDetailContent.test.tsx` — `baseEvent.date` changed from hardcoded `"2026-05-10T18:00:00Z"` (a past date relative to wall-clock 2026-05-14) to a relative-future `new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()`, so RSVP-availability branches render reliably. Tests that need a started/in-session event already override `date` explicitly.
+- `"renders formatted date"` assertion upgraded from literal `/may/i` substring to a derived expected month name (`new Date(baseEvent.date).toLocaleString("en-US", { month: "long" })`) inside a case-insensitive RegExp, so it stays correct as the fixture window slides across months.
+
+**Architect audit:** Grade A. No Must-fix, no Should-fix, Nice-to-haves noted only (extract `FUTURE_OFFSET_MS` constant; capture single `NOW` at module load for symmetry across overrides). Read-only review of a test-only change.
+
+**Latest validation (Batch 2 post-S3):**
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **655 passed / 0 failures** (+2 vs S3 — both formerly-failing EventDetailContent tests now green)
+- [x] `npx next lint --dir src` — clean
+- [x] No DB changes; Supabase advisor baseline unchanged by definition.
+
 ### Batch S2 — Lucide Icon Redraw (COMPLETE — `6798590`)
 
 Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md`. Single-file rewrite of `src/lib/categoryIcons.ts` to align the entire category/quick-panel/AI-search icon system with `lucide-react` v0.441.0.
