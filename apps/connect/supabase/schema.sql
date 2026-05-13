@@ -88,7 +88,7 @@ create table if not exists public.events (
     'education-equipping', 'marriage-family', 'mens-community', 'womens-community',
     'youth-students', 'kids', 'care-recovery', 'members-only', 'conferences-summits'
   )) default 'church-services',
-  category_id uuid references public.categories(id),
+  category_id uuid references public.categories(id) on delete set null,
   image_url text,
   website_url text,
   contact_email text,
@@ -246,36 +246,38 @@ do $$ begin
 end $$;
 
 -- Seed default categories (refined v2 taxonomy: 17 event-applies + 10 place-applies)
+-- Hex + emoji values must mirror supabase/migrations/064_refine_categories_v2.sql
+-- and src/lib/categories.ts (CATEGORY_HEX / PLACE_CATEGORY_HEX). Update all three together.
 insert into public.categories (name, slug, emoji, color, applies_to, sort_order) values
   -- Event-applies (sort_order 1..17)
-  ('Worship & Prayer',      'worship-prayer',      '🙏', '#7C3AED', 'events', 1),
-  ('Church Services',       'church-services',     '⛪', '#D4AF37', 'events', 2),
-  ('Outreach & Missions',   'outreach-missions',   '🌍', '#0EA5E9', 'events', 3),
-  ('Markets & Expos',       'markets-expos',       '🛍️', '#F97316', 'events', 4),
-  ('Sport & Recreation',    'sport-recreation',    '🏃', '#22C55E', 'events', 5),
-  ('Arts & Culture',        'arts-culture',        '🎨', '#FF6B35', 'events', 6),
-  ('Social Gatherings',     'social-gatherings',   '🎉', '#E91E63', 'events', 7),
-  ('Community Upliftment',  'community-upliftment','🤝', '#10B981', 'events', 8),
-  ('Education & Equipping', 'education-equipping', '📚', '#8B5CF6', 'events', 9),
-  ('Marriage & Family',     'marriage-family',     '💞', '#EC4899', 'events', 10),
-  ('Men''s Community',      'mens-community',      '👨', '#1E40AF', 'events', 11),
-  ('Women''s Community',    'womens-community',    '👩', '#BE185D', 'events', 12),
-  ('Youth & Students',      'youth-students',      '🌟', '#F59E0B', 'events', 13),
-  ('Kids',                  'kids',                '🧒', '#FBBF24', 'events', 14),
-  ('Care & Recovery',       'care-recovery',       '💗', '#06B6D4', 'events', 15),
-  ('Members Only',          'members-only',        '🔒', '#475569', 'events', 16),
-  ('Conferences & Summits', 'conferences-summits', '🏛️', '#9333EA', 'events', 17),
+  ('Worship & Prayer',      'worship-prayer',      '🙏',  '#B8860B', 'events', 1),
+  ('Church Services',       'church-services',     '⛪',  '#D4AF37', 'events', 2),
+  ('Outreach & Missions',   'outreach-missions',   '🌍',  '#1ABC9C', 'events', 3),
+  ('Markets & Expos',       'markets-expos',       '🛍️', '#F39C12', 'events', 4),
+  ('Sport & Recreation',    'sport-recreation',    '⚽',  '#2ECC71', 'events', 5),
+  ('Arts & Culture',        'arts-culture',        '🎭',  '#FF6B35', 'events', 6),
+  ('Social Gatherings',     'social-gatherings',   '☕',  '#E91E63', 'events', 7),
+  ('Community Upliftment',  'community-upliftment','🤝',  '#9B59B6', 'events', 8),
+  ('Education & Equipping', 'education-equipping', '📚',  '#3498DB', 'events', 9),
+  ('Marriage & Family',     'marriage-family',     '💍',  '#E74C3C', 'events', 10),
+  ('Men''s Community',      'mens-community',      '👔',  '#34495E', 'events', 11),
+  ('Women''s Community',    'womens-community',    '👗',  '#C71585', 'events', 12),
+  ('Youth & Students',      'youth-students',      '🔥',  '#FF8C42', 'events', 13),
+  ('Kids',                  'kids',                '🧒',  '#00BCD4', 'events', 14),
+  ('Care & Recovery',       'care-recovery',       '💗',  '#8E44AD', 'events', 15),
+  ('Members Only',          'members-only',        '🔒',  '#212121', 'events', 16),
+  ('Conferences & Summits', 'conferences-summits', '🎤',  '#5D6D7E', 'events', 17),
   -- Place-applies (sort_order 101..110)
-  ('Churches & Ministries', 'churches-ministries', '⛪', '#D4AF37', 'places', 101),
-  ('Hospitality & Cafés',   'hospitality-cafes',   '☕', '#A0522D', 'places', 102),
-  ('Recreation & Sport',    'recreation-sport',    '🏟️', '#22C55E', 'places', 103),
-  ('Media & Broadcasting',  'media-broadcasting',  '📺', '#0EA5E9', 'places', 104),
-  ('Retail & Shopping',     'retail-shopping',     '🛍️', '#F97316', 'places', 105),
-  ('Health & Wellness',     'health-wellness',     '🩺', '#06B6D4', 'places', 106),
-  ('Education & Training',  'education-training',  '🎓', '#8B5CF6', 'places', 107),
-  ('Arts & Creative',       'arts-creative',       '🎨', '#FF6B35', 'places', 108),
-  ('Christian Businesses',  'christian-businesses','🏢', '#475569', 'places', 109),
-  ('Safe Spaces',           'safe-spaces',         '🕊️', '#14B8A6', 'places', 110)
+  ('Churches & Ministries', 'churches-ministries', '⛪',  '#D4AF37', 'places', 101),
+  ('Hospitality & Cafés',   'hospitality-cafes',   '☕',  '#8B4513', 'places', 102),
+  ('Recreation & Sport',    'recreation-sport',    '🏃',  '#2ECC71', 'places', 103),
+  ('Media & Broadcasting',  'media-broadcasting',  '📻',  '#9B59B6', 'places', 104),
+  ('Retail & Shopping',     'retail-shopping',     '🛍️', '#E91E63', 'places', 105),
+  ('Health & Wellness',     'health-wellness',     '🩺',  '#E74C3C', 'places', 106),
+  ('Education & Training',  'education-training',  '📚',  '#3498DB', 'places', 107),
+  ('Arts & Creative',       'arts-creative',       '🎨',  '#FF6B35', 'places', 108),
+  ('Christian Businesses',  'christian-businesses','🏢',  '#A67C00', 'places', 109),
+  ('Safe Spaces',           'safe-spaces',         '🕊️', '#B59CD9', 'places', 110)
 on conflict (slug) do nothing;
 
 -- ══════════════════════════════════════════════

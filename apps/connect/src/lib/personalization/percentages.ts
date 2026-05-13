@@ -68,6 +68,9 @@ const TAG_CATEGORY_MAP: Record<string, (value: unknown) => CategorySlug[]> = {
     // S1: `weekends` historically mapped to the now-removed `weekend` bucket.
     // Until S3 reintroduces a derived `weekend` tag the closest semantic
     // bucket is the conference / retreat category.
+    // TODO(S3 — Weekend derived tag): once `isWeekendEvent()` lands in
+    // `src/lib/weekendTag.ts` and a `weekend` filter chip ships, replace this
+    // stopgap with a `{ weekendOnly: true }` flag and update tests.
     if (v === "weekends") return ["conferences-summits"];
     return [];
   },

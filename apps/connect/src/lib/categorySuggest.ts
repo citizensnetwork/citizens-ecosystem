@@ -13,7 +13,14 @@ type CategoryKeywords = Record<EventCategory, string[]>;
 
 /** Keyword buckets, in priority order. More specific words should appear
  *  first within each bucket so they win ties for categories with overlap
- *  (e.g. "prayer" belongs to church, not care). */
+ *  (e.g. "prayer" belongs to church, not care).
+ *
+ *  NOTE: A sibling keyword table lives in `src/lib/categories.ts`
+ *  (`EVENT_CATEGORY_KEYWORDS`). That one drives runtime *search/filter*
+ *  matching; this one drives the *auto-suggest* heuristic on event create.
+ *  When you add or rename a slug, update both — plus the
+ *  `CATEGORY_INTEREST_MAP` in `supabase/functions/_shared/category-interests.ts`.
+ */
 const KEYWORDS: CategoryKeywords = {
   // Healing, counseling, helps ministries, recovery, restorative events.
   // Merged from old `care` + `recovery` buckets.

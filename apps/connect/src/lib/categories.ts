@@ -333,6 +333,11 @@ export const PLACE_CATEGORY_KEYWORDS: Record<PlaceCategory, string[]> = {
 /**
  * Map event category slugs to keywords matched against event title,
  * description, location, and category name for client-side filtering.
+ *
+ * NOTE: A sibling keyword table lives in `src/lib/categorySuggest.ts` (KEYWORDS).
+ * That one drives the *auto-suggest* heuristic on event creation; this one
+ * drives *runtime search/filter matching*. When you add a new slug, update both,
+ * AND the `CATEGORY_INTEREST_MAP` in `supabase/functions/_shared/category-interests.ts`.
  */
 export const EVENT_CATEGORY_KEYWORDS: Record<EventCategory, string[]> = {
   "worship-prayer": [

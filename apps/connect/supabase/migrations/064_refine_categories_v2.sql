@@ -53,7 +53,7 @@ end $$;
 -- ──────────────────────────────────────────────────────────────
 update public.events
    set category = case category
-     when 'entertainment'         then 'arts-culture'
+     when 'entertainment'         then 'social-gatherings'
      when 'sport-fun'             then 'sport-recreation'
      when 'social-fun'            then 'social-gatherings'
      when 'community-upliftment'  then 'community-upliftment'
@@ -73,6 +73,30 @@ update public.events
      else category
    end
  where category is not null;
+
+-- ──────────────────────────────────────────────────────────────
+-- 2b. Pre-CHECK assertion: surface any legacy slugs that escaped
+--     the remap above by name, BEFORE the CHECK constraint fires
+--     an opaque violation. Easier to diagnose during apply.
+-- ──────────────────────────────────────────────────────────────
+do $$
+declare
+  unmapped text;
+begin
+  select string_agg(distinct category, ', ' order by category)
+    into unmapped
+    from public.events
+   where category is not null
+     and category not in (
+       'worship-prayer','church-services','outreach-missions','markets-expos',
+       'sport-recreation','arts-culture','social-gatherings','community-upliftment',
+       'education-equipping','marriage-family','mens-community','womens-community',
+       'youth-students','kids','care-recovery','members-only','conferences-summits'
+     );
+  if unmapped is not null then
+    raise exception 'Unmapped legacy event category slug(s): %. Extend the CASE in step 2 before re-running.', unmapped;
+  end if;
+end $$;
 
 -- ──────────────────────────────────────────────────────────────
 -- 3. New default for the column.
@@ -151,7 +175,7 @@ on conflict (slug) do update
 -- ──────────────────────────────────────────────────────────────
 with mapping(old_slug, new_slug) as (values
   -- events
-  ('entertainment',         'arts-culture'),
+  ('entertainment',         'social-gatherings'),
   ('sport-fun',             'sport-recreation'),
   ('social-fun',            'social-gatherings'),
   ('education',             'education-equipping'),
