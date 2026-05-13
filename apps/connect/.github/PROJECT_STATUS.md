@@ -405,6 +405,27 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Supabase migration applied via MCP — `place_media` and media policies verified in `pg_policies`.
 - [x] `mcp_supabase_get_advisors type:security` — **79 lints**, no `place_media`/`event_photos`/storage findings for this batch; previous `place-images` public-bucket listing warning removed by dropping the broad storage SELECT policy.
 
+### Batch S2 — Lucide Icon Redraw (COMPLETE — `6798590`)
+
+Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md`. Single-file rewrite of `src/lib/categoryIcons.ts` to align the entire category/quick-panel/AI-search icon system with `lucide-react` v0.441.0.
+
+**What shipped:**
+- New `CategoryIconId` union — 28 IDs (alphabetical): book-open, calendar-days, church, coffee, dumbbell, flame, globe, graduation-cap, hand-heart, heart, heart-handshake, key-round, lollipop, martini, mic, palette, pin, praying-hands, radio, shirt, shopping-bag, soccer-ball, stethoscope, store, user, user-round, users, weekend-tag. Replaces legacy 22-ID set (arts, bag, book, compass, couples, runner, tools, music, etc.).
+- 23 Lucide-extracted path strings copied verbatim from `node_modules/lucide-react/dist/esm/icons/*.js`: Church, Earth (globe-2 alias), Store, Palette, Martini, HeartHandshake, GraduationCap, Users, User, UserRound, Flame, HandHeart, KeyRound, MicVocal (mic-2 alias), Coffee, Dumbbell, Radio, ShoppingBag, Stethoscope, BookOpen, Heart, CalendarDays, Shirt.
+- 3 hand-authored custom 24×24 SVGs for slugs Lucide does not cover cleanly: `praying-hands`, `soccer-ball`, `lollipop`. Legacy `pin` retained as DEFAULT_CATEGORY_ICON.
+- `weekend-tag` is a CalendarDays alias (shared `CALENDAR_DAYS_SVG` constant) staged for the S3 weekend derived tag work.
+- EVENT_CATEGORY_ICON_IDS, PLACE_CATEGORY_ICON_IDS, QUICK_ACCESS_ICON_IDS, SEARCH_INTENT_ICON_IDS all remapped to the new union. No old IDs remain.
+- Architect Should-fix applied inline: `SVG_OPEN` now carries explicit `width="24" height="24"` + `xmlns` so glyphs render at correct size inside flex containers across Chrome / Firefox / Safari (previous viewBox-only form could fall back to 300×150 on some browsers).
+
+**Architect audit:** initial verdict B+ on a single Should-fix (SVG sizing). After inline fix, verdict A. Nice-to-haves logged (unused `getIconBySlug`, mixed-intent `QUICK_ACCESS_ICON_IDS` keys, fallback ID inconsistency) — queued for a future tidy-up batch, non-blocking.
+
+### Latest validation (Batch S2)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **637 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated to this batch).
+- [x] `npx next lint --dir src` — clean.
+- [x] Architect subagent — A after SVG_OPEN sizing patch.
+- [x] `mcp_supabase_get_advisors type:"security"` — no NEW warnings vs pre-batch baseline (no DB changes in this batch).
+
 ### Batch S1.1 — Categories Refinement v2 follow-ups (COMPLETE — `fbb418c`, `449dfe4`)
 
 Locked-in cleanup after Batch S1. Both commits on `origin/main`.

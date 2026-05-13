@@ -15,33 +15,32 @@
 
 ## 2. What just shipped
 
-**Batch S1.1 — Categories Refinement v2 follow-ups.** Two commits on `origin/main`:
+**Batch S2 — Lucide-aligned category icon registry redraw.** One commit on `origin/main`:
 
-- `fbb418c` — Architect Should-fix patch (5 items): entertainment→social-gatherings remapped in migration 064 (steps 2 + 6), fail-fast unmapped-slug guard added (step 2b), schema.sql seed mirrored to migration, `events.category_id` FK `on delete set null`, cross-reference docblocks added to category keyword maps, S3 TODO breadcrumb on weekends stopgap.
-- `449dfe4` — Coverage-gap regression tests (3 files): `categories.test.ts` parity it.each + hex regex, `percentages.test.ts` weekends stopgap pin, `category-interests.test.ts` (new) runtime regression guard for the Edge Function `CATEGORY_INTEREST_MAP`.
+- `6798590` — `src/lib/categoryIcons.ts` rewritten. New 28-ID `CategoryIconId` union replaces the legacy 22-ID set. 23 Lucide-extracted path strings copied verbatim from `lucide-react` v0.441.0 (`Church`, `Earth` (globe-2 alias), `Store`, `Palette`, `Martini`, `HeartHandshake`, `GraduationCap`, `Users`, `User`, `UserRound`, `Flame`, `HandHeart`, `KeyRound`, `MicVocal` (mic-2 alias), `Coffee`, `Dumbbell`, `Radio`, `ShoppingBag`, `Stethoscope`, `BookOpen`, `Heart`, `CalendarDays`, `Shirt`). 3 hand-authored custom 24×24 SVGs (`praying-hands`, `soccer-ball`, `lollipop`). Legacy `pin` retained as `DEFAULT_CATEGORY_ICON`. `weekend-tag` is a `CalendarDays` alias via the shared `CALENDAR_DAYS_SVG` constant — staged for S3. EVENT/PLACE/QUICK_ACCESS/SEARCH_INTENT maps all remapped; no old IDs remain.
 
-✅ **Migration 064 applied to remote DB** (project `xyiajtrvhlxaeplsiajj` restored from INACTIVE → ACTIVE_HEALTHY via `mcp_com_supabase__restore_project`). Verified: 17 event categories, 10 place categories, all `events.category` values within the new whitelist.
+✅ **Architect Should-fix applied inline:** `SVG_OPEN` now carries explicit `width="24" height="24"` + `xmlns` so glyphs size correctly inside flex containers across Chrome / Firefox / Safari.
 
-✅ **Architect audits:** A+ on both commits. No Should-fix outstanding.
+✅ **Architect audit:** initial B+ on SVG sizing finding → A after inline fix. Nice-to-haves logged (unused `getIconBySlug`, mixed-intent quick-access keys, fallback ID inconsistency) — non-blocking, queued for a future tidy-up batch.
 
-✅ **Quality gate:** tsc 0 errors, vitest **637 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated), lint clean, advisors no NEW warnings.
+✅ **Quality gate:** tsc 0 errors, vitest **637 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated), lint clean, advisors no NEW warnings (no DB changes in this batch).
 
 ## 3. Current platform state
 
-- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 all shipped.
+- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 all shipped.
 - Test suite: 637 passed / 2 pre-existing baseline failures in `__tests__/components/events/EventDetailContent.test.tsx` (`baseEvent.date` is in the past so the RSVP branches don't render). Unrelated to current batches.
 - TS: 0 errors. Lint: clean. Advisors: baseline unchanged.
-- Git: `origin/main` at `449dfe4`. Working tree clean apart from this RESUME_HERE refresh + PROJECT_STATUS + DECISIONS doc updates (will be folded into the S2 push or a small docs commit).
+- Git: `origin/main` at `6798590` (S2). PROJECT_STATUS + DECISIONS + RESUME_HERE doc updates pending as a follow-up docs commit after this push cycle.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch S2 — Lucide redraw.** Replace remaining emoji icons in `src/lib/categoryIcons.ts` `ICON_SVGS` with inline Lucide-extracted SVGs. Lucide imports planned: Shirt (Markets & Expos), Martini (Social Gatherings), Flame (Youth & Students), Store (Christian Businesses), Heart (Safe Spaces), Church, Globe2, Palette, HeartHandshake, GraduationCap, Users, User, UserRound, HandHeart, KeyRound, Mic2, CalendarDays, Stethoscope, BookOpen, ShoppingBag, Dumbbell, Coffee, Radio. Plus 4 custom SVGs: `praying-hands`, `soccer-ball`, `lollipop`, `weekend-tag`. Full spec: `.github/QUEUED_BATCH_S_categories_v2.md`. User confirmed "proceed exactly as specced".
+1. **Batch S3 — Weekend derived tag.** New `src/lib/weekendTag.ts` (`isWeekendEvent(event)` returning true if any spanned day is Fri/Sat/Sun). New `<WeekendChip />` component on `EventCard`, `EventDetailContent`, calendar tooltips. Weekend toggle in `EventsView` filter drawer (separate from category filter). Tests + `{ weekendOnly: true }` API. Removes the `weekends → conferences-summits` stopgap in `personalization/percentages.ts` (the pinned test in `percentages.test.ts` will fail intentionally and must be updated together).
 
-2. **Batch S3 — Weekend derived tag.** New `src/lib/weekendTag.ts` (`isWeekendEvent(event)` returning true if any spanned day is Fri/Sat/Sun). New `<WeekendChip />` component on `EventCard`, `EventDetailContent`, calendar tooltips. Weekend toggle in `EventsView` filter drawer (separate from category filter). Tests + `{ weekendOnly: true }` API. Removes the `weekends → conferences-summits` stopgap in `personalization/percentages.ts` (the pinned test in `percentages.test.ts` will fail intentionally and must be updated together).
+2. **Cross-sphere project status report** (owed to user — explicitly asked in earlier session). Sections: Product, Engineering, Database, Mobile (Capacitor), Content/Community, Outstanding roadmap, Continuity. Inputs: `.github/PROJECT_STATUS.md`, `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`.
 
-3. **Cross-sphere project status report** (owed to user — explicitly asked in earlier session). Sections: Product, Engineering, Database, Mobile (Capacitor), Content/Community, Outstanding roadmap, Continuity. Inputs: `.github/PROJECT_STATUS.md`, `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`.
+3. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
 
-4. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
+4. **S2 nice-to-haves** (logged in Architect audit, non-blocking): delete or test the unused `getIconBySlug`; split mixed-intent `QUICK_ACCESS_ICON_IDS` (currently mixes quick-access ids and event-category slugs); harmonise helper fallback IDs (some return `church`, others `pin`).
 
 ## 5. Open questions / deferred items
 
@@ -68,7 +67,7 @@ select category, count(*) from public.events group by category order by 2 desc;
 
 ## 7. Memory pointers
 
-- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-s1-1-shipped.md`).
+- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-s2-icons-shipped.md`).
 - Standing user workflow: `/memories/quality-pipeline.md` (user-scope).
 - Ecosystem vision + slogan: `/memories/repo/citizens-ecosystem-vision.md`, `/memories/repo/citizens-slogan.md`.
 - Coding conventions: `/memories/repo/coding-patterns.md`.

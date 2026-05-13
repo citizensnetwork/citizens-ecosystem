@@ -2,6 +2,24 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch S2 — Lucide Icon Redraw
+
+**Decision — `lucide-react` v0.441.0 is the canonical source of icon path data; the registry stores inline-SVG strings, not React components.** `src/lib/categoryIcons.ts` extracts path attributes verbatim from `node_modules/lucide-react/dist/esm/icons/*.js` and emits them as plain SVG strings sharing one `SVG_OPEN` envelope (24×24 viewBox, stroke=currentColor, stroke-width 2, round caps/joins).
+
+**Why:** Map markers, badges, AI-search chips and the quick panel all render via `innerHTML`/string-template paths, not React JSX, because MapLibre marker elements are HTMLElement instances created outside React. Strings keep one canonical visual language without pulling React-only Lucide components into non-React render paths.
+
+**Decision — 3 hand-authored custom SVGs (`praying-hands`, `soccer-ball`, `lollipop`) cover slugs Lucide does not ship cleanly.** All 24×24, currentColor strokes, structurally consistent with Lucide so temporal opacity / hover states inherit cleanly.
+
+**Why:** Substituting nearest-neighbour Lucide glyphs (e.g. `HandsPraying` does not exist; `Smile` is wrong; `Cherry` for kids reads as fruit) would harm category recognition. Custom-authoring three glyphs is cheaper than the recognition tax. Replace with Lucide originals if/when they land.
+
+**Decision — `SVG_OPEN` carries explicit `width="24" height="24"` + `xmlns` attribute.** Inline-SVG with only `viewBox` can fall back to the CSS2 default `300×150` intrinsic size inside a flex container in Chrome/Firefox/Safari edge cases. Explicit width/height matches what `lucide-react`'s React wrapper emits.
+
+**Why:** Map markers and badge surfaces size their `<span>` wrapper, not the SVG itself, via inline pixel styles. Without explicit dimensions the glyph could render oversized on first paint depending on browser layout pass. Architect flagged in S2 audit; applied inline before commit.
+
+**Decision — `weekend-tag` is an alias of `calendar-days` via a shared `CALENDAR_DAYS_SVG` constant.** Listed in the `CategoryIconId` union but no production consumer yet.
+
+**Why:** Staged ahead of Batch S3 (weekend derived tag) so the chip can render immediately when S3 wires up the time filter. Single source of truth (the shared constant) prevents glyph drift if either ID is consumed.
+
 ## Batch S1.1 — Categories Refinement v2 Follow-ups
 
 **Decision — `entertainment` legacy slug maps to `social-gatherings`, not `arts-culture`.** Migration 064 step 2 (text remap) and step 6 (FK remap CTE) both route the legacy `entertainment` slug to `social-gatherings`. Confirmed by user.
