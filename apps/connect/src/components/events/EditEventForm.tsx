@@ -39,7 +39,7 @@ export default function EditEventForm({ event }: Props) {
   // overwrite their edits on a subsequent map click.
   const locationManuallyEdited = useRef(false);
   const [category, setCategory] = useState<EventCategory>(
-    event.category ?? "church"
+    event.category ?? "church-services"
   );
   const [websiteUrl, setWebsiteUrl] = useState(event.website_url ?? "");
   const [contactEmail, setContactEmail] = useState(event.contact_email ?? "");

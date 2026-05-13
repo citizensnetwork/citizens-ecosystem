@@ -220,7 +220,7 @@ function TrendingBlock({
   onSelectEvent?: (event: Event) => void;
   onQuickAction?: (action: QuickAction, event: Event) => void;
 }) {
-  const cat = (event.category ?? "church") as EventCategory;
+  const cat = (event.category ?? "church-services") as EventCategory;
   const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
   const label = CATEGORY_LABELS[cat] ?? "Event";
   const now = new Date();

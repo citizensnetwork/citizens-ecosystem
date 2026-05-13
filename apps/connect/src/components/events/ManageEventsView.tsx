@@ -184,7 +184,7 @@ export default function ManageEventsView({ isVendor, groupByLifecycle = false }:
   );
 
   function renderEventRow(event: ManagedEvent) {
-    const cat = event.category ?? "church";
+    const cat = event.category ?? "church-services";
     const isExpanded = expandedId === event.id;
     const isFull = event.max_attendees != null && event.attendee_count >= event.max_attendees;
 

@@ -36,7 +36,7 @@ vi.mock("next/dynamic", () => ({
 }));
 
 const categories: Category[] = [
-  { id: "cat-1", name: "Church", slug: "church", emoji: "⛪", color: "#6366f1", applies_to: "both", sort_order: 1, created_at: "" },
+  { id: "cat-1", name: "Churches & Ministries", slug: "churches-ministries", emoji: "⛪", color: "#6366f1", applies_to: "both", sort_order: 1, created_at: "" },
   { id: "cat-2", name: "Ministry", slug: "ministry", emoji: "✝️", color: "#8b5cf6", applies_to: "both", sort_order: 2, created_at: "" },
 ];
 
@@ -61,7 +61,7 @@ describe("PlaceForm", () => {
 
   it("renders category options from props", () => {
     render(<PlaceForm categories={categories} />);
-    expect(screen.getByText("Church")).toBeInTheDocument();
+    expect(screen.getByText("Churches & Ministries")).toBeInTheDocument();
     expect(screen.getByText("Ministry")).toBeInTheDocument();
   });
 

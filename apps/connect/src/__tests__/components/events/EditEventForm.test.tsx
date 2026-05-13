@@ -63,7 +63,7 @@ describe("EditEventForm", () => {
     description: "Weekly worship",
     date: "2026-04-12T09:00:00Z",
     location: "Grace Church",
-    category: "church",
+    category: "church-services",
   });
 
   beforeEach(() => {

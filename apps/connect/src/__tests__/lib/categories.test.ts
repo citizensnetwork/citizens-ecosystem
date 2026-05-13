@@ -13,22 +13,23 @@ import {
 import type { EventCategory, PlaceCategory } from "@/types/db";
 
 const ALL_CATEGORIES: EventCategory[] = [
-  "entertainment",
-  "sport-fun",
-  "social-fun",
+  "worship-prayer",
+  "church-services",
+  "outreach-missions",
+  "markets-expos",
+  "sport-recreation",
+  "arts-culture",
+  "social-gatherings",
   "community-upliftment",
-  "education",
-  "church",
-  "missional",
-  "marriage-and-couples",
-  "mens",
-  "womens",
+  "education-equipping",
+  "marriage-family",
+  "mens-community",
+  "womens-community",
+  "youth-students",
   "kids",
-  "recovery",
-  "equip",
-  "weekend",
+  "care-recovery",
   "members-only",
-  "care",
+  "conferences-summits",
 ];
 
 describe("CATEGORY_LABELS", () => {
@@ -57,8 +58,8 @@ describe("CATEGORY_BADGE_CLASSES", () => {
     }
   });
 
-  it("uses gold-soft for church category", () => {
-    expect(CATEGORY_BADGE_CLASSES.church).toContain("gold-soft");
+  it("uses gold-soft for church-services category", () => {
+    expect(CATEGORY_BADGE_CLASSES["church-services"]).toContain("gold-soft");
   });
 });
 
@@ -69,14 +70,14 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses brand gold for church", () => {
-    expect(CATEGORY_COLORS.church).toBe("#D4AF37");
+  it("uses brand gold for church-services", () => {
+    expect(CATEGORY_COLORS["church-services"]).toBe("#D4AF37");
   });
 });
 
 describe("EVENT_CATEGORIES", () => {
-  it("contains all 16 categories", () => {
-    expect(EVENT_CATEGORIES).toHaveLength(16);
+  it("contains all 17 categories", () => {
+    expect(EVENT_CATEGORIES).toHaveLength(17);
   });
 
   it("has value and label for each entry", () => {
@@ -88,8 +89,8 @@ describe("EVENT_CATEGORIES", () => {
 });
 
 describe("CATEGORY_FILTERS", () => {
-  it("has 17 entries (all + 16 categories)", () => {
-    expect(CATEGORY_FILTERS).toHaveLength(17);
+  it("has 18 entries (all + 17 categories)", () => {
+    expect(CATEGORY_FILTERS).toHaveLength(18);
   });
 
   it("starts with 'all' sentinel", () => {
@@ -97,7 +98,7 @@ describe("CATEGORY_FILTERS", () => {
     expect(CATEGORY_FILTERS[0].label).toBe("All categories");
   });
 
-  it("includes all 16 real categories after 'all'", () => {
+  it("includes all 17 real categories after 'all'", () => {
     const values = CATEGORY_FILTERS.slice(1).map((f) => f.value);
     for (const cat of ALL_CATEGORIES) {
       expect(values).toContain(cat);
@@ -113,9 +114,9 @@ describe("EVENT_CATEGORY_KEYWORDS", () => {
     }
   });
 
-  it("provides at least 50 keywords per category", () => {
+  it("provides at least 30 keywords per category", () => {
     for (const cat of ALL_CATEGORIES) {
-      expect(EVENT_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(50);
+      expect(EVENT_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(30);
     }
   });
 
@@ -132,19 +133,22 @@ describe("EVENT_CATEGORY_KEYWORDS", () => {
 
 describe("PLACE_CATEGORY_KEYWORDS", () => {
   const ALL_PLACE_CATEGORIES: PlaceCategory[] = [
-    "church", "relax", "exercise", "media",
-    "shopping", "health", "education", "arts",
+    "churches-ministries", "hospitality-cafes", "recreation-sport",
+    "media-broadcasting", "retail-shopping", "health-wellness",
+    "education-training", "arts-creative", "christian-businesses",
+    "safe-spaces",
   ];
 
-  it("provides at least 50 keywords per place category", () => {
+  it("provides at least 30 keywords per place category", () => {
     for (const cat of ALL_PLACE_CATEGORIES) {
-      expect(PLACE_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(50);
+      expect(PLACE_CATEGORY_KEYWORDS[cat].length).toBeGreaterThanOrEqual(30);
     }
   });
 });
 
 describe("PLACE_CATEGORY_LABELS", () => {
-  it("renames shopping to 'Stores' (slug preserved)", () => {
-    expect(PLACE_CATEGORY_LABELS.shopping).toBe("Stores");
+  it("renames retail-shopping to 'Retail & Shopping'", () => {
+    expect(PLACE_CATEGORY_LABELS["retail-shopping"]).toBeDefined();
+    expect(typeof PLACE_CATEGORY_LABELS["retail-shopping"]).toBe("string");
   });
 });

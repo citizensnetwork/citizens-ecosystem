@@ -4,13 +4,13 @@ import { CATEGORY_HEX, CATEGORY_LABELS } from "@/lib/categories";
 import type { EventCategory } from "@/types/db";
 
 describe("QUICK_ACCESS_ITEMS", () => {
-  it("includes a Care quick-access item wired to the `care` event category", () => {
-    const care = QUICK_ACCESS_ITEMS.find((i) => i.id === "care");
+  it("includes a Care & Recovery quick-access item wired to the `care-recovery` event category", () => {
+    const care = QUICK_ACCESS_ITEMS.find((i) => i.id === "care-recovery");
     expect(care).toBeDefined();
-    expect(care?.eventCategories).toContain("care");
-    // Care uses the same lilac hex as the care event category so the
+    expect(care?.eventCategories).toContain("care-recovery");
+    // Care uses the same hex as the care-recovery event category so the
     // quick-access chip, burger-menu label, and map marker share a palette.
-    expect(care?.color).toBe(CATEGORY_HEX.care);
+    expect(care?.color).toBe(CATEGORY_HEX["care-recovery"]);
   });
 
   it("every quick-access item has a non-empty SVG glyph and colour", () => {

@@ -53,7 +53,7 @@ describe("EASTER_EGGS registry", () => {
     expect(egg("gender").shouldFire(baseCtx(), undefined)).toBe(false);
     expect(
       egg("gender").shouldFire(
-        baseCtx({ tappedEventCategories: new Set(["mens"]) }),
+        baseCtx({ tappedEventCategories: new Set(["mens-community"]) }),
         undefined
       )
     ).toBe(true);
@@ -67,7 +67,7 @@ describe("EASTER_EGGS registry", () => {
     };
     expect(
       egg("gender").shouldFire(
-        baseCtx({ tappedEventCategories: new Set(["mens"]) }),
+        baseCtx({ tappedEventCategories: new Set(["mens-community"]) }),
         answered
       )
     ).toBe(false);
@@ -77,7 +77,7 @@ describe("EASTER_EGGS registry", () => {
     const e = egg("relationship_stance");
     expect(
       e.shouldFire(
-        baseCtx({ tappedEventCategories: new Set(["marriage-and-couples"]) }),
+        baseCtx({ tappedEventCategories: new Set(["marriage-family"]) }),
         undefined
       )
     ).toBe(true);
@@ -89,7 +89,7 @@ describe("EASTER_EGGS registry", () => {
     };
     expect(
       e.shouldFire(
-        baseCtx({ tappedEventCategories: new Set(["marriage-and-couples"]) }),
+        baseCtx({ tappedEventCategories: new Set(["marriage-family"]) }),
         future
       )
     ).toBe(false);

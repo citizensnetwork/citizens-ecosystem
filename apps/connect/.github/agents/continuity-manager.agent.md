@@ -11,6 +11,7 @@ Mission: execute user requests end-to-end while preserving continuity so future 
 ## Required Workflow
 
 1. Reconstruct context from files, not chat memory:
+- **`RESUME_HERE.md`** at the repo root (always read first — it is the freshest snapshot of where the project is).
 - `.github/PROJECT_STATUS.md`
 - `.github/DECISIONS.md`
 - `.github/copilot-instructions.md`
@@ -24,6 +25,8 @@ Mission: execute user requests end-to-end while preserving continuity so future 
 - Update `.github/PROJECT_STATUS.md` with completed items or status changes.
 - Update `.github/DECISIONS.md` with new decisions and rationale.
 - If workflow is reusable, create or update a prompt/agent in `.github/prompts/` or `.github/agents/`.
+
+5. **End-of-batch RESUME_HERE.md refresh (mandatory).** Before declaring the batch done, rewrite `RESUME_HERE.md` at the repo root so the next conversation can resume with zero context loss. Required sections: project at a glance / what just shipped (with commit SHA + any deferred MCP applies) / current platform state / next batches queued / open questions / how to verify locally / memory pointers / architecture quick-orient.
 
 ## Guardrails
 

@@ -1,32 +1,35 @@
 import type { SearchProfile } from "@/lib/searchProfile";
 
 export type EventCategory =
-  | "entertainment"
-  | "sport-fun"
-  | "social-fun"
+  | "worship-prayer"
+  | "church-services"
+  | "outreach-missions"
+  | "markets-expos"
+  | "sport-recreation"
+  | "arts-culture"
+  | "social-gatherings"
   | "community-upliftment"
-  | "education"
-  | "church"
-  | "missional"
-  | "marriage-and-couples"
-  | "mens"
-  | "womens"
+  | "education-equipping"
+  | "marriage-family"
+  | "mens-community"
+  | "womens-community"
+  | "youth-students"
   | "kids"
-  | "recovery"
-  | "equip"
-  | "weekend"
+  | "care-recovery"
   | "members-only"
-  | "care";
+  | "conferences-summits";
 
 export type PlaceCategory =
-  | "church"
-  | "relax"
-  | "exercise"
-  | "media"
-  | "shopping"
-  | "health"
-  | "education"
-  | "arts";
+  | "churches-ministries"
+  | "hospitality-cafes"
+  | "recreation-sport"
+  | "media-broadcasting"
+  | "retail-shopping"
+  | "health-wellness"
+  | "education-training"
+  | "arts-creative"
+  | "christian-businesses"
+  | "safe-spaces";
 
 export type EventStatus = "draft" | "published" | "cancelled";
 

@@ -45,7 +45,7 @@ export default function EventCalendar({
   /* Map Event[] → FullCalendar EventInput[] */
   const fcEvents = events.map((e) => {
     const isRsvpd = rsvpEventIds.has(e.id);
-    const catColor = CATEGORY_COLORS[e.category ?? "church"] ?? "#D4AF37";
+    const catColor = CATEGORY_COLORS[e.category ?? "church-services"] ?? "#D4AF37";
     // RSVP'd: full vibrant category colour; un-RSVP'd: pale tinted background
     const bgColor = isRsvpd ? catColor : `${catColor}30`;
     const borderColor = catColor;

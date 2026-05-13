@@ -41,7 +41,7 @@ describe("GET /api/manage/joined", () => {
           end_time: null,
           status: "published",
           visibility: "public",
-          category: "prayer",
+          category: "worship-prayer",
           location: null,
           image_url: null,
           created_by: "host-1",

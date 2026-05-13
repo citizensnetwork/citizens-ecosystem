@@ -77,10 +77,10 @@ describe("EventForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders all 16 category options", () => {
+  it("renders all 17 category options", () => {
     render(<EventForm />);
     const select = screen.getByLabelText(/category/i) as HTMLSelectElement;
-    expect(select.options).toHaveLength(16);
+    expect(select.options).toHaveLength(17);
   });
 
   it("shows error when not logged in on submit", async () => {

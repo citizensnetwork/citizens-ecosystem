@@ -178,6 +178,12 @@ For every multi-batch session the user's standing expectations are:
    to every terminal command; never use `&&` in PowerShell, use `;`.
 7. **When something is missing or blocked,** ask the user with a single
    concise question rather than guessing.
+8. **After push and status update, refresh `RESUME_HERE.md` at the repo root**
+   so the next conversation can resume with zero loss. This is mandatory,
+   not optional. Sections required: project at a glance / what just shipped
+   (with commit SHA + any deferred MCP applies) / current platform state /
+   next batches queued / open questions / how to verify locally / memory
+   pointers / architecture quick-orient.
 
 This standing workflow is the canonical "quality, refining and pushing
 procedure" the user references. Follow it silently unless the user

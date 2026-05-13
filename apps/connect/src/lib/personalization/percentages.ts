@@ -48,24 +48,27 @@ const INTEREST_WEIGHT = 30;
 /** Tag slug → category slugs whose score should bump when the tag value is truthy/matching. */
 const TAG_CATEGORY_MAP: Record<string, (value: unknown) => CategorySlug[]> = {
   relationship_stance: (v) =>
-    v === "married" || v === "calculating" ? ["marriage-and-couples"] : [],
+    v === "married" || v === "calculating" ? ["marriage-family"] : [],
   love_language: (v) => {
-    if (v === "service") return ["community-upliftment", "missional"];
-    if (v === "time") return ["social-fun"];
-    if (v === "words") return ["equip", "education"];
-    if (v === "gifts") return ["care"];
-    if (v === "touch") return ["care", "social-fun"];
+    if (v === "service") return ["community-upliftment", "outreach-missions"];
+    if (v === "time") return ["social-gatherings"];
+    if (v === "words") return ["education-equipping"];
+    if (v === "gifts") return ["care-recovery"];
+    if (v === "touch") return ["care-recovery", "social-gatherings"];
     return [];
   },
   stage_of_life: (v) => {
-    if (v === "seeking") return ["church", "equip"];
-    if (v === "growing") return ["equip", "education"];
-    if (v === "serving") return ["missional", "community-upliftment"];
-    if (v === "leading") return ["equip"];
+    if (v === "seeking") return ["church-services", "education-equipping"];
+    if (v === "growing") return ["education-equipping"];
+    if (v === "serving") return ["outreach-missions", "community-upliftment"];
+    if (v === "leading") return ["education-equipping"];
     return [];
   },
   time_availability: (v) => {
-    if (v === "weekends") return ["weekend"];
+    // S1: `weekends` historically mapped to the now-removed `weekend` bucket.
+    // Until S3 reintroduces a derived `weekend` tag the closest semantic
+    // bucket is the conference / retreat category.
+    if (v === "weekends") return ["conferences-summits"];
     return [];
   },
 };
@@ -106,11 +109,11 @@ export function computeInterestPercentages(input: PercentageInput): Percentages 
   }
 
   // --- Demographic alignment ---------------------------------------------
-  if (input.gender === "male") bump(scores, ["mens"], DEMOGRAPHIC_WEIGHT);
-  if (input.gender === "female") bump(scores, ["womens"], DEMOGRAPHIC_WEIGHT);
-  if (input.stage_of_life === "seeking") bump(scores, ["church"], DEMOGRAPHIC_WEIGHT / 2);
+  if (input.gender === "male") bump(scores, ["mens-community"], DEMOGRAPHIC_WEIGHT);
+  if (input.gender === "female") bump(scores, ["womens-community"], DEMOGRAPHIC_WEIGHT);
+  if (input.stage_of_life === "seeking") bump(scores, ["church-services"], DEMOGRAPHIC_WEIGHT / 2);
   if (input.relationship_status === "married" || input.relationship_status === "engaged") {
-    bump(scores, ["marriage-and-couples"], DEMOGRAPHIC_WEIGHT);
+    bump(scores, ["marriage-family"], DEMOGRAPHIC_WEIGHT);
   }
 
   // --- Clamp + rebucket ---------------------------------------------------

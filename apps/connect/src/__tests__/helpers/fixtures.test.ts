@@ -50,7 +50,7 @@ describe("Test fixtures", () => {
 
   it("creates valid Category", () => {
     const category = makeCategory();
-    expect(category.slug).toBe("church");
+    expect(category.slug).toBe("church-services");
     expect(category.emoji).toBe("⛪");
   });
 

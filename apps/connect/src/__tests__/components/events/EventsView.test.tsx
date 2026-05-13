@@ -102,12 +102,12 @@ vi.mock("next/link", () => ({
 }));
 
 const events = [
-  makeEvent({ id: "1", title: "Worship Night", category: "church" }),
+  makeEvent({ id: "1", title: "Worship Night", category: "church-services" }),
   makeEvent({ id: "2", title: "Youth Camp", category: "kids" }),
   makeEvent({
     id: "3",
     title: "Bible Study",
-    category: "education",
+    category: "education-equipping",
     location: "Grace Center",
   }),
 ];

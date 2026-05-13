@@ -95,7 +95,7 @@ export const EASTER_EGGS: EasterEggDefinition[] = [
     tagKey: "relationship_stance",
     expiryDays: 365,
     shouldFire: (ctx, existing) =>
-      ctx.tappedEventCategories.has("marriage-and-couples") &&
+      ctx.tappedEventCategories.has("marriage-family") &&
       needsAnswer(existing, ctx.nowIso),
   },
   {
@@ -104,8 +104,8 @@ export const EASTER_EGGS: EasterEggDefinition[] = [
     tagKey: "gender",
     expiryDays: null, // lifetime
     shouldFire: (ctx, existing) =>
-      (ctx.tappedEventCategories.has("mens") ||
-        ctx.tappedEventCategories.has("womens")) &&
+      (ctx.tappedEventCategories.has("mens-community") ||
+        ctx.tappedEventCategories.has("womens-community")) &&
       needsAnswer(existing, ctx.nowIso),
   },
   {

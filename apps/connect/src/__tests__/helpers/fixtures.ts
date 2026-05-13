@@ -42,7 +42,7 @@ export function makeEvent(overrides?: Partial<Event>): Event {
     date: "2026-04-12T09:00:00Z",
     end_time: null,
     location: "Grace Church, Durban",
-    category: "church",
+    category: "church-services",
     image_url: null,
     website_url: null,
     contact_email: null,
@@ -90,8 +90,8 @@ export function makeComment(overrides?: Partial<Comment>): Comment {
 export function makeCategory(overrides?: Partial<Category>): Category {
   return {
     id: "cat-111",
-    name: "Church",
-    slug: "church",
+    name: "Church Services",
+    slug: "church-services",
     emoji: "⛪",
     color: "#6366f1",
     applies_to: "both",

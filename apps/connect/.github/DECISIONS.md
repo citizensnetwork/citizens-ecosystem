@@ -2,6 +2,24 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch S1 — Category Refinement v2 (Taxonomy)
+
+**Decision — 17 event-applies + 10 place-applies categories are the canonical taxonomy.** `EventCategory` slugs: `worship-prayer`, `church-services`, `outreach-missions`, `markets-expos`, `sport-recreation`, `arts-culture`, `social-gatherings`, `community-upliftment`, `education-equipping`, `marriage-family`, `mens-community`, `womens-community`, `youth-students`, `kids`, `care-recovery`, `members-only`, `conferences-summits`. `PlaceCategory` slugs: `churches-ministries`, `hospitality-cafes`, `recreation-sport`, `media-broadcasting`, `retail-shopping`, `health-wellness`, `education-training`, `arts-creative`, `christian-businesses`, `safe-spaces`. Default fallback for missing event categories is `church-services`.
+
+**Why:** Old 16-slug union mixed inconsistent verbs/scope (`equip`, `weekend`, `care`, `recovery`, `social-fun`). Merging `education+equip → education-equipping` and `care+recovery → care-recovery`, splitting worship from services (`worship-prayer` vs `church-services`), and renaming `weekend → conferences-summits` lets us reintroduce Weekend later as a derived tag (S3) computed from event date rather than a category. Two-word place slugs (`churches-ministries`, `hospitality-cafes`, …) align with event slugs, removing ambiguity between events and places that previously shared single-word slugs like `church`.
+
+**Decision — Weekend stays a derived tag, not a category.** Old `weekend` event slug is dropped. S3 will introduce `isWeekendEvent()` + `<WeekendChip />` + filter toggle so weekend filtering works across every category.
+
+**Why:** Categories should describe what an event *is*; Weekend describes *when* it happens. Mixing the two forced organisers to choose between thematic accuracy and discoverability.
+
+**Decision — Migration 064 ships in-repo before being applied.** `supabase/migrations/064_refine_categories_v2.sql` is committed, idempotent, and contains the full old→new slug remap for `events.category`, `events.category_id`, `places.category_id`, plus the 27-row `categories` seed and `events.category` `CHECK` constraint swap. Application to remote DB happens via `mcp_supabase_apply_migration name:"refine_categories_v2"` in the next session (Supabase MCP tools were not loaded this session).
+
+**Why:** Code and migration must travel together so a fresh checkout + `psql -f migration` reproduces the same state. Deferring application keeps the commit honest about what's been verified live without blocking the code refactor on tool availability.
+
+**Decision — `getIconBySlug()` provides back-compat slug lookups.** Database rows can carry arbitrary slug strings (e.g. user-set `marker_icon`); a single helper falls back through event icons → place icons → quick-access icons → `church` default.
+
+**Why:** The TypeScript `EventCategory`/`PlaceCategory` unions are tight, but DB strings aren't. Centralising the lookup avoids ad-hoc casts at every render site.
+
 ## Batch R — Category Icons + Media Gallery Architecture
 
 **Decision — Category/search icons live in one typed registry.** `src/lib/categoryIcons.ts` is the canonical SVG source for map event markers, place markers, quick-access buttons, and AI search intent groups. The registry maps concepts, not every synonym: canonical event/place categories get direct icon IDs, quick-access items reuse those IDs, and `SEARCH_INTENT_ICON_IDS` maps every `ALL_TAGS` slug to the nearest icon intent.

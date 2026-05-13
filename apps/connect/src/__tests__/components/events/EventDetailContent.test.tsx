@@ -77,7 +77,7 @@ const baseEvent = makeEvent({
   description: "A night of praise",
   date: "2026-05-10T18:00:00Z",
   location: "City Hall",
-  category: "church",
+  category: "church-services",
   image_url: "https://example.com/worship.jpg",
   latitude: -29.85,
   longitude: 31.02,
@@ -140,7 +140,7 @@ describe("EventDetailContent", () => {
   });
 
   it("renders category badge for categorized events", () => {
-    const socialEvent = makeEvent({ ...baseEvent, category: "social-fun" });
+    const socialEvent = makeEvent({ ...baseEvent, category: "social-gatherings" });
     render(
       <EventDetailContent
         event={socialEvent}
@@ -149,7 +149,7 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    expect(screen.getByText("Social Fun")).toBeInTheDocument();
+    expect(screen.getByText("Social Gatherings")).toBeInTheDocument();
   });
 
   it("renders description", () => {

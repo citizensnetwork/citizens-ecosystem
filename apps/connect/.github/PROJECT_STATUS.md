@@ -405,6 +405,50 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Supabase migration applied via MCP — `place_media` and media policies verified in `pg_policies`.
 - [x] `mcp_supabase_get_advisors type:security` — **79 lints**, no `place_media`/`event_photos`/storage findings for this batch; previous `place-images` public-bucket listing warning removed by dropping the broad storage SELECT policy.
 
+### Batch S1 — Category Refinement v2 (CODE SHIPPED — migration unapplied)
+
+Locked spec: `.github/QUEUED_BATCH_S_categories_v2.md`. **S1 (taxonomy refactor) executed.** S2 (Lucide redraw) and S3 (Weekend derived tag + chip + filter) remain queued.
+
+What shipped (code only):
+- `src/types/db.ts` — `EventCategory` rewritten to **17 canonical slugs**; `PlaceCategory` rewritten to **10 slugs**.
+- `src/lib/categories.ts` — full rewrite (labels short/long, hex, badge classes, filters, ≥30 keyword buckets per slug, place equivalents).
+- `src/lib/categoryIcons.ts` — 17 event + 10 place icon-id maps; new `getIconBySlug()` helper for arbitrary slug back-compat lookups.
+- `src/lib/categorySuggest.ts`, `src/lib/quickPanelOptions.ts`, `src/lib/personalization/percentages.ts`, `src/lib/easterEggs/wyr.ts`, `src/lib/easterEggs/registry.ts`, `src/lib/map/markers.ts` — all rebucketed to new slugs.
+- `supabase/functions/_shared/category-interests.ts` — 17-entry `CATEGORY_INTEREST_MAP` rewritten.
+- All 4 components carrying default fallbacks (`ManageEventsView`, `JoinedEventsView`, `FeaturedPanel`, `EventsView`, `EventCard`, `EventCalendar`, `EventDetailContent`, `EventForm`, `EditEventForm`) flipped from `?? "church"` → `?? "church-services"`.
+- Test suite: `categories.test`, `categorySuggest.test`, `easterEggs/registry.test`, `personalization/percentages.test`, `quickPanelOptions.test`, `helpers/fixtures.ts/test`, `EventCard.test`, `EventDetailContent.test`, `EventForm.test`, `EditEventForm.test`, `EventsView.test`, `PlaceForm.test`, `ai-search/route.test`, `manage/joined.test` — all updated.
+- `supabase/schema.sql` — events `CHECK` constraint and `categories` seed rebuilt to 27 rows (17 event + 10 place).
+- Migration `supabase/migrations/064_refine_categories_v2.sql` — idempotent old→new slug remap (events.category, events.category_id, places.category_id), CHECK constraint swap, default flip, 27-row seed, sanity assertions.
+
+⚠️ **Migration 064 NOT yet applied to remote DB.** Next session must run `mcp_supabase_apply_migration name:"refine_categories_v2"` against the file at `supabase/migrations/064_refine_categories_v2.sql` before re-running validation against live data.
+
+What remains queued (S2 + S3):
+- **S2 — Lucide redraw**: replace remaining emoji icons with Lucide-extracted inline SVGs + 3 custom SVGs (`praying-hands`, `soccer-ball`, `lollipop`) and one tag icon (`weekend-tag`).
+- **S3 — Weekend derived tag**: `src/lib/weekendTag.ts` (`isWeekendEvent()`), `<WeekendChip />`, Weekend filter toggle in `EventsView`, weekendTag unit tests. (Note in `personalization/percentages.ts` flags `time_availability=weekends` will re-route here when S3 lands.)
+
+### Latest validation (Batch S1)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **615 passed / 2 failed (617 total)** — both failures pre-existing on `main` baseline (`EventDetailContent` "shows RSVP button" + "Log in to RSVP" — date/status logic, unrelated to S1). No NEW failures introduced.
+- [x] `npx next lint --dir src` — No ESLint warnings or errors
+- [ ] Architect subagent — **deferred** (subagent tool not loaded this session); track in `RESUME_HERE.md` for next session.
+- [ ] `mcp_supabase_apply_migration name:"refine_categories_v2"` — **deferred** (Supabase MCP not loaded this session).
+- [ ] `mcp_supabase_get_advisors type:"security"` — **deferred** (run after migration apply).
+
+### Batch S — Category Refinement v2 (QUEUED — fully scoped, not yet executed)
+
+Locked spec lives at `.github/QUEUED_BATCH_S_categories_v2.md`. Summary:
+
+- Refines event taxonomy from 16 → **17 canonical slugs** (adds `worship-prayer`, `markets-expos`, `youth-students`; merges `education`+`equip` → `education-equipping` and `care`+`recovery` → `care-recovery`; renames `weekend` → `conferences-summits` because Weekend becomes a derived tag).
+- Refines place taxonomy from 8 → **10 canonical slugs** (adds `christian-businesses`, `safe-spaces`; renames the 8 existing slugs to two-word forms — `church` → `churches-ministries`, `relax` → `hospitality-cafes`, etc.).
+- Replaces emoji icons with **Lucide-extracted inline SVGs** as source-of-truth + 3 custom SVGs (`praying-hands`, `soccer-ball`, `lollipop`) and one tag icon (`weekend-tag`).
+- Introduces **`isWeekendEvent()`** derived tag in `src/lib/weekendTag.ts` + `<WeekendChip />` + Weekend filter toggle in `EventsView`.
+- Migration `supabase/migrations/064_refine_categories_v2.sql` (idempotent old→new slug mapping for `events.category`, `events.category_id`, `places.category_id`; rebuilds the `categories` seed with 27 rows).
+- Refreshes ≥50 keyword buckets per slug; rebuckets `categorySuggest`, `quickPanelOptions`, `personalization/percentages`, `easterEggs/wyr`, `easterEggs/registry`, `map/markers`, edge function `category-interests.ts`.
+- Updates all category test fixtures + adds `weekendTag` unit tests.
+- Adds `RESUME_HERE.md` at repo root and updates the continuity-manager contract so every future batch refreshes it.
+
+**Why deferred:** Single-session capacity insufficient for full A-grade execution (rewrites span ~15 source files + ~10 test files + migration + UI + docs + quality pipeline). Codebase is currently green; no in-flight changes were committed. Resume by reading `.github/QUEUED_BATCH_S_categories_v2.md` end-to-end and executing Phases A → H sequentially.
+
 ---
 
 ## Migration 025: Expanded Roles, Place Images & Category FK (COMPLETE)

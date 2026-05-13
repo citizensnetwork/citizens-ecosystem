@@ -91,7 +91,7 @@ export default function EventDetailContent({
   const dateStr = endStr ? `${startStr} – ${endStr}` : startStr;
 
   const hasCoords = event.latitude != null && event.longitude != null;
-  const cat = event.category ?? "church";
+  const cat = event.category ?? "church-services";
   const isCancelled = event.status === "cancelled";
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;

@@ -59,7 +59,7 @@ export function getTemporalStyle(
 const BASE_SIZE = 32;
 
 export function getCategoryIcon(category: EventCategory | null): string {
-  return getEventCategoryIcon(category ?? "church");
+  return getEventCategoryIcon(category ?? "church-services");
 }
 
 /**
@@ -71,7 +71,7 @@ export function createCategoryMarkerEl(
   temporal: TemporalStyle,
   overrideColor?: string
 ): HTMLDivElement {
-  const cat = category ?? "church";
+  const cat = category ?? "church-services";
   const icon = getCategoryIcon(cat);
   const borderColor = overrideColor ?? CATEGORY_HEX[cat] ?? "#D4AF37";
   const size = Math.round(BASE_SIZE * temporal.scale);
@@ -123,7 +123,7 @@ export function createCustomMarkerEl(
   const { markerType, category, temporal, markerImageUrl, creatorAvatarUrl } = options;
   const size = Math.round(BASE_SIZE * temporal.scale);
   const dotColor =
-    options.overrideColor ?? CATEGORY_HEX[category ?? "church"] ?? "#D4AF37";
+    options.overrideColor ?? CATEGORY_HEX[category ?? "church-services"] ?? "#D4AF37";
 
   // Profile photo marker
   if (markerType === "profile" && creatorAvatarUrl) {

@@ -4,11 +4,12 @@ This repository is conversation-safe by design. Any chat can be deleted and rebu
 
 ## Startup Protocol (every session)
 
+0. **Read `RESUME_HERE.md` at the repo root first.** It is refreshed at the end of every batch and tells you exactly where the project is, what just shipped, what's deferred, and what the next session must do first.
 1. Read `.github/PROJECT_STATUS.md`.
 2. Read `.github/DECISIONS.md`.
 3. Read `.github/copilot-instructions.md`.
 4. If the task touches architecture, UI, maps, or Supabase, load the matching instruction file in `.github/instructions/`.
-5. After implementing changes, update status/decision docs if anything meaningful changed.
+5. After implementing changes, update status/decision docs if anything meaningful changed, **and refresh `RESUME_HERE.md` so the next session can resume with zero context loss.**
 
 ## Persistence Rules
 

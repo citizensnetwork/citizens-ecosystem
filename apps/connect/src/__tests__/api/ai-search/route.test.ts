@@ -70,7 +70,7 @@ describe("POST /api/ai-search", () => {
         date: "2030-01-01T00:00:00Z",
         end_time: null,
         location: "",
-        category: "church",
+        category: "church-services",
         status: "published",
         visibility: "public",
         search_profile: { needs: ["community"] },

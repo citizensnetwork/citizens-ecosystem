@@ -8,41 +8,41 @@ describe("suggestCategory", () => {
     expect(suggestCategory("   ")).toBe(null);
   });
 
-  it("suggests 'care' for counseling / mental-health / restorative content", () => {
-    expect(suggestCategory("Bereavement support group")).toBe("care");
-    expect(suggestCategory("Mental health therapy session")).toBe("care");
-    expect(suggestCategory("Pastoral care and soul care retreat")).toBe("care");
+  it("suggests 'care-recovery' for counseling / mental-health / restorative content", () => {
+    expect(suggestCategory("Bereavement support group")).toBe("care-recovery");
+    expect(suggestCategory("Mental health therapy session")).toBe("care-recovery");
+    expect(suggestCategory("Pastoral care and soul care wellbeing day")).toBe("care-recovery");
   });
 
-  it("suggests 'church' for service / worship content", () => {
-    expect(suggestCategory("Sunday morning service with communion")).toBe("church");
+  it("suggests 'church-services' for service / worship content", () => {
+    expect(suggestCategory("Sunday morning service with communion")).toBe("church-services");
   });
 
-  it("suggests 'marriage-and-couples' for marriage retreats (longer keywords win ties)", () => {
-    expect(suggestCategory("Marriage retreat weekend away")).toBe("marriage-and-couples");
+  it("suggests 'marriage-family' for marriage retreats (longer keywords win ties)", () => {
+    expect(suggestCategory("Marriage retreat for couples")).toBe("marriage-family");
   });
 
-  it("suggests 'kids' for youth / children content", () => {
+  it("suggests 'kids' for children content", () => {
     expect(suggestCategory("Kids Sunday school VBS week")).toBe("kids");
   });
 
-  it("suggests 'education' for workshops / bible study", () => {
-    expect(suggestCategory("Bible study workshop on Romans")).toBe("education");
+  it("suggests 'education-equipping' for workshops / bible study", () => {
+    expect(suggestCategory("Bible study workshop on Romans")).toBe("education-equipping");
   });
 
-  it("suggests 'sport-fun' for sport events", () => {
-    expect(suggestCategory("Saturday morning parkrun 5k")).toBe("sport-fun");
+  it("suggests 'sport-recreation' for sport events", () => {
+    expect(suggestCategory("Saturday morning parkrun 5k")).toBe("sport-recreation");
   });
 
   it("case insensitive", () => {
-    expect(suggestCategory("MARRIAGE RETREAT")).toBe("marriage-and-couples");
-    expect(suggestCategory("MaRrIaGe ReTrEaT")).toBe("marriage-and-couples");
+    expect(suggestCategory("MARRIAGE RETREAT FOR COUPLES")).toBe("marriage-family");
+    expect(suggestCategory("MaRrIaGe ReTrEaT for couples")).toBe("marriage-family");
   });
 
   it("combines multiple parts (title + description + location)", () => {
     expect(
-      suggestCategory("Quiet day", "Time for rest and wholeness", "Retreat centre"),
-    ).toBe("care");
+      suggestCategory("Quiet day", "Time for rest and wholeness", "Wellbeing centre"),
+    ).toBe("care-recovery");
   });
 
   it("returns null when nothing matches", () => {

@@ -74,33 +74,36 @@ export const ICON_SVGS: Record<CategoryIconId, string> = {
 export const DEFAULT_CATEGORY_ICON = ICON_SVGS.pin;
 
 export const EVENT_CATEGORY_ICON_IDS: Record<EventCategory, CategoryIconId> = {
-  entertainment: "music",
-  "sport-fun": "runner",
-  "social-fun": "coffee",
+  "worship-prayer": "care",
+  "church-services": "church",
+  "outreach-missions": "compass",
+  "markets-expos": "bag",
+  "sport-recreation": "runner",
+  "arts-culture": "arts",
+  "social-gatherings": "coffee",
   "community-upliftment": "community",
-  education: "book",
-  church: "church",
-  missional: "compass",
-  "marriage-and-couples": "couples",
-  mens: "mens",
-  womens: "womens",
+  "education-equipping": "book",
+  "marriage-family": "couples",
+  "mens-community": "mens",
+  "womens-community": "womens",
+  "youth-students": "kids",
   kids: "kids",
-  recovery: "recovery",
-  equip: "tools",
-  weekend: "calendar",
+  "care-recovery": "recovery",
   "members-only": "lock",
-  care: "care",
+  "conferences-summits": "tools",
 };
 
 export const PLACE_CATEGORY_ICON_IDS: Record<PlaceCategory, CategoryIconId> = {
-  church: "church",
-  relax: "coffee",
-  exercise: "dumbbell",
-  media: "media",
-  shopping: "bag",
-  health: "health",
-  education: "book",
-  arts: "arts",
+  "churches-ministries": "church",
+  "hospitality-cafes": "coffee",
+  "recreation-sport": "dumbbell",
+  "media-broadcasting": "media",
+  "retail-shopping": "bag",
+  "health-wellness": "health",
+  "education-training": "book",
+  "arts-creative": "arts",
+  "christian-businesses": "bag",
+  "safe-spaces": "care",
 };
 
 export const QUICK_ACCESS_ICON_IDS: Record<string, CategoryIconId> = {
@@ -109,21 +112,24 @@ export const QUICK_ACCESS_ICON_IDS: Record<string, CategoryIconId> = {
   runs: "runner",
   churches: "church",
   outreaches: "community",
-  entertainment: "music",
-  missional: "compass",
-  couples: "couples",
-  mens: "mens",
-  womens: "womens",
+  "arts-culture": "arts",
+  "outreach-missions": "compass",
+  "marriage-family": "couples",
+  "mens-community": "mens",
+  "womens-community": "womens",
+  "youth-students": "kids",
   kids: "kids",
-  recovery: "recovery",
+  "care-recovery": "recovery",
   care: "care",
-  equip: "tools",
-  weekend: "calendar",
+  "conferences-summits": "tools",
   "members-only": "lock",
-  media: "media",
-  shopping: "bag",
-  health: "health",
-  arts: "arts",
+  "media-broadcasting": "media",
+  "retail-shopping": "bag",
+  "health-wellness": "health",
+  "arts-creative": "arts",
+  "markets-expos": "bag",
+  "worship-prayer": "care",
+  "church-services": "church",
 };
 
 export const SEARCH_INTENT_ICON_IDS: Record<string, CategoryIconId> = {
@@ -177,6 +183,17 @@ export function getIconSvg(iconId: CategoryIconId | null | undefined): string {
 
 export function getEventCategoryIcon(category: EventCategory | null | undefined): string {
   return getIconSvg(category ? EVENT_CATEGORY_ICON_IDS[category] : "church");
+}
+
+/** Backward-compat: lookup an icon by an arbitrary slug string
+ *  (for callers that store user-supplied marker_icon strings).
+ *  Returns the church icon for unknown slugs. */
+export function getIconBySlug(slug: string | null | undefined): string {
+  if (!slug) return ICON_SVGS.church;
+  const id = (EVENT_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[slug]
+    ?? (PLACE_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[slug]
+    ?? (QUICK_ACCESS_ICON_IDS as Record<string, CategoryIconId>)[slug];
+  return getIconSvg(id ?? "church");
 }
 
 export function getPlaceCategoryIcon(category: PlaceCategory | null | undefined): string {

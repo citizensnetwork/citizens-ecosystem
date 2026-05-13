@@ -399,7 +399,7 @@ export default function EventsView({
   }
 
   // Quick-access toggle: sets both event + place categories, clears regular selections.
-  // NOTE: Quick access items map to DB event categories by slug (e.g. "education", "church").
+  // NOTE: Quick access items map to DB event categories by slug (e.g. "education-equipping", "church-services").
   // If category slugs are renamed in the DB, update QUICK_ACCESS_ITEMS accordingly.
   function toggleQuickAccess(itemId: string) {
     if (activeQuickAccess === itemId) {
@@ -551,8 +551,8 @@ export default function EventsView({
       // wins. When active and the user has personalised categories, an
       // event matches if its category is in the set OR its text hits any
       // of those categories' keyword banks — this keeps the pill useful
-      // for events that were seeded with broad categories (e.g. "church")
-      // but belong thematically to "marriage-and-couples" via their title.
+      // for events that were seeded with broad categories (e.g. "church-services")
+      // but belong thematically to "marriage-family" via their title.
       if (forMeActive && personalised.hasSignal) {
         const categoryHit =
           e.category != null && personalised.eventCats.has(e.category);
@@ -610,7 +610,7 @@ export default function EventsView({
       if (!inBbox(p.latitude, p.longitude)) return false;
       // "For me" hard filter: applied before category logic. Uses the same
       // keyword-bank text match as the existing place filter so a place
-      // with category "church" surfaces for users into church-service, etc.
+      // with category "church-services" surfaces for users into church services, etc.
       if (forMeActive && personalised.hasSignal) {
         if (personalised.placeCats.size === 0) return false;
         const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
@@ -1522,7 +1522,7 @@ export default function EventsView({
                       style={{ transform: `translateX(calc(-${categoryPanelPage * 100}% - ${categoryPanelPage * 12}px))` }}
                     >
                       {filtered.map((event) => {
-                        const cat = (event.category ?? "church") as EventCategory;
+                        const cat = (event.category ?? "church-services") as EventCategory;
                         const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
                         return (
                           <button
@@ -1816,8 +1816,8 @@ export default function EventsView({
             {selectedEvent && (
               <div className="space-y-2 pt-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church"]}`}>
-                    {CATEGORY_LABELS[selectedEvent.category ?? "church"]}
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church-services"]}`}>
+                    {CATEGORY_LABELS[selectedEvent.category ?? "church-services"]}
                   </span>
                   {selectedEvent.community_contributor && (
                     <ContributorChip variant="community" />

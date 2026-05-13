@@ -44,7 +44,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [date, setDate] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
-  const [category, setCategory] = useState<EventCategory>("church");
+  const [category, setCategory] = useState<EventCategory>("church-services");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");

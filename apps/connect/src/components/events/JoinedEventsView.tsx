@@ -163,7 +163,7 @@ export default function JoinedEventsView() {
 }
 
 function JoinedEventRow({ event }: { event: JoinedEvent }) {
-  const cat = event.category ?? "church";
+  const cat = event.category ?? "church-services";
   return (
     <Link
       href={`/events/${event.id}`}
