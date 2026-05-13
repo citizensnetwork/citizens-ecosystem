@@ -86,4 +86,27 @@ describe("computeInterestPercentages", () => {
     });
     expect(out).toEqual({});
   });
+
+  /**
+   * Regression pin for the S1 → S3 transition. `time_availability: 'weekends'`
+   * currently maps to `conferences-summits` because the legacy `weekend`
+   * category was removed in migration 064. When S3 ships the derived
+   * weekend tag (`src/lib/weekendTag.ts`), this test MUST fail loudly so
+   * the migration to the new `{ weekendOnly: true }` API is not skipped.
+   * See TODO in src/lib/personalization/percentages.ts.
+   */
+  it("S1 stopgap: weekends time_availability maps to conferences-summits", () => {
+    const out = computeInterestPercentages({
+      preferences: {
+        tags: {
+          time_availability: {
+            value: "weekends",
+            answered_at: "2026-04-18T00:00:00Z",
+            expires_at: null,
+          },
+        },
+      },
+    });
+    expect(out["conferences-summits"]).toBeGreaterThan(0);
+  });
 });
