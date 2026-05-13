@@ -144,7 +144,11 @@ export const ICON_SVGS: Record<CategoryIconId, string> = {
   "weekend-tag": CALENDAR_DAYS_SVG,
 };
 
-export const DEFAULT_CATEGORY_ICON = ICON_SVGS.pin;
+/** Canonical fallback when an icon id is unknown or missing. Every public
+ *  helper in this module routes through this constant so the fallback stays
+ *  consistent across event / place / quick-access / unknown-slug lookups. */
+export const DEFAULT_ICON_ID: CategoryIconId = "pin";
+export const DEFAULT_CATEGORY_ICON = ICON_SVGS[DEFAULT_ICON_ID];
 
 export const EVENT_CATEGORY_ICON_IDS: Record<EventCategory, CategoryIconId> = {
   "worship-prayer": "praying-hands",
@@ -179,30 +183,18 @@ export const PLACE_CATEGORY_ICON_IDS: Record<PlaceCategory, CategoryIconId> = {
   "safe-spaces": "heart",
 };
 
+/** Quick-access pseudo-IDs that are NOT event or place category slugs.
+ *  Real event / place slugs are looked up via their own maps in
+ *  `getQuickAccessIcon`, so this list intentionally stays small and
+ *  represents only the curated quick-panel intents (bible-study, coffee,
+ *  runs, churches, outreaches, care). */
 export const QUICK_ACCESS_ICON_IDS: Record<string, CategoryIconId> = {
   "bible-study": "book-open",
   coffee: "coffee",
   runs: "dumbbell",
   churches: "church",
   outreaches: "globe",
-  "arts-culture": "palette",
-  "outreach-missions": "globe",
-  "marriage-family": "users",
-  "mens-community": "user",
-  "womens-community": "user-round",
-  "youth-students": "flame",
-  kids: "lollipop",
-  "care-recovery": "hand-heart",
   care: "hand-heart",
-  "conferences-summits": "mic",
-  "members-only": "key-round",
-  "media-broadcasting": "radio",
-  "retail-shopping": "shopping-bag",
-  "health-wellness": "stethoscope",
-  "arts-creative": "palette",
-  "markets-expos": "store",
-  "worship-prayer": "praying-hands",
-  "church-services": "church",
 };
 
 export const SEARCH_INTENT_ICON_IDS: Record<string, CategoryIconId> = {
@@ -255,24 +247,22 @@ export function getIconSvg(iconId: CategoryIconId | null | undefined): string {
 }
 
 export function getEventCategoryIcon(category: EventCategory | null | undefined): string {
-  return getIconSvg(category ? EVENT_CATEGORY_ICON_IDS[category] : "church");
-}
-
-/** Backward-compat: lookup an icon by an arbitrary slug string
- *  (for callers that store user-supplied marker_icon strings).
- *  Returns the church icon for unknown slugs. */
-export function getIconBySlug(slug: string | null | undefined): string {
-  if (!slug) return ICON_SVGS.church;
-  const id = (EVENT_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[slug]
-    ?? (PLACE_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[slug]
-    ?? (QUICK_ACCESS_ICON_IDS as Record<string, CategoryIconId>)[slug];
-  return getIconSvg(id ?? "church");
+  return getIconSvg(category ? EVENT_CATEGORY_ICON_IDS[category] : DEFAULT_ICON_ID);
 }
 
 export function getPlaceCategoryIcon(category: PlaceCategory | null | undefined): string {
-  return getIconSvg(category ? PLACE_CATEGORY_ICON_IDS[category] : "pin");
+  return getIconSvg(category ? PLACE_CATEGORY_ICON_IDS[category] : DEFAULT_ICON_ID);
 }
 
+/** Quick-access lookup. Falls back through native quick IDs → event
+ *  category slugs → place category slugs → DEFAULT_ICON_ID, so callers can
+ *  pass either a pseudo-quick-id (`bible-study`, `coffee`, …) or any real
+ *  category slug. */
 export function getQuickAccessIcon(id: string): string {
-  return getIconSvg(QUICK_ACCESS_ICON_IDS[id] ?? "pin");
+  const resolved =
+    QUICK_ACCESS_ICON_IDS[id]
+    ?? (EVENT_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[id]
+    ?? (PLACE_CATEGORY_ICON_IDS as Record<string, CategoryIconId>)[id]
+    ?? DEFAULT_ICON_ID;
+  return getIconSvg(resolved);
 }

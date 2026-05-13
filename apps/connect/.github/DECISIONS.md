@@ -2,6 +2,32 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch 3 (post-S3) — S2 + S3 nice-to-haves cleanup
+
+**Decision — A single `DEFAULT_ICON_ID: CategoryIconId = "pin"` is the canonical fallback for every icon-helper in `src/lib/categoryIcons.ts`.** `getEventCategoryIcon`, `getPlaceCategoryIcon`, `getQuickAccessIcon`, and `getIconSvg` all terminate on it; `DEFAULT_CATEGORY_ICON` is re-derived from it.
+
+**Why:** Eliminates the silent divergence the Architect flagged in Batch S2 (event helper fell back to `"church"`, place helper to `"pin"`, quick-access to a third literal). A single constant makes "what does this render when the slug is unknown?" answerable from one site and keeps future renames trivially safe.
+
+**Decision — `QUICK_ACCESS_ICON_IDS` is reduced to native quick-panel pseudo-ids only.** The 6 keys are `bible-study`, `coffee`, `runs`, `churches`, `outreaches`, `care`. `getQuickAccessIcon(id)` composes the lookup top-down: `QUICK_ACCESS_ICON_IDS → EVENT_CATEGORY_ICON_IDS → PLACE_CATEGORY_ICON_IDS → DEFAULT_ICON_ID`.
+
+**Why:** Pre-batch the map mixed three intent surfaces (quick-panel pseudo-ids, event slugs, place slugs), so renaming an event category required touching two maps and praying. Composition keeps each map single-purpose and lets the quick panel reuse event/place icons automatically when its `id` happens to be a real category slug. The terminal `?? DEFAULT_ICON_ID` guarantees the resolver always returns a valid `CategoryIconId` whose SVG is registered in `ICON_SVGS`.
+
+**Decision — `getIconBySlug` is deleted.** Zero call sites in `src/**` (confirmed by grep before removal).
+
+**Why:** Pure dead-code burndown. Keeping it would have invited future code to bypass the resolver chain.
+
+**Decision — `WeekendChip` renders its icon as an inline JSX SVG component, not via `dangerouslySetInnerHTML` on `CALENDAR_DAYS_SVG`.** Path data is kept in sync with the registry constant via a JSDoc note on the inline component.
+
+**Why:** This chip is rendered on every event card and on the calendar tooltip — three of the hottest render paths in the app. Inline JSX removes one `dangerouslySetInnerHTML` invocation from those paths (modest XSS-surface reduction even though the source string is a literal), gives React's reconciler a stable element to memoise, and avoids parsing the string at runtime on every render. The duplication is acceptable because a Lucide-bump test is the cheaper drift detector and the chip is the only consumer.
+
+**Decision — The Weekend-only toggle in `BurgerMenu` uses `role="switch"` + `aria-checked` rather than `aria-pressed`.** Applied to the inner `<button>` element only; the outer container remains a passive `div`.
+
+**Why:** `role="switch"` is the WAI-ARIA canonical pattern for a binary on/off filter; `aria-pressed` is intended for toggle-pressed buttons (e.g. "bold" in a rich-text toolbar) and screen readers announce it as a different affordance. The change is purely declarative — keyboard semantics (Space/Enter) carry over from `<button>`.
+
+**Decision — `EventsView` wraps `onToggleWeekend` in `useCallback` with an empty deps array.** `setWeekendOnly((w) => !w)` uses the functional setter, so no captured state.
+
+**Why:** Stable callback identity is a prerequisite for any future `React.memo` on `BurgerMenu` (which receives a large props bag and re-renders on every parent update today). Empty deps are safe because the only closure is `setWeekendOnly`, whose identity React guarantees stable.
+
 ## Batch 2 (post-S3) — EventDetailContent baseline-failure fix
 
 **Decision — Fixture dates in test files that exercise temporal UI branches must be relative to `Date.now()`, not hardcoded ISO strings.** Applied to `src/__tests__/components/events/EventDetailContent.test.tsx`: `baseEvent.date` is now `new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()`. The two tests that need a past / in-session event already override `date` explicitly.

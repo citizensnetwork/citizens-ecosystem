@@ -33,11 +33,23 @@ describe("category icon registry", () => {
   });
 
   it("keeps every quick-access item on the shared SVG registry", () => {
+    // QUICK_ACCESS_ICON_IDS only covers native quick-panel intents
+    // (bible-study, coffee, runs, churches, outreaches, care). Quick-access
+    // items that reuse a real event/place category slug (e.g. `arts-culture`,
+    // `worship-prayer`, `media-broadcasting`) resolve through getQuickAccessIcon's
+    // composition fall-through, so we assert against the resolver directly.
     for (const item of QUICK_ACCESS_ITEMS) {
-      const iconId = QUICK_ACCESS_ICON_IDS[item.id];
+      const svg = getQuickAccessIcon(item.id);
+      expect(svg).toMatch(/<svg/);
+      expect(item.svg).toBe(svg);
+    }
+  });
+
+  it("registers a native quick-access mapping for every quick-only intent", () => {
+    for (const id of ["bible-study", "coffee", "runs", "churches", "outreaches", "care"] as const) {
+      const iconId = QUICK_ACCESS_ICON_IDS[id];
       expect(iconId).toBeDefined();
-      expect(item.svg).toBe(ICON_SVGS[iconId]);
-      expect(getQuickAccessIcon(item.id)).toBe(item.svg);
+      expect(ICON_SVGS[iconId]).toMatch(/<svg/);
     }
   });
 

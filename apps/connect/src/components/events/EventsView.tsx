@@ -98,6 +98,7 @@ export default function EventsView({
   // Lives separately from `activeCategories` because weekend is a derived
   // attribute (see src/lib/weekendTag.ts), never a stored slug.
   const [weekendOnly, setWeekendOnly] = useState(false);
+  const handleToggleWeekend = useCallback(() => setWeekendOnly((w) => !w), []);
 
   // Burger menu Event / Place tab (lifted here so placesMode can be wired to
   // the EventMap — when "places" is active, only place markers render).
@@ -1786,7 +1787,7 @@ export default function EventsView({
         onTogglePlaceCategory={togglePlaceCategory}
         onClearPlaceCategories={() => { setActivePlaceCategories(new Set()); clearQuickAccess(); }}
         weekendOnly={weekendOnly}
-        onToggleWeekend={() => setWeekendOnly((w) => !w)}
+        onToggleWeekend={handleToggleWeekend}
         trending={trending}
         favouriteOrgs={favouriteOrgs}
         friends={friends}

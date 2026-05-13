@@ -1,5 +1,3 @@
-import { getIconSvg } from "@/lib/categoryIcons";
-
 /**
  * Small outline pill that marks an event as occurring over the weekend
  * (Sat, Sun, or Fri ≥17:00 UTC — see `src/lib/weekendTag.ts`).
@@ -15,7 +13,36 @@ type Props = {
   className?: string;
 };
 
-const SVG = getIconSvg("weekend-tag");
+/** Inline CalendarDays icon (Lucide path data, kept in sync with the
+ *  `calendar-days` / `weekend-tag` entry in `categoryIcons.ts`). Inlined as
+ *  JSX rather than an SVG string so the chip avoids `dangerouslySetInnerHTML`. */
+function CalendarDaysIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+    >
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect width={18} height={18} x={3} y={4} rx={2} />
+      <path d="M3 10h18" />
+      <path d="M8 14h.01" />
+      <path d="M12 14h.01" />
+      <path d="M16 14h.01" />
+      <path d="M8 18h.01" />
+      <path d="M12 18h.01" />
+      <path d="M16 18h.01" />
+    </svg>
+  );
+}
 
 export default function WeekendChip({ size = "sm", className = "" }: Props) {
   const isMd = size === "md";
@@ -28,11 +55,7 @@ export default function WeekendChip({ size = "sm", className = "" }: Props) {
       aria-label="Weekend event"
       className={`inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-transparent ${padding} ${textSize} font-medium text-[#8B7500] ${className}`}
     >
-      <span
-        aria-hidden="true"
-        className={`flex items-center justify-center text-[#8B7500] ${iconSize}`}
-        dangerouslySetInnerHTML={{ __html: SVG }}
-      />
+      <CalendarDaysIcon className={iconSize} />
       Weekend
     </span>
   );

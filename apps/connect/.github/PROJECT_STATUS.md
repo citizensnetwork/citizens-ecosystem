@@ -429,6 +429,29 @@ Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md` Phase D plus the pers
 - [x] Architect subagent — A across all axes; two Should-fix items applied inline.
 - [x] `mcp_supabase_get_advisors type:"security"` — ERROR 2 / WARN 77, identical shape to pre-S3 baseline (no DB changes in this batch).
 
+### Batch 3 (post-S3) — S2 + S3 nice-to-haves cleanup (COMPLETE)
+
+Burns down all nice-to-haves flagged by the Architect during Batches S2 and S3 (see prior commit `8093b81` for the cross-sphere status report and `36e43ec` for the EventDetailContent baseline fix that preceded this batch).
+
+**What shipped:**
+- `src/lib/categoryIcons.ts`
+  - Introduced `DEFAULT_ICON_ID: CategoryIconId = "pin"` and re-derived `DEFAULT_CATEGORY_ICON` from it; every helper's fallback now routes through this single constant.
+  - Deleted unused `getIconBySlug` (zero call sites in `src/**`).
+  - Reduced `QUICK_ACCESS_ICON_IDS` to the 6 native quick-panel pseudo-ids (`bible-study`, `coffee`, `runs`, `churches`, `outreaches`, `care`). Event-category slugs and place-category slugs already live in `EVENT_CATEGORY_ICON_IDS` / `PLACE_CATEGORY_ICON_IDS`, so `getQuickAccessIcon` now composes: `QUICK_ACCESS_ICON_IDS → EVENT_CATEGORY_ICON_IDS → PLACE_CATEGORY_ICON_IDS → DEFAULT_ICON_ID`.
+  - Harmonised the four helpers' fallbacks (`getEventCategoryIcon`, `getPlaceCategoryIcon`, `getQuickAccessIcon`, `getIconSvg`) on `DEFAULT_ICON_ID` instead of inconsistent `"church"` / `"pin"` literals.
+- `src/__tests__/lib/categoryIcons.test.ts` — quick-access invariant now asserts `getQuickAccessIcon(item.id) === item.svg` (the actual end-user contract); a second test pins the 6 native pseudo-ids to direct `QUICK_ACCESS_ICON_IDS` registrations.
+- `src/components/events/WeekendChip.tsx` — inline CalendarDays icon as a JSX SVG component; removed the last `dangerouslySetInnerHTML` on hot render paths (cards, detail panel, calendar tooltips). Path data kept in sync with `CALENDAR_DAYS_SVG` in `categoryIcons.ts`.
+- `src/components/events/BurgerMenu.tsx` — weekend-only filter button migrated from `aria-pressed` to `role="switch"` + `aria-checked` (canonical WAI-ARIA pattern for an on/off toggle).
+- `src/components/events/EventsView.tsx` — hoisted `onToggleWeekend` into `useCallback` for stable callback identity.
+
+**Architect audit:** Grade A across architecture, API design, security, performance, accessibility, code quality. No Must- or Should-fix findings. Three nice-to-haves logged for a future session (drift-test if Lucide is upgraded; literal-union typing for `QUICK_ACCESS_ICON_IDS`; cosmetic Record cast in resolver) — none warranting hold.
+
+**Latest validation (Batch 3 post-S3):**
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **656 passed / 0 failures** (+1 vs Batch 2 — new "native quick-access mapping" test)
+- [x] `npx next lint --dir src` — clean
+- [x] No DB changes; Supabase security advisor baseline unchanged by definition.
+
 ### Batch 2 (post-S3) — EventDetailContent baseline test fix (COMPLETE)
 
 Closes the 2 pre-existing baseline failures flagged in `RESUME_HERE.md` after Batch S3.

@@ -201,8 +201,9 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
               {/* Weekend-only derived filter (S3) */}
               <button
                 type="button"
+                role="switch"
+                aria-checked={weekendOnly}
                 onClick={onToggleWeekend}
-                aria-pressed={weekendOnly}
                 className={`mt-2 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition ${
                   weekendOnly
                     ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 font-medium text-black"
