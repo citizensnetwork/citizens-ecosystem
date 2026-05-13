@@ -65,13 +65,13 @@ const TAG_CATEGORY_MAP: Record<string, (value: unknown) => CategorySlug[]> = {
     return [];
   },
   time_availability: (v) => {
-    // S1: `weekends` historically mapped to the now-removed `weekend` bucket.
-    // Until S3 reintroduces a derived `weekend` tag the closest semantic
-    // bucket is the conference / retreat category.
-    // TODO(S3 — Weekend derived tag): once `isWeekendEvent()` lands in
-    // `src/lib/weekendTag.ts` and a `weekend` filter chip ships, replace this
-    // stopgap with a `{ weekendOnly: true }` flag and update tests.
-    if (v === "weekends") return ["conferences-summits"];
+    // S3: weekend is now a derived UI tag (see `src/lib/weekendTag.ts`),
+    // not a category. The `weekends` time_availability signal therefore
+    // boosts no category here — it would only express itself through the
+    // EventsView "Weekend only" filter chip, which is a hard filter, not
+    // a personalisation score. Returning an empty list keeps every other
+    // signal in this pipeline intact while making the stopgap explicit.
+    void v;
     return [];
   },
 };

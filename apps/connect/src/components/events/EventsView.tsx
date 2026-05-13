@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, PlaceCategory, Place, Profile } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
+import { isWeekendEvent } from "@/lib/weekendTag";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import EventStatusBadge from "@/components/events/EventStatusBadge";
 import { share } from "@/lib/capacitor/share";
@@ -91,6 +92,12 @@ export default function EventsView({
   const [activePlaceCategories, setActivePlaceCategories] = useState<Set<PlaceCategory>>(
     new Set()
   );
+
+  // "Weekend only" derived filter — AND-combines with active category filters
+  // (an event must match both selected categories AND be a weekend event).
+  // Lives separately from `activeCategories` because weekend is a derived
+  // attribute (see src/lib/weekendTag.ts), never a stored slug.
+  const [weekendOnly, setWeekendOnly] = useState(false);
 
   // Burger menu Event / Place tab (lifted here so placesMode can be wired to
   // the EventMap — when "places" is active, only place markers render).
@@ -571,6 +578,9 @@ export default function EventsView({
         activeCategories.size === 0 ||
         (e.category != null && activeCategories.has(e.category));
       if (!matchesCategory) return false;
+      // Weekend-only filter AND-combines with categories. Bypassed during
+      // search so free-text lookup remains exhaustive.
+      if (weekendOnly && !isSearching && !isWeekendEvent(e)) return false;
       const q = search.toLowerCase().trim();
       if (!q) return true;
       // Prefer the AI ranker when the query has taxonomy signal.
@@ -595,7 +605,7 @@ export default function EventsView({
       }
       return false;
     });
-  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised]);
+  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised, weekendOnly]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -1775,6 +1785,8 @@ export default function EventsView({
         activePlaceCategories={activePlaceCategories}
         onTogglePlaceCategory={togglePlaceCategory}
         onClearPlaceCategories={() => { setActivePlaceCategories(new Set()); clearQuickAccess(); }}
+        weekendOnly={weekendOnly}
+        onToggleWeekend={() => setWeekendOnly((w) => !w)}
         trending={trending}
         favouriteOrgs={favouriteOrgs}
         friends={friends}

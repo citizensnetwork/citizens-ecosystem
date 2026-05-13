@@ -5,6 +5,8 @@ import { CATEGORY_LABELS_SHORT, CATEGORY_BADGE_CLASSES } from "@/lib/categories"
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import { VerifiedBadge, isVerifiedContributor } from "@/components/ui/VerifiedBadge";
 import EventStatusBadge from "@/components/events/EventStatusBadge";
+import WeekendChip from "@/components/events/WeekendChip";
+import { isWeekendEvent } from "@/lib/weekendTag";
 
 export default function EventCard({ event }: { event: Event }) {
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
@@ -17,6 +19,7 @@ export default function EventCard({ event }: { event: Event }) {
   });
 
   const cat = event.category ?? "church-services";
+  const isWeekend = isWeekendEvent(event);
 
   return (
     <Link
@@ -51,6 +54,7 @@ export default function EventCard({ event }: { event: Event }) {
               {CATEGORY_LABELS_SHORT[cat]}
             </span>
           )}
+          {isWeekend && <WeekendChip />}
           {event.community_contributor && <ContributorChip variant="community" />}
           {!event.image_url && (
             <EventStatusBadge

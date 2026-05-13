@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Event } from "@/types/db";
 import { CATEGORY_COLORS } from "@/lib/categories";
+import { isWeekendEvent } from "@/lib/weekendTag";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -155,6 +156,17 @@ export default function EventCalendar({
           hour: "2-digit",
           minute: "2-digit",
           meridiem: "short",
+        }}
+        eventDidMount={(info) => {
+          const e = info.event.extendedProps.event as Event;
+          // Always set `title` deterministically so any DOM element FullCalendar
+          // recycles can't carry a stale "— Weekend" suffix from a previous
+          // weekend event. FullCalendar exposes no custom tooltip primitive,
+          // so we layer onto the default `title` attr.
+          info.el.setAttribute(
+            "title",
+            isWeekendEvent(e) ? `${e.title} — Weekend` : e.title
+          );
         }}
       />
     </div>

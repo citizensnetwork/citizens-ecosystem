@@ -6,6 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import type { Event, EventCategory, PlaceCategory, FavouriteOrg, FriendAttending, Profile, TrendingEvent } from "@/types/db";
 import { EVENT_CATEGORIES, CATEGORY_HEX, PLACE_CATEGORIES, PLACE_CATEGORY_HEX, PLACE_CATEGORY_DESCRIPTIONS } from "@/lib/categories";
+import { getIconSvg } from "@/lib/categoryIcons";
 import AccordionSection from "@/components/ui/AccordionSection";
 import type { User } from "@supabase/supabase-js";
 
@@ -22,6 +23,9 @@ type Props = {
   activePlaceCategories: Set<PlaceCategory>;
   onTogglePlaceCategory: (cat: PlaceCategory) => void;
   onClearPlaceCategories: () => void;
+  /** Weekend-only derived filter (S3) — AND-combines with active categories. */
+  weekendOnly: boolean;
+  onToggleWeekend: () => void;
   trending: TrendingEvent[];
   favouriteOrgs: FavouriteOrg[];
   friends: FriendAttending[];
@@ -52,6 +56,8 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     activePlaceCategories,
     onTogglePlaceCategory,
     onClearPlaceCategories,
+    weekendOnly,
+    onToggleWeekend,
     favouriteOrgs,
     friends,
     menuProfile,
@@ -192,6 +198,35 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   );
                 })}
               </div>
+              {/* Weekend-only derived filter (S3) */}
+              <button
+                type="button"
+                onClick={onToggleWeekend}
+                aria-pressed={weekendOnly}
+                className={`mt-2 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  weekendOnly
+                    ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 font-medium text-black"
+                    : "border-transparent text-black/70 hover:bg-black/[.04]"
+                }`}
+              >
+                <span
+                  className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
+                  style={weekendOnly
+                    ? { borderColor: "#D4AF37", backgroundColor: "rgba(212,175,55,0.30)" }
+                    : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
+                  }
+                >
+                  {weekendOnly && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#8B7500" strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  )}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="flex h-4 w-4 items-center justify-center text-[#8B7500]"
+                  dangerouslySetInnerHTML={{ __html: getIconSvg("weekend-tag") }}
+                />
+                Weekend only
+              </button>
             </AccordionSection>
           </>
           ) : (

@@ -17,6 +17,8 @@ import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
 import TagChipList from "./TagChipList";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import WeekendChip from "@/components/events/WeekendChip";
+import { isWeekendEvent } from "@/lib/weekendTag";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
@@ -92,6 +94,7 @@ export default function EventDetailContent({
 
   const hasCoords = event.latitude != null && event.longitude != null;
   const cat = event.category ?? "church-services";
+  const isWeekend = isWeekendEvent(event);
   const isCancelled = event.status === "cancelled";
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;
@@ -166,7 +169,7 @@ export default function EventDetailContent({
       {/* Organiser media gallery (photos + videos) */}
       <EventMediaStrip media={media} />
 
-      {(event.category || event.community_contributor) && (
+      {(event.category || event.community_contributor || isWeekend) && (
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
           {event.category && (
             <span
@@ -175,6 +178,7 @@ export default function EventDetailContent({
               {CATEGORY_LABELS[cat]}
             </span>
           )}
+          {isWeekend && <WeekendChip />}
           {event.community_contributor && <ContributorChip variant="community" />}
           {isLive && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
