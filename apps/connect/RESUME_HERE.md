@@ -15,44 +15,44 @@
 
 ## 2. What just shipped
 
-**Batch S3 — Weekend derived tag, chip, and filter.** One commit on `origin/main`:
+**Three batches in this session, all on `origin/main`:**
 
-- `07bb294` — new `src/lib/weekendTag.ts` exposing `isWeekendEvent({date, end_time})`. UTC-deterministic walk: returns true if any spanned day is Sat (any time), Sun (any time), or Fri ≥17:00 UTC. 366-day defensive guard; invalid dates return false. New `<WeekendChip />` outline pill (gold border `#D4AF37/55`, text `#8B7500`, Lucide `CalendarDays` icon) rendered alongside the category badge on `EventCard` and `EventDetailContent`. FullCalendar events get a deterministic native `title` attr via `eventDidMount` (`"<title>"` or `"<title> — Weekend"`). New "Weekend only" toggle inside the BurgerMenu events-tab Categories accordion (checkbox-style, gold-active state, `aria-pressed`). Filter is AND-combined with category selection inside `EventsView.filtered` and bypassed during free-text search. `personalization/percentages.ts` weekends→`conferences-summits` stopgap removed (now a no-op); pinned test updated to assert `{}`. 16 unit tests for `isWeekendEvent` covering Sat/Sun, the Fri 17:00 boundary, multi-day spans, invalid input, and the >1-year guard.
+- `3a5ed28` — **Batch 3: S2 + S3 nice-to-haves cleanup.** `src/lib/categoryIcons.ts` consolidated: new `DEFAULT_ICON_ID = "pin"` is the single canonical fallback for all four icon helpers (`getEventCategoryIcon`, `getPlaceCategoryIcon`, `getQuickAccessIcon`, `getIconSvg`); deleted unused `getIconBySlug` (zero call sites); reduced `QUICK_ACCESS_ICON_IDS` to the 6 native quick-panel pseudo-ids (`bible-study`, `coffee`, `runs`, `churches`, `outreaches`, `care`) and `getQuickAccessIcon` now composes top-down through event-category → place-category → DEFAULT. `WeekendChip` inlines its CalendarDays icon as JSX SVG (drops the last `dangerouslySetInnerHTML` on hot card/detail/calendar render paths). `BurgerMenu` weekend toggle migrated from `aria-pressed` to `role="switch"` + `aria-checked`. `EventsView` wraps `onToggleWeekend` in `useCallback`. Quick-access invariant test rewritten to assert the resolver contract; second test pins the 6 native pseudo-ids.
 
-✅ **Architect Should-fixes applied inline:** (1) calendar `title` attr now set deterministically for every event (not only weekend ones) so FullCalendar DOM recycling can't leave stale `— Weekend` suffixes; (2) misleading "guard cap" test comment corrected.
+- `36e43ec` — **Batch 2: EventDetailContent baseline test fix.** `baseEvent.date` switched to a `Date.now() + 30d` relative-future fixture; "renders formatted date" assertion now derives the expected month name from the fixture itself (case-insensitive RegExp). Closes the two pre-existing baseline failures flagged in the prior RESUME_HERE.
 
-✅ **Architect audit:** Grade A across architecture, API design, security, performance, accessibility, code quality. No must-fix. Remaining nice-to-haves logged (optional `role="switch"` upgrade, optional `useCallback`, optional inline JSX SVG to drop one `dangerouslySetInnerHTML`).
+- `8093b81` — **Batch 1: Cross-sphere status report.** `docs/STATUS_REPORT_2026-05.md` added — Product / Engineering / Database / Mobile / Content / Outstanding / Continuity sections. Docs-only.
 
-✅ **Quality gate:** tsc 0 errors, vitest **653 passed / 2 pre-existing baseline failures** (EventDetailContent — unrelated, same as before), lint clean, Supabase security advisors unchanged from baseline (no DB changes in this batch).
+✅ **Architect audit (Batch 3):** Grade A across architecture, API design, security, performance, accessibility, code quality. No Must- or Should-fix. Three nice-to-haves logged for a future session (Lucide-bump drift test for `WeekendChip` ↔ `CALENDAR_DAYS_SVG`; literal-union typing for `QUICK_ACCESS_ICON_IDS`; cosmetic Record cast in resolver) — none warranting hold.
+
+✅ **Quality gate (Batch 3):** tsc 0 errors, vitest **656 passed / 0 failures** (+1 vs Batch 2: new "native quick-access mapping" test), lint clean, Supabase security advisor baseline unchanged (no DB changes).
 
 ## 3. Current platform state
 
-- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 + S3 all shipped.
-- Test suite: **653 passed / 2 pre-existing baseline failures** in `__tests__/components/events/EventDetailContent.test.tsx` (`baseEvent.date` is in the past so the RSVP branches don't render). Unrelated to current batches.
+- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 + S3 + (post-S3) 1 + 2 + 3 all shipped.
+- Test suite: **656 passed / 0 failures.** (Was 653/2 pre-Batch-2; +2 from EventDetailContent fix, +1 from new quick-access mapping test.)
 - TS: 0 errors. Lint: clean. Advisors: baseline unchanged (ERROR 2 / WARN 77 — same shape as pre-S3).
-- Git: `origin/main` at `07bb294` (S3). PROJECT_STATUS + DECISIONS doc updates committed alongside this RESUME_HERE refresh.
+- Git: `origin/main` at `3a5ed28`. PROJECT_STATUS + DECISIONS + RESUME_HERE refreshed alongside this commit (docs are part of the same push window per standing workflow).
 
 ## 4. Next batches queued (in priority order)
 
-1. **Cross-sphere project status report** (owed to user — explicitly asked in earlier session). Sections: Product, Engineering, Database, Mobile (Capacitor), Content/Community, Outstanding roadmap, Continuity. Inputs: `.github/PROJECT_STATUS.md`, `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`. Docs-only commit.
+1. **Phase 18 — Content seeding & community onboarding pass.** Biggest gap per `docs/STATUS_REPORT_2026-05.md`. Seed real ministry/place data, dial in the onboarding wizard copy, write the public landing-page narrative. Likely needs the Community agent.
 
-2. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
+2. **Phase 22 — Push delivery via FCM/APNs.** Tokens + in-app fan-out shipped in Phase 10; actual native push delivery via Firebase Cloud Messaging (Android) and Apple Push Notification service (iOS) still pending. Edge function `notify-event-update` already exists; need credentials wiring + Capacitor plugin registration + token-refresh path.
 
-3. **S2 nice-to-haves** (logged in Architect audit, non-blocking): delete or test the unused `getIconBySlug`; split mixed-intent `QUICK_ACCESS_ICON_IDS` (currently mixes quick-access ids and event-category slugs); harmonise helper fallback IDs (some return `church`, others `pin`).
-
-4. **S3 nice-to-haves** (optional polish): consider `role="switch"` + `aria-checked` on the Weekend toggle; wrap `onToggleWeekend` in `useCallback` if `BurgerMenu` ever gets `React.memo`d; inline the Weekend chip icon as JSX SVG to drop one `dangerouslySetInnerHTML`.
+3. **Optional polish from Batch 3 Architect nice-to-haves** (defer until Lucide bumps): drift test asserting `WeekendChip` JSX path data is a subset of `CALENDAR_DAYS_SVG`; tighten `QUICK_ACCESS_ICON_IDS` to a string-literal union `QuickIntentId`.
 
 ## 5. Open questions / deferred items
 
-- None blocking S2. Entertainment mapping (resolved → social-gatherings) and MCP outage (resolved → project restored) from S1 are both closed.
-- The pre-existing `EventDetailContent` test failures should be triaged when next touching that file.
+- All baseline test failures resolved. No carried-over blockers.
+- FCM/APNs credentials: need confirmation from user on whether to register the Firebase project and Apple developer push key under the Citizens Network account before wiring tokens.
 
 ## 6. How to verify locally (Windows PowerShell)
 
 ```powershell
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
-npx vitest run              # expect 653 pass / 2 pre-existing fail
+npx vitest run              # expect 656 pass / 0 fail
 npx next lint --dir src     # expect clean
 ```
 
@@ -67,7 +67,7 @@ select category, count(*) from public.events group by category order by 2 desc;
 
 ## 7. Memory pointers
 
-- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-s3-weekend-tag-shipped.md`).
+- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-3-s2-s3-nicetohaves-shipped.md`).
 - Standing user workflow: `/memories/quality-pipeline.md` (user-scope).
 - Ecosystem vision + slogan: `/memories/repo/citizens-ecosystem-vision.md`, `/memories/repo/citizens-slogan.md`.
 - Coding conventions: `/memories/repo/coding-patterns.md`.
