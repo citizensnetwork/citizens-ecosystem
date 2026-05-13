@@ -405,6 +405,30 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Supabase migration applied via MCP — `place_media` and media policies verified in `pg_policies`.
 - [x] `mcp_supabase_get_advisors type:security` — **79 lints**, no `place_media`/`event_photos`/storage findings for this batch; previous `place-images` public-bucket listing warning removed by dropping the broad storage SELECT policy.
 
+### Batch S3 — Weekend derived tag (COMPLETE — `07bb294`)
+
+Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md` Phase D plus the personalization stopgap removal pinned in S1.1.
+
+**What shipped:**
+- `src/lib/weekendTag.ts` — new `isWeekendEvent({date, end_time})` helper. UTC-deterministic walk over each calendar day in the event span. Returns true if any day is Saturday (any time), Sunday (any time), or Friday from 17:00 UTC onwards. On a Fri-only span, overlap-tests against `[Fri 17:00 UTC, Fri 23:59:59.999 UTC]`. 366-day defensive guard; invalid dates short-circuit to false.
+- `src/components/events/WeekendChip.tsx` — outline pill component (gold border `#D4AF37/55`, transparent bg, text `#8B7500`, Lucide `CalendarDays` icon via `getIconSvg("weekend-tag")`). `size?: "sm" | "md"`. `aria-label="Weekend event"`, decorative icon `aria-hidden`.
+- `EventCard.tsx` + `EventDetailContent.tsx` — render `<WeekendChip />` alongside the category badge when `isWeekendEvent(event)` is true. EventDetailContent's wrapper conditional broadened to include the chip.
+- `EventCalendar.tsx` — `eventDidMount` now sets the native `title` attr deterministically for every event (either `e.title` or `"<title> — Weekend"`), so FullCalendar DOM recycling can never leave a stale weekend suffix on a non-weekend event.
+- `EventsView.tsx` — new `weekendOnly` state. Filter predicate now AND-combines with category selection (`if (weekendOnly && !isSearching && !isWeekendEvent(e)) return false`). Bypassed during free-text search so lookup stays exhaustive. Passes `weekendOnly` + `onToggleWeekend` to BurgerMenu.
+- `BurgerMenu.tsx` — required new props `weekendOnly: boolean; onToggleWeekend: () => void`. New "Weekend only" toggle inside the events-tab Categories accordion section. Checkbox-style indicator, gold-active state, CalendarDays icon, `aria-pressed`.
+- `src/lib/personalization/percentages.ts` — removed the `weekends → conferences-summits` stopgap from `time_availability` (S3 promises the chip + filter cover the user-facing need). Now `void v; return []` with an explanatory comment referencing this batch.
+- `src/__tests__/lib/personalization/percentages.test.ts` — replaced the pinned S1 stopgap test with a new "S3: weekends time_availability contributes no category bump" test that expects `out` to equal `{}`.
+- `src/__tests__/lib/weekendTag.test.ts` — 16 new unit tests covering Mon false, Tue→Wed false, Sat true, Sun true, Fri 17:00/18:00 true, Fri morning + Fri daytime 9-16 false, Fri 10-19 true, Thu→Sat true, Thu→Fri18 true, Thu→Fri16 false, week-long span true, invalid date false, invalid end_time false, multi-year span doesn't throw.
+
+**Architect audit:** Grade A across architecture, API design, security, performance, accessibility, code quality. Two Should-fixes applied inline (deterministic calendar `title` + corrected guard-cap test comment). Nice-to-haves logged: optional `role="switch"`/`aria-checked`, optional `useCallback` for the toggle, optional inline JSX SVG to remove one `dangerouslySetInnerHTML`.
+
+### Latest validation (Batch S3)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **653 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated). +16 tests vs S2 (15 new weekendTag tests + 1 rewritten personalization assertion now counted under percentages.test.ts).
+- [x] `npx next lint --dir src` — clean.
+- [x] Architect subagent — A across all axes; two Should-fix items applied inline.
+- [x] `mcp_supabase_get_advisors type:"security"` — ERROR 2 / WARN 77, identical shape to pre-S3 baseline (no DB changes in this batch).
+
 ### Batch S2 — Lucide Icon Redraw (COMPLETE — `6798590`)
 
 Locked spec from `.github/QUEUED_BATCH_S_categories_v2.md`. Single-file rewrite of `src/lib/categoryIcons.ts` to align the entire category/quick-panel/AI-search icon system with `lucide-react` v0.441.0.

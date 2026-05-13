@@ -2,6 +2,32 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch S3 — Weekend Derived Tag
+
+**Decision — A weekend event is one whose UTC span overlaps Saturday (any time), Sunday (any time), or Friday from 17:00 UTC onwards.** Implemented in `src/lib/weekendTag.ts` as a UTC-deterministic per-calendar-day walk with a 366-day defensive guard.
+
+**Why:** The Friday-evening cut-off matches how the South African (and most global) weekend social rhythm starts — typical weekend gatherings/services kick off Friday evening, not Friday morning. Picking 17:00 UTC (vs SAST 19:00 / America 12:00) keeps the rule timezone-neutral, deterministic, and trivially testable; it is also what we documented for the user-facing chip "Weekend" semantic. The 366-day guard exists only to defend against absurd input — real spans always short-circuit within 7 days.
+
+**Decision — Weekend is a derived UI tag, not a database column.** Computed on-the-fly per event from `date` + `end_time` everywhere it is consumed (chip, calendar tooltip, filter, future API surfaces). No `is_weekend` column on `public.events`.
+
+**Why:** Avoids a denormalised flag that drifts whenever an organiser edits `date`/`end_time` and avoids a trigger surface. The rule is cheap (≤7 iterations for any real event) and entirely declarative. If future personalisation needs server-side filtering, push the same rule into SQL using `extract(dow ...)` instead of a column.
+
+**Decision — Weekend filter AND-combines with the category filter and is bypassed during free-text search.** Inside `EventsView.filtered`, `if (weekendOnly && !isSearching && !isWeekendEvent(e)) return false` runs after the category match check.
+
+**Why:** AND-combine matches user mental model ("show me *only* my chosen categories *and only* weekend events"). Bypassing during search keeps free-text lookup exhaustive — users searching by name should never have results silently hidden by a passive toggle.
+
+**Decision — Weekend chip uses an outline pill style (`border-[#D4AF37]/55`, transparent bg, text `#8B7500`), not a filled gold chip.** Decided by user before implementation.
+
+**Why:** Sits visually alongside the filled category badge without competing for attention — the category badge is the primary classification; the weekend chip is a secondary affordance. Outline-only style also lets the chip render cleanly over coloured event cover images.
+
+**Decision — Personalization `time_availability=weekends` contributes **no** category bump (S3 supersedes the S1 stopgap).** `src/lib/personalization/percentages.ts` returns `[]` for the `weekends` value with an explanatory comment.
+
+**Why:** The S1 stopgap (`weekends → conferences-summits`) was an explicit hack pinned by `percentages.test.ts` precisely so its removal would be forced when S3 shipped. The chip + filter now deliver the user-visible value the stopgap was approximating, so artificially boosting an unrelated category is no longer justified. The pinned test was updated alongside the source change.
+
+**Decision — FullCalendar's native `title` attribute is the weekend tooltip surface.** Set deterministically inside `eventDidMount` for every event (`"<title>"` or `"<title> — Weekend"`).
+
+**Why:** FullCalendar exposes no custom tooltip primitive in the current usage, and we already avoid adding tooltip dependencies elsewhere. Setting the attr for *every* event (not only weekend events) prevents stale `— Weekend` suffixes when FullCalendar recycles event DOM across prop changes.
+
 ## Batch S2 — Lucide Icon Redraw
 
 **Decision — `lucide-react` v0.441.0 is the canonical source of icon path data; the registry stores inline-SVG strings, not React components.** `src/lib/categoryIcons.ts` extracts path attributes verbatim from `node_modules/lucide-react/dist/esm/icons/*.js` and emits them as plain SVG strings sharing one `SVG_OPEN` envelope (24×24 viewBox, stroke=currentColor, stroke-width 2, round caps/joins).

@@ -15,32 +15,32 @@
 
 ## 2. What just shipped
 
-**Batch S2 — Lucide-aligned category icon registry redraw.** One commit on `origin/main`:
+**Batch S3 — Weekend derived tag, chip, and filter.** One commit on `origin/main`:
 
-- `6798590` — `src/lib/categoryIcons.ts` rewritten. New 28-ID `CategoryIconId` union replaces the legacy 22-ID set. 23 Lucide-extracted path strings copied verbatim from `lucide-react` v0.441.0 (`Church`, `Earth` (globe-2 alias), `Store`, `Palette`, `Martini`, `HeartHandshake`, `GraduationCap`, `Users`, `User`, `UserRound`, `Flame`, `HandHeart`, `KeyRound`, `MicVocal` (mic-2 alias), `Coffee`, `Dumbbell`, `Radio`, `ShoppingBag`, `Stethoscope`, `BookOpen`, `Heart`, `CalendarDays`, `Shirt`). 3 hand-authored custom 24×24 SVGs (`praying-hands`, `soccer-ball`, `lollipop`). Legacy `pin` retained as `DEFAULT_CATEGORY_ICON`. `weekend-tag` is a `CalendarDays` alias via the shared `CALENDAR_DAYS_SVG` constant — staged for S3. EVENT/PLACE/QUICK_ACCESS/SEARCH_INTENT maps all remapped; no old IDs remain.
+- `07bb294` — new `src/lib/weekendTag.ts` exposing `isWeekendEvent({date, end_time})`. UTC-deterministic walk: returns true if any spanned day is Sat (any time), Sun (any time), or Fri ≥17:00 UTC. 366-day defensive guard; invalid dates return false. New `<WeekendChip />` outline pill (gold border `#D4AF37/55`, text `#8B7500`, Lucide `CalendarDays` icon) rendered alongside the category badge on `EventCard` and `EventDetailContent`. FullCalendar events get a deterministic native `title` attr via `eventDidMount` (`"<title>"` or `"<title> — Weekend"`). New "Weekend only" toggle inside the BurgerMenu events-tab Categories accordion (checkbox-style, gold-active state, `aria-pressed`). Filter is AND-combined with category selection inside `EventsView.filtered` and bypassed during free-text search. `personalization/percentages.ts` weekends→`conferences-summits` stopgap removed (now a no-op); pinned test updated to assert `{}`. 16 unit tests for `isWeekendEvent` covering Sat/Sun, the Fri 17:00 boundary, multi-day spans, invalid input, and the >1-year guard.
 
-✅ **Architect Should-fix applied inline:** `SVG_OPEN` now carries explicit `width="24" height="24"` + `xmlns` so glyphs size correctly inside flex containers across Chrome / Firefox / Safari.
+✅ **Architect Should-fixes applied inline:** (1) calendar `title` attr now set deterministically for every event (not only weekend ones) so FullCalendar DOM recycling can't leave stale `— Weekend` suffixes; (2) misleading "guard cap" test comment corrected.
 
-✅ **Architect audit:** initial B+ on SVG sizing finding → A after inline fix. Nice-to-haves logged (unused `getIconBySlug`, mixed-intent quick-access keys, fallback ID inconsistency) — non-blocking, queued for a future tidy-up batch.
+✅ **Architect audit:** Grade A across architecture, API design, security, performance, accessibility, code quality. No must-fix. Remaining nice-to-haves logged (optional `role="switch"` upgrade, optional `useCallback`, optional inline JSX SVG to drop one `dangerouslySetInnerHTML`).
 
-✅ **Quality gate:** tsc 0 errors, vitest **637 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated), lint clean, advisors no NEW warnings (no DB changes in this batch).
+✅ **Quality gate:** tsc 0 errors, vitest **653 passed / 2 pre-existing baseline failures** (EventDetailContent — unrelated, same as before), lint clean, Supabase security advisors unchanged from baseline (no DB changes in this batch).
 
 ## 3. Current platform state
 
-- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 all shipped.
-- Test suite: 637 passed / 2 pre-existing baseline failures in `__tests__/components/events/EventDetailContent.test.tsx` (`baseEvent.date` is in the past so the RSVP branches don't render). Unrelated to current batches.
-- TS: 0 errors. Lint: clean. Advisors: baseline unchanged.
-- Git: `origin/main` at `6798590` (S2). PROJECT_STATUS + DECISIONS + RESUME_HERE doc updates pending as a follow-up docs commit after this push cycle.
+- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 + S3 all shipped.
+- Test suite: **653 passed / 2 pre-existing baseline failures** in `__tests__/components/events/EventDetailContent.test.tsx` (`baseEvent.date` is in the past so the RSVP branches don't render). Unrelated to current batches.
+- TS: 0 errors. Lint: clean. Advisors: baseline unchanged (ERROR 2 / WARN 77 — same shape as pre-S3).
+- Git: `origin/main` at `07bb294` (S3). PROJECT_STATUS + DECISIONS doc updates committed alongside this RESUME_HERE refresh.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch S3 — Weekend derived tag.** New `src/lib/weekendTag.ts` (`isWeekendEvent(event)` returning true if any spanned day is Fri/Sat/Sun). New `<WeekendChip />` component on `EventCard`, `EventDetailContent`, calendar tooltips. Weekend toggle in `EventsView` filter drawer (separate from category filter). Tests + `{ weekendOnly: true }` API. Removes the `weekends → conferences-summits` stopgap in `personalization/percentages.ts` (the pinned test in `percentages.test.ts` will fail intentionally and must be updated together).
+1. **Cross-sphere project status report** (owed to user — explicitly asked in earlier session). Sections: Product, Engineering, Database, Mobile (Capacitor), Content/Community, Outstanding roadmap, Continuity. Inputs: `.github/PROJECT_STATUS.md`, `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`. Docs-only commit.
 
-2. **Cross-sphere project status report** (owed to user — explicitly asked in earlier session). Sections: Product, Engineering, Database, Mobile (Capacitor), Content/Community, Outstanding roadmap, Continuity. Inputs: `.github/PROJECT_STATUS.md`, `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`.
+2. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
 
-3. **Fix the 2 pre-existing `EventDetailContent` failures.** Either bump `baseEvent.date` further into the future, or mock `Date.now()` so RSVP-availability logic resolves to the "logged-in / not started" branch.
+3. **S2 nice-to-haves** (logged in Architect audit, non-blocking): delete or test the unused `getIconBySlug`; split mixed-intent `QUICK_ACCESS_ICON_IDS` (currently mixes quick-access ids and event-category slugs); harmonise helper fallback IDs (some return `church`, others `pin`).
 
-4. **S2 nice-to-haves** (logged in Architect audit, non-blocking): delete or test the unused `getIconBySlug`; split mixed-intent `QUICK_ACCESS_ICON_IDS` (currently mixes quick-access ids and event-category slugs); harmonise helper fallback IDs (some return `church`, others `pin`).
+4. **S3 nice-to-haves** (optional polish): consider `role="switch"` + `aria-checked` on the Weekend toggle; wrap `onToggleWeekend` in `useCallback` if `BurgerMenu` ever gets `React.memo`d; inline the Weekend chip icon as JSX SVG to drop one `dangerouslySetInnerHTML`.
 
 ## 5. Open questions / deferred items
 
@@ -52,7 +52,7 @@
 ```powershell
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
-npx vitest run              # expect 637 pass / 2 pre-existing fail
+npx vitest run              # expect 653 pass / 2 pre-existing fail
 npx next lint --dir src     # expect clean
 ```
 
@@ -67,7 +67,7 @@ select category, count(*) from public.events group by category order by 2 desc;
 
 ## 7. Memory pointers
 
-- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-s2-icons-shipped.md`).
+- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-s3-weekend-tag-shipped.md`).
 - Standing user workflow: `/memories/quality-pipeline.md` (user-scope).
 - Ecosystem vision + slogan: `/memories/repo/citizens-ecosystem-vision.md`, `/memories/repo/citizens-slogan.md`.
 - Coding conventions: `/memories/repo/coding-patterns.md`.
