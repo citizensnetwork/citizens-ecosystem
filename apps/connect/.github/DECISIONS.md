@@ -2,6 +2,28 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Batch S1.1 — Categories Refinement v2 Follow-ups
+
+**Decision — `entertainment` legacy slug maps to `social-gatherings`, not `arts-culture`.** Migration 064 step 2 (text remap) and step 6 (FK remap CTE) both route the legacy `entertainment` slug to `social-gatherings`. Confirmed by user.
+
+**Why:** The original migration draft routed `entertainment → arts-culture`, but live event content under that slug skews social (parties, mixers, gatherings) rather than artistic (concerts, performances). Routing to `social-gatherings` preserves user intent post-migration.
+
+**Decision — Migration step 2b fail-fast unmapped-slug guard.** New `do $$ ... select string_agg(distinct category) into unmapped from public.events where category not in (whitelist); if unmapped is not null then raise exception ...` block sits between the text remap and the CHECK constraint swap.
+
+**Why:** A future legacy slug we forgot to enumerate would otherwise silently fall through the `case` and either fail the new CHECK constraint with a generic message or get coerced to default. Explicit naming of the offending slug(s) in the exception message saves a debugging session.
+
+**Decision — `events.category_id` FK uses `on delete set null`.** Now matches `places.category_id`. Previously had no `on delete` clause (defaulted to `no action`).
+
+**Why:** Symmetric behaviour with places; deleting a category should not block deleting the row, and detaching is the safer default than cascade.
+
+**Decision — Edge Function `CATEGORY_INTEREST_MAP` parity is enforced by a runtime test, not TypeScript.** `src/__tests__/lib/category-interests.test.ts` reads the Deno source file via `readFileSync(process.cwd())`, strips comments, regex-extracts top-level keys, asserts all 17 canonical slugs present + no extras + exactly 17 keys.
+
+**Why:** `supabase/functions/` is intentionally outside the main `tsconfig.json` include (Deno runtime, separate type world). A static import would fail TS2307. The runtime parse is backstopped by the exact-count assertion, so any structural drift (renamed export, nested object shape, missing/extra key) fails loudly. False-pass paths are eliminated by comment-stripping before regex.
+
+**Decision — S1 weekends-stopgap is pinned by a deliberately fragile test.** `percentages.test.ts` asserts `time_availability=weekends → conferences-summits > 0`. When S3 introduces the proper `weekendOnly` derived tag and removes this mapping, the test fails on purpose.
+
+**Why:** Documents the temporary coupling between the personalization engine and the taxonomy so it cannot be silently forgotten when S3 ships.
+
 ## Batch S1 — Category Refinement v2 (Taxonomy)
 
 **Decision — 17 event-applies + 10 place-applies categories are the canonical taxonomy.** `EventCategory` slugs: `worship-prayer`, `church-services`, `outreach-missions`, `markets-expos`, `sport-recreation`, `arts-culture`, `social-gatherings`, `community-upliftment`, `education-equipping`, `marriage-family`, `mens-community`, `womens-community`, `youth-students`, `kids`, `care-recovery`, `members-only`, `conferences-summits`. `PlaceCategory` slugs: `churches-ministries`, `hospitality-cafes`, `recreation-sport`, `media-broadcasting`, `retail-shopping`, `health-wellness`, `education-training`, `arts-creative`, `christian-businesses`, `safe-spaces`. Default fallback for missing event categories is `church-services`.

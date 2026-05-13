@@ -405,6 +405,34 @@ view below zoom 12 and markers reveal only when a suburb is expanded.
 - [x] Supabase migration applied via MCP — `place_media` and media policies verified in `pg_policies`.
 - [x] `mcp_supabase_get_advisors type:security` — **79 lints**, no `place_media`/`event_photos`/storage findings for this batch; previous `place-images` public-bucket listing warning removed by dropping the broad storage SELECT policy.
 
+### Batch S1.1 — Categories Refinement v2 follow-ups (COMPLETE — `fbb418c`, `449dfe4`)
+
+Locked-in cleanup after Batch S1. Both commits on `origin/main`.
+
+**`fbb418c` — Architect Should-fix patch (5 items):**
+- `supabase/migrations/064_refine_categories_v2.sql` — fixed `entertainment → social-gatherings` mapping in BOTH step 2 (text remap) and step 6 (slug-keyed FK remap CTE). Added step 2b: fail-fast `do $$ ... raise exception 'Unmapped legacy event category slug(s): %'` guard so any future legacy slug we forgot can never silently land in NULL/default.
+- `supabase/schema.sql` — replaced 27-row category seed with hex/emoji values mirroring migration 064. Added comment cross-referencing migration + `categories.ts` (sources of truth must update together). Changed `events.category_id` FK to `on delete set null` (matches `places.category_id`).
+- `src/lib/categories.ts` — docblock above `EVENT_CATEGORY_KEYWORDS` cross-referencing sibling KEYWORDS in `categorySuggest.ts` AND `CATEGORY_INTEREST_MAP` in the Edge Function.
+- `src/lib/categorySuggest.ts` — docblock above `KEYWORDS` with the same cross-reference.
+- `src/lib/personalization/percentages.ts` — `TODO(S3 — Weekend derived tag)` breadcrumb on the `weekends → conferences-summits` stopgap.
+
+**Migration 064 APPLIED to remote DB** via `mcp_com_supabase__apply_migration` (project restored from INACTIVE → ACTIVE_HEALTHY first). Verified: 17 event categories, 10 place categories, all `events.category` values within new whitelist (social-gatherings=26, education-equipping=22, care-recovery=21, church-services=17).
+
+**`449dfe4` — Coverage-gap regression tests (3 files):**
+- `src/__tests__/lib/categories.test.ts` — new "category source-of-truth — key parity" block. `it.each` parity assertions across 7 event maps + 5 place maps against EVENT_REFERENCE (17 slugs) and PLACE_REFERENCE (10 slugs). List parity for EVENT_CATEGORIES / CATEGORY_FILTERS / PLACE_CATEGORIES. Hex regex `/^#[0-9A-Fa-f]{6}$/` over CATEGORY_HEX + PLACE_CATEGORY_HEX.
+- `src/__tests__/lib/personalization/percentages.test.ts` — pins the S1 `time_availability=weekends → conferences-summits > 0` stopgap. Intentionally fails when S3 ships `weekendOnly`.
+- `src/__tests__/lib/category-interests.test.ts` (new) — runtime regression guard for `supabase/functions/_shared/category-interests.ts` (Deno file, outside tsconfig include). Uses `readFileSync(process.cwd())` + comment-stripping + regex key extraction. Asserts all 17 canonical slugs present, no extras, exactly 17 keys, export name `CATEGORY_INTEREST_MAP` present.
+
+**Architect audit (`449dfe4`):** A+ across all axes. No Should-fix outstanding. Verdict: ship as-is.
+
+### Latest validation (Batch S1.1)
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npx vitest run` — **637 passed / 2 pre-existing baseline failures** (EventDetailContent, unrelated to this batch).
+- [x] `npx next lint --dir src` — clean.
+- [x] Architect subagent — A+ on both commits, no Should-fix.
+- [x] `mcp_supabase_apply_migration name:"refine_categories_v2"` — applied successfully.
+- [x] `mcp_supabase_get_advisors type:"security"` — no NEW warnings vs pre-batch baseline.
+
 ### Batch S1 — Category Refinement v2 (CODE SHIPPED — migration unapplied)
 
 Locked spec: `.github/QUEUED_BATCH_S_categories_v2.md`. **S1 (taxonomy refactor) executed.** S2 (Lucide redraw) and S3 (Weekend derived tag + chip + filter) remain queued.
