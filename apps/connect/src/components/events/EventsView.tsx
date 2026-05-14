@@ -13,8 +13,7 @@ import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
-import EventCalendar from "./EventCalendar";
-import FeaturedPanel from "./FeaturedPanel";
+import GlassCalendar from "./GlassCalendar";
 import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
@@ -49,19 +48,6 @@ type Props = {
 /** Number of event cards shown per page in the category panel. */
 const CARDS_PER_PAGE = 3;
 
-/** South African provinces for calendar filter. */
-const SA_PROVINCES = [
-  "Gauteng",
-  "Western Cape",
-  "KwaZulu-Natal",
-  "Eastern Cape",
-  "Free State",
-  "Limpopo",
-  "Mpumalanga",
-  "North West",
-  "Northern Cape",
-];
-
 /** Convert hex colour to rgba string (used for category panel card backgrounds). */
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -77,14 +63,20 @@ export default function EventsView({
   events,
   places = [],
   contributors = [],
-  isVendor = false,
+  // Reserved for downstream gating (e.g. contributor-only quick actions);
+  // surfaced here because callers already pass it.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isVendor: _isVendor = false,
 }: Props) {
   const searchParams = useSearchParams();
-  const initialView = searchParams.get("view") === "calendar" ? "calendar" : "map";
-  const [view, setView] = useState<"map" | "calendar">(initialView);
+  // Calendar is now a frosted overlay on top of the map (FEAT-02).
+  // The `?view=calendar` URL param (still emitted by the global Navbar link)
+  // simply auto-opens the overlay; the map stays mounted underneath.
+  const [calendarOpen, setCalendarOpen] = useState(
+    () => searchParams.get("view") === "calendar"
+  );
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [featuredOpen, setFeaturedOpen] = useState(false);
   const [longFormOpen, setLongFormOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set()
@@ -184,9 +176,6 @@ export default function EventsView({
     []
   );
 
-  // Province filter for calendar view
-  const [calendarProvince, setCalendarProvince] = useState("");
-
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
@@ -266,19 +255,18 @@ export default function EventsView({
 
   // Focus traps for drawers
   const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
-  const featuredRef = useFocusTrap<HTMLElement>(featuredOpen && !selectedEvent && !selectedPlace);
 
   // Escape key closes drawers and detail panels
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (filtersOpen) { setFiltersOpen(false); return; }
-      if (featuredOpen) { setFeaturedOpen(false); return; }
+      if (calendarOpen) { setCalendarOpen(false); return; }
       if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [filtersOpen, featuredOpen, selectedEvent, selectedPlace]);
+  }, [filtersOpen, calendarOpen, selectedEvent, selectedPlace]);
 
   // Burger menu social data — load eagerly so trending data is available for the panel
   const {
@@ -649,18 +637,11 @@ export default function EventsView({
     });
   }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
 
-  // Calendar province-filtered events (applies province filter on top of category/search filter)
-  const calendarEvents = useMemo(() => {
-    if (!calendarProvince) return filtered;
-    const prov = calendarProvince.toLowerCase();
-    return filtered.filter((e) => e.location.toLowerCase().includes(prov));
-  }, [filtered, calendarProvince]);
-
   const handleSelectEvent = useCallback(
     (event: Event) => {
       setSelectedPlace(null);
       setSelectedEvent(event);
-      setFeaturedOpen(false);
+      setCalendarOpen(false);
       // Let the Easter-egg orchestrator know which category was just
       // engaged with — powers the couples / gender-bucket prompts.
       if (event.category) {
@@ -689,7 +670,8 @@ export default function EventsView({
    * full-detail behaviour when the event has no coordinates.
    */
   const handleFocusEventOnMap = useCallback((event: Event) => {
-    if (view !== "map") setView("map");
+    // Close the calendar overlay so the fly-to is visible on the underlying map.
+    setCalendarOpen(false);
     const lat = event.latitude;
     const lng = event.longitude;
     if (lat == null || lng == null) {
@@ -700,7 +682,7 @@ export default function EventsView({
     setMapFlyTo([lat, lng]);
     setMapFlyToZoom(15);
     setMapFlyToToken((t) => t + 1);
-  }, [view, handleSelectEvent]);
+  }, [handleSelectEvent]);
 
   const handleQuickAction = useCallback(
     async (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => {
@@ -767,7 +749,7 @@ export default function EventsView({
   const handleSelectPlace = useCallback((place: Place) => {
     setSelectedEvent(null);
     setSelectedPlace(place);
-    setFeaturedOpen(false);
+    setCalendarOpen(false);
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -890,25 +872,17 @@ export default function EventsView({
     return () => clearInterval(id);
   }, [searchOpen, SEARCH_SUGGESTIONS.length]);
 
-  // ── Trending modal (replaces bottom slide-up panel) ──────────────
-  // Top 5 attended events (by RSVP count), falling back to most-recent if trending data is sparse.
-  const topAttendedEvents = useMemo(() => {
-    const list = trending ?? [];
-    // `trending` is already sorted by the API by popularity (see useBurgerMenuData).
-    return list.slice(0, 5);
-  }, [trending]);
-
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
     // South Africa center, zoom 5.5 shows full country
     setMapFlyTo([-28.7, 25.5]);
     setMapFlyToZoom(5.5);
     setMapFlyToToken((t) => t + 1);
-    if (view !== "map") setView("map");
+    setCalendarOpen(false);
   }
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter" || !search.trim() || view !== "map") return;
+    if (e.key !== "Enter" || !search.trim() || calendarOpen) return;
     // If the ranker extracted any taxonomy intent, the user meant a
     // semantic query ("homecells in my area", "I need counselling") — not
     // a city name, so skip geocoding and let the in-memory filter drive.
@@ -934,8 +908,8 @@ export default function EventsView({
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
-      {/* Map is always rendered so it shows through transparent calendar */}
-      <div className={`absolute inset-0${view === "calendar" ? " pointer-events-none" : ""}`}>
+      {/* Map is always rendered — calendar (when open) overlays it. */}
+      <div className={`absolute inset-0${calendarOpen ? " pointer-events-none" : ""}`}>
         <EventMap
           events={filtered}
           places={filteredPlaces}
@@ -960,48 +934,14 @@ export default function EventsView({
         />
       </div>
 
-      {view === "calendar" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
-          <div className="glass-calendar-overlay mx-3 my-4 flex h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden sm:mx-5 sm:my-6 sm:h-[calc(100dvh-3rem)]">
-            {/* Province filter bar */}
-            <div className="flex items-center gap-2 px-4 pt-16 pb-2 sm:px-6 sm:pt-16">
-              <label htmlFor="province-filter" className="sr-only">Filter by province</label>
-              <select
-                id="province-filter"
-                value={calendarProvince}
-                onChange={(e) => setCalendarProvince(e.target.value)}
-                className="rounded-xl border border-black/12 bg-white/80 px-3 py-1.5 text-xs font-medium text-black shadow-sm backdrop-blur-sm outline-none focus:border-(--gold)"
-              >
-                <option value="">All Provinces</option>
-                {SA_PROVINCES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              {calendarProvince && (
-                <button
-                  type="button"
-                  onClick={() => setCalendarProvince("")}
-                  className="rounded-lg px-2 py-1 text-[10px] font-medium text-black/50 transition hover:bg-black/5 hover:text-black/70"
-                >
-                  Clear
-                </button>
-              )}
-              <span className="ml-auto text-[10px] text-black/40">
-                {calendarEvents.length} event{calendarEvents.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div
-              className="flex-1 overflow-auto touch-pan-x touch-pan-y touch-pinch-zoom px-4 pb-4 sm:px-6"
-            >
-              <EventCalendar
-                events={calendarEvents}
-                rsvpEventIds={rsvpEventIds}
-                onSelectEvent={handleSelectEvent}
-                isVendor={isVendor}
-              />
-            </div>
-          </div>
-        </div>
+      {/* FEAT-02 — frosted glass-overlay calendar (no FullCalendar dep). */}
+      {calendarOpen && (
+        <GlassCalendar
+          events={filtered}
+          rsvpEventIds={rsvpEventIds}
+          onSelectEvent={handleSelectEvent}
+          onClose={() => setCalendarOpen(false)}
+        />
       )}
 
       {/* ── Floating top bar (no search — search is a floating bottom control) ────── */}
@@ -1032,19 +972,6 @@ export default function EventsView({
             </div>
 
             <div className="pointer-events-auto flex items-center gap-2">
-              {/* Trending round floating button (gold icon) — opens centered glass modal */}
-              <button
-                type="button"
-                onClick={() => setFeaturedOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/95 text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white"
-                aria-label="Open trending events"
-                aria-expanded={featuredOpen}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-                  <polyline points="16 7 22 7 22 13"/>
-                </svg>
-              </button>
               {user && (
                 <div className="rounded-full border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
                   <NotificationBell userId={user.id} />
@@ -1078,12 +1005,13 @@ export default function EventsView({
                 onClick={() => {
                   setMapFlyTo(null);
                   setMapFlyToZoom(undefined);
-                  setView((v) => (v === "map" ? "calendar" : "map"));
+                  setCalendarOpen((open) => !open);
                 }}
                 className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
                 aria-label="Toggle view mode"
+                aria-pressed={calendarOpen}
               >
-                {view === "map" ? (
+                {!calendarOpen ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-(--gold)"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
@@ -1098,7 +1026,7 @@ export default function EventsView({
        *  Compass reset appears only when the map is rotated; locate-me FAB
        *  is always visible in map view. Kept on the right edge so it does
        *  not collide with the left-side burger / quick-access column. */}
-      {view === "map" && !hasDetail && (
+      {!calendarOpen && !hasDetail && (
         <div className="pointer-events-none absolute right-3 bottom-24 z-999 flex flex-col items-center gap-2 sm:right-4 sm:bottom-28">
           {Math.abs(((mapBearing % 360) + 360) % 360) > 1 && (
             <button
@@ -1155,7 +1083,7 @@ export default function EventsView({
        *       up on nearly-identical top chrome.
        *    3. "Search this area"   — fallback when the user has panned
        *       the map and no personalised signal exists.                  */}
-      {view === "map" && !hasDetail && (viewportScoped || personalised.hasSignal || showSearchAreaPill) && (
+      {!calendarOpen && !hasDetail && (viewportScoped || personalised.hasSignal || showSearchAreaPill) && (
         <div className="pointer-events-none absolute inset-x-0 top-24 z-1005 flex justify-center px-4">
           {viewportScoped ? (
             <button
@@ -1205,7 +1133,7 @@ export default function EventsView({
       )}
 
       {/* ── Quick access tools (vertical stack under the burger button) ── */}
-      {view === "map" && visibleQuickItems.length > 0 && (
+      {!calendarOpen && visibleQuickItems.length > 0 && (
         <div className="pointer-events-none absolute left-3 top-[108px] z-999 sm:left-4 sm:top-[116px]">
           <div className="pointer-events-auto flex flex-col items-center gap-2">
             {visibleQuickItems.map((item) => {
@@ -1348,61 +1276,6 @@ export default function EventsView({
               </svg>
             </button>
           )}
-        </div>
-      )}
-
-      {/* ── Trending centered glass modal (replaces bottom slide-up panel) ───────────────── */}
-      {featuredOpen && !hasDetail && activeCategories.size === 0 && !activeQuickAccess && (
-        <div
-          className="absolute inset-0 z-1009 flex items-center justify-center p-4"
-          onClick={() => setFeaturedOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
-            aria-hidden="true"
-          />
-          <aside
-            ref={featuredRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Top attended events"
-            onClick={(e) => e.stopPropagation()}
-            className="glass-panel relative flex max-h-[78dvh] w-full max-w-lg flex-col overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.60)" }}
-          >
-            <div className="flex items-center justify-between px-5 pt-4 pb-2">
-              <div className="flex items-center gap-2">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-                  <polyline points="16 7 22 7 22 13"/>
-                </svg>
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-(--gold)">
-                  Top Attended
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFeaturedOpen(false)}
-                aria-label="Close trending panel"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-black/60 transition hover:bg-black/5 hover:text-black active:scale-95"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-2 pb-3">
-              <FeaturedPanel
-                trendingEvents={topAttendedEvents}
-                onSelectEvent={handleSelectEvent}
-                onSelectPlace={handleSelectPlace}
-                onQuickAction={handleQuickAction}
-                fallbackEvents={filtered}
-              />
-            </div>
-          </aside>
         </div>
       )}
 

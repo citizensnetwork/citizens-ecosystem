@@ -513,23 +513,6 @@ export type FriendAttending = {
 
 // ── Phase 11: Direct Messaging ──────────────────
 
-// ── Phase 12: Featured Listings ─────────────────
-
-export type FeaturedListing = {
-  id: string;
-  event_id: string | null;
-  place_id: string | null;
-  cover_url: string;
-  tagline: string;
-  priority: number;
-  starts_at: string;
-  ends_at: string | null;
-  created_by: string;
-  created_at: string;
-  events?: Event;
-  places?: Place;
-};
-
 // ── Direct Messaging ────────────────────────────
 
 // ── Phase 12C: Live Location ────────────────────

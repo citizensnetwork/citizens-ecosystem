@@ -10,7 +10,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 |-------|-------|--------|-------|
 | 1 | Admin panel restructure (FEAT-01 + D15) | **Shipped** | `/admin` dashboard, `/admin/applications` canonical, `/admin/contributors` redirect, burger admin links removed, profile admin link added. 656 tests, advisor baseline unchanged. |
 | 1b | Re-file (move MASTER_DIRECTION, archive AGENTS+11 agent files, rewrite copilot-instructions, VISION, README, create FUTURE_IDEAS + .env.example + RUNBOOK) | **Shipped** | Root MASTER_DIRECTION deleted; AGENTS + 11 agent files archived to docs/archive/; copilot-instructions/VISION/README rewritten; FUTURE_IDEAS, .env.example, RUNBOOK created. 656 tests unchanged. |
-| 2 | Legacy cleanup + map style + FEAT-02 minimal calendar + BUG-06 advisor fix | Queued | Remove FullCalendar / FeaturedPanel / Leaflet residue; small glass-overlay calendar. |
+| 2 | Legacy cleanup + FEAT-02 minimal calendar + BUG-06 advisor fix | **Shipped** | Removed FullCalendar (5 pkgs), FeaturedPanel, trending modal; added zero-dep GlassCalendar overlay; migration 065 (drop featured_listings, directory_contributors → security_invoker, app_settings RLS). 656 tests, 2 ERROR advisors → 0. |
 | 3 | FEAT-03 Organisation Profiles & Discovery | Queued | |
 | 4 | FEAT-04 Consider → Convince complete (`convinces` table) | Queued | |
 | 5 | FEAT-05 Broadcast Updates (`event_broadcasts` table) | Queued | |
@@ -28,6 +28,13 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 - `npx vitest run`: 656/656 passing (no source changed)
 - `npx next lint --dir src`: clean
 - Architect review: B→A after Should-fixes applied (S1–S6); no Must-fix items; nice-to-haves N1–N6 deferred
+
+### Batch 2 validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 73 files / 656 tests passing
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 2 ERROR → 0 ERROR (security_definer_view + rls_disabled_in_public cleared); WARN count 77 unchanged vs baseline — no new warnings
+- Architect review: no Must-fix; S1 (arrow-key hijack guard) + S2 (BYPASSRLS invariant comment) applied inline; N1–N5 deferred to Batch 3
 
 ---
 

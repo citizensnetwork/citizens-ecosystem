@@ -1157,49 +1157,11 @@ do $$ begin
 end $$;
 
 -- ══════════════════════════════════════════════
--- 17. Featured Listings
+-- 17. Featured Listings (removed in Batch 2 — see migration 065)
 -- ══════════════════════════════════════════════
-create table if not exists public.featured_listings (
-  id            uuid primary key default gen_random_uuid(),
-  event_id      uuid references public.events(id) on delete cascade,
-  place_id      uuid references public.places(id) on delete cascade,
-  cover_url     text not null,
-  tagline       text not null default '',
-  priority      int not null default 0,
-  starts_at     timestamptz not null default now(),
-  ends_at       timestamptz,
-  created_by    uuid not null references auth.users(id),
-  created_at    timestamptz not null default now(),
-  constraint exactly_one_target check (
-    (event_id is not null and place_id is null) or
-    (event_id is null and place_id is not null)
-  )
-);
-
-alter table public.featured_listings enable row level security;
-
-create index if not exists idx_featured_listings_active
-  on public.featured_listings (priority desc, starts_at)
-  where ends_at is null or ends_at > now();
-create index if not exists idx_featured_listings_event
-  on public.featured_listings (event_id) where event_id is not null;
-create index if not exists idx_featured_listings_place
-  on public.featured_listings (place_id) where place_id is not null;
-
-do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'Anyone can read featured listings' and tablename = 'featured_listings') then
-    create policy "Anyone can read featured listings" on public.featured_listings for select using (true);
-  end if;
-  if not exists (select 1 from pg_policies where policyname = 'Admin insert featured listings' and tablename = 'featured_listings') then
-    create policy "Admin insert featured listings" on public.featured_listings for insert with check (public.is_admin());
-  end if;
-  if not exists (select 1 from pg_policies where policyname = 'Admin update featured listings' and tablename = 'featured_listings') then
-    create policy "Admin update featured listings" on public.featured_listings for update using (public.is_admin());
-  end if;
-  if not exists (select 1 from pg_policies where policyname = 'Admin delete featured listings' and tablename = 'featured_listings') then
-    create policy "Admin delete featured listings" on public.featured_listings for delete using (public.is_admin());
-  end if;
-end $$;
+-- The legacy featured_listings table was dropped in
+-- 065_batch2_cleanup_and_security.sql; intentionally kept out of the
+-- canonical schema dump.
 
 -- ══════════════════════════════════════════════
 -- 18. Live Location Sharing

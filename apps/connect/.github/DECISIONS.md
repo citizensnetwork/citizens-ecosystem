@@ -2,6 +2,20 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 2 — Events surface simplification + advisor fix
+
+**Decision — FullCalendar removed; calendar is now a zero-dep glass overlay.** `EventCalendar.tsx` and all 5 `@fullcalendar/*` packages deleted. Replaced with `GlassCalendar.tsx` (~280 LOC, pure DOM + Tailwind), rendered as a transparent month-grid overlay above the persistent map. Removes ~150 LOC of `.fc-*` CSS overrides in `globals.css` and a heavy bundle. Calendar is no longer a separate `view` state — it's an overlay (`calendarOpen` boolean) over the always-mounted map.
+
+**Why:** FullCalendar's API was over-fitted to a feature-rich CRUD calendar. Connect's calendar is read-only "what's on when". A 280-LOC component delivers the FEAT-02 spec (frosted month grid, category-coloured tiles, RSVP gold tint) and matches the Connect UI system (glass + map-first) better than the third-party widget could.
+
+**Decision — `FeaturedPanel` and trending modal removed from events surface.** Paid promotion contradicts MASTER_DIRECTION's kingdom-equity stance ("every contributor surfaced equally, no boosted tier"). `featured_listings` table dropped in migration 065. The Trending list is still computed and surfaced inside BurgerMenu (passive discovery, not a paid placement).
+
+**Decision — `directory_contributors` view uses `WITH (security_invoker = on)`.** Default view semantics in Postgres run as the view owner (effectively SECURITY DEFINER), which bypasses RLS on the underlying table. Switching to `security_invoker = on` makes the caller's RLS on `profiles` apply. Column shape unchanged — Citizens Central read contract preserved. The existing "Profiles are viewable by everyone" policy continues to permit anon SELECT through the view.
+
+**Decision — `app_settings` table has RLS enabled with admin-only policies; SECURITY DEFINER triggers retain access via the `postgres` BYPASSRLS attribute.** Direct reads/writes to `app_settings` are admin-only. The trigger function `events_enforce_community_rate_limit` (037) is SECURITY DEFINER **and** owned by `postgres` (which has `BYPASSRLS`). It is the combination that lets the trigger read `app_settings` — DEFINER alone does not bypass RLS. This invariant is documented in the migration 065 header. If anyone re-owns the trigger function to a non-BYPASSRLS role, citizen community-event creation will silently fail.
+
+---
+
 ## MASTER_DIRECTION Batch 1b — Re-file
 
 **Decision — Root `MASTER_DIRECTION.md` deleted; `.github/MASTER_DIRECTION.md` is the sole canonical copy.** The root file was a duplicate introduced before `.github/` was established as the doc home. Removing the root copy eliminates drift risk and ensures AI sessions load the correct version via `.github/copilot-instructions.md`'s "Locked direction" pointer.

@@ -33,14 +33,15 @@ vi.mock("next/dynamic", () => ({
   },
 }));
 
-vi.mock("@/components/events/EventCalendar", () => ({
+vi.mock("@/components/events/GlassCalendar", () => ({
   default: ({
     events,
   }: {
     events: unknown[];
     onSelectEvent?: unknown;
-    isVendor?: boolean;
-  }) => <div data-testid="event-calendar">{events.length} events</div>,
+    rsvpEventIds?: unknown;
+    onClose?: () => void;
+  }) => <div data-testid="glass-calendar">{events.length} events</div>,
 }));
 
 vi.mock("@/components/events/BurgerMenu", () => {
@@ -71,10 +72,6 @@ vi.mock("@/components/reviews/PostEventPrompt", () => ({
 
 vi.mock("@/components/notifications/NotificationBell", () => ({
   default: () => <div data-testid="notification-bell" />,
-}));
-
-vi.mock("@/components/events/FeaturedPanel", () => ({
-  default: () => <div data-testid="featured-panel">Featured</div>,
 }));
 
 vi.mock("@/lib/capacitor/share", () => ({
@@ -133,7 +130,7 @@ describe("EventsView", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
     });
-    expect(screen.getByTestId("event-calendar")).toBeInTheDocument();
+    expect(screen.getByTestId("glass-calendar")).toBeInTheDocument();
     // Map is always rendered (visible behind transparent calendar) but non-interactive
     expect(screen.getByTestId("event-map")).toBeInTheDocument();
   });
@@ -194,17 +191,10 @@ describe("EventsView", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("event-calendar")).toHaveTextContent(
+      expect(screen.getByTestId("glass-calendar")).toHaveTextContent(
         "1 events"
       );
     });
-  });
-
-  it("shows trending panel button", async () => {
-    await renderView();
-    expect(
-      screen.getByRole("button", { name: /open trending events/i })
-    ).toBeInTheDocument();
   });
 
   it("renders Citizens Connect brand button with gold text", async () => {
@@ -234,6 +224,16 @@ describe("EventsView", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
     });
-    expect(screen.getByTestId("event-calendar")).toHaveTextContent("3 events");
+    expect(screen.getByTestId("glass-calendar")).toHaveTextContent("3 events");
+  });
+
+  it("opens calendar automatically when ?view=calendar is set", async () => {
+    mockSearchParams.set("view", "calendar");
+    try {
+      await renderView();
+      expect(screen.getByTestId("glass-calendar")).toBeInTheDocument();
+    } finally {
+      mockSearchParams.delete("view");
+    }
   });
 });
