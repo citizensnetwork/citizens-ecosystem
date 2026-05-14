@@ -498,50 +498,13 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   </Link>
                 )}
               {menuProfile?.role === "admin" && (
-                <>
-                  <Link
-                    href="/admin/contributors"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    Contributor applications
-                  </Link>
-                  <Link
-                    href="/admin/reports"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    Reports
-                  </Link>
-                  <Link
-                    href="/admin/categories"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    Manage Categories
-                  </Link>
-                  <Link
-                    href="/admin/tags"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    Manage Tags
-                  </Link>
-                  <Link
-                    href="/admin/users"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    Manage Users
-                  </Link>
-                  <Link
-                    href="/admin/api-keys"
-                    onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-sm text-black/70 transition hover:bg-black/5"
-                  >
-                    API Keys
-                  </Link>
-                </>
+                <Link
+                  href="/admin"
+                  onClick={onClose}
+                  className="block rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-sm font-medium text-black transition hover:bg-(--gold-soft)/70"
+                >
+                  Admin panel →
+                </Link>
               )}
               <button
                 type="button"

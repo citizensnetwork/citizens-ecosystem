@@ -227,6 +227,14 @@ export default async function ProfilePage() {
         >
           📍 Manage Places
         </Link>
+        {profile?.role === "admin" && (
+          <Link
+            href="/admin"
+            className="rounded-xl border border-(--gold)/50 bg-(--gold-soft) px-5 py-3 text-sm font-medium text-black hover:shadow-sm transition-shadow"
+          >
+            🛡️ Admin Panel
+          </Link>
+        )}
       </section>
 
       <section className="mb-8">

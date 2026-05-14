@@ -1,6 +1,6 @@
 // Shared loader for pending Contributor applications.
 //
-// Used by both `/admin/contributors` (the dedicated review inbox) and
+// Used by both `/admin/applications` (the dedicated review inbox) and
 // `/admin/users` (which surfaces pending apps as a secondary elevation
 // pipeline next to the admin users list). Centralised so the FK alias
 // (`profiles:contributor_applications_user_id_fkey`) and the
@@ -9,7 +9,7 @@
 //
 // Returns `{ applications, error }` so callers can render a visible
 // error banner when the fetch itself fails (the `/admin/users` flow
-// added in Batch P does this; `/admin/contributors` just logs).
+// added in Batch P does this; `/admin/applications` just logs).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PendingApplication } from "@/components/admin/ContributorReviewCard";

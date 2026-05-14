@@ -64,7 +64,7 @@ export default async function AdminContributorReviewPage({
       <div className="min-h-screen bg-[#faf9f6]">
         <PageHeader
           title="Application not found"
-          fallbackHref="/admin/contributors"
+          fallbackHref="/admin/applications"
         />
         <main className="mx-auto max-w-2xl px-4 py-6">
           <p className="rounded-xl border border-black/10 bg-white p-6 text-sm text-black/70">
@@ -108,7 +108,7 @@ export default async function AdminContributorReviewPage({
       <PageHeader
         title={app.display_name}
         subtitle={`Contributor application · ${row.status}`}
-        fallbackHref="/admin/contributors"
+        fallbackHref="/admin/applications"
       />
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
         {isDeepLink && sp.action && sp.sig && sp.exp ? (

@@ -8,7 +8,7 @@
  * (`not_applied → pending`, `rejected → pending`).
  *
  * NOTE: Admin notification is NOT fired from this route. Admins see
- * pending applications via the `/admin/contributors` inbox (reads
+ * pending applications via the `/admin/applications` inbox (reads
  * `contributor_applications WHERE status = 'pending'`). Email-based
  * alerts are tracked as a separate concern (see
  * `.github/DECISIONS.md`) — if/when they return they should be wired
@@ -167,7 +167,7 @@ export async function POST(request: Request) {
   }
 
   // Admin notification is intentionally deferred (see top-of-file).
-  // Pending applications are queryable via `/admin/contributors`.
+  // Pending applications are queryable via `/admin/applications`.
 
   return NextResponse.json({
     success: true,

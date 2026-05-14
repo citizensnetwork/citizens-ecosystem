@@ -2,6 +2,24 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 1 — Admin panel restructure
+
+**Decision — `/admin/applications` is the canonical contributor review inbox; `/admin/contributors` becomes a redirect.** Per `MASTER_DIRECTION.md` FEAT-01, the admin entry surface is reorganised behind a single `/admin` dashboard with named sub-routes. The legacy `/admin/contributors` page is preserved as a `redirect("/admin/applications")` shim because the email approval/rejection deep-links sent by the contributor-application Edge Function point at `/admin/contributors/[id]` and at the parent index. The child `[id]` route still resolves directly (Next.js routes child segments past a parent redirect), so existing emails keep working.
+
+**Why:** Renaming to `/admin/applications` makes the entry point self-describing (one of several admin tools), matches the new dashboard naming, and leaves room for `/admin/events`, `/admin/places`, etc. without re-introducing the "everything lives under /contributors" tangle.
+
+**Decision — Approval continues to set `profiles.role = 'contributor'` (with `contributor_kind` as the sub-type), not "role to match `contributor_kind`".** The literal wording in `MASTER_DIRECTION.md` FEAT-01 reads "sets `role` to match `contributor_kind`", but the codebase has been on the simplified 3-role model (`citizen` / `contributor` / `admin`) since migration 033, with `ministry` / `organization` / `business` carried on `contributor_kind` as a sub-type column. The `approve_contributor_application` RPC and `review-contributor-application` Edge Function already implement this correctly.
+
+**Why:** Reverting to ministry/organization/business as top-level roles would require schema rollback, regression-testing every RLS policy that references `is_admin()` / `is_contributor()`, and rewriting the contributor application flow. The 3-role + sub-type model is materially simpler and already shipped. We treat the doc wording as shorthand for "approval grants contributor privileges and preserves the requested kind".
+
+**Decision — `/admin/reports` is retained (not renamed to `/admin/reported`).** Doc spec calls for `/admin/reported`; existing route is `/admin/reports`. Rename deferred — both work, and renaming a live admin route mid-batch invites broken email/bookmark links for negligible benefit.
+
+**Decision — Admin guard remains inline per-page (5-line block: `getUser` → fetch `profiles.role` → `redirect("/events")`).** A `requireAdminPage()` helper in `src/lib/adminGuard.ts` was considered (currently only `requireAdmin` for route handlers exists). Deferred until at least one more admin page is added; the duplication is shallow and matches the pattern already used by `/admin/users`.
+
+**Decision — Burger bar gets a single "Admin panel →" link, gated on `profile.role === "admin"`.** Per MASTER_DIRECTION D15 ("burger bar must not contain admin links"), but FEAT-01 also says admin users see an Admin Panel entry-point in their profile menu. The BurgerMenu component is both a filter drawer and a profile menu; the link is placed in the profile-actions section, not the filter section. Profile page also gets a duplicate admin link in the management section.
+
+---
+
 ## Batch 3 (post-S3) — S2 + S3 nice-to-haves cleanup
 
 **Decision — A single `DEFAULT_ICON_ID: CategoryIconId = "pin"` is the canonical fallback for every icon-helper in `src/lib/categoryIcons.ts`.** `getEventCategoryIcon`, `getPlaceCategoryIcon`, `getQuickAccessIcon`, and `getIconSvg` all terminate on it; `DEFAULT_CATEGORY_ICON` is re-derived from it.

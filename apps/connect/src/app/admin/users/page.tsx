@@ -44,7 +44,7 @@ export default async function AdminUsersPage({
 
   // Pending Contributor applications — surfaced directly on the users
   // page as a secondary elevation pipeline next to admin elevations.
-  // Shared loader (also used by /admin/contributors) keeps the FK
+  // Shared loader (also used by /admin/applications) keeps the FK
   // alias + row mapping in lockstep across the two admin panes.
   const { applications, error: appsError } =
     await fetchPendingApplications(supabase);
