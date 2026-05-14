@@ -2,6 +2,18 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 1b — Re-file
+
+**Decision — Root `MASTER_DIRECTION.md` deleted; `.github/MASTER_DIRECTION.md` is the sole canonical copy.** The root file was a duplicate introduced before `.github/` was established as the doc home. Removing the root copy eliminates drift risk and ensures AI sessions load the correct version via `.github/copilot-instructions.md`'s "Locked direction" pointer.
+
+**Decision — 11-agent workflow discarded (D7 in MASTER_DIRECTION).** `.github/AGENTS.md` and all 12 `.github/agents/*.agent.md` files archived to `docs/archive/`. The session workflow is now: one Architect subagent review + Security review inline per batch. No separate agent invocations. This simplifies the quality gate and removes a maintenance surface that was growing stale.
+
+**Decision — `docs/FUTURE_IDEAS.md` created as the canonical deferred-features log.** Replaces scattered "nice-to-haves" in batch notes. Not a roadmap — just a holding area. Items from FUTURE_IDEAS are only promoted to MASTER_DIRECTION when explicitly decided.
+
+**Decision — `.env.example` committed with non-secret pre-fills.** `NEXT_PUBLIC_SUPABASE_URL` (public Supabase URL) and `NEXT_PUBLIC_MAPTILER_STYLE` (UUID of the branded map style) are not credentials — they are safe to publish. Committing them as defaults reduces contributor setup friction. `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are left empty and must be provided locally and in Vercel.
+
+---
+
 ## MASTER_DIRECTION Batch 1 — Admin panel restructure
 
 **Decision — `/admin/applications` is the canonical contributor review inbox; `/admin/contributors` becomes a redirect.** Per `MASTER_DIRECTION.md` FEAT-01, the admin entry surface is reorganised behind a single `/admin` dashboard with named sub-routes. The legacy `/admin/contributors` page is preserved as a `redirect("/admin/applications")` shim because the email approval/rejection deep-links sent by the contributor-application Edge Function point at `/admin/contributors/[id]` and at the parent index. The child `[id]` route still resolves directly (Next.js routes child segments past a parent redirect), so existing emails keep working.

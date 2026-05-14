@@ -27,8 +27,8 @@ npx tsc --noEmit
 ## Common Issues & Fixes
 
 ### "Map container is already initialized"
-- Cause: react-leaflet or missing `map.remove()` cleanup
-- Fix: Use raw Leaflet pattern with `useEffect`/`useRef` and `map.remove()` in cleanup
+- Cause: missing `map.remove()` cleanup in useEffect return
+- Fix: Use MapLibre GL JS pattern with `useEffect`/`useRef` and `map.remove()` in cleanup
 
 ### Next.js 15 params error
 - Cause: `params` is now `Promise<{ id: string }>` in Next.js 15

@@ -2,7 +2,11 @@
 
 Part of the **Citizens ecosystem** — see `.github/VISION.md` for full platform vision, mission, and feature evaluation criteria.
 
-Citizens Connect is the flagship channel: a map-first community discovery platform that serves organizers and non-organizers equally. It surfaces the vibrant, diverse layer of Christian community activity — outreaches, creative events, social gatherings, workshops, healing retreats, markets, celebrations, church services, and more — helping people find the spaces where they fit best and grow the most. Open to all, including non-Christians discovering the Kingdom. Next.js 15 App Router + Supabase + MapLibre GL + Tailwind CSS v4. Slogan: **Connecting the Kingdom** (Ephesians 2:19–22).
+Citizens Connect is the flagship channel: a map-first community discovery platform that serves Citizens and Contributors equally. It surfaces the vibrant, diverse layer of Christian community activity — outreaches, creative events, social gatherings, workshops, healing retreats, markets, celebrations, church services, and more — helping people find the spaces where they fit best and grow the most. Open to all, including non-Christians discovering the Kingdom.
+
+Stack: Next.js 15 App Router · TypeScript · Supabase · MapLibre GL JS · MapTiler Cloud · Tailwind CSS v4 · Capacitor (iOS + Android). Slogan: **Connecting the Kingdom** (Ephesians 2:19–22).
+
+**Locked direction:** `.github/MASTER_DIRECTION.md` is the single source of truth. All features, fixes, and decisions must align with it. Do not add features or refactor speculatively.
 
 ## Build & Run
 
@@ -24,7 +28,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 
 - **App Router (RSC):** Pages in `src/app/` are async Server Components that fetch data. Client interactivity lives in `src/components/` with `"use client"`.
 - **Supabase dual-client:** `await createClient()` from `src/lib/supabase/server.ts` in server components/routes. `createClient()` from `src/lib/supabase/client.ts` in client components (useEffect, form handlers).
-- **RLS-first security:** All tables use Row Level Security. The Supabase anon key is safe to expose — RLS policies enforce access. Vendor role gates event creation. Admin role can override all update/delete policies via `is_admin()` function.
+- **RLS-first security:** All tables use Row Level Security. The Supabase anon key is safe to expose — RLS policies enforce access. Contributor role gates event creation. Admin role can override all update/delete policies via `is_admin()` function.
 - **Next.js 15 params:** Dynamic route params are `Promise<{id: string}>` — always `await params` before destructuring.
 
 ## Key Conventions
@@ -76,7 +80,7 @@ Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categor
 
 Schema in `supabase/schema.sql` (idempotent — safe to re-run). Migrations in `supabase/migrations/`.
 
-Tables: `profiles` (extends auth.users, roles: individual/ministry/organization/business/admin), `events` (with lat/lng, category, category_id FK, image_url), `rsvps` (unique per user+event), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `place_media`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
+Tables: `profiles` (extends auth.users, roles: `citizen` / `contributor` / `admin`; contributors have a `contributor_kind` sub-type: `ministry` / `organization` / `business`), `events` (with lat/lng, category, category_id FK, image_url), `rsvps` (unique per user+event; status includes `going` / `consider`), `comments` (on events, with profile join), `categories` (DB-driven), `places` (permanent map listings), `reviews` (ratings + still_exists for places and events), `follows` (social graph, bidirectional = friends), `event_photos`, `place_media`, `event_views`, `push_tokens` (device push tokens), `notifications` (in-app + push), `place_follows` (user follows place, optimistic count), `conversations` (DM threads), `conversation_participants` (many-to-many), `messages` (chat messages with 2000 char limit).
 
 Trigger `on_auth_user_created` auto-creates a profile row from auth metadata on signup.
 
@@ -97,22 +101,17 @@ Marker utilities live in `src/lib/map/markers.ts`:
 
 ## Project Roadmap
 
-See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists.
-
-**Completed phases:** App Shell (Phase 2), Full-Screen Map (Phase 3), Calendar (Phase 4), Reviews & Verification (Phase 5), Capacitor Mobile (Phase 6), Event Enrichment & Discovery (Phase 7), Social Graph (Phase 8), Interest Profile & Onboarding (Phase 9), Smart Notifications (Phase 10), Direct Messaging (Phase 11), UX Bug Fixes + Quality Hardening
-**Current phase:** All core phases complete (Phases 1–11). 333 tests, CI pipeline active.
-**Upcoming:** Expanded roles, content diversity, ecosystem readiness
+See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists. Current status: 656 tests, all Phases 1–11 shipped.
 
 Platform has two full-screen primary views:
 1. **Map view** — full-viewport map with category markers, temporal encoding, clustering, geolocation, detail panel, floating controls
-2. **Calendar view** — FullCalendar with day/week/month views, category-colored events, detail panel integration, vendor quick-create on date click
-**Platform identity:** Serves organizers and non-organizers equally. All people and entities have equal dignity. Open to non-Christians discovering the Kingdom. See `.github/VISION.md` for full vision.
+2. **Calendar view** — lightweight glass-overlay calendar (FEAT-02; replaces removed FullCalendar)
 
-Roles expanding to: individual, ministry, organization, business, admin. Organiser roles (ministry/organization/business/admin) can create places.
+**Platform identity:** Serves Citizens and Contributors equally. All people and entities have equal dignity. Open to non-Christians discovering the Kingdom. See `.github/VISION.md` for full vision.
+
+Roles: `citizen` / `contributor` (with `contributor_kind`: ministry / organization / business) / `admin`. Contributors can create events and places.
 
 ## Project Customization Files
-
-To preserve decisions across sessions, the project uses these customization files:
 
 ### Instructions (auto-applied by file pattern)
 - `.github/instructions/project-architecture.instructions.md` — File map, component relationships, data flow, environment details
@@ -130,26 +129,9 @@ To preserve decisions across sessions, the project uses these customization file
 - `.github/prompts/resume-project.prompt.md` — Reconstruct context from files and execute tasks end-to-end
 - `.github/prompts/capture-session-context.prompt.md` — Persist progress/decisions after a work session
 
-### Agents (specialized reviewers)
-- `.github/agents/architect.agent.md` — Architecture, code quality, security, API design reviewer (read-only)
-- `.github/agents/testing.agent.md` — Writes/runs tests, generates fixtures, identifies coverage gaps
-- `.github/agents/refactor.agent.md` — Cleans code, enforces patterns, extracts utilities (never changes behavior)
-- `.github/agents/data.agent.md` — Seeds data, query performance analysis, index recommendations
-- `.github/agents/community.agent.md` — Content strategy, categories, onboarding copy, SEO/OG meta, brand voice
-- `.github/agents/notification.agent.md` — Notification templates, Edge Functions, push delivery, frequency management
-- `.github/agents/product-lead.agent.md` — Roadmap alignment, feature specs, scope control, progress tracking
-- `.github/agents/invite-flow.agent.md` — Event invite generation, share templates, channel-optimized formatting, RSVP conversion
-- `.github/agents/ui.agent.md` — UI/UX implementation specialist
-- `.github/agents/ui-consistency-review.agent.md` — Read-only UI compliance auditor
-- `.github/agents/schema-architect.agent.md` — Read-only DB schema advisor
-- `.github/agents/continuity-manager.agent.md` — Context reconstruction + implementation + continuity updates
-
-See `.github/AGENTS.md` for the full agent registry, invocation guide, and multi-agent workflows.
-
 ### Project Tracking
 - `.github/PROJECT_STATUS.md` — Living phase tracker with completion checklists
 - `.github/DECISIONS.md` — Technical decision log with rationale (prevents re-debating solved problems)
-- `.github/AGENTS.md` — Always-on continuity contract and startup protocol
 - `.github/SUPABASE_RECOVERY.md` — Fast reconnect + validation runbook for Supabase issues
 
 If a future request conflicts with these standards, follow explicit user direction for that request and then update the files above to keep the baseline current.
@@ -163,8 +145,8 @@ For every multi-batch session the user's standing expectations are:
    - `npx tsc --noEmit` → 0 errors
    - `npx vitest run` → full suite passes
    - `npx next lint --dir src` → clean
-   - Architect subagent audit with a detailed diff summary → apply every
-     Should-fix inline, note Nice-to-haves, then re-run tsc + vitest
+   - **Architect subagent review** with a detailed diff summary → apply every Should-fix inline, note Nice-to-haves, then re-run tsc + vitest
+   - **Security review inline** (OWASP Top 10, RLS correctness, input validation) → fix any findings before push
    - `mcp_supabase_get_advisors type:"security"` → no NEW warnings vs baseline
 3. **Push after each batch** (not only at end). Update `.github/PROJECT_STATUS.md`
    and `.github/DECISIONS.md` in the same push cadence.

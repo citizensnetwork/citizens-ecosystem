@@ -4,12 +4,12 @@
 
 ## MASTER_DIRECTION Execution (current)
 
-The single source of truth is now [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) (re-filing pending in Batch 1b). Earlier phase log retained below for history.
+The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md). Earlier phase log retained below for history.
 
 | Batch | Scope | Status | Notes |
 |-------|-------|--------|-------|
 | 1 | Admin panel restructure (FEAT-01 + D15) | **Shipped** | `/admin` dashboard, `/admin/applications` canonical, `/admin/contributors` redirect, burger admin links removed, profile admin link added. 656 tests, advisor baseline unchanged. |
-| 1b | Re-file (move MASTER_DIRECTION, archive AGENTS+11 agent files, rewrite copilot-instructions, VISION, README, create FUTURE_IDEAS + .env.example) | Pending | |
+| 1b | Re-file (move MASTER_DIRECTION, archive AGENTS+11 agent files, rewrite copilot-instructions, VISION, README, create FUTURE_IDEAS + .env.example + RUNBOOK) | **Shipped** | Root MASTER_DIRECTION deleted; AGENTS + 11 agent files archived to docs/archive/; copilot-instructions/VISION/README rewritten; FUTURE_IDEAS, .env.example, RUNBOOK created. 656 tests unchanged. |
 | 2 | Legacy cleanup + map style + FEAT-02 minimal calendar + BUG-06 advisor fix | Queued | Remove FullCalendar / FeaturedPanel / Leaflet residue; small glass-overlay calendar. |
 | 3 | FEAT-03 Organisation Profiles & Discovery | Queued | |
 | 4 | FEAT-04 Consider → Convince complete (`convinces` table) | Queued | |
@@ -22,6 +22,12 @@ The single source of truth is now [.github/MASTER_DIRECTION.md](.github/MASTER_D
 - `npx next lint --dir src`: clean
 - `mcp_supabase_get_advisors` (security): no new warnings vs baseline (still 2 known: `security_definer_view` on `directory_contributors`, `rls_disabled_in_public` on `app_settings` — addressed in Batch 2 / BUG-06)
 - Architect review: A across architecture / API / security; A− on performance, accessibility, code quality (deferred nice-to-haves)
+
+### Batch 1b validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 656/656 passing (no source changed)
+- `npx next lint --dir src`: clean
+- Architect review: B→A after Should-fixes applied (S1–S6); no Must-fix items; nice-to-haves N1–N6 deferred
 
 ---
 

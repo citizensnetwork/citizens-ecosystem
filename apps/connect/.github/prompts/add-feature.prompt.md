@@ -30,7 +30,7 @@ The user will describe a feature. Parse it and generate ALL necessary artifacts.
 
 ### 4. Integration
 - [ ] Wire the new page/component into existing navigation or views
-- [ ] If map-related: use raw Leaflet pattern (useEffect/useRef/map.remove), dynamic import with `ssr: false`
+- [ ] If map-related: use MapLibre GL JS pattern (useEffect/useRef/map.remove), dynamic import with `ssr: false`
 - [ ] If Supabase Storage: follow upload path convention `${user.id}/${timestamp}.ext`
 
 ### 5. Validation
@@ -44,8 +44,8 @@ The user will describe a feature. Parse it and generate ALL necessary artifacts.
 - **Client client**: `const supabase = createClient()` (from `@/lib/supabase/client`)
 - **Next.js 15 params**: `const { id } = await params` (params is a Promise)
 - **Categories**: church-service, youth, community-outreach, worship, bible-study, prayer, social, other
-- **Roles**: vendor (can create/edit events), client (can RSVP/comment)
-- **Map components**: raw Leaflet only, no react-leaflet
+- **Roles**: `citizen` (can RSVP/comment), `contributor` (can create/edit events, with `contributor_kind`)
+- **Map components**: MapLibre GL JS only, never react-leaflet or Leaflet
 - **CSS**: Tailwind v4 with CSS variables, no tailwind.config file
 
 ## Output Format

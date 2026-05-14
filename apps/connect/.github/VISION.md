@@ -1,6 +1,7 @@
 # Citizens — Platform Vision
 
-> Canonical vision document. All agents, features, and roadmap decisions should align with this.
+> Canonical vision document. Decisions locked in `.github/MASTER_DIRECTION.md`; this document provides the why.
+> Last updated: May 2026 · Aligns with MASTER_DIRECTION Parts 1, 2, 12.
 
 ## The Problem
 
@@ -12,7 +13,7 @@ The Christian community operates in silos. Ministries, churches, NGOs, brands, o
 
 Citizens is an expression of God's Kingdom on Earth, built on identity, connection, and personal contribution. Through channels like Citizens Connect, Citizens Wear, and Citizens Central, we create spaces where every person can belong, grow, and play their part. Because in the Kingdom, everyone is a Citizen — and every Citizen has value.
 
-The platform serves organizers and non-organizers with equal dignity. There are no first-class or second-class users. Every organizer's initiative matters — and every person seeking connection, growth, or purpose matters just as much. When we're connected, we realize we are all important pieces in the Kingdom, making greater impact through collaboration than we ever could in isolation.
+The platform serves Contributors and Citizens with equal dignity. There are no first-class or second-class users. Every Contributor's initiative matters — and every Citizen seeking connection, growth, or purpose matters just as much. When we're connected, we realize we are all important pieces in the Kingdom, making greater impact through collaboration than we ever could in isolation.
 
 Non-Christians are welcome. The Kingdom is not a gated community — anyone can discover it, explore it, and find their place within it.
 
@@ -34,7 +35,7 @@ The name "Citizens" is a direct reference to this passage — we are citizens of
 3. **Discovery as experience** — Finding community should feel like exploring a living map, not scrolling a feed
 4. **Community-amplified** — The platform amplifies community voices; it doesn't create content
 5. **Every entity has value** — Churches, home groups, NGOs, brands, individuals — all play integral roles. No user or entity is elevated above another
-6. **Every person has value** — Organizers and non-organizers are equally important. We serve people seeking where they fit best and grow the most, alongside people creating spaces for that growth to happen
+6. **Every person has value** — Contributors and Citizens are equally important. We serve people seeking where they fit best and grow the most, alongside people creating spaces for that growth to happen
 7. **Connected outcomes** — The greatest impact comes not from silos but from connected functions working in unified vision. We are all pieces of a greater scheme, and connection unlocks our collective potential
 8. **Open Kingdom** — Non-Christians have full right to the platform and the ability to discover the Kingdom. The door is open to all
 9. **People, society, and community focused** — Every feature must serve real human connection and community benefit
@@ -45,14 +46,19 @@ Citizens is the parent brand. Each "channel" serves a specific dimension of King
 
 ### Citizens Connect (Current — this app)
 **What:** Map-first event and activity discovery platform
-**Serves:** Everyone — people seeking community and purpose, and organizers creating spaces for that to happen. Christians and non-Christians alike.
+**Serves:** Everyone — Citizens seeking community and purpose, and Contributors creating spaces for that to happen. Christians and non-Christians alike.
 **Core experience:** Interactive map + calendar showing all faith-based events, places, and activities in a geographic area — helping people find the spaces where they fit best and grow the most
-**Starting point:** Durban, South Africa — designed for expansion
+**Default map centre:** Pretoria, South Africa — designed for national then global expansion
 
-### Citizens Wear (Future)
-**What:** Social-media-style shopping platform for Christian clothing and merchandise
-**Serves:** Private and retail Christian clothing brands seeking visibility; believers looking for faith-aligned fashion
-**Core experience:** Browse and purchase clothing items from Christian brands in a unified marketplace
+### Citizens Learn (Future)
+**What:** Faith-based learning platform — courses, discipleship content, and educational resources
+**Serves:** Believers seeking growth and knowledge; ministries and educators wanting to publish content
+**Core experience:** Browse and enrol in Kingdom-aligned courses and learning paths
+
+### Citizens Wear (Future — repositioned)
+**What:** Social-media-style marketplace for Christian clothing and merchandise
+**Serves:** Christian brands seeking visibility; believers looking for faith-aligned fashion
+**Core experience:** Browse and purchase items from Christian brands in a unified marketplace
 
 ### Citizens Central (Future)
 **What:** Comprehensive directory, database, and hub for Christian entities — with expanded social functions for collaborative event organizing
@@ -75,7 +81,7 @@ As the first and flagship channel, Connect sets the standard for the entire ecos
 - **Discoverability** — Make it effortless to find events, places, and entities that matter. Help every person find the spaces where they fit best and grow the most according to their goals and interests.
 - **Entity value with scale transparency** — Every listing gets equal platform dignity (a home group prayer meeting is never visually buried beneath a mega-church conference). However, scale is a useful discovery signal — a 2,000-person worship night is a very different experience from a 5-person discipleship circle, and users should be able to see expected attendance size so they can self-select the setting that fits them. Equal dignity does not mean hiding size.
 - **Connection prompts** — Features should actively surface related entities, similar initiatives, and collaboration opportunities
-- **Equal service** — The platform serves organizers and non-organizers alike. Organizers are served by making their initiatives visible and discoverable. Non-organizers are served by helping them find where they belong, through events and experiences that resonate with their interests and purpose. Both roles are essential — neither is elevated above the other.
+- **Equal service** — The platform serves Contributors and Citizens alike. Contributors are served by making their initiatives visible and discoverable. Citizens are served by helping them find where they belong, through events and experiences that resonate with their interests and purpose. Both roles are essential — neither is elevated above the other.
 - **Cross-channel readiness** — Architecture and data models should anticipate integration with Wear, Central, and Impact
 
 ## Feature Evaluation Criteria
@@ -88,7 +94,7 @@ When assessing any proposed feature, ask:
 4. **Does it enable collaboration** over competition?
 5. **Is it people/community focused** rather than institution-focused?
 6. **Does it serve discovery** — helping people find the spaces where they fit best and grow the most?
-7. **Does it serve equally** — does it benefit both organizers and non-organizers without elevating one over the other?
+7. **Does it serve equally** — does it benefit both Contributors and Citizens without elevating one over the other?
 8. **Does it move toward ecosystem readiness** — can this concept extend to Wear/Central/Impact?
 
 ## Content Identity (Connect)
@@ -109,6 +115,6 @@ Growth comes from utility — people share because events are easy to find and s
 
 The platform exists as a representation of the Christian Kingdom, accommodating and serving its Citizens. But the Kingdom's door is open — non-Christians can discover it too, explore its events and places, and find where they might belong.
 
-- **Organizers** (churches, ministries, NGOs, home groups, brands, individuals creating events) — We serve them by making their initiatives visible, discoverable, and connected to related efforts. Every initiative is important.
-- **Non-organizers** (people seeking community, growth, purpose, connection) — We serve them by helping them find the spaces where they fit best and grow the most in the Christian world, according to their goals and interests. Every person is important.
+- **Contributors** (churches, ministries, NGOs, home groups, brands, individuals creating events) — We serve them by making their initiatives visible, discoverable, and connected to related efforts. Every initiative is important. Contributor role with `contributor_kind`: ministry / organization / business.
+- **Citizens** (people seeking community, growth, purpose, connection) — We serve them by helping them find the spaces where they fit best and grow the most in the Christian world, according to their goals and interests. Every person is important.
 - **Together** — When connected, we realize we are all important pieces in the Kingdom, making greater impact through collaboration than we ever could alone. The whole building rises together (Ephesians 2:21).
