@@ -15,6 +15,20 @@
 
 ## 2. What just shipped
 
+**Batch 3 — FEAT-03 Organisation Profiles & Discovery + N1/N3/N5 + place owner link** — `origin/main` @ `ef7fac6`.
+
+- **Typo-tolerant contributor search** (`pg_trgm` in the `extensions` schema). RPC `public.search_contributors(q, kinds, location_query, category_slug, sort_by, result_limit)` — SECURITY INVOKER, STABLE, `search_path = public, extensions, pg_temp`, `word_similarity(qn, full_name) >= 0.3`. "evry naton" → "Every Nation Mooikloof" (sim 0.43). ILIKE branches escape `\ % _` to prevent wildcard injection.
+- **API:** `GET /api/contributors/search` — anon-allowed, rate-limited per IP (120/min), bare `@supabase/supabase-js` client singleton (no cookie, CDN-cacheable). `Cache-Control: public, s-maxage=15, stale-while-revalidate=60`.
+- **UI:** `OrgSearchPanel` (debounced 220ms, AbortController) mounted as an "Organisations" tab in the events bottom search bar (segmented Everything / Organisations toggle). Results → `/c/<slug>`.
+- **N1:** removed dead `isVendor` prop from EventsView + deduped router declaration.
+- **N3:** simplified profile select on `/events` page.
+- **N5:** GlassCalendar autofocuses its close button on open.
+- **URL hygiene:** single `closeCalendar()` callback routes every dismiss path (Escape, GlassCalendar onClose, event/place select, brand click, focus-event) so `?view=calendar` is always stripped.
+- **Place owner link:** `/places/[id]` now shows "Owned by <full_name>" linked to `/c/<slug>` when role=contributor + status=approved + slug.
+- **Migrations:** 066 (RPC + pg_trgm), 067 (pg_trgm relocated to `extensions`), 068 (ILIKE escaping). `supabase/schema.sql` canonical block appended.
+
+✅ **Quality gate (Batch 3):** tsc 0 errors · vitest 75 files / 668 tests (+12 new) · lint clean · Architect B→A after applying all three Should-fixes inline · advisors **0 ERROR / 77 WARN — unchanged from Batch 2 baseline**.
+
 **Batch 2 — Events surface simplification + RLS hardening (FEAT-02 + BUG-06)** — `origin/main` @ `ffd8133`.
 
 - **Removed:** FullCalendar (5 packages), `EventCalendar.tsx`, `FeaturedPanel.tsx`, `/api/featured` route, `featured_listings` table (migration 065), trending modal in EventsView, `leaflet.markercluster.d.ts`, ~150 LOC of `.fc-*` CSS overrides, calendar province filter.
@@ -48,17 +62,16 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1, 1b, 2 shipped; Batches 3 → 6 queued.
-- Test suite: 656 / 656. TS: 0 errors. Lint: clean.
-- Supabase advisors security: 0 ERROR (down from 2), 77 WARN unchanged from baseline.
-- Git: `origin/main` at `ffd8133`.
+- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3 shipped; Batches 4 → 6 queued.
+- Test suite: 668 / 668. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR, 77 WARN unchanged from baseline.
+- Git: `origin/main` at `ef7fac6`.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch 3 — FEAT-03 Organisation Profiles & Discovery.**
-2. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
-3. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
-4. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
+1. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
+2. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
+3. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
 
 (Bug list BUG-01..BUG-10 and owner tasks T1..T6 from `.github/MASTER_DIRECTION.md` Parts 6–8 fold into these batches.)
 
@@ -67,15 +80,16 @@
 - **T4 (owner task):** `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_MAPTILER_STYLE` are missing on Vercel. Map renders OSM raster fallback until set. See `docs/RUNBOOK.md` section 2 for Vercel setup steps. Style UUID locked: `019dba0f-b49b-73bb-bf6a-f9d820f43be8`.
 - **Doc-vs-code discrepancy logged in DECISIONS.md:** approval keeps `role='contributor'` + `contributor_kind` sub-type (per migration 033), not the literal "role to match contributor_kind" wording in MASTER_DIRECTION FEAT-01.
 - **`/admin/reports` not renamed to `/admin/reported`** per the spec — deferred (logged in DECISIONS).
-- **Batch 2 Architect nice-to-haves (N1–N5)** — deferred: clean `?view=calendar` from URL on close; `parseEventDate` local-tz construction; drop unused `isVendor` prop end-to-end; guard `setMapFlyTo(null)` on calendar close; auto-focus inside GlassCalendar dialog on open.
-- **Batch 1b Architect nice-to-haves (N1–N6)** — deferred: rename `leaflet-maps.instructions.md`, fix "vendor-only" language, etc.
+- **Batch 3 Architect nice-to-haves** — deferred: `word_similarity` is not directly indexable (revisit beyond ~5k contributors); add trgm index on `bio` if bios grow long; truncate `bio` to ~160 chars in RPC return; dedupe `contributor_kind` label maps into a single source (currently inlined in two components).
+- **Batch 2 Architect nice-to-haves N2/N4** — still deferred: `parseEventDate` local-tz construction; guard `setMapFlyTo(null)` on calendar close. (N1/N3/N5 shipped in Batch 3.)
+- **Batch 1b Architect nice-to-haves (N1–N6)** — deferred: rename `leaflet-maps.instructions.md`, etc.
 
 ## 6. How to verify locally (Windows PowerShell)
 
 ```powershell
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
-npx vitest run              # expect 656 pass / 0 fail
+npx vitest run              # expect 668 pass / 0 fail
 npx next lint --dir src     # expect clean (deprecation warning is non-blocking)
 ```
 
