@@ -15,6 +15,15 @@
 
 ## 2. What just shipped
 
+**Batch 2 — Events surface simplification + RLS hardening (FEAT-02 + BUG-06)** — `origin/main` @ `ffd8133`.
+
+- **Removed:** FullCalendar (5 packages), `EventCalendar.tsx`, `FeaturedPanel.tsx`, `/api/featured` route, `featured_listings` table (migration 065), trending modal in EventsView, `leaflet.markercluster.d.ts`, ~150 LOC of `.fc-*` CSS overrides, calendar province filter.
+- **Added:** `src/components/events/GlassCalendar.tsx` (~280 LOC, zero-dep frosted month-grid overlay rendered above the persistent map). Category-coloured left border, gold tint for RSVPed events, max 3 events/day + "+N more", Escape closes, arrow-key month nav (guarded against INPUT/TEXTAREA/contentEditable).
+- **EventsView refactor:** `view: "map"|"calendar"` state replaced with `calendarOpen: boolean` overlay; `?view=calendar` deep-link still works.
+- **Migration 065 applied:** dropped `featured_listings`; `directory_contributors` recreated `WITH (security_invoker = on)`; `app_settings` RLS enabled (admin-only). Supabase advisors **2 ERROR → 0 ERROR**.
+
+✅ **Quality gate (Batch 2):** tsc 0 errors · vitest 73 files / 656 tests · lint clean · Architect (no Must-fix; S1 + S2 applied inline; N1–N5 deferred) · advisors 2 ERROR cleared, no NEW warnings.
+
 **Batch 1b — Re-file** — `origin/main` @ `6d43e06`.
 
 - Root `MASTER_DIRECTION.md` deleted — `.github/MASTER_DIRECTION.md` is now the only copy.
@@ -25,10 +34,8 @@
 - `docs/FUTURE_IDEAS.md` created — seeded with AI search, multilingual, CASI, analytics, Citizens Social, ecosystem channels (Wear/Learn/Central/Impact), architecture ideas.
 - `.env.example` created — SUPABASE + MAPTILER keys documented; locked style UUID pre-filled.
 - `docs/RUNBOOK.md` created — local setup, env vars, Vercel T4 owner task steps, quality gate, Supabase ops, Capacitor builds, git convention, common issues.
-- `add-feature.prompt.md` + `debug-build.prompt.md`: Leaflet → MapLibre GL JS; vendor/client → contributor/citizen.
-- `PROJECT_STATUS.md` + `DECISIONS.md` updated (Batch 1b shipped row + decisions).
 
-✅ **Quality gate (Batch 1b):** tsc 0 errors · vitest 656/656 · lint clean · Architect A (6 Should-fixes applied: role language, prompt stale refs, PROJECT_STATUS update).
+✅ **Quality gate (Batch 1b):** tsc 0 errors · vitest 656/656 · lint clean · Architect A (6 Should-fixes applied).
 
 **Batch 1 — Admin panel restructure (FEAT-01 + D15)** — `origin/main` @ `375e7f2`.
 
@@ -41,24 +48,17 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1 + 1b shipped; Batches 2 → 6 queued.
-- Test suite: 656 / 656. TS: 0 errors. Lint: clean. Advisors: baseline unchanged (2 known: `security_definer_view` on `directory_contributors`, `rls_disabled_in_public` on `app_settings` — Batch 2 / BUG-06).
-- Git: `origin/main` at `6d43e06`.
+- MASTER_DIRECTION execution: Batches 1, 1b, 2 shipped; Batches 3 → 6 queued.
+- Test suite: 656 / 656. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR (down from 2), 77 WARN unchanged from baseline.
+- Git: `origin/main` at `ffd8133`.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch 2 — Legacy cleanup + map style + FEAT-02 calendar + BUG-06.**
-   - Remove FullCalendar package + `EventCalendar.tsx` + dual-view toggle.
-   - Remove FeaturedPanel + `/api/featured` + `featured_listings` table (drop migration).
-   - Remove residual Leaflet imports / dependencies.
-   - Remove `MapStyleDebugBadge` dev overlay (or confirm tree-shake).
-   - Build FEAT-02: simple glass-overlay calendar (~150 LOC, plain CSS grid, drives existing events state).
-   - BUG-06 advisor fixes: `directory_contributors` security_definer_view + `app_settings` RLS.
-
-2. **Batch 3 — FEAT-03 Organisation Profiles & Discovery.**
-3. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
-4. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
-5. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
+1. **Batch 3 — FEAT-03 Organisation Profiles & Discovery.**
+2. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
+3. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
+4. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
 
 (Bug list BUG-01..BUG-10 and owner tasks T1..T6 from `.github/MASTER_DIRECTION.md` Parts 6–8 fold into these batches.)
 
@@ -67,7 +67,8 @@
 - **T4 (owner task):** `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_MAPTILER_STYLE` are missing on Vercel. Map renders OSM raster fallback until set. See `docs/RUNBOOK.md` section 2 for Vercel setup steps. Style UUID locked: `019dba0f-b49b-73bb-bf6a-f9d820f43be8`.
 - **Doc-vs-code discrepancy logged in DECISIONS.md:** approval keeps `role='contributor'` + `contributor_kind` sub-type (per migration 033), not the literal "role to match contributor_kind" wording in MASTER_DIRECTION FEAT-01.
 - **`/admin/reports` not renamed to `/admin/reported`** per the spec — deferred (logged in DECISIONS).
-- **Architect nice-to-haves N1–N6** (deferred): rename `leaflet-maps.instructions.md`, fix "vendor-only" in `project-architecture.instructions.md`, fix "Vendor create" in `connect-ui-system.instructions.md`, add DECISIONS note on organizer terminology, fix `QUEUED_BATCH_S_categories_v2.md` AGENTS reference, fix `STATUS_REPORT_2026-05.md` "Vendor Analytics" label.
+- **Batch 2 Architect nice-to-haves (N1–N5)** — deferred: clean `?view=calendar` from URL on close; `parseEventDate` local-tz construction; drop unused `isVendor` prop end-to-end; guard `setMapFlyTo(null)` on calendar close; auto-focus inside GlassCalendar dialog on open.
+- **Batch 1b Architect nice-to-haves (N1–N6)** — deferred: rename `leaflet-maps.instructions.md`, fix "vendor-only" language, etc.
 
 ## 6. How to verify locally (Windows PowerShell)
 
