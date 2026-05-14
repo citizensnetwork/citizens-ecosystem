@@ -14,6 +14,7 @@ import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import GlassCalendar from "./GlassCalendar";
+import OrgSearchPanel from "@/components/contributor/OrgSearchPanel";
 import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
@@ -42,7 +43,6 @@ type Props = {
    *  search bar can surface ministries / orgs / businesses alongside
    *  events + places. Kept optional so existing call sites don't break. */
   contributors?: Profile[];
-  isVendor?: boolean;
 };
 
 /** Number of event cards shown per page in the category panel. */
@@ -63,11 +63,8 @@ export default function EventsView({
   events,
   places = [],
   contributors = [],
-  // Reserved for downstream gating (e.g. contributor-only quick actions);
-  // surfaced here because callers already pass it.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isVendor: _isVendor = false,
 }: Props) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   // Calendar is now a frosted overlay on top of the map (FEAT-02).
   // The `?view=calendar` URL param (still emitted by the global Navbar link)
@@ -75,6 +72,29 @@ export default function EventsView({
   const [calendarOpen, setCalendarOpen] = useState(
     () => searchParams.get("view") === "calendar"
   );
+  // Bottom search bar mode. "everything" preserves the original ranker
+  // (events + places + contributor chips). "organisations" swaps in the
+  // pg_trgm-backed OrgSearchPanel for typo-tolerant org discovery. The
+  // free-text input value is shared either way so toggling between modes
+  // keeps the user's query intact.
+  const [searchMode, setSearchMode] = useState<"everything" | "organisations">(
+    "everything"
+  );
+  // Wrapper for closing the calendar that also strips the `?view=calendar`
+  // URL param (Batch 2 N1). Using replace() avoids polluting browser
+  // history while still keeping deep-links shareable when the calendar is
+  // open. We keep the existing query string except for the `view` key.
+  const closeCalendar = useCallback(() => {
+    setCalendarOpen(false);
+    if (searchParams.get("view") === "calendar") {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("view");
+      const qs = next.toString();
+      router.replace(qs.length > 0 ? `/events?${qs}` : "/events", {
+        scroll: false,
+      });
+    }
+  }, [router, searchParams]);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [longFormOpen, setLongFormOpen] = useState(false);
@@ -188,7 +208,6 @@ export default function EventsView({
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const panelSwipeStartY = useRef(0);
   const panelSwipeStartX = useRef(0);
-  const router = useRouter();
 
   // Lock document scroll while the full-screen map view is mounted.
   // Without this, any focus() call on an off-screen element (e.g. the
@@ -261,12 +280,12 @@ export default function EventsView({
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (filtersOpen) { setFiltersOpen(false); return; }
-      if (calendarOpen) { setCalendarOpen(false); return; }
+      if (calendarOpen) { closeCalendar(); return; }
       if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [filtersOpen, calendarOpen, selectedEvent, selectedPlace]);
+  }, [filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
 
   // Burger menu social data — load eagerly so trending data is available for the panel
   const {
@@ -641,7 +660,7 @@ export default function EventsView({
     (event: Event) => {
       setSelectedPlace(null);
       setSelectedEvent(event);
-      setCalendarOpen(false);
+      closeCalendar();
       // Let the Easter-egg orchestrator know which category was just
       // engaged with — powers the couples / gender-bucket prompts.
       if (event.category) {
@@ -650,7 +669,7 @@ export default function EventsView({
         });
       }
     },
-    []
+    [closeCalendar]
   );
 
   // City search / geocoding fly-to state (declared inline so the focus helper
@@ -671,7 +690,7 @@ export default function EventsView({
    */
   const handleFocusEventOnMap = useCallback((event: Event) => {
     // Close the calendar overlay so the fly-to is visible on the underlying map.
-    setCalendarOpen(false);
+    closeCalendar();
     const lat = event.latitude;
     const lng = event.longitude;
     if (lat == null || lng == null) {
@@ -682,7 +701,7 @@ export default function EventsView({
     setMapFlyTo([lat, lng]);
     setMapFlyToZoom(15);
     setMapFlyToToken((t) => t + 1);
-  }, [handleSelectEvent]);
+  }, [handleSelectEvent, closeCalendar]);
 
   const handleQuickAction = useCallback(
     async (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => {
@@ -749,8 +768,8 @@ export default function EventsView({
   const handleSelectPlace = useCallback((place: Place) => {
     setSelectedEvent(null);
     setSelectedPlace(place);
-    setCalendarOpen(false);
-  }, []);
+    closeCalendar();
+  }, [closeCalendar]);
 
   const closeDetail = useCallback(() => {
     setSelectedEvent(null);
@@ -878,7 +897,7 @@ export default function EventsView({
     setMapFlyTo([-28.7, 25.5]);
     setMapFlyToZoom(5.5);
     setMapFlyToToken((t) => t + 1);
-    setCalendarOpen(false);
+    closeCalendar();
   }
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -940,7 +959,7 @@ export default function EventsView({
           events={filtered}
           rsvpEventIds={rsvpEventIds}
           onSelectEvent={handleSelectEvent}
-          onClose={() => setCalendarOpen(false)}
+          onClose={closeCalendar}
         />
       )}
 
@@ -1171,7 +1190,48 @@ export default function EventsView({
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-[10%] sm:bottom-6 sm:px-4">
           {searchOpen ? (
             <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
-              {topContributorMatches.length > 0 && (
+              {/* Segmented mode toggle. Lives above the input so the user
+               *  understands what scope their query searches before they
+               *  type. "Organisations" hides the event/place ranker and
+               *  drops in the pg_trgm-backed contributor panel. */}
+              <div
+                role="tablist"
+                aria-label="Search scope"
+                className="flex w-full max-w-[18rem] items-center rounded-full border border-black/10 bg-white/80 p-0.5 text-[11px] font-medium shadow-md backdrop-blur"
+              >
+                {(
+                  [
+                    { value: "everything", label: "Everything" },
+                    { value: "organisations", label: "Organisations" },
+                  ] as const
+                ).map((opt) => {
+                  const active = searchMode === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setSearchMode(opt.value)}
+                      className={`flex-1 rounded-full px-3 py-1 transition active:scale-95 ${
+                        active
+                          ? "bg-(--gold) text-black shadow-sm"
+                          : "text-black/60 hover:bg-black/5 hover:text-black"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {searchMode === "organisations" ? (
+                <OrgSearchPanel
+                  query={search}
+                  onSelect={() => setSearchOpen(false)}
+                />
+              ) : (
+                <>
+                  {topContributorMatches.length > 0 && (
                 <div
                   className="flex max-w-full flex-wrap items-center justify-center gap-1.5"
                   role="list"
@@ -1221,6 +1281,8 @@ export default function EventsView({
                   </svg>
                   <span>Matching: {intentLabel}</span>
                 </div>
+              )}
+                </>
               )}
               <div className="relative flex w-full items-center">
                 <svg

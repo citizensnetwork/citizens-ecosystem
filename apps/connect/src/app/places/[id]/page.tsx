@@ -37,8 +37,8 @@ export default async function PlaceDetailPage({
 
   const isOwner = !!user && user.id === place.created_by;
 
-  // Fetch reviews, media, follow data, and profile in parallel
-  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes] = await Promise.all([
+  // Fetch reviews, media, follow data, profile, and place owner in parallel
+  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
@@ -67,6 +67,13 @@ export default async function PlaceDetailPage({
     user
       ? supabase.from("profiles").select("role").eq("id", user.id).single()
       : Promise.resolve({ data: null }),
+    place.created_by
+      ? supabase
+          .from("profiles")
+          .select("id, full_name, role, contributor_status, contributor_slug")
+          .eq("id", place.created_by)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const reviews = reviewsRes.data;
@@ -75,6 +82,21 @@ export default async function PlaceDetailPage({
   const isFollowing = !!userFollowRes.data;
   const isAdmin = profileRes.data?.role === "admin";
   const canEdit = isOwner || isAdmin;
+  // Surface the contributor that created this place so visitors can
+  // jump to the org profile. Only link approved contributors with a
+  // public slug — citizens and pending contributors render as plain
+  // text (or are hidden entirely below).
+  const owner = (ownerRes.data ?? null) as {
+    id: string;
+    full_name: string | null;
+    role: string | null;
+    contributor_status: string | null;
+    contributor_slug: string | null;
+  } | null;
+  const ownerLinkable =
+    owner?.role === "contributor" &&
+    owner.contributor_status === "approved" &&
+    !!owner.contributor_slug;
 
   const avgRating =
     reviews && reviews.length > 0
@@ -112,6 +134,23 @@ export default async function PlaceDetailPage({
             <h1 className="mt-1 text-2xl font-bold text-black">
               {place.name}
             </h1>
+            {owner?.full_name && (
+              <p className="mt-1 text-xs text-black/60">
+                Owned by{" "}
+                {ownerLinkable ? (
+                  <Link
+                    href={`/c/${encodeURIComponent(owner.contributor_slug!)}`}
+                    className="font-medium text-(--gold) hover:underline"
+                  >
+                    {owner.full_name}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-black/70">
+                    {owner.full_name}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2">
             {avgRating !== null && (

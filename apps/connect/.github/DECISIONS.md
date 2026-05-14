@@ -2,6 +2,22 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 3 — FEAT-03 Organisation discovery
+
+**Decision — `pg_trgm` installed in the `extensions` schema, not `public`.** Supabase's advisor flags any extension in `public` as a warning, and `public` is on every role's default search_path which makes it a noisy namespace for opaque trigram operators. Migration 067 relocates the extension and recreates the GIN indexes with the qualified operator class `extensions.gin_trgm_ops`. The `search_contributors` RPC pins `search_path = public, extensions, pg_temp` so it can resolve `extensions.word_similarity`, `extensions.similarity`, and `extensions.gin_trgm_ops` without polluting `public`.
+
+**Decision — Fuzzy threshold is hard-coded `word_similarity(...) >= 0.3`, not the session GUC `pg_trgm.word_similarity_threshold`.** Supabase Postgres rejects `SET pg_trgm.word_similarity_threshold = ...` inside a function (`function-local SET` for a GUC owned by an extension errors at definition time). Putting `>= 0.3` directly in the WHERE clause is the most portable equivalent: it matches the user-asked "30% mistake range", remains visible/grepable in the function body, and avoids a session-level side effect. The ranking still uses `greatest(word_similarity, similarity)` so single-word queries against multi-word names ("evry naton" → "Every Nation Mooikloof") rank correctly.
+
+**Decision — ILIKE branches escape user input.** `q` and `location_query` are normalised then run through a triple `replace(..., '\', '\\') ; '%', '\%' ; '_', '\_'` chain in the `esc` CTE. All ILIKE branches use the escaped form and add `ESCAPE '\'`. Trigram operators receive the raw query (they don't interpret metacharacters). Without escaping, a one-character `%` query would scan the entire `profiles` table via wildcard match and effectively bypass the trigram threshold gate.
+
+**Decision — `/api/contributors/search` uses a bare anon `@supabase/supabase-js` client, not the cookie-bound SSR client.** The contributor directory is fully public. `await createClient()` from `@/lib/supabase/server` opens an `@supabase/ssr` client that emits `Set-Cookie` on every response (refresh-token rotation), which forbids shared / CDN caching. The bare client has `persistSession: false`, `autoRefreshToken: false`, `detectSessionInUrl: false` and is initialised once as a module-level singleton. The route now sets `Cache-Control: public, s-maxage=15, stale-while-revalidate=60`. Rate-limited per IP at 120 req/min (RATE_LIMITS.read).
+
+**Decision — Single `closeCalendar()` callback for every dismiss path.** Previously several handlers called `setCalendarOpen(false)` directly, leaving `?view=calendar` stuck in the URL — back-button then re-opened the overlay unexpectedly. `closeCalendar` now combines `setCalendarOpen(false)` with `router.replace("/events?<sanitised>")`. All callsites (Escape key, GlassCalendar onClose, event select, place select, brand click, focus-event-on-map) route through it.
+
+**Decision — Place owner link is a parallel fetch on `/places/[id]`, not a relational embed.** The existing `Promise.all` already issues five queries; adding a sixth `profiles` lookup keyed on `place.created_by` costs nothing in latency (same fan-out) and keeps `Place` row shape clean of joined columns. Rendered only when role=contributor + status=approved + slug.
+
+---
+
 ## MASTER_DIRECTION Batch 2 — Events surface simplification + advisor fix
 
 **Decision — FullCalendar removed; calendar is now a zero-dep glass overlay.** `EventCalendar.tsx` and all 5 `@fullcalendar/*` packages deleted. Replaced with `GlassCalendar.tsx` (~280 LOC, pure DOM + Tailwind), rendered as a transparent month-grid overlay above the persistent map. Removes ~150 LOC of `.fc-*` CSS overrides in `globals.css` and a heavy bundle. Calendar is no longer a separate `view` state — it's an overlay (`calendarOpen` boolean) over the always-mounted map.

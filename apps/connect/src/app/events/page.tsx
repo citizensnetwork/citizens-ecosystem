@@ -121,18 +121,17 @@ export default async function EventsPage() {
     };
   });
 
-  // Check if current user can create events
-  let canCreateEvents = false;
+  // Load preferences for the Easter-egg orchestrator. (Event-creation gating
+  // happens inside child components — the legacy `isVendor` prop on
+  // EventsView was dead code, so we no longer compute or pass it here.)
   let userPreferences: Preferences | null = null;
   let accountCreatedAt = "";
   if (currentUser) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, preferences, created_at")
+      .select("preferences, created_at")
       .eq("id", currentUser.id)
       .single();
-    // All authenticated users can create events (open creation)
-    canCreateEvents = !!profile;
     userPreferences = (profile?.preferences as Preferences | null) ?? null;
     accountCreatedAt = profile?.created_at ?? "";
   }
@@ -150,7 +149,6 @@ export default async function EventsPage() {
         events={events ?? []}
         places={placesWithStats}
         contributors={contributors ?? []}
-        isVendor={canCreateEvents}
       />
     </>
   );

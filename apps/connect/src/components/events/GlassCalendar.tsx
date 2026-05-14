@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Event } from "@/types/db";
 import { CATEGORY_HEX } from "@/lib/categories";
 
@@ -50,6 +50,14 @@ export default function GlassCalendar({
   onSelectEvent,
   onClose,
 }: Props) {
+  // Focus the close button on mount so keyboard users land somewhere
+  // inside the overlay (otherwise focus stays on whatever opened the
+  // calendar, making Escape feel disconnected from the visible UI).
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    closeBtnRef.current?.focus();
+  }, []);
+
   // Anchor controls which month is visible. We snap to the 1st so the
   // grid math (firstWeekday + daysInMonth) stays trivial.
   const today = useMemo(() => {
@@ -204,6 +212,7 @@ export default function GlassCalendar({
               Today
             </button>
             <button
+              ref={closeBtnRef}
               type="button"
               onClick={onClose}
               aria-label="Close calendar"

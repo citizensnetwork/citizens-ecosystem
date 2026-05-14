@@ -1252,3 +1252,104 @@ do $$ begin
     );
   end if;
 end $$;
+
+-- ===========================================================================
+-- FEAT-03 contributor fuzzy search (Batch 3, migrations 066/067/068)
+-- pg_trgm in the `extensions` schema, plus the search_contributors RPC.
+-- Idempotent.
+-- ===========================================================================
+create schema if not exists extensions;
+create extension if not exists pg_trgm with schema extensions;
+
+-- Trigram indexes on profile name/bio for fuzzy contributor search.
+create index if not exists profiles_full_name_trgm_idx
+  on public.profiles using gin (lower(full_name) extensions.gin_trgm_ops);
+create index if not exists profiles_bio_trgm_idx
+  on public.profiles using gin (lower(bio) extensions.gin_trgm_ops);
+
+create or replace function public.search_contributors(
+  q              text default null,
+  kinds          text[] default null,
+  location_query text default null,
+  category_slug  text default null,
+  sort_by        text default 'auto',
+  result_limit   int  default 25
+)
+returns table (
+  id                uuid,
+  full_name         text,
+  contributor_slug  text,
+  contributor_kind  text,
+  logo_url          text,
+  avatar_url        text,
+  physical_address  text,
+  bio               text,
+  followers_count   bigint,
+  similarity        real
+)
+language sql
+stable
+security invoker
+set search_path = public, extensions, pg_temp
+as $$
+  with norm as (
+    select
+      nullif(lower(coalesce(q, '')), '')              as qn,
+      nullif(lower(coalesce(location_query, '')), '') as locn
+  ), esc as (
+    select
+      qn,
+      locn,
+      replace(replace(replace(qn,   '\', '\\'), '%', '\%'), '_', '\_') as qn_like,
+      replace(replace(replace(locn, '\', '\\'), '%', '\%'), '_', '\_') as locn_like
+    from norm
+  ), base as (
+    select
+      p.id,
+      p.full_name,
+      p.contributor_slug,
+      p.contributor_kind,
+      p.logo_url,
+      p.avatar_url,
+      p.physical_address,
+      p.bio,
+      (select count(*)::bigint from public.follows f where f.followee_id = p.id) as followers_count,
+      case
+        when (select qn from esc) is null then 0
+        else greatest(
+          extensions.word_similarity((select qn from esc), lower(coalesce(p.full_name, ''))),
+          extensions.similarity(lower(coalesce(p.full_name, '')), (select qn from esc))
+        )
+      end::real as similarity
+    from public.profiles p
+    where p.role = 'contributor'
+      and p.contributor_status = 'approved'
+      and p.contributor_slug is not null
+      and (
+        (select qn from esc) is null
+        or extensions.word_similarity((select qn from esc), lower(coalesce(p.full_name, ''))) >= 0.3
+        or lower(coalesce(p.full_name, '')) ilike '%' || (select qn_like from esc) || '%' escape '\'
+        or lower(coalesce(p.bio, ''))       ilike '%' || (select qn_like from esc) || '%' escape '\'
+      )
+      and (kinds is null or p.contributor_kind = any(kinds))
+      and (
+        (select locn from esc) is null
+        or lower(coalesce(p.physical_address, '')) ilike '%' || (select locn_like from esc) || '%' escape '\'
+      )
+      and (
+        category_slug is null
+        or exists (select 1 from public.events e where e.created_by = p.id and e.category = category_slug)
+      )
+  )
+  select *
+  from base
+  order by
+    case when sort_by = 'similarity' or (sort_by = 'auto' and (select qn from esc) is not null) then base.similarity end desc nulls last,
+    case when sort_by in ('followers', 'auto') then base.followers_count end desc nulls last,
+    base.full_name asc
+  limit greatest(1, least(coalesce(result_limit, 25), 100));
+$$;
+
+revoke all on function public.search_contributors(text, text[], text, text, text, int) from public;
+grant execute on function public.search_contributors(text, text[], text, text, text, int) to anon, authenticated;
+

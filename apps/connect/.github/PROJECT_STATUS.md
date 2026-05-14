@@ -11,7 +11,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 1 | Admin panel restructure (FEAT-01 + D15) | **Shipped** | `/admin` dashboard, `/admin/applications` canonical, `/admin/contributors` redirect, burger admin links removed, profile admin link added. 656 tests, advisor baseline unchanged. |
 | 1b | Re-file (move MASTER_DIRECTION, archive AGENTS+11 agent files, rewrite copilot-instructions, VISION, README, create FUTURE_IDEAS + .env.example + RUNBOOK) | **Shipped** | Root MASTER_DIRECTION deleted; AGENTS + 11 agent files archived to docs/archive/; copilot-instructions/VISION/README rewritten; FUTURE_IDEAS, .env.example, RUNBOOK created. 656 tests unchanged. |
 | 2 | Legacy cleanup + FEAT-02 minimal calendar + BUG-06 advisor fix | **Shipped** | Removed FullCalendar (5 pkgs), FeaturedPanel, trending modal; added zero-dep GlassCalendar overlay; migration 065 (drop featured_listings, directory_contributors → security_invoker, app_settings RLS). 656 tests, 2 ERROR advisors → 0. |
-| 3 | FEAT-03 Organisation Profiles & Discovery | Queued | |
+| 3 | FEAT-03 Organisation Profiles & Discovery | **Shipped** | pg_trgm typo-tolerant contributor search (word_similarity >= 0.3) in `extensions` schema; new `/api/contributors/search` (anon, CDN-cacheable) + `OrgSearchPanel` wired into events search bar as "Organisations" tab; N1/N3/N5 nice-to-haves + place→owner link. Migrations 066/067/068. 668 tests; advisors 0 ERROR / 77 WARN (unchanged). |
 | 4 | FEAT-04 Consider → Convince complete (`convinces` table) | Queued | |
 | 5 | FEAT-05 Broadcast Updates (`event_broadcasts` table) | Queued | |
 | 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | Queued | |
@@ -35,6 +35,17 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 - `npx next lint --dir src`: clean
 - `mcp_supabase_get_advisors` (security): 2 ERROR → 0 ERROR (security_definer_view + rls_disabled_in_public cleared); WARN count 77 unchanged vs baseline — no new warnings
 - Architect review: no Must-fix; S1 (arrow-key hijack guard) + S2 (BYPASSRLS invariant comment) applied inline; N1–N5 deferred to Batch 3
+
+### Batch 3 validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 75 files / 668 tests passing (+12 new: 8 API + 4 component)
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 77 WARN — unchanged from Batch 2 baseline
+- Architect review: B→A after applying all three Should-fixes inline:
+  1. ILIKE metacharacter escaping in `search_contributors` (migration 068)
+  2. Single `closeCalendar()` callback routes every dismiss path (URL cleanup)
+  3. Bare anon `@supabase/supabase-js` client in `/api/contributors/search` (no Set-Cookie, `Cache-Control: public, s-maxage=15, stale-while-revalidate=60`)
+- Nice-to-haves deferred (tracked in DECISIONS): non-indexable word_similarity revisit beyond ~5k rows; bio trgm index; RPC bio truncation; contributor_kind label dedupe.
 
 ---
 
