@@ -1,51 +1,63 @@
 # RESUME_HERE — Citizens Connect
 
 > **Read this first. It is the single source of truth for "where are we?" between sessions.**
-> Updated at the end of every batch by the Continuity Manager.
+> Updated at the end of every batch.
 
 ---
 
 ## 1. Project at a glance
 
 - **Citizens Connect** — flagship channel of the Citizens ecosystem. Map-first community discovery (events, places, organisers) for the Christian community and anyone curious.
-- Stack: Next.js 15 App Router (RSC) + Supabase + MapLibre GL JS + Tailwind CSS v4 + Capacitor (iOS/Android wrapper).
-- Design: white-black-gold (60/30/10), full-screen map / calendar dual-view, floating controls, Kingdom-quality polish.
+- Stack: Next.js 15 App Router (RSC) + Supabase + MapLibre GL JS + MapTiler Cloud vector tiles + Tailwind CSS v4 + Capacitor (iOS/Android wrapper, no RN/Expo).
+- Design: white-black-gold (60/30/10), full-screen map-first, glass-overlay floating controls, royal/Kingdom polish.
 - Slogan: **Connecting the Kingdom** (Eph 2:19–22).
-- Vision + ecosystem context: `.github/VISION.md`, `/memories/repo/citizens-ecosystem-vision.md`.
+- **Locked single source of truth: `MASTER_DIRECTION.md` (Parts 1–12).** A duplicate copy sits at `.github/MASTER_DIRECTION.md` for now; Batch 1b will resolve to a single canonical location under `.github/`.
 
 ## 2. What just shipped
 
-**Three batches in this session, all on `origin/main`:**
+**Batch 1 — Admin panel restructure (FEAT-01 + D15)** — `origin/main` @ `793abcd`.
 
-- `3a5ed28` — **Batch 3: S2 + S3 nice-to-haves cleanup.** `src/lib/categoryIcons.ts` consolidated: new `DEFAULT_ICON_ID = "pin"` is the single canonical fallback for all four icon helpers (`getEventCategoryIcon`, `getPlaceCategoryIcon`, `getQuickAccessIcon`, `getIconSvg`); deleted unused `getIconBySlug` (zero call sites); reduced `QUICK_ACCESS_ICON_IDS` to the 6 native quick-panel pseudo-ids (`bible-study`, `coffee`, `runs`, `churches`, `outreaches`, `care`) and `getQuickAccessIcon` now composes top-down through event-category → place-category → DEFAULT. `WeekendChip` inlines its CalendarDays icon as JSX SVG (drops the last `dangerouslySetInnerHTML` on hot card/detail/calendar render paths). `BurgerMenu` weekend toggle migrated from `aria-pressed` to `role="switch"` + `aria-checked`. `EventsView` wraps `onToggleWeekend` in `useCallback`. Quick-access invariant test rewritten to assert the resolver contract; second test pins the 6 native pseudo-ids.
+- NEW `src/app/admin/page.tsx` — admin dashboard with five RLS-respecting stat tiles (pending applications, open reports, users, events, places) and a tools grid linking to existing sub-pages.
+- NEW `src/app/admin/applications/page.tsx` — canonical contributor application review inbox. Uses shared `fetchPendingApplications` loader + existing `ContributorReviewCard`; visible error banner on fetch failure.
+- `src/app/admin/contributors/page.tsx` — collapsed to `redirect("/admin/applications")` so the email approval/rejection deep-links keep working. `/admin/contributors/[id]` detail page is untouched.
+- `src/components/events/BurgerMenu.tsx` — six admin links replaced with a single gold-styled "Admin panel →" link, gated on `profile.role === "admin"` (per D15).
+- `src/app/profile/page.tsx` — added an admin-only "Admin Panel" management link.
+- Stale `fallbackHref="/admin/contributors"` and prose comments updated to reference `/admin/applications` (Architect Should-fix).
 
-- `36e43ec` — **Batch 2: EventDetailContent baseline test fix.** `baseEvent.date` switched to a `Date.now() + 30d` relative-future fixture; "renders formatted date" assertion now derives the expected month name from the fixture itself (case-insensitive RegExp). Closes the two pre-existing baseline failures flagged in the prior RESUME_HERE.
-
-- `8093b81` — **Batch 1: Cross-sphere status report.** `docs/STATUS_REPORT_2026-05.md` added — Product / Engineering / Database / Mobile / Content / Outstanding / Continuity sections. Docs-only.
-
-✅ **Architect audit (Batch 3):** Grade A across architecture, API design, security, performance, accessibility, code quality. No Must- or Should-fix. Three nice-to-haves logged for a future session (Lucide-bump drift test for `WeekendChip` ↔ `CALENDAR_DAYS_SVG`; literal-union typing for `QUICK_ACCESS_ICON_IDS`; cosmetic Record cast in resolver) — none warranting hold.
-
-✅ **Quality gate (Batch 3):** tsc 0 errors, vitest **656 passed / 0 failures** (+1 vs Batch 2: new "native quick-access mapping" test), lint clean, Supabase security advisor baseline unchanged (no DB changes).
+✅ **Quality gate (Batch 1):** tsc 0 errors · vitest 656 / 656 · `npx next lint --dir src` clean · Supabase security advisors unchanged vs baseline (still 2 known: `security_definer_view` on `directory_contributors`, `rls_disabled_in_public` on `app_settings` — both addressed in Batch 2 / BUG-06) · Architect review A / A / A on architecture / API / security; A− on perf / a11y / code quality (nice-to-haves deferred).
 
 ## 3. Current platform state
 
-- Phases 1 → 11 complete. Batches A → R + S1 + S1.1 + S2 + S3 + (post-S3) 1 + 2 + 3 all shipped.
-- Test suite: **656 passed / 0 failures.** (Was 653/2 pre-Batch-2; +2 from EventDetailContent fix, +1 from new quick-access mapping test.)
-- TS: 0 errors. Lint: clean. Advisors: baseline unchanged (ERROR 2 / WARN 77 — same shape as pre-S3).
-- Git: `origin/main` at `3a5ed28`. PROJECT_STATUS + DECISIONS + RESUME_HERE refreshed alongside this commit (docs are part of the same push window per standing workflow).
+- All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
+- **MASTER_DIRECTION execution begins this session.** Batch 1 shipped; Batches 1b → 6 queued.
+- Test suite: 656 / 656. TS: 0 errors. Lint: clean. Advisors: baseline unchanged.
+- Git: `origin/main` at `793abcd`. `PROJECT_STATUS.md` + `DECISIONS.md` updated in the same commit.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Phase 18 — Content seeding & community onboarding pass.** Biggest gap per `docs/STATUS_REPORT_2026-05.md`. Seed real ministry/place data, dial in the onboarding wizard copy, write the public landing-page narrative. Likely needs the Community agent.
+1. **Batch 1b — Re-file.** Move `MASTER_DIRECTION.md` → `.github/MASTER_DIRECTION.md` (delete root copy). Archive `.github/AGENTS.md` + the 11 `.github/agents/*.agent.md` files to `docs/archive/`. Rewrite `.github/copilot-instructions.md` with simplified 2-review workflow (Architect + inline Security). Rewrite `.github/VISION.md` per MASTER_DIRECTION Part 12. Create `docs/FUTURE_IDEAS.md` (seeded per Part 4: AI search, multilingual, CASI, Wear, Learn, Impact, Social, Mapbox-vs-MapTiler note, AI moderation). Create `.env.example` covering owner tasks (T4 MapTiler `NEXT_PUBLIC_MAPTILER_KEY` + `NEXT_PUBLIC_MAPTILER_STYLE=019dba0f-b49b-73bb-bf6a-f9d820f43be8`) and a runbook doc. Refresh `README.md` (drop Leaflet, refresh stack). Update relevant `/memories/repo/*` notes.
 
-2. **Phase 22 — Push delivery via FCM/APNs.** Tokens + in-app fan-out shipped in Phase 10; actual native push delivery via Firebase Cloud Messaging (Android) and Apple Push Notification service (iOS) still pending. Edge function `notify-event-update` already exists; need credentials wiring + Capacitor plugin registration + token-refresh path.
+2. **Batch 2 — Legacy cleanup + map style + FEAT-02 calendar + BUG-06.**
+   - Remove FullCalendar package + `EventCalendar.tsx` + dual-view toggle.
+   - Remove FeaturedPanel + `/api/featured` + `featured_listings` table (drop migration).
+   - Remove residual Leaflet imports / dependencies.
+   - Remove `MapStyleDebugBadge` dev overlay (or confirm tree-shake).
+   - Build FEAT-02: simple glass-overlay calendar (~150 LOC, plain CSS grid, drives existing events state).
+   - BUG-06 advisor fixes: `directory_contributors` security_definer_view + `app_settings` RLS.
+   - README + VISION + copilot-instructions updates.
 
-3. **Optional polish from Batch 3 Architect nice-to-haves** (defer until Lucide bumps): drift test asserting `WeekendChip` JSX path data is a subset of `CALENDAR_DAYS_SVG`; tighten `QUICK_ACCESS_ICON_IDS` to a string-literal union `QuickIntentId`.
+3. **Batch 3 — FEAT-03 Organisation Profiles & Discovery.**
+4. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
+5. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
+6. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
+
+(Bug list BUG-01..BUG-10 and owner tasks T1..T6 from `MASTER_DIRECTION.md` Parts 6–8 fold into these batches.)
 
 ## 5. Open questions / deferred items
 
-- All baseline test failures resolved. No carried-over blockers.
-- FCM/APNs credentials: need confirmation from user on whether to register the Firebase project and Apple developer push key under the Citizens Network account before wiring tokens.
+- **T4 (owner task):** `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_MAPTILER_STYLE` are missing on Vercel. Map renders OSM raster fallback until set. Batch 1b will add `.env.example` + runbook; user must paste the key into Vercel project settings. Style UUID locked: `019dba0f-b49b-73bb-bf6a-f9d820f43be8`.
+- **Doc-vs-code discrepancy logged in DECISIONS.md:** approval keeps `role='contributor'` + `contributor_kind` sub-type (per migration 033), not the literal "role to match contributor_kind" wording in MASTER_DIRECTION FEAT-01.
+- **`/admin/reports` not renamed to `/admin/reported`** per the spec — deferred (logged in DECISIONS).
 
 ## 6. How to verify locally (Windows PowerShell)
 
@@ -53,33 +65,30 @@
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
 npx vitest run              # expect 656 pass / 0 fail
-npx next lint --dir src     # expect clean
+npx next lint --dir src     # expect clean (deprecation warning is non-blocking)
 ```
 
-Live DB sanity check after S1.1:
+Smoke test the admin restructure:
 
-```sql
-select applies_to, count(*) from public.categories group by applies_to;
--- events 17, places 10
-select category, count(*) from public.events group by category order by 2 desc;
--- only the 17 new slugs appear (top: social-gatherings, education-equipping, care-recovery, church-services)
-```
+1. Sign in as an admin user → visit `/admin` → confirm 5 stat tiles render and `/admin/applications` opens from the tools grid.
+2. Visit `/admin/contributors` → confirm 302 to `/admin/applications`.
+3. Open the burger menu as admin → confirm a single "Admin panel →" entry (not six links).
+4. Visit `/profile` as admin → confirm the "Admin Panel" management tile appears.
+5. Visit `/admin` as a non-admin → confirm redirect to `/events`.
 
 ## 7. Memory pointers
 
-- Batch shipping notes: `/memories/repo/batch-*.md` (latest: `batch-3-s2-s3-nicetohaves-shipped.md`).
+- Locked direction: `MASTER_DIRECTION.md` (root + `.github/` copy — Batch 1b consolidates).
+- Batch shipping notes: `/memories/repo/batch-*.md`.
 - Standing user workflow: `/memories/quality-pipeline.md` (user-scope).
 - Ecosystem vision + slogan: `/memories/repo/citizens-ecosystem-vision.md`, `/memories/repo/citizens-slogan.md`.
 - Coding conventions: `/memories/repo/coding-patterns.md`.
-- Outstanding & roadmap: `/memories/repo/outstanding-items.md`, `/memories/repo/pre-progression-roadmap.md`, `/memories/repo/ecosystem-expansion-plan.md`.
-- Locked S2/S3 spec: `.github/QUEUED_BATCH_S_categories_v2.md`.
 
 ## 8. Architecture quick-orient
 
 - Full directory map + data flow + key relationships: `.github/instructions/project-architecture.instructions.md`.
 - UI rules (60/30/10, floating controls): `.github/instructions/connect-ui-system.instructions.md`.
-- MapLibre patterns: `.github/instructions/leaflet-maps.instructions.md`.
+- MapLibre + MapTiler patterns: `.github/instructions/leaflet-maps.instructions.md` (file name is legacy; content is MapLibre).
 - Supabase dual-client + RLS + storage: `.github/instructions/supabase-patterns.instructions.md`.
-- Always-on continuity contract + agent registry: `.github/AGENTS.md`.
-- Default session workflow (quality gate procedure): `.github/copilot-instructions.md` → "Default session workflow".
 - Project ID: `xyiajtrvhlxaeplsiajj`. Default map centre: Pretoria, South Africa `[-25.7479, 28.2293]`.
+- Roles: `citizen` / `contributor` / `admin` with `contributor_kind` sub-type (`ministry` / `organization` / `business`) per migration 033.
