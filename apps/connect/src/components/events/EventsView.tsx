@@ -292,8 +292,13 @@ export default function EventsView({
     trending,
     favouriteOrgs,
     friends,
+    friendConsiderings,
+    userConsidering,
+    incomingConvinceEventIds,
+    outgoingConvinceKeys,
     profile: menuProfile,
     loading: menuLoading,
+    refetch: refetchBurgerData,
   } = useBurgerMenuData(user?.id ?? null, true);
 
   // ── Personalisation: derive the categories the user is "into" ────
@@ -749,6 +754,7 @@ export default function EventsView({
                 });
               }
               setConsiderVersion((v) => v + 1);
+              refetchBurgerData();
             }
             break;
           }
@@ -762,7 +768,7 @@ export default function EventsView({
         /* network error — fail silently for quick actions */
       }
     },
-    [router]
+    [router, refetchBurgerData]
   );
 
   const handleSelectPlace = useCallback((place: Place) => {
@@ -1470,6 +1476,7 @@ export default function EventsView({
                       {filtered.map((event) => {
                         const cat = (event.category ?? "church-services") as EventCategory;
                         const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
+                        const isConvinced = incomingConvinceEventIds.has(event.id);
                         return (
                           <button
                             key={event.id}
@@ -1477,11 +1484,20 @@ export default function EventsView({
                             onClick={() => handleFocusEventOnMap(event)}
                             onMouseEnter={() => setHoveredEventId(event.id)}
                             onMouseLeave={() => setHoveredEventId((id) => (id === event.id ? null : id))}
-                            className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
+                            className="relative flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
                             style={{
                               background: hexToRgba(hex, 0.35),
                             }}
                           >
+                            {isConvinced && (
+                              <span
+                                className="absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-full bg-(--gold) px-1.5 py-0.5 text-[9px] font-semibold text-black shadow"
+                                aria-label="A friend wants you to come"
+                                title="A friend wants you to come"
+                              >
+                                ✦ Convinced
+                              </span>
+                            )}
                             <div
                               className="mb-1 h-0.5 w-8 rounded-full"
                               style={{ background: hex }}
@@ -1638,16 +1654,27 @@ export default function EventsView({
                       style={{ transform: `translateX(calc(-${quickPanelPage * 100}% - ${quickPanelPage * 12}px))` }}
                     >
                       {/* Event cards */}
-                      {quickFilteredEvents.map((event) => (
+                      {quickFilteredEvents.map((event) => {
+                        const isConvinced = incomingConvinceEventIds.has(event.id);
+                        return (
                         <button
                           key={`e-${event.id}`}
                           type="button"
                           onClick={() => handleFocusEventOnMap(event)}
                           onMouseEnter={() => setHoveredEventId(event.id)}
                           onMouseLeave={() => setHoveredEventId((id) => (id === event.id ? null : id))}
-                          className="flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
+                          className="relative flex-shrink-0 w-[calc(33.333%-8px)] min-w-[140px] rounded-xl border border-white/15 p-2.5 text-left transition-all active:scale-[0.97] hover:brightness-110"
                           style={{ background: hexToRgba(activeQuickItem.color, 0.35) }}
                         >
+                          {isConvinced && (
+                            <span
+                              className="absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-full bg-(--gold) px-1.5 py-0.5 text-[9px] font-semibold text-black shadow"
+                              aria-label="A friend wants you to come"
+                              title="A friend wants you to come"
+                            >
+                              ✦ Convinced
+                            </span>
+                          )}
                           <div
                             className="mb-1 h-0.5 w-8 rounded-full"
                             style={{ background: activeQuickItem.color }}
@@ -1662,7 +1689,8 @@ export default function EventsView({
                             {new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                           </p>
                         </button>
-                      ))}
+                        );
+                      })}
                       {/* Place cards */}
                       {quickFilteredPlaces.map((place) => (
                         <button
@@ -1726,6 +1754,10 @@ export default function EventsView({
         trending={trending}
         favouriteOrgs={favouriteOrgs}
         friends={friends}
+        friendConsiderings={friendConsiderings}
+        userConsidering={userConsidering}
+        outgoingConvinceKeys={outgoingConvinceKeys}
+        onAfterAction={refetchBurgerData}
         menuProfile={menuProfile}
         menuLoading={menuLoading}
         onSelectEvent={handleSelectEvent}

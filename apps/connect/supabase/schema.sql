@@ -1353,3 +1353,165 @@ $$;
 revoke all on function public.search_contributors(text, text[], text, text, text, int) from public;
 grant execute on function public.search_contributors(text, text[], text, text, text, int) to anon, authenticated;
 
+
+-- --------------------------------------------------------------------
+-- FEAT-04: Convince system + friend-activity notifications (migrations 069/070)
+-- --------------------------------------------------------------------
+
+
+-- Convinces table (FEAT-04: friend recommends an event to another friend who is "considering")
+create table if not exists public.convinces (
+  id uuid primary key default extensions.uuid_generate_v4(),
+  from_user_id uuid not null references public.profiles(id) on delete cascade,
+  to_user_id   uuid not null references public.profiles(id) on delete cascade,
+  event_id     uuid not null references public.events(id)   on delete cascade,
+  created_at   timestamptz not null default now(),
+  constraint convinces_no_self check (from_user_id <> to_user_id),
+  constraint convinces_unique unique (from_user_id, to_user_id, event_id)
+);
+
+create index if not exists convinces_to_event_idx on public.convinces (to_user_id, event_id);
+create index if not exists convinces_from_idx     on public.convinces (from_user_id, event_id);
+
+alter table public.convinces enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Convince participants can read' and tablename = 'convinces') then
+    create policy "Convince participants can read" on public.convinces for select
+      using (auth.uid() = from_user_id or auth.uid() = to_user_id);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname = 'Mutual followers can convince considering friends' and tablename = 'convinces') then
+    create policy "Mutual followers can convince considering friends" on public.convinces for insert
+      with check (
+        auth.uid() = from_user_id
+        and from_user_id <> to_user_id
+        and exists (
+          select 1 from public.follows f1
+          join public.follows f2 on f2.follower_id = f1.followee_id and f2.followee_id = f1.follower_id
+          where f1.follower_id = from_user_id and f1.followee_id = to_user_id
+        )
+        and exists (
+          select 1 from public.rsvps r where r.user_id = to_user_id and r.event_id = convinces.event_id and r.status = 'considering'
+        )
+      );
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname = 'Sender can revoke convince' and tablename = 'convinces') then
+    create policy "Sender can revoke convince" on public.convinces for delete
+      using (auth.uid() = from_user_id);
+  end if;
+end $$;
+
+grant select, insert, delete on public.convinces to authenticated;
+
+-- Notifications type allow-list — widen for FEAT-04
+do $$ begin
+  alter table public.notifications drop constraint if exists notifications_type_check;
+  alter table public.notifications add constraint notifications_type_check check (type in (
+    'event_reminder','new_event_match','event_cancelled','new_follower','event_update',
+    'new_message','review_prompt','admin_elevation_request','friend_convince','friend_attending'
+  ));
+end $$;
+
+-- Trigger: notify the recipient of a convince
+create or replace function public.notify_on_convince()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  sender_name text;
+  event_title text;
+  target_prefs jsonb;
+begin
+  select coalesce(full_name, 'Someone') into sender_name from public.profiles where id = new.from_user_id;
+  select title into event_title from public.events where id = new.event_id;
+  if event_title is null then return new; end if;
+  select notification_prefs into target_prefs from public.profiles where id = new.to_user_id;
+  if coalesce((target_prefs->>'friends_activity')::boolean, true) = false then return new; end if;
+  insert into public.notifications (user_id, type, title, body, data)
+  values (
+    new.to_user_id, 'friend_convince',
+    sender_name || ' thinks you should go to ' || event_title,
+    'Tap to revisit the event',
+    jsonb_build_object('event_id', new.event_id, 'from_user_id', new.from_user_id)
+  );
+  return new;
+end $$;
+
+drop trigger if exists trg_notify_on_convince on public.convinces;
+create trigger trg_notify_on_convince after insert on public.convinces
+  for each row execute function public.notify_on_convince();
+
+-- Trigger: notify mutual friends when a user RSVPs attending
+create or replace function public.notify_friends_on_rsvp_attending()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  actor_name text;
+  event_title text;
+begin
+  if new.status is distinct from 'attending' then return new; end if;
+  if tg_op = 'UPDATE' and old.status = 'attending' then return new; end if;
+  select coalesce(full_name, 'Someone') into actor_name from public.profiles where id = new.user_id;
+  select title into event_title from public.events where id = new.event_id;
+  if event_title is null then return new; end if;
+  insert into public.notifications (user_id, type, title, body, data)
+  select
+    f1.follower_id, 'friend_attending',
+    actor_name || ' is going to ' || event_title,
+    'Tap to view the event',
+    jsonb_build_object('event_id', new.event_id, 'actor_id', new.user_id)
+  from public.follows f1
+  join public.follows f2 on f2.follower_id = f1.followee_id and f2.followee_id = f1.follower_id
+  join public.profiles p on p.id = f1.follower_id
+  where f1.followee_id = new.user_id
+    and f1.follower_id <> new.user_id
+    and coalesce((p.notification_prefs->>'friends_activity')::boolean, true) = true
+    and not exists (
+      select 1 from public.notifications n
+      where n.user_id = f1.follower_id
+        and n.type = 'friend_attending'
+        and (n.data->>'event_id')::uuid = new.event_id
+        and (n.data->>'actor_id')::uuid = new.user_id
+        and n.created_at > now() - interval '24 hours'
+    );
+  return new;
+end $$;
+
+drop trigger if exists trg_notify_friends_on_rsvp_attending on public.rsvps;
+create trigger trg_notify_friends_on_rsvp_attending
+  after insert or update of status on public.rsvps
+  for each row execute function public.notify_friends_on_rsvp_attending();
+
+-- toggle_consider RPC (FEAT-04 hardened; see migrations 022 + 070)
+create or replace function public.toggle_consider(p_user_id uuid, p_event_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_existing uuid;
+begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'unauthorized';
+  end if;
+  select id into v_existing from public.rsvps where user_id = p_user_id and event_id = p_event_id;
+  if v_existing is not null then
+    delete from public.rsvps where id = v_existing and status = 'considering';
+    return jsonb_build_object('success', true, 'action', 'removed');
+  else
+    insert into public.rsvps (user_id, event_id, status) values (p_user_id, p_event_id, 'considering');
+    return jsonb_build_object('success', true, 'action', 'added');
+  end if;
+end;
+$$;
+
+revoke all on function public.toggle_consider(uuid, uuid) from public;
+grant execute on function public.toggle_consider(uuid, uuid) to authenticated;

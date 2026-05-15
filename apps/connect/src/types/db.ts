@@ -410,7 +410,36 @@ export type NotificationType =
   | "new_follower"
   | "event_update"
   | "new_message"
-  | "review_prompt";
+  | "review_prompt"
+  | "friend_convince"
+  | "friend_attending";
+
+/**
+ * FEAT-04 Convince row — one per (from, to, event); permanent UNIQUE.
+ * RLS lets sender and target read; only mutual friends can insert when
+ * the target is currently considering the event. See migration 069.
+ */
+export type Convince = {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  event_id: string;
+  created_at: string;
+};
+
+/**
+ * FEAT-04 Friends-considering aggregate: one event + the list of mutual
+ * friends who are currently considering it. Powers the "Friends" tab of
+ * the Considerations section in BurgerMenu.
+ */
+export type FriendConsidering = {
+  event: Event;
+  friends: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  }[];
+};
 
 /**
  * Reusable event tag (migration 056). Tags are a flat namespace distinct

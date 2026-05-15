@@ -45,10 +45,15 @@ create or replace function public.toggle_consider(
 ) returns jsonb
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_existing uuid;
 begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'unauthorized';
+  end if;
+
   select id into v_existing
   from public.rsvps
   where user_id = p_user_id and event_id = p_event_id;
@@ -66,3 +71,6 @@ begin
   end if;
 end;
 $$;
+
+revoke all on function public.toggle_consider(uuid, uuid) from public;
+grant execute on function public.toggle_consider(uuid, uuid) to authenticated;

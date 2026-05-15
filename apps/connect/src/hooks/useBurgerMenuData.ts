@@ -7,6 +7,7 @@ import type {
   TrendingEvent,
   FavouriteOrg,
   FriendAttending,
+  FriendConsidering,
   Profile,
 } from "@/types/db";
 
@@ -14,8 +15,18 @@ type BurgerMenuData = {
   trending: TrendingEvent[];
   favouriteOrgs: FavouriteOrg[];
   friends: FriendAttending[];
+  /** FEAT-04: events friends are currently considering. */
+  friendConsiderings: FriendConsidering[];
+  /** FEAT-04: events the current user is considering. */
+  userConsidering: Event[];
+  /** FEAT-04: events for which the current user has been convinced by ≥1 friend. */
+  incomingConvinceEventIds: Set<string>;
+  /** FEAT-04: `${eventId}|${toUserId}` keys for convinces the user has already sent. */
+  outgoingConvinceKeys: Set<string>;
   profile: Profile | null;
   loading: boolean;
+  /** Force re-fetch (e.g. after toggling consider / sending convince). */
+  refetch: () => void;
 };
 
 /**
@@ -24,6 +35,10 @@ type BurgerMenuData = {
  *
  * Optimised: uses trending_events RPC, single-query favourite orgs,
  * and parallelised batches to minimise round-trips.
+ *
+ * FEAT-04 additions: friends-considering aggregation, current user's
+ * considerings, and incoming/outgoing convince state — all powered by
+ * the same friendIds list so no extra round-trips for mutuals.
  */
 export function useBurgerMenuData(
   userId: string | null,
@@ -32,6 +47,14 @@ export function useBurgerMenuData(
   const [trending, setTrending] = useState<TrendingEvent[]>([]);
   const [favouriteOrgs, setFavouriteOrgs] = useState<FavouriteOrg[]>([]);
   const [friends, setFriends] = useState<FriendAttending[]>([]);
+  const [friendConsiderings, setFriendConsiderings] = useState<FriendConsidering[]>([]);
+  const [userConsidering, setUserConsidering] = useState<Event[]>([]);
+  const [incomingConvinceEventIds, setIncomingConvinceEventIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [outgoingConvinceKeys, setOutgoingConvinceKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -65,33 +88,84 @@ export function useBurgerMenuData(
           .sort((a: TrendingEvent, b: TrendingEvent) => b.rsvp_count - a.rsvp_count);
       })();
 
-      // ── Auth-gated sections (run in parallel with trending) ──
       if (!userId) {
         const trendingResult = await trendingPromise;
         setTrending(trendingResult);
         setFavouriteOrgs([]);
         setFriends([]);
+        setFriendConsiderings([]);
+        setUserConsidering([]);
+        setIncomingConvinceEventIds(new Set());
+        setOutgoingConvinceKeys(new Set());
         setProfile(null);
         return;
       }
 
-      // Batch 1: profile + follows + trending (all independent)
-      const [trendingResult, profileResult, followsResult] = await Promise.all([
+      const [
+        trendingResult,
+        profileResult,
+        followsResult,
+        userRsvpsResult,
+        incomingConvincesResult,
+        outgoingConvincesResult,
+      ] = await Promise.all([
         trendingPromise,
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("follows").select("followee_id").eq("follower_id", userId),
+        supabase
+          .from("rsvps")
+          .select("event_id, status")
+          .eq("user_id", userId)
+          .eq("status", "considering"),
+        supabase
+          .from("convinces")
+          .select("event_id, from_user_id")
+          .eq("to_user_id", userId),
+        supabase
+          .from("convinces")
+          .select("event_id, to_user_id")
+          .eq("from_user_id", userId),
       ]);
 
       setTrending(trendingResult);
       setProfile(profileResult.data as Profile | null);
 
+      const userConsideringEventIds = (userRsvpsResult.data ?? []).map(
+        (r: { event_id: string }) => r.event_id,
+      );
+      if (userConsideringEventIds.length > 0) {
+        const { data: ucEvents } = await supabase
+          .from("events")
+          .select("*")
+          .in("id", userConsideringEventIds)
+          .eq("status", "published")
+          .gte("date", now)
+          .order("date", { ascending: true });
+        setUserConsidering((ucEvents ?? []) as Event[]);
+      } else {
+        setUserConsidering([]);
+      }
+
+      setIncomingConvinceEventIds(
+        new Set(
+          (incomingConvincesResult.data ?? []).map(
+            (c: { event_id: string }) => c.event_id,
+          ),
+        ),
+      );
+      setOutgoingConvinceKeys(
+        new Set(
+          (outgoingConvincesResult.data ?? []).map(
+            (c: { event_id: string; to_user_id: string }) =>
+              `${c.event_id}|${c.to_user_id}`,
+          ),
+        ),
+      );
+
       const followeeIds = (followsResult.data ?? []).map(
         (f: { followee_id: string }) => f.followee_id
       );
 
-      // Batch 2: contributor profiles + mutual follows (both depend on followeeIds)
-      // Surfaces the user's followed contributors as "Favourite Orgs" further
-      // down — see migration 033 (role rename: vendor → contributor).
       const [vendorProfilesResult, mutualsResult] = await Promise.all([
         followeeIds.length > 0
           ? supabase
@@ -109,7 +183,6 @@ export function useBurgerMenuData(
           : Promise.resolve({ data: [] as { follower_id: string }[] }),
       ]);
 
-      // ── Favourite Orgs: single query for all vendor events (no N+1) ──
       const vendorProfiles = vendorProfilesResult.data ?? [];
       const vendorIds = vendorProfiles.map((vp: { id: string }) => vp.id);
 
@@ -138,13 +211,11 @@ export function useBurgerMenuData(
       );
       setFavouriteOrgs(orgs);
 
-      // ── Friends: bidirectional follows ──
       const friendIds = (mutualsResult.data ?? []).map(
         (m: { follower_id: string }) => m.follower_id
       );
 
       if (friendIds.length > 0) {
-        // Batch 3: friend profiles + friend RSVPs (independent of each other)
         const [friendProfilesResult, friendRsvpsResult] = await Promise.all([
           supabase
             .from("profiles")
@@ -152,14 +223,17 @@ export function useBurgerMenuData(
             .in("id", friendIds),
           supabase
             .from("rsvps")
-            .select("user_id, event_id")
+            .select("user_id, event_id, status")
             .in("user_id", friendIds),
         ]);
 
-        const friendRsvps = friendRsvpsResult.data ?? [];
-        const friendEventIds = [
-          ...new Set(friendRsvps.map((r: { event_id: string }) => r.event_id)),
-        ];
+        const friendRsvps = (friendRsvpsResult.data ?? []) as {
+          user_id: string;
+          event_id: string;
+          status: "attending" | "considering";
+        }[];
+
+        const friendEventIds = [...new Set(friendRsvps.map((r) => r.event_id))];
 
         let allFriendEvents: Event[] = [];
         if (friendEventIds.length > 0) {
@@ -171,27 +245,70 @@ export function useBurgerMenuData(
             .gte("date", now);
           allFriendEvents = (fEvents ?? []) as Event[];
         }
+        const eventById = new Map<string, Event>(
+          allFriendEvents.map((e) => [e.id, e]),
+        );
+        const friendProfileById = new Map<
+          string,
+          { id: string; full_name: string; avatar_url: string | null }
+        >(
+          (friendProfilesResult.data ?? []).map(
+            (fp: { id: string; full_name: string; avatar_url: string | null }) => [fp.id, fp],
+          ),
+        );
 
-        const friendsResult: FriendAttending[] = (friendProfilesResult.data ?? []).map(
-          (fp: { id: string; full_name: string; avatar_url: string | null }) => {
+        // Friends ATTENDING
+        const friendsResult: FriendAttending[] = Array.from(friendProfileById.values()).map(
+          (fp) => {
             const theirEventIds = friendRsvps
-              .filter((r: { user_id: string }) => r.user_id === fp.id)
-              .map((r: { event_id: string }) => r.event_id);
-
+              .filter((r) => r.user_id === fp.id && r.status === "attending")
+              .map((r) => r.event_id);
             return {
               id: fp.id,
               full_name: fp.full_name,
               avatar_url: fp.avatar_url,
-              attending_events: allFriendEvents.filter((e) =>
-                theirEventIds.includes(e.id)
-              ),
+              attending_events: theirEventIds
+                .map((id) => eventById.get(id))
+                .filter((e): e is Event => Boolean(e)),
             };
-          }
+          },
         );
-
         setFriends(friendsResult);
+
+        // Friends CONSIDERING (grouped by event)
+        const considerByEvent = new Map<
+          string,
+          { id: string; full_name: string; avatar_url: string | null }[]
+        >();
+        for (const r of friendRsvps) {
+          if (r.status !== "considering") continue;
+          const ev = eventById.get(r.event_id);
+          if (!ev) continue;
+          const friend = friendProfileById.get(r.user_id);
+          if (!friend) continue;
+          const list = considerByEvent.get(r.event_id) ?? [];
+          list.push({
+            id: friend.id,
+            full_name: friend.full_name,
+            avatar_url: friend.avatar_url,
+          });
+          considerByEvent.set(r.event_id, list);
+        }
+        const considerings: FriendConsidering[] = Array.from(considerByEvent.entries())
+          .map(([eventId, friendList]) => {
+            const ev = eventById.get(eventId);
+            if (!ev) return null;
+            return { event: ev, friends: friendList };
+          })
+          .filter((x): x is FriendConsidering => x !== null)
+          .sort(
+            (a, b) =>
+              new Date(a.event.date).getTime() - new Date(b.event.date).getTime(),
+          );
+        setFriendConsiderings(considerings);
       } else {
         setFriends([]);
+        setFriendConsiderings([]);
       }
     } catch (err) {
       console.error("Failed to load burger menu data:", err);
@@ -201,7 +318,6 @@ export function useBurgerMenuData(
   }, [userId]);
 
   useEffect(() => {
-    // Only fetch when drawer opens and data hasn't been fetched for this user
     const cacheKey = userId ?? "__anon__";
     if (isOpen && fetchedForRef.current !== cacheKey) {
       fetchedForRef.current = cacheKey;
@@ -209,5 +325,21 @@ export function useBurgerMenuData(
     }
   }, [isOpen, userId, fetchData]);
 
-  return { trending, favouriteOrgs, friends, profile, loading };
+  const refetch = useCallback(() => {
+    fetchedForRef.current = null;
+    fetchData();
+  }, [fetchData]);
+
+  return {
+    trending,
+    favouriteOrgs,
+    friends,
+    friendConsiderings,
+    userConsidering,
+    incomingConvinceEventIds,
+    outgoingConvinceKeys,
+    profile,
+    loading,
+    refetch,
+  };
 }

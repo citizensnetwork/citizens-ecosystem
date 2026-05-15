@@ -1,10 +1,9 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useState } from "react";
+import { forwardRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
-import type { Event, EventCategory, PlaceCategory, FavouriteOrg, FriendAttending, Profile, TrendingEvent } from "@/types/db";
+import type { Event, EventCategory, PlaceCategory, FavouriteOrg, FriendAttending, FriendConsidering, Profile, TrendingEvent } from "@/types/db";
 import { EVENT_CATEGORIES, CATEGORY_HEX, PLACE_CATEGORIES, PLACE_CATEGORY_HEX, PLACE_CATEGORY_DESCRIPTIONS } from "@/lib/categories";
 import { getIconSvg } from "@/lib/categoryIcons";
 import AccordionSection from "@/components/ui/AccordionSection";
@@ -28,7 +27,17 @@ type Props = {
   onToggleWeekend: () => void;
   trending: TrendingEvent[];
   favouriteOrgs: FavouriteOrg[];
-  friends: FriendAttending[];
+  /** Kept for backward-compat; the Friends-attending list is now surfaced
+   *  via notifications instead of a dedicated accordion. */
+  friends?: FriendAttending[];
+  /** FEAT-04: events friends are currently considering (groupings). */
+  friendConsiderings?: FriendConsidering[];
+  /** FEAT-04: events the current user is considering. */
+  userConsidering?: Event[];
+  /** FEAT-04: `${eventId}|${toUserId}` set of convinces already sent. */
+  outgoingConvinceKeys?: Set<string>;
+  /** FEAT-04: re-fetch after a successful convince / consider toggle. */
+  onAfterAction?: () => void;
   menuProfile: Profile | null;
   menuLoading: boolean;
   onSelectEvent: (event: Event) => void;
@@ -59,14 +68,16 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
     weekendOnly,
     onToggleWeekend,
     favouriteOrgs,
-    friends,
+    friendConsiderings,
+    userConsidering,
+    outgoingConvinceKeys,
+    onAfterAction,
     menuProfile,
     menuLoading,
     onSelectEvent,
     filteredCount,
     filteredPlacesCount,
     onLogout,
-    considerVersion,
     activeTab: controlledTab,
     onTabChange,
   },
@@ -284,7 +295,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
             </AccordionSection>
           )}
 
-          {/* Shared sections: Favourites, Friends, Considers — always visible in both tabs */}
+          {/* Shared sections: Favourites + Considerations — always visible in both tabs */}
 
           {/* Favourites */}
           <AccordionSection
@@ -312,30 +323,17 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
             )}
           </AccordionSection>
 
-          {/* Friends */}
-          <AccordionSection title="Friends" icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} badge={friends.length || undefined}>
-            {!user ? (
-              <p className="px-3 py-2 text-xs text-black/40">
-                <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
-                  Log in
-                </Link>{" "}
-                to see friends
-              </p>
-            ) : menuLoading ? (
-              <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-            ) : friends.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-black/40">Your mutual follows will appear here</p>
-            ) : (
-              <div className="space-y-1">
-                {friends.map((fr) => (
-                  <FriendAccordion key={fr.id} friend={fr} onSelectEvent={selectAndClose} />
-                ))}
-              </div>
-            )}
-          </AccordionSection>
-
-          {/* Considers */}
-          <BurgerConsiderSection user={user} onClose={onClose} considerVersion={considerVersion} />
+          {/* FEAT-04 Considerations — unified My / Friends section */}
+          <ConsiderationsSection
+            user={user}
+            menuLoading={menuLoading}
+            userConsidering={userConsidering ?? []}
+            friendConsiderings={friendConsiderings ?? []}
+            outgoingConvinceKeys={outgoingConvinceKeys ?? new Set<string>()}
+            onSelectEvent={selectAndClose}
+            onClose={onClose}
+            onAfterAction={onAfterAction}
+          />
 
           {/* Quick actions (always visible) */}
           <div className="mt-4 border-t border-black/8 pt-4 text-sm text-black/65">
@@ -602,156 +600,232 @@ function OrgAccordion({
   );
 }
 
-function FriendAccordion({
-  friend,
+function ConsiderationsSection({
+  user,
+  menuLoading,
+  userConsidering,
+  friendConsiderings,
+  outgoingConvinceKeys,
   onSelectEvent,
+  onClose,
+  onAfterAction,
 }: {
-  friend: FriendAttending;
+  user: User | null;
+  menuLoading: boolean;
+  userConsidering: Event[];
+  friendConsiderings: FriendConsidering[];
+  outgoingConvinceKeys: Set<string>;
   onSelectEvent: (e: Event) => void;
+  onClose: () => void;
+  onAfterAction?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
-      >
-        {friend.avatar_url ? (
-          <Image
-            src={friend.avatar_url}
-            alt=""
-            width={24}
-            height={24}
-            className="h-6 w-6 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-(--gold-soft) text-[10px] font-bold uppercase">
-            {friend.full_name?.[0] ?? "?"}
-          </span>
-        )}
-        <span className="flex-1 truncate">{friend.full_name}</span>
-        <span className="text-xs text-black/40">{friend.attending_events.length}</span>
-        <span
-          className={`text-xs text-black/30 transition-transform duration-150 ${
-            open ? "rotate-90" : ""
-          }`}
-        >
-          ▶
-        </span>
-      </button>
-      {open && (
-        <div className="ml-8 space-y-0.5 pb-1">
-          {friend.attending_events.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-black/40">Not attending any upcoming events</p>
-          ) : (
-            friend.attending_events.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => onSelectEvent(e)}
-                className="block w-full truncate rounded px-2 py-1 text-left text-xs text-black/70 transition hover:bg-black/5"
-              >
-                {e.title}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── BurgerConsiderSection: shows "Considering" events in burger menu ── */
-
-type ConsiderItem = {
-  event_id: string;
-  title: string;
-  date: string;
-};
-
-type ConsiderRsvpRow = {
-  event_id: string;
-  events: { title: string; date: string } | null;
-};
-
-function BurgerConsiderSection({ user, onClose, considerVersion }: { user: User | null; onClose: () => void; considerVersion?: number }) {
-  const [items, setItems] = useState<ConsiderItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const fetchConsiders = useCallback(async () => {
-    if (!user) {
-      setLoaded(true);
-      return;
-    }
-    const supabase = createClient();
-    const today = new Date().toISOString().split("T")[0];
-    const { data: rsvps } = await supabase
-      .from("rsvps")
-      .select("event_id, events!inner(title, date)")
-      .eq("user_id", user.id)
-      .eq("status", "considering")
-      .gte("events.date", today);
-
-    const rows = (rsvps ?? []) as unknown as ConsiderRsvpRow[];
-
-    setItems(
-      rows
-        .filter((r) => r.events != null)
-        .map((r) => ({
-          event_id: r.event_id,
-          title: r.events?.title ?? "Event",
-          date: r.events?.date ?? "",
-        }))
-    );
-    setLoaded(true);
-  }, [user]);
-
-  useEffect(() => {
-    fetchConsiders();
-  }, [fetchConsiders, considerVersion]);
+  const [tab, setTab] = useState<"mine" | "friends">("mine");
+  const totalBadge =
+    (userConsidering?.length ?? 0) + (friendConsiderings?.length ?? 0);
+  const friendsBadge = friendConsiderings?.length ?? 0;
 
   return (
     <AccordionSection
-      title="Considering"
-      icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>}
-      badge={items.length || undefined}
+      title="Considerations"
+      icon={
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-(--gold)">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
+      }
+      badge={totalBadge || undefined}
     >
       {!user ? (
         <p className="px-3 py-2 text-xs text-black/40">
           <Link href="/login" onClick={onClose} className="text-(--gold) hover:underline">
             Log in
           </Link>{" "}
-          to see events you&apos;re considering
-        </p>
-      ) : !loaded ? (
-        <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
-      ) : items.length === 0 ? (
-        <p className="px-3 py-2 text-xs text-black/40">
-          Use the &quot;Consider&quot; action on events to track them here
+          to see events you and your friends are considering
         </p>
       ) : (
-        <div className="space-y-0.5">
-          {items.map((item) => (
-            <Link
-              key={item.event_id}
-              href={`/events/${item.event_id}`}
-              onClick={onClose}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
+        <>
+          {/* Segmented My / Friends toggle */}
+          <div className="mx-1 mb-2 flex rounded-lg bg-black/5 p-0.5">
+            <button
+              type="button"
+              onClick={() => setTab("mine")}
+              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                tab === "mine"
+                  ? "bg-white text-black shadow-sm"
+                  : "text-black/55 hover:text-black/80"
+              }`}
             >
-              <span className="flex-1 truncate">{item.title}</span>
-              <span className="text-xs text-black/40">
-                {item.date
-                  ? new Date(item.date).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : ""}
-              </span>
-            </Link>
-          ))}
-        </div>
+              My ({userConsidering.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("friends")}
+              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                tab === "friends"
+                  ? "bg-white text-black shadow-sm"
+                  : "text-black/55 hover:text-black/80"
+              }`}
+            >
+              Friends ({friendsBadge})
+            </button>
+          </div>
+
+          {menuLoading ? (
+            <p className="px-3 py-2 text-xs text-black/40">Loading…</p>
+          ) : tab === "mine" ? (
+            userConsidering.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-black/40">
+                Use the &quot;Consider&quot; action on events to track them here
+              </p>
+            ) : (
+              <div className="space-y-0.5">
+                {userConsidering.map((ev) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => onSelectEvent(ev)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-black/80 transition hover:bg-black/5"
+                  >
+                    <span className="flex-1 truncate">{ev.title}</span>
+                    <span className="text-xs text-black/40">
+                      {ev.date
+                        ? new Date(ev.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : friendConsiderings.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-black/40">
+              When friends mark events as &quot;considering&quot; they&apos;ll show up here so you can convince them.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {friendConsiderings.map((fc) => (
+                <FriendConsideringCard
+                  key={fc.event.id}
+                  fc={fc}
+                  outgoingConvinceKeys={outgoingConvinceKeys}
+                  onSelectEvent={onSelectEvent}
+                  onAfterAction={onAfterAction}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </AccordionSection>
+  );
+}
+
+function FriendConsideringCard({
+  fc,
+  outgoingConvinceKeys,
+  onSelectEvent,
+  onAfterAction,
+}: {
+  fc: FriendConsidering;
+  outgoingConvinceKeys: Set<string>;
+  onSelectEvent: (e: Event) => void;
+  onAfterAction?: () => void;
+}) {
+  const [sending, setSending] = useState<string | null>(null);
+  // Per-friend sent state lets each row flip to "Convinced ✓" without
+  // waiting for the next refetch.
+  const [localSent, setLocalSent] = useState<Set<string>>(new Set());
+
+  async function sendConvince(toUserId: string) {
+    if (sending) return;
+    setSending(toUserId);
+    try {
+      const res = await fetch("/api/convince", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: fc.event.id, to_user_id: toUserId }),
+      });
+      if (res.ok || res.status === 409) {
+        setLocalSent((s) => new Set([...s, toUserId]));
+        onAfterAction?.();
+      }
+    } catch {
+      // Silently fail — user can retry; the optimistic state isn't set.
+    } finally {
+      setSending(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-black/6 bg-white/55 p-2.5">
+      <button
+        type="button"
+        onClick={() => onSelectEvent(fc.event)}
+        className="block w-full text-left"
+      >
+        <p className="truncate text-sm font-medium text-black">{fc.event.title}</p>
+        <p className="mt-0.5 text-[11px] text-black/45">
+          {fc.event.date
+            ? new Date(fc.event.date).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
+            : ""}
+          {" · "}
+          {fc.friends.length} friend{fc.friends.length !== 1 ? "s" : ""}
+        </p>
+      </button>
+      <ul className="mt-2 space-y-1">
+        {fc.friends.map((fr) => {
+          const key = `${fc.event.id}|${fr.id}`;
+          const isSent =
+            localSent.has(fr.id) || outgoingConvinceKeys.has(key);
+          return (
+            <li
+              key={fr.id}
+              className="flex items-center gap-2 rounded-lg px-1 py-1"
+            >
+              {fr.avatar_url ? (
+                <Image
+                  src={fr.avatar_url}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="h-5 w-5 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gold-soft) text-[9px] font-bold uppercase">
+                  {fr.full_name?.[0] ?? "?"}
+                </span>
+              )}
+              <span className="flex-1 truncate text-xs text-black/75">
+                {fr.full_name}
+              </span>
+              {isSent ? (
+                <span
+                  className="flex items-center gap-1 rounded-full bg-(--gold-soft) px-2 py-0.5 text-[10px] font-medium text-black/80"
+                  aria-label={`Already convinced ${fr.full_name}`}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="h-2.5 w-2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  Convinced
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={sending === fr.id}
+                  onClick={() => sendConvince(fr.id)}
+                  className="rounded-full bg-(--gold) px-2.5 py-0.5 text-[10px] font-semibold text-black transition hover:brightness-105 disabled:opacity-50"
+                >
+                  {sending === fr.id ? "…" : "Convince"}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

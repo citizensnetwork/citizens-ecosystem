@@ -27,6 +27,9 @@ const TYPE_ICONS: Record<string, string> = {
   new_follower: "○",
   event_update: "▸",
   review_prompt: "★",
+  friend_convince: "✦",
+  friend_attending: "♥",
+  new_message: "✉",
 };
 
 /** Safely read dismissed review IDs from localStorage. */

@@ -83,8 +83,13 @@ vi.mock("@/hooks/useBurgerMenuData", () => ({
     trending: [],
     favouriteOrgs: [],
     friends: [],
+    friendConsiderings: [],
+    userConsidering: [],
+    incomingConvinceEventIds: new Set<string>(),
+    outgoingConvinceKeys: new Set<string>(),
     profile: null,
     loading: false,
+    refetch: () => {},
   }),
 }));
 
