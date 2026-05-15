@@ -175,7 +175,7 @@ No new advisor delta introduced by Batches S1 → S3.
 1. Read [RESUME_HERE.md](RESUME_HERE.md) first — always current within ~1 batch.
 2. Cross-check `/memories/repo/batch-*.md` for the most recent invariants (latest: `batch-s3-weekend-tag-shipped.md`).
 3. Follow `/memories/quality-pipeline.md` for the per-batch quality gate procedure.
-4. Architecture orientation: `.github/instructions/project-architecture.instructions.md` (file map) → `.github/instructions/connect-ui-system.instructions.md` (UI rules) → `.github/instructions/leaflet-maps.instructions.md` (MapLibre patterns) → `.github/instructions/supabase-patterns.instructions.md` (data layer).
+4. Architecture orientation: `.github/instructions/project-architecture.instructions.md` (file map) → `.github/instructions/connect-ui-system.instructions.md` (UI rules) → `.github/instructions/maplibre-maps.instructions.md` (MapLibre patterns) → `.github/instructions/supabase-patterns.instructions.md` (data layer).
 5. Standing decisions log: `.github/DECISIONS.md`.
 
 ### Windows-specific reminders

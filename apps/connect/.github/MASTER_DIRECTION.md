@@ -338,8 +338,10 @@ The burger bar has a new **Considerations** accordion section containing two sub
 - Links to event detail panel with Updates section scrolled into view
 
 **DB additions needed:**
-- `event_broadcasts` table: `id, event_id, profile_id, message (text, max 500), created_at`
-- RLS: event owner or admin inserts; authenticated users read; owner/admin deletes
+- `event_updates` table (shipped name; the spec's earlier `event_broadcasts` label was harmonised with the actual implementation in Batch 5): `id, event_id, author_id, body (text, 1–1000 chars), created_at`
+- The 1000-char ceiling was chosen over the original 500 once we saw real organiser drafts — sub-paragraph venue directions and last-minute schedule rewrites consistently brushed the 500 limit. The composer warns at 50 remaining and stops at 1000.
+- RLS: event creator or admin inserts; authenticated users read; author or admin deletes
+- Realtime: table is in the `supabase_realtime` publication (migration 071) so the viewer updates without refresh
 - Index on `(event_id, created_at DESC)`
 
 ---

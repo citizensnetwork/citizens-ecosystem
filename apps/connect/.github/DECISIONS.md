@@ -2,6 +2,40 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 5 — FEAT-05 Broadcast Updates polish + retroactive infrastructure fix
+
+**Critical discovery — migration `030_event_updates.sql` was never applied to the remote project.** The local migrations folder contained 030 (table + RLS for `event_updates`), but `supabase_migrations.schema_migrations` had no record of it. `to_regclass('public.event_updates')` returned `null`. This means **every Phase E surface that called into the broadcast-updates substrate (composer in ManageEventsView, viewer in EventUpdatesList, GET/POST `/api/events/:id/updates`, the `notify-event-update` edge function) was silently broken in production from the moment Phase E shipped.** Applied 030 retroactively via MCP in Batch 5; no data loss because no rows ever existed. Lesson: when a migration is authored locally, the apply step must be verified against `supabase_migrations.schema_migrations` before the feature is declared shipped. A future batch should add a CI guard.
+
+**Decision — `event_broadcasts` in MASTER_DIRECTION is implemented as `event_updates`.** The original spec called the table `event_broadcasts` with a 500-char `message` column. The actual implementation uses `event_updates` with a 1000-char `body` column. Reasons:
+- "Updates" is what organisers naturally call them in copy ("From the Organiser").
+- 1000 chars is the right ceiling after we saw real drafts: venue directions and last-minute schedule rewrites consistently brushed the 500 limit. The composer warns at 50 remaining and the DB CHECK caps at 1000.
+- MASTER_DIRECTION FEAT-05 has been updated in this batch to reflect the shipped names and limits.
+
+**Decision — DELETE endpoint trusts RLS for authorisation, mapping `42501` and `row-level security` text to 403.** `src/app/api/events/[id]/updates/[updateId]/route.ts` does not duplicate the author/admin check in Node — the DB is the source of truth via policy `event_updates_delete_author_or_admin`. The endpoint scopes the DELETE by both `event_id` and `id` so a caller can't reach into another event's row by guessing UUIDs (RLS would still block it, but the deterministic 404 is cleaner than relying on RLS for that case). 200 on success (with `{success:true}` body), 404 when row absent or RLS-hidden, 403 on policy denial, 401 unauth, 400 on malformed UUID.
+
+**Decision — EventUpdatesList realtime uses merge-not-replace for the initial fetch.** The realtime channel is subscribed synchronously alongside the `fetch()` for the initial snapshot. If a new INSERT arrives in the sub-second window before the snapshot resolves, the INSERT handler prepends the row, then naively `setUpdates(items)` would clobber it. The snapshot now merges via a `Set` of seen ids: `[...realtime-only extras, ...snapshot]`. Mirrors the INSERT-handler dedupe and removes a hard-to-reproduce ghosting bug. (Architect Should-fix applied inline.)
+
+**Decision — INSERT and DELETE handlers both attempt a `filter: event_id=eq.<id>` clause on the realtime subscription, even though Supabase only evaluates filters against PK columns on DELETE payloads.** With default `REPLICA IDENTITY` the DELETE filter is silently dropped server-side, so the client receives DELETE events for every row in `event_updates` and filters in JS via `prev.filter(u => u.id !== deletedId)`. Correctness is preserved (the local list only contains this event's rows, unmatched ids are a no-op). Bandwidth is wasted at high broadcast volume; if/when that becomes measurable, switch to `alter table public.event_updates replica identity full;` and the server-side filter will start working.
+
+**Decision — Optimistic DELETE on the client swallows non-OK responses silently.** No toast infra is in place yet; the row simply stays visible if the DELETE fails. Acceptable for a low-traffic affordance — surface a toast in a later batch.
+
+**Decision — `OrgSearchPanel` keeps the short "Org" label rather than reusing canonical `CONTRIBUTOR_KIND_LABELS.organization = "Organization"`.** "Organization" wraps the compact row on narrow phones. The dedupe is achieved with a local `KIND_BADGE_LABEL` record at file scope (not a triple ternary) with an inline comment explaining why the two label sets are intentionally divergent.
+
+**Decision — `leaflet-maps.instructions.md` renamed to `maplibre-maps.instructions.md`.** The file's content has been MapLibre since we migrated; the legacy filename was the last vestige of Leaflet. `git mv` preserves blame; all references in `copilot-instructions.md`, `RESUME_HERE.md`, and `docs/STATUS_REPORT_2026-05.md` updated.
+
+**Deferred prior-batch items that turned out to be already resolved:**
+- *Batch 4 — Convince API error mapping split*: `/api/convince` already maps 23505 → 409 `code:"already"`, 42501/RLS → 403 `code:"forbidden"`, self-block → 400 `"Cannot convince yourself"` separately. The DECISIONS deferred note was stale at the time of writing.
+- *Batch 4 — `friend_invite` allow-list cleanup*: migration 069's `notifications_type_check` already omits `friend_invite`. Cleanup done in the original drop-and-recreate.
+- *Batch 2 N2 — `parseEventDate` local-tz construction*: `GlassCalendar.parseEventDate` is correct for the `timestamptz` shape that `events.date` actually has. Not a real issue.
+- *Batch 2 N4 — Guard `setMapFlyTo(null)` on calendar close*: `EventMap`'s `flyTo` effect already early-returns when `flyTo == null`. Not a real issue.
+
+**Still deferred:**
+- Batch 3 — `word_similarity` indexability, `bio` trgm index, bio truncation (revisit beyond ~5k contributors).
+- T4 owner task: Vercel MapTiler env vars.
+- BUG-09: rename `/admin/reports` → `/admin/reported` (cosmetic).
+
+---
+
 ## MASTER_DIRECTION Batch 4 — FEAT-04 Consider → Convince
 
 **Decision — `convinces` is a permanent record with `UNIQUE (from_user_id, to_user_id, event_id)`.** Once a friend has been told "you should go to this", repeated nags add noise without adding signal. The DB-level UNIQUE constraint turns the second click into a `23505` which the API maps to `409 already-convinced`; the UI uses this (`res.ok || res.status === 409`) to flip the local button to "Convinced ✓" instead of erroring. Revocation is allowed via DELETE (sender-only RLS policy) so a mistaken convince can be undone, but the standing intent is that Convinced is a one-time act per (sender, recipient, event).

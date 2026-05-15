@@ -20,6 +20,20 @@ import Image from "next/image";
 
 type ContributorKind = "ministry" | "organization" | "business";
 
+/**
+ * Compact contributor-kind labels for tight UI rows. Intentionally
+ * different from the canonical `CONTRIBUTOR_KIND_LABELS` in `types/db.ts`
+ * (which expands "organization" to "Organization") because in this dense
+ * search list "Org" reads better and keeps the row from wrapping on
+ * narrow phones. If you change one, consider whether the other should
+ * change too.
+ */
+const KIND_BADGE_LABEL: Record<ContributorKind, string> = {
+  organization: "Org",
+  ministry: "Ministry",
+  business: "Business",
+};
+
 type SearchHit = {
   id: string;
   full_name: string | null;
@@ -210,11 +224,7 @@ function OrgRow({ hit, onSelect }: { hit: SearchHit; onSelect?: () => void }) {
   const name = hit.full_name ?? "Unnamed contributor";
   const logo = hit.logo_url || hit.avatar_url || null;
   const kindLabel = hit.contributor_kind
-    ? hit.contributor_kind === "organization"
-      ? "Org"
-      : hit.contributor_kind === "ministry"
-        ? "Ministry"
-        : "Business"
+    ? KIND_BADGE_LABEL[hit.contributor_kind]
     : null;
 
   return (

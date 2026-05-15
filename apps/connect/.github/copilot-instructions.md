@@ -116,7 +116,7 @@ Roles: `citizen` / `contributor` (with `contributor_kind`: ministry / organizati
 ### Instructions (auto-applied by file pattern)
 - `.github/instructions/project-architecture.instructions.md` — File map, component relationships, data flow, environment details
 - `.github/instructions/connect-ui-system.instructions.md` — UI system rules (60/30/10 white-black-gold, floating controls)
-- `.github/instructions/leaflet-maps.instructions.md` — MapLibre GL JS API patterns for map components
+- `.github/instructions/maplibre-maps.instructions.md` — MapLibre GL JS API patterns for map components
 - `.github/instructions/supabase-patterns.instructions.md` — Dual-client pattern, RLS, storage, migrations
 
 ### Prompts (reusable workflows)

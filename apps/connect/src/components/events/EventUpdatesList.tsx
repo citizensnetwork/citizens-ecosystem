@@ -57,6 +57,14 @@ export default function EventUpdatesList({ eventId }: Props) {
   const [updates, setUpdates] = useState<EventUpdate[]>([]);
   const [authors, setAuthors] = useState<AuthorMap>({});
   const [loading, setLoading] = useState(true);
+  // Viewer identity is resolved once on mount and drives whether the
+  // inline Delete affordance is rendered on each row. A null value means
+  // "not signed in or still resolving" — in both cases the button stays
+  // hidden. The DELETE API independently enforces the policy via RLS.
+  const [viewer, setViewer] = useState<{ id: string; isAdmin: boolean } | null>(null);
+  // Track in-flight deletes so users can't double-tap and so we can show
+  // a subtle pending state. Realtime DELETE events will also clean up.
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   // Hold a single Supabase client across renders to avoid re-creating WebSocket
   // / fetch adapters on every state change.
   const supabaseRef = useRef(createClient());
@@ -64,6 +72,48 @@ export default function EventUpdatesList({ eventId }: Props) {
   useEffect(() => {
     let cancelled = false;
     const ctrl = new AbortController();
+    const supabase = supabaseRef.current;
+
+    async function loadViewer() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const role = (profile as { role?: string } | null)?.role;
+      setViewer({ id: user.id, isAdmin: role === "admin" });
+    }
+
+    // Resolve a single author's display info into state on demand — used
+    // by the realtime INSERT path so a brand-new update from another
+    // organiser still shows their name/avatar without a full reload.
+    async function resolveAuthor(authorId: string) {
+      // Reading from `authors` directly inside a callback would close over
+      // a stale value, so we use the functional setter to dedupe.
+      let alreadyKnown = false;
+      setAuthors((prev) => {
+        if (prev[authorId]) alreadyKnown = true;
+        return prev;
+      });
+      if (alreadyKnown) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .eq("id", authorId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const row = data as { id: string; full_name: string; avatar_url: string | null };
+      setAuthors((prev) =>
+        prev[row.id]
+          ? prev
+          : { ...prev, [row.id]: { full_name: row.full_name, avatar_url: row.avatar_url } },
+      );
+    }
 
     async function load() {
       try {
@@ -85,7 +135,7 @@ export default function EventUpdatesList({ eventId }: Props) {
         // placeholder until the names arrive.
         if (items.length > 0) {
           const authorIds = Array.from(new Set(items.map((u) => u.author_id)));
-          const { data: profiles } = await supabaseRef.current
+          const { data: profiles } = await supabase
             .from("profiles")
             .select("id, full_name, avatar_url")
             .in("id", authorIds);
@@ -99,7 +149,15 @@ export default function EventUpdatesList({ eventId }: Props) {
         }
 
         if (!cancelled) {
-          setUpdates(items);
+          // Merge rather than replace so any realtime INSERT that won the
+          // race against the initial fetch (sub-second window where the
+          // channel is already subscribed but `load()` hasn't resolved)
+          // isn't clobbered by the snapshot.
+          setUpdates((prev) => {
+            const seen = new Set(items.map((u) => u.id));
+            const extras = prev.filter((u) => !seen.has(u.id));
+            return [...extras, ...items];
+          });
           setLoading(false);
         }
       } catch (err) {
@@ -108,13 +166,80 @@ export default function EventUpdatesList({ eventId }: Props) {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
+    void loadViewer();
+    void load();
+
+    // Live broadcast subscription. Migration 071 adds event_updates to the
+    // supabase_realtime publication; without that the postgres_changes
+    // events would never fire. We listen for INSERT and DELETE only —
+    // updates aren't editable in this product.
+    const channel = supabase
+      .channel(`event-updates-${eventId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "event_updates",
+          filter: `event_id=eq.${eventId}`,
+        },
+        (payload) => {
+          const row = payload.new as EventUpdate;
+          if (!row?.id) return;
+          setUpdates((prev) =>
+            prev.some((u) => u.id === row.id) ? prev : [row, ...prev],
+          );
+          void resolveAuthor(row.author_id);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "event_updates",
+          filter: `event_id=eq.${eventId}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as { id?: string })?.id;
+          if (!deletedId) return;
+          setUpdates((prev) => prev.filter((u) => u.id !== deletedId));
+        },
+      )
+      .subscribe();
 
     return () => {
       cancelled = true;
       ctrl.abort();
+      void supabase.removeChannel(channel);
     };
   }, [eventId]);
+
+  async function handleDelete(updateId: string) {
+    if (pendingDeletes.has(updateId)) return;
+    setPendingDeletes((prev) => {
+      const next = new Set(prev);
+      next.add(updateId);
+      return next;
+    });
+    try {
+      const res = await fetch(
+        `/api/events/${eventId}/updates/${updateId}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        // Optimistic local removal — the realtime DELETE event will also
+        // catch this for other viewers / tabs.
+        setUpdates((prev) => prev.filter((u) => u.id !== updateId));
+      }
+    } finally {
+      setPendingDeletes((prev) => {
+        const next = new Set(prev);
+        next.delete(updateId);
+        return next;
+      });
+    }
+  }
 
   // Hide the entire section while empty.  Comments still anchor the area
   // below; we don't want a perpetually-empty "From the organiser" box on
@@ -143,6 +268,8 @@ export default function EventUpdatesList({ eventId }: Props) {
           const author = authors[u.author_id];
           const name = author?.full_name?.trim() || "Organiser";
           const initial = name.charAt(0).toUpperCase() || "O";
+          const canDelete = !!viewer && (viewer.id === u.author_id || viewer.isAdmin);
+          const isPending = pendingDeletes.has(u.id);
           return (
             <li
               key={u.id}
@@ -157,12 +284,12 @@ export default function EventUpdatesList({ eventId }: Props) {
                   <img
                     src={author.avatar_url}
                     alt=""
-                    className="h-7 w-7 flex-shrink-0 rounded-full object-cover ring-1 ring-black/10"
+                    className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/10"
                   />
                 ) : (
                   <div
                     aria-hidden
-                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-(--gold) text-[11px] font-bold text-black"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--gold) text-[11px] font-bold text-black"
                   >
                     {initial}
                   </div>
@@ -175,9 +302,22 @@ export default function EventUpdatesList({ eventId }: Props) {
                     >
                       {name}
                     </Link>
-                    <span className="flex-shrink-0 text-[10px] text-black/50">
-                      {timeAgo(u.created_at)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[10px] text-black/50">
+                        {timeAgo(u.created_at)}
+                      </span>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(u.id)}
+                          disabled={isPending}
+                          className="text-[10px] font-medium text-black/40 transition hover:text-red-700 disabled:opacity-40"
+                          aria-label="Delete update"
+                        >
+                          {isPending ? "Deleting…" : "Delete"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {/* whitespace-pre-wrap preserves intentional line breaks
                       from the composer textarea (e.g. step-by-step venue

@@ -13,7 +13,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 2 | Legacy cleanup + FEAT-02 minimal calendar + BUG-06 advisor fix | **Shipped** | Removed FullCalendar (5 pkgs), FeaturedPanel, trending modal; added zero-dep GlassCalendar overlay; migration 065 (drop featured_listings, directory_contributors → security_invoker, app_settings RLS). 656 tests, 2 ERROR advisors → 0. |
 | 3 | FEAT-03 Organisation Profiles & Discovery | **Shipped** | pg_trgm typo-tolerant contributor search (word_similarity >= 0.3) in `extensions` schema; new `/api/contributors/search` (anon, CDN-cacheable) + `OrgSearchPanel` wired into events search bar as "Organisations" tab; N1/N3/N5 nice-to-haves + place→owner link. Migrations 066/067/068. 668 tests; advisors 0 ERROR / 77 WARN (unchanged). |
 | 4 | FEAT-04 Consider → Convince complete (`convinces` table) | **Shipped** `a99366d` | New `convinces` table + RLS; `/api/convince` POST/DELETE; `notify_on_convince` + `notify_friends_on_rsvp_attending` triggers (24h dedup); BurgerMenu unified Considerations section (My/Friends toggle, Convince CTA); horizontal-card "Convinced" overlay; migrations 069 + 070 (search_path hardening). 677 tests; advisors 0 ERROR / 83 WARN (+4 expected for new SECURITY DEFINER triggers + 2 scan variability). |
-| 5 | FEAT-05 Broadcast Updates (`event_broadcasts` table) | Queued | |
+| 5 | FEAT-05 Broadcast Updates polish + retroactive infrastructure fix | **Shipped** | Discovered migration 030 was never applied in prod (FEAT-05 silently broken since Phase E); applied retroactively. New migration 071 adds `event_updates` to `supabase_realtime` publication. New DELETE endpoint `/api/events/[id]/updates/[updateId]` (RLS-gated, 400/401/403/404/200). EventUpdatesList rewritten with realtime INSERT/DELETE subscription + inline Delete button for author/admin (merge-not-replace race fix). OrgSearchPanel kind-label ternary deduped into `KIND_BADGE_LABEL` record. `leaflet-maps.instructions.md` renamed to `maplibre-maps.instructions.md` (+ all refs updated). MASTER_DIRECTION FEAT-05 doc reconciled to shipped names (`event_updates`, 1000-char ceiling). 682 tests (+5 new for DELETE); advisors 0 ERROR / 83 WARN (unchanged from Batch 4 baseline). |
 | 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | Queued | |
 
 ### Batch 1 validation
@@ -60,6 +60,14 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
   2. Both new triggers `search_path` corrected from `public, pg_temp` → `pg_catalog, public` (project standard, see 051)
   3. Should-fix applied inline: 24h dedup `not exists` guard on `notify_friends_on_rsvp_attending` so rapid attending↔considering toggles don't re-fan-out to every mutual friend
 - Should-fix items deferred (recorded in DECISIONS.md): friend-considerings list scoped only to event-organiser friends (current scope: all events with any considering mutual); mutual-friendship recheck on SELECT side of convinces (currently INSERT-only); split API error mapping for self-block vs other unique-violation; legacy `friend_invite` notification type still in pg_notification CHECK after deprecation.
+
+### Batch 5 validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 77 files / 682 tests passing (+5 new for DELETE `/api/events/:id/updates/:updateId`)
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN — **unchanged from Batch 4 baseline**.
+- Architect subagent review: applied 1 Should-fix inline (merge-not-replace race fix on initial fetch of `EventUpdatesList`). Two infra Nice-to-haves logged in DECISIONS.md: (a) `REPLICA IDENTITY FULL` on `event_updates` so server-side DELETE filter works (currently filtered in JS), (b) toast on optimistic DELETE failure when toast infra lands.
+- **Critical finding:** migration 030 (`event_updates` table + RLS) was authored locally on the Phase E ship date but never applied to the remote project. The entire FEAT-05 substrate has been silently 500'ing in production. Applied retroactively in this batch via MCP; verified `to_regclass('public.event_updates')` now resolves and the table is in `supabase_realtime` publication.
 - Nice-to-haves deferred: invite-status badge polish, optimistic burger refresh staleness budget, segment-toggle keyboard nav.
 
 

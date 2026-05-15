@@ -15,6 +15,18 @@
 
 ## 2. What just shipped
 
+**Batch 5 — FEAT-05 Broadcast Updates polish + retroactive infrastructure fix** — `origin/main` (this batch).
+
+- **Critical finding:** migration `030_event_updates.sql` was authored locally on the Phase E ship date but never applied to the remote project. Every FEAT-05 surface (composer, viewer, GET/POST API, edge function) had been silently 500'ing in production since Phase E shipped. Applied retroactively via MCP.
+- **New migration `071_event_updates_realtime.sql`** adds `event_updates` to the `supabase_realtime` publication (idempotent), applied.
+- **New `DELETE /api/events/:id/updates/:updateId`** — RLS-gated (author or admin), UUID-validated, scoped by both `event_id` and `id` so a caller can't reach across events. Maps 42501/RLS → 403, missing row → 404, success → 200. 5 new tests.
+- **`EventUpdatesList` rewritten** — resolves current viewer + admin role on mount; subscribes to `postgres_changes` INSERT and DELETE filtered by `event_id`; renders inline Delete button when `viewer.id === author_id` or `viewer.isAdmin`; optimistic local removal; cleans up channel on unmount. Initial snapshot uses merge-not-replace dedupe to avoid a sub-second race against the realtime channel (Architect Should-fix).
+- **`OrgSearchPanel` kind-label dedupe** — triple ternary replaced with a local `KIND_BADGE_LABEL` record at file scope; commented why the short "Org" label intentionally diverges from canonical `CONTRIBUTOR_KIND_LABELS`.
+- **`leaflet-maps.instructions.md` renamed to `maplibre-maps.instructions.md`** via `git mv`; refs updated in `copilot-instructions.md`, `RESUME_HERE.md`, `docs/STATUS_REPORT_2026-05.md`.
+- **`.github/MASTER_DIRECTION.md` FEAT-05 doc reconciled** — `event_broadcasts` is the spec name; `event_updates` (1000 chars, not 500) is the shipped name. Future readers won't re-debate this.
+
+✅ **Quality gate (Batch 5):** tsc 0 errors · vitest 77 files / 682 tests · lint clean · Architect 1 Should-fix applied inline (race), 2 Nice-to-haves logged · advisors **0 ERROR / 83 WARN — unchanged from Batch 4 baseline**.
+
 **Batch 4 — FEAT-04 Consider → Convince + friend-activity notifications** — `origin/main` @ `a99366d`.
 
 - **`convinces` table** (id, from_user_id, to_user_id, event_id, created_at) + RLS: participants read; mutual-friend + target-is-considering insert; sender-only delete. `UNIQUE (from_user_id, to_user_id, event_id)` makes Convinced a one-time act per recipient/event — duplicate INSERT returns 23505 → API maps to 409 → UI flips to "Convinced ✓".
@@ -79,15 +91,14 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, **4** shipped; Batches 5 → 6 queued.
-- Test suite: 677 / 677. TS: 0 errors. Lint: clean.
-- Supabase advisors security: 0 ERROR, 83 WARN (baseline 77 + 4 new project-pattern advisors for the 2 new SECURITY DEFINER triggers + 2 scan variability).
-- Git: `origin/main` at `a99366d`.
+- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, **5** shipped; Batch 6 queued.
+- Test suite: 682 / 682. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR, 83 WARN (unchanged from Batch 4 baseline).
+- Git: `origin/main` updated this batch (see commit log).
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
-2. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
+1. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
 
 (Bug list BUG-01..BUG-10 and owner tasks T1..T6 from `.github/MASTER_DIRECTION.md` Parts 6–8 fold into these batches.)
 
@@ -96,16 +107,15 @@
 - **T4 (owner task):** `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_MAPTILER_STYLE` are missing on Vercel. Map renders OSM raster fallback until set. See `docs/RUNBOOK.md` section 2 for Vercel setup steps. Style UUID locked: `019dba0f-b49b-73bb-bf6a-f9d820f43be8`.
 - **Doc-vs-code discrepancy logged in DECISIONS.md:** approval keeps `role='contributor'` + `contributor_kind` sub-type (per migration 033), not the literal "role to match contributor_kind" wording in MASTER_DIRECTION FEAT-01.
 - **`/admin/reports` not renamed to `/admin/reported`** per the spec — deferred (logged in DECISIONS).
-- **Batch 3 Architect nice-to-haves** — deferred: `word_similarity` is not directly indexable (revisit beyond ~5k contributors); add trgm index on `bio` if bios grow long; truncate `bio` to ~160 chars in RPC return; dedupe `contributor_kind` label maps into a single source (currently inlined in two components).
-- **Batch 2 Architect nice-to-haves N2/N4** — still deferred: `parseEventDate` local-tz construction; guard `setMapFlyTo(null)` on calendar close. (N1/N3/N5 shipped in Batch 3.)
-- **Batch 1b Architect nice-to-haves (N1–N6)** — deferred: rename `leaflet-maps.instructions.md`, etc.
+- **Batch 5 Architect Nice-to-haves:** `REPLICA IDENTITY FULL` on `event_updates` so the server-side DELETE filter works (currently filtered in JS, correctness preserved); toast on optimistic DELETE failure when toast infra lands.
+- **Batch 3 Architect nice-to-haves** — deferred: `word_similarity` is not directly indexable (revisit beyond ~5k contributors); add trgm index on `bio` if bios grow long; truncate `bio` to ~160 chars in RPC return.
 
 ## 6. How to verify locally (Windows PowerShell)
 
 ```powershell
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
-npx vitest run              # expect 668 pass / 0 fail
+npx vitest run              # expect 682 pass / 0 fail
 npx next lint --dir src     # expect clean (deprecation warning is non-blocking)
 ```
 
@@ -131,7 +141,7 @@ Smoke test the admin restructure:
 
 - Full directory map + data flow + key relationships: `.github/instructions/project-architecture.instructions.md`.
 - UI rules (60/30/10, floating controls): `.github/instructions/connect-ui-system.instructions.md`.
-- MapLibre + MapTiler patterns: `.github/instructions/leaflet-maps.instructions.md` (filename is legacy; content is MapLibre GL JS — rename is N1 deferred).
+- MapLibre + MapTiler patterns: `.github/instructions/maplibre-maps.instructions.md`.
 - Supabase dual-client + RLS + storage: `.github/instructions/supabase-patterns.instructions.md`.
 - Project ID: `xyiajtrvhlxaeplsiajj`. Default map centre: Pretoria, South Africa `[-25.7479, 28.2293]`.
 - Roles: `citizen` / `contributor` / `admin` with `contributor_kind` sub-type (`ministry` / `organization` / `business`) per migration 033.
