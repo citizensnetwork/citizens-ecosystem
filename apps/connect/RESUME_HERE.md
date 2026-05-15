@@ -112,7 +112,7 @@
 - MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, 5, **6** shipped; Wear feature spec queued next.
 - Test suite: 682 / 682. TS: 0 errors. Lint: clean.
 - Supabase advisors security: 0 ERROR, 83 WARN (unchanged from Batch 5 baseline).
-- Git: `origin/main` updated with Batch 6 (see commit SHA at top of "What just shipped").
+- Git: `origin/main` at `a6d9f1f` (Batch 6).
 
 ## 4. Next batches queued (in priority order)
 
