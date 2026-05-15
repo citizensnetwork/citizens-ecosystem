@@ -2,6 +2,29 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 4 — FEAT-04 Consider → Convince
+
+**Decision — `convinces` is a permanent record with `UNIQUE (from_user_id, to_user_id, event_id)`.** Once a friend has been told "you should go to this", repeated nags add noise without adding signal. The DB-level UNIQUE constraint turns the second click into a `23505` which the API maps to `409 already-convinced`; the UI uses this (`res.ok || res.status === 409`) to flip the local button to "Convinced ✓" instead of erroring. Revocation is allowed via DELETE (sender-only RLS policy) so a mistaken convince can be undone, but the standing intent is that Convinced is a one-time act per (sender, recipient, event).
+
+**Decision — One `friends_activity` notification pref controls both new types.** `friend_convince` and `friend_attending` reuse the existing `notification_prefs.friends_activity` jsonb key (default `true`, opt-out only). Adding two separate prefs would force users to make a granular choice they don't have the mental model for yet — Citizens Connect is still pre-launch and we don't have data on which fan-out is more annoying. The two triggers `notify_on_convince` and `notify_friends_on_rsvp_attending` both read the recipient's pref before inserting; if `friends_activity = false`, the trigger early-returns with no row written.
+
+**Decision — Unified Considerations section, not split between two burger tabs.** Original design considered separating "My Considerations" (events I am considering) and "Friend Considerations" (events my friends are considering and I should convince them about). Chose a single section with a segmented My/Friends toggle and a combined badge count (`myConsidering.length + friendConsiderings.length`) — keeps the burger card count down, surfaces both halves of the loop at one entry point, and matches the unified "Considerations" framing in MASTER_DIRECTION.
+
+**Decision — 24h dedup guard on `notify_friends_on_rsvp_attending` via NOT EXISTS subquery.** A user can flip `rsvps.status` from attending → considering → attending repeatedly (e.g. on mobile when the network is flaky and they retry). Without a guard, every flip fans out a fresh `friend_attending` notification to every mutual follower. The dedup `not exists (select 1 from notifications n where ... and n.created_at > now() - interval '24 hours')` is cheaper than a separate dedup table and naturally expires. Trade-off: a user who flips after 25h gets re-notified, which is the desired behaviour — that long a gap is no longer a "double-tap" but a deliberate re-commit.
+
+**Decision — Two new SECURITY DEFINER triggers + `toggle_consider` RPC use `search_path = pg_catalog, public` (not `public, pg_temp`).** Project hardening standard set in migration 051: any `public`-schema object can shadow a built-in inside a SECURITY DEFINER context. Prepending `pg_catalog` and dropping `pg_temp` blocks both vectors. Migration 070 was created specifically to apply this hardening to the in-flight-deployed `toggle_consider` (which was hardened with auth.uid() + grant via MCP in the prior session but its search_path was still `public, pg_temp`) and the two new triggers.
+
+**Decision — Local migration 022 source updated to match deployed hardening (auth.uid() check + revoke/grant) so cold-deploys don't regress.** The deployed `toggle_consider` was hardened in-flight via MCP after-the-fact. A fresh environment (CI, restore, new project) that re-runs migrations from disk would have re-created the function in its original SECURITY DEFINER-without-auth.uid()-check shape — a privilege-escalation hazard. 022 is now rewritten on-disk to match deployed state; 070 then layers the search_path fix on top.
+
+**Should-fix items deferred for a future polish batch:**
+
+- *Friend-considerings scoping*: currently `useBurgerMenuData` lists every event any mutual is considering. A reasonable refinement is to scope to events organised by another mutual friend (true peer-to-peer recommend) or by a contributor I follow. Holding off until we see how the unscoped feed performs.
+- *Convince INSERT-only mutual recheck*: the SELECT policy on `convinces` allows participants to read after the row exists, but does not re-verify the friendship at read time. If the sender unfollows the recipient mid-flight, the receiver still sees the row in their notifications. Acceptable since deleting the friendship doesn't retract the act of having recommended.
+- *Convince API error mapping*: `42501` (RLS denial) and the self-block 400 share a single `forbidden` body. A unique-violation that arises from concurrent inserts is mapped to 409 alongside legitimate duplicate; could be split for cleaner client telemetry.
+- *Legacy `friend_invite` allow-list value* still present in `notifications.type` CHECK from an earlier prototype; defer cleanup until we know whether B2B invite flow will revive it.
+
+---
+
 ## MASTER_DIRECTION Batch 3 — FEAT-03 Organisation discovery
 
 **Decision — `pg_trgm` installed in the `extensions` schema, not `public`.** Supabase's advisor flags any extension in `public` as a warning, and `public` is on every role's default search_path which makes it a noisy namespace for opaque trigram operators. Migration 067 relocates the extension and recreates the GIN indexes with the qualified operator class `extensions.gin_trgm_ops`. The `search_contributors` RPC pins `search_path = public, extensions, pg_temp` so it can resolve `extensions.word_similarity`, `extensions.similarity`, and `extensions.gin_trgm_ops` without polluting `public`.

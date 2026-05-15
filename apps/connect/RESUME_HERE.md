@@ -15,6 +15,23 @@
 
 ## 2. What just shipped
 
+**Batch 4 — FEAT-04 Consider → Convince + friend-activity notifications** — `origin/main` @ `a99366d`.
+
+- **`convinces` table** (id, from_user_id, to_user_id, event_id, created_at) + RLS: participants read; mutual-friend + target-is-considering insert; sender-only delete. `UNIQUE (from_user_id, to_user_id, event_id)` makes Convinced a one-time act per recipient/event — duplicate INSERT returns 23505 → API maps to 409 → UI flips to "Convinced ✓".
+- **`/api/convince` (POST + DELETE)** — rate-limited, UUID-validated, self-block, error-code mapping (23505 → 409, 42501 → 403, 201 on success). 9 new tests.
+- **Two new SECURITY DEFINER triggers** (both `search_path = pg_catalog, public`, per project hardening standard from migration 051):
+  - `notify_on_convince` — fires on `convinces` INSERT, respects `notification_prefs.friends_activity` (default ON), writes `friend_convince` notification.
+  - `notify_friends_on_rsvp_attending` — fires on `rsvps` INSERT or UPDATE when `status=attending` (first-time transition only), fans out `friend_attending` notifications to every mutual follower with the pref on, **with 24h dedup `not exists` guard** so rapid attending↔considering toggles don't re-fan-out.
+- **Notifications type allow-list widened** for `friend_convince` and `friend_attending`.
+- **`useBurgerMenuData` rewritten** — 6 parallel queries: trending, favourite orgs, friends, friend-considerings (grouped mutuals per event), userConsidering, incomingConvinceEventIds (`Set<event_id>` of events convinced TO me), outgoingConvinceKeys (`Set<event_id|to_user_id>`). Returns a `refetch()` callable.
+- **BurgerMenu refactored** into unified **Considerations** section: segmented My/Friends toggle; combined badge `userConsidering.length + friendConsiderings.length`; new `FriendConsideringCard` renders event card + mutual avatars + Convince button (treats 201 || 409 as success → flips to "Convinced" pill via `localSent` || `outgoingConvinceKeys.has(...)`). Old Friends accordion + `BurgerConsiderSection` + `FriendAccordion` helpers removed.
+- **EventsView wired**: passes new hook fields to BurgerMenu; quick-action `consider` calls `refetchBurgerData()` after `setConsiderVersion`; both horizontal-card grids (trending + quick-panel) render a small "✦ Convinced" overlay on events present in `incomingConvinceEventIds`.
+- **NotificationPanel** `TYPE_ICONS` extended with `friend_convince: "✦"`, `friend_attending: "♥"`, `new_message: "✉"`. Existing `data.event_id` deep-link already navigates.
+- **Migrations**: `022` source updated on-disk to match deployed hardened state (auth.uid() check + revoke/grant). `069` created (table + RLS + widened CHECK + 2 triggers). `070` created (search_path hardening on all 3 functions + dedup guard) — both applied to remote via MCP and verified.
+- **`supabase/schema.sql`** canonical FEAT-04 block appended.
+
+✅ **Quality gate (Batch 4):** tsc 0 errors · vitest 76 files / 677 tests (+9 new for /api/convince) · lint clean · Architect B→A after applying both Must-fixes + one Should-fix inline (see DECISIONS.md) · advisors **0 ERROR / 83 WARN** (baseline 77 + 4 expected for new SECURITY DEFINER triggers + 2 scan variability; no new ERROR-level findings).
+
 **Batch 3 — FEAT-03 Organisation Profiles & Discovery + N1/N3/N5 + place owner link** — `origin/main` @ `ef7fac6`.
 
 - **Typo-tolerant contributor search** (`pg_trgm` in the `extensions` schema). RPC `public.search_contributors(q, kinds, location_query, category_slug, sort_by, result_limit)` — SECURITY INVOKER, STABLE, `search_path = public, extensions, pg_temp`, `word_similarity(qn, full_name) >= 0.3`. "evry naton" → "Every Nation Mooikloof" (sim 0.43). ILIKE branches escape `\ % _` to prevent wildcard injection.
@@ -62,16 +79,15 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3 shipped; Batches 4 → 6 queued.
-- Test suite: 668 / 668. TS: 0 errors. Lint: clean.
-- Supabase advisors security: 0 ERROR, 77 WARN unchanged from baseline.
-- Git: `origin/main` at `ef7fac6`.
+- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, **4** shipped; Batches 5 → 6 queued.
+- Test suite: 677 / 677. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR, 83 WARN (baseline 77 + 4 new project-pattern advisors for the 2 new SECURITY DEFINER triggers + 2 scan variability).
+- Git: `origin/main` at `a99366d`.
 
 ## 4. Next batches queued (in priority order)
 
-1. **Batch 4 — FEAT-04 Consider → Convince complete (new `convinces` table).**
-2. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
-3. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
+1. **Batch 5 — FEAT-05 Broadcast Updates (new `event_broadcasts` table).**
+2. **Batch 6 — Extended profiles schema + `content_labels` table + monorepo folder prep.**
 
 (Bug list BUG-01..BUG-10 and owner tasks T1..T6 from `.github/MASTER_DIRECTION.md` Parts 6–8 fold into these batches.)
 

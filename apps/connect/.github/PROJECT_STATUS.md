@@ -12,7 +12,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 1b | Re-file (move MASTER_DIRECTION, archive AGENTS+11 agent files, rewrite copilot-instructions, VISION, README, create FUTURE_IDEAS + .env.example + RUNBOOK) | **Shipped** | Root MASTER_DIRECTION deleted; AGENTS + 11 agent files archived to docs/archive/; copilot-instructions/VISION/README rewritten; FUTURE_IDEAS, .env.example, RUNBOOK created. 656 tests unchanged. |
 | 2 | Legacy cleanup + FEAT-02 minimal calendar + BUG-06 advisor fix | **Shipped** | Removed FullCalendar (5 pkgs), FeaturedPanel, trending modal; added zero-dep GlassCalendar overlay; migration 065 (drop featured_listings, directory_contributors → security_invoker, app_settings RLS). 656 tests, 2 ERROR advisors → 0. |
 | 3 | FEAT-03 Organisation Profiles & Discovery | **Shipped** | pg_trgm typo-tolerant contributor search (word_similarity >= 0.3) in `extensions` schema; new `/api/contributors/search` (anon, CDN-cacheable) + `OrgSearchPanel` wired into events search bar as "Organisations" tab; N1/N3/N5 nice-to-haves + place→owner link. Migrations 066/067/068. 668 tests; advisors 0 ERROR / 77 WARN (unchanged). |
-| 4 | FEAT-04 Consider → Convince complete (`convinces` table) | Queued | |
+| 4 | FEAT-04 Consider → Convince complete (`convinces` table) | **Shipped** `a99366d` | New `convinces` table + RLS; `/api/convince` POST/DELETE; `notify_on_convince` + `notify_friends_on_rsvp_attending` triggers (24h dedup); BurgerMenu unified Considerations section (My/Friends toggle, Convince CTA); horizontal-card "Convinced" overlay; migrations 069 + 070 (search_path hardening). 677 tests; advisors 0 ERROR / 83 WARN (+4 expected for new SECURITY DEFINER triggers + 2 scan variability). |
 | 5 | FEAT-05 Broadcast Updates (`event_broadcasts` table) | Queued | |
 | 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | Queued | |
 
@@ -46,6 +46,22 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
   2. Single `closeCalendar()` callback routes every dismiss path (URL cleanup)
   3. Bare anon `@supabase/supabase-js` client in `/api/contributors/search` (no Set-Cookie, `Cache-Control: public, s-maxage=15, stale-while-revalidate=60`)
 - Nice-to-haves deferred (tracked in DECISIONS): non-indexable word_similarity revisit beyond ~5k rows; bio trgm index; RPC bio truncation; contributor_kind label dedupe.
+
+### Batch 4 validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 76 files / 677 tests passing (+9 new for `/api/convince` route)
+- `npx next lint --dir src`: clean (no warnings or errors)
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN
+  - Baseline before this batch: 77 WARN
+  - +4 expected new advisors: 2 new SECURITY DEFINER triggers (`notify_on_convince`, `notify_friends_on_rsvp_attending`) each generate `anon_security_definer_function_executable` + `authenticated_security_definer_function_executable` — same project-pattern as the 31 other definer functions already on the list. Not exploitable: both triggers fire under RLS-protected INSERTs with mutual-friend + target-considering predicate (convinces) and user-owned predicate (rsvps).
+  - +2 advisor-scan variability on unchanged functions (no new ERROR-level findings).
+- Architect subagent review: B→A after applying both Must-fixes inline:
+  1. New migration 070 hardens `toggle_consider` (search_path = `pg_catalog, public`) + brings local 022 source in sync with deployed shape (auth.uid() check + revoke/grant), removing the cold-deploy regression hazard
+  2. Both new triggers `search_path` corrected from `public, pg_temp` → `pg_catalog, public` (project standard, see 051)
+  3. Should-fix applied inline: 24h dedup `not exists` guard on `notify_friends_on_rsvp_attending` so rapid attending↔considering toggles don't re-fan-out to every mutual friend
+- Should-fix items deferred (recorded in DECISIONS.md): friend-considerings list scoped only to event-organiser friends (current scope: all events with any considering mutual); mutual-friendship recheck on SELECT side of convinces (currently INSERT-only); split API error mapping for self-block vs other unique-violation; legacy `friend_invite` notification type still in pg_notification CHECK after deprecation.
+- Nice-to-haves deferred: invite-status badge polish, optimistic burger refresh staleness budget, segment-toggle keyboard nav.
+
 
 ---
 
