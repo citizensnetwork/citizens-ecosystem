@@ -14,7 +14,8 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 3 | FEAT-03 Organisation Profiles & Discovery | **Shipped** | pg_trgm typo-tolerant contributor search (word_similarity >= 0.3) in `extensions` schema; new `/api/contributors/search` (anon, CDN-cacheable) + `OrgSearchPanel` wired into events search bar as "Organisations" tab; N1/N3/N5 nice-to-haves + place→owner link. Migrations 066/067/068. 668 tests; advisors 0 ERROR / 77 WARN (unchanged). |
 | 4 | FEAT-04 Consider → Convince complete (`convinces` table) | **Shipped** `a99366d` | New `convinces` table + RLS; `/api/convince` POST/DELETE; `notify_on_convince` + `notify_friends_on_rsvp_attending` triggers (24h dedup); BurgerMenu unified Considerations section (My/Friends toggle, Convince CTA); horizontal-card "Convinced" overlay; migrations 069 + 070 (search_path hardening). 677 tests; advisors 0 ERROR / 83 WARN (+4 expected for new SECURITY DEFINER triggers + 2 scan variability). |
 | 5 | FEAT-05 Broadcast Updates polish + retroactive infrastructure fix | **Shipped** | Discovered migration 030 was never applied in prod (FEAT-05 silently broken since Phase E); applied retroactively. New migration 071 adds `event_updates` to `supabase_realtime` publication. New DELETE endpoint `/api/events/[id]/updates/[updateId]` (RLS-gated, 400/401/403/404/200). EventUpdatesList rewritten with realtime INSERT/DELETE subscription + inline Delete button for author/admin (merge-not-replace race fix). OrgSearchPanel kind-label ternary deduped into `KIND_BADGE_LABEL` record. `leaflet-maps.instructions.md` renamed to `maplibre-maps.instructions.md` (+ all refs updated). MASTER_DIRECTION FEAT-05 doc reconciled to shipped names (`event_updates`, 1000-char ceiling). 682 tests (+5 new for DELETE); advisors 0 ERROR / 83 WARN (unchanged from Batch 4 baseline). |
-| 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | Queued | |
+| 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | **Shipped** `a6d9f1f` | Migrations 072-078, search_contributors v2, `/admin/reports`->`/admin/reported`, monorepo-prep stubs. 682 tests; advisors 0 ERROR / 83 WARN. |
+| 7a | Staged audit fixes (middleware-and-session + api-surface) | **Shipped** | `redirectWithCookies` cookie propagation on signOut redirects; admin-review hardening (UUID/enum validation, `requireAdmin`, IP rate limit with trusted-IP gating + fail-closed); rate limits added to consider PUT, follow DELETE, event-updates POST, conversations GET, indemnity POST, contributor/profile POST, preferences POST, push-token DELETE; event-updates error sanitisation + RLS->403. 683 tests (+1); advisors 0 ERROR / 83 WARN (unchanged). Both audit surfaces -> `clean`. |
 
 ### Batch 1 validation
 - `npx tsc --noEmit`: 0 errors
@@ -92,6 +93,19 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 - `npx next lint --dir src`: clean
 - `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN — **unchanged from Batch 5 baseline**. Migration 073 briefly added 2 WARN; 076 restored baseline.
 - Architect subagent review: B→A after applying 2 Must-fixes + 2 Should-fixes inline (077 stale-label cleanup, 077 orphan-label cleanup triggers, 077 tightened SELECT policy, API/page URL split documented). Nice-to-haves deferred to DECISIONS.md: SA-province CHECK on `connect_home_province`, `learn_enrolled_listings` no-dupes CHECK, per-app `profiles_wear`/`profiles_learn` sub-tables once 3rd Wear-only RLS-different column ships, fully-qualified `search_path=''` sweep across all SECURITY DEFINER functions.
+
+### Batch 7a — Staged audit fixes (middleware + API surface)
+- **middleware.ts** — new `redirectWithCookies()` helper copies cookies from `supabaseResponse` (notably the cleared `sb-*` cookies that `signOut()` writes via our `cookies.setAll` callback) onto every signOut redirect. Both signOut branches (profile-lookup-error, force-reauth iat mismatch) routed through it. Regression test added.
+- **admin/contributors/review** — full hardening: UUID + enum validation up front; in-app uses `requireAdmin()` + per-user rate limit; deep-link uses IP rate limit (trusts only `request.ip` / Vercel-set XFF; fails closed with 400 when client IP cannot be determined). 429 responses carry `Retry-After`.
+- **Rate limits added** to: consider PUT, follow DELETE, event-updates POST (+ UUID guard + error sanitisation, RLS→403 via 42501), conversations GET, indemnity POST, contributor/profile POST, preferences POST, push-token DELETE (shared bucket with POST, intentional).
+- **Audit queue**: both surfaces (`middleware-and-session`, `api-surface`) marked `clean`.
+
+### Batch 7a validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 77 files / 683 tests passing (+1 new cookie-propagation regression test)
+- `npx next lint --dir src`: clean (no warnings or errors)
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN — **unchanged from Batch 6 baseline**
+- Architect subagent review: no Must-fix. Two Should-fix items applied inline (S1 trusted-IP gating, S2 fail-closed on missing client IP). Nice-to-haves N1, N3, N5 deferred (in-memory limiter scope, admin-review upstream detail sanitisation, action type narrowing).
 
 
 ---

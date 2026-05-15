@@ -23,9 +23,9 @@ vi.mock("@supabase/ssr", () => ({
 
 // Mock NextResponse
 const mockNextResponse = {
-  cookies: { set: vi.fn() },
+  cookies: { set: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
 };
-const mockRedirectResponse = { redirected: true };
+const mockRedirectResponse = { redirected: true, cookies: { set: vi.fn() } };
 
 vi.mock("next/server", () => ({
   NextResponse: {
@@ -195,5 +195,49 @@ describe("middleware", () => {
     await middleware(makeRequest("/events") as never);
     expect(mockSignOut).toHaveBeenCalled();
     expect(NextResponse.redirect).toHaveBeenCalled();
+  });
+
+  it("propagates cleared auth cookies onto the redirect on signOut paths", async () => {
+    // Audit: middleware-and-session, Finding #1.
+    // signOut() writes cleared sb-* cookies onto supabaseResponse via
+    // our cookies.setAll callback. The redirect response must inherit
+    // them or the browser keeps stale auth cookies and force-reauth fails.
+    const supabaseCookieJar = [
+      { name: "sb-access-token", value: "", maxAge: 0 },
+      { name: "sb-refresh-token", value: "", maxAge: 0 },
+    ];
+    const redirectCookieSet = vi.fn();
+    const supabaseResponseStub = {
+      cookies: {
+        getAll: () => supabaseCookieJar,
+        set: vi.fn(),
+      },
+    };
+    const redirectResponseStub = {
+      redirected: true,
+      cookies: { set: redirectCookieSet },
+    };
+
+    const { NextResponse } = await import("next/server");
+    (NextResponse.next as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      supabaseResponseStub,
+    );
+    (NextResponse.redirect as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      redirectResponseStub,
+    );
+
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u6" } }, error: null });
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: "42P01", message: "transient" },
+    });
+
+    const { middleware } = await import("@/middleware");
+    await middleware(makeRequest("/events") as never);
+
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(redirectCookieSet).toHaveBeenCalledTimes(supabaseCookieJar.length);
+    expect(redirectCookieSet).toHaveBeenCalledWith(supabaseCookieJar[0]);
+    expect(redirectCookieSet).toHaveBeenCalledWith(supabaseCookieJar[1]);
   });
 });

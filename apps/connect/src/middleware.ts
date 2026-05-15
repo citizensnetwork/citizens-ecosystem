@@ -15,6 +15,20 @@ const BIO_SETUP_ALLOW = [
   "/auth",
 ];
 
+/**
+ * Build a redirect response that carries every cookie currently set on
+ * `supabaseResponse`. Required because `supabase.auth.signOut()` sets
+ * `Set-Cookie: sb-*=; Max-Age=0` on `supabaseResponse` via our
+ * `cookies.setAll` callback — returning a fresh `NextResponse.redirect(...)`
+ * would discard those headers and leave stale auth cookies in the browser,
+ * defeating force-reauth (audit: middleware-and-session, Finding #1).
+ */
+function redirectWithCookies(target: URL, supabaseResponse: NextResponse): NextResponse {
+  const res = NextResponse.redirect(target);
+  supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+  return res;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -75,7 +89,7 @@ export async function middleware(request: NextRequest) {
       loginUrl.pathname = "/login";
       loginUrl.search = "";
       loginUrl.searchParams.set("reauth", "1");
-      return NextResponse.redirect(loginUrl);
+      return redirectWithCookies(loginUrl, supabaseResponse);
     }
 
     // Force-reauth gate: admin bumped force_reauth_at after a role change.
@@ -108,7 +122,7 @@ export async function middleware(request: NextRequest) {
         loginUrl.pathname = "/login";
         loginUrl.search = "";
         loginUrl.searchParams.set("reauth", "1");
-        return NextResponse.redirect(loginUrl);
+        return redirectWithCookies(loginUrl, supabaseResponse);
       }
     }
 

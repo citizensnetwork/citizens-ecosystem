@@ -2,6 +2,30 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 7a — Staged audit fixes
+
+**Decision — `signOut()` redirects must propagate Set-Cookie headers via `redirectWithCookies()`.**
+The Supabase SSR client's `cookies.setAll` callback writes cleared `sb-*` cookies onto the `supabaseResponse` whenever `auth.signOut()` runs. A plain `NextResponse.redirect()` creates a fresh response and discards those headers, so the browser keeps the stale session cookies and the next request is authenticated again — silently defeating force-reauth. The middleware now wraps every signOut redirect with `redirectWithCookies(target, supabaseResponse)`, which copies `supabaseResponse.cookies.getAll()` onto the redirect. Regression test asserts the propagation. Audit ref: `.audit/surfaces/middleware-and-session.md` Finding #1.
+
+**Decision — rate-limit ordering convention: `auth -> rate-limit -> body parse -> validation`.**
+Unauthenticated callers must not pollute per-user buckets, JSON parsing is cheap but unbounded body reads are not, and validation needs the parsed payload. Pure-syntactic URL/param validation (e.g. UUID guard from a route `params`) may run *before* auth because it's a constant-cost check and the 400/401 distinction is fine to leak. Documented in DECISIONS so the convention is not re-debated per route.
+
+**Decision — IP-bucket rate limits must trust only the platform-set XFF and fail closed.**
+With ad-hoc trust of `x-forwarded-for` an attacker can rotate the leading value per request and defeat per-IP rate limits; the previous `getClientIp` also collapsed missing-header requests into a single shared `"unknown"` bucket, which is a DoS amplifier (one bad actor exhausts the quota for every legitimate caller without an IP). Project standard: prefer `request.ip` (Next.js populates from Vercel-trusted XFF), fall back to `x-forwarded-for` / `x-real-ip` only when `process.env.VERCEL` is set, and otherwise return `null`. Routes that bucket by IP (currently only the admin-review deep-link path) must `return 400 client_identity_required` on null rather than bucketing as "unknown".
+
+**Decision — Admin review API uses `requireAdmin()` + per-mode rate limits.**
+`/api/admin/contributors/review` has two modes: in-app (admin session present) and HMAC deep-link (signed email from the application notification). The in-app path now goes through the shared `requireAdmin()` guard (same as every other admin route) and rate-limits by `${guard.user.id}` with `RATE_LIMITS.mutation`. The deep-link path rate-limits by client IP with `RATE_LIMITS.heavy` to make HMAC enumeration uneconomic. UUID + enum validation is applied up front in both modes. 429 responses carry `Retry-After`.
+
+**Decision — `push-token` POST and DELETE share `push:${user.id}` bucket intentionally.**
+Register/unregister storms are the same abuse pattern (token churn). Legitimate clients call DELETE once on logout; the shared bucket means a token-cycling attacker can't double their budget by alternating verbs. Comment in the file documents the choice so future maintainers don't "fix" the duplication.
+
+**Decision — Event-updates POST maps RLS denials explicitly to 403 via `error.code === "42501"`.**
+Postgres error code `42501` is `insufficient_privilege` (RLS deny). Previously we matched only on `/row-level security/i` against `error.message`; the code-level match is locale-independent and survives any future Postgres message rewording. `error.message` is no longer surfaced to clients on 500; we log it and return a generic `"Failed to create update"` instead.
+
+**Architect Nice-to-haves deferred:**
+- Swap in-memory rate-limit store for Upstash Redis when serverless-instance count starts to materially relax the effective limit (currently acceptable because deep-link path also requires valid HMAC + non-expired `exp`).
+- Admin review `review_failed` response sanitises upstream `detail` (or moves it to server-only logs) — not blocking because the upstream Edge Function is under our control.
+
 ## MASTER_DIRECTION Batch 6 — Citizens ecosystem foundation
 
 **Decision — extend `public.profiles` with Wear / Learn / Connect columns rather than create per-app rows now.**

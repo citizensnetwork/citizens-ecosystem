@@ -17,9 +17,45 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAdmin } from "@/lib/adminGuard";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isValidUUID } from "@/lib/validation";
 
-export async function POST(request: Request) {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const ALLOWED_ACTIONS = new Set(["approve", "reject"]);
+
+/**
+ * Resolve the caller IP for rate-limit bucketing.
+ *
+ * On Vercel, `request.ip` is populated from the platform's *trusted*
+ * `x-forwarded-for` and is safe. Off-Vercel, XFF is fully client-
+ * controlled and an attacker can rotate the leading value to defeat
+ * the per-IP limiter, so we only honour the header when running on a
+ * known-trusted edge. When no IP can be determined in deep-link mode
+ * we return `null` so the caller can fail closed rather than letting
+ * every header-less request share the "unknown" bucket (which would
+ * DoS-amplify across legitimate callers).
+ */
+function getClientIp(req: NextRequest): string | null {
+  // Next.js / Vercel populates `request.ip` from the trusted platform XFF.
+  const direct = (req as unknown as { ip?: string }).ip;
+  if (direct) return direct;
+  if (process.env.VERCEL) {
+    const fwd = req.headers.get("x-forwarded-for");
+    if (fwd) {
+      const first = fwd.split(",")[0]?.trim();
+      if (first) return first;
+    }
+    const real = req.headers.get("x-real-ip");
+    if (real) return real;
+  }
+  return null;
+}
+
+export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   let payload: {
@@ -35,27 +71,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!payload.application_id || !payload.action) {
+  if (
+    !payload.application_id ||
+    !isValidUUID(payload.application_id) ||
+    !payload.action ||
+    !ALLOWED_ACTIONS.has(payload.action)
+  ) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
   // Deep-link mode: skip admin check; the Edge Function verifies HMAC.
-  // In-app mode: require admin session.
+  // In-app mode: require admin session via shared requireAdmin guard.
   const isDeepLink = Boolean(payload.sig && payload.exp);
-  if (!isDeepLink) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isDeepLink) {
+    // Deep-link mode: rate-limit by IP to prevent HMAC brute-force enumeration.
+    // Fail closed when the client IP cannot be trusted — otherwise every
+    // header-less request would share one bucket and could DoS each other.
+    const ip = getClientIp(request);
+    if (!ip) {
+      return NextResponse.json({ error: "client_identity_required" }, { status: 400 });
     }
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    const rl = checkRateLimit(`admin-review-deeplink:${ip}`, RATE_LIMITS.heavy);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() } },
+      );
+    }
+  } else {
+    const guard = await requireAdmin(supabase);
+    if (!guard.ok) return guard.deny;
+    const rl = checkRateLimit(`admin-review-inapp:${guard.user.id}`, RATE_LIMITS.mutation);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() } },
+      );
     }
   }
 

@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const MAX_BODY = 1000;
 
@@ -9,6 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("event_updates")
@@ -18,7 +23,8 @@ export async function GET(
     .limit(50);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[API event-updates GET]", error);
+    return NextResponse.json({ error: "Failed to load updates" }, { status: 500 });
   }
   return NextResponse.json({ updates: data ?? [] });
 }
@@ -29,6 +35,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   const supabase = await createClient();
 
   const {
@@ -36,6 +45,14 @@ export async function POST(
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`event-updates:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() } },
+    );
   }
 
   let payload: { body?: unknown } = {};
@@ -63,9 +80,11 @@ export async function POST(
     .single();
 
   if (error) {
-    // RLS violations surface as "new row violates row-level security policy".
-    const status = /row-level security/i.test(error.message) ? 403 : 500;
-    return NextResponse.json({ error: error.message }, { status });
+    if (error.code === "42501" || /row-level security/i.test(error.message)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    console.error("[API event-updates POST]", error);
+    return NextResponse.json({ error: "Failed to create update" }, { status: 500 });
   }
 
   return NextResponse.json({ update: data }, { status: 201 });

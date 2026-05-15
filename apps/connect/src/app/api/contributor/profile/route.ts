@@ -14,6 +14,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const ALLOWED_KEYS = [
   "bio",
@@ -54,6 +55,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`contrib-profile:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const { data: me } = await supabase

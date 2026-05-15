@@ -14,6 +14,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = checkRateLimit(`conv-list:${user.id}`, RATE_LIMITS.read);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() } },
+    );
+  }
+
   // Get all conversations the user is part of
   const { data: participations, error: partError } = await supabase
     .from("conversation_participants")

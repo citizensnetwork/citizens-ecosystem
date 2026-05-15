@@ -85,3 +85,9 @@ next-env.d.ts
 build.log
 vitest.log
 .testagent/
+
+# Connect Auditor working folder (per-surface checkpoints + staged patches).
+# Local-only by design: each dev's audit run is independent and resumable
+# without polluting git history. The auditor and apply prompts live in
+# .github/ and .github/prompts/ — see .github/agents/connect-auditor.agent.md
+.audit/
