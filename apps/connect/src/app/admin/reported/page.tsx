@@ -1,4 +1,4 @@
-// /admin/reports — list open and recently-resolved reports for admin review.
+// /admin/reported — list open and recently-resolved reports for admin review.
 //
 // Admin-only. Pulls reports with reporter's profile joined.  Resolution
 // happens via PATCH /api/admin/reports/[id], which logs to admin_actions.
@@ -82,9 +82,9 @@ export default async function AdminReportsPage({
       <PageHeader title="Reports" fallbackHref="/events" />
       <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
         <nav className="flex flex-wrap gap-2 text-sm" aria-label="Filter reports by status">
-          <StatusTab label="Open" href="/admin/reports" active={filterStatus === "open"} />
-          <StatusTab label="Actioned" href="/admin/reports?status=actioned" active={filterStatus === "actioned"} />
-          <StatusTab label="Dismissed" href="/admin/reports?status=dismissed" active={filterStatus === "dismissed"} />
+          <StatusTab label="Open" href="/admin/reported" active={filterStatus === "open"} />
+          <StatusTab label="Actioned" href="/admin/reported?status=actioned" active={filterStatus === "actioned"} />
+          <StatusTab label="Dismissed" href="/admin/reported?status=dismissed" active={filterStatus === "dismissed"} />
         </nav>
         <ReportsManager rows={rows} />
       </div>

@@ -71,7 +71,7 @@ export default async function AdminDashboardPage() {
     {
       label: "Open reports",
       value: openReportsRes.count ?? 0,
-      href: "/admin/reports",
+      href: "/admin/reported",
       hint: "Flagged content awaiting decision",
       emphasis: (openReportsRes.count ?? 0) > 0,
     },
@@ -108,7 +108,7 @@ export default async function AdminDashboardPage() {
       description: "Manage roles, elevate Citizens to Contributors, audit trail.",
     },
     {
-      href: "/admin/reports",
+      href: "/admin/reported",
       label: "Reports",
       description: "Resolve user-submitted content reports.",
     },

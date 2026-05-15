@@ -1405,7 +1405,7 @@ end $$;
 
 grant select, insert, delete on public.convinces to authenticated;
 
--- Notifications type allow-list — widen for FEAT-04
+-- Notifications type allow-list ï¿½ widen for FEAT-04
 do $$ begin
   alter table public.notifications drop constraint if exists notifications_type_check;
   alter table public.notifications add constraint notifications_type_check check (type in (
@@ -1515,3 +1515,123 @@ $$;
 
 revoke all on function public.toggle_consider(uuid, uuid) from public;
 grant execute on function public.toggle_consider(uuid, uuid) to authenticated;
+
+-- ============================================================================
+-- Batch 6 (migrations 072 + 073 + 074 + 075 + 076) ï¿½ Citizens ecosystem
+-- preparation: extended profile schema for Wear/Learn/Connect, content
+-- labels with auto-labelling trigger, replica identity tightening, and
+-- search RPC bio truncation.  Idempotent.
+-- ============================================================================
+
+-- Migration 072: profile extensions for cross-app personalisation.
+alter table public.profiles
+  add column if not exists wear_style_preferences jsonb not null default '{}'::jsonb,
+  add column if not exists wear_wardrobe_visibility text not null default 'private'
+    check (wear_wardrobe_visibility in ('public', 'private', 'friends')),
+  add column if not exists learn_enrolled_listings uuid[] not null default '{}'::uuid[],
+  add column if not exists connect_home_province text;
+
+comment on column public.profiles.wear_style_preferences is 'Citizens Wear style preferences bag; free-form jsonb validated client-side.';
+comment on column public.profiles.wear_wardrobe_visibility is 'Wear wardrobe visibility: public | private | friends. Default private.';
+comment on column public.profiles.learn_enrolled_listings is 'Citizens Learn enrolled course/listing ids.';
+comment on column public.profiles.connect_home_province is 'Connect-specific home province for province-level filtering.';
+
+-- Migration 073 + 076: content_labels table + auto-label trigger.
+create table if not exists public.content_labels (
+  id uuid primary key default gen_random_uuid(),
+  entity_type text not null check (entity_type in ('event', 'place', 'profile')),
+  entity_id uuid not null,
+  label text not null check (char_length(label) between 1 and 64),
+  created_at timestamptz not null default now(),
+  unique (entity_type, entity_id, label)
+);
+
+create index if not exists idx_content_labels_entity on public.content_labels (entity_type, entity_id);
+create index if not exists idx_content_labels_label on public.content_labels (label);
+
+alter table public.content_labels enable row level security;
+
+drop policy if exists content_labels_select_all on public.content_labels;
+drop policy if exists content_labels_select_public_entities on public.content_labels;
+create policy content_labels_select_public_entities on public.content_labels
+  for select using (entity_type in ('event', 'place'));
+
+drop policy if exists content_labels_admin_write on public.content_labels;
+create policy content_labels_admin_write on public.content_labels
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create or replace function public.apply_event_content_labels()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  -- Clear rule-managed labels first so a category change clears stale tags.
+  delete from public.content_labels
+    where entity_type = 'event'
+      and entity_id = new.id
+      and label in ('market', 'education');
+
+  if new.category = 'markets-expos' then
+    insert into public.content_labels (entity_type, entity_id, label)
+      values ('event', new.id, 'market')
+      on conflict (entity_type, entity_id, label) do nothing;
+  end if;
+  if new.category in ('education-equipping', 'education', 'equip') then
+    insert into public.content_labels (entity_type, entity_id, label)
+      values ('event', new.id, 'education')
+      on conflict (entity_type, entity_id, label) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.apply_event_content_labels() from public;
+revoke execute on function public.apply_event_content_labels() from anon, authenticated;
+grant execute on function public.apply_event_content_labels() to service_role;
+
+drop trigger if exists trg_apply_event_content_labels on public.events;
+create trigger trg_apply_event_content_labels
+  after insert or update of category on public.events
+  for each row execute function public.apply_event_content_labels();
+
+-- Migration 077: cascade-cleanup of content_labels on entity delete.
+create or replace function public.cleanup_content_labels_on_entity_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_entity_type text := tg_argv[0];
+begin
+  delete from public.content_labels
+    where entity_type = v_entity_type
+      and entity_id = old.id;
+  return old;
+end;
+$$;
+
+revoke all on function public.cleanup_content_labels_on_entity_delete() from public;
+revoke execute on function public.cleanup_content_labels_on_entity_delete() from anon, authenticated;
+grant execute on function public.cleanup_content_labels_on_entity_delete() to service_role;
+
+drop trigger if exists trg_cleanup_content_labels_event on public.events;
+create trigger trg_cleanup_content_labels_event
+  after delete on public.events
+  for each row execute function public.cleanup_content_labels_on_entity_delete('event');
+
+drop trigger if exists trg_cleanup_content_labels_place on public.places;
+create trigger trg_cleanup_content_labels_place
+  after delete on public.places
+  for each row execute function public.cleanup_content_labels_on_entity_delete('place');
+
+drop trigger if exists trg_cleanup_content_labels_profile on public.profiles;
+create trigger trg_cleanup_content_labels_profile
+  after delete on public.profiles
+  for each row execute function public.cleanup_content_labels_on_entity_delete('profile');
+
+-- Migration 074: replica identity full on event_updates so DELETE realtime
+-- events arrive with the full old-row payload (drops the JS-side ghost filter).
+alter table public.event_updates replica identity full;

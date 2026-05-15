@@ -246,6 +246,32 @@ export type Profile = {
    *  `/api/contributor/setup`. Middleware routes contributors with this
    *  flag to `/contributor/setup` before any other protected page. */
   bio_setup_required?: boolean;
+  /** Citizens Wear style preferences bag (migration 072).  Free-form jsonb;
+   *  schema is enforced client-side by `apps/wear`.  Empty `{}` for users
+   *  who have not used Wear. */
+  wear_style_preferences?: Record<string, unknown>;
+  /** Wear wardrobe visibility (migration 072).  Default `'private'`. */
+  wear_wardrobe_visibility?: "public" | "private" | "friends";
+  /** Citizens Learn enrolled course/listing ids (migration 072).
+   *  Empty array for users who have not enrolled in anything. */
+  learn_enrolled_listings?: string[];
+  /** Connect-specific home province for province-level filtering and
+   *  badges (migration 072).  Free-form text, e.g. `'Gauteng'`. */
+  connect_home_province?: string | null;
+  created_at: string;
+};
+
+/**
+ * Row in `public.content_labels` (migration 073).  Labels are written by
+ * admins or by the `apply_event_content_labels` trigger; they are read by
+ * every client (RLS allows SELECT for anon).  Labels are short, lowercase
+ * tags such as `'market'` or `'education'` used by filter chips and search.
+ */
+export type ContentLabel = {
+  id: string;
+  entity_type: "event" | "place" | "profile";
+  entity_id: string;
+  label: string;
   created_at: string;
 };
 

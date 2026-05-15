@@ -5,6 +5,11 @@
  *
  * Admin-only. Writes the transition + notes to the row AND logs an
  * append-only entry in `admin_actions` so every decision is auditable.
+ *
+ * URL note: the user-visible page lives at `/admin/reported` (BUG-09 rename,
+ * Batch 6), while this internal API stays at `/api/admin/reports/[id]`.
+ * Splitting URL vocab between marketing-facing routes and internal APIs is
+ * intentional — the API consumer is the admin client, not the user.
  */
 
 import { NextRequest, NextResponse } from "next/server";

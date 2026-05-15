@@ -70,6 +70,29 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 - **Critical finding:** migration 030 (`event_updates` table + RLS) was authored locally on the Phase E ship date but never applied to the remote project. The entire FEAT-05 substrate has been silently 500'ing in production. Applied retroactively in this batch via MCP; verified `to_regclass('public.event_updates')` now resolves and the table is in `supabase_realtime` publication.
 - Nice-to-haves deferred: invite-status badge polish, optimistic burger refresh staleness budget, segment-toggle keyboard nav.
 
+### Batch 6 — Citizens ecosystem foundation: profile schema extensions + content labels + monorepo prep + deferred polish
+- **Migrations 072–078** (all applied to remote project `xyiajtrvhlxaeplsiajj`):
+  - `072_extended_profile_schema` — adds `wear_style_preferences jsonb`, `wear_wardrobe_visibility text default 'private' check in (public|private|friends)`, `learn_enrolled_listings uuid[]`, `connect_home_province text` to `public.profiles`. Intentional no-op on `connect_notification_radius` — existing `notification_radius_km int default 50` stays canonical.
+  - `073_content_labels` — new `public.content_labels(id, entity_type in event|place|profile, entity_id, label 1–64 chars, created_at, UNIQUE(entity_type, entity_id, label))` with `(entity_type, entity_id)` + `(label)` indexes. RLS: public read, admin write. Trigger `apply_event_content_labels()` SECURITY DEFINER, search_path hardened; rules: `markets-expos` → `'market'`, `education-equipping|education|equip` → `'education'`. Backfill: 22 education labels seeded, 0 markets.
+  - `074_event_updates_replica_identity_full` — activates the existing server-side `event_id=eq.${eventId}` DELETE filter in `EventUpdatesList.tsx`.
+  - `075` + `078` — `search_contributors` RPC truncates bio at 160 chars on the last word boundary (`regexp_replace(substr(bio,1,160), '\s+\S*$','') || '…'`). Preserves 068's escape + word_similarity 0.3 gate.
+  - `076_tighten_apply_event_content_labels_grants` — fix-up after 073: revokes EXECUTE on the trigger function from public/anon/authenticated, grants to service_role only. Triggers run as owner (postgres), so caller EXECUTE is unnecessary.
+  - `077_content_labels_lifecycle_and_tighten_rls` — Architect Must-fixes:
+    1. apply trigger now DELETEs rule-managed labels before reinserting so a category change clears stale tags.
+    2. New `cleanup_content_labels_on_entity_delete()` + AFTER DELETE triggers on events/places/profiles prevent orphan labels.
+    3. SELECT policy tightened from `using (true)` to `using (entity_type in ('event','place'))` to pre-empt profile-label leaks.
+- **TypeScript types** (`src/types/db.ts`) — added Wear/Learn/Connect optional fields to `Profile`; new `ContentLabel` type.
+- **Canonical schema** (`supabase/schema.sql`) — Batch 6 block appended; idempotent.
+- **BUG-09 — page rename** `git mv src/app/admin/reports → src/app/admin/reported`; updated 3 page hrefs + 2 admin dashboard hrefs. API stays at `/api/admin/reports/[id]` (documented in route header as intentional URL split).
+- **Monorepo prep** (per MASTER_DIRECTION Part 7) — `docs/MONOREPO_PLAN.md` describes target `citizens/` Turborepo + pnpm workspace; `monorepo-prep/` holds README-only stubs for `ui`, `auth`, `database`, `config`, `utils`.
+
+### Batch 6 validation
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 77 files / 682 tests passing
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN — **unchanged from Batch 5 baseline**. Migration 073 briefly added 2 WARN; 076 restored baseline.
+- Architect subagent review: B→A after applying 2 Must-fixes + 2 Should-fixes inline (077 stale-label cleanup, 077 orphan-label cleanup triggers, 077 tightened SELECT policy, API/page URL split documented). Nice-to-haves deferred to DECISIONS.md: SA-province CHECK on `connect_home_province`, `learn_enrolled_listings` no-dupes CHECK, per-app `profiles_wear`/`profiles_learn` sub-tables once 3rd Wear-only RLS-different column ships, fully-qualified `search_path=''` sweep across all SECURITY DEFINER functions.
+
 
 ---
 

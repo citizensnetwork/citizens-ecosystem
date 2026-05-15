@@ -2,6 +2,42 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 6 — Citizens ecosystem foundation
+
+**Decision — extend `public.profiles` with Wear / Learn / Connect columns rather than create per-app rows now.**
+The ecosystem direction (MASTER_DIRECTION Part 5) puts Wear, Learn, Vision etc. on the same `auth.users` and `profiles` rows. Migration 072 adds four nullable-with-defaults columns directly on `profiles`. Tradeoffs:
+- *Pros:* One row per user → trivial joins; no extra RLS layer per app; lazy clients (Wear hadn't even read these columns yet) still get sensible defaults; cheap rollback (`DROP COLUMN`).
+- *Cons:* `profiles` is now ~30 columns wide and mixes concerns across apps. At ~60 columns or when per-app RLS diverges from profile-level visibility we will refactor to per-app sub-tables `profiles_wear`, `profiles_learn` (PK+FK on `user_id` with their own RLS). **Not** an EAV `profile_app_data(app, data jsonb)` — EAV kills cross-app joins and constraints.
+- *Trigger:* the third Wear-only column that requires custom RLS different from the parent profile.
+
+**Decision — `connect_notification_radius` is intentionally NOT added.**
+MASTER_DIRECTION Part 5 listed it among the new columns, but the existing `notification_radius_km int default 50` (migration 011) already serves that purpose for Connect. Adding a second column would split writes and silently divide UI from filtering logic. Header of 072 documents the no-op.
+
+**Decision — `content_labels` is a cross-app **read** surface; writes are admin-only or via trigger.**
+The labels table (migration 073) is consumed by Wear (e.g. "this place sells modest workout wear" → `label='wear'`) and Learn (e.g. event with `markets-expos` category gets auto-labelled `'market'` so Wear can surface it as a marketplace). Decisions:
+- Read posture: `using (entity_type in ('event','place'))` (migration 077) — events and places are already publicly readable through their own RLS; their labels carry no new privacy signal. Profile labels intentionally excluded until per-profile visibility logic is in place. Initial `using (true)` posture (073) was an over-reach caught by Architect.
+- Write posture: admin-only. Auto-labelling happens via the SECURITY DEFINER trigger `apply_event_content_labels()`.
+- Lifecycle: 077 added (a) stale-label cleanup on category change, (b) AFTER DELETE cascade on `events`/`places`/`profiles` to prevent orphan rows. The Architect Must-fix that flagged both was right.
+
+**Decision — SECURITY DEFINER trigger functions must not grant EXECUTE to anon/authenticated.**
+The 073 → 076 cycle was a real lesson. A SECURITY DEFINER trigger runs as its owner (postgres) regardless of who invoked the parent DML. Granting EXECUTE to `anon` and `authenticated` is therefore (a) unnecessary and (b) raises advisor warnings (`anon_security_definer_function_executable`, `authenticated_security_definer_function_executable`). Project standard going forward: trigger-only SECURITY DEFINER functions get `revoke all from public; revoke execute from anon, authenticated; grant execute to service_role;`. This matches the pattern already used by `notify_on_convince`, `notify_friends_on_rsvp_attending`, `toggle_consider`.
+
+**Decision — `search_contributors.bio` truncates at the last word boundary inside 160 chars.**
+Migration 075 cut at exactly 160 chars, which can split a grapheme cluster (emoji ZWJ sequences, combining marks). Migration 078 changed the slice to `regexp_replace(substr(bio,1,160), '\s+\S*$', '') || '…'`. The 160 char cap matches a typical two-line snippet at the panel's font/width; client may further ellipsize. We chose to truncate at the RPC boundary (not via a separate `bio_excerpt` column) so the truncation rule lives next to the cursor that needs it. Rejected: trim by graphemes (`pg_unicode_word_break`) — Postgres doesn't ship it natively and CLDR rules are heavier than this use case warrants.
+
+**Decision — `/admin/reports` page renamed to `/admin/reported`; `/api/admin/reports/[id]` API stays.**
+The marketing-facing page vocab moves to "reported" (an event/place that has been reported by users — matches the noun on the page itself). The internal API stays at `/api/admin/reports/[id]` because (a) only the admin client calls it, (b) renaming the API requires a deprecation window, and (c) the verb-mismatch is bounded to one client (`ReportsManager.tsx`). Documented in the route file header so future maintainers don't re-debate. Should-fix from Architect noted: a one-line comment was added; full URL match deferred until the API needs other breaking changes.
+
+**Decision — monorepo prep ships as README-only stubs + plan doc.**
+Per the user's standing "stub folders + plan doc" preference. `docs/MONOREPO_PLAN.md` is the authoritative target-state document (target layout, tooling choice — pnpm + Turborepo, migration steps with `git filter-repo --to-subdirectory-filter`, gating criteria). `monorepo-prep/packages/{ui,auth,database,config,utils}/README.md` document each future package's responsibility. **Nothing is wired into the build.** When the cutover happens, these READMEs travel into the new `citizens/` repo as the seed of each `packages/<name>/README.md`. Cutover gates (PR-01..PR-10 bugs cleared, Wear feature spec drafted, at least one external pilot signed up, GitHub org chosen) are in §5 of the plan doc.
+
+**Architect Nice-to-haves deferred to a later batch:**
+- SA-province CHECK constraint (or `provinces` lookup table) on `profiles.connect_home_province` before any UI ships against it.
+- `learn_enrolled_listings` no-dupes CHECK or `array(select distinct unnest(...))` on read.
+- Fully-qualified `search_path = ''` sweep across all SECURITY DEFINER functions (currently project standard is `pg_catalog, public` — strictest form would qualify every identifier).
+- Per-app `profiles_wear` / `profiles_learn` sub-tables when 3rd Wear-only RLS-different column ships.
+- Toast infra on optimistic DELETE failure (still deferred from Batch 5).
+
 ## MASTER_DIRECTION Batch 5 — FEAT-05 Broadcast Updates polish + retroactive infrastructure fix
 
 **Critical discovery — migration `030_event_updates.sql` was never applied to the remote project.** The local migrations folder contained 030 (table + RLS for `event_updates`), but `supabase_migrations.schema_migrations` had no record of it. `to_regclass('public.event_updates')` returned `null`. This means **every Phase E surface that called into the broadcast-updates substrate (composer in ManageEventsView, viewer in EventUpdatesList, GET/POST `/api/events/:id/updates`, the `notify-event-update` edge function) was silently broken in production from the moment Phase E shipped.** Applied 030 retroactively via MCP in Batch 5; no data loss because no rows ever existed. Lesson: when a migration is authored locally, the apply step must be verified against `supabase_migrations.schema_migrations` before the feature is declared shipped. A future batch should add a CI guard.
