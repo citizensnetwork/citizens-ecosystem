@@ -15,7 +15,7 @@
 
 ## 2. What just shipped
 
-**Batch 5 — FEAT-05 Broadcast Updates polish + retroactive infrastructure fix** — `origin/main` (this batch).
+**Batch 5 — FEAT-05 Broadcast Updates polish + retroactive infrastructure fix** — `origin/main` @ `a198be7`.
 
 - **Critical finding:** migration `030_event_updates.sql` was authored locally on the Phase E ship date but never applied to the remote project. Every FEAT-05 surface (composer, viewer, GET/POST API, edge function) had been silently 500'ing in production since Phase E shipped. Applied retroactively via MCP.
 - **New migration `071_event_updates_realtime.sql`** adds `event_updates` to the `supabase_realtime` publication (idempotent), applied.
@@ -94,7 +94,7 @@
 - MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, **5** shipped; Batch 6 queued.
 - Test suite: 682 / 682. TS: 0 errors. Lint: clean.
 - Supabase advisors security: 0 ERROR, 83 WARN (unchanged from Batch 4 baseline).
-- Git: `origin/main` updated this batch (see commit log).
+- Git: `origin/main` at `a198be7`.
 
 ## 4. Next batches queued (in priority order)
 
