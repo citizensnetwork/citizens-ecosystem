@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     event_id: event_id || null,
     place_id: place_id || null,
     template_version: template.version,
-    ip_address: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+    ip_address: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 64) || null,
   });
 
   if (insertError) {

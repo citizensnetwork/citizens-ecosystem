@@ -16,6 +16,8 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 5 | FEAT-05 Broadcast Updates polish + retroactive infrastructure fix | **Shipped** | Discovered migration 030 was never applied in prod (FEAT-05 silently broken since Phase E); applied retroactively. New migration 071 adds `event_updates` to `supabase_realtime` publication. New DELETE endpoint `/api/events/[id]/updates/[updateId]` (RLS-gated, 400/401/403/404/200). EventUpdatesList rewritten with realtime INSERT/DELETE subscription + inline Delete button for author/admin (merge-not-replace race fix). OrgSearchPanel kind-label ternary deduped into `KIND_BADGE_LABEL` record. `leaflet-maps.instructions.md` renamed to `maplibre-maps.instructions.md` (+ all refs updated). MASTER_DIRECTION FEAT-05 doc reconciled to shipped names (`event_updates`, 1000-char ceiling). 682 tests (+5 new for DELETE); advisors 0 ERROR / 83 WARN (unchanged from Batch 4 baseline). |
 | 6 | Extended profiles schema + `content_labels` table + monorepo folder prep | **Shipped** `a6d9f1f` | Migrations 072-078, search_contributors v2, `/admin/reports`->`/admin/reported`, monorepo-prep stubs. 682 tests; advisors 0 ERROR / 83 WARN. |
 | 7a | Staged audit fixes (middleware-and-session + api-surface) | **Shipped** | `redirectWithCookies` cookie propagation on signOut redirects; admin-review hardening (UUID/enum validation, `requireAdmin`, IP rate limit with trusted-IP gating + fail-closed); rate limits added to consider PUT, follow DELETE, event-updates POST, conversations GET, indemnity POST, contributor/profile POST, preferences POST, push-token DELETE; event-updates error sanitisation + RLS->403. 683 tests (+1); advisors 0 ERROR / 83 WARN (unchanged). Both audit surfaces -> `clean`. |
+| 7b | Closing deferred DECISIONS items (DB-only) | **Shipped** | Migration 079 `provinces` lookup + FK `profiles.connect_home_province → provinces(name)` (DEFERRABLE, ON DELETE SET NULL). Migration 080 IMMUTABLE helper `uuid_array_has_no_duplicates` + CHECK on `profiles.learn_enrolled_listings`. `friend_invite` confirmed already absent from `notifications.type` CHECK (no migration). 683 tests; advisors 0 ERROR / 83 WARN (unchanged). |
+| 8 | FEAT-06 contributor billing foundation | **Shipped** | Migration 081 (`billing_tier` + `billing_trial_started_at` on profiles, `contributor_billing` table with owner-or-admin RLS, two SECURITY DEFINER tally triggers on events/places INSERT, `contributor_event_rate(tier)` IMMUTABLE rate function). Migration 082 (column REVOKE on the 2 billing columns + `get_my_billing_context()` RPC + `trg_stamp_billing_trial_on_approval` BEFORE UPDATE trigger). New `BillPreviewCard` server component (self-auth, RPC-driven) + `/profile/contributor/billing/setup` stub + dashboard wiring + types. PayFast wiring still deferred (D11 / T5). 683 tests; advisors 0 ERROR / 84 WARN (+1 expected: `authenticated_security_definer_function_executable` on `get_my_billing_context`, matches baseline SD-function pattern). |
 
 ### Batch 1 validation
 - `npx tsc --noEmit`: 0 errors
@@ -106,6 +108,17 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 - `npx next lint --dir src`: clean (no warnings or errors)
 - `mcp_supabase_get_advisors` (security): 0 ERROR / 83 WARN — **unchanged from Batch 6 baseline**
 - Architect subagent review: no Must-fix. Two Should-fix items applied inline (S1 trusted-IP gating, S2 fail-closed on missing client IP). Nice-to-haves N1, N3, N5 deferred (in-memory limiter scope, admin-review upstream detail sanitisation, action type narrowing).
+
+### Batch 7b + 8 validation (combined commit)
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 77 files / 683 tests passing (no test surface change — DB + UI only)
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 84 WARN. **+1 expected** new advisor `authenticated_security_definer_function_executable` on `public.get_my_billing_context` — matches the established baseline pattern for SD functions granted to `authenticated` (e.g. `approve_contributor_application`, `toggle_consider`); function is hardened (locked search_path, returns only the caller's own row via `auth.uid()`, EXECUTE revoked from `public/anon`).
+- Architect subagent review: **A−** with no Must-fix. All three Should-fix items applied inline:
+  1. Column-level `REVOKE SELECT (billing_tier, billing_trial_started_at) ON profiles FROM anon, authenticated` + `get_my_billing_context()` RPC (migration 082).
+  2. `trg_stamp_billing_trial_on_approval` BEFORE UPDATE trigger stamps `billing_trial_started_at = now()` on `non-approved → approved` transition, ensuring the on-page "first 3 months from approval are free" promise is truthful for users approved long after sign-up.
+  3. `BillPreviewCard` dropped its `profileId` prop and now resolves the viewer from `supabase.auth.getUser()`.
+  - Nice-to-haves deferred to Batch 8.1 / PayFast batch (month → date type, DELETE-decrement triggers, setup-page flash-message, calculated_total doc-comment already added).
 
 
 ---

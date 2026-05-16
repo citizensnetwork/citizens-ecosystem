@@ -110,6 +110,9 @@ export default function CategoryManager({ categories }: Props) {
   }
 
   async function handleDelete(id: string) {
+    const target = items.find((c) => c.id === id);
+    const label = target?.name ?? "this category";
+    if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
     setLoading(true);
     const { error: err } = await supabase
       .from("categories")

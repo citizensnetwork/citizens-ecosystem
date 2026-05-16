@@ -2,6 +2,46 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 8 — FEAT-06 contributor billing foundation (+ Architect Should-fixes)
+
+**Decision — counters written exclusively by SECURITY DEFINER triggers, never by clients.**
+Money cannot ride on client-trust. `tally_contributor_event` and `tally_contributor_place` (migration 081) fire `AFTER INSERT` on `events` / `places`, gate on `created_by` and `role = 'contributor'`, then upsert the current-month row in `contributor_billing`. Both triggers are SECURITY DEFINER, `search_path = pg_catalog, public`, with EXECUTE revoked from `public/anon/authenticated` so the only call path is the trigger itself. Clients are blocked from `contributor_billing` writes by explicit `REVOKE INSERT, UPDATE, DELETE FROM anon, authenticated`. SELECT policy is `profile_id = auth.uid() OR public.is_admin()`. `ON CONFLICT … DO UPDATE` makes concurrent same-month inserts race-safe (row-lock acquired by upsert).
+
+**Decision — pricing tiers stored on `profiles` as `billing_tier` (`individual` / `medium` / `large`), rate looked up by IMMUTABLE helper `contributor_event_rate(tier)` returning R30 / R150 / R250.**
+Matches MASTER_DIRECTION FEAT-06 pricing table. Tier change does NOT retroactively rewrite history — `calculated_total` is stamped at the tier rate *at time of post*. Documented in migration 081 + DECISIONS to prevent future "tier downgrade ⇒ refund last month" expectations.
+
+**Decision — `contributor_billing.month` stored as `text` (YYYY-MM) with regex CHECK rather than `date`.**
+The trigger key is `to_char(now(), 'YYYY-MM')` and the row PK is `(profile_id, month)`. Text avoids a `date_trunc('month', …)` everywhere and keeps the human-readable key in admin queries. Nice-to-have ergonomic conversion to `date` is deferred — see "Deferred from Batch 8" below.
+
+**Decision — first 3 months free, trial anchored on `billing_trial_started_at` which is stamped by trigger when `profiles.contributor_status` transitions to `'approved'`.**
+Migration 082 adds `trg_stamp_billing_trial_on_approval` (BEFORE UPDATE OF contributor_status on profiles). The trigger is SECURITY DEFINER, locked search_path, and only sets the column on the `non-approved → approved` transition AND only if it is still null (never clobbers a manual seed or admin override). The UI falls back to `created_at` for legacy rows whose trial start was never stamped. This closes Architect Batch-8 Should-fix #2 — without the trigger, a citizen approved months after sign-up would have had a partially burned trial making the on-page promise untrue.
+
+**Decision — `billing_tier` and `billing_trial_started_at` are NOT publicly readable; access goes through `get_my_billing_context()` RPC.**
+The `profiles` SELECT policy is `using (true)` (everything is public-by-design for full_name/avatar etc.). Migration 082 column-revokes SELECT on the two billing columns from `anon, authenticated`, then provides a `STABLE SECURITY DEFINER` RPC `get_my_billing_context()` that returns ONLY the caller's own row (keyed on `auth.uid()`). `BillPreviewCard` calls this RPC instead of `select billing_tier from profiles`. Closes Architect Batch-8 Should-fix #1 (column privacy leak). The accompanying Supabase advisor warning `authenticated_security_definer_function_executable` is accepted as baseline — same advisor type is already approved for every other SD function granted to `authenticated` in this codebase (e.g. `approve_contributor_application`).
+
+**Decision — `BillPreviewCard` resolves the viewer from `supabase.auth.getUser()` and accepts no `profileId` prop.**
+Originally took `profileId: string` and the dashboard passed `user.id`. Architect Should-fix #3 flagged that as a future-footgun if a child route ever sourced the id from a URL param. Removing the prop closes the loop: the component can only ever render the signed-in user's billing surface. Closes Architect Batch-8 Should-fix #3.
+
+**Decision — PayFast wiring stays deferred (D11 / T5 / MASTER_DIRECTION Part 6).**
+Batch 8 lands schema, triggers, types, UI surface, and the "Set up billing →" stub page. Real payment integration is the next billing batch and intentionally not in scope here. `/profile/contributor/billing/setup` is auth+role gated and renders a "Coming soon" card.
+
+**Deferred from Batch 8 (Architect Nice-to-haves):**
+- `contributor_billing.month` as `date` with `CHECK (extract(day from month) = 1)` for native ordering — ergonomic only.
+- Symmetric `AFTER DELETE` decrement triggers on events/places — spec doesn't require it (contributor cannot un-bill by deleting a post), but cleaner before PayFast goes live.
+- Doc-comment on `calculated_total` already added: "Stored at the tier rate at time-of-post; tier changes do not retroactively rewrite history."
+- Flash message on `/profile/contributor/billing/setup` when an unapproved contributor is redirected — currently silent redirect to `/profile`.
+
+## MASTER_DIRECTION Batch 7b — closing deferred DECISIONS items
+
+**Decision — SA provinces stored in a `provinces` lookup table with FK from `profiles.connect_home_province`, NOT a CHECK constraint.**
+Migration 079 creates `public.provinces(name text PK, display_order int, created_at timestamptz)` seeded with the 9 SA provinces, RLS-readable to anon+authenticated. `profiles.connect_home_province` gets `FK → provinces(name) ON UPDATE CASCADE ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE`. CASCADE supports rare renames (e.g. KwaZulu-Natal punctuation tweaks). SET NULL is safe because the FK targets a lookup table whose only RLS policy is SELECT — no client can delete a province row. The lookup beats a CHECK because (a) we get cheap `display_order` for UI ordering without hard-coding, and (b) admin UI for managing provinces is a single insert/update against the lookup, not a migration.
+
+**Decision — `profiles.learn_enrolled_listings` uniqueness enforced by CHECK calling IMMUTABLE helper `uuid_array_has_no_duplicates(uuid[])`.**
+Postgres forbids subqueries inside CHECK expressions, so the natural `array_length(array, 1) = (select count(distinct …) …)` formulation is rejected with `0A000`. Migration 080 wraps the predicate in an IMMUTABLE SQL function (legal because the input array is the only state read; no catalog, no time, no settings). The function is marked IMMUTABLE so Postgres can use it inside a CHECK and so the optimizer can fold constant inputs.
+
+**Decision — `friend_invite` already absent from `notifications.type` CHECK — no migration required.**
+The deferred TODO from earlier DECISIONS assumed `friend_invite` was in the enum and needed removal. Inspection of the current CHECK constraint shows it isn't. Closed-as-noop.
+
 ## MASTER_DIRECTION Batch 7a — Staged audit fixes
 
 **Decision — `signOut()` redirects must propagate Set-Cookie headers via `redirectWithCookies()`.**

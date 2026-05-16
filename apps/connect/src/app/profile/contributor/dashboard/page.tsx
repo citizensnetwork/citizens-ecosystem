@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import ManageEventsView from "@/components/events/ManageEventsView";
+import BillPreviewCard from "@/components/contributor/BillPreviewCard";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function ContributorDashboardPage() {
           )}
         </div>
         <ManageEventsView isVendor groupByLifecycle />
+        <BillPreviewCard />
       </div>
     </div>
   );

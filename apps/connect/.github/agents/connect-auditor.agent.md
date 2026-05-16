@@ -232,7 +232,10 @@ Return a concise summary:
 - **Never create a second surface checkpoint file for a surface that already has one.** Update the existing file.
 - **Never create a patch filename that doesn't follow `<queue-surface-name>--<slug>.diff` exactly.** The queue surface name is the canonical identifier — copy it verbatim.
 - **Never seed or rewrite QUEUE.md if it already exists.** Only update individual rows.
-- **One surface per run.** Resist scope creep. Note follow-up surfaces in "Next surface suggested" and stop.
+- **One surface per run (default).** When a batch count is provided (max 3), complete each surface fully before starting the next. Never start surface N+1 before surface N's checkpoint is written and its QUEUE row updated.
+- **Batch quality gates:** when auditing 2–3 surfaces in one run, run tsc + vitest + lint once after all Fix-clean edits across the batch rather than once per surface. This reduces token waste on repeated full-suite runs. If a gate fails, bisect to identify which surface's edit caused the failure before continuing.
+- **Batch tier boundary rule:** when selecting surfaces for a batch run, do not mix risk tiers in a single batch. Stop at the boundary (e.g. if 3 surfaces requested but only 2 `critical` surfaces are pending, audit those 2 and note the tier boundary rather than pulling in a `high` surface to fill the slot).
+- **Context pressure acknowledgement:** if auditing surface 3 of a batch requires reading a very large file set (>40 files), note in that surface's checkpoint that a focused follow-up re-audit is recommended before applying its patches, since context window pressure may have limited trace depth.
 - **Ask, don't guess** on blockers. Working assumptions are fine; silent guesses on intent are not.
 - **Skip when correct.** If a gate finds nothing, say so and move on — no manufactured findings.
 

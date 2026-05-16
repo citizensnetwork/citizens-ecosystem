@@ -147,8 +147,11 @@ Smoke test the admin restructure:
 
 ## Audit queue
 
-- 🟡 **middleware-and-session** — 1 staged fix (auth cookie propagation on signOut+redirect, HIGH). Apply via `/audit-apply middleware-and-session`. Checkpoint: `.audit/surfaces/middleware-and-session.md`. Patch: `.audit/patches/middleware-and-session--cookie-propagation.diff`.
-- pending: api-surface, auth-and-signup, admin, edge-functions, event-create-edit, rsvp-and-comments, messaging-dm, place-create-edit-media, notifications, onboarding, events-browse, event-detail, profile-and-interests, places-browse-and-follow, map-core, storage-and-media-uploads.
+- ✅ **middleware-and-session** — clean (patch applied Batch 7a, audited 2026-05-15)
+- ✅ **api-surface** — clean (patches applied Batch 7a, audited 2026-05-15)
+- 🟡 **auth-and-signup** — 2 staged fixes, run `/audit-apply auth-and-signup`. Checkpoint: `.audit/surfaces/auth-and-signup.md`. Patches: `auth-and-signup--indemnity-applies-to-injection.diff` (PostgREST filter injection), `auth-and-signup--redirect-after-login.diff` (redirect param ignored after login).
+- 🟡 **admin** — 1 Fix-clean applied inline (CategoryManager delete confirmation), 1 staged fix, run `/audit-apply admin`. Checkpoint: `.audit/surfaces/admin.md`. Patch: `admin--categories-admin-rls.diff` (adds missing admin INSERT/UPDATE/DELETE RLS policies on `public.categories` — currently Gate 1 broken). Confirm via `pg_policies` query before applying.
+- pending: edge-functions, event-create-edit, rsvp-and-comments, messaging-dm, place-create-edit-media, notifications, onboarding, events-browse, event-detail, profile-and-interests, places-browse-and-follow, map-core, storage-and-media-uploads.
 - Full queue: `.audit/QUEUE.md`.
 
 ## 7. Memory pointers

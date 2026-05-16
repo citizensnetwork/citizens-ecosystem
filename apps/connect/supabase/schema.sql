@@ -1635,3 +1635,412 @@ create trigger trg_cleanup_content_labels_profile
 -- Migration 074: replica identity full on event_updates so DELETE realtime
 -- events arrive with the full old-row payload (drops the JS-side ghost filter).
 alter table public.event_updates replica identity full;
+
+-- =====================================================================
+-- Batch 7b (migrations 079, 080) � Provinces lookup + array dedupe helper
+-- =====================================================================
+
+-- Migration 079 — Provinces lookup table + FK on profiles.connect_home_province
+--
+-- Batch 7b. Closes the deferred "SA-province CHECK" Architect nice-to-have from
+-- Batch 6 by using a proper lookup table + FK instead of a CHECK constraint.
+-- A lookup table beats a CHECK because:
+--   1. Admin UI can edit the list without a schema change.
+--   2. We can attach labels / display order / metadata to provinces later.
+--   3. FK errors surface cleanly in PostgREST (23503) instead of generic CHECK.
+--
+-- The FK is intentionally DEFERRABLE INITIALLY IMMEDIATE so backfill / data
+-- imports can defer the check inside a transaction if needed, while default
+-- behaviour stays strict.
+
+create table if not exists public.provinces (
+  name text primary key,
+  display_order int not null,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.provinces is
+  'Lookup table of South African provinces. Referenced by profiles.connect_home_province.';
+
+-- Seed the nine SA provinces idempotently.
+insert into public.provinces (name, display_order) values
+  ('Eastern Cape',   1),
+  ('Free State',     2),
+  ('Gauteng',        3),
+  ('KwaZulu-Natal',  4),
+  ('Limpopo',        5),
+  ('Mpumalanga',     6),
+  ('Northern Cape',  7),
+  ('North West',     8),
+  ('Western Cape',   9)
+on conflict (name) do nothing;
+
+-- Public read; no writes from the API.
+alter table public.provinces enable row level security;
+
+drop policy if exists "provinces read" on public.provinces;
+create policy "provinces read"
+  on public.provinces
+  for select
+  to anon, authenticated
+  using (true);
+
+-- Attach FK on profiles.connect_home_province only if it isn't already there.
+do $$
+begin
+  if not exists (
+    select 1
+    from   pg_constraint
+    where  conname = 'profiles_connect_home_province_fkey'
+    and    conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_connect_home_province_fkey
+      foreign key (connect_home_province)
+      references public.provinces(name)
+      on update cascade
+      on delete set null
+      deferrable initially immediate;
+  end if;
+end
+$$;
+-- Migration 080 — No-duplicates CHECK on profiles.learn_enrolled_listings
+--
+-- Batch 7b. Closes the deferred "CHECK no-dupes on learn_enrolled_listings"
+-- Architect nice-to-have from Batch 6.
+--
+-- Postgres forbids subqueries directly inside CHECK expressions, so we wrap the
+-- dedupe predicate in an IMMUTABLE helper function. The CHECK then calls the
+-- function and Postgres is happy.
+
+create or replace function public.uuid_array_has_no_duplicates(arr uuid[])
+returns boolean
+language sql
+immutable
+set search_path = pg_catalog, public
+as $$
+  select arr is null
+      or cardinality(arr) = cardinality(array(select distinct unnest(arr)));
+$$;
+
+comment on function public.uuid_array_has_no_duplicates(uuid[]) is
+  'IMMUTABLE helper for CHECK constraints — true iff arr is null/empty or all elements are distinct.';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from   pg_constraint
+    where  conname = 'profiles_learn_enrolled_listings_no_dupes'
+    and    conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_learn_enrolled_listings_no_dupes
+      check (public.uuid_array_has_no_duplicates(learn_enrolled_listings));
+  end if;
+end
+$$;
+
+-- =====================================================================
+-- Batch 8 (migration 081) — FEAT-06 Contributor Billing Foundation
+-- =====================================================================
+
+-- Migration 081 — FEAT-06 Contributor Billing Foundation (Batch 8)
+--
+-- Per MASTER_DIRECTION Part 5 / FEAT-06. Tracks per-contributor monthly event
+-- and place counts and a calculated total in ZAR. The actual PayFast recurring
+-- billing wiring is deferred until D11 / T5 are resolved — this migration is
+-- the data foundation and the in-app bill preview.
+--
+-- Pricing tiers (from MASTER_DIRECTION):
+--   individual / small brand           → R30 per event
+--   medium organisation (50-500)       → R150 per event
+--   large ministry / corporate (500+)  → R250 per event
+--   place markers                      → flat rate TBD per month (price stays 0
+--                                        in calculated_total for now; we still
+--                                        store the count so we can charge once
+--                                        a price is set)
+--
+-- Trial: "first 3 months free" surfaces in the UI by comparing
+-- coalesce(billing_trial_started_at, created_at) to now. The trigger itself
+-- always records the raw counts and full calculated_total — the UI presents
+-- the trial discount so historical numbers stay meaningful.
+--
+-- This migration intentionally does NOT backfill historical events/places so
+-- contributors aren't billed for posts they made before billing existed.
+
+----------------------------------------------------------------
+-- 1. profiles columns: billing_tier + billing_trial_started_at
+----------------------------------------------------------------
+
+alter table public.profiles
+  add column if not exists billing_tier text not null default 'individual',
+  add column if not exists billing_trial_started_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from   pg_constraint
+    where  conname = 'profiles_billing_tier_check'
+    and    conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_billing_tier_check
+      check (billing_tier in ('individual','medium','large'));
+  end if;
+end
+$$;
+
+comment on column public.profiles.billing_tier is
+  'Billing tier — individual (R30/event), medium (R150/event), large (R250/event). Set by admin during contributor approval. Default individual.';
+comment on column public.profiles.billing_trial_started_at is
+  'Optional explicit trial start timestamp. Falls back to profiles.created_at when null. Used by the UI to compute the "first 3 months free" window.';
+
+----------------------------------------------------------------
+-- 2. contributor_billing table
+----------------------------------------------------------------
+
+create table if not exists public.contributor_billing (
+  profile_id        uuid           not null references public.profiles(id) on delete cascade,
+  month             text           not null,                              -- YYYY-MM
+  event_count       integer        not null default 0,
+  place_count       integer        not null default 0,
+  calculated_total  numeric(12,2)  not null default 0,
+  updated_at        timestamptz    not null default now(),
+  primary key (profile_id, month),
+  constraint contributor_billing_month_format
+    check (month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  constraint contributor_billing_counts_nonneg
+    check (event_count >= 0 and place_count >= 0 and calculated_total >= 0)
+);
+
+comment on table public.contributor_billing is
+  'Monthly tally of billable activity per contributor. Rows are written exclusively by the tally_contributor_event/_place triggers.';
+
+create index if not exists contributor_billing_month_idx
+  on public.contributor_billing (month);
+
+----------------------------------------------------------------
+-- 3. RLS — owner reads own, admin reads all, no client writes
+----------------------------------------------------------------
+
+alter table public.contributor_billing enable row level security;
+
+drop policy if exists "contributor_billing owner read" on public.contributor_billing;
+create policy "contributor_billing owner read"
+  on public.contributor_billing
+  for select
+  to authenticated
+  using (profile_id = auth.uid() or public.is_admin());
+
+-- Explicitly revoke direct mutation rights; triggers run as table owner.
+revoke insert, update, delete on public.contributor_billing from anon, authenticated;
+
+----------------------------------------------------------------
+-- 4. Tier → rate helper
+----------------------------------------------------------------
+
+create or replace function public.contributor_event_rate(tier text)
+returns numeric
+language sql
+immutable
+set search_path = pg_catalog, public
+as $$
+  select case lower(coalesce(tier, 'individual'))
+    when 'large'  then 250.00
+    when 'medium' then 150.00
+    else               30.00          -- individual / unknown
+  end::numeric;
+$$;
+
+comment on function public.contributor_event_rate(text) is
+  'Returns the per-event ZAR rate for a billing tier. Unknown tiers fall back to the individual rate (R30) so a misconfigured profile never blocks event creation.';
+
+----------------------------------------------------------------
+-- 5. Trigger: tally_contributor_event on events INSERT
+----------------------------------------------------------------
+
+create or replace function public.tally_contributor_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_role  text;
+  v_tier  text;
+  v_rate  numeric;
+  v_month text;
+begin
+  -- Only tally when the row has a creator we can attribute to.
+  if new.created_by is null then
+    return new;
+  end if;
+
+  select role, billing_tier
+    into v_role, v_tier
+    from public.profiles
+   where id = new.created_by;
+
+  -- Citizens (or missing profiles) are not billed.
+  if v_role is distinct from 'contributor' then
+    return new;
+  end if;
+
+  v_rate  := public.contributor_event_rate(v_tier);
+  v_month := to_char(coalesce(new.created_at, now()), 'YYYY-MM');
+
+  insert into public.contributor_billing as cb
+    (profile_id, month, event_count, place_count, calculated_total, updated_at)
+  values
+    (new.created_by, v_month, 1, 0, v_rate, now())
+  on conflict (profile_id, month) do update
+    set event_count       = cb.event_count + 1,
+        calculated_total  = cb.calculated_total + v_rate,
+        updated_at        = now();
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.tally_contributor_event() from public, anon, authenticated;
+
+drop trigger if exists trg_tally_contributor_event on public.events;
+create trigger trg_tally_contributor_event
+  after insert on public.events
+  for each row execute function public.tally_contributor_event();
+
+----------------------------------------------------------------
+-- 6. Trigger: tally_contributor_place on places INSERT
+--    Counts only; calculated_total stays 0 until the place price is decided.
+----------------------------------------------------------------
+
+create or replace function public.tally_contributor_place()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_role  text;
+  v_month text;
+begin
+  if new.created_by is null then
+    return new;
+  end if;
+
+  select role into v_role
+    from public.profiles
+   where id = new.created_by;
+
+  if v_role is distinct from 'contributor' then
+    return new;
+  end if;
+
+  v_month := to_char(coalesce(new.created_at, now()), 'YYYY-MM');
+
+  insert into public.contributor_billing as cb
+    (profile_id, month, event_count, place_count, calculated_total, updated_at)
+  values
+    (new.created_by, v_month, 0, 1, 0, now())
+  on conflict (profile_id, month) do update
+    set place_count = cb.place_count + 1,
+        updated_at  = now();
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.tally_contributor_place() from public, anon, authenticated;
+
+drop trigger if exists trg_tally_contributor_place on public.places;
+create trigger trg_tally_contributor_place
+  after insert on public.places
+  for each row execute function public.tally_contributor_place();
+
+-- =====================================================================
+-- Batch 8 Architect Should-fixes (migration 082) � billing column privacy + trial stamp
+-- =====================================================================
+
+-- Migration 082 — Batch 8 Architect Should-fixes (tighten billing column
+-- privacy + stamp trial start on contributor approval).
+--
+-- 1. REVOKE column-level SELECT on the two new billing columns from anon and
+--    authenticated. The existing `profiles` SELECT policy (using (true)) was
+--    designed for the public-by-design fields (full_name, avatar_url, bio …)
+--    — billing data must not ride the same broad read.
+-- 2. Provide an authoritative `get_my_billing_context()` RPC the UI uses
+--    instead of selecting columns it can no longer see. The function runs as
+--    the table owner (SECURITY DEFINER) but only ever returns the caller's
+--    OWN row, keyed on auth.uid(). It is also the only path admin/UI code
+--    ever needs to read these columns for the signed-in user.
+-- 3. Stamp `billing_trial_started_at = now()` on the profiles row the moment
+--    `contributor_status` transitions to 'approved' (and only if it hasn't
+--    already been stamped). Without this, a citizen who signs up months
+--    before being approved would have a partially-burned trial — making the
+--    "First 3 months from your contributor approval are free" copy untrue.
+
+-- ---------------------------------------------------------------------------
+-- 1. Column-level privacy
+-- ---------------------------------------------------------------------------
+
+revoke select (billing_tier, billing_trial_started_at)
+  on public.profiles
+  from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 2. get_my_billing_context — owner-self RPC
+-- ---------------------------------------------------------------------------
+
+create or replace function public.get_my_billing_context()
+returns table (
+  billing_tier              text,
+  billing_trial_started_at  timestamptz,
+  created_at                timestamptz
+)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select p.billing_tier, p.billing_trial_started_at, p.created_at
+    from public.profiles p
+   where p.id = auth.uid();
+$$;
+
+comment on function public.get_my_billing_context() is
+  'Returns the signed-in user''s billing tier + trial start + account created_at. Used by the BillPreviewCard to compute the trial window without granting broad column SELECT on profiles.';
+
+revoke execute on function public.get_my_billing_context() from public, anon;
+grant  execute on function public.get_my_billing_context() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Stamp trial start on contributor approval
+-- ---------------------------------------------------------------------------
+
+create or replace function public.stamp_billing_trial_on_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  -- Only fire on the transition into 'approved'. NEW.billing_trial_started_at
+  -- may already be set (manual seed in 061, admin override) — never clobber.
+  if  coalesce(new.contributor_status, '') = 'approved'
+  and coalesce(old.contributor_status, '') is distinct from 'approved'
+  and new.billing_trial_started_at is null
+  then
+    new.billing_trial_started_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.stamp_billing_trial_on_approval() from public, anon, authenticated;
+
+drop trigger if exists trg_stamp_billing_trial_on_approval on public.profiles;
+create trigger trg_stamp_billing_trial_on_approval
+  before update of contributor_status on public.profiles
+  for each row execute function public.stamp_billing_trial_on_approval();

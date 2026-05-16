@@ -256,9 +256,44 @@ export type Profile = {
    *  Empty array for users who have not enrolled in anything. */
   learn_enrolled_listings?: string[];
   /** Connect-specific home province for province-level filtering and
-   *  badges (migration 072).  Free-form text, e.g. `'Gauteng'`. */
+   *  badges (migration 072).  FK to `public.provinces(name)` (migration 079). */
   connect_home_province?: string | null;
+  /** FEAT-06 billing tier (migration 081). `'individual'` = R30/event,
+   *  `'medium'` = R150/event, `'large'` = R250/event. Default `'individual'`.
+   *  Set by admin during contributor approval. */
+  billing_tier?: BillingTier;
+  /** Optional explicit start of the contributor's 3-month free trial
+   *  (migration 081). When null the UI falls back to `created_at`. */
+  billing_trial_started_at?: string | null;
   created_at: string;
+};
+
+/** FEAT-06 — contributor billing tier (migration 081). */
+export type BillingTier = "individual" | "medium" | "large";
+
+export const BILLING_TIER_LABELS: Record<BillingTier, string> = {
+  individual: "Individual / Small brand",
+  medium: "Medium organisation (50–500)",
+  large: "Large ministry / Corporate (500+)",
+};
+
+export const BILLING_TIER_EVENT_RATE_ZAR: Record<BillingTier, number> = {
+  individual: 30,
+  medium: 150,
+  large: 250,
+};
+
+/** Row in `public.contributor_billing` (migration 081). Monthly tally of
+ *  billable activity per contributor, written by DB triggers. */
+export type ContributorBilling = {
+  profile_id: string;
+  /** YYYY-MM, e.g. `"2026-05"`. */
+  month: string;
+  event_count: number;
+  place_count: number;
+  /** ZAR. Computed by trigger from `billing_tier × event_count`. */
+  calculated_total: number;
+  updated_at: string;
 };
 
 /**
