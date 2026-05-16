@@ -245,6 +245,53 @@ do $$ begin
   end if;
 end $$;
 
+-- Admin write policies (mirrors migration 083).
+-- Admins may create, modify, and delete categories via the /admin/categories
+-- surface. No functional scope change -- this restores the originally-intended
+-- write path that was blocked by RLS having only a SELECT policy.
+-- VERIFICATION: after applying, run:
+--   select policyname, cmd from pg_policies
+--   where schemaname='public' and tablename='categories' order by cmd;
+-- and mcp_supabase_get_advisors type:"security" (expect no new warnings).
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'categories'
+      and policyname = 'categories_insert_admin'
+  ) then
+    create policy "categories_insert_admin"
+      on public.categories for insert
+      to authenticated
+      with check (public.is_admin());
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'categories'
+      and policyname = 'categories_update_admin'
+  ) then
+    create policy "categories_update_admin"
+      on public.categories for update
+      to authenticated
+      using  (public.is_admin())
+      with check (public.is_admin());
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'categories'
+      and policyname = 'categories_delete_admin'
+  ) then
+    create policy "categories_delete_admin"
+      on public.categories for delete
+      to authenticated
+      using (public.is_admin());
+  end if;
+end $$;
+
 -- Seed default categories (refined v2 taxonomy: 17 event-applies + 10 place-applies)
 -- Hex + emoji values must mirror supabase/migrations/064_refine_categories_v2.sql
 -- and src/lib/categories.ts (CATEGORY_HEX / PLACE_CATEGORY_HEX). Update all three together.
