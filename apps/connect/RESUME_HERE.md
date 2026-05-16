@@ -15,6 +15,35 @@
 
 ## 2. What just shipped
 
+**Batch 8 — FEAT-06 contributor billing foundation (no PayFast)** — combined commit `ec74032` with Batch 7b.
+
+- **Migration `081_contributor_billing.sql`** — adds `profiles.billing_tier` (`individual` / `medium` / `large`, default `individual`) + `profiles.billing_trial_started_at` (nullable). Creates `public.contributor_billing(profile_id, month YYYY-MM regex CHECK, event_count, place_count, calculated_total numeric, updated_at)` PK `(profile_id, month)` with index on `(month)`. RLS SELECT owner-or-admin; explicit `REVOKE INSERT, UPDATE, DELETE FROM anon, authenticated`. Two `SECURITY DEFINER` tally triggers (`tally_contributor_event` / `tally_contributor_place`) fire AFTER INSERT on `events` / `places`, gated on `role='contributor'`, upserting the current-month row with `ON CONFLICT … DO UPDATE` (race-safe). IMMUTABLE helper `contributor_event_rate(text)` returns R250 / R150 / R30 per FEAT-06.
+- **Migration `082_billing_privacy_and_trial_stamp.sql`** (Architect Should-fixes):
+  - Column-level `REVOKE SELECT (billing_tier, billing_trial_started_at) ON profiles FROM anon, authenticated` — closes leak via the public profiles `using (true)` policy.
+  - New `STABLE SECURITY DEFINER` RPC `get_my_billing_context()` returns ONLY the caller's own `(billing_tier, billing_trial_started_at, created_at)` keyed on `auth.uid()`.
+  - New `BEFORE UPDATE OF contributor_status` trigger `trg_stamp_billing_trial_on_approval` stamps `billing_trial_started_at = now()` on the `non-approved → approved` transition (never clobbers a pre-set value). Closes the trial-anchor copy-vs-reality mismatch.
+- **`BillPreviewCard` server component** — self-auth via `supabase.auth.getUser()`, calls the new RPC for tier+trial, fetches current-month tally via the RLS-scoped client. Renders glass-panel with amber trial banner + 4 dl tiles (events / places / tier+rate / due-this-month with "(R… after trial)" hint). No `profileId` prop — closes Architect Should-fix #3.
+- **`/profile/contributor/billing/setup` page** — auth+role-gated "Coming soon" stub (PayFast deferred per D11 / T5).
+- **`/profile/contributor/dashboard`** wired to render `<BillPreviewCard />` after `<ManageEventsView/>`.
+- **`src/types/db.ts`** — new `BillingTier`, `BILLING_TIER_LABELS`, `BILLING_TIER_EVENT_RATE_ZAR`, `ContributorBilling` exports; `Profile.billing_tier?`, `Profile.billing_trial_started_at?`.
+
+**Batch 7b — Closing deferred DECISIONS (DB-only)** — same commit `ec74032`.
+
+- **Migration `079_provinces_lookup.sql`** — `public.provinces(name text PK, display_order int, created_at)` seeded with 9 SA provinces, RLS SELECT to anon+authenticated. FK `profiles.connect_home_province → provinces(name) ON UPDATE CASCADE ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE`.
+- **Migration `080_learn_enrolled_listings_no_dupes.sql`** — IMMUTABLE helper `uuid_array_has_no_duplicates(uuid[])` + CHECK on `profiles.learn_enrolled_listings` (helper wraps the predicate because Postgres forbids subqueries inside CHECK).
+- `notifications.type 'friend_invite'` — confirmed already absent from CHECK; no migration needed. Closed-as-noop.
+
+✅ **Quality gate (Batch 7b + 8 combined):** tsc 0 errors · vitest 77 files / 683 tests passing · `next lint --dir src` clean · advisors **0 ERROR / 84 WARN** (+1 expected `authenticated_security_definer_function_executable` on `get_my_billing_context`, matches established baseline pattern) · Architect **A−** with no Must-fix; all 3 Should-fixes applied inline.
+
+**Batch 7a — Staged audit fixes** — `origin/main` @ `4053d71`.
+
+- `redirectWithCookies()` helper ensures `auth.signOut()` Set-Cookie headers actually reach the browser on redirect (otherwise stale session cookies survived and the next request re-authenticated silently).
+- `/api/admin/contributors/review` hardened: `requireAdmin()` on in-app path, IP rate limit with trusted-IP gating (`request.ip` first, XFF/X-Real-IP only when `VERCEL` is set, fail-closed with 400 `client_identity_required` when null) on deep-link path. UUID + enum validation up front in both modes.
+- Rate limits added to consider PUT, follow DELETE, event-updates POST, conversations GET, indemnity POST, contributor/profile POST, preferences POST, push-token DELETE.
+- Event-updates POST: RLS denial → 403 via `error.code === '42501'` (locale-independent), error message no longer surfaced to clients.
+
+✅ **Quality gate (Batch 7a):** 683 tests · advisors 0 ERROR / 83 WARN unchanged.
+
 **Batch 6 — Citizens ecosystem foundation: profile schema extensions + content labels + monorepo prep + deferred polish.**
 
 - **Migration `072_extended_profile_schema.sql`** — adds four nullable-with-defaults columns to `public.profiles`: `wear_style_preferences jsonb default '{}'`, `wear_wardrobe_visibility text default 'private' check in (public|private|friends)`, `learn_enrolled_listings uuid[] default '{}'`, `connect_home_province text`. Intentional no-op on `connect_notification_radius` — existing `notification_radius_km int default 50` stays the source of truth (logged in DECISIONS.md).
@@ -109,15 +138,17 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, 5, **6** shipped; Wear feature spec queued next.
-- Test suite: 682 / 682. TS: 0 errors. Lint: clean.
-- Supabase advisors security: 0 ERROR, 83 WARN (unchanged from Batch 5 baseline).
-- Git: `origin/main` at `a6d9f1f` (Batch 6).
+- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, 5, 6, 7a, **7b**, **8** shipped. FEAT-01 → FEAT-06 schema + UI surfaces all landed; PayFast wire-up still deferred.
+- Test suite: 683 / 683. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR, 84 WARN (+1 vs Batch 7a baseline — the new `get_my_billing_context` SD function advisor matches the established baseline pattern).
+- Git: `origin/main` at `ec74032` (Batch 7b + 8 combined).
 
 ## 4. Next batches queued (in priority order)
 
-1. **Wear feature spec** — separate planning session per MASTER_DIRECTION Part 12.
-2. **Monorepo cutover** — once gating criteria in `docs/MONOREPO_PLAN.md` §5 are met.
+1. **PayFast wire-up batch** — D11 / T5 / MASTER_DIRECTION Part 6. Deploy `payfast-webhook` edge function, wire `/profile/contributor/billing/setup` to the PayFast hosted checkout, record `payments` ledger rows, mark months as paid/unpaid, surface "Pay R… now" CTA on the BillPreviewCard when the trial expires.
+2. **Wear feature spec** — separate planning session per MASTER_DIRECTION Part 12.
+3. **Monorepo cutover** — once gating criteria in `docs/MONOREPO_PLAN.md` §5 are met.
+4. **Batch 8.1 nice-to-haves** — DELETE-decrement triggers on events/places, month-as-date conversion, setup-page flash-message.
 3. **Apply remaining BUG-01..BUG-08, BUG-10** and **T-tasks** from `.github/MASTER_DIRECTION.md` Parts 6–8.
 4. **Province lookup CHECK** on `profiles.connect_home_province` before any UI ships against it (Architect nice-to-have).
 
