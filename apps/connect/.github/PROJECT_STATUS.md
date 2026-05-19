@@ -18,6 +18,8 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 7a | Staged audit fixes (middleware-and-session + api-surface) | **Shipped** | `redirectWithCookies` cookie propagation on signOut redirects; admin-review hardening (UUID/enum validation, `requireAdmin`, IP rate limit with trusted-IP gating + fail-closed); rate limits added to consider PUT, follow DELETE, event-updates POST, conversations GET, indemnity POST, contributor/profile POST, preferences POST, push-token DELETE; event-updates error sanitisation + RLS->403. 683 tests (+1); advisors 0 ERROR / 83 WARN (unchanged). Both audit surfaces -> `clean`. |
 | 7b | Closing deferred DECISIONS items (DB-only) | **Shipped** | Migration 079 `provinces` lookup + FK `profiles.connect_home_province → provinces(name)` (DEFERRABLE, ON DELETE SET NULL). Migration 080 IMMUTABLE helper `uuid_array_has_no_duplicates` + CHECK on `profiles.learn_enrolled_listings`. `friend_invite` confirmed already absent from `notifications.type` CHECK (no migration). 683 tests; advisors 0 ERROR / 83 WARN (unchanged). |
 | 8 | FEAT-06 contributor billing foundation | **Shipped** | Migration 081 (`billing_tier` + `billing_trial_started_at` on profiles, `contributor_billing` table with owner-or-admin RLS, two SECURITY DEFINER tally triggers on events/places INSERT, `contributor_event_rate(tier)` IMMUTABLE rate function). Migration 082 (column REVOKE on the 2 billing columns + `get_my_billing_context()` RPC + `trg_stamp_billing_trial_on_approval` BEFORE UPDATE trigger). New `BillPreviewCard` server component (self-auth, RPC-driven) + `/profile/contributor/billing/setup` stub + dashboard wiring + types. PayFast wiring still deferred (D11 / T5). 683 tests; advisors 0 ERROR / 84 WARN (+1 expected: `authenticated_security_definer_function_executable` on `get_my_billing_context`, matches baseline SD-function pattern). |
+| 9 | Admin Tier B (audit log + rate limits + glass scaffold) | **Shipped** `e6c1df6` | Migration 083 (`audit_log` table + RLS + indexes); `requireAdmin` + `logAdminAction` helper in `src/lib/adminGuard.ts`; rate-limits added to every admin write endpoint (`RATE_LIMITS.mutation` / `read`); CategoryManager glass-modal scaffold; admin/reported reuses `requireAdmin`; ApiKeyManager hardening (UUID guard scaffold). 683 tests; advisors 0 ERROR / 84 WARN (unchanged). |
+| 10 | Admin batch 2 — 8 audit fixes + ConfirmModal a11y + audit-policy defer ask | **Shipped** `be0cb77` | New `ConfirmModal` (focus-on-cancel for destructive, ESC dismisses, backdrop non-dismissive). New `/api/admin/categories` POST + `[id]` PATCH/DELETE (requireAdmin → UUID → rate-limit → validate → DB → audit). CategoryManager refactored to use the API. ApiKeyManager replaces native `confirm()`/`alert()` with ConfirmModal. `api-keys` GET → RATE_LIMITS.read; DELETE adds mutation rate-limit + UUID guard. `reports/[id]` PATCH gets RATE_LIMITS.mutation. `users` search escapes LIKE wildcards. 5 admin pages `.single() → .maybeSingle()`. `contributors/review` removes dead `NextRequest.ip` branch. Audit policy (`connect-auditor.agent.md`) Phase 2 now asks user (apply / select / defer) before leaving Report-only items unfixed. 697 tests (+14); advisors 0 ERROR / 84 WARN (unchanged). |
 
 ### Batch 1 validation
 - `npx tsc --noEmit`: 0 errors
@@ -119,6 +121,20 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
   2. `trg_stamp_billing_trial_on_approval` BEFORE UPDATE trigger stamps `billing_trial_started_at = now()` on `non-approved → approved` transition, ensuring the on-page "first 3 months from approval are free" promise is truthful for users approved long after sign-up.
   3. `BillPreviewCard` dropped its `profileId` prop and now resolves the viewer from `supabase.auth.getUser()`.
   - Nice-to-haves deferred to Batch 8.1 / PayFast batch (month → date type, DELETE-decrement triggers, setup-page flash-message, calculated_total doc-comment already added).
+
+### Batch 9 validation (Admin Tier B)
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 683 tests passing
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 84 WARN — **unchanged from Batch 8 baseline**.
+- Shipped `e6c1df6`: `audit_log` migration 083, `requireAdmin`/`logAdminAction` helpers, rate-limit on every admin write endpoint, CategoryManager glass-modal scaffold.
+
+### Batch 10 validation (Admin batch 2 — 8 audit fixes + ConfirmModal + audit-policy)
+- `npx tsc --noEmit`: 0 errors
+- `npx vitest run`: 78 files / 697 tests passing (+14)
+- `npx next lint --dir src`: clean
+- `mcp_supabase_get_advisors` (security): 0 ERROR / 84 WARN — **unchanged from Batch 9 baseline**.
+- Architect subagent review: no Must-fix. Both Should-fix items applied inline (1: `.maybeSingle()` parity on `contributors/[id]/page.tsx`; 2: ConfirmModal focuses Cancel for destructive tone). Nice-to-haves deferred via the new audit-policy "defer ask" path: ConfirmModal focus-trap + aria-describedby; test-mock realism improvement; grapheme-aware emoji slice; tighter `#hex` regex; categories `is_system` flag; `logAdminAction` error handling. Shipped `be0cb77`.
 
 
 ---

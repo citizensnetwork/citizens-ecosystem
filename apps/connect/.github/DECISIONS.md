@@ -2,6 +2,40 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 10 — Admin batch 2 (audit fixes + ConfirmModal + audit-policy defer ask)
+
+**Decision — every admin mutation route must funnel through `requireAdmin` → `isValidUUID` → `checkRateLimit(per-actor)` → validate → DB → `logAdminAction`, in that order.**
+The Phase 1 helper landed in Batch 9 but several legacy routes still skipped one or two steps. This batch normalises: `api-keys` DELETE adds UUID + rate-limit; `reports/[id]` PATCH adds rate-limit; `categories` (new) follows the full pipeline. Rate-limit keys are namespaced per route (`admin-categories-patch:${id}`, `admin-keys-revoke:${id}`, …) so the buckets don't collide and per-actor (`guard.user.id`) so one admin abusing one endpoint can't lock out other admins.
+
+**Decision — admin category CRUD goes through `/api/admin/categories` (not direct client → Supabase).**
+The original CategoryManager held a client-side Supabase reference and wrote directly. That made the audit policy unenforceable (no `logAdminAction`, no central rate-limit, validation duplicated in the UI). API-route ownership is now the standard for every admin mutation: easier to audit, easier to rate-limit, easier to mock in tests, and keeps the `categories` RLS policies tight (admins only via `is_admin()`).
+
+**Decision — `ConfirmModal` is the canonical destructive-action confirmation primitive; native `confirm()`/`alert()` are banned on admin surfaces.**
+ESC dismisses; backdrop click intentionally does NOT (avoids accidental loss on a misclick); confirm button has `requestAnimationFrame`-deferred focus so the SR announces the title first; default focus lands on **Cancel** for `tone="destructive"` and on **Confirm** for `tone="primary"` so a stray Enter carried from the trigger button does not immediately re-fire the destructive action. Focus-trap + `aria-describedby` deferred (Nice-to-have) because every current consumer is admin-only and the existing escape-and-button-focus is sufficient until ConfirmModal is reused on Citizen-facing flows.
+
+**Decision — `users` search escapes LIKE wildcards after the allowlist regex.**
+The allowlist removes most attack surface, but `%` / `_` / `\` were still possible — letting a logged-in admin (no privilege escalation, but DoS-shaped) ship a wildcard query that scans the whole index. `q.replace(/[\\%_]/g, "\\$&")` before `ilike()` makes the search literal-only without changing the user-visible behaviour for the supported character set.
+
+**Decision — `getClientIp` for admin-contributors-review off-Vercel returns `null` and fails closed (already in Batch 7a), and we now actively prune the dead-code branch that referenced the removed `NextRequest.ip`.**
+Keeping dead branches around invites a future "let's just add this back" PR. Removed in this batch.
+
+**Decision — every admin page that reads the caller's profile role must use `.maybeSingle()`, never `.single()`.**
+`.single()` throws on missing rows; the auth-callback path can race a freshly-created auth user before the `handle_new_user` trigger has populated `profiles`, which used to 500 the page. Migrated to `.maybeSingle()` everywhere this batch touched: `admin/{categories,reported,tags,api-keys,contributors/[id]}/page.tsx`. The pattern (`{ data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (me?.role !== "admin") redirect(...);`) is now the standard.
+
+**Decision — the auditor agent is required to ASK the user before leaving Report-only items unfixed (`connect-auditor.agent.md` Phase 2 step 6).**
+User mandate: "We cannot keep delaying fixes — please ask me for input if anything is needed". The audit policy now interrupts with `askQuestions("Apply now / Apply selected / Defer all")` whenever there are Report-only items that could be fixed inline. The choice is recorded in the checkpoint so future audit runs of the same surface don't re-ask. Default recommendation rules: suggest "apply now" only for ≤3 single-line edits with no behaviour change; suggest "defer" when context is light or items need design input.
+
+**Decision — `categories` DELETE relies on `ON DELETE SET NULL` from `events.category_id` and `places.category_id`.**
+Documented in route comments and in the ConfirmModal warning copy. A future enhancement (deferred Nice-to-have) is an `is_system boolean` column on `categories` to prevent admins from deleting the core taxonomy; not in scope for this batch because it touches schema.
+
+**Deferred from Batch 10 (will resurface via the new audit-policy ask):**
+- `ConfirmModal` focus-trap + `aria-describedby` for Citizen-facing reuse
+- Test-helper that distinguishes between consecutive `.single()` / `.maybeSingle()` calls (currently shared `_chain._result` is column-blind)
+- Grapheme-aware `emoji.slice(0, 8)` (ZWJ family emoji currently get sliced mid-sequence)
+- Tighter `color` regex `/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i`
+- `categories.is_system` flag (requires migration)
+- `logAdminAction` error handling — Supabase `.insert()` returns errors on the `error` field but the helper's try/catch only catches throws, so audit-log failures are silently swallowed
+
 ## MASTER_DIRECTION Batch 8 — FEAT-06 contributor billing foundation (+ Architect Should-fixes)
 
 **Decision — counters written exclusively by SECURITY DEFINER triggers, never by clients.**

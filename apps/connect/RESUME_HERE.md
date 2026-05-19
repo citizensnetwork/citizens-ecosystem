@@ -15,6 +15,30 @@
 
 ## 2. What just shipped
 
+**Batch 10 — Admin batch 2 (8 audit fixes + ConfirmModal a11y + audit-policy defer ask)** — `origin/main` @ `be0cb77`.
+
+- **`src/components/ui/ConfirmModal.tsx`** — reusable destructive/primary glass confirm modal. ESC dismisses (when not busy). Backdrop click intentionally NOT dismissive. Default focus lands on **Cancel** for `tone="destructive"` (avoids stray Enter re-firing destructive action) and on **Confirm** for `tone="primary"`. Auto-focus is deferred via `requestAnimationFrame` so SR announces title first.
+- **`/api/admin/categories` POST + `/api/admin/categories/[id]` PATCH+DELETE** — admin-only categories CRUD. Pipeline: `requireAdmin` → `isValidUUID(id)` → `checkRateLimit(per-actor, RATE_LIMITS.mutation)` → validate (name 1–80, slug `/^[a-z0-9]+(?:-[a-z0-9]+)*$/`, applies_to ∈ events|places|both, sort_order 0–10000, optional emoji ≤8 chars, optional `#hex` color) → DB op → `logAdminAction`. 23505 → 409.
+- **`CategoryManager.tsx`** — refactored to fetch the new API (no direct Supabase client). Delete uses `ConfirmModal` with copy warning about ON DELETE SET NULL FK detach.
+- **`ApiKeyManager.tsx`** — replaces native `confirm()`/`alert()` with `ConfirmModal` + inline error state.
+- **`/api/admin/api-keys`** — GET on `RATE_LIMITS.read`; DELETE adds mutation rate-limit + UUID validation before the RPC call.
+- **`/api/admin/reports/[id]` PATCH** — adds `RATE_LIMITS.mutation`.
+- **`/api/admin/contributors/review`** — removes dead branch from `getClientIp` (Next.js 15 removed `NextRequest.ip`).
+- **`/api/admin/users`** — search escapes LIKE wildcards `\ % _` after the allowlist regex.
+- **5 admin pages `.single()` → `.maybeSingle()`** on the profile role lookup: `admin/{categories,reported,tags,api-keys,contributors/[id]}/page.tsx` — defends against the rare race where the auth user exists but `handle_new_user` hasn't yet populated `profiles`.
+- **Audit policy update** — `.github/agents/connect-auditor.agent.md` Phase 2 now has a new step 6 that `askQuestions`s the user (apply now / apply selected / defer all) before leaving Report-only items unfixed. Default recommendation rules: suggest "apply now" only for ≤3 single-line edits with no behaviour change; suggest "defer" when context is light or items need design input. Choice is recorded in the checkpoint to prevent re-asking.
+- **Tests +14, suite 697 passing**: new `src/__tests__/api/admin/categories.test.ts` (POST 401/403/400×3/201, PATCH 400-uuid/400-empty/200, DELETE 400-uuid/404/200); extended `api-keys.test.ts` (DELETE rejects non-UUID id); extended `reports/route.test.ts` (rate-limit mock + 429).
+
+✅ **Quality gate (Batch 10):** tsc 0 errors · vitest 78 files / **697 tests passing** · `next lint --dir src` clean · advisors **0 ERROR / 84 WARN — unchanged from Batch 9 baseline** · Architect subagent: no Must-fix; both Should-fixes (`.maybeSingle()` parity on `contributors/[id]/page.tsx` + ConfirmModal focuses Cancel for destructive tone) applied inline before commit; Nice-to-haves routed via the new audit-policy ask path.
+
+**Batch 9 — Admin Tier B (audit log + rate limits + glass scaffold)** — `origin/main` @ `e6c1df6`.
+
+- **Migration `083_audit_log.sql`** — `public.audit_log(id, actor_id, action, target_type, target_id, metadata, created_at)` + RLS (admin-only read, service-role write) + indexes.
+- **`src/lib/adminGuard.ts`** — `requireAdmin(supabase)` returns discriminated `{ok:true, user} | {ok:false, deny:NextResponse}`; `logAdminAction(supabase, entry)` inserts a row into `audit_log`.
+- Rate-limits added to every admin write endpoint (`RATE_LIMITS.mutation`/`read`). CategoryManager glass-modal scaffold landed (refactored into API-driven form in Batch 10). ApiKeyManager UUID guard scaffold landed (rate-limit + Confirm modal landed in Batch 10).
+
+✅ **Quality gate (Batch 9):** tsc 0 errors · vitest 683 tests · lint clean · advisors 0 ERROR / 84 WARN unchanged.
+
 **Batch 8 — FEAT-06 contributor billing foundation (no PayFast)** — combined commit `ec74032` with Batch 7b.
 
 - **Migration `081_contributor_billing.sql`** — adds `profiles.billing_tier` (`individual` / `medium` / `large`, default `individual`) + `profiles.billing_trial_started_at` (nullable). Creates `public.contributor_billing(profile_id, month YYYY-MM regex CHECK, event_count, place_count, calculated_total numeric, updated_at)` PK `(profile_id, month)` with index on `(month)`. RLS SELECT owner-or-admin; explicit `REVOKE INSERT, UPDATE, DELETE FROM anon, authenticated`. Two `SECURITY DEFINER` tally triggers (`tally_contributor_event` / `tally_contributor_place`) fire AFTER INSERT on `events` / `places`, gated on `role='contributor'`, upserting the current-month row with `ON CONFLICT … DO UPDATE` (race-safe). IMMUTABLE helper `contributor_event_rate(text)` returns R250 / R150 / R30 per FEAT-06.
@@ -138,19 +162,21 @@
 ## 3. Current platform state
 
 - All Phase 1 → 11 work plus prior batches A–R, S1–S3, post-S3 1–3 remain shipped.
-- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, 5, 6, 7a, **7b**, **8** shipped. FEAT-01 → FEAT-06 schema + UI surfaces all landed; PayFast wire-up still deferred.
-- Test suite: 683 / 683. TS: 0 errors. Lint: clean.
-- Supabase advisors security: 0 ERROR, 84 WARN (+1 vs Batch 7a baseline — the new `get_my_billing_context` SD function advisor matches the established baseline pattern).
-- Git: `origin/main` at `ec74032` (Batch 7b + 8 combined).
+- MASTER_DIRECTION execution: Batches 1, 1b, 2, 3, 4, 5, 6, 7a, 7b, 8, **9 (Admin Tier B)**, **10 (Admin batch 2)** shipped. FEAT-01 → FEAT-06 schema + UI surfaces all landed; PayFast wire-up still deferred.
+- Test suite: **697 / 697**. TS: 0 errors. Lint: clean.
+- Supabase advisors security: 0 ERROR, 84 WARN (all baseline — no new warnings vs Batch 9).
+- Git: `origin/main` at `be0cb77` (Batch 10 — admin audit fixes).
+- **Admin surface posture:** every admin mutation route now goes through `requireAdmin` → UUID guard → per-actor rate-limit → validate → DB → `logAdminAction`. Native `confirm()`/`alert()` are banned on admin surfaces (use `ConfirmModal`).
 
 ## 4. Next batches queued (in priority order)
 
 1. **PayFast wire-up batch** — D11 / T5 / MASTER_DIRECTION Part 6. Deploy `payfast-webhook` edge function, wire `/profile/contributor/billing/setup` to the PayFast hosted checkout, record `payments` ledger rows, mark months as paid/unpaid, surface "Pay R… now" CTA on the BillPreviewCard when the trial expires.
-2. **Wear feature spec** — separate planning session per MASTER_DIRECTION Part 12.
-3. **Monorepo cutover** — once gating criteria in `docs/MONOREPO_PLAN.md` §5 are met.
-4. **Batch 8.1 nice-to-haves** — DELETE-decrement triggers on events/places, month-as-date conversion, setup-page flash-message.
-3. **Apply remaining BUG-01..BUG-08, BUG-10** and **T-tasks** from `.github/MASTER_DIRECTION.md` Parts 6–8.
-4. **Province lookup CHECK** on `profiles.connect_home_province` before any UI ships against it (Architect nice-to-have).
+2. **Next audit surface (from `.audit/QUEUE.md`)** — pick the next highest-risk surface; the auditor will now ask before deferring Report-only items.
+3. **Wear feature spec** — separate planning session per MASTER_DIRECTION Part 12.
+4. **Monorepo cutover** — once gating criteria in `docs/MONOREPO_PLAN.md` §5 are met.
+5. **Batch 8.1 nice-to-haves** — DELETE-decrement triggers on events/places, month-as-date conversion, setup-page flash-message.
+6. **Batch 10 Nice-to-haves (deferred via audit-policy ask)** — `ConfirmModal` focus-trap + `aria-describedby` for Citizen-facing reuse; test-helper that distinguishes between consecutive `.single()` / `.maybeSingle()` calls; grapheme-aware emoji slice; tighter `#hex` regex; `categories.is_system` flag; `logAdminAction` error handling.
+7. **Apply remaining BUG-01..BUG-08, BUG-10** and **T-tasks** from `.github/MASTER_DIRECTION.md` Parts 6–8.
 
 ## 5. Open questions / deferred items
 
@@ -164,7 +190,7 @@
 ```powershell
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npx tsc --noEmit            # expect 0 errors
-npx vitest run              # expect 682 pass / 0 fail
+npx vitest run              # expect 697 pass / 0 fail
 npx next lint --dir src     # expect clean (deprecation warning is non-blocking)
 ```
 
