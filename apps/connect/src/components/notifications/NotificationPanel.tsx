@@ -192,6 +192,11 @@ export default function NotificationPanel({
     if (data?.user_id && typeof data.user_id === "string") {
       return `/profile/${data.user_id}`;
     }
+    // Generic in-app deep link — used by contributor approval / rejection
+    // notifications and any future writer that needs a static path.
+    if (data?.url && typeof data.url === "string" && data.url.startsWith("/")) {
+      return data.url;
+    }
     return null;
   }
 

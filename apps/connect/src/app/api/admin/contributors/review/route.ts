@@ -110,9 +110,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Explicitly forward the caller's access token in deep-link-less mode so
+  // the edge function's RPC sees auth.uid() and is_admin() returns true.
+  // (The SSR cookie client doesn't always populate the functions.invoke
+  // Authorization header from the session.)
+  const invokeHeaders: Record<string, string> = {};
+  if (!isDeepLink) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    invokeHeaders.Authorization = `Bearer ${session.access_token}`;
+  }
+
   const { data, error } = await supabase.functions.invoke(
     "review-contributor-application",
-    { body: payload },
+    { body: payload, headers: invokeHeaders },
   );
 
   if (error) {

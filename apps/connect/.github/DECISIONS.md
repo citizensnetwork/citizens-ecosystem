@@ -2,6 +2,20 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 11 — BUG: Admin contributor approvals 500
+
+**Decision — `notifications` deep links always live in the `data` jsonb column (`data.url`), never in a top-level column.**
+The notifications table has columns `(id, user_id, type, title, body, data, ...)`. There is no `url` column. The original contributor approval RPCs (migration 036) and the edge function's service-mode fallback both inserted into `url`, raising `column "url" of relation "notifications" does not exist` on every admin click. Canonical pattern (per schema.sql, migrations 069/070, and every working trigger): `jsonb_build_object('url', '/some/path')` into `data`. Migration 084 brings the two contributor RPCs and the edge function v3 in line.
+
+**Decision — `NotificationPanel.getNotificationLink` reads `data.url` after `data.event_id` and `data.user_id` branches; URLs must start with `/`.**
+Architect must-fix from this batch: the panel was dropping deep links from any notification that didn't carry `event_id` or `user_id`, so contributor approval notifications rendered but were not clickable. New branch accepts only strings starting with `/` (prevents an off-site open via a future malicious writer). Future writers should prefer the typed branches (event_id / user_id) where possible; `data.url` is the escape hatch for static destinations like `/profile/contributor` and `/contributor/apply`.
+
+**Decision — defer email-deep-link state-transition atomicity hardening to a follow-up batch.**
+Architect flagged that `performReviewAsService` in the edge function performs a non-transactional profile-then-application mutation, missing the `for update` row-lock that the SQL RPC has. Real risk, but it only affects the HMAC email-link path under concurrent admin clicks within the link's expiry window, with no privilege-escalation surface (HMAC + expiry already gate access). Triaged out of this bugfix to keep blast radius minimal; will consolidate by adding `approve_contributor_application_as_service(_application_id uuid, _reviewer_id uuid)` callable with a verified HMAC bypass, then deleting `performReviewAsService`.
+
+**Decision — Supabase edge functions deployed via MCP must use `./_shared/…` (sibling), not `../_shared/…` (parent) relative imports.**
+The MCP deploy bundler places every uploaded file inside `source/` and resolves the entrypoint at `source/index.ts`. With the source tree's natural `../_shared/` import, the bundler looks one level above `source/` and finds nothing (`Module not found`). The local source still uses `../_shared/` because that's correct on disk (functions live in their own folders). Local code is committed as-is for local dev / future CLI deploys; the deployed bundle was generated with rewritten `./_shared/` imports + an inlined deno.json import map. Documented here so future MCP deploys (or anyone replicating the runbook) know to swap the import prefix when packaging the upload.
+
 ## MASTER_DIRECTION Batch 10 — Admin batch 2 (audit fixes + ConfirmModal + audit-policy defer ask)
 
 **Decision — every admin mutation route must funnel through `requireAdmin` → `isValidUUID` → `checkRateLimit(per-actor)` → validate → DB → `logAdminAction`, in that order.**

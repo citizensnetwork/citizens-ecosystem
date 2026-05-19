@@ -250,7 +250,7 @@ async function performReviewAsService(
       type: "contributor_approved",
       title: "You're an approved Contributor!",
       body: "Welcome! You can now create public events and places.",
-      url: "/profile/contributor",
+      data: { url: "/profile/contributor" },
     });
 
     // Discard any unused preflight state.
@@ -291,7 +291,7 @@ async function performReviewAsService(
       type: "contributor_rejected",
       title: "Contributor application update",
       body: input.reason,
-      url: "/contributor/apply",
+      data: { url: "/contributor/apply" },
     });
     return { success: true };
   }
