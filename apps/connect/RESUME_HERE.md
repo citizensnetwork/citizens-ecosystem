@@ -15,6 +15,25 @@
 
 ## 2. What just shipped
 
+**Batch 11 — BUG: admin contributor approvals 500 (notifications.url + auth wiring)** — `origin/main` @ `cf9e00b`.
+
+- **Symptom:** `/admin/contributors/[id]` Approve/Reject buttons returned "Review failed". Postgres logs showed `ERROR: column "url" of relation "notifications" does not exist` on every click.
+- **Root cause #1 — wrong column.** The two contributor RPCs (`approve_contributor_application` / `reject_contributor_application`, originally migration 036) and the edge function's service-mode fallback (`performReviewAsService`) were both inserting into a top-level `notifications.url` column that has never existed. Canonical pattern in this project: deep links live in the `data` jsonb (`{url: '/some/path'}`) — see schema.sql, migrations 069/070, and every working trigger.
+- **Root cause #2 — auth header.** `/api/admin/contributors/review` invoked the edge function via `supabase.functions.invoke(...)` from an SSR cookie client. That path doesn't always forward the session JWT as `Authorization: Bearer`, so the edge function couldn't see `auth.uid()` and silently fell through to the unauthorized branch.
+- **Migration 084** rewrites both RPCs to write `data := jsonb_build_object('url', '/profile/contributor')` (approve) / `'/contributor/apply'` (reject); both gain `set search_path = pg_catalog, public` while we're in there.
+- **Edge function `review-contributor-application` v3** deployed via MCP. Service-mode fallback now writes `data: { url: ... }`. (Local source uses `../_shared/` which is correct on disk; MCP deploy bundles everything into `source/` so the deploy payload was rewritten to `./_shared/` + an inlined deno.json import_map.)
+- **`/api/admin/contributors/review`** explicitly pulls the access token via `supabase.auth.getSession()` and forwards `Authorization: Bearer <jwt>` to `functions.invoke`. Returns 401 if no session.
+- **`NotificationPanel.getNotificationLink`** (architect must-fix) extended with a `data.url` branch — accepts only strings starting with `/`. Without this, contributor approval notifications rendered but were unclickable.
+- **`supabase` CLI** added to devDependencies for local dev parity.
+
+✅ **Quality gate (Batch 11):** tsc 0 errors · vitest 78 files / **697 tests passing** · `next lint --dir src` clean · advisors **0 ERROR / 82 WARN — no new vs baseline** (the 4 SD-function warnings on these 2 RPCs were pre-existing since migration 036) · Architect run: 1 Must-fix applied inline (NotificationPanel `data.url` branch); 5 Should-fixes deferred with rationale (atomicity of `performReviewAsService`, sign reviewer_id + reason inside HMAC, add replay nonce, restrict RPC EXECUTE to authenticated only — see DECISIONS.md Batch 11).
+
+**How to verify locally:**
+1. Sign in as an admin. Open `/admin/contributors/[id]` for a pending application.
+2. Click Approve → toast success → recipient's bell shows a new notification ✦ → clicking it routes to `/profile/contributor`.
+3. Click Reject (different app) → recipient notification routes to `/contributor/apply`.
+4. Test the email-deep-link path: trigger an approval email from a previous run (or via the `?token=…&state=…` query string in the dev console), click — same flow, no 500.
+
 **Batch 10 — Admin batch 2 (8 audit fixes + ConfirmModal a11y + audit-policy defer ask)** — `origin/main` @ `be0cb77`.
 
 - **`src/components/ui/ConfirmModal.tsx`** — reusable destructive/primary glass confirm modal. ESC dismisses (when not busy). Backdrop click intentionally NOT dismissive. Default focus lands on **Cancel** for `tone="destructive"` (avoids stray Enter re-firing destructive action) and on **Confirm** for `tone="primary"`. Auto-focus is deferred via `requestAnimationFrame` so SR announces title first.
