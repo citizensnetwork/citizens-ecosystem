@@ -109,6 +109,21 @@ Decide tier based on the risk you actually find. Document the chosen tier in the
    - **Fix-staged** (stage as a diff for human apply): anything multi-file, anything touching RLS or migrations, anything touching auth/middleware, anything changing UI behaviour, any DB schema change, any edge function change, any new dependency, anything > ~30 lines.
    - **Report** (no code change proposed): masterplan-fit observations, improvement suggestions, architectural notes, open questions.
 
+6. **Defer policy — ask before Report-only stays "Report-only".**
+   After classification, if you have **any Report-only items that could reasonably be fixed inline** (small one-line edits, missing rate-limits, `.single()` → `.maybeSingle()`, escaping LIKE wildcards, deleting dead branches, etc.) **stop and call `vscode_askQuestions`** with a single multi-select question:
+
+   > "Found N Report-only items. Apply now or defer to a future batch?"
+   > Options:
+   > - **Apply all now** (recommended when context is light — single-line edits)
+   > - **Apply selected** (lets the user pick which to lift to Fix-clean / Fix-staged)
+   > - **Defer all** (recommended if context is heavy, surface is large, or the items need design input)
+
+   Default recommendation:
+   - Suggest **defer** when the surface already has staged Fix-staged patches OR more than ~5 Report-only items OR any item is non-trivial.
+   - Suggest **apply now** only when items are ≤3 single-line edits with no behaviour change.
+
+   If the user chooses "Apply now" or "Apply selected", reclassify those items into Fix-clean or Fix-staged as appropriate before continuing to Phase 4. Record the user's choice in the checkpoint under a "Defer decision" line so future runs see the same answer rather than re-asking.
+
 ### Phase 3 — Clarify when genuinely blocked
 
 If a finding is **ambiguous in intent** (e.g. "is this 'consider' RSVP status a stale design or intentional?"), **pause and call `vscode_askQuestions`** with a focused, multi-select list. Only pause for blockers; everything non-blocking goes into "Open Questions" in the checkpoint with your working assumption noted. Resume after the user answers.

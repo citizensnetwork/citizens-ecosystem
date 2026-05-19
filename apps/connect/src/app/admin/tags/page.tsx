@@ -21,7 +21,7 @@ export default async function AdminTagsPage() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profile?.role !== "admin") {
     redirect("/events");

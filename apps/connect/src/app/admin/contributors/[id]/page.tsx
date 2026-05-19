@@ -48,7 +48,7 @@ export default async function AdminContributorReviewPage({
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
   if (me?.role !== "admin") redirect("/events");
 
   const { data: row } = await supabase

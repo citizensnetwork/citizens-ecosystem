@@ -8,6 +8,18 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue(mockClient),
 }));
 
+// Disable real rate-limiter so the mutation bucket doesn't trip between
+// tests sharing the same admin id.
+vi.mock("@/lib/rate-limit", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rate-limit")>(
+    "@/lib/rate-limit",
+  );
+  return {
+    ...actual,
+    checkRateLimit: vi.fn().mockReturnValue({ success: true, resetMs: 0 }),
+  };
+});
+
 const { PATCH } = await import("@/app/api/admin/reports/[id]/route");
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
@@ -69,6 +81,16 @@ describe("PATCH /api/admin/reports/[id]", () => {
       ctx(),
     );
     expect(res.status).toBe(400);
+  });
+
+  it("returns 429 when rate-limited", async () => {
+    const rl = await import("@/lib/rate-limit");
+    (rl.checkRateLimit as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      success: false,
+      resetMs: 60_000,
+    });
+    const res = await PATCH(makeReq({ status: "actioned" }), ctx());
+    expect(res.status).toBe(429);
   });
 
   it("returns 200 on successful resolution", async () => {

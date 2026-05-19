@@ -31,7 +31,7 @@ export default async function AdminReportsPage({
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
   if (profile?.role !== "admin") redirect("/events");
 
   const filterStatus =

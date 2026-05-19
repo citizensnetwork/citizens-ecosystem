@@ -19,7 +19,7 @@ export default async function AdminApiKeysPage() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
   if (profile?.role !== "admin") redirect("/events");
 
   // Pre-fetch data in parallel so the client component renders without

@@ -30,19 +30,19 @@ const ALLOWED_ACTIONS = new Set(["approve", "reject"]);
 /**
  * Resolve the caller IP for rate-limit bucketing.
  *
- * On Vercel, `request.ip` is populated from the platform's *trusted*
- * `x-forwarded-for` and is safe. Off-Vercel, XFF is fully client-
- * controlled and an attacker can rotate the leading value to defeat
- * the per-IP limiter, so we only honour the header when running on a
- * known-trusted edge. When no IP can be determined in deep-link mode
- * we return `null` so the caller can fail closed rather than letting
- * every header-less request share the "unknown" bucket (which would
- * DoS-amplify across legitimate callers).
+ * On Vercel, the platform normalises `x-forwarded-for` and we can trust
+ * its first hop. Off-Vercel, XFF is fully client-controlled and an
+ * attacker can rotate the leading value to defeat the per-IP limiter,
+ * so we only honour the header when running on a known-trusted edge.
+ * When no IP can be determined in deep-link mode we return `null` so
+ * the caller can fail closed rather than letting every header-less
+ * request share the "unknown" bucket (which would DoS-amplify across
+ * legitimate callers).
  */
 function getClientIp(req: NextRequest): string | null {
-  // Next.js / Vercel populates `request.ip` from the trusted platform XFF.
-  const direct = (req as unknown as { ip?: string }).ip;
-  if (direct) return direct;
+  // `NextRequest.ip` was removed in Next.js 15 — the surviving trustworthy
+  // source is Vercel's normalised `x-forwarded-for` (only honoured when
+  // we know we are running on Vercel's edge).
   if (process.env.VERCEL) {
     const fwd = req.headers.get("x-forwarded-for");
     if (fwd) {

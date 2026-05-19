@@ -26,9 +26,10 @@ export async function GET(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  // Light read cap — defence-in-depth for admin session compromise
-  // (Architect audit L3).
-  const rl = checkRateLimit(`admin-keys-get:${guard.user.id}`, RATE_LIMITS.mutation);
+  // Light read cap — defence-in-depth for admin session compromise.
+  // Listing keys is a read; mutation tier was needlessly tight (Tier-B
+  // audit follow-up — `read` matches the rest of admin list endpoints).
+  const rl = checkRateLimit(`admin-keys-list:${guard.user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -199,10 +200,29 @@ export async function DELETE(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
+  const rl = checkRateLimit(
+    `admin-keys-revoke:${guard.user.id}`,
+    RATE_LIMITS.mutation,
+  );
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() },
+      },
+    );
+  }
+
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  if (!UUID_RE.test(id)) {
+    // Reject obvious junk before round-tripping to the RPC. The RPC
+    // will also fail, but a 400 here is clearer + cheaper.
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
   const { data, error } = await supabase.rpc("revoke_api_key", {

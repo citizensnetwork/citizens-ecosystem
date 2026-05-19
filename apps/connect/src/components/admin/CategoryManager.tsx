@@ -1,9 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+/**
+ * Admin surface for category CRUD.
+ *
+ * Writes go through `/api/admin/categories` (POST / PATCH / DELETE) rather
+ * than directly to the `categories` table via PostgREST. The API route is
+ * the single chokepoint for validation, rate-limiting, and `admin_actions`
+ * audit logging — the table-level RLS is the second line of defence.
+ */
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category, CategoryAppliesTo } from "@/types/db";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 type Props = {
   categories: Category[];
@@ -18,9 +27,9 @@ export default function CategoryManager({ categories }: Props) {
   const [sortOrder, setSortOrder] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
-  const supabaseRef = useRef(createClient());
-  const supabase = supabaseRef.current;
 
   function resetForm() {
     setEditingId(null);
@@ -49,86 +58,77 @@ export default function CategoryManager({ categories }: Props) {
     setLoading(true);
     setError("");
 
-    if (editingId) {
-      const { error: err } = await supabase
-        .from("categories")
-        .update({
-          name: name.trim(),
-          slug: slug.trim(),
-          applies_to: appliesTo,
-          sort_order: sortOrder,
-        })
-        .eq("id", editingId);
+    try {
+      const payload = {
+        name: name.trim(),
+        slug: slug.trim(),
+        applies_to: appliesTo,
+        sort_order: sortOrder,
+      };
 
-      if (err) {
-        setError(err.message);
-        setLoading(false);
-        return;
+      if (editingId) {
+        const res = await fetch(`/api/admin/categories/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          category?: Category;
+          error?: string;
+        };
+        if (!res.ok || !json.category) {
+          setError(json.error ?? "Failed to update category.");
+          return;
+        }
+        const updated = json.category;
+        setItems((prev) =>
+          prev.map((c) => (c.id === editingId ? updated : c)),
+        );
+      } else {
+        const res = await fetch("/api/admin/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          category?: Category;
+          error?: string;
+        };
+        if (!res.ok || !json.category) {
+          setError(json.error ?? "Failed to create category.");
+          return;
+        }
+        setItems((prev) => [...prev, json.category as Category]);
       }
 
-      setItems((prev) =>
-        prev.map((c) =>
-          c.id === editingId
-            ? {
-                ...c,
-                name: name.trim(),
-                slug: slug.trim(),
-                applies_to: appliesTo,
-                sort_order: sortOrder,
-              }
-            : c
-        )
-      );
-    } else {
-      const { data, error: err } = await supabase
-        .from("categories")
-        .insert({
-          name: name.trim(),
-          slug: slug.trim(),
-          emoji: "",
-          color: "#6b7280",
-          applies_to: appliesTo,
-          sort_order: sortOrder,
-        })
-        .select()
-        .single();
-
-      if (err) {
-        setError(err.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data) {
-        setItems((prev) => [...prev, data as Category]);
-      }
+      resetForm();
+      router.refresh();
+    } finally {
+      setLoading(false);
     }
-
-    resetForm();
-    setLoading(false);
-    router.refresh();
   }
 
-  async function handleDelete(id: string) {
-    const target = items.find((c) => c.id === id);
-    const label = target?.name ?? "this category";
-    if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
-    setLoading(true);
-    const { error: err } = await supabase
-      .from("categories")
-      .delete()
-      .eq("id", id);
-
-    if (err) {
-      setError(err.message);
-      setLoading(false);
-      return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/categories/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(json.error ?? "Failed to delete category.");
+        return;
+      }
+      const removedId = deleteTarget.id;
+      setItems((prev) => prev.filter((c) => c.id !== removedId));
+      if (editingId === removedId) resetForm();
+      setDeleteTarget(null);
+      router.refresh();
+    } finally {
+      setDeleting(false);
     }
-
-    setItems((prev) => prev.filter((c) => c.id !== id));
-    if (editingId === id) resetForm();
-    setLoading(false);
-    router.refresh();
   }
 
   return (
@@ -141,9 +141,9 @@ export default function CategoryManager({ categories }: Props) {
         </div>
       )}
 
-      {/* Category list */}
       <div className="space-y-2">
         {items
+          .slice()
           .sort((a, b) => a.sort_order - b.sort_order)
           .map((cat) => (
             <div
@@ -170,7 +170,7 @@ export default function CategoryManager({ categories }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(cat.id)}
+                  onClick={() => setDeleteTarget(cat)}
                   disabled={loading}
                   className="text-xs text-red-500 hover:underline disabled:opacity-50"
                 >
@@ -181,7 +181,6 @@ export default function CategoryManager({ categories }: Props) {
           ))}
       </div>
 
-      {/* Add / Edit form */}
       <div className="rounded-xl border border-black/10 bg-white p-4 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-black/50">
           {editingId ? "Edit Category" : "Add Category"}
@@ -206,7 +205,7 @@ export default function CategoryManager({ categories }: Props) {
                     e.target.value
                       .toLowerCase()
                       .replace(/[^a-z0-9]+/g, "-")
-                      .replace(/(^-|-$)/g, "")
+                      .replace(/(^-|-$)/g, ""),
                   );
                 }
               }}
@@ -290,6 +289,26 @@ export default function CategoryManager({ categories }: Props) {
           )}
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Delete category?"
+          message={
+            <>
+              This will remove <strong>{deleteTarget.name}</strong> (
+              <code>{deleteTarget.slug}</code>) and detach it from any events
+              or places that referenced it. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          tone="destructive"
+          busy={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            if (!deleting) setDeleteTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

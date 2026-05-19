@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 type ApiKeyRow = {
   id: string;
@@ -53,6 +54,13 @@ export default function ApiKeyManager({
 
   // Raw-key modal: only populated immediately after POST, cleared on dismiss.
   const [newKey, setNewKey] = useState<{ raw_key: string; name: string; id: string } | null>(null);
+
+  // Revoke confirm modal target. Replaces native `confirm()` so destructive
+  // actions match the Connect UI system and stay accessible (focus,
+  // ESC, screen-reader announce).
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
+  const [revokeError, setRevokeError] = useState("");
 
   const refresh = useCallback(async (withDisabled: boolean) => {
     const qs = withDisabled ? "?include_disabled=1" : "";
@@ -102,16 +110,25 @@ export default function ApiKeyManager({
     }
   }
 
-  async function handleRevoke(id: string, displayName: string) {
-    if (!confirm(`Revoke "${displayName}"? This cannot be undone.`)) return;
-    const res = await fetch(`/api/admin/api-keys?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      alert("Failed to revoke key.");
-      return;
+  async function confirmRevoke() {
+    if (!revokeTarget) return;
+    setRevokeBusy(true);
+    setRevokeError("");
+    try {
+      const res = await fetch(
+        `/api/admin/api-keys?id=${encodeURIComponent(revokeTarget.id)}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setRevokeError(json.error ?? "Failed to revoke key.");
+        return;
+      }
+      setRevokeTarget(null);
+      await refresh(includeDisabled);
+    } finally {
+      setRevokeBusy(false);
     }
-    await refresh(includeDisabled);
   }
 
   async function toggleDisabled(next: boolean) {
@@ -248,7 +265,10 @@ export default function ApiKeyManager({
                 {!k.disabled_at && (
                   <button
                     type="button"
-                    onClick={() => handleRevoke(k.id, k.name)}
+                    onClick={() => {
+                      setRevokeError("");
+                      setRevokeTarget({ id: k.id, name: k.name });
+                    }}
                     className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
                   >
                     Revoke
@@ -261,6 +281,32 @@ export default function ApiKeyManager({
       </section>
 
       {newKey && <NewKeyModal entry={newKey} onClose={() => setNewKey(null)} />}
+
+      {revokeTarget && (
+        <ConfirmModal
+          title="Revoke API key?"
+          message={
+            <>
+              This will immediately disable <strong>{revokeTarget.name}</strong>.
+              Any service using it will start receiving 401s. This cannot be
+              undone.
+              {revokeError && (
+                <span className="mt-2 block text-red-600">{revokeError}</span>
+              )}
+            </>
+          }
+          confirmLabel="Revoke"
+          tone="destructive"
+          busy={revokeBusy}
+          onConfirm={confirmRevoke}
+          onCancel={() => {
+            if (!revokeBusy) {
+              setRevokeTarget(null);
+              setRevokeError("");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

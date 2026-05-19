@@ -87,6 +87,11 @@ describe("/api/admin/api-keys", () => {
     expect(res.status).toBe(400);
   });
 
+  it("DELETE rejects non-UUID id", async () => {
+    const res = await DELETE(jsonReq(null, "DELETE", "?id=not-a-uuid"));
+    expect(res.status).toBe(400);
+  });
+
   it("DELETE rejects non-admin", async () => {
     mockClient._chain._result.data = { role: "contributor" };
     const res = await DELETE(jsonReq(null, "DELETE", "?id=abc"));

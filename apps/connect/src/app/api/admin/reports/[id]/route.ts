@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,22 @@ export async function PATCH(
   const supabase = await createClient();
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
+
+  // Defence-in-depth for admin session compromise (parity with the rest
+  // of the admin write surfaces).
+  const rl = checkRateLimit(
+    `admin-reports-patch:${guard.user.id}`,
+    RATE_LIMITS.mutation,
+  );
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() },
+      },
+    );
+  }
 
   const { id } = await params;
   if (!isValidUUID(id)) {

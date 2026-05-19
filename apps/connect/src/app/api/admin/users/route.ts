@@ -52,7 +52,12 @@ export async function GET(request: NextRequest) {
 
   const url = new URL(request.url);
   const rawQ = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  const q = rawQ.replace(/[^a-zA-Z0-9 \-'@._]/g, " ").trim();
+  const allowlisted = rawQ.replace(/[^a-zA-Z0-9 \-'@._]/g, " ").trim();
+  // Escape PostgREST/SQL LIKE special characters that survive the
+  // allowlist (`_` is allowed in the allowlist so users can search
+  // by handle/email containing it, but it must not act as a wildcard).
+  // `%` is excluded by the allowlist but escape defensively too.
+  const q = allowlisted.replace(/[\\%_]/g, "\\$&");
   const pageRaw = parseInt(url.searchParams.get("page") ?? "1", 10);
   const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(pageRaw, 500)) : 1;
   const status = url.searchParams.get("status");
