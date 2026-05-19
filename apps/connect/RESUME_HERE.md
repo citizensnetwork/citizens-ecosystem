@@ -181,7 +181,7 @@ Smoke test the admin restructure:
 - ✅ **middleware-and-session** — clean (patch applied Batch 7a, audited 2026-05-15)
 - ✅ **api-surface** — clean (patches applied Batch 7a, audited 2026-05-15)
 - 🟡 **auth-and-signup** — 2 staged fixes, run `/audit-apply auth-and-signup`. Checkpoint: `.audit/surfaces/auth-and-signup.md`. Patches: `auth-and-signup--indemnity-applies-to-injection.diff` (PostgREST filter injection), `auth-and-signup--redirect-after-login.diff` (redirect param ignored after login).
-- 🟡 **admin** — 1 Fix-clean applied inline (CategoryManager delete confirmation), migration `083_categories_admin_write_policies.sql` written to disk + `schema.sql` patched. **Still needs `mcp_supabase_apply_migration` to go live.** After applying, verify with `select policyname,cmd from pg_policies where tablename='categories';` and `mcp_supabase_get_advisors type:"security"`. Checkpoint: `.audit/surfaces/admin.md`.
+- ✅ **admin** — Gate 1 fix applied (categories admin write RLS, migration 083, Studio-applied + committed fbafb60). 8 Report-only observations remain in checkpoint. Next: verify with `mcp_supabase_execute_sql` + `mcp_supabase_get_advisors` in a session where MCP is connected. Checkpoint: `.audit/surfaces/admin.md`.
 - pending: edge-functions, event-create-edit, rsvp-and-comments, messaging-dm, place-create-edit-media, notifications, onboarding, events-browse, event-detail, profile-and-interests, places-browse-and-follow, map-core, storage-and-media-uploads.
 - Full queue: `.audit/QUEUE.md`.
 
