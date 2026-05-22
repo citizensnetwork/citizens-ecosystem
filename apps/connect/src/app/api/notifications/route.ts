@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
 
 /** GET — fetch current user's notifications (newest first, max 50) */
 export async function GET() {
@@ -11,6 +16,11 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`notifications-get:${user.id}`, RATE_LIMITS.read);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const { data, error } = await supabase
@@ -39,14 +49,23 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body;
+  const rl = checkRateLimit(`notifications-patch:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { id, all } = body;
+  if (!isRecord(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { id, all } = body as { id?: unknown; all?: unknown };
 
   if (all === true) {
     // Mark all as read
@@ -64,7 +83,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
-  if (!isValidUUID(id)) {
+  if (typeof id !== "string" || !isValidUUID(id)) {
     return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
   }
 
@@ -93,16 +112,25 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body;
+  const rl = checkRateLimit(`notifications-delete:${user.id}`, RATE_LIMITS.mutation);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { id } = body;
+  if (!isRecord(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  if (!isValidUUID(id)) {
+  const { id } = body as { id?: unknown };
+
+  if (typeof id !== "string" || !isValidUUID(id)) {
     return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
   }
 

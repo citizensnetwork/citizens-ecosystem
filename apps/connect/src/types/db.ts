@@ -473,7 +473,11 @@ export type NotificationType =
   | "new_message"
   | "review_prompt"
   | "friend_convince"
-  | "friend_attending";
+  | "friend_attending"
+  // Admin / contributor pipeline (DB CHECK in migrations 069 + 085).
+  | "admin_elevation_request"
+  | "contributor_approved"
+  | "contributor_rejected";
 
 /**
  * FEAT-04 Convince row — one per (from, to, event); permanent UNIQUE.
