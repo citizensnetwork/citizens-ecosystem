@@ -29,10 +29,14 @@ export interface PendingApplication {
 
 export function ContributorReviewCard({ app }: { app: PendingApplication }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"idle" | "rejecting" | "working">("idle");
+  const [mode, setMode] = useState<
+    "idle" | "rejecting" | "confirming-delete" | "working"
+  >("idle");
   const [rejectReason, setRejectReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<null | "approved" | "rejected">(null);
+  const [done, setDone] = useState<null | "approved" | "rejected" | "deleted">(
+    null,
+  );
 
   const submit = async (action: "approve" | "reject") => {
     if (action === "reject" && rejectReason.trim().length < 5) {
@@ -72,10 +76,44 @@ export function ContributorReviewCard({ app }: { app: PendingApplication }) {
     }
   };
 
+  const submitDelete = async () => {
+    setError(null);
+    setMode("working");
+    try {
+      const res = await fetch("/api/admin/contributors/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ application_id: app.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string"
+            ? data.error.replace(/_/g, " ")
+            : "Delete failed. Please try again.",
+        );
+        setMode("confirming-delete");
+        return;
+      }
+      setDone("deleted");
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      setError("Network error. Please try again.");
+      setMode("confirming-delete");
+    }
+  };
+
   if (done) {
+    const label =
+      done === "approved"
+        ? "Approved ✓"
+        : done === "rejected"
+          ? "Rejected ✓"
+          : "Deleted ✓";
     return (
       <div className="rounded-xl border border-black/10 bg-white p-4 text-sm text-black/60">
-        {done === "approved" ? "Approved ✓" : "Rejected ✓"} — {app.display_name}
+        {label} — {app.display_name}
       </div>
     );
   }
@@ -184,8 +222,43 @@ export function ContributorReviewCard({ app }: { app: PendingApplication }) {
             </button>
           </div>
         </div>
+      ) : mode === "confirming-delete" ? (
+        <div className="space-y-2 rounded-lg border border-red-200 bg-red-50/60 p-3">
+          <p className="text-sm text-red-900">
+            Delete this application permanently? The applicant&apos;s
+            contributor status will reset to <em>not applied</em> so they can
+            re-apply. No email is sent.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("idle");
+                setError(null);
+              }}
+              className="rounded-lg px-3 py-1.5 text-sm text-black/70 hover:bg-black/6"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitDelete}
+              className="rounded-lg bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-800"
+            >
+              Confirm delete
+            </button>
+          </div>
+        </div>
       ) : (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("confirming-delete")}
+            disabled={mode === "working"}
+            className="rounded-lg border border-red-200 bg-white px-4 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            Delete
+          </button>
           <button
             type="button"
             onClick={() => setMode("rejecting")}
