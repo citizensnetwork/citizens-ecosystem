@@ -17,7 +17,7 @@ import {
   PLACE_MARKER_SIZE,
   PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
-import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
+import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
 import {
@@ -235,6 +235,12 @@ export default function EventMap({
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
   const updateMarkerSizesRef = useRef<() => void>(() => {});
+  /** Viewport culling — hides markers whose `lngLat` is outside the
+   *  current map bounds (plus a margin) by toggling `display: none`.
+   *  Eliminates per-frame transform compositing for off-screen markers,
+   *  which is the dominant DOM-marker cost at province-level zooms.
+   *  Reset by `clearMarkers()`; runs on every `move` via rAF. */
+  const cullMarkersRef = useRef<() => void>(() => {});
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach((m) => m.remove());
@@ -1018,6 +1024,43 @@ export default function EventMap({
   runDeconflictionRef.current = runDeconfliction;
   updateMarkerSizesRef.current = updateMarkerSizes;
 
+  // Viewport culling: hide markers outside current bounds (+10% margin).
+  // Keeps a margin so panning doesn't pop markers in/out at the edge.
+  // Display-toggle (not removal) so deconfliction/leader-line state stays
+  // intact — the marker objects still exist in `markersRef`/`placeMarkersRef`.
+  const cullMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    const west = b.getWest();
+    const east = b.getEast();
+    const south = b.getSouth();
+    const north = b.getNorth();
+    const padLng = (east - west) * 0.1;
+    const padLat = (north - south) * 0.1;
+    const inBounds = (lng: number, lat: number) =>
+      lng >= west - padLng &&
+      lng <= east + padLng &&
+      lat >= south - padLat &&
+      lat <= north + padLat;
+    const cull = (m: maplibregl.Marker) => {
+      const ll = m.getLngLat();
+      const el = m.getElement() as HTMLElement;
+      const visible = inBounds(ll.lng, ll.lat);
+      const hidden = el.dataset.cculled === "1";
+      if (visible && hidden) {
+        el.style.display = "";
+        el.dataset.cculled = "0";
+      } else if (!visible && !hidden) {
+        el.style.display = "none";
+        el.dataset.cculled = "1";
+      }
+    };
+    for (const m of markersRef.current) cull(m);
+    for (const m of placeMarkersRef.current) cull(m);
+  }, []);
+  cullMarkersRef.current = cullMarkers;
+
   /** Sticky 50 km nearby-event ring — REMOVED.
    *  Previously pinned off-screen markers to the viewport edge with a
    *  distance-based opacity falloff. Produced dimmed icons at low zoom,
@@ -1087,6 +1130,7 @@ export default function EventMap({
     if (stored) hasRestoredView.current = true;
 
     mapRef.current = map;
+    attachBasemapPruner(map);
 
     // SVG overlay for deconfliction leader lines
     const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1175,6 +1219,7 @@ export default function EventMap({
     map.on("move", () => {
       if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
       deconflictRaf = requestAnimationFrame(() => {
+        cullMarkersRef.current();
         runDeconflictionRef.current();
         updateMarkerSizesRef.current();
       });
@@ -1182,6 +1227,7 @@ export default function EventMap({
 
     // After panning stops, do a final deconfliction pass
     map.on("moveend", () => {
+      cullMarkersRef.current();
       runDeconflictionRef.current();
       onMoveEndRef.current?.();
       if (onBoundsChangeRef.current) {
@@ -1601,6 +1647,7 @@ export default function EventMap({
       setTimeout(() => {
         updateMarkerSizesRef.current();
         runDeconflictionRef.current();
+        cullMarkersRef.current();
         clearLegacyRingStateRef.current();
       }, 300);
     };

@@ -15,7 +15,28 @@
 
 ## 2. What just shipped
 
-**Batch 11 — BUG: admin contributor approvals 500 (notifications.url + auth wiring)** — `origin/main` @ `cf9e00b`.
+**Batch 13 — Map perf: basemap layer pruning + DOM marker culling + MapTiler "Lite" checklist** — `origin/main` (pending push @ this batch).
+
+- **Symptom:** Map noticeably laggy at province/city zooms — confirmed at multiple zoom bands.
+- **Three-pronged fix, all surgical, no rewrites:**
+  1. **Runtime basemap pruner** — `pruneBasemapLayers(map)` + `attachBasemapPruner(map)` in `src/lib/map/config.ts`. Walks `map.getStyle().layers` after `style.load` and strips POIs, buildings, transit, ferry/aeroway, housenumbers, hillshade, contours. Toggle: `NEXT_PUBLIC_MAP_PRUNE` (defaults `"on"`; set `"off"` to A/B). Wired into `EventMap`, `MiniMap`, `MapBackdrop`, `LocationPicker`. Per-layer try/catch.
+  2. **MapTiler "Lite" style checklist** — `docs/MAP_TILER_LITE_CHECKLIST.md`. Durable Studio recipe (layers to drop / keep, font/glyph trims, palette, env-var swap, rollback). User has the new Lite UUID in `.env.local`; **must update `NEXT_PUBLIC_MAPTILER_STYLE` in Vercel Production + Preview env vars by hand** for the deployed site to switch.
+  3. **DOM marker culling** — `cullMarkers()` in `EventMap.tsx`. Toggles `display:none` on event/place markers whose `lngLat` is outside `map.getBounds()` (+10% margin). Runs via existing rAF on `move` + on `moveend` + after initial marker spawn. `.cc-marker` and `.cc-geo-cluster` gain `will-change: transform; contain: layout style` so each marker gets its own GPU layer. `data-cculled` flag de-dupes redundant style writes. Marker objects stay in `markersRef`/`placeMarkersRef` so deconfliction, leader-lines and bubble expansions remain intact.
+- **Full DOM-markers → symbol-layer rewrite intentionally deferred** to a dedicated batch — see `.github/DECISIONS.md` Batch 13. Current marker stack is load-bearing for clustering tiers, click-to-expand, SVG leader lines, per-marker temporal opacity. Not appropriate to bundle with a perf hotfix.
+- **+4 new tests** for the pruner (layer removal, off-toggle respected, raster safety, `getStyle` throw safety).
+
+✅ **Quality gate (Batch 13):** tsc 0 errors · vitest 78 files / **701 tests passing** · `next lint --dir src` clean.
+
+**Out-of-band action required from user:** update `NEXT_PUBLIC_MAPTILER_STYLE` in Vercel → Settings → Environment Variables for **Production** and **Preview** to the new "Lite" style UUID once you're happy with the local Lite style. `.env.local` already updated.
+
+**How to verify locally:**
+1. `npm run dev`, open the map. Markers should pop in/out only at the viewport edge (+10% margin) during panning — never inside the visible area.
+2. Set `NEXT_PUBLIC_MAP_PRUNE=off` in `.env.local`, restart dev. Map now shows POIs / buildings / transit again → easy A/B comparison.
+3. Devtools → Performance panel during a pan: composite layers count for `.cc-marker` should match visible-marker count, not total-marker count.
+
+---
+
+
 
 - **Symptom:** `/admin/contributors/[id]` Approve/Reject buttons returned "Review failed". Postgres logs showed `ERROR: column "url" of relation "notifications" does not exist` on every click.
 - **Root cause #1 — wrong column.** The two contributor RPCs (`approve_contributor_application` / `reject_contributor_application`, originally migration 036) and the edge function's service-mode fallback (`performReviewAsService`) were both inserting into a top-level `notifications.url` column that has never existed. Canonical pattern in this project: deep links live in the `data` jsonb (`{url: '/some/path'}`) — see schema.sql, migrations 069/070, and every working trigger.
@@ -227,7 +248,14 @@ Smoke test the admin restructure:
 - ✅ **api-surface** — clean (patches applied Batch 7a, audited 2026-05-15)
 - 🟡 **auth-and-signup** — 2 staged fixes, run `/audit-apply auth-and-signup`. Checkpoint: `.audit/surfaces/auth-and-signup.md`. Patches: `auth-and-signup--indemnity-applies-to-injection.diff` (PostgREST filter injection), `auth-and-signup--redirect-after-login.diff` (redirect param ignored after login).
 - ✅ **admin** — Gate 1 fix applied (categories admin write RLS, migration 083, Studio-applied + committed fbafb60). 8 Report-only observations remain in checkpoint. Next: verify with `mcp_supabase_execute_sql` + `mcp_supabase_get_advisors` in a session where MCP is connected. Checkpoint: `.audit/surfaces/admin.md`.
-- pending: edge-functions, event-create-edit, rsvp-and-comments, messaging-dm, place-create-edit-media, notifications, onboarding, events-browse, event-detail, profile-and-interests, places-browse-and-follow, map-core, storage-and-media-uploads.
+- 🟡 **edge-functions** — 4 staged fixes (audited 2026-05-22), run `/audit-apply edge-functions`. Checkpoint: `.audit/surfaces/edge-functions.md`. Patches: rsvp-reminders attending-only filter, event-reminder attending+pref filter, review-prompt attending-only, push payload type union widening.
+- 🟡 **event-create-edit** — 2 staged fixes (audited 2026-05-22), run `/audit-apply event-create-edit`. Checkpoint: `.audit/surfaces/event-create-edit.md`. Patches: boundary validation (title/coords/end-after-start), surface delete errors in EditEventForm.
+- 🟡 **messaging-dm** — 3 staged fixes (audited 2026-05-22), run `/audit-apply messaging-dm`. Checkpoint: `.audit/surfaces/messaging-dm.md`. Patches: `.maybeSingle()` parity for participant/recipient/cursor lookups, PATCH /read rate-limit, GET /messages `limit` NaN guard. All low-risk; RLS posture clean.
+- 🔴 **rsvp-and-comments** — 3 staged fixes including a **CRITICAL authenticated IDOR** in the `safe_rsvp` RPC (audited 2026-05-16). Run `/audit-apply rsvp-and-comments`. Checkpoint: `.audit/surfaces/rsvp-and-comments.md`. Patches: migration 086 hardens `safe_rsvp` (auth check + search_path + grants — copy of toggle_consider template), migration 087 adds `comments.body` length CHECK + `comments_user_id_idx`, RSVPButton surfaces 409/429/500 errors. **Apply migration 086 first and verify with `get_advisors`.**
+- 🟡 **place-create-edit-media** — 3 staged fixes (audited 2026-05-16), run `/audit-apply place-create-edit-media`. Checkpoint: `.audit/surfaces/place-create-edit-media.md`. Patches: migration 088 length CHECKs for `places` free-text columns (storage-DoS), migration 089 enforces the 6-month delete window in a BEFORE DELETE trigger (currently client-only and bypassable), shared native-confirm → `ConfirmModal` refactor for EditPlaceForm gallery + CommentSection delete. 6 Report-only items deferred.
+- 🟡 **notifications** — 2 staged fixes (audited 2026-05-22), run `/audit-apply notifications`. Checkpoint: `.audit/surfaces/notifications.md`. Patches: `notifications--bell-revert-on-error.diff` (revert optimistic mark-read/delete on 429/500), `notifications--channel-name-per-user.diff` (per-user realtime channel). 7 Fix-clean already applied inline (4 missing rate-limits across GET/PATCH/DELETE + preferences PATCH, 2 body type guards, `NotificationType` union widened to match DB CHECK).
+- pending: onboarding, events-browse, event-detail, profile-and-interests, places-browse-and-follow, map-core, storage-and-media-uploads.
+- Tip: run `/audit-fix` from the main session to apply all 7 findings-ready surfaces (auth-and-signup, edge-functions, event-create-edit, messaging-dm, rsvp-and-comments, place-create-edit-media, notifications) in one batch. Recommend applying `rsvp-and-comments--safe-rsvp-idor-hardening.diff` first and individually so the security advisor delta can be inspected in isolation.
 - Full queue: `.audit/QUEUE.md`.
 
 ## 7. Memory pointers

@@ -2,6 +2,22 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 13 — Map perf: tile pruning + Lite checklist + DOM marker culling
+
+**Decision — keep DOM markers; defer the GeoJSON / symbol-layer rewrite to a dedicated batch.**
+The current marker stack (HTML elements via `maplibregl.Marker`) is load-bearing for clustering tiers, click-to-expand bubbles, SVG leader-line deconfliction, per-marker temporal opacity/scale, and the cluster gold-badge component. Rewriting to a single symbol layer with built-in MapLibre clustering would replace every one of those subsystems at once — a multi-batch effort that doesn't belong bundled inside a perf hotfix. Surgical culling + GPU compositing covers the ~80% case (off-viewport markers were the dominant cost at province-level zooms) without touching interaction code. The full rewrite remains a candidate for a dedicated FEAT batch when convoy mode lands.
+
+**Decision — runtime basemap pruner (`pruneBasemapLayers`) is enabled by default (`NEXT_PUBLIC_MAP_PRUNE` defaults `"on"`).**
+Acts as a safety net so perf wins are realised even before the MapTiler "Lite" custom style is published, and as belt-and-braces afterwards (if the Lite style accidentally re-inherits a heavy preset, the pruner still strips POIs/buildings/transit). Set `NEXT_PUBLIC_MAP_PRUNE=off` to A/B compare. Wrapped in `try/catch` per-layer so a single MapLibre style change can't crash the map init.
+
+**Decision — viewport culling uses `display:none` with a 10% bounds margin, not marker removal.**
+`map.removeMarker()` would dismantle deconfliction registries (`evtMarkerDataRef`, `placeMarkerDataRef`) and force a re-add cycle, breaking expansion-bubble state. `display:none` is reversible, leaves the marker object intact in `markersRef`, and stops the browser from compositing the off-screen DOM nodes (the cost we actually want to avoid). The 10% margin prevents pop-in/pop-out at the viewport edge during panning. A `data-cculled` flag avoids redundant style writes when a marker stays in/out across many frames.
+
+**Decision — Vercel env var (`NEXT_PUBLIC_MAPTILER_STYLE`) is updated by hand, out-of-band from the code commit.**
+Env var changes don't belong in a commit body; user updates Production + Preview directly in the Vercel dashboard once they're satisfied with the new Lite style on local dev. The runtime pruner means the deployed site still benefits from this batch even before the env var swap.
+
+---
+
 ## MASTER_DIRECTION Batch 11 — BUG: Admin contributor approvals 500
 
 **Decision — `notifications` deep links always live in the `data` jsonb column (`data.url`), never in a top-level column.**

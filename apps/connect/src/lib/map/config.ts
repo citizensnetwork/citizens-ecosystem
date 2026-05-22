@@ -5,7 +5,7 @@
  * otherwise falls back to OpenStreetMap raster tiles so the map
  * always renders regardless of configuration.
  */
-import type { StyleSpecification } from "maplibre-gl";
+import type { Map as MaplibreMap, StyleSpecification } from "maplibre-gl";
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
 /**
@@ -86,4 +86,117 @@ export const DEFAULT_CENTER: [number, number] = [-25.7479, 28.2293];
 /** Convert [lat, lng] → [lng, lat] for MapLibre. */
 export function toLngLat(latLng: [number, number]): [number, number] {
   return [latLng[1], latLng[0]];
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Basemap layer pruning
+ *
+ * MapTiler Cloud vector styles (OpenMapTiles schema) ship with dozens of
+ * layers we do not need for Citizens Connect — POI icons compete with our
+ * category markers, building footprints add cost at high zoom, and
+ * transit / aeroway / hillshade are noise for our use case.
+ *
+ * `pruneBasemapLayers(map)` strips a conservative allow-list of
+ * clutter layers at runtime on `style.load`. It is a no-op for raster
+ * basemaps (CARTO fallback) because they expose only a single raster
+ * layer that we obviously must keep.
+ *
+ * Set `NEXT_PUBLIC_MAP_PRUNE=off` to disable pruning (debugging only).
+ *
+ * What this DOES strip (universally safe):
+ *   - POI icons + POI labels (`poi`, `poi_*`)
+ *   - Building footprints + 3D extrusions (`building`, `building-3d`)
+ *   - Aeroway (runways, taxiways)
+ *   - Transit lines/stops, ferries
+ *   - House numbers
+ *   - Hillshade, contours, terrain
+ *
+ * What this preserves:
+ *   - All roads (transportation)
+ *   - All place / road / suburb labels
+ *   - Water, parks, landuse polygons
+ *   - Boundaries
+ *
+ * For deeper, style-level stripping (landuse fill, font fallbacks, etc.)
+ * edit the MapTiler Cloud style itself — see
+ * `docs/MAP_TILER_LITE_CHECKLIST.md`.
+ * ────────────────────────────────────────────────────────────────────── */
+
+const PRUNE_LAYER_PATTERNS: readonly RegExp[] = [
+  /(^|[_-])poi([_-]|$)/i,
+  /^building($|[-_])/i,
+  /(^|[_-])aeroway([_-]|$)/i,
+  /(^|[_-])transit([_-]|$)/i,
+  /(^|[_-])ferry([_-]|$)/i,
+  /(^|[_-])housenum/i,
+  /(^|[_-])hillshade/i,
+  /(^|[_-])contour/i,
+];
+
+const PRUNE_SOURCE_LAYERS: ReadonlySet<string> = new Set([
+  "poi",
+  "building",
+  "aeroway",
+  "transit",
+  "ferry",
+  "housenumber",
+]);
+
+function pruneEnabled(): boolean {
+  return (process.env.NEXT_PUBLIC_MAP_PRUNE ?? "on").toLowerCase() !== "off";
+}
+
+/**
+ * Remove non-essential basemap layers to reduce render cost.
+ * Safe to call multiple times; missing layers are silently skipped.
+ */
+export function pruneBasemapLayers(map: MaplibreMap): void {
+  if (!pruneEnabled()) return;
+  let style;
+  try {
+    style = map.getStyle();
+  } catch {
+    return;
+  }
+  const layers = style?.layers;
+  if (!Array.isArray(layers)) return;
+
+  for (const layer of layers) {
+    if (!layer || layer.type === "raster" || layer.type === "background") {
+      continue;
+    }
+    const id = layer.id ?? "";
+    const sourceLayer = "source-layer" in layer ? layer["source-layer"] : undefined;
+    const matchesId = PRUNE_LAYER_PATTERNS.some((re) => re.test(id));
+    const matchesSrc =
+      typeof sourceLayer === "string" && PRUNE_SOURCE_LAYERS.has(sourceLayer);
+    if (!matchesId && !matchesSrc) continue;
+    try {
+      if (map.getLayer(id)) map.removeLayer(id);
+    } catch {
+      /* layer already gone or style mid-swap — safe to ignore */
+    }
+  }
+}
+
+/**
+ * Convenience: attach pruning to a map so it runs on every style load
+ * (including style changes). Returns the cleanup handler.
+ */
+export function attachBasemapPruner(map: MaplibreMap): () => void {
+  const run = () => pruneBasemapLayers(map);
+  map.on("style.load", run);
+  // Also run immediately in case the style is already loaded.
+  try {
+    if (map.isStyleLoaded()) run();
+  } catch {
+    /* ignore */
+  }
+  return () => {
+    try {
+      map.off("style.load", run);
+    } catch {
+      /* ignore */
+    }
+  };
 }

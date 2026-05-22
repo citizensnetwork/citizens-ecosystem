@@ -227,6 +227,8 @@ body {
  * sibling bubbles so the split reads as "elevated". */
 .cc-geo-cluster {
   z-index: 5;
+  will-change: transform;
+  contain: layout style;
 }
 .cc-geo-cluster-child {
   /* Sit above sibling tier bubbles AND above lifted event/place markers
@@ -298,11 +300,17 @@ body {
   overflow: visible;
 }
 
-/* Ensure event marker elements render above leader lines */
+/* Ensure event marker elements render above leader lines.
+ * `will-change: transform` promotes each marker to its own GPU
+ * compositing layer so MapLibre's per-frame transform updates do not
+ * trigger expensive layout/paint work — biggest single perf win for
+ * dense maps. `contain` confines reflow side-effects to the marker. */
 .cc-marker {
   background: transparent !important;
   border: none !important;
   z-index: 3 !important;
+  will-change: transform;
+  contain: layout style;
 }
 
 /* MapLibre popups render above all markers */

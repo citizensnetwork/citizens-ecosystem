@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getMapStyle } from "@/lib/map/config";
+import { getMapStyle, attachBasemapPruner } from "@/lib/map/config";
 import AttendeeMarkers from "./AttendeeMarkers";
 
 type Props = {
@@ -30,6 +30,7 @@ export default function MiniMap({ latitude, longitude, eventId }: Props) {
     });
 
     mapRef.current = map;
+    attachBasemapPruner(map);
     map.on("load", () => setMapReady(true));
 
     new maplibregl.Marker({ color: "#D4AF37" })

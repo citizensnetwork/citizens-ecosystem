@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
+import { getMapStyle, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
 
 type Props = {
   position: [number, number] | null;
@@ -41,6 +41,7 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
     );
 
     mapRef.current = map;
+    attachBasemapPruner(map);
 
     if (position) {
       markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })

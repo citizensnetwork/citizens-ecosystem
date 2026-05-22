@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getMapStyle, toLngLat, DEFAULT_CENTER } from "@/lib/map/config";
+import { getMapStyle, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
 
 /**
  * Purely-decorative, non-interactive MapLibre map used as a backdrop behind
@@ -33,6 +33,7 @@ export default function MapBackdrop() {
       "bottom-left",
     );
     mapRef.current = map;
+    attachBasemapPruner(map);
 
     return () => {
       map.remove();
