@@ -157,6 +157,37 @@ export default function EditEventForm({ event }: Props) {
     setError("");
     setLoading(true);
 
+    // Boundary validation — UI uses `required`/`min` attributes for
+    // hints but a determined client can bypass them. DB columns have
+    // no CHECK on lat/lng or date-ordering so we validate here.
+    // Mirrors the same guard in EventForm.
+    const trimmedTitle = title.trim();
+    if (trimmedTitle.length === 0) {
+      setError("Title can't be empty.");
+      setLoading(false);
+      return;
+    }
+    if (coords) {
+      const [lat, lng] = coords;
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
+      ) {
+        setError("Pinned location is out of range. Please re-select on the map.");
+        setLoading(false);
+        return;
+      }
+    }
+    if (endTime && new Date(endTime) <= new Date(date)) {
+      setError("End time must be after start time.");
+      setLoading(false);
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -176,7 +207,7 @@ export default function EditEventForm({ event }: Props) {
     const { error: updateErr } = await supabase
       .from("events")
       .update({
-        title,
+        title: trimmedTitle,
         description,
         date: new Date(date).toISOString(),
         end_time: endTime ? new Date(endTime).toISOString() : null,
@@ -246,7 +277,15 @@ export default function EditEventForm({ event }: Props) {
   async function handleDelete() {
     if (!confirm("Delete this event? This cannot be undone.")) return;
     setDeleting(true);
-    await supabase.from("events").delete().eq("id", event.id);
+    const { error: delErr } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", event.id);
+    if (delErr) {
+      setError("Failed to delete event: " + delErr.message);
+      setDeleting(false);
+      return;
+    }
     router.push("/events");
     router.refresh();
   }

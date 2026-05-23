@@ -226,6 +226,38 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     setError("");
     setLoading(true);
 
+    // Boundary validation — UI uses `required`/`min` attributes for
+    // hints but a determined client (or a future programmatic flow)
+    // can bypass them. DB columns have no CHECK on lat/lng or
+    // date-ordering so we validate here. Mirrors the same guard in
+    // EditEventForm.
+    const trimmedTitle = title.trim();
+    if (trimmedTitle.length === 0) {
+      setError("Title can't be empty.");
+      setLoading(false);
+      return;
+    }
+    if (coords) {
+      const [lat, lng] = coords;
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
+      ) {
+        setError("Pinned location is out of range. Please re-select on the map.");
+        setLoading(false);
+        return;
+      }
+    }
+    if (endTime && new Date(endTime) <= new Date(date)) {
+      setError("End time must be after start time.");
+      setLoading(false);
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -283,7 +315,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
     }
 
     const { data: inserted, error } = await supabase.from("events").insert({
-      title,
+      title: trimmedTitle,
       description,
       date: new Date(date).toISOString(),
       end_time: endTime ? new Date(endTime).toISOString() : null,

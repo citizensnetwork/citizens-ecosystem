@@ -92,3 +92,6 @@ vitest.log
 # without polluting git history. The auditor and apply prompts live in
 # .github/ and .github/prompts/ — see .github/agents/connect-auditor.agent.md
 .audit/
+
+.vitest-p2.log
+.vitest*.log
