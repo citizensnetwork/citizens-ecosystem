@@ -17,6 +17,15 @@
 
 ## 2. What just shipped
 
+### Audit fix batch — P1 (notifications) + P2 (map-core) — 2026-05-23
+
+- **map-core** — `ff4d9f5`. LocationPicker reverse-geocode AbortController (latest click wins; previous Nominatim fetch cancelled on click + on unmount); privacy disclosure line under the picker tells the user pinned coordinates are sent to nominatim.openstreetmap.org.
+- **notifications** — `01ec87a`. NotificationBell optimistic revert on fetch error (mark-read / mark-all-read / delete now restore previous state on network / 429 / 500); realtime channel name scoped per user (`notifications:`+userId) so logout/login of a different user in the same tab cannot reuse a stale subscription.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · advisors 83 → 83 (code-only). Patches archived under `.audit/patches/applied/`.
+
+---
+
 ### Pre-launch prep + restructuring — 2026-05-23 — uncommitted (local only)
 
 #### Migration 092 — Refresh seeded event dates
@@ -65,8 +74,8 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 ## 3. Current platform state
 
 - Test suite: **714 / 714** · TS: 0 errors · Lint: clean
-- Supabase advisors: 0 ERROR / 84 WARN (baseline — no new warnings)
-- Latest commit: `11372b9` (Batch QP1)
+- Supabase advisors: 0 ERROR / 83 WARN (baseline maintained — no new warnings)
+- Latest commit: `ff4d9f5` (audit: apply map-core fixes)
 - Uncommitted local changes: migration 092 file + `.claude/` structure (ready to commit)
 - **Demo readiness (June 9 WCI):**
   - Map custom style: ❌ missing on Vercel (T4 — owner action, 10 min fix)
@@ -90,7 +99,7 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 
 ### Normal batch cadence (post-June 9)
 
-- Next audit surface from `.audit/QUEUE.md` (P5 notifications, P6 map-core)
+- Next audit surface from `.audit/QUEUE.md` (queue empty — run `/audit` to pick the next pending row)
 - PayFast wire-up (D11 / T5) — needs PayFast credentials from Stephen
 - Push notifications (FCM/APNs) — needs Firebase + Apple credentials
 - Monorepo migration — before Citizens Wear begins
@@ -156,6 +165,5 @@ Full queue: `.audit/QUEUE.md`. Status:
 
 - ✅ middleware-and-session, api-surface, auth-and-signup, admin, rsvp-and-comments, events-browse, event-detail, onboarding, profile-and-interests, places-browse-and-follow, storage-and-media-uploads
 - ✅ edge-functions (14d), event-create-edit (14e), place-create-edit-media (14f), messaging-dm (14g)
-- 🟡 **[P5] notifications** — patches staged, run `/audit-fix notifications`
-- 🟡 **[P6] map-core** — 1 patch staged (LocationPicker AbortController + privacy disclosure)
-- All 17 surfaces audited at least once.
+- ✅ notifications (`01ec87a`), map-core (`ff4d9f5`) — applied 2026-05-23
+- All 17 surfaces audited and clean. Next run: `/audit` to pick the next pending row, or `/audit-polish 1` to start the Polish Queue.
