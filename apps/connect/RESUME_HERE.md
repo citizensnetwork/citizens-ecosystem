@@ -17,6 +17,40 @@
 
 ## 2. What just shipped
 
+### Stage 5–6: LocationPicker forward-geocode + place events surface — `77d6250`
+
+- **LocationPicker** now accepts an optional `address` prop. When the
+  parent's address input changes, it debounces (400ms) and queries
+  Nominatim `/search`, rendering up to 5 suggestions inside the map
+  container. Clicking a suggestion moves the marker, flies to zoom 15,
+  and notifies the parent (`onSelect` + `onAddress`). A `lastSetAddressRef`
+  prevents the reverse/forward loop. AbortControllers clean up on
+  unmount. Wired into `PlaceForm`, `EditPlaceForm`, `EventForm`,
+  `EditEventForm`.
+- **PlaceDetailServer** now fetches up to 10 upcoming + 10 past active
+  events for the place owner (`created_by = place.created_by`) in
+  parallel with existing reads. Renders two compact sections under the
+  edit row. **"+ Create Event" CTA** appears next to "Edit Place" for
+  owners.
+
+Existing contributor dashboard at `/profile/contributor/dashboard`
+already provides lifecycle grouping via
+`<ManageEventsView isVendor groupByLifecycle />` — no rebuild this batch.
+
+✅ tsc 0 · vitest **714 / 714** · lint clean · advisors unchanged (no DB change).
+
+### Edit-flow bugfixes (stages 1–4) — `ab6cd47` / `8d35898` / `66a433a`
+
+- Migration `095_reviews_event_id_repair.sql` applied — fixes
+  "Could not find the 'event_id' column" schema-cache error.
+- Event detail: admin gate plumbed (`isAdmin` server → client) so admins
+  can edit any event.
+- New intercepted route `@panel/(.)events/[id]/edit/page.tsx` so event
+  edit opens in the same side panel (kills dual-window UX).
+- `EditPlaceForm` upload errors now surface the underlying Supabase
+  message instead of "Media Upload failed".
+- `.gitignore` updated; accidentally tracked `vitest-out.txt` removed.
+
 ### Place panel + image upload RLS + cover-image remove — 2026-05-23 — `aba287a`
 
 Three user-reported bugs fixed:
