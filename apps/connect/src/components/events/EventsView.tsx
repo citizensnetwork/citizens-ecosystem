@@ -19,8 +19,10 @@ import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings"
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
 import { QUICK_ACCESS_ITEMS, type QuickAccessItem } from "@/lib/quickPanelOptions";
-import { rankResults, type RankedResult } from "@/lib/aiSearch";
+import { rankResults, distanceKm, type RankedResult } from "@/lib/aiSearch";
 import { describeIntent } from "@/lib/searchProfile";
+import { getCityLabel } from "@/lib/cityLabel";
+import { DEFAULT_CENTER } from "@/lib/map/config";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 
@@ -441,22 +443,55 @@ export default function EventsView({
   // Active quick-access item (derived for convenience)
   const activeQuickItem = QUICK_ACCESS_ITEMS.find((i) => i.id === activeQuickAccess) ?? null;
 
-  // Quick-access filtered events (both event + place items merged for the panel)
+  // Browser geolocation: lazily requested only when the user types a
+  // "near me" style query (effect declared further down). The cached
+  // value also drives proximity sorting in the quick-search panel below
+  // — never triggers a prompt on its own, so panel sorting silently
+  // falls back to Pretoria when no location is known.
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Quick-access filtered events (both event + place items merged for the panel).
+  // Sorted by proximity to the user's location when known (cached, never
+  // prompts), falling back to Pretoria so SA users see local results first.
   const quickFilteredEvents = useMemo(() => {
     if (!activeQuickItem) return [];
     const cats = new Set(activeQuickItem.eventCategories);
-    return events.filter((e) => e.category != null && cats.has(e.category));
-  }, [events, activeQuickItem]);
+    const matched = events.filter((e) => e.category != null && cats.has(e.category));
+    const origin: [number, number] = userLocation
+      ? [userLocation.lat, userLocation.lng]
+      : DEFAULT_CENTER;
+    return [...matched].sort((a, b) => {
+      const da = a.latitude != null && a.longitude != null
+        ? distanceKm(origin, [a.latitude, a.longitude])
+        : Number.POSITIVE_INFINITY;
+      const db = b.latitude != null && b.longitude != null
+        ? distanceKm(origin, [b.latitude, b.longitude])
+        : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+  }, [events, activeQuickItem, userLocation]);
 
   const quickFilteredPlaces = useMemo(() => {
     if (!activeQuickItem) return [];
-    return places.filter((p) => {
+    const matched = places.filter((p) => {
       const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
       return activeQuickItem.placeCategories.some((cat) =>
         PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
       );
     });
-  }, [places, activeQuickItem]);
+    const origin: [number, number] = userLocation
+      ? [userLocation.lat, userLocation.lng]
+      : DEFAULT_CENTER;
+    return [...matched].sort((a, b) => {
+      const da = a.latitude != null && a.longitude != null
+        ? distanceKm(origin, [a.latitude, a.longitude])
+        : Number.POSITIVE_INFINITY;
+      const db = b.latitude != null && b.longitude != null
+        ? distanceKm(origin, [b.latitude, b.longitude])
+        : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+  }, [places, activeQuickItem, userLocation]);
 
   // ── Semantic (AI) search ranking ─────────────────────────────────
   // Runs entirely client-side against the already-loaded events/places via
@@ -468,8 +503,7 @@ export default function EventsView({
   //
   // Browser geolocation is requested lazily — only when the user types a
   // "near me" style query — so we never prompt on page load. The result
-  // is cached in state for the session.
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // is cached in `userLocation` state (declared above) for the session.
   const geoRequestedRef = useRef(false);
   const parsedNearMe = useMemo(() => {
     const q = search.toLowerCase();
@@ -661,6 +695,33 @@ export default function EventsView({
     });
   }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
 
+  // Category-panel ordering: same proximity sort as the quick-access panel
+  // so users see local results first. The underlying `filtered` array
+  // remains untouched (it feeds the map, where marker order is irrelevant).
+  const sortedCategoryPanelEvents = useMemo(() => {
+    const origin: [number, number] = userLocation
+      ? [userLocation.lat, userLocation.lng]
+      : DEFAULT_CENTER;
+    return [...filtered].sort((a, b) => {
+      const da = a.latitude != null && a.longitude != null
+        ? distanceKm(origin, [a.latitude, a.longitude])
+        : Number.POSITIVE_INFINITY;
+      const db = b.latitude != null && b.longitude != null
+        ? distanceKm(origin, [b.latitude, b.longitude])
+        : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+  }, [filtered, userLocation]);
+
+  // Quick-access panel scoping: when the burger "Locations" tab is active
+  // the user has signalled they want to browse places — so only place
+  // tiles render. Otherwise (default events tab) only event tiles render,
+  // preventing the "tap a place → map zooms to an empty spot" bug where
+  // place markers were hidden but place tiles still surfaced in the panel.
+  const quickPanelEvents = burgerTab === "places" ? [] : quickFilteredEvents;
+  const quickPanelPlaces = burgerTab === "places" ? quickFilteredPlaces : [];
+  const quickPanelTotal = quickPanelEvents.length + quickPanelPlaces.length;
+
   const handleSelectEvent = useCallback(
     (event: Event) => {
       setSelectedPlace(null);
@@ -801,6 +862,9 @@ export default function EventsView({
   useEffect(() => {
     setShowSearchAreaPill(false);
     setViewportScoped(null);
+    // Reset quick-panel pagination so a tab/category switch doesn't leave
+    // the carousel scrolled off the end of a now-shorter result set.
+    setQuickPanelPage(0);
   }, [activeCategories, activePlaceCategories, activeQuickAccess, search, burgerTab]);
   const handleMapMoveEnd = useCallback(() => {
     // Only surface the pill once per pan, not every moveend tick.
@@ -1473,10 +1537,11 @@ export default function EventsView({
                       className="flex gap-3 transition-transform duration-300"
                       style={{ transform: `translateX(calc(-${categoryPanelPage * 100}% - ${categoryPanelPage * 12}px))` }}
                     >
-                      {filtered.map((event) => {
+                      {sortedCategoryPanelEvents.map((event) => {
                         const cat = (event.category ?? "church-services") as EventCategory;
                         const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
                         const isConvinced = incomingConvinceEventIds.has(event.id);
+                        const cityCode = getCityLabel(event.location, event.latitude, event.longitude);
                         return (
                           <button
                             key={event.id}
@@ -1505,9 +1570,16 @@ export default function EventsView({
                             <h3 className="text-xs font-semibold leading-tight text-white line-clamp-2">
                               {event.title}
                             </h3>
-                            <p className="mt-1 text-[10px] text-white/65 line-clamp-1">
-                              {event.location}
-                            </p>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              {cityCode && (
+                                <span className="shrink-0 rounded-full bg-white/20 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-white">
+                                  {cityCode}
+                                </span>
+                              )}
+                              <p className="text-[10px] text-white/65 line-clamp-1">
+                                {event.location}
+                              </p>
+                            </div>
                             <p className="mt-0.5 text-[10px] text-white/50">
                               {new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </p>
@@ -1590,7 +1662,7 @@ export default function EventsView({
                   {activeQuickItem.label}
                 </h2>
                 <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
-                  {quickFilteredEvents.length + quickFilteredPlaces.length}
+                  {quickPanelTotal}
                 </span>
               </div>
               {/* Settings gear (top-right) */}
@@ -1613,7 +1685,7 @@ export default function EventsView({
               className="flex-1 overflow-y-auto backdrop-blur-md pb-4"
               style={{ background: hexToRgba(activeQuickItem.color, 0.3) }}
             >
-              {quickFilteredEvents.length === 0 && quickFilteredPlaces.length === 0 ? (
+              {quickPanelTotal === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-white/50">
                   No items found
                 </div>
@@ -1640,8 +1712,7 @@ export default function EventsView({
                     }}
                     onTouchEnd={(e) => {
                       const dx = e.changedTouches[0].clientX - panelSwipeStartX.current;
-                      const total = quickFilteredEvents.length + quickFilteredPlaces.length;
-                      const maxPage = Math.ceil(total / CARDS_PER_PAGE) - 1;
+                      const maxPage = Math.ceil(quickPanelTotal / CARDS_PER_PAGE) - 1;
                       if (dx < -40) {
                         setQuickPanelPage((p) => Math.min(maxPage, p + 1));
                       } else if (dx > 40) {
@@ -1654,8 +1725,9 @@ export default function EventsView({
                       style={{ transform: `translateX(calc(-${quickPanelPage * 100}% - ${quickPanelPage * 12}px))` }}
                     >
                       {/* Event cards */}
-                      {quickFilteredEvents.map((event) => {
+                      {quickPanelEvents.map((event) => {
                         const isConvinced = incomingConvinceEventIds.has(event.id);
+                        const cityCode = getCityLabel(event.location, event.latitude, event.longitude);
                         return (
                         <button
                           key={`e-${event.id}`}
@@ -1682,9 +1754,16 @@ export default function EventsView({
                           <h3 className="text-xs font-semibold leading-tight text-white line-clamp-2">
                             {event.title}
                           </h3>
-                          <p className="mt-1 text-[10px] text-white/65 line-clamp-1">
-                            {event.location}
-                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            {cityCode && (
+                              <span className="shrink-0 rounded-full bg-white/20 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-white">
+                                {cityCode}
+                              </span>
+                            )}
+                            <p className="text-[10px] text-white/65 line-clamp-1">
+                              {event.location}
+                            </p>
+                          </div>
                           <p className="mt-0.5 text-[10px] text-white/50">
                             {new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                           </p>
@@ -1692,7 +1771,9 @@ export default function EventsView({
                         );
                       })}
                       {/* Place cards */}
-                      {quickFilteredPlaces.map((place) => (
+                      {quickPanelPlaces.map((place) => {
+                        const cityCode = getCityLabel(place.address, place.latitude, place.longitude);
+                        return (
                         <button
                           key={`p-${place.id}`}
                           type="button"
@@ -1706,22 +1787,30 @@ export default function EventsView({
                           <h3 className="text-xs font-semibold leading-tight text-white line-clamp-2">
                             {place.name}
                           </h3>
-                          <p className="mt-1 text-[10px] text-white/65 line-clamp-1">
-                            {place.address}
-                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            {cityCode && (
+                              <span className="shrink-0 rounded-full bg-white/20 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-white">
+                                {cityCode}
+                              </span>
+                            )}
+                            <p className="text-[10px] text-white/65 line-clamp-1">
+                              {place.address}
+                            </p>
+                          </div>
                           <p className="mt-0.5 text-[10px] text-white/50">
                             Place
                           </p>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Right arrow */}
                   <button
                     type="button"
-                    onClick={() => setQuickPanelPage((p) => Math.min(Math.ceil((quickFilteredEvents.length + quickFilteredPlaces.length) / CARDS_PER_PAGE) - 1, p + 1))}
-                    disabled={quickPanelPage >= Math.ceil((quickFilteredEvents.length + quickFilteredPlaces.length) / CARDS_PER_PAGE) - 1}
+                    onClick={() => setQuickPanelPage((p) => Math.min(Math.ceil(quickPanelTotal / CARDS_PER_PAGE) - 1, p + 1))}
+                    disabled={quickPanelPage >= Math.ceil(quickPanelTotal / CARDS_PER_PAGE) - 1}
                     className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition disabled:opacity-25 hover:bg-white/20"
                     aria-label="Next items"
                   >

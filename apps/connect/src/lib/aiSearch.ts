@@ -43,7 +43,7 @@ const W_PROXIMITY = 1.5; // max boost when within 2km
 const W_RECENCY = 0.25;
 
 /** Earth-radius haversine distance in km. */
-function distanceKm(a: [number, number], b: [number, number]): number {
+export function distanceKm(a: [number, number], b: [number, number]): number {
   const R = 6371;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const [lat1, lon1] = a;
