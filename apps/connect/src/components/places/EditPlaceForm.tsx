@@ -436,6 +436,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
           position={coords}
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => setAddress(addr)}
+          address={address}
         />
       </div>
 

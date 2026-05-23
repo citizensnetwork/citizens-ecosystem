@@ -320,6 +320,7 @@ export default function PlaceForm({ categories }: Props) {
           position={coords}
           onSelect={(lat, lng) => setCoords([lat, lng])}
           onAddress={(addr) => setAddress(addr)}
+          address={address}
         />
       </div>
 

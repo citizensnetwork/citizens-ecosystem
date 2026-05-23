@@ -434,6 +434,7 @@ export default function EditEventForm({ event }: Props) {
           onAddress={(addr) => {
             if (!locationManuallyEdited.current) setLocation(addr);
           }}
+          address={location}
         />
       </div>
 

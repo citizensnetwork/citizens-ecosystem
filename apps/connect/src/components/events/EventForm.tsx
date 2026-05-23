@@ -688,6 +688,7 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
             // themselves — we never silently overwrite intentional edits.
             if (!locationManuallyEdited.current) setLocation(addr);
           }}
+          address={location}
         />
       </div>
 

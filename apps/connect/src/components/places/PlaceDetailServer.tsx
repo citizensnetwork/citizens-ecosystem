@@ -18,7 +18,7 @@ import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
-import type { Place, PlaceMedia, Review } from "@/types/db";
+import type { Event, Place, PlaceMedia, Review } from "@/types/db";
 
 export const getPlaceById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -45,7 +45,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
 
   const isOwner = !!user && user.id === place.created_by;
 
-  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes] = await Promise.all([
+  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes, upcomingEventsRes, pastEventsRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
@@ -81,6 +81,28 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
           .eq("id", place.created_by)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    place.created_by
+      ? supabase
+          .from("events")
+          .select("id, title, date, category, image_url")
+          .eq("created_by", place.created_by)
+          .eq("status", "active")
+          .gte("date", new Date().toISOString())
+          .order("date", { ascending: true })
+          .limit(10)
+          .returns<Pick<Event, "id" | "title" | "date" | "category" | "image_url">[]>()
+      : Promise.resolve({ data: [] as Pick<Event, "id" | "title" | "date" | "category" | "image_url">[] }),
+    place.created_by
+      ? supabase
+          .from("events")
+          .select("id, title, date, category, image_url")
+          .eq("created_by", place.created_by)
+          .eq("status", "active")
+          .lt("date", new Date().toISOString())
+          .order("date", { ascending: false })
+          .limit(10)
+          .returns<Pick<Event, "id" | "title" | "date" | "category" | "image_url">[]>()
+      : Promise.resolve({ data: [] as Pick<Event, "id" | "title" | "date" | "category" | "image_url">[] }),
   ]);
 
   const reviews = reviewsRes.data;
@@ -89,6 +111,8 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
   const isFollowing = !!userFollowRes.data;
   const isAdmin = profileRes.data?.role === "admin";
   const canEdit = isOwner || isAdmin;
+  const upcomingEvents = upcomingEventsRes.data ?? [];
+  const pastEvents = pastEventsRes.data ?? [];
 
   const owner = (ownerRes.data ?? null) as {
     id: string;
@@ -220,12 +244,88 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
       {isOwner && <ReverifyPlaceButton placeId={place.id} />}
 
       {canEdit && (
-        <Link
-          href={`/places/${place.id}/edit`}
-          className="inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black hover:brightness-95"
-        >
-          Edit Place
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/places/${place.id}/edit`}
+            className="inline-block rounded-xl bg-(--gold) px-4 py-2 text-sm font-semibold text-black hover:brightness-95"
+          >
+            Edit Place
+          </Link>
+          {isOwner && (
+            <Link
+              href="/events/new"
+              className="inline-block rounded-xl border border-(--gold) px-4 py-2 text-sm font-semibold text-(--gold) hover:bg-(--gold-soft)"
+            >
+              + Create Event
+            </Link>
+          )}
+        </div>
+      )}
+
+      {(upcomingEvents.length > 0 || pastEvents.length > 0) && (
+        <div className="mt-2 space-y-4">
+          {upcomingEvents.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-black/50">
+                Upcoming events from this organizer
+              </h3>
+              <ul className="divide-y divide-black/5 rounded-xl border border-black/8">
+                {upcomingEvents.map((e) => (
+                  <li key={e.id}>
+                    <Link
+                      href={`/events/${e.id}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-black/3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-black">{e.title}</p>
+                        <p className="text-xs text-black/60">
+                          {new Date(e.date).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm text-(--gold)">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {pastEvents.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-black/50">
+                Past events
+              </h3>
+              <ul className="divide-y divide-black/5 rounded-xl border border-black/8">
+                {pastEvents.map((e) => (
+                  <li key={e.id}>
+                    <Link
+                      href={`/events/${e.id}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 text-black/70 transition-colors hover:bg-black/3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">{e.title}</p>
+                        <p className="text-xs text-black/50">
+                          {new Date(e.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm text-black/40">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
 
       {/* Reviews */}
