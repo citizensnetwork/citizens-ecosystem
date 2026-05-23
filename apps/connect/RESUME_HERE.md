@@ -15,6 +15,16 @@
 
 ## 2. What just shipped
 
+**Batch 14b — Audit fix P1 `storage-and-media-uploads` (SVG-XSS + ProfileEditor avatar RLS)** — `origin/main` @ `bc83f3c`.
+
+- **HIGH — SVG dropped from upload allowlist (XSS on public buckets closed).** `image/svg+xml` removed from `ALLOWED_IMAGE_TYPES` and `SAFE_IMAGE_EXTENSIONS` (`src/lib/validation.ts`), from the unreachable `SKIP_TYPES` branch (`src/lib/imageCompression.ts`), and from every `accept=` attribute (events × 2 forms, places × 2 forms, media gallery). Public `event-images` / `place-images` objects served `Content-Type: image/svg+xml` were live XSS on the storage origin; no further inline SVGs can be uploaded.
+- **CRITICAL — ProfileEditor avatar upload was RLS-rejected and extension-unsafe.** `handleAvatarUpload` used path `avatars/<uid>/<ts>.<ext>` which violates the storage RLS predicate `(storage.foldername(name))[1] = auth.uid()::text` (position [1] was the literal "avatars"); the feature has been silently broken for all users. Path now `${profile.id}/avatars/${ts}.${ext}`. Hand-rolled 4-MIME + 2 MB check replaced with the canonical `validateImageFile` + `compressImageIfNeeded` pipeline; `safeImageExtension(file.name)` replaces the raw `split(".").pop()` fallback so hostile filenames can't smuggle a `.php` / `.svg` into the storage key. Legacy `profile.avatar_url` values continue to resolve via the public-SELECT policy — no migration needed.
+- **Architect SE: ✅ ship as-is.** No Should-fix. 4 nice-to-haves folded into the deferred storage-hygiene line in `.audit/QUEUE.md` / Polish Queue row 10: legacy SVG purge, shared `IMAGE_ACCEPT` constant export, dedicated `avatars` bucket migration, ProfileEditor `accept=` attribute ordering cosmetic.
+
+✅ **Quality gate (Batch 14b):** tsc 0 errors · vitest 78 files / **703 tests passing** (−1: SVG-skip test removed) · `next lint --dir src` clean · advisors **83 → 83** (code-only batch, no DB change).
+
+---
+
 **Batch 14a — Audit fix P1 `rsvp-and-comments` (CRITICAL `safe_rsvp` IDOR closed)** — `origin/main` @ `fa1ac6b` (carryover `0c6f0b5` shipped immediately before).
 
 - **CRITICAL — `safe_rsvp` IDOR closed (migration 086).** `public.safe_rsvp(p_user_id, p_event_id)` was `SECURITY DEFINER` without an `auth.uid() = p_user_id` guard. A signed-in attacker could `supabase.rpc('safe_rsvp', { p_user_id: '<victim>', p_event_id })` and force a victim to "attend" any event — `notify_friends_on_rsvp_attending` then fanned the action out to the victim's mutual friends as if they had attended. Migration 086 adds the `auth.uid() = p_user_id` guard (raises `unauthorized` / SQLSTATE `42501`), sets `search_path = pg_catalog, public`, revokes EXECUTE from public, grants EXECUTE to authenticated. Mirrors the `toggle_consider` precedent from migration 070. `supabase/schema.sql` canonical block updated.
@@ -36,7 +46,7 @@
 3. Fire 7+ rapid POSTs to `/api/rsvp` → 429 surfaces "Too many requests, please wait a moment.".
 4. Try inserting a 3000-char comment via supabase-js directly → constraint violation; UI 1000-char cap still in place.
 
-**Next P1:** `storage-and-media-uploads` (SVG-XSS on public buckets + ProfileEditor avatar RLS bypass). Run `/audit-fix 1`.
+**Next P1:** `auth-and-signup` (PostgREST filter injection on `indemnity_applies_to` + post-login redirect bypass). Run `/audit-fix 1`.
 
 ---
 
@@ -287,7 +297,7 @@ Smoke test the admin restructure:
 - ✅ **profile-and-interests** — clean (audited 2026-05-22). 3 Fix-clean applied inline (`.single()` → `.maybeSingle()` parity on `/profile`, `/profile/[id]` `generateMetadata`, `/api/preferences` profile read). 4 Report-only deferred (regex dedup with `isValidUUID`, early UUID guard on `/profile/[id]`, contributor-locations waterfall, prefs response payload). Checkpoint: `.audit/surfaces/profile-and-interests.md`.
 - ✅ **places-browse-and-follow** — clean (audited 2026-05-22). 4 Fix-clean applied inline (`.single()` → `.maybeSingle()` parity on `/places/[id]`, `/places/[id]/edit`, `/places/new` for place + profile-role lookups). 5 Report-only deferred for a future "places polish" batch (`/api/manage/places` rate-limit + FollowPlaceButton error surfacing + ManagePlacesView fetch error state + manage-places SQL aggregate + cross-surface regex dedup). Checkpoint: `.audit/surfaces/places-browse-and-follow.md`.
 - 🟡 **[P8] map-core** — 1 staged fix (audited 2026-05-17), run `/audit-fix map-core`. Checkpoint: `.audit/surfaces/map-core.md`. Patch: `map-core--location-picker-abort-and-disclosure.diff` (AbortController on Nominatim reverse-geocode + privacy disclosure copy). EventMap.tsx (1788 LOC) only spot-traced — Tier C Playwright follow-up recommended. 4 Report-only deferred.
-- 🔴 **[P1] storage-and-media-uploads** — 2 staged fixes including a **HIGH SVG-XSS** and a **CRITICAL broken-feature** (audited 2026-05-17), run `/audit-fix storage-and-media-uploads`. Checkpoint: `.audit/surfaces/storage-and-media-uploads.md`. Patches: `storage-and-media-uploads--remove-svg-from-allowlist.diff` (drop `image/svg+xml` from MIME + extension allowlists across 8 files; closes XSS on public buckets), `storage-and-media-uploads--profile-editor-avatar-fix.diff` (path `avatars/<id>/…` violates `(storage.foldername(name))[1] = auth.uid()` policy → fix to `<id>/avatars/…`, use `safeImageExtension` + `validateImageFile` + `compressImageIfNeeded`). **Before applying patch 2, run `mcp_supabase_list_policies schema:"storage"`** to rule out a dashboard-only override. 5 Report-only deferred.
+- ✅ **storage-and-media-uploads** — shipped `bc83f3c` (2026-05-23). SVG dropped from upload allowlist (XSS on public buckets closed across 8 files); ProfileEditor avatar upload now uses canonical `validateImageFile` + `compressImageIfNeeded` + `safeImageExtension` and writes to `${profile.id}/avatars/${ts}.${ext}` (was RLS-rejected). 703 tests, advisors 83 → 83 (code-only). Architect SE ✅ ship as-is. 4 nice-to-haves folded into Polish Queue row 10 deferred storage-hygiene line: legacy `.svg` purge, shared `IMAGE_ACCEPT` constant, dedicated avatars bucket, `accept=` ordering cosmetic.
 - pending: (none — all 17 surfaces audited at least once).
 - Tip: P1 → P2 should each be applied **solo** (`/audit-fix 1` twice) so each `get_advisors` delta is attributable. P3–P8 can be batched 2–3 at a time (`/audit-fix 2` or `/audit-fix 3`). Report-only items live in the Polish Queue → `/audit-polish 1` for next surface.
 - Full queue + priority table + Polish Queue: `.audit/QUEUE.md`.
