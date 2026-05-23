@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Comment } from "@/types/db";
 import type { User } from "@supabase/supabase-js";
 import { ReportButton } from "@/components/ui/ReportButton";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 type Props = {
   eventId: string;
@@ -17,6 +18,9 @@ export default function CommentSection({ eventId, user }: Props) {
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
@@ -59,10 +63,22 @@ export default function CommentSection({ eventId, user }: Props) {
     setLoading(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this comment?")) return;
-    await supabase.from("comments").delete().eq("id", id);
-    setComments((prev) => prev.filter((c) => c.id !== id));
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", pendingDeleteId);
+    if (error) {
+      setDeleteError(error.message || "Failed to delete comment.");
+      setDeleting(false);
+      return;
+    }
+    setComments((prev) => prev.filter((c) => c.id !== pendingDeleteId));
+    setDeleting(false);
+    setPendingDeleteId(null);
   }
 
   return (
@@ -105,7 +121,7 @@ export default function CommentSection({ eventId, user }: Props) {
                   </span>
                   {user?.id === c.user_id ? (
                     <button
-                      onClick={() => handleDelete(c.id)}
+                      onClick={() => setPendingDeleteId(c.id)}
                       className="ml-auto text-xs text-red-400 hover:text-red-600"
                     >
                       Delete
@@ -161,6 +177,23 @@ export default function CommentSection({ eventId, user }: Props) {
           to leave a comment.
         </p>
       )}
+
+      {pendingDeleteId ? (
+        <ConfirmModal
+          title="Delete this comment?"
+          message={deleteError ?? "This can't be undone."}
+          confirmLabel="Delete"
+          tone="destructive"
+          busy={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            if (!deleting) {
+              setPendingDeleteId(null);
+              setDeleteError(null);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

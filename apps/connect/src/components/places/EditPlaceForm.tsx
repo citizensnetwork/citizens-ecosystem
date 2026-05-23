@@ -11,6 +11,7 @@ import MediaGalleryUploader, { type SelectedMedia } from "@/components/media/Med
 import { validateImageFile, safeImageExtension } from "@/lib/validation";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadPlaceMedia } from "@/lib/placeMedia";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const LocationPicker = dynamic(
   () => import("@/components/map/LocationPicker"),
@@ -56,6 +57,8 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingRemoveMediaId, setPendingRemoveMediaId] = useState<string | null>(null);
+  const [removingMedia, setRemovingMedia] = useState(false);
   const router = useRouter();
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -79,19 +82,28 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
     setImagePreview(URL.createObjectURL(file));
   }
 
-  async function handleRemoveExistingMedia(id: string) {
-    if (!confirm("Remove this gallery item?")) return;
+  function handleRemoveExistingMedia(id: string) {
+    setPendingRemoveMediaId(id);
+  }
+
+  async function confirmRemoveExistingMedia() {
+    if (!pendingRemoveMediaId) return;
+    setRemovingMedia(true);
     const { error: deleteError } = await supabase
       .from("place_media")
       .delete()
-      .eq("id", id);
+      .eq("id", pendingRemoveMediaId);
 
     if (deleteError) {
       setError("Failed to remove: " + deleteError.message);
+      setRemovingMedia(false);
+      setPendingRemoveMediaId(null);
       return;
     }
 
-    setExistingMedia((prev) => prev.filter((item) => item.id !== id));
+    setExistingMedia((prev) => prev.filter((item) => item.id !== pendingRemoveMediaId));
+    setRemovingMedia(false);
+    setPendingRemoveMediaId(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -467,6 +479,20 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
           </button>
         )}
       </div>
+
+      {pendingRemoveMediaId ? (
+        <ConfirmModal
+          title="Remove this gallery item?"
+          message="This can't be undone."
+          confirmLabel="Remove"
+          tone="destructive"
+          busy={removingMedia}
+          onConfirm={confirmRemoveExistingMedia}
+          onCancel={() => {
+            if (!removingMedia) setPendingRemoveMediaId(null);
+          }}
+        />
+      ) : null}
     </form>
   );
 }

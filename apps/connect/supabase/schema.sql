@@ -398,6 +398,77 @@ do $$ begin
   end if;
 end $$;
 
+-- Length CHECK constraints (migration 088). Forms only enforce maxLength on
+-- custom_category; the DB constraints close storage-DoS via direct
+-- supabase-js writes. NOT VALID + VALIDATE pattern; if any existing row
+-- violates the bound the constraint stays NOT VALID for remediation.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select * from (values
+      ('places_name_length_chk',
+        'char_length(name) between 1 and 120'),
+      ('places_description_length_chk',
+        'char_length(description) between 0 and 4000'),
+      ('places_address_length_chk',
+        'char_length(address) between 0 and 500'),
+      ('places_phone_length_chk',
+        'phone is null or char_length(phone) <= 32'),
+      ('places_website_length_chk',
+        'website is null or char_length(website) <= 500'),
+      ('places_custom_category_length_chk',
+        'custom_category is null or char_length(custom_category) <= 120')
+    ) as t(name, expr)
+  loop
+    if not exists (
+      select 1 from pg_constraint
+      where conname = c.name and conrelid = 'public.places'::regclass
+    ) then
+      execute format(
+        'alter table public.places add constraint %I check (%s) not valid',
+        c.name, c.expr
+      );
+      begin
+        execute format('alter table public.places validate constraint %I', c.name);
+      exception when check_violation then
+        raise notice 'constraint % left NOT VALID (existing rows fail check)', c.name;
+      end;
+    end if;
+  end loop;
+end $$;
+
+-- 6-month delete window (migration 089). EditPlaceForm enforces client-side;
+-- this trigger closes the bypass via direct supabase-js delete. Admins bypass.
+create or replace function public.enforce_place_six_month_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if public.is_admin() then
+    return old;
+  end if;
+
+  if old.created_at > (now() - interval '6 months') then
+    raise exception 'places cannot be removed within 6 months of creation'
+      using errcode = '42501';
+  end if;
+
+  return old;
+end;
+$$;
+
+revoke all on function public.enforce_place_six_month_delete() from public;
+revoke all on function public.enforce_place_six_month_delete() from anon, authenticated;
+
+drop trigger if exists trg_enforce_place_six_month_delete on public.places;
+create trigger trg_enforce_place_six_month_delete
+  before delete on public.places
+  for each row execute function public.enforce_place_six_month_delete();
+
 -- ══════════════════════════════════════════════
 -- 7. Reviews (for places and events)
 -- ══════════════════════════════════════════════
