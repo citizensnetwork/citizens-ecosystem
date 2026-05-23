@@ -144,7 +144,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
         .upload(path, imageFile, { upsert: true });
 
       if (uploadError) {
-        setError("Image upload failed. Please try again.");
+        setError("Image upload failed: " + uploadError.message);
         setLoading(false);
         return;
       }
@@ -194,7 +194,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
         startSortOrder,
       });
       if (galleryError) {
-        setError("Gallery upload failed. Please try again.");
+        setError(galleryError);
         setLoading(false);
         return;
       }

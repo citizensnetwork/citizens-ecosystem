@@ -95,6 +95,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
   let locationSharingEnabled = false;
+  let isAdmin = false;
 
   // `rsvps.user_id` is a belongs-to FK to `profiles`, so Supabase
   // returns a single embedded object (or null), not an array.
@@ -122,13 +123,14 @@ export default async function EventDetailServer({ id }: { id: string }) {
           .eq("follower_id", user.id),
         supabase
           .from("profiles")
-          .select("location_sharing")
+          .select("location_sharing, role")
           .eq("id", user.id)
           .maybeSingle(),
       ]);
 
     hasRsvped = !!rsvp;
     locationSharingEnabled = profile?.location_sharing ?? false;
+    isAdmin = profile?.role === "admin";
 
     const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
     let friendSet = new Set<string>();
@@ -170,6 +172,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       media={media}
       tags={tags}
       organiser={organiser}
+      isAdmin={isAdmin}
     />
   );
 }

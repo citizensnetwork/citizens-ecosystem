@@ -51,6 +51,7 @@ type Props = {
   media?: EventMedia[];
   tags?: EventTag[];
   organiser?: EventOrganiser | null;
+  isAdmin?: boolean;
 };
 
 export default function EventDetailContent({
@@ -63,6 +64,7 @@ export default function EventDetailContent({
   media = [],
   tags = [],
   organiser = null,
+  isAdmin = false,
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -129,7 +131,7 @@ export default function EventDetailContent({
             isAuthenticated={!!user}
           />
         )}
-        {user?.id === event.created_by && (
+        {(user?.id === event.created_by || isAdmin) && (
           <Link
             href={`/events/${event.id}/edit`}
             className="text-xs text-black/60 hover:text-black border border-black/15 rounded-xl px-2.5 py-1 transition hover:bg-black/5"
