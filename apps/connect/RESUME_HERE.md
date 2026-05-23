@@ -80,12 +80,13 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 
 ### URGENT — before June 9 WCI presentation
 
-1. **[STEPHEN] RSVP to Whole City Talks** — email `jani.bravenboer@popup.co.za` — **deadline May 29**
-2. **[STEPHEN] Vercel env vars (T4)** — Add `NEXT_PUBLIC_MAPTILER_KEY` + `NEXT_PUBLIC_MAPTILER_STYLE = 019dba0f-b49b-73bb-bf6a-f9d820f43be8` to Vercel dashboard (Production + Preview + Development) → redeploy
-3. **[DEV] Apply migration 092** — Supabase SQL editor → paste `supabase/migrations/092_refresh_seeded_event_dates.sql` → run
-4. **[DEV+STEPHEN] Landing page rewrite** — collaborative session: replace rotating-tagline copy with NPO/ministry-facing copy (see `CITIZE~1.MD` Part 4.3)
-5. **[STEPHEN] Upload images** — log into deployed site as POPUP contributor → upload logo + cover image via contributor dashboard
-6. **[STEPHEN] Verify demo flow** — walk map → POPUP event → org profile → admin approval flow
+- **[DEV] Apply migration 092** — Supabase SQL editor → paste `supabase/migrations/092_refresh_seeded_event_dates.sql` → run
+- **[STEPHEN] Upload images** — log into deployed site as POPUP contributor → upload logo + cover image via contributor dashboard
+- **[STEPHEN] Verify demo flow** — walk map → POPUP event → org profile → admin approval flow
+
+✅ RSVP sent (May 23)
+✅ Vercel env vars added + redeployed (May 23)
+✅ Landing page taglines rewritten for dual audience (May 23)
 
 ### Normal batch cadence (post-June 9)
 
