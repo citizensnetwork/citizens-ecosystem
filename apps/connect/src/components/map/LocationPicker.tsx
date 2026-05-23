@@ -15,6 +15,7 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
+  const geocodeAbortRef = useRef<AbortController | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onAddressRef = useRef(onAddress);
@@ -64,9 +65,16 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
 
       // Reverse geocode to auto-populate address
       if (onAddressRef.current) {
+        // Cancel any in-flight lookup so the *latest* click wins.
+        geocodeAbortRef.current?.abort();
+        const controller = new AbortController();
+        geocodeAbortRef.current = controller;
         fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-          { headers: { "Accept-Language": "en", "User-Agent": "CitizensConnect/1.0" } }
+          {
+            headers: { "Accept-Language": "en", "User-Agent": "CitizensConnect/1.0" },
+            signal: controller.signal,
+          }
         )
           .then((res) => res.json())
           .then((data) => {
@@ -75,12 +83,13 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
             }
           })
           .catch(() => {
-            /* reverse geocode failed — user can type manually */
+            /* reverse geocode failed or was aborted — user can type manually */
           });
       }
     });
 
     return () => {
+      geocodeAbortRef.current?.abort();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
@@ -99,6 +108,10 @@ export default function LocationPicker({ position, onSelect, onAddress }: Props)
           Coordinates: {position[0].toFixed(5)}, {position[1].toFixed(5)}
         </p>
       )}
+      <p className="text-[10px] text-gray-400">
+        Address lookup uses OpenStreetMap (Nominatim). Coordinates you pin
+        are sent to nominatim.openstreetmap.org to fetch the street name.
+      </p>
     </div>
   );
 }
