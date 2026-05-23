@@ -17,6 +17,24 @@
 
 ## 2. What just shipped
 
+### Place panel + image upload RLS + cover-image remove — 2026-05-23 — `aba287a`
+
+Three user-reported bugs fixed:
+
+1. **Place detail opens in side panel** (was full-screen): Created `PlaceDetailServer.tsx` (shared RSC with `React.cache()` dedup mirroring `EventDetailServer` pattern). Created `src/app/@panel/(.)places/[id]/page.tsx` (intercepted route wrapping in `SidePanel`). Updated `places/[id]/page.tsx` as thin wrapper — page + panel share the same content component.
+
+2. **Image upload no longer fails with RLS error**: Two migrations — `fix_place_images_rls_and_admin_update` (replaced restrictive folder-path INSERT policy; added `is_admin()` to places UPDATE/DELETE policies) and `tighten_place_images_insert_policy` (restored folder-level scoping with `is_admin()` bypass for uploads to any path). Upload path in `EditPlaceForm` is already `${user.id}/covers/...` so regular users are unblocked.
+
+3. **Can now remove cover image**: Added `removeImage` state, X overlay button on preview, and `handleSubmit` respects `removeImage ? null : place.image_url`.
+
+4. **Label rename**: "Photo" → "Organisation Icon".
+
+5. **Architect Should-fix applied**: Raw error messages replaced with user-friendly strings; `role="alert"` on error div; `reviews!` non-null assertion fixed.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect A/B → all Should-fix applied · advisors no new warnings.
+
+---
+
 ### Polish batch 2 — `/audit-polish 2` (deferred items) — 2026-05-23 — `86303b2`
 
 Polish Queue rows 4–5 from `.audit/QUEUE.md` (places-browse-and-follow + notifications):
