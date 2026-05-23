@@ -17,6 +17,17 @@
 
 ## 2. What just shipped
 
+### Polish batch 2 — `/audit-polish 2` (deferred items) — 2026-05-23 — `86303b2`
+
+Polish Queue rows 4–5 from `.audit/QUEUE.md` (places-browse-and-follow + notifications):
+
+- **places-browse-and-follow row 4(d) — SQL aggregate** — new migration `094_get_user_places_with_stats.sql` introduces `public.get_user_places_with_stats()` (`language sql stable security invoker set search_path = public, pg_temp`, `where p.created_by = auth.uid()`, `left join lateral` for follow + review aggregates, `revoke … from public, anon`, `grant execute … to authenticated`). `src/app/api/manage/places/route.ts` replaces the previous fetch-places → parallel-fetch-follows/reviews → JS-filter/reduce pipeline with a single `supabase.rpc("get_user_places_with_stats")` call. `supabase/schema.sql` mirrored. **File-only — awaits normal Supabase cadence to apply to remote.** Row 4 fully closed (items a/b/c/e already shipped in polish batch 1).
+- **notifications row 5(a) — re-deferred** — review-prompt flow dedup (`PendingReviews` inline block vs `review_prompt` notification overlap) is a UX consolidation decision requiring design input. Reviewed and promoted to **findings-ready** for a dedicated `/audit notifications` re-run; not a mechanical polish. Items b/c already shipped in polish batch 1.
+
+Audit state: `.audit/QUEUE.md` rows 4–5 struck through; surface checkpoints `places-browse-and-follow.md` and `notifications.md` updated with polish run 2 notes.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect SE: A across the board (no Should-fix, 2 cosmetic Nice-to-haves logged). Advisors **83 → 83** (code-only — migration 094 is file-only until applied).
+
 ### Polish batch 1 — `/audit-polish 3` — 2026-05-23 — `10b4816`
 
 Polish Queue rows 1–3 from `.audit/QUEUE.md` (onboarding + event-detail + profile-and-interests):
