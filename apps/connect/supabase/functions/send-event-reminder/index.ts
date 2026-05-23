@@ -7,6 +7,7 @@
 import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { createServiceClient } from "../_shared/client.ts";
+import { filterUserIdsByPref } from "../_shared/prefs.ts";
 
 serve(async () => {
   try {
@@ -38,11 +39,15 @@ serve(async () => {
       return new Response(JSON.stringify({ reminders: 0 }), { status: 200 });
     }
 
+    // Only attending users receive "starting soon" pushes; `considering`
+    // users have not committed and the per-user `event_reminders` pref
+    // must be honoured (matches send-rsvp-reminders behaviour).
     const eventIds = events.map((e) => e.id);
     const { data: allRsvps } = await supabase
       .from("rsvps")
       .select("user_id, event_id")
-      .in("event_id", eventIds);
+      .in("event_id", eventIds)
+      .eq("status", "attending");
 
     const rsvpsByEvent = new Map<string, string[]>();
     for (const rsvp of allRsvps ?? []) {
@@ -54,7 +59,13 @@ serve(async () => {
     let totalReminders = 0;
 
     for (const event of events) {
-      const userIds = rsvpsByEvent.get(event.id) ?? [];
+      const rawUserIds = rsvpsByEvent.get(event.id) ?? [];
+      if (rawUserIds.length === 0) continue;
+      const userIds = await filterUserIdsByPref(
+        supabase,
+        rawUserIds,
+        "event_reminders",
+      );
       if (userIds.length === 0) continue;
 
       const eventDate = new Date(event.date);

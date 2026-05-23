@@ -8,7 +8,15 @@ export interface PushPayload {
   user_ids: string[];
   title: string;
   body: string;
-  type: "event_reminder" | "new_event_match" | "event_cancelled" | "new_follower" | "event_update";
+  type:
+    | "event_reminder"
+    | "new_event_match"
+    | "event_cancelled"
+    | "new_follower"
+    | "event_update"
+    | "review_prompt"
+    | "contributor_approved"
+    | "contributor_rejected";
   image_url?: string;
   data?: Record<string, string>;
 }

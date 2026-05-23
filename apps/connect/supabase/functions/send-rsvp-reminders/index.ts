@@ -26,12 +26,14 @@ serve(async () => {
       return new Response(JSON.stringify({ reminders: 0 }), { status: 200 });
     }
 
-    // Batch-fetch all RSVPs for upcoming events in a single query
+    // Batch-fetch attending RSVPs only — `considering` users have not
+    // committed and should not receive "happening today" reminders.
     const eventIds = events.map((e) => e.id);
     const { data: allRsvps } = await supabase
       .from("rsvps")
       .select("user_id, event_id")
-      .in("event_id", eventIds);
+      .in("event_id", eventIds)
+      .eq("status", "attending");
 
     // Group RSVPs by event_id
     const rsvpsByEvent = new Map<string, string[]>();

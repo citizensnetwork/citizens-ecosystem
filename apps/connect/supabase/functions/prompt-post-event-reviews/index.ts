@@ -67,7 +67,8 @@ serve(async () => {
       supabase
         .from("rsvps")
         .select("user_id, event_id")
-        .in("event_id", eventIds),
+        .in("event_id", eventIds)
+        .eq("status", "attending"),
       supabase
         .from("reviews")
         .select("user_id, event_id")
