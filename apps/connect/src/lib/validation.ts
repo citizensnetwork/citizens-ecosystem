@@ -5,13 +5,18 @@ export function isValidUUID(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
-/** Allowed image MIME types for event/place cover uploads. */
+/** Allowed image MIME types for event/place cover uploads.
+ *
+ *  Note: `image/svg+xml` is deliberately excluded. Both `event-images` and
+ *  `place-images` are public storage buckets that serve files with the
+ *  upload's Content-Type. An attacker-uploaded SVG containing inline JS
+ *  would execute on the storage subdomain origin when another user opens
+ *  the public URL directly (XSS). */
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
 ];
 
 /** Maximum image file size in bytes (15 MB).
@@ -24,8 +29,9 @@ const ALLOWED_IMAGE_TYPES = [
  */
 const MAX_IMAGE_SIZE = 15 * 1024 * 1024;
 
-/** Allowed file extensions for image uploads. */
-const SAFE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
+/** Allowed file extensions for image uploads.
+ *  `svg` deliberately excluded — see {@link ALLOWED_IMAGE_TYPES}. */
+const SAFE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
 
 /**
  * Validate an image file for upload. Returns an error message string
@@ -33,7 +39,7 @@ const SAFE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
  */
 export function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return "Only JPEG, PNG, GIF, WebP, or SVG images are allowed.";
+    return "Only JPEG, PNG, GIF, or WebP images are allowed.";
   }
   if (file.size > MAX_IMAGE_SIZE) {
     return "Image must be smaller than 15 MB.";
@@ -94,7 +100,7 @@ export function validateMediaFile(file: File): string | null {
     if (file.size > MAX_VIDEO_SIZE) return "Videos must be smaller than 100 MB.";
     return null;
   }
-  return "Only JPEG, PNG, GIF, WebP, SVG, MP4, WebM, or MOV files are allowed.";
+  return "Only JPEG, PNG, GIF, WebP, MP4, WebM, or MOV files are allowed.";
 }
 
 /** Sanitise a media filename extension. Falls back based on detected kind. */

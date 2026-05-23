@@ -317,7 +317,7 @@ export default function EditEventForm({ event }: Props) {
         <label htmlFor="coverImage" className="block text-sm font-medium mb-1">
           Cover Image <span className="text-gray-400 font-normal">(optional)</span>
         </label>
-        <input id="coverImage" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml" onChange={handleImageChange}
+        <input id="coverImage" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageChange}
           className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
         {imagePreview && (
           // eslint-disable-next-line @next/next/no-img-element

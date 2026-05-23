@@ -282,7 +282,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
         <input
           id="coverImage"
           type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+          accept="image/jpeg,image/png,image/gif,image/webp"
           onChange={handleImageChange}
           className="w-full text-sm text-black/60 file:mr-3 file:rounded-full file:border-0 file:bg-black/5 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-black hover:file:bg-black/10"
         />

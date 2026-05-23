@@ -4,6 +4,11 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import {
+  validateImageFile,
+  safeImageExtension,
+} from "@/lib/validation";
+import { compressImageIfNeeded } from "@/lib/imageCompression";
+import {
   CONTRIBUTOR_KIND_LABELS,
   type ContributorKind,
   type Profile,
@@ -49,25 +54,25 @@ export default function ProfileEditor({ profile, email }: Props) {
   } | null>(null);
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const raw = e.target.files?.[0];
+    if (!raw) return;
 
-    // Validate file type and size (max 2MB)
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!validTypes.includes(file.type)) {
-      setAvatarError("Please upload a JPEG, PNG, WebP, or GIF image.");
+    const validationError = validateImageFile(raw);
+    if (validationError) {
+      setAvatarError(validationError);
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError("Image must be under 2 MB.");
-      return;
-    }
+
+    const file = await compressImageIfNeeded(raw);
 
     setUploading(true);
     setAvatarError("");
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-      const path = `avatars/${profile.id}/${Date.now()}.${ext}`;
+      // Path MUST start with `${profile.id}/` to satisfy storage RLS:
+      //   (storage.foldername(name))[1] = auth.uid()::text
+      // See supabase/migrations/031_event_images_rls_and_care_category.sql
+      const ext = safeImageExtension(file.name);
+      const path = `${profile.id}/avatars/${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("event-images")

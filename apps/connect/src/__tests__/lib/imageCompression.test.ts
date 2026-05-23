@@ -25,10 +25,8 @@ describe("compressImageIfNeeded", () => {
     await expect(compressImageIfNeeded(f)).resolves.toBe(f);
   });
 
-  it("skips SVG (vector — re-encode would be lossy)", async () => {
-    const f = makeFile("icon.svg", "image/svg+xml", 10 * 1024 * 1024);
-    await expect(compressImageIfNeeded(f)).resolves.toBe(f);
-  });
+  // SVG removed from upload allowlist (XSS on public storage buckets) —
+  // GIF still exercises the SKIP_TYPES branch below.
 
   it("skips GIF (animation would be lost)", async () => {
     const f = makeFile("anim.gif", "image/gif", 10 * 1024 * 1024);

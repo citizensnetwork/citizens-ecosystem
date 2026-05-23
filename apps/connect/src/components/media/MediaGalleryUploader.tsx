@@ -96,7 +96,7 @@ export default function MediaGalleryUploader({
         ref={inputRef}
         type="file"
         multiple
-        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
+        accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
         onChange={handleFilesSelected}
         disabled={atCap}
         className="w-full text-sm text-black/60 file:mr-3 file:rounded-full file:border-0 file:bg-black/5 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-black hover:file:bg-black/10 disabled:opacity-50"

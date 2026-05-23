@@ -42,8 +42,11 @@ const DEFAULT_OPTIONS: Required<CompressImageOptions> = {
   skipIfSmallerThan: SKIP_IF_SMALLER_THAN,
 };
 
-/** Skip these types (re-encoding would be lossy or change their behaviour). */
-const SKIP_TYPES = new Set(["image/gif", "image/svg+xml"]);
+/** Skip these types (re-encoding would be lossy or change their behaviour).
+ *  Note: `image/svg+xml` is no longer in the upload allowlist
+ *  ({@link validateImageFile}), but the GIF skip path remains so animated
+ *  GIFs keep their animation intact. */
+const SKIP_TYPES = new Set(["image/gif"]);
 
 /**
  * Compress (resize + re-encode) an image file in the browser. Always returns
