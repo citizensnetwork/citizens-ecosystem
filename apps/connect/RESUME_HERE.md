@@ -164,6 +164,8 @@ Demo smoke test:
 ## 7. Memory pointers
 
 - Locked direction: `.github/MASTER_DIRECTION.md`
+- Strategic vision + WCI opportunity: `CITIZENS_STRATEGIC_DIRECTION_MAY2026.md` (planning session May 23 2026)
+- Restructuring strategy: `CITIZENS_CONNECT_RESTRUCTURING_STRATEGY.md`
 - Deferred features: `docs/FUTURE_IDEAS.md`
 - Operations runbook: `docs/RUNBOOK.md`
 - Coding conventions: `.claude/skills/` + subdirectory CLAUDE.md files
