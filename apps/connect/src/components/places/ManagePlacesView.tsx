@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 type ManagedPlace = {
@@ -17,16 +17,35 @@ type ManagedPlace = {
 export default function ManagePlacesView() {
   const [places, setPlaces] = useState<ManagedPlace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     fetch("/api/manage/places")
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(
+            r.status === 429
+              ? "Too many requests, please wait a moment."
+              : "Couldn't load your places. Please try again.",
+          );
+        }
+        return r.json();
+      })
       .then((data) => {
         setPlaces(data.places ?? []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Couldn't load your places.");
+        setLoading(false);
+      });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) {
     return (
@@ -34,6 +53,21 @@ export default function ManagePlacesView() {
         {[1, 2, 3].map((i) => (
           <div key={i} className="skeleton h-20 rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-red-600" role="alert">{error}</p>
+        <button
+          type="button"
+          onClick={load}
+          className="mt-3 inline-flex items-center rounded-xl bg-black/5 px-4 py-2 text-xs font-semibold text-black hover:bg-black/10"
+        >
+          Retry
+        </button>
       </div>
     );
   }

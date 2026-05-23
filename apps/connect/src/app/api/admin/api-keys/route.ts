@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isValidUUID } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,6 @@ export const dynamic = "force-dynamic";
 const MAX_SCOPES = 10;
 const SCOPE_PATTERN = /^[a-z0-9:_\-]{1,40}$/;
 const MAX_NAME = 80;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LIST_CAP = 200;
 
 export async function GET(request: NextRequest) {
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
   // Resolve owner by email or by id. Owner must exist and be an
   // approved contributor OR an admin.
   let ownerId = body.owner_id ?? "";
-  if (ownerId && !UUID_RE.test(ownerId)) {
+  if (ownerId && !isValidUUID(ownerId)) {
     // Defence-in-depth — don't rely on the RPC to validate UUID shape
     // (Architect audit L2).
     return NextResponse.json(
@@ -219,7 +219,7 @@ export async function DELETE(request: NextRequest) {
   if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
-  if (!UUID_RE.test(id)) {
+  if (!isValidUUID(id)) {
     // Reject obvious junk before round-tripping to the RPC. The RPC
     // will also fail, but a 400 here is clearer + cheaper.
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });

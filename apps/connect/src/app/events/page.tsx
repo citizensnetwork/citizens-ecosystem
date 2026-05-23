@@ -5,6 +5,15 @@ import type { Event, Place, Preferences, Profile, Review } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
+/** Cap public-bucket fetches so a mature platform with thousands of
+ *  rows can't blow up first-paint payload. The map shell only needs a
+ *  representative sample for search ranking + clustering. */
+const PLACES_LIMIT = 1000;
+const REVIEWS_LIMIT = 5000;
+/** Only consider reviews from the last 12 months when computing
+ *  freshness / verification signals. Older signals are noise. */
+const REVIEW_WINDOW_MONTHS = 12;
+
 export default async function EventsPage() {
   const supabase = await createClient();
 
@@ -14,8 +23,28 @@ export default async function EventsPage() {
   sixMonths.setMonth(sixMonths.getMonth() + 6);
   const cutoff = sixMonths.toISOString();
 
-  // Fetch public events, user's private events (RSVPed or created), places,
-  // approved contributors (for search bucket), and reviews in parallel.
+  const reviewWindowStart = new Date();
+  reviewWindowStart.setMonth(reviewWindowStart.getMonth() - REVIEW_WINDOW_MONTHS);
+  const reviewWindowCutoff = reviewWindowStart.toISOString();
+
+  // Resolve the current user first — it's a fast local cookie read and we
+  // need user.id to fan out the preferences fetch alongside the public
+  // data queries. Previously preferences ran sequentially after the
+  // Promise.all block; this restructure removes that round-trip.
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+
+  const preferencesPromise = currentUser
+    ? supabase
+        .from("profiles")
+        .select("preferences, created_at")
+        .eq("id", currentUser.id)
+        .maybeSingle()
+    : Promise.resolve({ data: null as { preferences: unknown; created_at: string } | null });
+
+  // Fetch public events, places, approved contributors (for search bucket),
+  // reviews, and the current user's preferences in parallel.
   // Contributor list stays small (bounded at 200) since it only powers
   // client-side search ranking — never the map itself.
   const [
@@ -23,6 +52,7 @@ export default async function EventsPage() {
     { data: places },
     { data: reviews },
     { data: contributors },
+    { data: profile },
   ] = await Promise.all([
     supabase
       .from("events")
@@ -36,11 +66,15 @@ export default async function EventsPage() {
       .from("places")
       .select("*, categories(*)")
       .order("name")
+      .limit(PLACES_LIMIT)
       .returns<Place[]>(),
     supabase
       .from("reviews")
       .select("place_id, rating, still_exists")
       .not("place_id", "is", null)
+      .gte("created_at", reviewWindowCutoff)
+      .order("created_at", { ascending: false })
+      .limit(REVIEWS_LIMIT)
       .returns<Pick<Review, "place_id" | "rating" | "still_exists">[]>(),
     supabase
       .from("profiles")
@@ -53,14 +87,11 @@ export default async function EventsPage() {
       .order("created_at", { ascending: false })
       .limit(200)
       .returns<Profile[]>(),
+    preferencesPromise,
   ]);
 
 
   // Filter: show public events to everyone; show private events only to creator or RSVPed users
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser();
-
   let events: Event[] = [];
   if (currentUser) {
     // Get event IDs the user has RSVPed to
@@ -121,20 +152,14 @@ export default async function EventsPage() {
     };
   });
 
-  // Load preferences for the Easter-egg orchestrator. (Event-creation gating
-  // happens inside child components — the legacy `isVendor` prop on
-  // EventsView was dead code, so we no longer compute or pass it here.)
-  let userPreferences: Preferences | null = null;
-  let accountCreatedAt = "";
-  if (currentUser) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("preferences, created_at")
-      .eq("id", currentUser.id)
-      .maybeSingle();
-    userPreferences = (profile?.preferences as Preferences | null) ?? null;
-    accountCreatedAt = profile?.created_at ?? "";
-  }
+  // Hydrate preferences (already fetched in the parallel block above)
+  // for the Easter-egg orchestrator. Event-creation gating happens inside
+  // child components — the legacy `isVendor` prop on EventsView was dead
+  // code, so we no longer compute or pass it here.
+  const userPreferences = currentUser
+    ? ((profile?.preferences as Preferences | null) ?? null)
+    : null;
+  const accountCreatedAt = currentUser ? (profile?.created_at ?? "") : "";
 
   return (
     <>

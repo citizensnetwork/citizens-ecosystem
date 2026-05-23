@@ -42,13 +42,23 @@ function getDismissedReviewIds(): string[] {
   }
 }
 
+/** Maximum number of dismissed-review IDs kept in localStorage.
+ *  Cap prevents unbounded growth for long-tenured users; FIFO eviction
+ *  keeps the most-recent dismissals which are the ones most likely to
+ *  re-appear as `review_prompt` notifications. */
+const DISMISSED_REVIEWS_CAP = 100;
+
 /** Safely persist a dismissed review ID to localStorage. */
 function addDismissedReviewId(eventId: string): void {
   try {
     const dismissed = getDismissedReviewIds();
     if (!dismissed.includes(eventId)) {
       dismissed.push(eventId);
-      localStorage.setItem("cc_dismissed_reviews", JSON.stringify(dismissed));
+      // FIFO eviction once we exceed the cap.
+      const trimmed = dismissed.length > DISMISSED_REVIEWS_CAP
+        ? dismissed.slice(dismissed.length - DISMISSED_REVIEWS_CAP)
+        : dismissed;
+      localStorage.setItem("cc_dismissed_reviews", JSON.stringify(trimmed));
     }
   } catch {
     // localStorage unavailable — dismiss is session-only

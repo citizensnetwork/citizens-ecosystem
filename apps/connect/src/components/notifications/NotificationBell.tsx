@@ -25,9 +25,11 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
   useEffect(() => {
     fetchNotifications();
 
-    // Subscribe to realtime inserts for this user.
+    // Subscribe to realtime changes for this user.
     // Channel name is user-scoped so a logout/login of a different user in the
     // same tab won't reuse a stale subscription bound to the previous user_id.
+    // INSERT prepends new rows; UPDATE syncs read-state across devices/tabs;
+    // DELETE removes rows that were dismissed elsewhere.
     const channel = supabase
       .channel(`notifications:${userId}`)
       .on(
@@ -40,6 +42,35 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
         },
         (payload) => {
           setNotifications((prev) => [payload.new as Notification, ...prev]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const updated = payload.new as Notification;
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === updated.id ? updated : n))
+          );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const oldRow = payload.old as { id?: string };
+          if (!oldRow?.id) return;
+          setNotifications((prev) => prev.filter((n) => n.id !== oldRow.id));
         }
       )
       .subscribe();

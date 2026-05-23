@@ -17,6 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isValidUUID } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,6 @@ const ALLOWED_CONTRIB_STATUS = [
 ] as const;
 const ALLOWED_CONTRIB_KINDS = ["ministry", "organization", "business"] as const;
 const PAGE_SIZE = 20;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.user_id || !UUID_RE.test(body.user_id)) {
+  if (!isValidUUID(body.user_id)) {
     return NextResponse.json({ error: "Valid user_id required" }, { status: 400 });
   }
 

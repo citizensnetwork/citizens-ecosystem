@@ -23,6 +23,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
+import { isValidUUID } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,6 @@ const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
 const MAX_RADIUS_KM = 500;
 const DEFAULT_RADIUS_KM = 25;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CATEGORY_RE = /^[a-z0-9\-]{1,40}$/;
 
 function clampInt(raw: string | null, def: number, min: number, max: number) {
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
   );
   const createdByRaw = url.searchParams.get("created_by");
   const createdBy =
-    createdByRaw && UUID_RE.test(createdByRaw) ? createdByRaw : null;
+    isValidUUID(createdByRaw) ? createdByRaw : null;
   const limit = clampInt(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   // Offset ceiling: drop to 500 when proximity filter is active because
   // the in-memory post-filter makes deep pagination semantically broken

@@ -11,18 +11,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isValidUUID } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string; action?: string }> },
 ) {
   const { id } = await ctx.params;
-  if (!UUID_RE.test(id)) {
+  if (!isValidUUID(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
