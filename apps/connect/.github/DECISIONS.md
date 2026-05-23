@@ -2,6 +2,32 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## MASTER_DIRECTION Batch 14g — Audit fix P2 (messaging-dm)
+
+**Decision — `.single()` is reserved for inserts/RPCs where exactly-one-row is guaranteed; everything else uses `.maybeSingle()`.**
+Every read where a missing row is a legitimate outcome (RLS-denied, not-yet-participant, cursor pointing at a deleted message, recipient profile missing) is now `.maybeSingle()`. `.single()` throws PGRST116 on zero rows, which propagates as a 500 unless explicitly caught — `.maybeSingle()` returns `{data: null, error: null}` and lets the route's `if (!row)` branch do its job. This is now the codebase-wide rule; commit `94dc675` closed five sites across the conversations & messages APIs and the test mocks were updated symmetrically.
+
+**Decision — read-receipt PATCH rate-limit keyed per-user at 120/min.**
+`PATCH /conversations/[id]/read` was the only unrated mutation on the messaging surface. Per-user (not per-conversation) is correct because the abuse vector is "many UPDATEs from one user" not "one UPDATE per chat" — and a user actively in 50 conversations marking each one read in a single burst is well under 120/min. The handler also intentionally **does not** verify participant membership: the UPDATE's `.eq("user_id", user.id)` makes it a no-op for non-participants and `success: true` is returned without disclosing existence. Documented as intentional so a future "fix" doesn't restore the existence oracle.
+
+**Decision — NaN-safe `?limit=` parsing uses `Number.isFinite` + `>0` guard, not `||`.**
+`parseInt(searchParams.get("limit") || "50", 10)` looks safe but `parseInt("abc", 10)` returns `NaN`, which then propagates through `Math.min(NaN, 100) === NaN` to `.limit(NaN)`. The canonical guard is `const safe = Number.isFinite(raw) && raw > 0 ? raw : 50;` — applied here and is the pattern to reuse for every paginated GET that takes a `?limit=` param.
+
+---
+
+## MASTER_DIRECTION Batch 14f — Audit fix P1 (place-create-edit-media)
+
+**Decision — `NOT VALID` + exception-swallowed `VALIDATE CONSTRAINT` is the safe shape for adding length CHECKs to existing tables.**
+Migration 088 wraps every `ADD CONSTRAINT … CHECK … NOT VALID` followed by `VALIDATE CONSTRAINT` inside a `begin … exception when check_violation then raise notice` block. If pre-existing rows violate (e.g. someone seeded a 500-char description before the cap), the constraint stays `NOT VALID` but the migration succeeds — new writes are still gated. This is the canonical pattern going forward for tightening text-length bounds on hot tables.
+
+**Decision — SECURITY DEFINER trigger functions must `REVOKE … FROM anon, authenticated`, not just `FROM public`.**
+Migration 089's `enforce_place_six_month_delete()` is a BEFORE DELETE trigger, but Supabase's `security_definer_function_executable` advisor fires on any SD function callable by `anon` or `authenticated` (even if no route ever calls it directly). Migration 091 closes both advisor lints with `REVOKE ALL ON FUNCTION … FROM anon, authenticated;` — trigger invocation is unaffected because Postgres trigger execution doesn't go through the EXECUTE privilege check. New rule: every new SD function ships with revokes from `public, anon, authenticated` and explicit `GRANT EXECUTE TO authenticated` only if it's an RPC entrypoint.
+
+**Decision — DB-enforced delete window for `places`; admin bypass via `is_admin()`; reject with `errcode 42501`.**
+The 6-month delete window was previously client-only (UI hid the delete button). Migration 089 enforces it at the trigger level so even direct DB writes / API misuse can't bypass. Non-admin attempts to delete a recently-created place raise `'Places can only be deleted after 6 months. Edit instead.' using errcode = '42501'` (insufficient privilege) so it surfaces as a 403 through PostgREST, not a 500. Admins bypass via `public.is_admin()` for moderation needs.
+
+---
+
 ## MASTER_DIRECTION Batch 13 — Map perf: tile pruning + Lite checklist + DOM marker culling
 
 **Decision — keep DOM markers; defer the GeoJSON / symbol-layer rewrite to a dedicated batch.**

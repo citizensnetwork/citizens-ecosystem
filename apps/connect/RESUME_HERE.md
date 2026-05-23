@@ -15,6 +15,39 @@
 
 ## 2. What just shipped
 
+**Batches 14f + 14g — Audit fix P1 + P2 (`place-create-edit-media` + `messaging-dm`)** — `origin/main` @ `94dc675` (after `2906189`).
+
+### Batch 14g — `messaging-dm` (low-risk parity + rate-limit + NaN guard) @ `94dc675`
+
+- **MEDIUM — `.single()` → `.maybeSingle()` parity (5 sites).** Routes affected: `POST /api/conversations` (recipient profile lookup → 404 instead of 500-via-PGRST116), `GET /api/conversations/[id]/messages` (participant verify, cursor message lookup by id, other-participant lookup), `POST /api/conversations/[id]/messages` (participant verify). RLS-denied / missing-row reads now return clean `{data:null}` instead of throwing PGRST116. New codebase-wide rule logged in DECISIONS: `.single()` reserved for inserts/RPCs.
+- **LOW — NaN-safe `?limit=` parsing on `GET /messages`.** `parseInt("abc", 10) === NaN` was passed through `Math.min(NaN, 100) === NaN` to `.limit(NaN)`. New guard: `Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 50`, capped at 100.
+- **MEDIUM — Rate-limit gate on `PATCH /conversations/[id]/read`.** Keyed `conv-read:${user.id}`, `RATE_LIMITS.read` = 120/min, `Retry-After` header on 429. Was the only unrated mutation on the messaging surface.
+- **9 test mock sites updated** from `single.mockResolvedValueOnce` → `maybeSingle.mockResolvedValueOnce` to match route changes.
+- **Architect SE: A — APPROVED.** No Must/Should-fix. 4 nice-to-haves deferred (scope cursor `before` to conv_id as defense-in-depth, `has_more` off-by-one polish, reorder rate-limit before participant verify on POST, document the intentional non-disclosure posture of read PATCH).
+
+### Batch 14f — `place-create-edit-media` (length CHECKs + 6-month delete trigger + native-confirm cleanup) @ `2906189`
+
+- **MEDIUM — Migration 088: `places` length CHECKs.** `name` 1..120, `description` 0..4000, `address` 0..500, `phone` ≤32, `website` ≤500, `custom_category` ≤120. Added `NOT VALID` + `VALIDATE CONSTRAINT` wrapped in `EXCEPTION WHEN check_violation` blocks so pre-existing violators don't block deploy; new writes still gated. Closes storage-DoS / unbounded-write gap.
+- **HIGH — Migration 089: 6-month delete window enforced at DB.** `BEFORE DELETE` trigger `enforce_place_six_month_delete()` (`SECURITY DEFINER`, admin bypass via `public.is_admin()`) raises `errcode 42501` "Places can only be deleted after 6 months. Edit instead." Previously client-only.
+- **Migration 090** — lower-bound fix on description/address (was `between 1 and X`, rejecting column's `default ''`). Architect Must-fix.
+- **Migration 091** — `REVOKE ALL ON FUNCTION enforce_place_six_month_delete() FROM anon, authenticated` to satisfy `security_definer_function_executable` advisor. Trigger invocation unaffected. New codebase rule: SD functions revoke from `public, anon, authenticated`.
+- **MEDIUM — `CommentSection` delete errors surfaced.** New state `pendingDeleteId / deleting / deleteError`. Failed delete now keeps `ConfirmModal` open and shows the error instead of silently filtering the comment out of local state.
+- **LOW — `EditPlaceForm.handleRemoveExistingMedia` made sync** (was `async` with no `await` — false promise).
+- **schema.sql Section 6** mirrors all four migrations.
+
+✅ **Quality gate (both batches):** tsc 0 errors · vitest **703/703 passing** · `next lint --dir src` clean · advisors **83 → 85 (after 089) → 83 (after 091) — back to baseline**.
+
+**How to verify locally:**
+1. `git log --oneline -3` → `94dc675 audit: apply messaging-dm fixes (P2)` · `2906189 audit: apply place-create-edit-media fixes (P1)` · `71c9085 audit: apply event-create-edit fixes`.
+2. As a non-admin contributor, try `DELETE FROM places WHERE id = <a place < 6 months old>` via the Supabase SQL editor under your role → error code 42501 "Places can only be deleted after 6 months. Edit instead." Admins succeed.
+3. Open `/c/[id]` (a comment thread), delete one of your comments — modal stays open with error if RLS denies; closes on success.
+4. `GET /api/conversations/<conv_id>/messages?limit=abc` → 200 with default 50-msg page (not NaN crash).
+5. Spam `PATCH /api/conversations/<conv_id>/read` >120× in 60s → 429 with `Retry-After` header.
+
+**Next P1:** `notifications` (3 staged: optimistic revert on error + per-user realtime channel name + 7 Fix-clean already inline). Run `/audit-fix 1`.
+
+---
+
 **Batch 14e — Audit fix P2 `event-create-edit` (boundary validation + delete error surfacing)** — `origin/main` @ `71c9085`.
 
 - **HIGH — Boundary validation in EventForm + EditEventForm.** Both `handleSubmit` flows now run a shared validation block immediately after `setLoading(true)`: (a) `title.trim()` rejected if empty, (b) `coords` rejected if `!Number.isFinite()` on either axis or `lat ∉ [-90,90]` or `lng ∉ [-180,180]`, (c) `endTime <= date` rejected. Each early-return clears `loading` so the submit button stays interactive. `.insert({...})` / `.update({...})` use `title: trimmedTitle`. DB has no CHECK constraints for these — a programmatic client bypassing the HTML hints could write malformed rows; now they get a clean UX-layer rejection.
@@ -23,13 +56,6 @@
 - **Architect SE: ✅ SHIP as-is.** No Should-fix. Nice-to-haves (DB-level CHECK migration for lat/lng/end_time ordering, shared `validateEventInput` helper in `src/lib/validation.ts`, optional upper-bound title length cap, separate tracking for the unrelated flaky Navbar timeout) all deferred.
 
 ✅ **Quality gate (Batch 14e):** tsc 0 errors · vitest 703 functional tests passing (1 unrelated Navbar dropdown timeout under full-suite parallel load — passes in 751 ms in isolation, tracked as flake not a regression) · `next lint --dir src` clean · advisors **83 → 83** (code-only).
-
-**How to verify locally:**
-1. `/events/new` — submit with title `"   "` (spaces only) → inline error "Title can't be empty." Submit with title `Foo`, location pinned, `endTime` ≤ `date` → "End time must be after start time."
-2. As a contributor on `/e/[id]/edit`, edit then delete an event you don't own (force RLS denial via DB) → red error "Failed to delete event: …" instead of silent redirect.
-3. `git log --oneline -2` → `71c9085 audit: apply event-create-edit fixes` on top of `7fba70d audit: apply edge-functions fixes`.
-
-**Next P1:** `place-create-edit-media` (3 staged: places length CHECKs via migration 088, 6-month delete trigger via migration 089, native-confirm cleanup). Run `/audit-fix 1`.
 
 ---
 
