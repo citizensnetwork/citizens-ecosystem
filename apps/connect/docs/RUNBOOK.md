@@ -31,7 +31,7 @@ npm run dev
 | `NEXT_PUBLIC_MAPTILER_KEY` | [MapTiler Cloud](https://cloud.maptiler.com/account/keys/) | Yes (prod) |
 | `NEXT_PUBLIC_MAPTILER_STYLE` | MapTiler Cloud → Maps → copy style UUID | Yes (prod) |
 
-**Locked style UUID:** `019dba0f-b49b-73bb-bf6a-f9d820f43be8` (Kingdom Commons branded style).
+**Locked style UUID:** `019e5525-61a4-7791-82f2-2222fb440592` (Kingdom Commons branded style).
 
 ### Setting variables on Vercel (T4 — owner task)
 
@@ -127,7 +127,7 @@ If the map stops showing branded tiles:
 1. Log in to [MapTiler Cloud](https://cloud.maptiler.com)
 2. Check **Account → Keys** — verify the key is not expired or rate-limited
 3. Regenerate if necessary and update both `.env.local` and Vercel environment variables
-4. Verify the style UUID (`019dba0f-b49b-73bb-bf6a-f9d820f43be8`) still exists in **Maps**
+4. Verify the style UUID (`019e5525-61a4-7791-82f2-2222fb440592`) still exists in **Maps**
 
 ---
 

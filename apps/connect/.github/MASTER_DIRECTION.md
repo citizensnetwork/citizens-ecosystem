@@ -111,7 +111,7 @@ Fix these before building anything new. Each is a blocker for real user testing.
 - Symptom: Map shows generic tiles, not the custom branded Kingdom Commons style
 - Root cause: `NEXT_PUBLIC_MAPTILER_KEY` and `NEXT_PUBLIC_MAPTILER_STYLE` environment variables are almost certainly NOT set in Vercel dashboard (they exist only in local `.env.local`)
 - Fix: Go to Vercel dashboard → Project → Settings → Environment Variables → add both keys for Production, Preview, and Development environments → redeploy
-- Style UUID to use: `019dba0f-b49b-73bb-bf6a-f9d820f43be8` (from Batch M)
+- Style UUID to use: `019e5525-61a4-7791-82f2-2222fb440592` (from Batch M)
 - Verify the MapTiler key is still valid and not expired in MapTiler Cloud dashboard
 
 ### 🟠 P1 — Blocks contributor value proposition

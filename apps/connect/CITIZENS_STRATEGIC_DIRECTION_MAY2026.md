@@ -148,8 +148,8 @@ The map on the deployed site (`citizens-connect.vercel.app`) currently renders a
 **Steps:**
 1. Go to Vercel dashboard → Project → Settings → Environment Variables
 2. Add for Production, Preview, and Development:
-   - `NEXT_PUBLIC_MAPTILER_KEY` = `vopPYlm4eVtmPRVUBjK8`
-   - `NEXT_PUBLIC_MAPTILER_STYLE` = `019dba0f-b49b-73bb-bf6a-f9d820f43be8`
+   - `NEXT_PUBLIC_MAPTILER_KEY` = `HazsK0vf8bZH1Bv1HPUz`
+   - `NEXT_PUBLIC_MAPTILER_STYLE` = `019e5525-61a4-7791-82f2-2222fb440592`
 3. Redeploy
 
 This single change transforms the visual impression of the platform completely. It is the highest-priority action before June 9.

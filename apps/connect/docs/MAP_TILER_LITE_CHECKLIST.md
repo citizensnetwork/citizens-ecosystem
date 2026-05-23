@@ -15,7 +15,7 @@ incorrectly. Doing both is intentional.
 ## 1 · Duplicate the live style
 
 1. Sign in to <https://cloud.maptiler.com/>.
-2. Open the current Citizens Connect style: ID `019dba0f-b49b-73bb-bf6a-f9d820f43be8`.
+2. Open the current Citizens Connect style: ID `019e5525-61a4-7791-82f2-2222fb440592`.
 3. **Duplicate** → name the copy `Citizens Connect Lite`.
 4. Note the new UUID. Do **not** delete or edit the original yet — keep it as
    a rollback.
@@ -140,7 +140,7 @@ If anything looks wrong:
 vercel env rm NEXT_PUBLIC_MAPTILER_STYLE production
 # then re-add with the OLD UUID:
 vercel env add NEXT_PUBLIC_MAPTILER_STYLE production
-# value: 019dba0f-b49b-73bb-bf6a-f9d820f43be8
+# value: 019e5525-61a4-7791-82f2-2222fb440592
 ```
 
 Or simply paste the original UUID back into the env var via the Vercel
@@ -161,7 +161,7 @@ If you want to compare lite vs. full at runtime, set:
 
 ```bash
 # Full style + runtime prune off → see everything
-NEXT_PUBLIC_MAPTILER_STYLE=019dba0f-b49b-73bb-bf6a-f9d820f43be8
+NEXT_PUBLIC_MAPTILER_STYLE=019e5525-61a4-7791-82f2-2222fb440592
 NEXT_PUBLIC_MAP_PRUNE=off
 
 # Lite style + runtime prune on (production default)
