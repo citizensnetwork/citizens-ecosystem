@@ -25,9 +25,11 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
   useEffect(() => {
     fetchNotifications();
 
-    // Subscribe to realtime inserts for this user
+    // Subscribe to realtime inserts for this user.
+    // Channel name is user-scoped so a logout/login of a different user in the
+    // same tab won't reuse a stale subscription bound to the previous user_id.
     const channel = supabase
-      .channel("notifications")
+      .channel(`notifications:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -51,32 +53,45 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleMarkRead = async (id: string) => {
+    const prevState = notifications;
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
-    await fetch("/api/notifications", {
+    const res = await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    });
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      // Revert optimistic update on failure (network / 429 / 500).
+      setNotifications(prevState);
+    }
   };
 
   const handleMarkAllRead = async () => {
+    const prevState = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    await fetch("/api/notifications", {
+    const res = await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ all: true }),
-    });
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setNotifications(prevState);
+    }
   };
 
   const handleDelete = async (id: string) => {
+    const prevState = notifications;
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    await fetch("/api/notifications", {
+    const res = await fetch("/api/notifications", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    });
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setNotifications(prevState);
+    }
   };
 
   return (
