@@ -38,7 +38,7 @@ export default async function ProfilePage() {
     { count: followingCount },
     { data: friendsCount },
   ] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("rsvps")
       .select("event_id, events(*)")

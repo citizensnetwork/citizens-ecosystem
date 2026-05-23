@@ -25,7 +25,7 @@ export default async function PlaceDetailPage({
     .from("places")
     .select("*, categories(*)")
     .eq("id", id)
-    .single<Place>();
+    .maybeSingle<Place>();
 
   if (!place) {
     notFound();
@@ -65,7 +65,7 @@ export default async function PlaceDetailPage({
           .maybeSingle()
       : Promise.resolve({ data: null }),
     user
-      ? supabase.from("profiles").select("role").eq("id", user.id).single()
+      ? supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     place.created_by
       ? supabase

@@ -17,7 +17,7 @@ export async function generateMetadata({
     .from("events")
     .select("title, description, image_url, date, location")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
   if (!event) return { title: "Event Not Found" };
 

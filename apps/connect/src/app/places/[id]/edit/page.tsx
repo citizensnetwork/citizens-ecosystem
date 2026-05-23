@@ -27,8 +27,8 @@ export default async function EditPlacePage({
       .from("places")
       .select("*, categories(*)")
       .eq("id", id)
-      .single<Place>(),
-    supabase.from("profiles").select("role").eq("id", user.id).single(),
+      .maybeSingle<Place>(),
+    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
     supabase
       .from("categories")
       .select("*")

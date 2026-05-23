@@ -131,7 +131,7 @@ export default async function EventsPage() {
       .from("profiles")
       .select("preferences, created_at")
       .eq("id", currentUser.id)
-      .single();
+      .maybeSingle();
     userPreferences = (profile?.preferences as Preferences | null) ?? null;
     accountCreatedAt = profile?.created_at ?? "";
   }

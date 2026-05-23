@@ -21,7 +21,7 @@ export default async function NewPlacePage() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!ORGANISER_ROLES.includes(profile?.role as UserRole)) {
     redirect("/events");

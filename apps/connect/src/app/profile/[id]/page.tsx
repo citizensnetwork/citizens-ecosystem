@@ -18,7 +18,7 @@ export async function generateMetadata({
     .from("profiles")
     .select("full_name, role")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
   if (!profile) return { title: "Profile Not Found" };
 

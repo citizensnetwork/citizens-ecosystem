@@ -138,7 +138,7 @@ For each Fix-clean finding:
   - `npx next lint --dir src` → clean
 - If any gate fails, revert the offending edit and reclassify it as Fix-staged.
 
-**Do not commit Fix-clean changes yourself.** Leave them in the working tree. The apply step (`/audit-apply`) or the user's main session will commit them as part of a normal batch. Reason: keeps your work from interrupting active dev branches.
+**Do not commit Fix-clean changes yourself.** Leave them in the working tree. The apply step (`/audit-fix`) or the user's main session will commit them as part of a normal batch. Reason: keeps your work from interrupting active dev branches.
 
 If a `audit/<surface>` branch is desired (user must enable via flag in QUEUE notes), commit and push there instead. Default: leave uncommitted.
 
@@ -149,7 +149,7 @@ For each Fix-staged finding:
 - Write the diff to `.audit/patches/<surface>--<slug>.diff`.
 - Reference it from the checkpoint with a clear "Why staged" rationale.
 
-Never apply Fix-staged changes without `/audit-apply` invocation.
+Never apply Fix-staged changes without `/audit-fix` invocation.
 
 ### Phase 6 — Upsert the checkpoint
 
@@ -192,7 +192,7 @@ Perf / UX / a11y / DB shape suggestions.
 ### Fix-clean (applied this run)
 1. <one line> — <files> — <result of quality gate>
 
-### Fix-staged (queued for /audit-apply)
+### Fix-staged (queued for /audit-fix)
 1. <one line> — patch: `.audit/patches/<surface>--<slug>.diff` — risk: <low|med|high> — why staged: <reason>
 
 ### Report-only
@@ -216,7 +216,7 @@ Perf / UX / a11y / DB shape suggestions.
 - Append a one-line pointer to `RESUME_HERE.md` under an **"Audit queue"** section (create the section if missing). Example:
   ```
   ## Audit queue
-  - 🟡 rsvp-and-comments — 2 staged fixes, run `/audit-apply rsvp-and-comments`
+  - 🟡 rsvp-and-comments — 2 staged fixes, run `/audit-fix rsvp-and-comments` (or `/audit-fix 1` to take the top priority row)
   - ✅ middleware-and-session — clean (audited 2026-05-15)
   - pending: api-surface, auth-and-signup, …
   ```
@@ -233,7 +233,7 @@ Return a concise summary:
 - Report-only count (where to read them)
 - Open questions outstanding
 - Next surface recommendation
-- Exact apply command: `/audit-apply <surface>`
+- Exact apply command: `/audit-fix <surface>` (or `/audit-fix <N>` to walk the priority order)
 
 ## Guardrails
 

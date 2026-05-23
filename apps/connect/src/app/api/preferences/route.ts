@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       "preferences, gender, age_range, relationship_status, stage_of_life, energy_level",
     )
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
   if (readError) {
     console.error("[API preferences] read", readError);
     return NextResponse.json({ error: "Could not read preferences" }, { status: 500 });

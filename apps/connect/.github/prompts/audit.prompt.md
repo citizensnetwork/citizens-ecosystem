@@ -20,6 +20,6 @@ Run the **Connect Auditor**.
    - **Quality gates (tsc, vitest, lint)** — run once after all Fix-clean edits across ALL surfaces in the batch rather than per surface. This reduces redundant full-suite runs.
    - If context pressure becomes apparent on surface 3 (very large file lists, deep traces), note in the checkpoint that a focused re-audit of that surface is recommended before applying its patches.
 
-4. Return a consolidated final report covering all surfaces audited: per-surface verdict, Fix-clean count, Fix-staged patch list, and one combined apply command (e.g. `/audit-fix` if all are ready, or individual `/audit-apply <surface>` calls if some are outstanding).
+4. Return a consolidated final report covering all surfaces audited: per-surface verdict, Fix-clean count, Fix-staged patch list, and one combined apply command (e.g. `/audit-fix all` if every surface is ready, `/audit-fix <N>` to apply the next N priority surfaces, or `/audit-fix <surface>` for a single named row). For Report-only items, point to `/audit-polish <N>`.
 
 If anything blocks orientation (missing master docs, conflicting queue state), stop and ask via askQuestions before touching code.
