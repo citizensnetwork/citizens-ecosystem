@@ -17,6 +17,22 @@
 
 ## 2. What just shipped
 
+### Polish batch 1 — `/audit-polish 3` — 2026-05-23 — `10b4816`
+
+Polish Queue rows 1–3 from `.audit/QUEUE.md` (onboarding + event-detail + profile-and-interests):
+
+- **onboarding** — migration `093_drop_profiles_onboarding_completed.sql` (idempotent `do $$ … drop column if exists … end $$`). **File-only — awaits normal Supabase cadence to apply to remote.** All code reads removed (`schema.sql`, `src/types/db.ts`, `src/app/profile/page.tsx`, test fixtures) plus 6 dead `UPDATE` lines in `supabase/migrations/061_seed_testing_contributors.sql` (architect Should-fix — prevents replay failure when 061 reruns on a post-093 schema).
+- **event-detail** — `MessageButton recipientName` now `organiser?.full_name || "Organiser"` (was hard-coded `"Organizer"`). `src/app/events/[id]/page.tsx` `generateMetadata` reuses `getEventById` from `EventDetailServer` (React `cache()`) → metadata + body share one Supabase round-trip per request.
+- **profile-and-interests** — `/profile/[id]/[mode]` uses `isValidUUID` from `@/lib/validation` (regex dedup). `/profile/[id]` adds early `isValidUUID` guard in both `generateMetadata` and page body (calls `notFound()`) before any Postgres call.
+
+Audit state: `.audit/QUEUE.md` rows 1–3 marked shipped (struck through); surface checkpoints `onboarding.md`, `event-detail.md`, `profile-and-interests.md` each append a `## Polish run 2026-05-23` section.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · advisors **83 → 83** (code-only — migration is file-only). Architect SE: A across the board; 2 Should-fixes applied inline (061 dead-line cleanup + QUEUE state).
+
+⚠ **Deferred Supabase apply:** migration 093 is on disk; apply via normal Supabase cadence (dashboard SQL editor or `supabase db push`). Idempotent — safe to run.
+
+---
+
 ### Audit fix batch — P1 (notifications) + P2 (map-core) — 2026-05-23
 
 - **map-core** — `ff4d9f5`. LocationPicker reverse-geocode AbortController (latest click wins; previous Nominatim fetch cancelled on click + on unmount); privacy disclosure line under the picker tells the user pinned coordinates are sent to nominatim.openstreetmap.org.
@@ -165,4 +181,5 @@ Full queue: `.audit/QUEUE.md`. Status:
 - ✅ middleware-and-session, api-surface, auth-and-signup, admin, rsvp-and-comments, events-browse, event-detail, onboarding, profile-and-interests, places-browse-and-follow, storage-and-media-uploads
 - ✅ edge-functions (14d), event-create-edit (14e), place-create-edit-media (14f), messaging-dm (14g)
 - ✅ notifications (`01ec87a`), map-core (`ff4d9f5`) — applied 2026-05-23
-- All 17 surfaces audited and clean. Next run: `/audit` to pick the next pending row, or `/audit-polish 1` to start the Polish Queue.
+- ✅ **Polish Queue rows 1–3 shipped 2026-05-23** (`10b4816`): onboarding column drop (migration 093 file-only), event-detail metadata cache + organiser name, profile UUID guards.
+- All 17 surfaces audited and clean. Next polish runs: row 4 (places-browse-and-follow, M), row 5 (notifications, M), row 6 (events-browse minus EventsView split, M). Run `/audit-polish 1` to pick the next row.
