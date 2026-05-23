@@ -15,6 +15,35 @@
 
 ## 2. What just shipped
 
+**Batch 14e — Audit fix P2 `event-create-edit` (boundary validation + delete error surfacing)** — `origin/main` @ `71c9085`.
+
+- **HIGH — Boundary validation in EventForm + EditEventForm.** Both `handleSubmit` flows now run a shared validation block immediately after `setLoading(true)`: (a) `title.trim()` rejected if empty, (b) `coords` rejected if `!Number.isFinite()` on either axis or `lat ∉ [-90,90]` or `lng ∉ [-180,180]`, (c) `endTime <= date` rejected. Each early-return clears `loading` so the submit button stays interactive. `.insert({...})` / `.update({...})` use `title: trimmedTitle`. DB has no CHECK constraints for these — a programmatic client bypassing the HTML hints could write malformed rows; now they get a clean UX-layer rejection.
+- **MEDIUM — `EditEventForm.handleDelete` surfaces RLS / FK errors.** Previously `await supabase.from("events").delete().eq("id", event.id)` ignored the error and unconditionally redirected, so a denied delete looked successful to the user. Now `delErr` is captured, displayed as `"Failed to delete event: <msg>"`, and the redirect is skipped on failure. `setDeleting(false)` is restored too.
+- **`.gitignore`** extended with `.vitest*.log` after an accidental log capture (amended out of the commit).
+- **Architect SE: ✅ SHIP as-is.** No Should-fix. Nice-to-haves (DB-level CHECK migration for lat/lng/end_time ordering, shared `validateEventInput` helper in `src/lib/validation.ts`, optional upper-bound title length cap, separate tracking for the unrelated flaky Navbar timeout) all deferred.
+
+✅ **Quality gate (Batch 14e):** tsc 0 errors · vitest 703 functional tests passing (1 unrelated Navbar dropdown timeout under full-suite parallel load — passes in 751 ms in isolation, tracked as flake not a regression) · `next lint --dir src` clean · advisors **83 → 83** (code-only).
+
+**How to verify locally:**
+1. `/events/new` — submit with title `"   "` (spaces only) → inline error "Title can't be empty." Submit with title `Foo`, location pinned, `endTime` ≤ `date` → "End time must be after start time."
+2. As a contributor on `/e/[id]/edit`, edit then delete an event you don't own (force RLS denial via DB) → red error "Failed to delete event: …" instead of silent redirect.
+3. `git log --oneline -2` → `71c9085 audit: apply event-create-edit fixes` on top of `7fba70d audit: apply edge-functions fixes`.
+
+**Next P1:** `place-create-edit-media` (3 staged: places length CHECKs via migration 088, 6-month delete trigger via migration 089, native-confirm cleanup). Run `/audit-fix 1`.
+
+---
+
+**Batch 14d — Audit fix P1 `edge-functions` (push fan-out attending-only + payload type union)** — `origin/main` @ `7fba70d`.
+
+- **HIGH — Push fan-out restricted to `status = 'attending'`.** `supabase/functions/send-rsvp-reminders/index.ts`, `send-event-reminder/index.ts`, and `prompt-post-event-reviews/index.ts` were querying `rsvps` without a status filter — so users who only marked `considering` were getting RSVP/review push notifications they never opted into. All three now `.eq("status", "attending")` on the batch / per-event rsvps query.
+- **MEDIUM — `event_reminders` preference now honoured in `send-event-reminder`.** Added `import { filterUserIdsByPref } from "../_shared/prefs.ts";` and a per-event `await filterUserIdsByPref(supabase, rawUserIds, "event_reminders")` step (parity with `send-rsvp-reminders`). Users who disabled event reminders in NotificationSettings will no longer receive them via this code path.
+- **LOW — `PushPayload.type` union widened in `supabase/functions/_shared/push.ts`** to include `"review_prompt" | "contributor_approved" | "contributor_rejected"`. All three already exist in the DB `notifications.type` CHECK constraint from migration 085, so this is purely a type-safety alignment (no runtime change).
+- **Architect SE: ✅ SHIP.** No Should-fix; 3 nice-to-haves noted (hoist per-event pref fetch into one batch query if event count grows, comment-drift cleanup in send-rsvp-reminders referencing migration 049, document that `event_reminders` covers review-prompt fan-out so a separate pref key isn't introduced).
+
+✅ **Quality gate (Batch 14d):** tsc 0 errors · vitest 703/703 passing · `next lint --dir src` clean · advisors **83 → 83** (code-only — edge functions, no DB DDL).
+
+---
+
 **Batch 14c — Audit fix P1 `auth-and-signup` (PostgREST filter-injection + login open-redirect bypass)** — `origin/main` @ `e38fca5`.
 
 - **HIGH — PostgREST filter injection on `/api/indemnity` closed.** `GET /api/indemnity?applies_to=…` was interpolating the raw query param directly into a PostgREST `.or()` filter against `indemnity_templates` (`applies_to.eq.${appliesTo},applies_to.eq.both`). The route now validates against the allowlist `["events", "places", "both"]` (mirrors the DB `applies_to_check` CHECK) and falls back to `"events"` for anything else. No more attacker-controlled filter clauses, no more wildcard / subquery smuggling, no information disclosure on inactive templates.
@@ -23,13 +52,6 @@
 - **Security inline review (OWASP A03 Injection + A10 Open Redirect):** no findings.
 
 ✅ **Quality gate (Batch 14c):** tsc 0 errors · vitest 78 files / **703 tests passing** · `next lint --dir src` clean · advisors **83 → 83** (code-only batch, no DB change).
-
-**How to verify locally:**
-1. `curl 'http://localhost:3000/api/indemnity?applies_to=both'` → 200 with `both` + `events` templates merged (existing behaviour). Then `?applies_to=)%20or%20(1%3D1` → still 200, falls back silently to `events` (no DB-level error, no filter injection).
-2. Sign out, visit `/profile/contributor` → bounced to `/login?redirect=%2Fprofile%2Fcontributor`. Sign in → lands back on `/profile/contributor`, not `/events`.
-3. Tamper attempt: `/login?redirect=//evil.com` → after sign-in, ignores the hostile value and lands on `/events`. Same for `/login?redirect=javascript:alert(1)`.
-
-**Next P1:** `edge-functions` (4 staged push fan-out patches: RSVP reminder + event reminder + review prompt attending-only filters + push payload type union). Run `/audit-fix 1`. Surfaces are now batch-safe — no more solo-critical surfaces in the queue.
 
 ---
 
