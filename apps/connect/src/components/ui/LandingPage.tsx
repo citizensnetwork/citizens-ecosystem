@@ -26,14 +26,14 @@ type Props = {
  */
 const CONNECTING_PHRASES = [
   { text: "THE KINGDOM", anchor: true },
+  { text: "Members to Ministries", anchor: false },
+  { text: "Needs to Non-Profits", anchor: false },
+  { text: "Change-Makers to the City", anchor: false },
+  { text: "Parts to the Body", anchor: false },
+  { text: "The Scattered to Solutions", anchor: false },
   { text: "Leaders to Purpose", anchor: false },
   { text: "Families to Fun", anchor: false },
-  { text: "Entrepreneurs to Networks", anchor: false },
   { text: "Lonely to Community", anchor: false },
-  { text: "Fire to Forests", anchor: false },
-  { text: "Spenders to Believers", anchor: false },
-  { text: "Students to Miagi's", anchor: false },
-  { text: "Energy to the Streets!", anchor: false },
   { text: "Seekers to Christ", anchor: false },
 ] as const;
 
