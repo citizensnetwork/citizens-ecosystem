@@ -26,6 +26,18 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
   const needsConfirmation = searchParams.get("confirmed") === "false";
   const reauthRequired = searchParams.get("reauth") === "1";
+  // Honour the ?redirect= param set by middleware when a protected page is
+  // accessed unauthenticated. Apply the same guard used in auth/callback to
+  // prevent open redirect: path must start with exactly one "/" and contain
+  // no backslashes or protocol colons.
+  const rawRedirect = searchParams.get("redirect") ?? "";
+  function safeRedirect(raw: string): string {
+    if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\") || raw.includes(":")) {
+      return "/events";
+    }
+    return raw;
+  }
+  const postLoginPath = safeRedirect(rawRedirect) || "/events";
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,7 +56,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/events");
+    router.push(postLoginPath);
     router.refresh();
   }
 
@@ -79,7 +91,7 @@ export default function LoginForm() {
 
       {error && <Alert variant="destructive">{error}</Alert>}
 
-      <OAuthButtons />
+      <OAuthButtons redirectTo={postLoginPath} />
 
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-[var(--border)]" />

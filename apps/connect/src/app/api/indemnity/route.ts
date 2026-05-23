@@ -18,7 +18,14 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const appliesTo = searchParams.get("applies_to") ?? "events";
+  const rawAppliesTo = searchParams.get("applies_to") ?? "events";
+  // Validate against allowlist to prevent PostgREST filter injection via the
+  // .or() string interpolation below. Only these three values are valid schema
+  // CHECK values on indemnity_templates.applies_to.
+  const VALID_APPLIES_TO = ["events", "places", "both"] as const;
+  const appliesTo = (VALID_APPLIES_TO as readonly string[]).includes(rawAppliesTo)
+    ? rawAppliesTo
+    : "events";
   const eventId = searchParams.get("event_id");
 
   // Fetch required templates
