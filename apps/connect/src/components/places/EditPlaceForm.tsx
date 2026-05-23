@@ -45,6 +45,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
   const [imagePreview, setImagePreview] = useState<string | null>(
     place.image_url ?? null
   );
+  const [removeImage, setRemoveImage] = useState(false);
   const [existingMedia, setExistingMedia] = useState<PlaceMedia[]>(media);
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>([
@@ -63,6 +64,12 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
+  function handleRemoveCoverImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveImage(true);
+  }
+
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.files?.[0] ?? null;
     if (!raw) {
@@ -70,6 +77,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       setImageFile(null);
       return;
     }
+    setRemoveImage(false);
     const validationError = validateImageFile(raw);
     if (validationError) {
       setError(validationError);
@@ -95,7 +103,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       .eq("id", pendingRemoveMediaId);
 
     if (deleteError) {
-      setError("Failed to remove: " + deleteError.message);
+      setError("Failed to remove media item. Please try again.");
       setRemovingMedia(false);
       setPendingRemoveMediaId(null);
       return;
@@ -127,7 +135,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       return;
     }
 
-    let image_url: string | null = place.image_url;
+    let image_url: string | null = removeImage ? null : (place.image_url ?? null);
     if (imageFile) {
       const safeExt = safeImageExtension(imageFile.name);
       const path = `${user.id}/covers/${Date.now()}.${safeExt}`;
@@ -136,7 +144,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
         .upload(path, imageFile, { upsert: true });
 
       if (uploadError) {
-        setError("Image upload failed: " + uploadError.message);
+        setError("Image upload failed. Please try again.");
         setLoading(false);
         return;
       }
@@ -169,7 +177,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       .eq("id", place.id);
 
     if (updateError) {
-      setError(updateError.message);
+      setError("Failed to save changes. Please try again.");
       setLoading(false);
       return;
     }
@@ -186,7 +194,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
         startSortOrder,
       });
       if (galleryError) {
-        setError(galleryError);
+        setError("Gallery upload failed. Please try again.");
         setLoading(false);
         return;
       }
@@ -220,7 +228,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       .eq("id", place.id);
 
     if (deleteError) {
-      setError(deleteError.message);
+      setError("Failed to delete place. Please try again.");
       setLoading(false);
       setShowDeleteConfirm(false);
       return;
@@ -235,7 +243,7 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
       <h1 className="text-2xl font-bold">Edit Place</h1>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+        <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -289,7 +297,8 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
 
       <div>
         <label htmlFor="coverImage" className="mb-1 block text-sm font-medium">
-          Photo <span className="font-normal text-gray-400">(optional)</span>
+          Organisation Icon{" "}
+          <span className="font-normal text-gray-400">(optional)</span>
         </label>
         <input
           id="coverImage"
@@ -299,12 +308,22 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
           className="w-full text-sm text-black/60 file:mr-3 file:rounded-full file:border-0 file:bg-black/5 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-black hover:file:bg-black/10"
         />
         {imagePreview && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imagePreview}
-            alt="Preview"
-            className="mt-2 max-h-48 w-full rounded-lg object-cover"
-          />
+          <div className="mt-2 relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagePreview}
+              alt="Preview"
+              className="max-h-48 w-full rounded-lg object-cover"
+            />
+            <button
+              type="button"
+              onClick={handleRemoveCoverImage}
+              aria-label="Remove organisation icon"
+              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white shadow-sm transition hover:bg-black"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-3 w-3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
         )}
       </div>
 
