@@ -2,6 +2,28 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## QP1 — Quick-search panel: tab-gated tiles, city chips, proximity sort
+
+**Decision — quick-search panel tiles are gated by `burgerTab`, never mixed.**
+The map hides place markers below zoom 12. Rendering BOTH event tiles AND place tiles in the panel meant a user on the default Events view could tap a place tile and fly the map to a location whose marker did not exist — they saw an empty patch and assumed the app was broken. The fix is structural, not visual: in `events` tab only event tiles render, in `places` tab only place tiles render. Derived aliases `quickPanelEvents` / `quickPanelPlaces` / `quickPanelTotal` feed header count, empty-state, both card lists, and all pagination math from a single source of truth. Future "show both" requests must first make place markers visible at the panel's default zoom, not the reverse.
+
+**Decision — proximity sort uses cached `userLocation`, never a fresh prompt.**
+The category panel and quick-search panel both sort closest-first using whatever `userLocation` is already cached in state (set when the user previously typed "near me" or similar), falling back to `DEFAULT_CENTER` (Pretoria) when none exists. We deliberately do NOT call `navigator.geolocation` here — surfacing a permission prompt on a passive UI re-render is hostile UX. Pretoria-first is acceptable for a SA-targeted app; when telemetry justifies it we can swap the fallback to bounding-box centre or last-known view centre.
+
+**Decision — `sortedCategoryPanelEvents` is a separate memo; the underlying `filtered` array stays unsorted.**
+`filtered` feeds map markers, where draw order is irrelevant (z-order is handled by MapLibre). Sorting it in place would force every marker re-render to walk a sorted array unnecessarily. The new memo is a sorted copy used only by the category-panel JSX. This pattern (one sort consumer, leave the source unsorted) is the rule for any future panel that needs a different order than the map.
+
+**Decision — `quickPanelPage` resets on every filter/tab change.**
+Originally only `showSearchAreaPill` and `viewportScoped` were reset when `burgerTab` / `activeCategories` / `activePlaceCategories` / `activeQuickAccess` / `search` changed. Switching from Events (7 results, page 2) to Locations (3 results, 1 page) left the carousel translated by `calc(-200% - 24px)` into empty space; the arrow buttons correctly disabled but the user saw nothing and could not recover without re-tapping a category. Adding `setQuickPanelPage(0)` to the same effect is the minimal fix.
+
+**Decision — city codes use padded text-match first, haversine fallback second.**
+`event.location` is free-form user input ("Sandton Convention Centre", "Pretoria CBD", "Online via Zoom"). Coordinate-only resolution gets it wrong when an organiser drops a pin in the wrong suburb; text-only fails on online/national events that still have valid coords. So `cityLabel.ts` tries text-match-with-padded-word-boundaries first (so " pe " matches "Held in PE" but not "type"), then falls back to a 40 km haversine radius. Short-alias collisions are prevented by padding (` pta ` not `pta`); ambiguous city/suburb pairs (Stellenbosch was in both CT and STB) are resolved by removing the alias from the broader region and letting the specific match win. The `CITIES` array order is now significant — most specific first.
+
+**Decision — `distanceKm` lives in `src/lib/aiSearch.ts`, not duplicated.**
+Two consumers (aiSearch and cityLabel) now share the haversine. The export is the canonical location; future consumers import it rather than copy-paste.
+
+---
+
 ## MASTER_DIRECTION Batch 14g — Audit fix P2 (messaging-dm)
 
 **Decision — `.single()` is reserved for inserts/RPCs where exactly-one-row is guaranteed; everything else uses `.maybeSingle()`.**

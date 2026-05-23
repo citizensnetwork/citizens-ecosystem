@@ -15,6 +15,36 @@
 
 ## 2. What just shipped
 
+**Batch QP1 — Quick-search panel: tab-gated tiles + city chips + proximity sort** — `origin/main` @ `11372b9`.
+
+### Bug fixed
+Quick-search panel rendered BOTH event AND place tiles regardless of the burger-bar tab. Map hides place markers below zoom 12, so tapping a place tile flew the map to a patch where the marker did not exist — users saw an empty map and assumed the app was broken.
+
+### What changed
+- **Tab gating** — Quick-search panel now renders event tiles only when `burgerTab !== "places"` and place tiles only when `burgerTab === "places"`. Header count, empty-state, carousel pagination, and touch-swipe `maxPage` all consume the new gated total via `quickPanelTotal`.
+- **City chips** — Every event/place tile in both the category panel and the quick-search panel now renders a short city-code chip (PTA / JHB / CT / DBN / PE / BFN / ELS / PMB / POL / GRG / STB / RBT / KIM). New `src/lib/cityLabel.ts` resolves via padded text-match first (so `" pe "` doesn't match "type"), then 40 km haversine radius fallback. Returns `null` when neither resolves; the chip is omitted.
+- **Proximity sort** — `quickFilteredEvents` / `quickFilteredPlaces` / `sortedCategoryPanelEvents` sort closest-first using cached `userLocation` (only set when the user previously typed "near me") with `DEFAULT_CENTER` (Pretoria) as fallback. No new geolocation prompt is triggered. Items missing lat/lng sink with `Number.POSITIVE_INFINITY`.
+- **Carousel state hygiene** — `quickPanelPage` now resets to 0 on every `burgerTab` / category / search change so a tab switch can't leave the carousel translated past the end of a shorter result set.
+- **Refactor** — `distanceKm` is now `export`-ed from `src/lib/aiSearch.ts` (one haversine, two callers). New memo `sortedCategoryPanelEvents` keeps the proximity sort off the unsorted `filtered` array that still feeds map markers (z-order is irrelevant on the map).
+- **11 new tests in `src/__tests__/lib/cityLabel.test.ts`** — bare-`Stellenbosch` → `STB` regression, alias collisions, padded word-boundary check (`Capricorn Park` must not match `CT`), and text-wins-over-coords priority.
+
+### Architect SE review
+A after applying both Should-fix items inline:
+1. Removed `"stellenbosch"` from `CT`'s alias list so the explicit `STB` entry actually wins.
+2. Added `setQuickPanelPage(0)` to the filter-reset effect so the carousel re-anchors when tabs/filters change.
+
+✅ **Quality gate (Batch QP1):** tsc 0 errors · vitest **714 passing (79 files, +11 new)** · `next lint --dir src` clean · advisors **unchanged baseline** (code-only batch, no DB DDL).
+
+**How to verify locally:**
+1. `git log --oneline -1` → `11372b9 feat(events): proximity-sorted quick panel + city chips + tab-gated tiles`.
+2. Open `/events`, tap a category badge to expand it — every tile shows a city chip + proximity-sorted closest-first.
+3. Tap the burger menu's quick-access pill on the category bar — the panel opens. With burger on "Events" only events appear; flip to "Locations" and only places appear. Tapping any tile now flies the map to a marker that actually exists.
+4. Change category or search → carousel resets to page 1.
+
+---
+
+## Earlier batches
+
 **Batches 14f + 14g — Audit fix P1 + P2 (`place-create-edit-media` + `messaging-dm`)** — `origin/main` @ `94dc675` (after `2906189`).
 
 ### Batch 14g — `messaging-dm` (low-risk parity + rate-limit + NaN guard) @ `94dc675`
