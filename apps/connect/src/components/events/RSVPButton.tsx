@@ -16,10 +16,12 @@ export default function RSVPButton({
   const [loading, setLoading] = useState(false);
   const [showProfileHint, setShowProfileHint] = useState(false);
   const [waiverOpen, setWaiverOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
 
   async function performRsvp() {
     setLoading(true);
+    setErrorMessage(null);
     const res = await fetch("/api/rsvp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -35,6 +37,15 @@ export default function RSVPButton({
     } else if (res.status === 401) {
       router.push("/login");
       return;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      const fallback =
+        res.status === 429
+          ? "Too many requests, please wait a moment."
+          : "Couldn't RSVP. Please try again.";
+      setErrorMessage(
+        (typeof data?.error === "string" && data.error) || fallback,
+      );
     }
 
     setLoading(false);
@@ -44,6 +55,7 @@ export default function RSVPButton({
   async function handleClick() {
     if (rsvped) {
       setLoading(true);
+      setErrorMessage(null);
       const res = await fetch("/api/rsvp", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -55,6 +67,12 @@ export default function RSVPButton({
       } else if (res.status === 401) {
         router.push("/login");
         return;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(
+          (typeof data?.error === "string" && data.error) ||
+            "Couldn't cancel RSVP. Please try again.",
+        );
       }
       setLoading(false);
       router.refresh();
@@ -63,6 +81,7 @@ export default function RSVPButton({
 
     // New RSVP: check whether the attendee waiver has been signed
     setLoading(true);
+    setErrorMessage(null);
     try {
       const res = await fetch(
         "/api/indemnity/template?slug=attendee-participation-waiver",
@@ -106,6 +125,11 @@ export default function RSVPButton({
           ? "Cancel RSVP"
           : "RSVP / Attend"}
       </button>
+      {errorMessage && (
+        <p className="mt-2 text-xs text-red-600" role="alert">
+          {errorMessage}
+        </p>
+      )}
       {showProfileHint && (
         <p className="mt-2 text-xs text-gray-500">
           Set up your{" "}

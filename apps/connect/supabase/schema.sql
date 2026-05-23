@@ -195,7 +195,23 @@ create table if not exists public.comments (
 
 alter table public.comments enable row level security;
 
+-- Server-enforced length cap (migration 087). Client cap is 1000; DB allows
+-- headroom for legacy rows. Bypassable client paths are protected by the CHECK.
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'comments_body_length_chk'
+      and conrelid = 'public.comments'::regclass
+  ) then
+    alter table public.comments
+      add constraint comments_body_length_chk
+      check (char_length(body) between 1 and 2000) not valid;
+    alter table public.comments validate constraint comments_body_length_chk;
+  end if;
+end $$;
+
 create index if not exists comments_event_id_idx on public.comments(event_id);
+create index if not exists comments_user_id_idx on public.comments(user_id);
 
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Comments are viewable by everyone' and tablename = 'comments') then
@@ -828,11 +844,13 @@ as $$
   limit lim;
 $$;
 
--- Atomic RSVP with capacity check (prevents race condition)
+-- Atomic RSVP with capacity check (prevents race condition) — hardened in
+-- migration 086 with auth.uid() guard, search_path lock, and minimal grants.
 create or replace function public.safe_rsvp(p_user_id uuid, p_event_id uuid)
 returns jsonb
 language plpgsql
 security definer
+set search_path = pg_catalog, public
 as $$
 declare
   v_status text;
@@ -840,6 +858,11 @@ declare
   v_current int;
   v_remaining int;
 begin
+  -- Authorisation: only the authenticated caller may RSVP themselves.
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+
   select status, max_attendees into v_status, v_max
   from public.events
   where id = p_event_id
@@ -849,7 +872,7 @@ begin
     return jsonb_build_object('success', false, 'error', 'Event not found', 'status', 404);
   end if;
 
-  if v_status != 'published' then
+  if v_status <> 'published' then
     return jsonb_build_object('success', false, 'error', 'Cannot RSVP to a ' || v_status || ' event', 'status', 400);
   end if;
 
@@ -877,6 +900,9 @@ begin
   return jsonb_build_object('success', true, 'remaining', v_remaining, 'status', 201);
 end;
 $$;
+
+revoke all on function public.safe_rsvp(uuid, uuid) from public;
+grant execute on function public.safe_rsvp(uuid, uuid) to authenticated;
 
 -- ══════════════════════════════════════════════
 -- Interest Groups

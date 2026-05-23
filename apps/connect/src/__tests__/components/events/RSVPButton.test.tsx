@@ -174,4 +174,56 @@ describe("RSVPButton", () => {
     const button = screen.getByRole("button");
     expect(button.className).toContain("bg-red-100");
   });
+
+  it("surfaces a 409 capacity-full error to the user", async () => {
+    queueWaiverSigned();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: () => Promise.resolve({ error: "Event is full" }),
+    });
+
+    render(<RSVPButton eventId="event-1" hasRsvped={false} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Event is full");
+    });
+    // Still shows RSVP CTA — no optimistic flip on failure.
+    expect(screen.getByText("RSVP / Attend")).toBeInTheDocument();
+  });
+
+  it("surfaces a 429 rate-limited error with a friendly fallback", async () => {
+    queueWaiverSigned();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({}),
+    });
+
+    render(<RSVPButton eventId="event-1" hasRsvped={false} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/too many requests/i);
+    });
+  });
+
+  it("surfaces a DELETE failure when cancelling RSVP", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({}),
+    });
+
+    render(<RSVPButton eventId="event-1" hasRsvped={true} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /couldn't cancel rsvp/i,
+      );
+    });
+    expect(screen.getByText("Cancel RSVP")).toBeInTheDocument();
+  });
 });
