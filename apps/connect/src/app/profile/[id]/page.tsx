@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import ProfileDetailServer from "@/components/profile/ProfileDetailServer";
+import { isValidUUID } from "@/lib/validation";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  if (!isValidUUID(id)) return { title: "Profile Not Found" };
   const supabase = await createClient();
 
   const { data: profile } = await supabase
@@ -34,6 +36,11 @@ export default async function PublicProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Skip the Postgres round-trip on malformed IDs (clean 404 instead
+  // of a `22P02 invalid input syntax for type uuid` error surfacing
+  // through the React error boundary). Matches the guard pattern in
+  // `/profile/[id]/[mode]/page.tsx`.
+  if (!isValidUUID(id)) notFound();
   const supabase = await createClient();
   const {
     data: { user },

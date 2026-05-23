@@ -75,7 +75,6 @@ update public.profiles set
   physical_address = 'CRC Bloubergstrand, Cape Town, Western Cape',
   physical_latitude = -33.8116,
   physical_longitude = 18.4716,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000001';
 
@@ -93,7 +92,6 @@ update public.profiles set
   physical_address = 'Olympus Drive, Mooikloof, Pretoria, Gauteng',
   physical_latitude = -25.8231,
   physical_longitude = 28.3564,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000002';
 
@@ -110,7 +108,6 @@ update public.profiles set
   physical_address = 'Lynnwood Road, Lynnwood, Pretoria, Gauteng',
   physical_latitude = -25.7670,
   physical_longitude = 28.2940,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000003';
 
@@ -128,7 +125,6 @@ update public.profiles set
   physical_address = 'Pecanwood Estate Road, Hartbeespoort, North West',
   physical_latitude = -25.7311,
   physical_longitude = 27.8650,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000004';
 
@@ -146,7 +142,6 @@ update public.profiles set
   physical_address = '237 Visagie Street, Pretoria Central, Gauteng',
   physical_latitude = -25.7534,
   physical_longitude = 28.1873,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000005';
 
@@ -164,7 +159,6 @@ update public.profiles set
   physical_address = '1 Roeland Street, Cape Town CBD, Western Cape',
   physical_latitude = -33.9290,
   physical_longitude = 18.4197,
-  onboarding_completed = true,
   bio_setup_required = false
 where id = '11111111-1111-4111-8111-000000000006';
 

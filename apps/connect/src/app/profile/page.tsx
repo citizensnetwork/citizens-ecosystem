@@ -82,7 +82,6 @@ export default async function ProfilePage() {
     contributor_kind: profile?.contributor_kind ?? null,
     full_name: profile?.full_name ?? "",
     avatar_url: profile?.avatar_url ?? null,
-    onboarding_completed: profile?.onboarding_completed ?? false,
     notification_email: profile?.notification_email ?? null,
     home_latitude: profile?.home_latitude ?? null,
     home_longitude: profile?.home_longitude ?? null,

@@ -112,7 +112,6 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 - **T5** — PayFast merchant registration in progress; billing stub live, wire when credentials ready
 - **Monorepo** — execute after June 9; plan at `docs/MONOREPO_PLAN.md`
 - **Citizens Vision** — needs dedicated planning session before development resumes
-- **`profiles.onboarding_completed`** — dead column (onboarding feature removed); drop in a future migration
 
 ---
 

@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import EventDetailServer from "@/components/events/EventDetailServer";
+import EventDetailServer, { getEventById } from "@/components/events/EventDetailServer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { Metadata } from "next";
 
@@ -11,13 +10,10 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-
-  const { data: event } = await supabase
-    .from("events")
-    .select("title, description, image_url, date, location")
-    .eq("id", id)
-    .maybeSingle();
+  // Reuse the same cached fetch as `EventDetailServer` so when Next.js
+  // renders metadata + body in one request we hit Supabase once. The
+  // cache is per-request, so unrelated requests stay independent.
+  const event = await getEventById(id);
 
   if (!event) return { title: "Event Not Found" };
 

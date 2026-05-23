@@ -198,7 +198,6 @@ export type Profile = {
   contributor_kind: ContributorKind | null;
   full_name: string;
   avatar_url: string | null;
-  onboarding_completed: boolean;
   notification_email: string | null;
   home_latitude: number | null;
   home_longitude: number | null;

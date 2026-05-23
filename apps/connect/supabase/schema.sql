@@ -35,7 +35,6 @@ create table if not exists public.profiles (
   contributor_kind text
     check (contributor_kind is null or contributor_kind in ('ministry', 'organization', 'business')),
   avatar_url text,
-  onboarding_completed boolean not null default false,
   notification_email text,
   home_latitude double precision,
   home_longitude double precision,

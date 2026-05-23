@@ -206,7 +206,6 @@ describe("scoreContributor", () => {
       contributor_kind: over.contributor_kind ?? null,
       full_name: over.full_name ?? "",
       avatar_url: null,
-      onboarding_completed: true,
       notification_email: null,
       home_latitude: null,
       home_longitude: null,

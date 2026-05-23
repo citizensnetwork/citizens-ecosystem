@@ -14,7 +14,6 @@ export function makeProfile(overrides?: Partial<Profile>): Profile {
     full_name: "Test User",
     avatar_url: null,
     created_at: "2025-01-01T00:00:00Z",
-    onboarding_completed: false,
     notification_email: null,
     home_latitude: null,
     home_longitude: null,

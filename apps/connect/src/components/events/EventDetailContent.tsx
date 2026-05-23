@@ -367,7 +367,7 @@ export default function EventDetailContent({
         <div className="mt-4">
           <MessageButton
             recipientId={event.created_by}
-            recipientName="Organizer"
+            recipientName={organiser?.full_name || "Organiser"}
           />
         </div>
       )}

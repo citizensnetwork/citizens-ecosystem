@@ -3,11 +3,10 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { isValidUUID } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PAGE_LIMIT = 100;
 
 type Mode = "followers" | "following";
@@ -76,7 +75,7 @@ export default async function FollowListPage({
 }) {
   const { id, mode: rawMode } = await params;
   if (rawMode !== "followers" && rawMode !== "following") notFound();
-  if (!UUID_RE.test(id)) notFound();
+  if (!isValidUUID(id)) notFound();
   const mode = rawMode as Mode;
 
   // Gate the social graph behind auth — we don't want anonymous
