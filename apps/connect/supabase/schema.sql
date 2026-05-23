@@ -2187,3 +2187,54 @@ drop trigger if exists trg_stamp_billing_trial_on_approval on public.profiles;
 create trigger trg_stamp_billing_trial_on_approval
   before update of contributor_status on public.profiles
   for each row execute function public.stamp_billing_trial_on_approval();
+
+-- ============================================================================
+-- Polish 2026-05-23 — get_user_places_with_stats (migration 094)
+-- ============================================================================
+-- Aggregates the caller's places with follower/review counts in one round-trip,
+-- replacing the per-place client-side filter in /api/manage/places.
+-- SECURITY INVOKER + auth.uid() filter; safe under existing RLS.
+
+create or replace function public.get_user_places_with_stats()
+returns table (
+  id            uuid,
+  name          text,
+  address       text,
+  verified      boolean,
+  created_at    timestamptz,
+  follow_count  bigint,
+  review_count  bigint,
+  avg_rating    numeric
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select
+    p.id,
+    p.name,
+    p.address,
+    p.verified,
+    p.created_at,
+    coalesce(f.cnt, 0)::bigint                                as follow_count,
+    coalesce(r.cnt, 0)::bigint                                as review_count,
+    case when coalesce(r.cnt, 0) > 0 then r.avg else null end as avg_rating
+  from public.places p
+  left join lateral (
+    select count(*)::bigint as cnt
+    from public.place_follows pf
+    where pf.place_id = p.id
+  ) f on true
+  left join lateral (
+    select count(*)::bigint as cnt, avg(rating)::numeric as avg
+    from public.reviews rv
+    where rv.place_id = p.id
+  ) r on true
+  where p.created_by = auth.uid()
+  order by p.created_at desc;
+$$;
+
+revoke all on function public.get_user_places_with_stats() from public;
+revoke all on function public.get_user_places_with_stats() from anon;
+grant execute on function public.get_user_places_with_stats() to authenticated;

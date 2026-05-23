@@ -74,7 +74,7 @@ Buckets `event-images` and `place-images` are public. Cover upload path: `${user
 
 ### Event Categories
 
-Hardcoded in components as `CATEGORY_LABELS` and `CATEGORY_COLORS` maps. Categories: church-service, youth, community-outreach, worship, bible-study, prayer, social, other.
+17 canonical event slugs and 10 place slugs. Authoritative source: `src/lib/categories.ts` (`EVENT_CATEGORIES`, `PLACE_CATEGORIES`) and `src/types/db.ts` (`EventCategory`, `PlaceCategory`). Do **not** hard-code category strings inline — always import from `categories.ts`.
 
 ## Database
 
@@ -93,7 +93,7 @@ Use `next/image` `<Image>` for Supabase-hosted images (the storage domain is con
 ### Map Markers & Clustering
 
 Marker utilities live in `src/lib/map/markers.ts`:
-- `createCategoryMarkerEl(category, temporal)` — Returns an `HTMLDivElement` for MapLibre GL markers with category-specific color and emoji
+- `createCategoryMarkerEl(category, temporal)` — Returns an `HTMLDivElement` for MapLibre GL markers with category-specific color and inline SVG icon
 - `createPlaceMarkerEl(category)` — Returns a place marker element
 - `createClusterEl(count)` — Returns a gold-branded cluster badge element
 - `getTemporalStyle(dateStr, endDateStr?)` — Returns opacity/scale/isLive based on event proximity to now
@@ -101,7 +101,7 @@ Marker utilities live in `src/lib/map/markers.ts`:
 
 ## Project Roadmap
 
-See `.github/PROJECT_STATUS.md` for full phase tracker with detailed checklists. Current status: 656 tests, all Phases 1–11 shipped.
+See `.github/PROJECT_STATUS.md` for full phase tracker. Current status: 714 tests, all phases through Batch 14h shipped.
 
 Platform has two full-screen primary views:
 1. **Map view** — full-viewport map with category markers, temporal encoding, clustering, geolocation, detail panel, floating controls
@@ -152,8 +152,7 @@ For every multi-batch session the user's standing expectations are:
    and `.github/DECISIONS.md` in the same push cadence.
 4. **Implement as much as capacity allows, in order.** When capacity ends,
    persist important context before the conversation is deleted:
-   - Update `/memories/session/plan.md` batch table with `✅ SHIPPED <sha>`
-   - Record shipped invariants in `/memories/repo/batch-*.md`
+   - Update `RESUME_HERE.md` at repo root (what shipped + commit SHA + next items)
    - Leave PROJECT_STATUS + DECISIONS current on `origin/main`
 5. **Final report** lists what shipped + what remains + resume instructions.
 6. **Windows env reminder:** prepend `$env:PATH = "C:\\Program Files\\nodejs;" + $env:PATH`

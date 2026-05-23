@@ -17,32 +17,6 @@
 
 ## 2. What just shipped
 
-### Polish batch 2 — `/audit-polish 3` — 2026-05-23 — `0d609c5`
-
-Polish Queue rows 4–6 from `.audit/QUEUE.md` (places-browse-and-follow + notifications + events-browse). **8 Report-only items** applied across 3 surfaces:
-
-- **places-browse-and-follow**
-  - (a) `GET /api/manage/places` gains user-scoped rate-limit (`RATE_LIMITS.read`); 429 on miss.
-  - (b) `FollowPlaceButton` now surfaces 429 + generic fetch failure in a `role="alert"` region — parity with `RSVPButton`.
-  - (c) `ManagePlacesView` adds error state + retry button (load extracted to a `useCallback`).
-  - (e) UUID validation dedup — replaced inline `UUID_RE.test(...)` with the centralised `isValidUUID()` helper across `admin/users`, `admin/api-keys` (×2), `admin/pending-elevations/[id]/approve`, `v1/events`, `v1/events/[id]`. Net security tightening (helper adds `typeof === "string"` guard).
-- **notifications**
-  - (b) `dismissed-review-prompts` localStorage list capped at 100 with FIFO eviction (`slice(-CAP)`).
-  - (c) `NotificationBell` realtime subscription extended with **UPDATE + DELETE** postgres_changes handlers alongside INSERT (filtered `user_id=eq.${userId}`). Read-state and dismissals now sync across tabs/devices.
-- **events-browse**
-  - (a + b) `/events` data-loading restructured. `getUser()` resolves first (fast cookie read), then one `Promise.all` fires publicEvents + places (`.limit(1000)`) + reviews (`.gte(created_at, twelveMonthsAgo).order(created_at desc).limit(5000)`) + contributors + preferencesPromise. Removes the sequential preferences round-trip and bounds two previously unbounded queries. New module constants `PLACES_LIMIT` / `REVIEWS_LIMIT` / `REVIEW_WINDOW_MONTHS`.
-
-**Deferred per user choice** (will be picked up in a later batch):
-- 4d — manage-places SQL aggregate (needs migration)
-- 5a — PendingReviews realtime dedup (low impact)
-- 6c — events detail panel extraction (refactor)
-
-Audit state: `.audit/QUEUE.md` rows 4–6 struck through with shipped marker; surface checkpoints `places-browse-and-follow.md`, `notifications.md`, `events-browse.md` each append a "Polish run 2026-05-23" line.
-
-✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · advisors **83 → 83** (code-only). Architect SE: A across all three surfaces — SHIP, no Should-fix; 4 nice-to-haves logged (AbortController on ManagePlacesView fetch, REPLICA-IDENTITY comment on DELETE handler, distinct network-error copy on FollowPlaceButton, per-place review-count truthness when reviews truncate at 5000).
-
----
-
 ### Polish batch 1 — `/audit-polish 3` — 2026-05-23 — `10b4816`
 
 Polish Queue rows 1–3 from `.audit/QUEUE.md` (onboarding + event-detail + profile-and-interests):
@@ -179,8 +153,6 @@ Demo smoke test:
 ## 7. Memory pointers
 
 - Locked direction: `.github/MASTER_DIRECTION.md`
-- Strategic vision + WCI opportunity: `CITIZE~1.MD` (planning session May 23 2026)
-- Restructuring strategy: `CITIZENS_CONNECT_RESTRUCTURING_STRATEGY.md`
 - Deferred features: `docs/FUTURE_IDEAS.md`
 - Operations runbook: `docs/RUNBOOK.md`
 - Coding conventions: `.claude/skills/` + subdirectory CLAUDE.md files
@@ -208,5 +180,4 @@ Full queue: `.audit/QUEUE.md`. Status:
 - ✅ edge-functions (14d), event-create-edit (14e), place-create-edit-media (14f), messaging-dm (14g)
 - ✅ notifications (`01ec87a`), map-core (`ff4d9f5`) — applied 2026-05-23
 - ✅ **Polish Queue rows 1–3 shipped 2026-05-23** (`10b4816`): onboarding column drop (migration 093 file-only), event-detail metadata cache + organiser name, profile UUID guards.
-- ✅ **Polish Queue rows 4–6 shipped 2026-05-23** (`0d609c5`): places-browse-and-follow (rate-limit + error surfacing + UUID dedup), notifications (FIFO cap + realtime UPDATE/DELETE), events-browse (parallel prefs + bounded queries). 3 items deferred: 4d (SQL aggregate, needs migration), 5a (review-prompt dedup), 6c (detail panel extraction).
-- All 17 surfaces audited and clean. **Polish Queue remaining:** row 7 event-detail attendee fanout (M, query design needed), row 8 profile-and-interests contributor-locations waterfall (M, query design), row 9 map-core (L, Tier C Playwright follow-up), row 10 place-create-edit-media (L, 6 storage-hygiene items). Run `/audit-polish 1` to pick the next row.
+- All 17 surfaces audited and clean. Next polish runs: row 4 (places-browse-and-follow, M), row 5 (notifications, M), row 6 (events-browse minus EventsView split, M). Run `/audit-polish 1` to pick the next row.
