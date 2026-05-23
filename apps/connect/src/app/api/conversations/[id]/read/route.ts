@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -19,6 +20,17 @@ export async function PATCH(_request: NextRequest, { params }: RouteParams) {
 
   if (!isValidUUID(conversationId)) {
     return NextResponse.json({ error: "Invalid conversation ID" }, { status: 400 });
+  }
+
+  const rl = checkRateLimit(`conv-read:${user.id}`, RATE_LIMITS.read);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() },
+      }
+    );
   }
 
   const { error } = await supabase

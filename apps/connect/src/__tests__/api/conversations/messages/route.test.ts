@@ -63,7 +63,7 @@ describe("GET /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant query returns null
-    mockClient._chain.single.mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await GET(makeGetRequest(CONV_ID), makeParams(CONV_ID));
     expect(response.status).toBe(403);
@@ -76,7 +76,7 @@ describe("GET /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant check passes
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { conversation_id: CONV_ID },
       error: null,
     });
@@ -89,7 +89,7 @@ describe("GET /api/conversations/[id]/messages", () => {
       count: 1,
     };
     // other_user query
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: {
         user_id: "other-user",
         profiles: { id: "other-user", full_name: "Other User", avatar_url: null },
@@ -113,7 +113,7 @@ describe("GET /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant check passes
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { conversation_id: CONV_ID },
       error: null,
     });
@@ -195,7 +195,7 @@ describe("POST /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant check fails
-    mockClient._chain.single.mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(makePostRequest(CONV_ID, { body: "Hello" }), makeParams(CONV_ID));
     expect(response.status).toBe(403);
@@ -207,7 +207,7 @@ describe("POST /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant check passes
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { conversation_id: CONV_ID },
       error: null,
     });
@@ -236,7 +236,7 @@ describe("POST /api/conversations/[id]/messages", () => {
       error: null,
     });
     // participant check passes
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { conversation_id: CONV_ID },
       error: null,
     });

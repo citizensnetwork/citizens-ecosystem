@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     .select("conversation_id")
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!participant) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });
@@ -37,7 +37,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // Get cursor for pagination
   const { searchParams } = new URL(request.url);
   const before = searchParams.get("before");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100);
+  const rawLimit = parseInt(searchParams.get("limit") || "50", 10);
+  const safeLimit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 50;
+  const limit = Math.min(safeLimit, 100);
 
   let query = supabase
     .from("messages")
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from("messages")
       .select("created_at")
       .eq("id", before)
-      .single();
+      .maybeSingle();
 
     if (cursorMsg) {
       query = query.lt("created_at", cursorMsg.created_at);
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     .select("user_id, profiles:user_id(id, full_name, avatar_url)")
     .eq("conversation_id", conversationId)
     .neq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   return NextResponse.json({
     messages: (messages || []).reverse(),
@@ -120,7 +122,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .select("conversation_id")
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!participant) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });

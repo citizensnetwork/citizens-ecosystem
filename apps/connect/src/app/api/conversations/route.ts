@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
     .from("profiles")
     .select("id")
     .eq("id", recipient_id)
-    .single();
+    .maybeSingle();
 
   if (!recipient) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 });

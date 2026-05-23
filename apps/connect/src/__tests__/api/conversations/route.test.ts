@@ -122,7 +122,7 @@ describe("POST /api/conversations", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
-    mockClient._chain.single.mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
     expect(response.status).toBe(404);
@@ -134,7 +134,7 @@ describe("POST /api/conversations", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { id: RECIPIENT_ID },
       error: null,
     });
@@ -152,7 +152,7 @@ describe("POST /api/conversations", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
-    mockClient._chain.single.mockResolvedValueOnce({
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { id: RECIPIENT_ID },
       error: null,
     });
