@@ -17,7 +17,7 @@ const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
  */
 const MAPTILER_STYLE =
   process.env.NEXT_PUBLIC_MAPTILER_STYLE ??
-  "019dba0f-b49b-73bb-bf6a-f9d820f43be8";
+  "019e5525-61a4-7791-82f2-2222fb440592";
 
 /**
  * Light/neutral raster fallback using CartoDB Positron.

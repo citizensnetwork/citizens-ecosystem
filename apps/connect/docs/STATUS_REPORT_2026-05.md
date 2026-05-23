@@ -185,7 +185,7 @@ No new advisor delta introduced by Batches S1 → S3.
 
 ### Project IDs / env
 - **Supabase project:** `xyiajtrvhlxaeplsiajj` (URL: `https://xyiajtrvhlxaeplsiajj.supabase.co`).
-- **MapTiler style:** UUID `019dba0f-b49b-73bb-bf6a-f9d820f43be8` (env-driven, fallback OSM raster).
+- **MapTiler style:** UUID `019e5525-61a4-7791-82f2-2222fb440592` (env-driven, fallback OSM raster).
 - **Default map centre:** Pretoria, South Africa `[-25.7479, 28.2293]`.
 - **Citizens Network identity:** `citizensnetworkpbo@gmail.com` for git commit author.
 
