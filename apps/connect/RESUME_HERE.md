@@ -17,7 +17,35 @@
 
 ## 2. What just shipped
 
-### Stage 5–6: LocationPicker forward-geocode + place events surface — `77d6250`
+### Bug Batch 1 — 7 UI bugs + feature clarity system — `6b0f9f9`
+
+All 7 user-reported bugs fixed:
+
+1. **RSVP toggle (map popup "Connect" button)** — `handleQuickAction` "join" now reads `rsvpEventIdsRef.current` (ref mirror of state for stale-closure safety) and sends `DELETE` when already joined, `POST` when not. State set removes/adds correctly.
+
+2. **Contributor profile opens full-width in SidePanel** — Removed `min-h-screen` from `ContributorPublicProfile` wrapper div. Component now renders correctly in both full-page (`/c/[slug]`) and SidePanel panel/drawer contexts.
+
+3. **Social media links now have brand icons + colours** — `SocialLinksRow` replaced: globe icon (Website), camera (Instagram, pink/purple), "f" (Facebook, blue), music note (TikTok, black), play (YouTube, red). All pills now have brand-appropriate colour.
+
+4. **MessageButton deferred** — Removed from contributor profiles pending design clarity. 15-question grill document at `docs/feature-clarity/messaging.md`.
+
+5. **"Community organised" chip removed from contributor-owned events** — Guard added on all 3 render surfaces: EventsView preview overlay, EventDetailContent, EventMap popup. Check: `event.community_contributor && event.creator?.role !== "contributor"`.
+
+6. **Reporting system fully documented** — System is live. Gaps (admin notification on new report, reporter notification on resolution, auto-hide threshold) documented in `docs/feature-clarity/reporting.md`.
+
+7. **Contributor type label clickable** — `ContributorKindLink` replaces static `<p>`. Uses `CONTRIBUTOR_KIND_LABELS` short label ("Ministry" not "Contributor - Ministry"). Routes to `/events?q=Ministry`. EventsView now reads `searchParams.get("q")` on mount to pre-populate search.
+
+**Security fix (Architect should-fix):** URL protocol validation (`normalisePublicUrl`) now applied to `website_url`, `facebook_url`, `youtube_url` in contributor profile PATCH API — prevents stored XSS via `javascript:` / `data:` URIs.
+
+**Feature clarity MDs created** (`docs/feature-clarity/`):
+- `messaging.md` — 15 design questions
+- `friends.md` — 16 design questions
+- `reporting.md` — existing system gap map + 10 questions
+- `search-and-discovery.md` — 12 questions for burger-menu Contributors tab + search overhaul
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect review → all should-fix applied · advisors unchanged (no DB change).
+
+
 
 - **LocationPicker** now accepts an optional `address` prop. When the
   parent's address input changes, it debounces (400ms) and queries

@@ -2,6 +2,26 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Bug Batch 1 — UI fixes + feature clarity system
+
+**Decision — MessageButton removed from ContributorPublicProfile until messaging is designed.**
+The transport layer exists (conversations table, API routes, ConversationList, ChatView) but the product scope is unclear: who can message whom, message requests vs. direct delivery, group messaging, retention, notifications. Rather than ship a half-baked feature, the MessageButton CTA was removed. A full questioning document lives at `docs/feature-clarity/messaging.md`. Re-implement after all 15 questions are answered.
+
+**Decision — RSVP toggle uses a ref mirror (rsvpEventIdsRef) not a dep-list addition.**
+`handleQuickAction` is a `useCallback`. Adding `rsvpEventIds` to its dep array would cause it to be recreated on every RSVP change, potentially de-registering and re-registering the MapLibre click handler each time. The idiomatic pattern is a ref that mirrors the state (`rsvpEventIdsRef.current = rsvpEventIds` at render time); the callback closes over the ref, not the state value.
+
+**Decision — community_contributor chip is suppressed when event.creator?.role === "contributor".**
+The `community_contributor` boolean is "true when a Citizen (non-contributor) created the event". Some seeded contributor events have it set to `true` incorrectly. Rather than a DB migration, we add a code guard on all three render surfaces (EventsView preview overlay, EventDetailContent, EventMap popup). A DB migration to fix stale data is deferred — it's a data-quality issue not a security issue.
+
+**Decision — ContributorKindLink uses CONTRIBUTOR_KIND_LABELS short label ("Ministry"), not getRoleDisplayLabel ("Contributor - Ministry").**
+The kind label on the profile is already preceded by the "Contributor" badge. Repeating "Contributor - Ministry" in the clickable link is redundant. The short label is the correct copy. The link routes to `/events?q=Ministry` which the EventsView picks up via `searchParams.get("q")` on mount.
+
+**Decision — URL protocol validation added for website_url / facebook_url / youtube_url in contributor profile PATCH API.**
+normalisePublicUrl was already applied to gallery_urls. The same check now applies to all three link fields. Any non-http(s) scheme (javascript:, data:) is rejected with 400. This closes a stored XSS vector where a malicious contributor could craft a link that executes script in a visitor's browser.
+
+**Decision — Feature Clarity folder (docs/feature-clarity/) established for complex features.**
+Any feature that requires more than 15 design questions before implementation gets a questioning MD in docs/feature-clarity/. Current MDs: messaging, friends, reporting, search-and-discovery. The folder is not gitignored — it is part of the repo so all sessions can reference it.
+
 ## QP1 — Quick-search panel: tab-gated tiles, city chips, proximity sort
 
 **Decision — quick-search panel tiles are gated by `burgerTab`, never mixed.**
