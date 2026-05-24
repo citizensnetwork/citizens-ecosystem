@@ -1432,7 +1432,7 @@ export default function EventMap({
 
           return `<div class="cc-popup">
             ${event.status === "cancelled" ? '<span class="cc-chip-cancelled" title="This event has been cancelled">Cancelled</span>' : ""}
-            ${event.community_contributor ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
+            ${event.community_contributor && event.creator?.role !== "contributor" ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
             <strong>${escapeHtml(event.title)}</strong>
             <p>${dateStr}</p>
             <p>${escapeHtml(event.location)}</p>

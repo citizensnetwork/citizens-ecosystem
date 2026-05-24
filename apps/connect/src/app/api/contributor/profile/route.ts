@@ -120,6 +120,22 @@ export async function POST(request: Request) {
     }
     update.gallery_urls = unique;
   }
+
+  // Reject javascript: / data: / other non-https URLs so they cannot be
+  // rendered as stored XSS in SocialLinksRow.
+  for (const urlKey of ["website_url", "facebook_url", "youtube_url"] as const) {
+    if (update[urlKey] !== undefined && update[urlKey] !== null) {
+      const norm = normalisePublicUrl(update[urlKey] as string);
+      if (norm === null) {
+        return NextResponse.json(
+          { error: `${urlKey} must be a valid https/http URL` },
+          { status: 400 },
+        );
+      }
+      update[urlKey] = norm;
+    }
+  }
+
   if (
     update.physical_latitude !== undefined &&
     update.physical_latitude !== null &&

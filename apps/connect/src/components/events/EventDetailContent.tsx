@@ -181,7 +181,10 @@ export default function EventDetailContent({
             </span>
           )}
           {isWeekend && <WeekendChip />}
-          {event.community_contributor && <ContributorChip variant="community" />}
+          {event.community_contributor &&
+            organiser?.role !== "contributor" && (
+              <ContributorChip variant="community" />
+          )}
           {isLive && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />

@@ -17,15 +17,15 @@
 // `ssr: false` in Server Components.
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import type { ContributorLocation, Event, Profile } from "@/types/db";
+import type { ContributorKind, ContributorLocation, Event, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
-import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
-import { getRoleDisplayLabel } from "@/types/db";
+import { CONTRIBUTOR_KIND_LABELS } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
 // SSR off matches the pattern in `MiniMap.tsx`.
@@ -77,7 +77,7 @@ export function ContributorPublicProfile({
     typeof profile.physical_longitude === "number";
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] pb-16">
+    <div className="bg-[#faf9f6] pb-16">
       {/* ── 1. Header band ─────────────────────────────── */}
       <header className="border-b border-black/10 bg-white">
         <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-start sm:gap-6 sm:py-8">
@@ -107,9 +107,7 @@ export function ContributorPublicProfile({
                 <VerifiedIcon /> Contributor
               </span>
             </div>
-            <p className="mt-1 text-sm text-black/60">
-              {getRoleDisplayLabel("contributor", profile.contributor_kind)}
-            </p>
+            <ContributorKindLink contributorKind={profile.contributor_kind} />
 
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-black/70">
               <span>
@@ -129,11 +127,6 @@ export function ContributorPublicProfile({
 
           {viewer && (
             <div className="flex shrink-0 items-center gap-2">
-              <MessageButton
-                recipientId={profile.id}
-                recipientName={profile.full_name}
-                variant="icon"
-              />
               <FollowButton
                 followeeId={profile.id}
                 isFollowing={isFollowing}
@@ -285,6 +278,34 @@ function Section({
   );
 }
 
+/** Clickable contributor kind label — taps through to the events search
+ *  pre-populated with this kind (e.g. "Ministry") so the user can browse
+ *  all contributors of the same type. */
+function ContributorKindLink({
+  contributorKind,
+}: {
+  contributorKind: ContributorKind | null | undefined;
+}) {
+  if (!contributorKind) return null;
+  const label = CONTRIBUTOR_KIND_LABELS[contributorKind];
+  return (
+    <Link
+      href={`/events?q=${encodeURIComponent(label)}`}
+      className="mt-1 inline-block text-sm text-black/50 underline-offset-2 hover:text-black/80 hover:underline"
+      title={`Browse all ${label} contributors`}
+    >
+      {label}
+    </Link>
+  );
+}
+
+type SocialLink = {
+  label: string;
+  href: string;
+  icon: ReactNode;
+  pillClass: string;
+};
+
 function SocialLinksRow({
   profile,
   standalone = false,
@@ -292,23 +313,67 @@ function SocialLinksRow({
   profile: Profile;
   standalone?: boolean;
 }) {
-  const links: Array<{ label: string; href: string }> = [];
+  const links: SocialLink[] = [];
+
   if (profile.website_url)
-    links.push({ label: "Website", href: profile.website_url });
+    links.push({
+      label: "Website",
+      href: profile.website_url,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
+          <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      ),
+      pillClass: "border-black/15 bg-white text-black/80 hover:border-black/40",
+    });
+
   if (profile.instagram_handle)
     links.push({
       label: "Instagram",
       href: `https://instagram.com/${profile.instagram_handle.replace(/^@/, "")}`,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+        </svg>
+      ),
+      pillClass: "border-pink-200 bg-gradient-to-r from-purple-50 to-pink-50 text-pink-700 hover:from-purple-100 hover:to-pink-100",
     });
+
   if (profile.facebook_url)
-    links.push({ label: "Facebook", href: profile.facebook_url });
+    links.push({
+      label: "Facebook",
+      href: profile.facebook_url,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
+          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+        </svg>
+      ),
+      pillClass: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    });
+
   if (profile.tiktok_handle)
     links.push({
       label: "TikTok",
       href: `https://tiktok.com/@${profile.tiktok_handle.replace(/^@/, "")}`,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
+          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.88a8.28 8.28 0 0 0 4.86 1.55V7a4.85 4.85 0 0 1-1.09-.31z" />
+        </svg>
+      ),
+      pillClass: "border-black/20 bg-black text-white hover:bg-black/80",
     });
+
   if (profile.youtube_url)
-    links.push({ label: "YouTube", href: profile.youtube_url });
+    links.push({
+      label: "YouTube",
+      href: profile.youtube_url,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
+          <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" /><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white" />
+        </svg>
+      ),
+      pillClass: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+    });
 
   if (links.length === 0) return null;
 
@@ -320,8 +385,9 @@ function SocialLinksRow({
             href={l.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-full border border-black/15 bg-white px-3 py-1 text-xs font-medium text-black/80 hover:border-(--gold) hover:text-black"
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${l.pillClass}`}
           >
+            {l.icon}
             {l.label}
           </a>
         </li>

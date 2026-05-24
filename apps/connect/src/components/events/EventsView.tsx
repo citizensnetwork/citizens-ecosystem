@@ -97,7 +97,9 @@ export default function EventsView({
       });
     }
   }, [router, searchParams]);
-  const [search, setSearch] = useState("");
+  // Pre-populate search from ?q= param so contributor type-label links
+  // land with the search box already filled.
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [longFormOpen, setLongFormOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
@@ -204,6 +206,10 @@ export default function EventsView({
   // User state for auth section in burger menu
   const [user, setUser] = useState<User | null>(null);
   const [rsvpEventIds, setRsvpEventIds] = useState<Set<string>>(new Set());
+  // Ref mirrors rsvpEventIds so handleQuickAction (useCallback) always reads
+  // the latest value without needing it in its dep list.
+  const rsvpEventIdsRef = useRef<Set<string>>(new Set());
+  rsvpEventIdsRef.current = rsvpEventIds;
   const [considerEventIds, setConsiderEventIds] = useState<Set<string>>(new Set());
   const [considerVersion, setConsiderVersion] = useState(0);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
@@ -777,14 +783,19 @@ export default function EventsView({
             router.push(`/events/${event.id}`);
             break;
           case "join": {
+            const alreadyJoined = rsvpEventIdsRef.current.has(event.id);
             const res = await fetch("/api/rsvp", {
-              method: "POST",
+              method: alreadyJoined ? "DELETE" : "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ event_id: event.id }),
             });
             if (res.status === 401) { router.push("/login"); return; }
             if (res.ok) {
-              setRsvpEventIds((prev) => new Set([...prev, event.id]));
+              if (alreadyJoined) {
+                setRsvpEventIds((prev) => { const next = new Set(prev); next.delete(event.id); return next; });
+              } else {
+                setRsvpEventIds((prev) => new Set([...prev, event.id]));
+              }
             }
             break;
           }
@@ -1888,7 +1899,8 @@ export default function EventsView({
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church-services"]}`}>
                     {CATEGORY_LABELS[selectedEvent.category ?? "church-services"]}
                   </span>
-                  {selectedEvent.community_contributor && (
+                  {selectedEvent.community_contributor &&
+                    selectedEvent.creator?.role !== "contributor" && (
                     <ContributorChip variant="community" />
                   )}
                   <EventStatusBadge
