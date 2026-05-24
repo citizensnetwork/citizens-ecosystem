@@ -66,10 +66,6 @@ vi.mock("@/components/events/EventFeed", () => ({
   ),
 }));
 
-vi.mock("@/components/reviews/PostEventPrompt", () => ({
-  default: () => <div data-testid="post-event-prompt" />,
-}));
-
 vi.mock("@/components/notifications/NotificationBell", () => ({
   default: () => <div data-testid="notification-bell" />,
 }));

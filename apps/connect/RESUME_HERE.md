@@ -282,6 +282,8 @@ Full queue: `.audit/QUEUE.md`. Status:
 
 - ✅ middleware-and-session, api-surface, auth-and-signup, admin, rsvp-and-comments, events-browse, event-detail, onboarding, profile-and-interests, places-browse-and-follow, storage-and-media-uploads
 - ✅ edge-functions (14d), event-create-edit (14e), place-create-edit-media (14f), messaging-dm (14g)
-- ✅ notifications (`01ec87a`), map-core (`ff4d9f5`) — applied 2026-05-23
+- ✅ map-core (`ff4d9f5`) — applied 2026-05-23
+- 🟡 **notifications** — re-audited 2026-05-24. Fix-clean applied (uncommitted working tree): `PostEventPrompt.tsx` deleted + stale mock removed. Fix-staged: `notifications--pending-reviews-dedup.diff` removes PendingReviews inline block (duplicate of notification-driven review flow). Run `/audit-fix notifications` to apply.
 - ✅ **Polish Queue rows 1–3 shipped 2026-05-23** (`10b4816`): onboarding column drop (migration 093 file-only), event-detail metadata cache + organiser name, profile UUID guards.
-- All 17 surfaces audited and clean. Next polish runs: row 4 (places-browse-and-follow, M), row 5 (notifications, M), row 6 (events-browse minus EventsView split, M). Run `/audit-polish 1` to pick the next row.
+- ✅ **Polish Queue row 6 (events-browse) shipped 2026-05-24** (pending commit): inline detail panel extracted to `EventPreviewPanel.tsx`; 4 imports cleaned from EventsView.
+- Polish Queue rows 7–10 pending. Run `/audit-polish 1` for next row (event-detail row 7 — attendee fanout design decision needed).
