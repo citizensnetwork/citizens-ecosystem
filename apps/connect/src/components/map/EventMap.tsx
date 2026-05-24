@@ -18,6 +18,7 @@ import {
   PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
 import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
+import { isCommunityEvent, isCancelledEvent } from "@/lib/events/capabilities";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
 import {
@@ -1431,8 +1432,8 @@ export default function EventMap({
           const considerClass = `cc-action-btn${isConsidering ? " cc-action-done" : ""}`;
 
           return `<div class="cc-popup">
-            ${event.status === "cancelled" ? '<span class="cc-chip-cancelled" title="This event has been cancelled">Cancelled</span>' : ""}
-            ${event.community_contributor && event.creator?.role !== "contributor" ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
+            ${isCancelledEvent(event) ? '<span class="cc-chip-cancelled" title="This event has been cancelled">Cancelled</span>' : ""}
+            ${isCommunityEvent(event) ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
             <strong>${escapeHtml(event.title)}</strong>
             <p>${dateStr}</p>
             <p>${escapeHtml(event.location)}</p>

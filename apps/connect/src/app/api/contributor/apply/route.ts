@@ -26,6 +26,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isApprovedContributor } from "@/lib/profiles/capabilities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,10 +73,10 @@ export async function POST(request: Request) {
   // Short-circuit already-approved contributors.
   const { data: me } = await supabase
     .from("profiles")
-    .select("contributor_status")
+    .select("contributor_status, role")
     .eq("id", user.id)
     .maybeSingle();
-  if (me?.contributor_status === "approved") {
+  if (isApprovedContributor(me)) {
     return NextResponse.json(
       { error: "already_approved" },
       { status: 409 },

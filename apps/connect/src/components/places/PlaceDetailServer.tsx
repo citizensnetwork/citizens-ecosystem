@@ -18,6 +18,7 @@ import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
+import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 import type { Event, Place, PlaceMedia, Review } from "@/types/db";
 
 export const getPlaceById = cache(async (id: string) => {
@@ -109,7 +110,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
   const media = mediaRes.data ?? [];
   const followerCount = followerCountRes.count ?? 0;
   const isFollowing = !!userFollowRes.data;
-  const isAdmin = profileRes.data?.role === "admin";
+  const isAdmin = profileIsAdmin(profileRes.data);
   const canEdit = isOwner || isAdmin;
   const upcomingEvents = upcomingEventsRes.data ?? [];
   const pastEvents = pastEventsRes.data ?? [];
@@ -122,9 +123,8 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
     contributor_slug: string | null;
   } | null;
   const ownerLinkable =
-    owner?.role === "contributor" &&
-    owner.contributor_status === "approved" &&
-    !!owner.contributor_slug;
+    isApprovedContributor(owner) &&
+    !!owner?.contributor_slug;
 
   const avgRating =
     reviews && reviews.length > 0

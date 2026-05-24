@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 import { EVENT_TAG_LIMIT } from "@/types/db";
@@ -38,7 +39,7 @@ async function requireOwnerOrAdmin(
     .select("role")
     .eq("id", userId)
     .maybeSingle();
-  if (profile?.role === "admin") return { ok: true };
+  if (profileIsAdmin(profile)) return { ok: true };
   return { ok: false, status: 403, error: "Forbidden" };
 }
 

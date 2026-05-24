@@ -7,6 +7,7 @@ import { VerifiedBadge, isVerifiedContributor } from "@/components/ui/VerifiedBa
 import EventStatusBadge from "@/components/events/EventStatusBadge";
 import WeekendChip from "@/components/events/WeekendChip";
 import { isWeekendEvent } from "@/lib/weekendTag";
+import { isCommunityEvent } from "@/lib/events/capabilities";
 
 export default function EventCard({ event }: { event: Event }) {
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
@@ -55,7 +56,9 @@ export default function EventCard({ event }: { event: Event }) {
             </span>
           )}
           {isWeekend && <WeekendChip />}
-          {event.community_contributor && <ContributorChip variant="community" />}
+          {isCommunityEvent(event) && (
+            <ContributorChip variant="community" />
+          )}
           {!event.image_url && (
             <EventStatusBadge
               status={event.status}

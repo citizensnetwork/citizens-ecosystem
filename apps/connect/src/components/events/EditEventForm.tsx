@@ -13,6 +13,7 @@ import SearchProfilePicker from "./SearchProfilePicker";
 import TagPicker from "./TagPicker";
 import type { Event, EventCategory, EventStatus, EventVisibility, AttendeesVisibility, EventMedia, EventTag } from "@/types/db";
 import type { SearchProfile } from "@/lib/searchProfile";
+import { isCancelledEvent } from "@/lib/events/capabilities";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
   ssr: false,
@@ -328,7 +329,7 @@ export default function EditEventForm({ event }: Props) {
         </div>
       </div>
 
-      {event.status === "cancelled" && (
+      {isCancelledEvent(event) && (
         <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm font-medium">
           This event has been cancelled.
         </div>
@@ -491,7 +492,7 @@ export default function EditEventForm({ event }: Props) {
             <select id="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)} className="w-full border rounded-md px-3 py-2 text-sm">
               <option value="published">Published</option>
               <option value="draft">Draft</option>
-              {event.status === "cancelled" && <option value="cancelled">Cancelled</option>}
+              {isCancelledEvent(event) && <option value="cancelled">Cancelled</option>}
             </select>
           </div>
           <div>

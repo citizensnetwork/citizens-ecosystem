@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import EditPlaceForm from "@/components/places/EditPlaceForm";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { Place, Category, PlaceMedia } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export default async function EditPlacePage({
   }
 
   const isOwner = user.id === place.created_by;
-  const isAdmin = profileRes.data?.role === "admin";
+  const isAdmin = profileIsAdmin(profileRes.data);
 
   if (!isOwner && !isAdmin) {
     redirect(`/places/${id}`);

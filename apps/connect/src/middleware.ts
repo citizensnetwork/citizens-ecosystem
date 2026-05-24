@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isContributor } from "@/lib/profiles/capabilities";
 
 /** Routes that require authentication — redirect to /login if no session */
 const PROTECTED_ROUTES = ["/profile", "/events/new", "/messages", "/admin"];
@@ -130,7 +131,7 @@ export async function middleware(request: NextRequest) {
     // minimum public profile before accessing the rest of the app.
     if (
       profile?.bio_setup_required &&
-      profile?.role === "contributor" &&
+      isContributor(profile) &&
       !BIO_SETUP_ALLOW.some((p) => pathname === p || pathname.startsWith(p + "/"))
     ) {
       const setupUrl = request.nextUrl.clone();

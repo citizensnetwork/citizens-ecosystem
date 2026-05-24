@@ -14,6 +14,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import OrgDashboard from "@/components/admin/OrgDashboard";
+import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,10 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .maybeSingle<{ role: string; contributor_status: string | null }>();
 
-  const isAdmin = me?.role === "admin";
-  const isApprovedContributor =
-    me?.role === "contributor" && me.contributor_status === "approved";
+  const isAdmin = profileIsAdmin(me);
+  const isApprovedContributorUser = isApprovedContributor(me);
 
-  if (!isAdmin && !isApprovedContributor) {
+  if (!isAdmin && !isApprovedContributorUser) {
     redirect("/profile");
   }
 

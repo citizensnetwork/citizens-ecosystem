@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Event, EventCategory, PlaceCategory, FavouriteOrg, FriendAttending, FriendConsidering, Profile, TrendingEvent } from "@/types/db";
 import { EVENT_CATEGORIES, CATEGORY_HEX, PLACE_CATEGORIES, PLACE_CATEGORY_HEX, PLACE_CATEGORY_DESCRIPTIONS } from "@/lib/categories";
+import { isAdmin, isContributor, isCitizen, isApprovedContributor, isPendingContributor, isRejectedContributor } from "@/lib/profiles/capabilities";
 import { getIconSvg } from "@/lib/categoryIcons";
 import AccordionSection from "@/components/ui/AccordionSection";
 import type { User } from "@supabase/supabase-js";
@@ -359,8 +360,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   Messages
                 </Link>
                 {/* Contributor-only shortcuts */}
-                {menuProfile?.role === "contributor" &&
-                  menuProfile?.contributor_status === "approved" && (
+                {isApprovedContributor(menuProfile) && (
                     <Link
                       href="/places/new"
                       onClick={onClose}
@@ -370,10 +370,10 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     </Link>
                   )}
                 {/* Citizens without an application see the apply CTA */}
-                {menuProfile?.role === "citizen" &&
+                {isCitizen(menuProfile) &&
                   (!menuProfile?.contributor_status ||
                     menuProfile?.contributor_status === "not_applied" ||
-                    menuProfile?.contributor_status === "rejected") && (
+                    isRejectedContributor(menuProfile)) && (
                     <Link
                       href="/contributor/apply"
                       onClick={onClose}
@@ -397,7 +397,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 >
                   + Create Event
                 </Link>
-                {menuProfile?.role === "citizen" && (
+                {isCitizen(menuProfile) && (
                   <p className="mt-1 px-1 text-center text-[11px] leading-tight text-black/55">
                     Citizens can publish 1 community event / month. Apply to
                     contribute for unlimited publishing.
@@ -435,8 +435,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                   <p className="truncate text-xs text-black/50">{user.email}</p>
                 </div>
               </Link>
-              {menuProfile?.role === "contributor" &&
-                menuProfile?.contributor_status === "approved" && (
+              {isApprovedContributor(menuProfile) && (
                   <>
                     {menuProfile?.contributor_slug && (
                       <Link
@@ -463,8 +462,8 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     </Link>
                   </>
                 )}
-              {menuProfile?.role === "contributor" &&
-                menuProfile?.contributor_status === "pending" && (
+              {isContributor(menuProfile) &&
+                isPendingContributor(menuProfile) && (
                   <div className="rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-xs leading-snug text-black/70">
                     <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-(--gold)" />
                     Application under review
@@ -475,8 +474,8 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 )}
               {/* Citizens flip to pending on apply while role stays 'citizen' */}
               {/* until approval — surface the same pill so they get feedback. */}
-              {menuProfile?.role === "citizen" &&
-                menuProfile?.contributor_status === "pending" && (
+              {isCitizen(menuProfile) &&
+                isPendingContributor(menuProfile) && (
                   <div className="rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-xs leading-snug text-black/70">
                     <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-(--gold)" />
                     Contributor application under review
@@ -485,8 +484,8 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     </p>
                   </div>
                 )}
-              {menuProfile?.role === "contributor" &&
-                menuProfile?.contributor_status === "rejected" && (
+              {isContributor(menuProfile) &&
+                isRejectedContributor(menuProfile) && (
                   <Link
                     href="/contributor/apply"
                     onClick={onClose}
@@ -495,7 +494,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     Application not approved — apply again
                   </Link>
                 )}
-              {menuProfile?.role === "admin" && (
+              {isAdmin(menuProfile) && (
                 <Link
                   href="/admin"
                   onClick={onClose}

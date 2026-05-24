@@ -11,6 +11,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { Event, EventMedia, EventTag, UserRole } from "@/types/db";
 
 /**
@@ -130,7 +131,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
 
     hasRsvped = !!rsvp;
     locationSharingEnabled = profile?.location_sharing ?? false;
-    isAdmin = profile?.role === "admin";
+    isAdmin = profileIsAdmin(profile);
 
     const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
     let friendSet = new Set<string>();

@@ -169,3 +169,11 @@ For every multi-batch session the user's standing expectations are:
 This standing workflow is the canonical "quality, refining and pushing
 procedure" the user references. Follow it silently unless the user
 explicitly overrides it for a specific request.
+
+9. **Context compression after every completed to-do:** immediately after
+   marking a task complete, emit only a one-sentence summary of what was
+   done (no code echoes, no re-listing of unchanged context). Keep running
+   context usage below 50%: drop full file listings, long diffs, and
+   repeated boilerplate from replies. Reference file paths and line ranges
+   instead of quoting code back. Do not omit technical detail that the
+   user needs to act — compress framing, not substance.

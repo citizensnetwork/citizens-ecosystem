@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { isCancelledEvent, isDraftEvent, isPublishedEvent, isPrivateEvent } from "@/lib/events/capabilities";
 import type { EventCategory } from "@/types/db";
 
 type ManagedEvent = {
@@ -40,7 +41,7 @@ export function lifecycleOf(
   e: Pick<ManagedEvent, "status" | "date" | "end_time">,
   now: number,
 ): Lifecycle {
-  if (e.status === "cancelled") return "cancelled";
+  if (isCancelledEvent(e)) return "cancelled";
   const start = new Date(e.date).getTime();
   const end = e.end_time
     ? new Date(e.end_time).getTime()
@@ -105,9 +106,9 @@ export default function ManageEventsView({ isVendor, groupByLifecycle = false }:
       acc.views += e.view_count ?? 0;
       acc.rsvps += e.attendee_count ?? 0;
       acc.considers += e.consider_count ?? 0;
-      if (e.status === "published") acc.published += 1;
-      if (e.status === "draft") acc.drafts += 1;
-      if (e.status === "cancelled") acc.cancelled += 1;
+      if (isPublishedEvent(e)) acc.published += 1;
+      if (isDraftEvent(e)) acc.drafts += 1;
+      if (isCancelledEvent(e)) acc.cancelled += 1;
       const capacity = e.max_attendees;
       if (capacity != null && (e.attendee_count ?? 0) >= capacity) acc.soldOut += 1;
       return acc;
@@ -208,9 +209,9 @@ export default function ManageEventsView({ isVendor, groupByLifecycle = false }:
                     </span>
                     <span
                       className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${
-                        event.status === "published"
+                        isPublishedEvent(event)
                           ? "bg-green-100 text-green-700"
-                          : event.status === "cancelled"
+                          : isCancelledEvent(event)
                             ? "bg-red-100 text-red-700"
                             : "bg-yellow-100 text-yellow-700"
                       }`}
@@ -219,12 +220,12 @@ export default function ManageEventsView({ isVendor, groupByLifecycle = false }:
                     </span>
                     <span
                       className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${
-                        event.visibility === "private"
+                        isPrivateEvent(event)
                           ? "bg-purple-100 text-purple-700"
                           : "bg-blue-100 text-blue-700"
                       }`}
                     >
-                      {event.visibility === "private" ? "Private" : "Public"}
+                      {isPrivateEvent(event) ? "Private" : "Public"}
                     </span>
                     {isFull && (
                       <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">

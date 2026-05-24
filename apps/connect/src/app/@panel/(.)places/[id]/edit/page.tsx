@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import SidePanel from "@/components/ui/SidePanel";
 import EditPlaceForm from "@/components/places/EditPlaceForm";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { Place, Category, PlaceMedia } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export default async function InterceptedEditPlacePanel({
   }
 
   const isOwner = user.id === place.created_by;
-  const isAdmin = profileRes.data?.role === "admin";
+  const isAdmin = profileIsAdmin(profileRes.data);
 
   if (!isOwner && !isAdmin) {
     redirect(`/places/${id}`);

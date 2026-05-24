@@ -25,6 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { EventUpdate } from "@/types/db";
 
 type AuthorMap = Record<string, { full_name: string; avatar_url: string | null }>;
@@ -86,7 +87,7 @@ export default function EventUpdatesList({ eventId }: Props) {
         .maybeSingle();
       if (cancelled) return;
       const role = (profile as { role?: string } | null)?.role;
-      setViewer({ id: user.id, isAdmin: role === "admin" });
+      setViewer({ id: user.id, isAdmin: profileIsAdmin({ role }) });
     }
 
     // Resolve a single author's display info into state on demand — used

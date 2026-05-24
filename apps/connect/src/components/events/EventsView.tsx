@@ -10,6 +10,7 @@ import { isWeekendEvent } from "@/lib/weekendTag";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import EventStatusBadge from "@/components/events/EventStatusBadge";
 import { share } from "@/lib/capacitor/share";
+import { isCommunityEvent } from "@/lib/events/capabilities";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
@@ -1899,8 +1900,7 @@ export default function EventsView({
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_BADGE_CLASSES[selectedEvent.category ?? "church-services"]}`}>
                     {CATEGORY_LABELS[selectedEvent.category ?? "church-services"]}
                   </span>
-                  {selectedEvent.community_contributor &&
-                    selectedEvent.creator?.role !== "contributor" && (
+                  {isCommunityEvent(selectedEvent) && (
                     <ContributorChip variant="community" />
                   )}
                   <EventStatusBadge

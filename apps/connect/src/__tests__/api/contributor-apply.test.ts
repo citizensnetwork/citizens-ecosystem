@@ -40,9 +40,9 @@ describe("POST /api/contributor/apply", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
-    // first maybeSingle → profile.contributor_status = "approved"
+    // first maybySingle → profile.contributor_status = "approved", role = "contributor"
     mockClient._chain.maybeSingle.mockResolvedValueOnce({
-      data: { contributor_status: "approved" },
+      data: { contributor_status: "approved", role: "contributor" },
       error: null,
     });
     const res = await POST(makeReq({ display_name: "Hope Ministries" }));

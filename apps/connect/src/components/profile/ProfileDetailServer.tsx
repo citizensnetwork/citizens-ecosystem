@@ -18,6 +18,7 @@ import MutualFriends from "@/components/social/MutualFriends";
 import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
 import type { ContributorLocation, Event, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
+import { isApprovedContributor } from "@/lib/profiles/capabilities";
 
 export const getProfileById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -102,10 +103,7 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
   const displayName = profile.full_name || profile.email;
 
   // Contributor branch — richer public profile.
-  if (
-    profile.role === "contributor" &&
-    profile.contributor_status === "approved"
-  ) {
+  if (isApprovedContributor(profile)) {
     const now = new Date().toISOString();
     const allEvents = createdEvents ?? [];
     const upcoming = allEvents.filter((e) => e.date >= now);

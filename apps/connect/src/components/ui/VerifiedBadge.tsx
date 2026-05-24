@@ -4,10 +4,12 @@
 // Contributor" at a glance.
 //
 // Render conditionally — caller is responsible for deciding whether
-// the subject qualifies (role === 'contributor' && contributor_status
-// === 'approved').  This component is purely visual.
+// the subject qualifies.  Use `isVerifiedContributor` (re-exported here
+// for backward compatibility) or `isApprovedContributor` from
+// `@/lib/profiles/capabilities` as the predicate.
 
 import type { UserRole } from "@/types/db";
+import { isApprovedContributor } from "@/lib/profiles/capabilities";
 
 type Size = "sm" | "md";
 
@@ -46,16 +48,16 @@ export function VerifiedBadge({
   );
 }
 
-/** Convenience predicate — caller can pass the profile fields it already has. */
+/**
+ * Convenience predicate — delegates to `isApprovedContributor` from
+ * `@/lib/profiles/capabilities`.  Kept here for backward compatibility
+ * with existing import sites.
+ */
 export function isVerifiedContributor(
   profile: {
     role?: UserRole | string | null;
     contributor_status?: string | null;
   } | null | undefined,
 ): boolean {
-  if (!profile) return false;
-  return (
-    profile.role === "contributor" &&
-    profile.contributor_status === "approved"
-  );
+  return isApprovedContributor(profile);
 }

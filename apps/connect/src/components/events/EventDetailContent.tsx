@@ -22,6 +22,8 @@ import { isWeekendEvent } from "@/lib/weekendTag";
 import { ContributorChip } from "@/components/ui/ContributorChip";
 import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
+import { isCancelledEvent, isDraftEvent, isCommunityEvent } from "@/lib/events/capabilities";
+import { isApprovedContributor } from "@/lib/profiles/capabilities";
 import type { Event, EventMedia, EventTag } from "@/types/db";
 import type { EventOrganiser } from "@/components/events/EventDetailServer";
 import type { User } from "@supabase/supabase-js";
@@ -97,7 +99,7 @@ export default function EventDetailContent({
   const hasCoords = event.latitude != null && event.longitude != null;
   const cat = event.category ?? "church-services";
   const isWeekend = isWeekendEvent(event);
-  const isCancelled = event.status === "cancelled";
+  const isCancelled = isCancelledEvent(event);
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;
 
@@ -149,7 +151,7 @@ export default function EventDetailContent({
       )}
 
       {/* Draft banner */}
-      {event.status === "draft" && (
+      {isDraftEvent(event) && (
         <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-lg mb-3 text-center text-xs font-medium">
           Draft — only you can see this event
         </div>
@@ -181,8 +183,7 @@ export default function EventDetailContent({
             </span>
           )}
           {isWeekend && <WeekendChip />}
-          {event.community_contributor &&
-            organiser?.role !== "contributor" && (
+          {isCommunityEvent({ community_contributor: event.community_contributor, creator: organiser }) && (
               <ContributorChip variant="community" />
           )}
           {isLive && (
@@ -206,8 +207,7 @@ export default function EventDetailContent({
           Organised by{" "}
           <Link
             href={
-              organiser.role === "contributor" &&
-              organiser.contributor_status === "approved" &&
+              isApprovedContributor(organiser) &&
               organiser.contributor_slug
                 ? `/c/${organiser.contributor_slug}`
                 : `/profile/${organiser.id}`

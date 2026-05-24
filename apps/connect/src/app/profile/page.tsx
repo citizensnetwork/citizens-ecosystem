@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Event, Preferences, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
+import { isPrivateEvent } from "@/lib/events/capabilities";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
 import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
@@ -301,11 +302,11 @@ export default async function ProfilePage() {
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="font-medium text-sm">{e.title}</p>
                         <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          e.visibility === "private"
+                          isPrivateEvent(e)
                             ? "bg-purple-100 text-purple-700"
                             : "bg-green-100 text-green-700"
                         }`}>
-                          {e.visibility === "private" ? "Private" : "Public"}
+                          {isPrivateEvent(e) ? "Private" : "Public"}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500">

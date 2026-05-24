@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { isCancelledEvent } from "@/lib/events/capabilities";
 import type { EventCategory } from "@/types/db";
 
 type JoinedEvent = {
@@ -47,7 +48,7 @@ const BUCKET_ORDER: Bucket[] = ["upcoming", "past", "cancelled"];
 const LIVE_FALLBACK_MS = 2 * 60 * 60 * 1000;
 
 function bucketOf(e: JoinedEvent, now: number): Bucket {
-  if (e.status === "cancelled") return "cancelled";
+  if (isCancelledEvent(e)) return "cancelled";
   const start = new Date(e.date).getTime();
   const end = e.end_time ? new Date(e.end_time).getTime() : start + LIVE_FALLBACK_MS;
   if (now <= end) return "upcoming";
@@ -201,7 +202,7 @@ function JoinedEventRow({ event }: { event: JoinedEvent }) {
           >
             {event.rsvp_status === "attending" ? "Joined" : "Considering"}
           </span>
-          {event.status === "cancelled" && (
+          {isCancelledEvent(event) && (
             <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
               Cancelled
             </span>

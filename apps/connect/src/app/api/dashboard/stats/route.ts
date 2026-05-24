@@ -27,6 +27,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,11 +48,11 @@ export async function GET() {
     .eq("id", user.id)
     .maybeSingle();
 
-  const isAdmin = me?.role === "admin";
-  const isApprovedContributor =
-    me?.role === "contributor" && me?.contributor_status === "approved";
+  const isAdmin = profileIsAdmin(me);
+  const isApprovedContributorUser =
+    isApprovedContributor(me);
 
-  if (!isAdmin && !isApprovedContributor) {
+  if (!isAdmin && !isApprovedContributorUser) {
     return NextResponse.json(
       { error: "Dashboard is for approved contributors and admins only" },
       { status: 403 },

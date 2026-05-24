@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import SidePanel from "@/components/ui/SidePanel";
 import EditEventForm from "@/components/events/EditEventForm";
+import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { Event } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function InterceptedEditEventPanel({
     .maybeSingle();
 
   const isOwner = user.id === event.created_by;
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profileIsAdmin(profile);
 
   if (!isOwner && !isAdmin) {
     redirect(`/events/${id}`);

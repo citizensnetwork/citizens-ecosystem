@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContributorApplicationForm } from "@/components/contributor/ContributorApplicationForm";
+import { isContributor, isAdmin as profileIsAdmin, isPendingContributor } from "@/lib/profiles/capabilities";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,13 @@ export default async function ContributorApplyPage() {
     .single();
 
   // Already a contributor or admin — nothing to apply for.
-  if (profile?.role === "contributor" || profile?.role === "admin") {
+  if (isContributor(profile) || profileIsAdmin(profile)) {
     redirect("/profile");
   }
 
   // Already has a pending application — send them to their profile
   // where the banner + status are shown.
-  if (profile?.contributor_status === "pending") {
+  if (isPendingContributor(profile)) {
     redirect("/profile?application=submitted");
   }
 
