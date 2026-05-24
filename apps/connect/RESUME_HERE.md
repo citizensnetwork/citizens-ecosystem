@@ -17,7 +17,18 @@
 
 ## 2. What just shipped
 
+### Capabilities sweep — Dynamic-surfaces compliance — 2026-05-24 — `563a67d`
+
+Two new lib files created as single source of truth for all role/status/state checks:
+- **`src/lib/profiles/capabilities.ts`** — `isAdmin`, `isContributor`, `isCitizen`, `canCreateEvents`, `isApprovedContributor`, `isPendingContributor`, `isRejectedContributor`
+- **`src/lib/events/capabilities.ts`** — `isCancelledEvent`, `isDraftEvent`, `isPublishedEvent`, `isPrivateEvent`, `isCommunityEvent`, `canEditEvent`
+
+All 30+ inline string comparisons (`profile?.role === "admin"`, `event.status === "cancelled"`, etc.) replaced across 24 source files + 1 test file. Edge Runtime compatibility confirmed (capabilities only imports TS types, no Node APIs). One failing test fixed: `api/contributor/apply/route.ts` now selects `role` alongside `contributor_status` so `isApprovedContributor` has the field it needs; test mock updated.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect review applied (comments added clarifying MinProfile widening, isPending/isRejected state-machine intent, canCreateEvents role-only guard).
+
 ### Bug Batch 1 — 7 UI bugs + feature clarity system — `6b0f9f9`
+
 
 All 7 user-reported bugs fixed:
 

@@ -2,7 +2,24 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
-## Bug Batch 1 — UI fixes + feature clarity system
+## Capabilities sweep — Centralize all role/status/state checks
+
+**Decision — `src/lib/profiles/capabilities.ts` and `src/lib/events/capabilities.ts` are the single sources of truth for all role/status capability checks.**
+30+ inline string comparisons like `profile?.role === "admin"` and `event.status === "cancelled"` were scattered across 26 files. This violated the dynamic-surfaces rule (see `docs/feature-clarity/dynamic-surfaces.md`). Both lib files are now the canonical location — import from them rather than writing inline comparisons. Commit `563a67d`.
+
+**Decision — `MinProfile.role` accepts `UserRole | string | null` (not just `UserRole | null`).**
+Supabase query results whose `.role` column is typed as `string` (not the narrow `UserRole` union) would fail the type check if we restricted to `UserRole | null`. Widening to `string` avoids a cascade of cast changes across all Supabase call sites while preserving correct runtime behaviour. The comparison strings ("admin", "contributor", "citizen") are still string literals, so any typo in the capability body would still be caught by tests. A future type-tightening pass can narrow this when all Supabase selects are typed with `UserRole`.
+
+**Decision — `isPendingContributor` and `isRejectedContributor` intentionally have no role guard.**
+Pending applicants have `role='citizen'` (role is only upgraded to `'contributor'` upon admin approval). Adding a `role==='contributor'` guard would break these predicates. The state machine is: apply → `citizen + pending`; approve → `contributor + approved`; reject → `citizen + rejected`.
+
+**Decision — `canCreateEvents` is role-only (not approval-status-based).**
+`role='contributor'` is only assigned upon admin approval. A pending applicant still has `role='citizen'` and therefore `canCreateEvents` returns false for them. The role check is equivalent to "approved contributor or admin" — no separate approval-status guard is needed.
+
+**Decision — `isVerifiedContributor` (VerifiedBadge) kept as backward-compat alias.**
+Multiple test files and component callers import `isVerifiedContributor` from `VerifiedBadge`. Rather than migrating all call sites in this batch, the export is kept but delegates to `isApprovedContributor`. A `TODO` comment marks it for future removal once callers are migrated.
+
+
 
 **Decision — MessageButton removed from ContributorPublicProfile until messaging is designed.**
 The transport layer exists (conversations table, API routes, ConversationList, ChatView) but the product scope is unclear: who can message whom, message requests vs. direct delivery, group messaging, retention, notifications. Rather than ship a half-baked feature, the MessageButton CTA was removed. A full questioning document lives at `docs/feature-clarity/messaging.md`. Re-implement after all 15 questions are answered.

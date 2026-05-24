@@ -9,6 +9,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 
 | Batch | Scope | Status | Notes |
 |-------|-------|--------|-------|
+| capabilities-sweep | Centralize all role/status/state checks — 2 new lib files, 26 modified, 30+ inline strings replaced | **Shipped** `563a67d` | tsc 0 errors, vitest 714/714, lint clean. |
 | place-panel-fix | Place detail side-panel + image upload RLS + cover-image remove | **Shipped** `aba287a` | PlaceDetailServer RSC; @panel intercepted route; fix_place_images_rls migrations (094+095); is_admin() on places UPDATE/DELETE; removeImage state; label rename. 714 tests. |
 | bug-batch-1 | 7 UI bugs + feature clarity MDs | **Shipped** `6b0f9f9` | RSVP toggle fix; contributor profile panel (min-h-screen); social media brand icons; MessageButton deferred (clarity MD); community chip suppression on contributor events (3 surfaces); XSS-safe URL validation in profile API; clickable contributor kind label → ?q= search. 714 tests. Feature clarity MDs: messaging, friends, reporting, search-and-discovery. |
 | polish-2 | Polish Queue rows 4–5 (places-browse-and-follow + notifications): SQL aggregate RPC; row 5(a) re-deferred | **Shipped** | Migration 094 `get_user_places_with_stats` (file-only, security invoker + `auth.uid()`). `/api/manage/places` refactored. 714 tests. |
