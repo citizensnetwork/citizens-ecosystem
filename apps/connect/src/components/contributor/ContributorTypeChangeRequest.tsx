@@ -72,10 +72,11 @@ export default function ContributorTypeChangeRequest({ currentKind }: Props) {
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-black/70">
+          <label htmlFor="requested-kind" className="block text-sm font-medium text-black/70">
             Request type change to
           </label>
           <select
+            id="requested-kind"
             value={requestedKind}
             onChange={(e) =>
               setRequestedKind(e.target.value as ContributorKind | "")
@@ -91,11 +92,12 @@ export default function ContributorTypeChangeRequest({ currentKind }: Props) {
           </select>
         </div>
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-black/70">
+          <label htmlFor="type-change-reason" className="block text-sm font-medium text-black/70">
             Reason{" "}
             <span className="font-normal text-black/40">(optional)</span>
           </label>
           <textarea
+            id="type-change-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={MAX_REASON}
@@ -109,6 +111,7 @@ export default function ContributorTypeChangeRequest({ currentKind }: Props) {
         </div>
         {message && (
           <p
+            role="alert"
             className={`text-sm ${
               message.type === "error" ? "text-red-600" : "text-green-700"
             }`}

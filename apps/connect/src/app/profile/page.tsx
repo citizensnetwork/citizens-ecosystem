@@ -341,7 +341,7 @@ export default async function ProfilePage() {
       </section>
 
       {/* ── Contributor Type Change Request (contributors only) ─── */}
-      {isVendor && (
+      {profile?.role === "contributor" && (
         <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
           <ContributorTypeChangeRequest
             currentKind={typedProfile.contributor_kind ?? null}

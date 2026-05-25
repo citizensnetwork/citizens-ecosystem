@@ -178,9 +178,9 @@ export default function ProfileEditor({ profile, email }: Props) {
           <p className="text-sm text-black/50">
             Click the image to upload a new photo
           </p>
-          <p className="text-xs text-black/30">JPEG, PNG, WebP, or GIF · Max 2 MB</p>
+          <p className="text-xs text-black/30">JPEG, PNG, WebP, or GIF · Max 15 MB</p>
           {avatarError && (
-            <p className="mt-1 text-xs text-red-600">{avatarError}</p>
+            <p role="alert" className="mt-1 text-xs text-red-600">{avatarError}</p>
           )}
         </div>
       </section>
