@@ -16,7 +16,7 @@
 
 ## Browser Supabase client — module-level singleton
 
-**Decision — `createClient()` returns a cached `createBrowserClient(...)` instance keyed on the module.** Each call previously instantiated a fresh client with its own auth listener; mounting N components meant N listeners on the same browser session. The singleton is safe because `NEXT_PUBLIC_*` env vars are inlined at build time so the placeholder fallback is only used during prerender. `__resetClientForTests()` is gated by `process.env.NODE_ENV === "test"` so it is a no-op in production bundles. Commit PENDING_SHA.
+**Decision — `createClient()` returns a cached `createBrowserClient(...)` instance keyed on the module.** Each call previously instantiated a fresh client with its own auth listener; mounting N components meant N listeners on the same browser session. The singleton is safe because `NEXT_PUBLIC_*` env vars are inlined at build time so the placeholder fallback is only used during prerender. `__resetClientForTests()` is gated by `process.env.NODE_ENV === "test"` so it is a no-op in production bundles. Commit `3f91ec2`.
 
 ## MapLibre CSS — root layout, not per-component
 

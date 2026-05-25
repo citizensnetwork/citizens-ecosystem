@@ -17,6 +17,30 @@
 
 ## 2. What just shipped
 
+### Batch 16b — Dashboard access UX + perf RPC + client singleton — `3f91ec2`
+
+**Stage A.1 — admin dashboard access on contributor public profile:**
+- `DashboardAccessButton` (states: `owner` / `admin-granted` / `admin-no-grant`) with white-label "Request access" / "Request pending" overlays. **All gating data computed server-side** in `ProfileDetailServer` (queries `contributor_access_requests` for `admin_id = auth.uid()` with non-expired, non-revoked pending/approved rows) and passed as props — component never trusts client role.
+- POST `/api/contributor/[handle]/access-requests` now maps `23505` unique-violation → existing `409` response.
+- SR live region announces "Submitting dashboard access request" during the POST.
+
+**Stage B.1 — contributor theme tint extension:**
+- `ContributorPublicProfile` applies `data-contributor-ui` on the outer wrapper when the feature flag is on. Gold/paper tint now extends beyond `/c/[slug]/dashboard` to every contributor public profile.
+
+**Perf P0 — events page review aggregation in SQL:**
+- Migration **101** `get_place_review_stats(p_window_start timestamptz)` — `SECURITY INVOKER`, `search_path = public, pg_temp`, grants execute to `anon, authenticated`. Returns one pre-aggregated row per place. `src/app/events/page.tsx` swaps a 5,000-row capped SELECT + JS reduce for the RPC. Row shape hoisted to top-level `ReviewStatRow` type.
+
+**Race-fix follow-up:**
+- Migration **102** `contributor_access_requests_pending_unique` partial unique index on `(contributor_id, admin_id) WHERE status='pending' AND revoked_at IS NULL`. Collapses concurrent-submit race into a DB-level uniqueness violation the API translates to `409`.
+
+**Cross-cutting cleanup:**
+- `src/lib/supabase/client.ts` — `createClient()` now returns a module-level singleton (one auth listener per browser session instead of one per mount). `__resetClientForTests()` gated by `NODE_ENV === "test"`.
+- `src/app/layout.tsx` imports `maplibre-gl/dist/maplibre-gl.css` once at the root; removed duplicates from `EventMap.tsx` + `MapBackdrop.tsx`.
+
+**Planning:** `docs/plans/contributor-dashboard.md` — locked v2 Q&A (A1–A66) + Stage A–L plan.
+
+**Quality gate:** tsc 0 · vitest **714 / 714** (143.93s) · lint clean · Architect Should-fix (RLS read parity verified, 23505 catch, SR live region, hoisted RPC row type, test-only client reset) all applied inline · vibe-security scan: no findings · advisors **85 WARN** (identical breakdown to baseline — no new warnings from migrations 101 + 102).
+
 ### Batch 16 — Contributor Dashboard Foundation — `f2d7889`
 
 12 new tables, full dashboard UI, global suggestion button.
@@ -273,6 +297,25 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 ---
 
 ## 4. Next queued (priority order)
+
+### Contributor Dashboard — locked Stages C → L
+
+Plan: [docs/plans/contributor-dashboard.md](docs/plans/contributor-dashboard.md) (v2 + locked plan).
+
+- **Stage C — Cover photos + carousel.** 5-slot uploader (PNG/JPG, optional captions), 16:9 auto-rotating public carousel. `profiles.cover_photo_urls jsonb` exists. SVG/GIF: decide sanitisation vs reject; record in DECISIONS.md.
+- **Stage D — Specialised services chip input.** Predefined + custom, max 10, strict `[A-Za-z0-9 ._-]{1,40}` regex.
+- **Stage E — Broadcast fan-out.** Place→followers, event→RSVPs only; in-app + push + banner.
+- **Stage F — Volunteer openings toggle on places.** New migration (events already have it via 098) + public "Volunteer" pill + apply form.
+- **Stage G — Team invite popup.** Three search bars (name / user_id / email) + atomic owner-transfer RPC.
+- **Stage H — Analytics time-window selector.** 7/14/30/60/90 d, 6 mo, 1 yr + CSV/XLSX export.
+- **Stage I — Planning task/idea cards.** Top-right completion / delete marker + Public toggle.
+- **Stage J — Suggestion admin inbox.** XLSX export + 10/day rate limit + status updates to submitter.
+- **Stage K — Slug change warning.** 1/month rule + admin override.
+- **Stage L — Top-10 search queries this month.** Anonymised + keyword autocomplete feed.
+
+### Pre-Stage C cleanup (cheap)
+
+- Apply Architect Nice-to-haves: `reviews (place_id, created_at desc)` covering index in a future migration; tighten `setPending(body.id ?? null)` (API already guarantees id).
 
 ### URGENT — before June 9 WCI presentation
 
