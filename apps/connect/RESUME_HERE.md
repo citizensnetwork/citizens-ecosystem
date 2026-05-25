@@ -17,7 +17,7 @@
 
 ## 2. What just shipped
 
-### Batch 16 — Contributor Dashboard Foundation — pending push
+### Batch 16 — Contributor Dashboard Foundation — `f2d7889`
 
 12 new tables, full dashboard UI, global suggestion button.
 
