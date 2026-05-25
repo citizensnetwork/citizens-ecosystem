@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
-import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { validateImageFile, safeImageExtension, sanitizeSocialUrl } from "@/lib/validation";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
@@ -71,6 +71,23 @@ export default function EditEventForm({ event }: Props) {
   );
   const [tags, setTags] = useState<EventTag[]>([]);
   const [initialTagIds, setInitialTagIds] = useState<Set<string>>(new Set());
+  // Social media
+  const [instagramUrl, setInstagramUrl] = useState(event.instagram_url ?? "");
+  const [facebookUrl, setFacebookUrl] = useState(event.facebook_url ?? "");
+  const [tiktokUrl, setTiktokUrl] = useState(event.tiktok_url ?? "");
+  const [youtubeUrl, setYoutubeUrl] = useState(event.youtube_url ?? "");
+  // Volunteer openings
+  const [volunteerOpenings, setVolunteerOpenings] = useState(event.volunteer_openings ?? false);
+  // Recurring
+  const [isRecurring, setIsRecurring] = useState(event.is_recurring ?? false);
+  const [recurringFrequency, setRecurringFrequency] = useState<"daily" | "weekly" | "monthly" | "yearly">(
+    event.recurring_pattern?.frequency ?? "weekly"
+  );
+  const [recurringDays, setRecurringDays] = useState<string[]>(event.recurring_pattern?.days_of_week ?? []);
+  const [recurringEndDate, setRecurringEndDate] = useState(event.recurring_pattern?.end_date ?? "");
+  const [recurringCount, setRecurringCount] = useState(
+    event.recurring_pattern?.count != null ? String(event.recurring_pattern.count) : ""
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -225,6 +242,20 @@ export default function EditEventForm({ event }: Props) {
         latitude: coords?.[0] ?? null,
         longitude: coords?.[1] ?? null,
         search_profile: searchProfile ?? null,
+        instagram_url: sanitizeSocialUrl(instagramUrl),
+        facebook_url: sanitizeSocialUrl(facebookUrl),
+        tiktok_url: sanitizeSocialUrl(tiktokUrl),
+        youtube_url: sanitizeSocialUrl(youtubeUrl),
+        volunteer_openings: volunteerOpenings,
+        is_recurring: isRecurring,
+        recurring_pattern: isRecurring
+          ? {
+              frequency: recurringFrequency,
+              ...(recurringDays.length > 0 ? { days_of_week: recurringDays } : {}),
+              ...(recurringEndDate ? { end_date: recurringEndDate } : {}),
+              ...(recurringCount ? (() => { const n = parseInt(recurringCount, 10); return Number.isFinite(n) ? { count: n } : {}; })() : {}),
+            }
+          : null,
       })
       .eq("id", event.id);
 
@@ -509,6 +540,100 @@ export default function EditEventForm({ event }: Props) {
               <option value="public">Everyone sees names</option>
               <option value="count_only">Count only</option>
             </select>
+          </div>
+        </div>
+
+        {/* Volunteer openings */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            role="switch"
+            aria-label="Looking for volunteers"
+            aria-checked={volunteerOpenings}
+            tabIndex={0}
+            onClick={() => setVolunteerOpenings((v) => !v)}
+            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setVolunteerOpenings((v) => !v); } }}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-(--gold) ${volunteerOpenings ? "bg-(--gold)" : "bg-black/15"}`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${volunteerOpenings ? "translate-x-4.5" : "translate-x-0.5"}`} />
+          </div>
+          <span className="text-sm font-medium">Looking for volunteers</span>
+        </label>
+
+        {/* Recurring */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div
+              role="switch"
+              aria-label="Recurring event"
+              aria-checked={isRecurring}
+              tabIndex={0}
+              onClick={() => setIsRecurring((v) => !v)}
+              onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setIsRecurring((v) => !v); } }}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-(--gold) ${isRecurring ? "bg-(--gold)" : "bg-black/15"}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${isRecurring ? "translate-x-4.5" : "translate-x-0.5"}`} />
+            </div>
+            <span className="text-sm font-medium">Recurring event</span>
+          </label>
+          {isRecurring && (
+            <div className="rounded-xl border border-black/10 bg-black/2 p-3 space-y-3">
+              <div>
+                <label htmlFor="editRecurringFreq" className="block text-xs font-medium text-black/60 mb-1">Frequency</label>
+                <select id="editRecurringFreq" value={recurringFrequency} onChange={(e) => setRecurringFrequency(e.target.value as typeof recurringFrequency)} className="w-full border rounded-md px-3 py-2 text-sm">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              {recurringFrequency === "weekly" && (
+                <div>
+                  <p className="text-xs font-medium text-black/60 mb-1">Days of week</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((day) => {
+                      const val = day.toLowerCase();
+                      const active = recurringDays.includes(val);
+                      return (
+                        <button key={day} type="button" onClick={() => setRecurringDays((prev) => active ? prev.filter((d) => d !== val) : [...prev, val])} className={`rounded-full px-3 py-1 text-xs font-medium transition ${active ? "bg-(--gold) text-black" : "bg-black/5 text-black/60 hover:bg-black/10"}`}>{day}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="editRecurringEnd" className="block text-xs font-medium text-black/60 mb-1">End date</label>
+                  <input id="editRecurringEnd" type="date" value={recurringEndDate} onChange={(e) => setRecurringEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label htmlFor="editRecurringCount" className="block text-xs font-medium text-black/60 mb-1">Occurrences</label>
+                  <input id="editRecurringCount" type="number" min="2" max="365" value={recurringCount} onChange={(e) => setRecurringCount(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 12" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Social media */}
+      <div className="border-t pt-4 mt-4 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Social Media</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="editInstagram" className="block text-xs font-medium text-black/60 mb-1">Instagram</label>
+            <input id="editInstagram" type="text" value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="@handle or URL" maxLength={300} />
+          </div>
+          <div>
+            <label htmlFor="editFacebook" className="block text-xs font-medium text-black/60 mb-1">Facebook</label>
+            <input id="editFacebook" type="text" value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="https://facebook.com/…" maxLength={300} />
+          </div>
+          <div>
+            <label htmlFor="editTiktok" className="block text-xs font-medium text-black/60 mb-1">TikTok</label>
+            <input id="editTiktok" type="text" value={tiktokUrl} onChange={(e) => setTiktokUrl(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="@handle or URL" maxLength={300} />
+          </div>
+          <div>
+            <label htmlFor="editYoutube" className="block text-xs font-medium text-black/60 mb-1">YouTube</label>
+            <input id="editYoutube" type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="https://youtube.com/…" maxLength={300} />
           </div>
         </div>
       </div>

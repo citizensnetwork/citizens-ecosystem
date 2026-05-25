@@ -99,12 +99,27 @@ create table if not exists public.events (
   latitude double precision,
   longitude double precision,
   search_profile jsonb,
+  instagram_url text,
+  facebook_url text,
+  tiktok_url text,
+  youtube_url text,
+  volunteer_openings boolean not null default false,
+  is_recurring boolean not null default false,
+  recurring_pattern jsonb,
   created_by uuid references public.profiles(id) on delete cascade not null,
   created_at timestamptz not null default now()
 );
 
 -- Ensure column exists for pre-existing databases (see migration 032).
 alter table public.events add column if not exists search_profile jsonb;
+-- Social media + volunteer + recurring (migration 098).
+alter table public.events add column if not exists instagram_url text;
+alter table public.events add column if not exists facebook_url text;
+alter table public.events add column if not exists tiktok_url text;
+alter table public.events add column if not exists youtube_url text;
+alter table public.events add column if not exists volunteer_openings boolean not null default false;
+alter table public.events add column if not exists is_recurring boolean not null default false;
+alter table public.events add column if not exists recurring_pattern jsonb;
 
 alter table public.events enable row level security;
 
@@ -136,7 +151,9 @@ end $$;
 do $$ begin
   if not exists (select 1 from pg_policies where policyname = 'Owners or admins can update events' and tablename = 'events') then
     create policy "Owners or admins can update events" on public.events
-      for update using (auth.uid() = created_by or public.is_admin());
+      for update
+      using  (auth.uid() = created_by or public.is_admin())
+      with check (auth.uid() = created_by or public.is_admin());
   end if;
 end $$;
 
@@ -2239,3 +2256,51 @@ $$;
 revoke all on function public.get_user_places_with_stats() from public;
 revoke all on function public.get_user_places_with_stats() from anon;
 grant execute on function public.get_user_places_with_stats() to authenticated;
+
+-- ══════════════════════════════════════════════
+-- Storage: event-images bucket policies
+-- (DROP + CREATE so re-runs always land on the correct definition)
+-- ══════════════════════════════════════════════
+
+-- Upload: owner's own folder OR admin.
+DROP POLICY IF EXISTS "Event images upload own" ON storage.objects;
+CREATE POLICY "Event images upload own" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'event-images'
+    AND (
+      (storage.foldername(name))[1] = auth.uid()::text
+      OR public.is_admin()
+    )
+  );
+
+-- Update / upsert: same guard as insert.
+DROP POLICY IF EXISTS "Event images update own" ON storage.objects;
+CREATE POLICY "Event images update own" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'event-images'
+    AND (
+      (storage.foldername(name))[1] = auth.uid()::text
+      OR public.is_admin()
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'event-images'
+    AND (
+      (storage.foldername(name))[1] = auth.uid()::text
+      OR public.is_admin()
+    )
+  );
+
+-- Delete: owner or admin.
+DROP POLICY IF EXISTS "Event images delete own" ON storage.objects;
+CREATE POLICY "Event images delete own" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'event-images'
+    AND (
+      (storage.foldername(name))[1] = auth.uid()::text
+      OR public.is_admin()
+    )
+  );

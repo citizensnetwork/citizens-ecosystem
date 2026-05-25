@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import OAuthButtons from "./OAuthButtons";
-import PhoneAuthForm from "./PhoneAuthForm";
 import {
   Alert,
   Badge,
@@ -14,14 +13,11 @@ import {
   Label,
 } from "@/components/ui/shadcn";
 
-type AuthMode = "email" | "phone";
-
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("email");
   const router = useRouter();
   const searchParams = useSearchParams();
   const needsConfirmation = searchParams.get("confirmed") === "false";
@@ -101,88 +97,48 @@ export default function LoginForm() {
         <div className="h-px flex-1 bg-[var(--border)]" />
       </div>
 
-      {/* Auth mode toggle.  Two buttons sharing a rounded-xl pill container —
-          kept as a bespoke segment because shadcn Tabs would introduce a
-          heavier Radix pattern than warranted here. */}
-      <div className="flex overflow-hidden rounded-xl border border-black/10">
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMode("email");
-            setError("");
-          }}
-          className={`flex-1 py-2 text-xs font-semibold transition ${
-            authMode === "email"
-              ? "bg-black text-white"
-              : "bg-white text-black/60 hover:bg-black/5"
-          }`}
-        >
-          Email
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMode("phone");
-            setError("");
-          }}
-          className={`flex-1 py-2 text-xs font-semibold transition ${
-            authMode === "phone"
-              ? "bg-black text-white"
-              : "bg-white text-black/60 hover:bg-black/5"
-          }`}
-        >
-          Phone
-        </button>
+      <div className="space-y-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
       </div>
 
-      {authMode === "phone" ? (
-        <PhoneAuthForm />
-      ) : (
-        <>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@example.com"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="••••••••"
-            />
-            <div className="flex justify-end pt-0.5">
-              <Link
-                href="/login/forgot-password"
-                className="text-xs text-[var(--foreground-soft)] transition hover:text-black"
-              >
-                Forgot password?
-              </Link>
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            variant="gold"
-            size="lg"
-            disabled={loading}
-            className="w-full"
+      <div className="space-y-1.5">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={6}
+          placeholder="••••••••"
+        />
+        <div className="flex justify-end pt-0.5">
+          <Link
+            href="/login/forgot-password"
+            className="text-xs text-[var(--foreground-soft)] transition hover:text-black"
           >
-            {loading ? "Logging in..." : "Log In"}
-          </Button>
-        </>
-      )}
+            Forgot password?
+          </Link>
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        variant="gold"
+        size="lg"
+        disabled={loading}
+        className="w-full"
+      >
+        {loading ? "Logging in..." : "Log In"}
+      </Button>
 
       <p className="text-center text-sm text-[var(--foreground-soft)]">
         Don&apos;t have an account?{" "}

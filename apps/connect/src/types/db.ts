@@ -71,6 +71,22 @@ export type Event = {
   community_contributor?: boolean;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
+  /** Social media handles / URLs for the event or organiser. */
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  tiktok_url?: string | null;
+  youtube_url?: string | null;
+  /** True when the event is looking for volunteers. */
+  volunteer_openings?: boolean;
+  /** True when this event recurs on a defined schedule. */
+  is_recurring?: boolean;
+  /** Recurrence schedule: { frequency, days_of_week?, end_date?, count? }. */
+  recurring_pattern?: {
+    frequency: "daily" | "weekly" | "monthly" | "yearly";
+    days_of_week?: string[];
+    end_date?: string;
+    count?: number;
+  } | null;
   /** Optional embedded creator profile — populated by `select("*, creator:profiles!events_created_by_fkey(avatar_url, role, contributor_status)")`.
    *  Used by the map to auto-render an organiser's avatar as the marker when
    *  `marker_type === "category"`, and by the verified-contributor crown. */

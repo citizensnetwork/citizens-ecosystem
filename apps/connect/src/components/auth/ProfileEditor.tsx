@@ -2,15 +2,12 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
 import {
   validateImageFile,
-  safeImageExtension,
 } from "@/lib/validation";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
+import { createClient } from "@/lib/supabase/client";
 import {
-  CONTRIBUTOR_KIND_LABELS,
-  type ContributorKind,
   type Profile,
 } from "@/types/db";
 
@@ -21,8 +18,6 @@ type Props = {
 
 export default function ProfileEditor({ profile, email }: Props) {
   const supabase = useRef(createClient()).current;
-
-  // ── Avatar state ──────────────────────────
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [uploading, setUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -33,16 +28,6 @@ export default function ProfileEditor({ profile, email }: Props) {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSuccess, setNameSuccess] = useState(false);
   const [nameError, setNameError] = useState("");
-
-  // ── Contributor kind state ─────────────────
-  const [contributorKind, setContributorKind] = useState<ContributorKind | null>(
-    profile.contributor_kind
-  );
-  const [kindSaving, setKindSaving] = useState(false);
-  const [kindMessage, setKindMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
 
   // ── Password state ────────────────────────
   const [newPassword, setNewPassword] = useState("");
@@ -68,33 +53,23 @@ export default function ProfileEditor({ profile, email }: Props) {
     setUploading(true);
     setAvatarError("");
     try {
-      // Path MUST start with `${profile.id}/` to satisfy storage RLS:
-      //   (storage.foldername(name))[1] = auth.uid()::text
-      // See supabase/migrations/031_event_images_rls_and_care_category.sql
-      const ext = safeImageExtension(file.name);
-      const path = `${profile.id}/avatars/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("event-images")
-        .upload(path, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("event-images").getPublicUrl(path);
-
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", profile.id);
-
-      if (updateError) throw updateError;
-
-      setAvatarUrl(publicUrl);
+      // Upload via server-side API route which uses a fresh admin storage
+      // client — avoids stale-JWT RLS failures from the browser client.
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/avatar", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Upload failed"
+        );
+      }
+      setAvatarUrl(data.avatar_url);
     } catch (err) {
       console.error("Avatar upload failed:", err);
-      setAvatarError("Failed to upload avatar. Please try again.");
+      setAvatarError(
+        err instanceof Error ? err.message : "Failed to upload avatar. Please try again."
+      );
     } finally {
       setUploading(false);
     }
@@ -162,29 +137,6 @@ export default function ProfileEditor({ profile, email }: Props) {
       });
     } finally {
       setPwSaving(false);
-    }
-  }
-
-  async function handleContributorKindSave(nextKind: ContributorKind) {
-    if (profile.role !== "contributor") return;
-    setKindSaving(true);
-    setKindMessage(null);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ contributor_kind: nextKind })
-        .eq("id", profile.id);
-      if (error) throw error;
-      setContributorKind(nextKind);
-      setKindMessage({ type: "success", text: "Contributor type updated." });
-    } catch (err) {
-      console.error("Contributor kind update failed:", err);
-      setKindMessage({
-        type: "error",
-        text: "Could not update contributor type. Please try again.",
-      });
-    } finally {
-      setKindSaving(false);
     }
   }
 
@@ -269,45 +221,6 @@ export default function ProfileEditor({ profile, email }: Props) {
           {email}
         </p>
       </section>
-
-      {profile.role === "contributor" && (
-        <section>
-          <h3 className="mb-2 text-sm font-medium text-black/70">
-            Contributor Type
-          </h3>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {(
-              Object.entries(CONTRIBUTOR_KIND_LABELS) as [
-                ContributorKind,
-                string,
-              ][]
-            ).map(([kind, label]) => (
-              <button
-                key={kind}
-                type="button"
-                disabled={kindSaving || contributorKind === kind}
-                onClick={() => handleContributorKindSave(kind)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                  contributorKind === kind
-                    ? "border-black bg-black text-white"
-                    : "border-black/12 bg-white text-black/80 hover:border-black/30"
-                } disabled:cursor-default disabled:opacity-75`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {kindMessage && (
-            <p
-              className={`mt-2 text-xs ${
-                kindMessage.type === "error" ? "text-red-600" : "text-green-700"
-              }`}
-            >
-              {kindMessage.text}
-            </p>
-          )}
-        </section>
-      )}
 
       {/* ── Password change ────────────────────── */}
       <section>

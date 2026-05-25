@@ -7,8 +7,8 @@ import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import { isPrivateEvent } from "@/lib/events/capabilities";
 import ProfileEditor from "@/components/auth/ProfileEditor";
 import SocialLinksEditor from "@/components/auth/SocialLinksEditor";
-import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
 import LinkedAccounts from "@/components/auth/LinkedAccounts";
+import ContributorTypeChangeRequest from "@/components/contributor/ContributorTypeChangeRequest";
 import DeleteAccountButton from "@/components/auth/DeleteAccountButton";
 import ProfileLogOutButton from "@/components/auth/ProfileLogOutButton";
 import PersonalizationPanel from "@/components/profile/PersonalizationPanel";
@@ -112,67 +112,74 @@ export default async function ProfilePage() {
       <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
         <div className="glass-panel w-full max-w-2xl px-6 py-8 sm:px-8">
       {/* Profile header */}
-      <div className="flex items-center gap-4 mb-8">
-        {typedProfile.avatar_url ? (
-          <Image
-            src={typedProfile.avatar_url}
-            alt="Profile photo"
-            width={64}
-            height={64}
-            className="w-16 h-16 rounded-full object-cover ring-2 ring-black/10"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-2xl font-bold uppercase">
-            {(displayName as string)?.[0] ?? "?"}
-          </div>
-        )}
-        <div>
-          <h1 className="text-2xl font-bold">{displayName}</h1>
-          <p className="text-sm text-gray-500">{user.email}</p>
-          <span
-            className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${
-              isVendor
-                ? "bg-(--gold-soft) text-black"
-                : "bg-black/5 text-black/70"
-            }`}
-          >
-            {getRoleDisplayLabel(
-              (profile?.role as UserRole) ?? "citizen",
-              profile?.contributor_kind ?? null
-            )}
-          </span>
-          <div className="mt-2 flex gap-4 text-sm text-black/70">
-            <Link
-              href={`/profile/${user.id}/followers`}
-              className="hover:underline focus:underline focus:outline-none"
+      <div className="flex items-start justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          {typedProfile.avatar_url ? (
+            <Image
+              src={typedProfile.avatar_url}
+              alt="Profile photo"
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-full object-cover ring-2 ring-black/10"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-(--gold-soft) text-black flex items-center justify-center text-2xl font-bold uppercase">
+              {(displayName as string)?.[0] ?? "?"}
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold">{displayName}</h1>
+            <p className="text-sm text-gray-500">{user.email}</p>
+            <span
+              className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${
+                isVendor
+                  ? "bg-(--gold-soft) text-black"
+                  : "bg-black/5 text-black/70"
+              }`}
             >
-              <strong className="text-black">{followersCount ?? 0}</strong>{" "}
-              {followersCount === 1 ? "follower" : "followers"}
-            </Link>
-            <Link
-              href={`/profile/${user.id}/following`}
-              className="hover:underline focus:underline focus:outline-none"
-            >
-              <strong className="text-black">{followingCount ?? 0}</strong>{" "}
-              following
-            </Link>
-            {(friendsCount ?? 0) > 0 && (
-              <span>
-                <strong className="text-black">{friendsCount}</strong>{" "}
-                {friendsCount === 1 ? "friend" : "friends"}
-              </span>
-            )}
+              {getRoleDisplayLabel(
+                (profile?.role as UserRole) ?? "citizen",
+                profile?.contributor_kind ?? null
+              )}
+            </span>
+            <div className="mt-2 flex gap-4 text-sm text-black/70">
+              <Link
+                href={`/profile/${user.id}/followers`}
+                className="hover:underline focus:underline focus:outline-none"
+              >
+                <strong className="text-black">{followersCount ?? 0}</strong>{" "}
+                {followersCount === 1 ? "follower" : "followers"}
+              </Link>
+              <Link
+                href={`/profile/${user.id}/following`}
+                className="hover:underline focus:underline focus:outline-none"
+              >
+                <strong className="text-black">{followingCount ?? 0}</strong>{" "}
+                following
+              </Link>
+              {(friendsCount ?? 0) > 0 && (
+                <span>
+                  <strong className="text-black">{friendsCount}</strong>{" "}
+                  {friendsCount === 1 ? "friend" : "friends"}
+                </span>
+              )}
+            </div>
           </div>
         </div>
+        {isVendor && (
+          <Link
+            href="/profile/contributor/dashboard"
+            className="shrink-0 rounded-lg bg-(--gold) px-4 py-2 text-sm font-semibold text-black transition hover:brightness-95"
+          >
+            Open Dashboard
+          </Link>
+        )}
       </div>
 
       {/* ── Profile Editor (avatar, name, password) ─── */}
       <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
         <h2 className="text-lg font-semibold mb-4">Account Settings</h2>
         <ProfileEditor profile={typedProfile} email={user.email ?? ""} />
-        <div className="mt-6 pt-6 border-t border-black/5">
-          <TwoFactorSetup />
-        </div>
         <div className="mt-6 pt-6 border-t border-black/5">
           <LinkedAccounts />
         </div>
@@ -332,6 +339,15 @@ export default async function ProfilePage() {
       <section className="mb-8">
         <ProfileLogOutButton />
       </section>
+
+      {/* ── Contributor Type Change Request (contributors only) ─── */}
+      {isVendor && (
+        <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
+          <ContributorTypeChangeRequest
+            currentKind={typedProfile.contributor_kind ?? null}
+          />
+        </section>
+      )}
 
       {/* ── Danger Zone (always last) ─── */}
       <section className="mb-8 rounded-xl border border-red-100 bg-white/50 p-5">

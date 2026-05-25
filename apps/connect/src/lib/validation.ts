@@ -149,6 +149,32 @@ export function isValidTagLabel(value: unknown): value is string {
   );
 }
 
+/* ────────────────────────────────────────────────────────── */
+/* Social media URL sanitisation (migration 098)             */
+/* ────────────────────────────────────────────────────────── */
+
+/** Dangerous URI schemes that must never be stored in link columns.
+ *  Blocks javascript:, data:, vbscript:, and blob: execution vectors. */
+const DANGEROUS_URL_RE = /^\s*(javascript|data|vbscript|blob)\s*:/i;
+
+/**
+ * Sanitise a social media URL or handle before persisting.
+ *
+ * Accepts:
+ *  - Empty string → null (field not filled in)
+ *  - @handle → stored as plain text (no href rendering concern)
+ *  - https://… or http://… → returned as-is
+ *
+ * Rejects (returns null, never persisted):
+ *  - javascript:, data:, vbscript:, blob: schemes
+ */
+export function sanitizeSocialUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (DANGEROUS_URL_RE.test(trimmed)) return null;
+  return trimmed;
+}
+
 /** Validate a tag slug (already normalised). */
 export function isValidTagSlug(value: unknown): value is string {
   return typeof value === "string" && TAG_SLUG_RE.test(value);

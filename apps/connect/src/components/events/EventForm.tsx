@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
-import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { validateImageFile, safeImageExtension, sanitizeSocialUrl } from "@/lib/validation";
 import { compressImageIfNeeded, SKIP_IF_SMALLER_THAN } from "@/lib/imageCompression";
 import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
@@ -72,6 +72,22 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
 
+  // Social media handles
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [tiktokUrl, setTiktokUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+
+  // Volunteer openings
+  const [volunteerOpenings, setVolunteerOpenings] = useState(false);
+
+  // Recurring event
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+  const [recurringDays, setRecurringDays] = useState<string[]>([]);
+  const [recurringEndDate, setRecurringEndDate] = useState("");
+  const [recurringCount, setRecurringCount] = useState("");
+
   // Vendor-only: place booking
   const [bookAtPlace, setBookAtPlace] = useState(false);
   const [addNewPlace, setAddNewPlace] = useState(false);
@@ -111,8 +127,9 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
   // Track whether form has been touched
   const isDirty = useCallback(() => {
     return !!(title || description || date || location || imageFile || coords ||
-      placeName || placeDescription || placeAddress);
-  }, [title, description, date, location, imageFile, coords, placeName, placeDescription, placeAddress]);
+      placeName || placeDescription || placeAddress || instagramUrl || facebookUrl ||
+      tiktokUrl || youtubeUrl || volunteerOpenings || isRecurring);
+  }, [title, description, date, location, imageFile, coords, placeName, placeDescription, placeAddress, instagramUrl, facebookUrl, tiktokUrl, youtubeUrl, volunteerOpenings, isRecurring]);
 
   // Unsaved changes guard
   useEffect(() => {
@@ -333,6 +350,20 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       longitude: coords?.[1] ?? null,
       search_profile:
         searchProfile ?? deriveSearchProfile(title, description, location) ?? null,
+      instagram_url: sanitizeSocialUrl(instagramUrl),
+      facebook_url: sanitizeSocialUrl(facebookUrl),
+      tiktok_url: sanitizeSocialUrl(tiktokUrl),
+      youtube_url: sanitizeSocialUrl(youtubeUrl),
+      volunteer_openings: volunteerOpenings,
+      is_recurring: isRecurring,
+      recurring_pattern: isRecurring
+        ? {
+            frequency: recurringFrequency,
+            ...(recurringDays.length > 0 ? { days_of_week: recurringDays } : {}),
+            ...(recurringEndDate ? { end_date: recurringEndDate } : {}),
+            ...(recurringCount ? (() => { const n = parseInt(recurringCount, 10); return Number.isFinite(n) ? { count: n } : {}; })() : {}),
+          }
+        : null,
       created_by: user.id,
     }).select("id").single();
 
@@ -842,6 +873,218 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
               <option value="public">Public — visible to everyone</option>
               <option value="private">Private — only invited members can see</option>
             </select>
+          </div>
+        </div>
+
+        {/* Volunteer openings toggle */}
+        <label className="flex items-center gap-3 cursor-pointer select-none group">
+          <div
+            role="switch"
+            aria-label="Volunteer openings"
+            aria-checked={volunteerOpenings}
+            tabIndex={0}
+            onClick={() => setVolunteerOpenings((v) => !v)}
+            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setVolunteerOpenings((v) => !v); } }}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-(--gold) ${volunteerOpenings ? "bg-(--gold)" : "bg-black/15"}`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${volunteerOpenings ? "translate-x-4.5" : "translate-x-0.5"}`}
+            />
+          </div>
+          <div>
+            <span className="text-sm font-medium text-black">Volunteer openings</span>
+            <p className="text-[11px] text-black/50 leading-tight">
+              Let people know this event is looking for volunteers
+            </p>
+          </div>
+        </label>
+
+        {/* Recurring event toggle + pattern */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none group">
+            <div
+              role="switch"
+              aria-label="Recurring event"
+              aria-checked={isRecurring}
+              tabIndex={0}
+              onClick={() => setIsRecurring((v) => !v)}
+              onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setIsRecurring((v) => !v); } }}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-(--gold) ${isRecurring ? "bg-(--gold)" : "bg-black/15"}`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${isRecurring ? "translate-x-4.5" : "translate-x-0.5"}`}
+              />
+            </div>
+            <div>
+              <span className="text-sm font-medium text-black">Recurring event</span>
+              <p className="text-[11px] text-black/50 leading-tight">
+                This event repeats on a regular schedule
+              </p>
+            </div>
+          </label>
+
+          {isRecurring && (
+            <div className="rounded-2xl border border-black/10 bg-white/60 p-4 space-y-3">
+              <div>
+                <label htmlFor="recurringFrequency" className="block text-xs font-medium text-black/60 mb-1.5">
+                  Frequency
+                </label>
+                <select
+                  id="recurringFrequency"
+                  value={recurringFrequency}
+                  onChange={(e) => setRecurringFrequency(e.target.value as typeof recurringFrequency)}
+                  className={CC_INPUT}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+
+              {recurringFrequency === "weekly" && (
+                <div>
+                  <p className="block text-xs font-medium text-black/60 mb-1.5">Days of week</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((day) => {
+                      const val = day.toLowerCase();
+                      const active = recurringDays.includes(val);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() =>
+                            setRecurringDays((prev) =>
+                              active ? prev.filter((d) => d !== val) : [...prev, val],
+                            )
+                          }
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            active
+                              ? "bg-(--gold) text-black"
+                              : "bg-black/5 text-black/60 hover:bg-black/10"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="recurringEndDate" className="block text-xs font-medium text-black/60 mb-1.5">
+                    End date <span className="text-black/30 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="recurringEndDate"
+                    type="date"
+                    value={recurringEndDate}
+                    min={date ? date.slice(0, 10) : undefined}
+                    onChange={(e) => setRecurringEndDate(e.target.value)}
+                    className={CC_INPUT}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="recurringCount" className="block text-xs font-medium text-black/60 mb-1.5">
+                    Occurrences <span className="text-black/30 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="recurringCount"
+                    type="number"
+                    min="2"
+                    max="365"
+                    value={recurringCount}
+                    onChange={(e) => setRecurringCount(e.target.value)}
+                    className={CC_INPUT}
+                    placeholder="e.g. 12"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Social Media ────────────────────────────────── */}
+      <div className="border-t border-black/10 pt-5 mt-5 space-y-4">
+        <h2 className="text-[11px] font-semibold text-black/40 uppercase tracking-wider">Social Media</h2>
+        <p className="text-[11px] text-black/50 -mt-2">
+          Share links or handles so attendees can follow along. Full URLs or @handles both accepted.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="instagramUrl" className="flex items-center gap-1.5 text-xs font-medium text-black/60 mb-1.5">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-pink-500" aria-hidden>
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+              </svg>
+              Instagram
+            </label>
+            <input
+              id="instagramUrl"
+              type="text"
+              value={instagramUrl}
+              onChange={(e) => setInstagramUrl(e.target.value)}
+              className={CC_INPUT}
+              placeholder="@handle or https://instagram.com/…"
+              maxLength={300}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="facebookUrl" className="flex items-center gap-1.5 text-xs font-medium text-black/60 mb-1.5">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-blue-600" aria-hidden>
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Facebook
+            </label>
+            <input
+              id="facebookUrl"
+              type="text"
+              value={facebookUrl}
+              onChange={(e) => setFacebookUrl(e.target.value)}
+              className={CC_INPUT}
+              placeholder="https://facebook.com/…"
+              maxLength={300}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="tiktokUrl" className="flex items-center gap-1.5 text-xs font-medium text-black/60 mb-1.5">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-black" aria-hidden>
+                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+              </svg>
+              TikTok
+            </label>
+            <input
+              id="tiktokUrl"
+              type="text"
+              value={tiktokUrl}
+              onChange={(e) => setTiktokUrl(e.target.value)}
+              className={CC_INPUT}
+              placeholder="@handle or https://tiktok.com/…"
+              maxLength={300}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="youtubeUrl" className="flex items-center gap-1.5 text-xs font-medium text-black/60 mb-1.5">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-red-600" aria-hidden>
+                <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              YouTube
+            </label>
+            <input
+              id="youtubeUrl"
+              type="text"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              className={CC_INPUT}
+              placeholder="https://youtube.com/…"
+              maxLength={300}
+            />
           </div>
         </div>
       </div>

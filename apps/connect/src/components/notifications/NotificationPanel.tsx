@@ -30,6 +30,8 @@ const TYPE_ICONS: Record<string, string> = {
   friend_convince: "✦",
   friend_attending: "♥",
   new_message: "✉",
+  contributor_approved: "✦",
+  contributor_rejected: "✕",
 };
 
 /** Safely read dismissed review IDs from localStorage. */
