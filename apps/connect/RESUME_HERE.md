@@ -17,6 +17,22 @@
 
 ## 2. What just shipped
 
+### Batch 15a — Profile/login improvements — `f908e01`
+
+Four improvements to profile and login flows:
+
+1. **Avatar upload fix (server-side API)** — `POST /api/avatar` route handles all avatar uploads. Uses `createAdminClient()` for the storage write to avoid stale-JWT RLS failures on the browser client. Validates file type (`validateImageFile`) + 15 MB cap, rate-limited. `ProfileEditor` now POSTs FormData to `/api/avatar` instead of uploading directly.
+
+2. **Contributor type-change application** — Direct kind-switch removed from `ProfileEditor`. New `ContributorTypeChangeRequest` form lets approved contributors submit a type-change request (ministry/organization/business). API route `POST /api/contributor/type-change` gates on `role === 'contributor' AND contributor_status === 'approved'`, upserts to `contributor_type_change_requests` table, notifies all admins. Migration 099 creates the table, RLS, and widens `notifications_type_check` to include `'contributor_type_change_request'`.
+
+3. **Remove phone 2FA** — `LoginForm` phone/2FA tab removed. Email-only login.
+
+4. **Open Dashboard button** — Profile header shows "Open Dashboard" link → `/profile/contributor/dashboard` for contributors (shown when `role === 'contributor'`). `ContributorTypeChangeRequest` section similarly gated on `role === 'contributor'` (not `isVendor` which includes admins).
+
+**Architect fixes applied:** a11y `htmlFor`/`id` on form controls, `role="alert"` on feedback paragraphs, `isVendor → role === "contributor"` for type-change section.
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect all Should-fix applied · advisors 0 new warnings
+
 ### Event form fix + enhanced fields — 2026-05-28 — `7229353`
 
 **Root bug fixed — "Page not Found" when opening Create Event from burger bar:**

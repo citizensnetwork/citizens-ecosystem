@@ -2,6 +2,16 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Avatar uploads — must go through server-side API route
+
+**Decision — avatar uploads POST to `/api/avatar`, which uses `createAdminClient()` for the actual storage write.**
+Direct browser Supabase client storage uploads fail intermittently because the browser JWT can be stale when `auth.uid()` is evaluated inside the storage RLS policy (returns null → INSERT denied). Server-side API route avoids the stale-JWT issue: the route calls `createClient()` (cookie-based, always fresh) to verify the user, then calls `createAdminClient()` (service-role, bypasses RLS) for the storage write. The user identity is validated server-side before the admin client is used — no security regression. Commit `f908e01`.
+
+## Contributor kind changes — require admin review, not self-service
+
+**Decision — contributors cannot switch their kind (ministry/organization/business) directly; they submit an application reviewed by an admin.**
+Allowing self-service kind changes would let a contributor bypass moderation (e.g., switch to a trusted-business label without approval). The type-change request model (migration 099, `contributor_type_change_requests` table) mirrors the original contributor application flow: one pending slot per user (upsert on `user_id`), status `pending → approved/rejected`. The `ContributorTypeChangeRequest` form is shown only when `profile.role === "contributor"` (not admins via `isVendor`). Commit `f908e01`.
+
 ## Event form — /events/new static interceptor over dynamic [id]
 
 **Decision — `@panel/(.)events/new/page.tsx` is a static segment that shadows the dynamic `[id]` interceptor.**

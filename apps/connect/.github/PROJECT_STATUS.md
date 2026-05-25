@@ -9,6 +9,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 
 | Batch | Scope | Status | Notes |
 |-------|-------|--------|-------|
+| 15a | Profile/login improvements: avatar upload fix, contributor type-change request, remove phone 2FA, Open Dashboard button | **Shipped** `f908e01` | POST /api/avatar (server-side, admin client, 15 MB cap); POST /api/contributor/type-change + ContributorTypeChangeRequest form + migration 099 (table + RLS + notifications_type_check widened); ProfileEditor direct kind-switch removed; LoginForm phone tab removed; Open Dashboard button on profile header (contributors only). Architect fixes applied (a11y labels, role=alert, isVendor → role check). tsc 0 errors, vitest 714/714, lint clean. |
 | event-form-new-panel | Fix /events/new 'Page not Found' in panel + enhanced event creation form | **Shipped** `7229353` | Static @panel/(.)events/new interceptor; migration 098 (social URLs, volunteer_openings, is_recurring, recurring_pattern); sanitizeSocialUrl XSS guard; a11y aria-labels; NaN guard. 714/714. |
 | broadcast-isolation-rls | Broadcast isolation (is_system flag) + event-images storage RLS restore | **Shipped** `1462d2b` | Migration 096; API filter; EventUpdatesList composer + realtime guard; schema.sql updated. tsc 0 errors, 714/714, lint clean. |
 | capabilities-sweep | Centralize all role/status/state checks — 2 new lib files, 26 modified, 30+ inline strings replaced | **Shipped** `563a67d` | tsc 0 errors, vitest 714/714, lint clean. |
