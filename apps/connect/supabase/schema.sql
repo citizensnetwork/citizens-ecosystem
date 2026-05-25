@@ -1368,6 +1368,7 @@ create table if not exists public.event_updates (
   event_id uuid not null references public.events(id) on delete cascade,
   author_id uuid not null references public.profiles(id) on delete cascade,
   body text not null check (char_length(body) between 1 and 1000),
+  is_system boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -2189,7 +2190,7 @@ create trigger trg_stamp_billing_trial_on_approval
   for each row execute function public.stamp_billing_trial_on_approval();
 
 -- ============================================================================
--- Polish 2026-05-23 — get_user_places_with_stats (migration 094)
+-- Polish 2026-05-23 ï¿½ get_user_places_with_stats (migration 094)
 -- ============================================================================
 -- Aggregates the caller's places with follower/review counts in one round-trip,
 -- replacing the per-place client-side filter in /api/manage/places.

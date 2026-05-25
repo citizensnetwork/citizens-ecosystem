@@ -32,6 +32,8 @@ type AuthorMap = Record<string, { full_name: string; avatar_url: string | null }
 
 type Props = {
   eventId: string;
+  /** When true, renders a Broadcast composer above the updates list. */
+  isOwner?: boolean;
 };
 
 /** Friendly relative-time formatter (matches the look of CommentSection). */
@@ -54,10 +56,16 @@ function timeAgo(iso: string): string {
   });
 }
 
-export default function EventUpdatesList({ eventId }: Props) {
+const BROADCAST_MAX = 1_000;
+
+export default function EventUpdatesList({ eventId, isOwner = false }: Props) {
   const [updates, setUpdates] = useState<EventUpdate[]>([]);
   const [authors, setAuthors] = useState<AuthorMap>({});
   const [loading, setLoading] = useState(true);
+  // Broadcast composer state — only active when isOwner is true.
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [broadcastStatus, setBroadcastStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
   // Viewer identity is resolved once on mount and drives whether the
   // inline Delete affordance is rendered on each row. A null value means
   // "not signed in or still resolving" — in both cases the button stays
@@ -187,6 +195,7 @@ export default function EventUpdatesList({ eventId }: Props) {
         (payload) => {
           const row = payload.new as EventUpdate;
           if (!row?.id) return;
+          if (row.is_system) return;   // skip auto-generated field-change rows
           setUpdates((prev) =>
             prev.some((u) => u.id === row.id) ? prev : [row, ...prev],
           );
@@ -242,9 +251,36 @@ export default function EventUpdatesList({ eventId }: Props) {
     }
   }
 
-  // Hide the entire section while empty.  Comments still anchor the area
-  // below; we don't want a perpetually-empty "From the organiser" box on
-  // every event that hasn't received an update yet.
+  async function handleBroadcast(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = broadcastBody.trim();
+    if (!trimmed || broadcastStatus === "sending") return;
+    setBroadcastStatus("sending");
+    setBroadcastError(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: trimmed }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: "Failed to send" }));
+        setBroadcastError((payload as { error?: string }).error ?? "Failed to send broadcast");
+        setBroadcastStatus("error");
+        return;
+      }
+      setBroadcastBody("");
+      setBroadcastStatus("sent");
+      // Realtime INSERT subscription will add the new row to the list automatically.
+      setTimeout(() => setBroadcastStatus("idle"), 2500);
+    } catch (err) {
+      setBroadcastError(err instanceof Error ? err.message : "Network error");
+      setBroadcastStatus("error");
+    }
+  }
+
+  // Hide the entire section while empty — UNLESS the viewer is the owner, in
+  // which case we always show it so they can post their first broadcast.
   if (loading) {
     return (
       <div className="space-y-2">
@@ -253,16 +289,73 @@ export default function EventUpdatesList({ eventId }: Props) {
       </div>
     );
   }
-  if (updates.length === 0) return null;
+  if (updates.length === 0 && !isOwner) return null;
+
+  const broadcastRemaining = BROADCAST_MAX - broadcastBody.length;
+  const broadcastDisabled =
+    broadcastStatus === "sending" ||
+    broadcastBody.trim().length === 0 ||
+    broadcastBody.length > BROADCAST_MAX;
 
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-black/80">From the Organiser</h2>
-        <span className="rounded-full bg-(--gold-soft) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black/70">
-          {updates.length} {updates.length === 1 ? "update" : "updates"}
-        </span>
+        {updates.length > 0 && (
+          <span className="rounded-full bg-(--gold-soft) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black/70">
+            {updates.length} {updates.length === 1 ? "update" : "updates"}
+          </span>
+        )}
       </div>
+
+      {/* Broadcast composer — only visible to event owner / admin */}
+      {isOwner && (
+        <form
+          onSubmit={handleBroadcast}
+          className="rounded-xl border border-(--gold)/40 bg-(--gold-soft)/30 p-4 space-y-2"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">
+            Broadcast to attendees
+          </p>
+          <p className="text-[11px] text-black/40">
+            All RSVPed and considering attendees receive an in-app + push notification.
+          </p>
+          <textarea
+            aria-label="Broadcast message"
+            value={broadcastBody}
+            onChange={(e) => setBroadcastBody(e.target.value)}
+            rows={3}
+            maxLength={BROADCAST_MAX}
+            placeholder="e.g. Venue change — we're now meeting at…"
+            className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm focus:border-(--gold) focus:outline-none bg-white/70"
+            disabled={broadcastStatus === "sending"}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <span className={`text-[11px] ${broadcastRemaining < 50 ? "text-red-600" : "text-black/40"}`}>
+              {broadcastRemaining} left
+            </span>
+            <div className="flex items-center gap-2">
+              {broadcastStatus === "sent" && (
+                <span role="status" className="text-[11px] font-medium text-green-700">Broadcast sent ✓</span>
+              )}
+              {broadcastStatus === "error" && broadcastError && (
+                <span role="alert" className="text-[11px] font-medium text-red-700">{broadcastError}</span>
+              )}
+              <button
+                type="submit"
+                disabled={broadcastDisabled}
+                className="rounded-lg bg-black px-4 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {broadcastStatus === "sending" ? "Sending…" : "Broadcast"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {updates.length === 0 && isOwner && (
+        <p className="text-xs text-black/40 text-center py-2">No broadcasts yet. Send your first one above.</p>
+      )}
 
       <ul className="space-y-2">
         {updates.map((u) => {

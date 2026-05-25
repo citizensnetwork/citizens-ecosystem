@@ -17,8 +17,9 @@ export async function GET(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("event_updates")
-    .select("id, event_id, author_id, body, created_at")
+    .select("id, event_id, author_id, body, is_system, created_at")
     .eq("event_id", id)
+    .eq("is_system", false)   // exclude auto-generated field-change rows
     .order("created_at", { ascending: false })
     .limit(50);
 

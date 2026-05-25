@@ -400,12 +400,15 @@ export default function EventDetailContent({
         );
       })()}
 
-      {/* From the Organiser — read-only feed of organiser-authored
-          updates (composer lives in /events/manage).  Self-hides when
-          the event has no updates yet so it doesn't add visual noise to
-          the long tail of brand-new events. */}
+      {/* From the Organiser — organiser-authored broadcast updates.
+          The composer is visible to the event owner and admins so they
+          can post directly from the detail view. The section self-hides
+          for regular viewers when there are no updates yet. */}
       <div className="mt-6 border-t pt-5">
-        <EventUpdatesList eventId={event.id} />
+        <EventUpdatesList
+          eventId={event.id}
+          isOwner={!!(user && (user.id === event.created_by || isAdmin))}
+        />
       </div>
 
       {/* Comments */}

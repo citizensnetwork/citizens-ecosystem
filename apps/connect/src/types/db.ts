@@ -538,6 +538,7 @@ export type EventUpdate = {
   event_id: string;
   author_id: string;
   body: string;
+  is_system: boolean;
   created_at: string;
 };
 

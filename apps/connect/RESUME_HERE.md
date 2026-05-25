@@ -285,5 +285,5 @@ Full queue: `.audit/QUEUE.md`. Status:
 - ✅ map-core (`ff4d9f5`) — applied 2026-05-23
 - 🟡 **notifications** — re-audited 2026-05-24. Fix-clean applied (uncommitted working tree): `PostEventPrompt.tsx` deleted + stale mock removed. Fix-staged: `notifications--pending-reviews-dedup.diff` removes PendingReviews inline block (duplicate of notification-driven review flow). Run `/audit-fix notifications` to apply.
 - ✅ **Polish Queue rows 1–3 shipped 2026-05-23** (`10b4816`): onboarding column drop (migration 093 file-only), event-detail metadata cache + organiser name, profile UUID guards.
-- ✅ **Polish Queue row 6 (events-browse) shipped 2026-05-24** (pending commit): inline detail panel extracted to `EventPreviewPanel.tsx`; 4 imports cleaned from EventsView.
+- ✅ **Polish Queue row 6 (events-browse) shipped 2026-05-24** (`3eaabcb`): inline detail panel extracted to `EventPreviewPanel.tsx`; 4 imports cleaned from EventsView.
 - Polish Queue rows 7–10 pending. Run `/audit-polish 1` for next row (event-detail row 7 — attendee fanout design decision needed).
