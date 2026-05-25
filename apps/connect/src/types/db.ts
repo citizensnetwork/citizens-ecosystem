@@ -205,6 +205,15 @@ export function getRoleDisplayLabel(
   return ROLE_LABELS[role] ?? "Citizen";
 }
 
+/** Single cover photo entry in `profiles.cover_photo_urls` (migration 100). */
+export type CoverPhoto = {
+  url: string;
+  caption?: string | null;
+};
+
+export const COVER_PHOTOS_MAX = 5;
+export const COVER_PHOTO_CAPTION_MAX = 140;
+
 export type Profile = {
   id: string;
   email: string;
@@ -239,6 +248,10 @@ export type Profile = {
   physical_longitude?: number | null;
   logo_url?: string | null;
   gallery_urls?: string[];
+  /** Ordered cover photos for contributor public profile. Max 5. Each entry
+   *  is `{url, caption?}`. Stored as JSONB in `profiles.cover_photo_urls`
+   *  (migration 100). Contributors only — citizens leave this empty. */
+  cover_photo_urls?: CoverPhoto[];
   youtube_url?: string | null;
   contributor_slug?: string | null;
   needs_re_review?: boolean;
@@ -860,11 +873,6 @@ export type Suggestion = {
   resolved_by: string | null;
   resolved_at: string | null;
   created_at: string;
-};
-
-export type CoverPhoto = {
-  url: string;
-  caption: string | null;
 };
 
 /** Period in days for analytics selectors */

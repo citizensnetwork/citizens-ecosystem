@@ -98,3 +98,6 @@ vitest.log
 .vitest*.log
 
 vitest-out.txt
+
+v.txt
+vitest-out.txt

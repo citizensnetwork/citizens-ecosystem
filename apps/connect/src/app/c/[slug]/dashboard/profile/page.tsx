@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import CoverPhotoManager from "@/components/contributor/CoverPhotoManager";
+import type { CoverPhoto } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +24,12 @@ export default async function ProfileDashboardPage({
   const contributor = await resolveContributorSlug(slug);
   if (!contributor) redirect("/");
 
+  const isOwner = user.id === contributor.id;
+
   const [profileResult, followsResult, keywordsResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("avatar_url")
+      .select("avatar_url, cover_photo_urls")
       .eq("id", contributor.id)
       .maybeSingle(),
     supabase
@@ -77,6 +81,16 @@ export default async function ProfileDashboardPage({
         </div>
       </section>
 
+      {/* Cover photos */}
+      {isOwner && (
+        <CoverPhotoManager
+          initialPhotos={
+            Array.isArray(profileResult.data?.cover_photo_urls)
+              ? (profileResult.data?.cover_photo_urls as CoverPhoto[])
+              : []
+          }
+        />
+      )}
       {/* Keywords */}
       <section>
         <h3 className="text-sm font-semibold mb-3">

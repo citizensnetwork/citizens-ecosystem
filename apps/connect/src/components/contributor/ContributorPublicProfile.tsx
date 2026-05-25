@@ -26,6 +26,7 @@ import FollowButton from "@/components/social/FollowButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
 import DashboardAccessButton from "@/components/contributor/DashboardAccessButton";
+import CoverPhotoCarousel from "@/components/contributor/CoverPhotoCarousel";
 import { CONTRIBUTOR_KIND_LABELS } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
@@ -68,6 +69,9 @@ export function ContributorPublicProfile({
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
+  const coverPhotos = Array.isArray(profile.cover_photo_urls)
+    ? profile.cover_photo_urls
+    : [];
   const galleryMedia = Array.isArray(profile.gallery_urls)
     ? profile.gallery_urls.slice(0, 6)
         .filter((url): url is string => typeof url === "string" && url.trim().length > 0)
@@ -93,6 +97,9 @@ export function ContributorPublicProfile({
       data-contributor-ui={contributorThemeEnabled ? "" : undefined}
       className="bg-[#faf9f6] pb-16"
     >
+      {coverPhotos.length > 0 && (
+        <CoverPhotoCarousel photos={coverPhotos} altLabel={displayName ?? "Contributor"} />
+      )}
       {/* ── 1. Header band ─────────────────────────────── */}
       <header className="border-b border-black/10 bg-white">
         <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-start sm:gap-6 sm:py-8">

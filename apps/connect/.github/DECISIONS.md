@@ -2,6 +2,10 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Contributor cover photos — PNG/JPG/GIF/WebP only; SVG rejected
+
+**Decision — Stage C cover-photo uploads (`/api/contributor/cover-photos`) reuse `validateImageFile()`, which excludes SVG.** A15 in the v2 Q&A asked for PNG/JPG/SVG/GIF support, but `event-images` is a public bucket that serves uploads with the user-supplied Content-Type. An attacker-uploaded SVG with inline JS would execute on the storage subdomain origin, leaking session data — same threat that already blocked SVG avatars (`ALLOWED_IMAGE_TYPES` in `src/lib/validation.ts`). The fallback noted in the plan is taken: GIF stays in (frame-based, harmless), SVG out. Uploads also go through `/api/contributor/cover-photos` POST so the storage write uses `createAdminClient()` with a server-validated `user.id` path — matches the avatar pattern. PATCH only accepts URLs that already exist in the contributor's stored array, blocking off-platform URL injection.
+
 ## Contributor dashboard access UX — server-computed mode, never client-trusted role
 
 **Decision — `DashboardAccessButton` receives `mode: "owner" | "admin-granted" | "admin-no-grant"` as a server-rendered prop; the component never inspects the viewer's role client-side.** `ProfileDetailServer` resolves the mode by checking `profile.id === viewer.id`, then querying `contributor_access_requests` for `admin_id = auth.uid()` with status in (`pending`, `approved`), filtering server-side for `revoked_at IS NULL` and unexpired `expires_at`. The button only renders when mode is non-null; non-admin Citizens get no button at all. This keeps the existing RLS-first model — `is_admin()` and `auth.uid()` are evaluated inside Postgres, never inferred from a client header. Stage A.1 of `docs/plans/contributor-dashboard.md`.
