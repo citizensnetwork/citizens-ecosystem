@@ -17,6 +17,20 @@
 
 ## 2. What just shipped
 
+### Event form fix + enhanced fields — 2026-05-28 — `7229353`
+
+**Root bug fixed — "Page not Found" when opening Create Event from burger bar:**
+- `@panel/(.)events/new/page.tsx` created as a static interceptor segment. Next.js resolves static paths before `[id]`, so "new" no longer matches the dynamic `EventDetailServer` path. The new page renders `EventFormWithIndemnity` in the side-panel drawer with full auth + role + quota checks.
+
+**Event form enhanced — 10+ new fields across create + edit:**
+- Migration 098: `instagram_url`, `facebook_url`, `tiktok_url`, `youtube_url`, `volunteer_openings boolean NOT NULL DEFAULT false`, `is_recurring boolean NOT NULL DEFAULT false`, `recurring_pattern jsonb`
+- `Event` type in `db.ts` updated with all 7 new optional fields
+- `EventForm` + `EditEventForm`: Social Media section (branded SVG icons per platform), Volunteer Openings toggle (`role="switch"`), Recurring Event toggle + pattern picker (frequency, days-of-week pills, end-date, count)
+- `sanitizeSocialUrl()` added to `src/lib/validation.ts` — protocol denylist (`javascript:`, `data:`, `vbscript:`, `blob:`) prevents stored XSS before any DB write
+- `aria-label` added to all `role="switch"` elements; NaN guard on `parseInt(recurringCount)`
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect MUST-FIX (XSS) + SHOULD-FIX (a11y, NaN) all applied
+
 ### Bug Batch 2 — Broadcast isolation + event-images RLS — 2026-05-27 — `1462d2b`
 
 Two production bugs fixed:

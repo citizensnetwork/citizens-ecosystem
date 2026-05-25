@@ -2,6 +2,16 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Event form — /events/new static interceptor over dynamic [id]
+
+**Decision — `@panel/(.)events/new/page.tsx` is a static segment that shadows the dynamic `[id]` interceptor.**
+The `@panel/(.)events/[id]` intercepting route was matching the literal path "/events/new", treating "new" as an event ID and rendering EventDetailServer with a non-existent event — causing "Page not Found" in the side-panel drawer. Next.js App Router resolves static segments before dynamic ones, so creating a dedicated `(.)events/new/page.tsx` gives it priority. Commit `7229353`.
+
+## Social URL fields — sanitizeSocialUrl() protocol denylist
+
+**Decision — social media URL fields (instagram_url, facebook_url, tiktok_url, youtube_url) are sanitised with `sanitizeSocialUrl()` before any DB write.**
+Accepting raw user input for URL fields opens a stored-XSS vector: `javascript:`, `data:`, `vbscript:`, and `blob:` URIs can execute code when rendered as href attributes. The shared `sanitizeSocialUrl()` in `src/lib/validation.ts` uses a protocol denylist regex and returns null for any dangerous value. Field accepts both full URLs and @handles (no scheme required). Commit `7229353`.
+
 ## Broadcast isolation — is_system flag on event_updates
 
 **Decision — auto-generated field-change notifications use `is_system=TRUE`; owner-authored broadcasts use `is_system=FALSE`.**

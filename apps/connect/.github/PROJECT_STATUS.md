@@ -9,6 +9,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 
 | Batch | Scope | Status | Notes |
 |-------|-------|--------|-------|
+| event-form-new-panel | Fix /events/new 'Page not Found' in panel + enhanced event creation form | **Shipped** `7229353` | Static @panel/(.)events/new interceptor; migration 098 (social URLs, volunteer_openings, is_recurring, recurring_pattern); sanitizeSocialUrl XSS guard; a11y aria-labels; NaN guard. 714/714. |
 | broadcast-isolation-rls | Broadcast isolation (is_system flag) + event-images storage RLS restore | **Shipped** `1462d2b` | Migration 096; API filter; EventUpdatesList composer + realtime guard; schema.sql updated. tsc 0 errors, 714/714, lint clean. |
 | capabilities-sweep | Centralize all role/status/state checks — 2 new lib files, 26 modified, 30+ inline strings replaced | **Shipped** `563a67d` | tsc 0 errors, vitest 714/714, lint clean. |
 | place-panel-fix | Place detail side-panel + image upload RLS + cover-image remove | **Shipped** `aba287a` | PlaceDetailServer RSC; @panel intercepted route; fix_place_images_rls migrations (094+095); is_admin() on places UPDATE/DELETE; removeImage state; label rename. 714 tests. |
