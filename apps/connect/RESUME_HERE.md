@@ -17,7 +17,7 @@
 
 ## 2. What just shipped
 
-### Batch 18 — Stage F: `places.volunteer_openings` toggle + public Volunteer pill — `<pending>`
+### Batch 18 — Stage F: `places.volunteer_openings` toggle + public Volunteer pill — `2174121`
 
 **Migration 103** — `supabase/migrations/103_place_volunteer_openings.sql` applied via MCP:
 - `places.volunteer_openings boolean NOT NULL DEFAULT false`
@@ -330,7 +330,7 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 
 - Test suite: **729 / 729** (80 files) · TS: 0 errors · Lint: clean
 - Supabase advisors: 0 ERROR / **85 WARN** (baseline maintained — no new warnings since batch 16b)
-- Latest commit: `<pending>` (batch 18 — Stage F volunteer_openings) · prior `a9ada85` (batch 17 — Stage C cover photos)
+- Latest commit: `2174121` (batch 18 — Stage F volunteer_openings) · prior `a9ada85` (batch 17 — Stage C cover photos)
 - Uncommitted local changes: none
 - **Demo readiness (June 9 WCI):**
   - Map custom style: ❌ missing on Vercel (T4 — owner action, 10 min fix)
