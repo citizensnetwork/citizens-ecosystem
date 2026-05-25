@@ -8,6 +8,9 @@ import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
 import BetaBanner from "@/components/ui/BetaBanner";
 import TermsAcceptanceGate from "@/components/ui/TermsAcceptanceGate";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import dynamic from "next/dynamic";
+
+const SuggestionButton = dynamic(() => import("@/components/ui/SuggestionButton"), { ssr: false });
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -63,6 +66,7 @@ export default function RootLayout({
             leaving the underlying page. */}
         {panel}
         <TermsAcceptanceGate />
+        <SuggestionButton variant="floating" />
       </body>
     </html>
   );

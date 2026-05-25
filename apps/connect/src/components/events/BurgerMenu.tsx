@@ -8,6 +8,7 @@ import { EVENT_CATEGORIES, CATEGORY_HEX, PLACE_CATEGORIES, PLACE_CATEGORY_HEX, P
 import { isAdmin, isContributor, isCitizen, isApprovedContributor, isPendingContributor, isRejectedContributor } from "@/lib/profiles/capabilities";
 import { getIconSvg } from "@/lib/categoryIcons";
 import AccordionSection from "@/components/ui/AccordionSection";
+import SuggestionButton from "@/components/ui/SuggestionButton";
 import type { User } from "@supabase/supabase-js";
 
 type BurgerTab = "events" | "places";
@@ -529,6 +530,9 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
               </Link>
             </div>
           )}
+          <div className="mt-4 border-t border-black/8 pt-3 text-center">
+            <SuggestionButton variant="inline" />
+          </div>
         </div>
       </aside>
     </>

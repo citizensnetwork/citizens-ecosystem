@@ -17,6 +17,28 @@
 
 ## 2. What just shipped
 
+### Batch 16 — Contributor Dashboard Foundation — pending push
+
+12 new tables, full dashboard UI, global suggestion button.
+
+**Schema (migrations 100 + 100b):**
+- New tables: `contributor_access_requests`, `activity_log` (append-only, no DELETE policy), `broadcast_messages` (soft-delete only), `contributor_drafts`, `team_memberships`, `volunteer_applications`, `contributor_keywords`, `specialised_services`, `planning_tasks`, `planning_ideas`, `contributor_analytics`, `suggestions`.
+- Profile additions: `cover_photo_urls jsonb` (max 5), `handle_changed_at timestamptz` (one-per-month rule).
+- SECURITY DEFINER fns: `check_max_dashboard_sessions` (max 2 concurrent admin sessions), `approve_dashboard_access` (3-day expiry + audit log), `deny_dashboard_access` (reason 3–500 chars + audit), `purge_old_activity_logs` (90-day), `purge_old_analytics` (1-year), `increment_contributor_metric`.
+- 100b hardening: `suggestions_insert` tightened to `user_id IS NULL OR user_id = auth.uid()`; `REVOKE EXECUTE` on purge/internal fns from `anon, authenticated, public`.
+- Postgres note: function-expression UNIQUE (e.g. `lower(keyword)`) must be a separate `CREATE UNIQUE INDEX` — fixed during apply.
+
+**UI (`/c/[slug]/dashboard/*`):**
+- Overview, planning (tasks + ideas with status cycling + rollback), team (active/removed with rollback), settings (access requests with inline deny form + revoke), broadcasts, volunteers, analytics (with `generateMetadata`), drafts, history, search, profile.
+- ARIA tablists, dialog/modal labels, Escape handler, `useFocusTrap`, named handlers, `role="alert"` on errors.
+- Global floating `SuggestionButton` via `dynamic({ ssr: false })` in `layout.tsx`; inline footer entry in BurgerMenu.
+
+**Security:**
+- `page_url` validated `^https?://` (blocks `javascript:`/`data:` XSS).
+- `useOptimistic` misuse removed → `setX(prev)` rollback on `!res.ok`.
+
+**Quality gate:** tsc 0 · vitest **714 / 714** · lint clean · Architect 12 Should-fix + Nice-to-haves (1,2,4,7,9) applied · advisors 85 WARN (+1 same-family SD-fn warning, `rls_policy_always_true` cleared).
+
 ### Batch 15a — Profile/login improvements — `f908e01`
 
 Four improvements to profile and login flows:

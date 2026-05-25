@@ -703,3 +703,214 @@ export type IndemnitySignature = {
   template_version: number;
   created_at: string;
 };
+
+// ── Contributor Dashboard (migration 100) ─────────────────────────────────
+
+export type AccessRequestStatus = "pending" | "approved" | "denied" | "revoked";
+
+export type ContributorAccessRequest = {
+  id: string;
+  contributor_id: string;
+  admin_id: string;
+  status: AccessRequestStatus;
+  reason: string | null;
+  denied_reason: string | null;
+  approved_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+export type ActivityLog = {
+  id: string;
+  contributor_id: string;
+  actor_id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type BroadcastMessage = {
+  id: string;
+  contributor_id: string;
+  entity_type: "event" | "place";
+  entity_id: string;
+  body: string;
+  sent_by: string;
+  deleted_at: string | null;
+  created_at: string;
+};
+
+export type ContributorDraftType = "event" | "place" | "broadcast" | "other";
+
+export type ContributorDraft = {
+  id: string;
+  contributor_id: string;
+  draft_type: ContributorDraftType;
+  title: string | null;
+  body: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamRole = "editor" | "viewer";
+export type TeamMemberStatus = "active" | "removed";
+
+export type TeamMembership = {
+  id: string;
+  contributor_id: string;
+  member_id: string;
+  role: TeamRole;
+  status: TeamMemberStatus;
+  created_at: string;
+};
+
+export type VolunteerStatus = "pending" | "approved" | "declined";
+
+export type VolunteerApplication = {
+  id: string;
+  contributor_id: string;
+  applicant_id: string;
+  entity_type: "event" | "place";
+  entity_id: string;
+  message: string | null;
+  status: VolunteerStatus;
+  created_at: string;
+};
+
+export type ContributorKeyword = {
+  id: string;
+  contributor_id: string;
+  keyword: string;
+  created_at: string;
+};
+
+export type SpecialisedService = {
+  id: string;
+  contributor_id: string;
+  place_id: string;
+  service: string;
+  created_at: string;
+};
+
+export type TaskStatus = "pending" | "in_progress" | "completed";
+
+export type PlanningTask = {
+  id: string;
+  contributor_id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  due_date: string | null;
+  visible_to_team: boolean;
+  completed_at: string | null;
+  sort_order: number;
+  linked_event_id: string | null;
+  linked_place_id: string | null;
+  created_at: string;
+};
+
+export type PlanningIdea = {
+  id: string;
+  contributor_id: string;
+  title: string;
+  description: string | null;
+  tags: string[];
+  visible_to_team: boolean;
+  linked_event_id: string | null;
+  linked_place_id: string | null;
+  created_at: string;
+};
+
+export type AnalyticsMetric =
+  | "views"
+  | "rsvps"
+  | "cancellations"
+  | "follows"
+  | "comments"
+  | "reports"
+  | "shares"
+  | "convinces"
+  | "broadcasts";
+
+export type AnalyticsEntityType = "contributor" | "event" | "place";
+
+export type ContributorAnalytics = {
+  id: string;
+  contributor_id: string;
+  entity_type: AnalyticsEntityType;
+  entity_id: string | null;
+  date: string;
+  metric: AnalyticsMetric;
+  value: number;
+};
+
+export type SuggestionStatus = "open" | "in_review" | "actioned" | "declined";
+
+export type Suggestion = {
+  id: string;
+  user_id: string | null;
+  title: string;
+  body: string;
+  page_url: string | null;
+  status: SuggestionStatus;
+  admin_response: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+};
+
+export type CoverPhoto = {
+  url: string;
+  caption: string | null;
+};
+
+/** Period in days for analytics selectors */
+export type AnalyticsPeriod = 7 | 14 | 30 | 60 | 90 | 180 | 365;
+
+export const ANALYTICS_PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
+  7: "7d",
+  14: "14d",
+  30: "30d",
+  60: "60d",
+  90: "90d",
+  180: "6m",
+  365: "1y",
+};
+
+export type PredefinedService = string;
+
+export const PREDEFINED_SERVICES: PredefinedService[] = [
+  "Youth ministry",
+  "Women's ministry",
+  "Men's ministry",
+  "Children's church",
+  "Counselling",
+  "Food bank",
+  "Homeless outreach",
+  "Prison ministry",
+  "Marriage enrichment",
+  "Alpha course",
+  "Bible study",
+  "Prayer groups",
+  "Worship team",
+  "Community development",
+  "Skills training",
+  "Addiction recovery",
+  "Grief support",
+  "Language classes",
+  "Tutoring",
+  "Music",
+];
+
+export type ActivityEntry = {
+  id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  actor: { full_name: string | null; avatar_url: string | null } | null;
+};

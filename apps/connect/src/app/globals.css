@@ -499,6 +499,37 @@ body {
   padding: 4px 8px;
 }
 
+/* ── Contributor Dashboard theme variant ───────────────────────────────────
+ * Applied via the `data-contributor-ui` attribute on the layout root div.
+ * Subtle warm-gold tint only — NOT dark mode. Respects NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED.
+ * Override: vivid gold (#C9A227) replaces the lighter #D4AF37 token for
+ * action buttons, accent lines, and active nav tabs.                       */
+[data-contributor-ui] {
+  --gold: #C9A227;
+  --gold-soft: #fef9ec;
+  --background: #FDFCF8;
+  --surface: #FFFFFF;
+  --surface-muted: #F9F6EE;
+  --border: #E8E2D4;
+  --accent: #C9A227;
+  --accent-foreground: #000000;
+  --ring: #C9A227;
+}
+
+/* Contributor dashboard active tab indicator */
+[data-contributor-ui] .cd-tab-active {
+  border-bottom-color: var(--gold);
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* Admin-access banner — amber strip at top of dashboard */
+.cd-admin-banner {
+  background: linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%);
+  border-bottom: 1px solid #F59E0B;
+  color: #78350F;
+}
+
 /* MapLibre attribution minimal */
 .maplibregl-ctrl-attrib {
   font-size: 10px;

@@ -2,6 +2,14 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Contributor dashboard — non-destructible audit + SECURITY DEFINER for privileged transitions
+
+**Decision — `contributor_access_requests` and `activity_log` are append-only; no DELETE RLS policies.** Admin dashboard access is gated by an approval workflow with max 2 concurrent sessions enforced inside `check_max_dashboard_sessions(uuid)` (SECURITY DEFINER). State transitions go through `approve_dashboard_access(uuid)` and `deny_dashboard_access(uuid, text)` so the audit-log INSERT and the status UPDATE are atomic; the contributor's own UPDATE RLS path is reserved for self-driven actions. `purge_old_activity_logs()` (90-day) and `purge_old_analytics()` (1-year) are SECURITY DEFINER with `REVOKE EXECUTE FROM anon, authenticated, public` so only service-role / pg_cron can run them. Migrations 100 + 100b. Function-expression uniqueness (e.g. `lower(keyword)`) must be a separate `CREATE UNIQUE INDEX`, not an inline table `UNIQUE` constraint — Postgres syntax requirement we re-confirmed during migration 100.
+
+## Suggestions — anonymous allowed, but `user_id` must match `auth.uid()` when set
+
+**Decision — `suggestions_insert` policy is `user_id IS NULL OR user_id = auth.uid()`, not `WITH CHECK (true)`.** Allowing `true` triggered `rls_policy_always_true` advisor and let an authenticated user spoof a suggestion as another user. The new check still permits anonymous (logged-out) submissions because `auth.uid()` returns NULL and the row's `user_id` may be NULL, but prevents impersonation. `page_url` is validated against `^https?://` at the API layer to block `javascript:` / `data:` XSS vectors before insert. Migration 100b.
+
 ## Avatar uploads — must go through server-side API route
 
 **Decision — avatar uploads POST to `/api/avatar`, which uses `createAdminClient()` for the actual storage write.**
