@@ -2,6 +2,17 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Broadcast isolation — is_system flag on event_updates
+
+**Decision — auto-generated field-change notifications use `is_system=TRUE`; owner-authored broadcasts use `is_system=FALSE`.**
+Migration 050 introduced a DB trigger that inserts into `event_updates` whenever a published event's date/time/location is changed (to drive push-notification fan-out via Edge Function). These rows appeared in the broadcast feed ("From the Organiser") making every edit look like a deliberate message. Solution: migration 096 adds `is_system boolean NOT NULL DEFAULT false`; the trigger sets it to `TRUE`; the API GET filters to `is_system=FALSE`; the realtime INSERT handler skips `is_system=TRUE` rows client-side. The trigger rows still exist for the push-notification webhook to consume. Commit `1462d2b`.
+
+**Decision — broadcast composer lives inline in EventUpdatesList, not a separate route.**
+The composer is a small textarea + button shown when `isOwner=true`. Extracting it to a separate route adds navigation overhead for minimal complexity. The 1 000-char limit matches the DB CHECK constraint.
+
+**Decision — event-images storage RLS restore (migration 096).**
+Migration 031 originally created INSERT/UPDATE/DELETE policies on `storage.objects` for the `event-images` bucket, but they were absent from the live DB. Migration 096 re-creates all three, scoped to `(storage.foldername(name))[1] = auth.uid()::text`. This unblocked both cover-photo and gallery-photo uploads. Commit `1462d2b`.
+
 ## Capabilities sweep — Centralize all role/status/state checks
 
 **Decision — `src/lib/profiles/capabilities.ts` and `src/lib/events/capabilities.ts` are the single sources of truth for all role/status capability checks.**

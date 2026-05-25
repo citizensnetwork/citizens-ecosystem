@@ -17,6 +17,23 @@
 
 ## 2. What just shipped
 
+### Bug Batch 2 — Broadcast isolation + event-images RLS — 2026-05-27 — `1462d2b`
+
+Two production bugs fixed:
+
+**Broadcast isolation (event edits showed as broadcasts):**
+- Migration 096 adds `is_system boolean NOT NULL DEFAULT false` to `event_updates`
+- Updated `notify_event_field_changes()` trigger (from migration 050) to set `is_system = TRUE` on auto-generated field-change rows
+- API GET `/api/events/[id]/updates` filters `.eq("is_system", false)` + includes `is_system` in select projection
+- `EventUpdate` type updated with `is_system: boolean`
+- `EventUpdatesList`: realtime INSERT handler guards `if (row.is_system) return;`; added `isOwner` prop + inline Broadcast composer (textarea + Broadcast button) for event owners/admins; BROADCAST_MAX at module scope; ARIA roles added
+- `EventDetailContent` passes `isOwner={!!(user && (user.id === event.created_by || isAdmin))}` to `EventUpdatesList`
+
+**Event-images storage RLS (cover + gallery upload failed with RLS violation):**
+- Migration 096 re-creates the three missing `storage.objects` policies for the `event-images` bucket: INSERT/UPDATE/DELETE scoped to `(storage.foldername(name))[1] = auth.uid()::text`
+
+✅ Quality gate: tsc 0 · vitest **714 / 714** · lint clean · Architect review applied (all 6 items)
+
 ### Capabilities sweep — Dynamic-surfaces compliance — 2026-05-24 — `563a67d`
 
 Two new lib files created as single source of truth for all role/status/state checks:
