@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import PlaceForm from "@/components/places/PlaceForm";
 import type { Category } from "@/types/db";
 
@@ -97,5 +97,20 @@ describe("PlaceForm", () => {
     render(<PlaceForm categories={categories} />);
     const btn = screen.getByRole("button", { name: /add place/i });
     expect(btn).toHaveTextContent("Add Place");
+  });
+
+  it("renders the volunteer-openings switch defaulted off", () => {
+    render(<PlaceForm categories={categories} />);
+    const sw = screen.getByRole("switch", { name: /looking for volunteers/i });
+    expect(sw).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("toggles the volunteer-openings switch when clicked", () => {
+    render(<PlaceForm categories={categories} />);
+    const sw = screen.getByRole("switch", { name: /looking for volunteers/i });
+    fireEvent.click(sw);
+    expect(sw).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(sw);
+    expect(sw).toHaveAttribute("aria-checked", "false");
   });
 });

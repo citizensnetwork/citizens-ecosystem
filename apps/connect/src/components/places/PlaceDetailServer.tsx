@@ -235,6 +235,12 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
         </span>
       )}
 
+      {place.volunteer_openings && (
+        <span className="ml-2 inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--gold)">
+          Volunteer
+        </span>
+      )}
+
       {place.verification_flagged && (
         <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
           Possibly closed (community reports)

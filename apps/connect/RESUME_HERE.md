@@ -17,6 +17,50 @@
 
 ## 2. What just shipped
 
+### Batch 18 — Stage F: `places.volunteer_openings` toggle + public Volunteer pill — `<pending>`
+
+**Migration 103** — `supabase/migrations/103_place_volunteer_openings.sql` applied via MCP:
+- `places.volunteer_openings boolean NOT NULL DEFAULT false`
+- Comment distinguishes it from per-event `events.volunteer_openings` (added in migration 098).
+- No new RLS — owner-update / insert paths on `places` already cover the column.
+
+**Types:** `Place.volunteer_openings?: boolean` added in `src/types/db.ts`.
+
+**Forms:** `PlaceForm` + `EditPlaceForm` get a new switch UI (`role="switch"`, `aria-checked`, `aria-label="Looking for volunteers"`), gold track when on, white knob. State is wired through the `.insert({...})` and `.update({...})` payloads after `search_profile`.
+
+**Public surface:** `PlaceDetailServer` renders a gold "Volunteer" pill right after the existing `verified` pill when `place.volunteer_openings` is truthy. Existing `.select("*, categories(*)")` already pulls the column.
+
+**Tests:** `src/__tests__/components/places/PlaceForm.test.tsx` — 2 new cases: default-off render, toggle flips `aria-checked` true → false.
+
+**Quality gate:** tsc 0 · vitest **729 / 729** (80 files) · lint clean · Architect SHIP (no must-fix / should-fix) · advisors **85 WARN** identical to baseline.
+
+**Stage F Nice-to-haves (log only):**
+- Extract a shared `<ToggleSwitch>` to dedupe the toggle markup currently duplicated across `PlaceForm`, `EditPlaceForm`, and the event forms.
+- Tighten `Place.volunteer_openings` to non-optional `boolean` to mirror the NOT NULL column.
+- Add `create index on places(volunteer_openings) where volunteer_openings;` when discovery filtering ("places with openings") ships.
+- Tooltip / helper text on the public Volunteer pill when first-time visitors hover.
+
+### Batch 17 — Stage C: contributor cover photos + auto-rotating carousel — `a9ada85`
+
+**API:** `src/app/api/contributor/cover-photos/route.ts` (POST/PATCH/DELETE)
+- POST: FormData upload, MIME allowlist PNG/JPG/GIF/WebP (SVG rejected — DECISIONS), 15 MB cap, admin-client storage write (mirrors `/api/avatar`), path `${user.id}/covers/${ts}-${crypto.randomUUID()}.${ext}`, **TOCTOU mitigation** — re-reads `cover_photo_urls` before update; returns **409** + rolls back orphan blob if cap was crossed by a concurrent upload.
+- PATCH: URL allowlist (only stored URLs accepted — no off-platform injection); rejects duplicate URLs; best-effort orphan cleanup for URLs dropped from the list.
+- DELETE: by `?index=N`; best-effort storage removal scoped to user's folder.
+
+**UI:**
+- `CoverPhotoManager` (owner-only on `/c/[slug]/dashboard/profile`): upload, edit caption (≤140), reorder ↑/↓, remove. Optimistic state with rollback; draft caption preserved on PATCH failure.
+- `CoverPhotoCarousel` (public on `ContributorPublicProfile`): 16:9 `<Image fill>` layers, 5 s auto-rotate, pause on hover/focus/`visibilitychange`, prev/next + dot pagination when >1, keyboard ←/→, SR live region.
+
+**Types:** `CoverPhoto`, `COVER_PHOTOS_MAX = 5`, `COVER_PHOTO_CAPTION_MAX = 140` in `src/types/db.ts`.
+
+**Tests:** `src/__tests__/api/contributor-cover-photos.test.ts` — **13 tests** covering 401, 403, 400 (no file / SVG / cap), 200 happy-path, **409 TOCTOU**, PATCH unknown URL / **duplicate** / cap, DELETE invalid index / happy-path.
+
+**Decisions:** `.github/DECISIONS.md` top entry "Contributor cover photos — PNG/JPG/GIF/WebP only; SVG rejected" — XSS-on-public-bucket rationale + PATCH allowlist contract.
+
+**Migration:** none (column added in migration 100, Batch 16).
+
+**Quality gate:** tsc 0 · vitest **725 / 725** (80 files) · lint clean · Architect Should-fix #1–#4 applied inline (PATCH dup reject, PATCH orphan cleanup, POST TOCTOU re-read, draft-caption preserved on failure) · advisors **85 WARN** (identical to baseline).
+
 ### Batch 16b — Dashboard access UX + perf RPC + client singleton — `3f91ec2`
 
 **Stage A.1 — admin dashboard access on contributor public profile:**
@@ -284,10 +328,10 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 
 ## 3. Current platform state
 
-- Test suite: **714 / 714** · TS: 0 errors · Lint: clean
-- Supabase advisors: 0 ERROR / 83 WARN (baseline maintained — no new warnings)
-- Latest commit: `ff4d9f5` (audit: apply map-core fixes)
-- Uncommitted local changes: migration 092 file + `.claude/` structure (ready to commit)
+- Test suite: **729 / 729** (80 files) · TS: 0 errors · Lint: clean
+- Supabase advisors: 0 ERROR / **85 WARN** (baseline maintained — no new warnings since batch 16b)
+- Latest commit: `<pending>` (batch 18 — Stage F volunteer_openings) · prior `a9ada85` (batch 17 — Stage C cover photos)
+- Uncommitted local changes: none
 - **Demo readiness (June 9 WCI):**
   - Map custom style: ❌ missing on Vercel (T4 — owner action, 10 min fix)
   - Seeded event dates: ❌ stale (migration 092 ready, needs applying)
@@ -302,16 +346,23 @@ Tab-gated tiles + city chips (PTA/JHB/CT/etc. via `src/lib/cityLabel.ts`) + prox
 
 Plan: [docs/plans/contributor-dashboard.md](docs/plans/contributor-dashboard.md) (v2 + locked plan).
 
-- **Stage C — Cover photos + carousel.** 5-slot uploader (PNG/JPG, optional captions), 16:9 auto-rotating public carousel. `profiles.cover_photo_urls jsonb` exists. SVG/GIF: decide sanitisation vs reject; record in DECISIONS.md.
+**Progress:** A.1 ✅, B.1 ✅, C ✅, **F ✅** (this batch). 4 of 12 stages shipped. 8 stages remain.
+
+- **Stage A.2–A.7 (admin governance).** Active grant banner on contributor dashboard, admin-attribution middleware tag, contributor notifications on admin changes, Settings → Access list with self-revoke, max-2 concurrent admin sessions enforced at API layer.
 - **Stage D — Specialised services chip input.** Predefined + custom, max 10, strict `[A-Za-z0-9 ._-]{1,40}` regex.
 - **Stage E — Broadcast fan-out.** Place→followers, event→RSVPs only; in-app + push + banner.
-- **Stage F — Volunteer openings toggle on places.** New migration (events already have it via 098) + public "Volunteer" pill + apply form.
 - **Stage G — Team invite popup.** Three search bars (name / user_id / email) + atomic owner-transfer RPC.
 - **Stage H — Analytics time-window selector.** 7/14/30/60/90 d, 6 mo, 1 yr + CSV/XLSX export.
 - **Stage I — Planning task/idea cards.** Top-right completion / delete marker + Public toggle.
 - **Stage J — Suggestion admin inbox.** XLSX export + 10/day rate limit + status updates to submitter.
 - **Stage K — Slug change warning.** 1/month rule + admin override.
 - **Stage L — Top-10 search queries this month.** Anonymised + keyword autocomplete feed.
+
+### Stage C Nice-to-haves (log only)
+
+- DB CHECK `jsonb_array_length(cover_photo_urls) <= 5` for belt-and-braces TOCTOU defence.
+- Drag-and-drop reorder with `@dnd-kit` (currently ↑/↓ buttons).
+- Test the storage-cleanup branch of DELETE (assert `admin.storage.remove` was called with the right path).
 
 ### Pre-Stage C cleanup (cheap)
 

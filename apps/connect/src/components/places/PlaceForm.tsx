@@ -41,6 +41,7 @@ export default function PlaceForm({ categories }: Props) {
   const [galleryItems, setGalleryItems] = useState<SelectedMedia[]>([]);
   const [coords, setCoords] = useState<[number, number] | null>(null);
   const [searchProfile, setSearchProfile] = useState<SearchProfile | null>(null);
+  const [volunteerOpenings, setVolunteerOpenings] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -128,6 +129,7 @@ export default function PlaceForm({ categories }: Props) {
         longitude: coords[1],
         search_profile:
           searchProfile ?? deriveSearchProfile(name, description, address) ?? null,
+        volunteer_openings: volunteerOpenings,
         created_by: user.id,
       })
       .select("id")
@@ -329,6 +331,32 @@ export default function PlaceForm({ categories }: Props) {
           Discovery tags <span className="text-gray-400 font-normal">(optional)</span>
         </label>
         <SearchProfilePicker value={searchProfile} onChange={setSearchProfile} />
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-black/10 bg-white/60 px-4 py-3">
+        <div className="pr-3">
+          <p className="text-sm font-medium">Looking for volunteers</p>
+          <p className="text-xs text-black/60">
+            Shows a &quot;Volunteer&quot; pill on the public page so visitors
+            know you welcome helpers.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={volunteerOpenings}
+          aria-label="Looking for volunteers"
+          onClick={() => setVolunteerOpenings((v) => !v)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-(--gold) ${
+            volunteerOpenings ? "bg-(--gold)" : "bg-black/20"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+              volunteerOpenings ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
       </div>
 
       <button

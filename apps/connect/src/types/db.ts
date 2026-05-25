@@ -432,6 +432,11 @@ export type Place = {
   created_at: string;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
+  /** True when the place advertises an ongoing need for volunteers
+   *  (distinct from per-event volunteer openings on `events.volunteer_openings`).
+   *  Surfaced as a "Volunteer" pill on the public place view. Added in
+   *  migration 103. */
+  volunteer_openings?: boolean;
   categories?: Category;
 };
 
