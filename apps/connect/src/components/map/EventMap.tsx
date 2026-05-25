@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
 import type { Event, EventCategory, PlaceCategory, Place } from "@/types/db";
 import { ORGANISER_ROLES } from "@/types/db";
 import {

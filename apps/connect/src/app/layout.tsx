@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import Navbar from "@/components/ui/Navbar";
 import CapacitorInit from "@/components/ui/CapacitorInit";
 import ApplicationPendingBannerServer from "@/components/ui/ApplicationPendingBannerServer";

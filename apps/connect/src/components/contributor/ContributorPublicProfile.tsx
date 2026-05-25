@@ -25,6 +25,7 @@ import type { ContributorKind, ContributorLocation, Event, Profile } from "@/typ
 import FollowButton from "@/components/social/FollowButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
+import DashboardAccessButton from "@/components/contributor/DashboardAccessButton";
 import { CONTRIBUTOR_KIND_LABELS } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
@@ -46,6 +47,10 @@ export interface ContributorPublicProfileProps {
   /** Additional venues (migration 060). Primary venue still uses
    *  `profile.physical_address` + lat/lng. */
   locations?: ContributorLocation[];
+  /** Computed server-side: owner / admin-granted / admin-no-grant / null. */
+  dashboardMode?: "owner" | "admin-granted" | "admin-no-grant" | null;
+  /** Pending access request id when admin has an outstanding request. */
+  dashboardPendingRequestId?: string | null;
 }
 
 export function ContributorPublicProfile({
@@ -58,6 +63,8 @@ export function ContributorPublicProfile({
   upcomingEvents,
   pastEvents,
   locations = [],
+  dashboardMode = null,
+  dashboardPendingRequestId = null,
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
@@ -76,8 +83,16 @@ export function ContributorPublicProfile({
     typeof profile.physical_latitude === "number" &&
     typeof profile.physical_longitude === "number";
 
+  // Apply contributor theme tint across the entire contributor-owned
+  // public profile experience (A8). Respect dev override env flag.
+  const contributorThemeEnabled =
+    process.env.NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED !== "false";
+
   return (
-    <div className="bg-[#faf9f6] pb-16">
+    <div
+      data-contributor-ui={contributorThemeEnabled ? "" : undefined}
+      className="bg-[#faf9f6] pb-16"
+    >
       {/* ── 1. Header band ─────────────────────────────── */}
       <header className="border-b border-black/10 bg-white">
         <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-start sm:gap-6 sm:py-8">
@@ -126,7 +141,14 @@ export function ContributorPublicProfile({
           </div>
 
           {viewer && (
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {dashboardMode && profile.contributor_slug && (
+                <DashboardAccessButton
+                  slug={profile.contributor_slug}
+                  mode={dashboardMode}
+                  pendingRequestId={dashboardPendingRequestId}
+                />
+              )}
               <FollowButton
                 followeeId={profile.id}
                 isFollowing={isFollowing}

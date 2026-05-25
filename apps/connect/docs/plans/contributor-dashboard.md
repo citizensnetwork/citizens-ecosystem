@@ -461,3 +461,220 @@ RLS: all tables scoped by `contributor_id` = `auth.uid()` or `is_admin()`.
 
 User answers v2 questions (A1–A66). Then lock v1 cut, slot after edit-fixes batch, break into stages.
 
+---
+
+## Q&A Round 2 — Answered 2026-05-25 (locked)
+
+> Authoritative answers. Implementation MUST honour these. Where an answer
+> conflicts with the proposed architecture above, the answer wins.
+
+### Admin access (A1–A7)
+- **A1.** "Request access" is visible **only to admins**, placed where the contributor's own "Open Dashboard" affordance appears on the public profile. If the admin has no active grant, render the same Dashboard button with a white "Request access" overlay label.
+- **A2.** Approved admin = **full access** (full read + edit, same as owner).
+- **A3.** Full access. All actions are written to the non-destructible `activity_log` so wrongful actions are traceable.
+- **A4.** Access window = **3 days**, then auto-expires.
+- **A5.** Yes — contributor sees currently-active admin grants in the dashboard and can revoke any of them. Place under Settings → Access. (Position negotiable later.)
+- **A6.** Yes — while an admin grant is active, contributor sees a visible "Admin X is viewing your dashboard" indicator.
+- **A7.** **Max 2 concurrent admins** per contributor.
+
+### Visual theme (A8–A10)
+- **A8.** Slightly more vivid / darker-gold tint applies across the **entire contributor-owned experience** (public `/c/[handle]` profile, dashboard, all contributor surfaces). Not dark mode — a tonal shift only.
+- **A9.** All surfaces shift: background tints, card borders, buttons, nav highlights.
+- **A10.** Fixed design decision for users. Provide a dev-only override toggle (e.g. env var or query flag) so we can flip back to the standard theme during development.
+
+### Cover photos (A11–A16)
+- **A11.** Max **5** cover photos per contributor profile.
+- **A12.** Carousel **auto-rotates** on the public profile.
+- **A13.** Aspect ratio **16:9**.
+- **A14.** Optional caption per image.
+- **A15.** Accept PNG, JPG, **SVG, and GIF**. (If GIF/SVG poses a security or perf risk that cannot be cleanly mitigated, fall back to PNG/JPG only and note in DECISIONS.)
+- **A16.** Cover photos are **contributor-only**. Citizens (non-contributors) instead get optional profile "flair" icons (crowns, balloons, etc.) shown beside their avatar on the map when live. (Flair system scoped as a follow-up.)
+
+### Analytics (A17–A21)
+- **A17.** Per-contributor analytics, **nested** by place → events → volunteers/followers/managers. Storage should reflect this hierarchy so other Citizens ecosystem apps (Vision) can pull contributor-rooted trees.
+- **A18.** Daily aggregated counters (light footprint, retain as much functionality as possible).
+- **A19.** Public to Citizens: follows + joins on users / events / orgs / places. Owner-only: views, cancels, reports, RSVPs, search-results, anything tied to contributor profile/assets.
+- **A20.** CSV / XLSX export from the analytics tab if possible.
+- **A21.** **1 year** retention inside Connect. Yearly snapshots get exported to Citizens Vision storage for longer-term use.
+
+### 40% right-panel (A22–A25)
+- **A22.** Empty state when nothing selected. Show a friendly "Select an item to preview" + a couple of "you may want to…" suggestions. (Design free to surface KPIs/quick-actions here if helpful.)
+- **A23.** Explicit **Save** button — no auto-save.
+- **A24.** On save, the change goes live on the public surface **immediately** (no review step for owners).
+- **A25.** Mobile panel supports **swipe-to-close**.
+
+### Specialised services (A26–A29)
+- **A26.** Predefined tags **plus** custom strings — expands the search bank.
+- **A27.** Max **10** specialised services per place.
+- **A28.** Searchable **immediately** on entry. **Strict input validation/sanitisation** to prevent SQL injection / search-engine injection. Apply best-practice allowlist (length cap, character class restrictions, normalisation) on insert and on search.
+- **A29.** **Per-place** scope, not contributor-wide.
+
+### Broadcasts (A30–A34)
+- **A30.** Place broadcasts → **all followers of the place**. Event broadcasts → **only RSVPed users**.
+- **A31.** Delivered as **in-app notification + push notification + a banner update on the event/place view card**.
+- **A32.** **500 char** limit.
+- **A33.** **Text only.** No media or links.
+- **A34.** Reactions allowed **only if implementation stays lightweight**. If it adds bugs or perf cost, ship read-only and revisit later.
+
+### Volunteer system (A35–A40)
+- **A35.** Volunteer application = **message only** (free-text).
+- **A36.** Volunteers apply per-asset: each event or place exposes its own "Volunteer" CTA when the owner has enabled it. Provide an **"Open for volunteers"** toggle on event create/edit and on place create/edit which shows or hides the volunteer pill.
+- **A37.** Approved volunteer role is **purely informational** for now — no special edit permissions. Expandable later.
+- **A38.** Volunteer list is **contributor-private**.
+- **A39.** No hard cap. Owner approves or declines individually.
+- **A40.** Volunteers may **withdraw** after approval. Flow: TBD in implementation (simple "Withdraw" button on the volunteer's own application card).
+
+### Team roles (A41–A45)
+- **A41.** Only owner / editor / viewer / volunteer for now. Other roles deferred.
+- **A42.** Invite via in-dashboard **search popup** with 3 search bars: full name, user ID, email. Results stream from the user database; click to send invite.
+- **A43.** Exactly **one owner**, but ownership can be **transferred** (reassign owner `user_id`).
+- **A44.** Confirmed:
+  - **Editor** — full edit on events, places, broadcasts.
+  - **Viewer** — read-only analytics + inbox.
+- **A45.** Team membership is **visible on the public contributor profile** (removable later if unneeded).
+
+### Admin "view as contributor" (A46–A48)
+- **A46.** Yes — every admin action while access is active is logged as "Admin [name] on behalf of [Contributor]" in the audit log.
+- **A47.** Yes — contributor receives an in-app notification on each admin-attributed change.
+- **A48.** **Only admins** can revoke their own active access (contributor cannot self-revoke an active session). _Note: this overrides the earlier A5 statement — contributor sees the active grant, but revocation power sits with admins. Clarify in implementation if user reconfirms._
+
+### Dashboard home (A49–A52)
+- **A49.** Confirm the suggested set. Rename "KPI" → **"Analytics"** throughout the UI.
+- **A50.** Time-period selectors: **7 / 14 / 30 / 60 / 90 days · 6 months · 1 year**.
+- **A51.** Quick-action row above analytics — confirmed.
+- **A52.** Recent activity feed showing **citizen activity on the contributor's events and places**.
+
+### Planning (A53–A56)
+- **A53.** Confirm the suggested contents. Additional rule: each task is a **card with a title** that, when opened, exposes details, lists, links, assigned places, etc. Each card has a **top-right completion box** (turns green when complete).
+- **A54.** **Free-form lists only.** No calendar sync.
+- **A55.** Planning items are **contributor-private by default**. Each card has a **"Public" toggle below the delete control** that, when on, makes the card visible to the contributor's team members.
+- **A56.** Yes — **Ideas bank** as a sibling of tasks. Same card model as tasks (title + detail body + lists + links + assigned places). Top-right control is a **delete marker**; same Public toggle below it.
+
+### Suggestion button (A57–A60)
+- **A57.** Not a categorised report — a single floating **"Suggestions?" / "Fixes?"** button that invites open feedback. On click, glass-panel popup with a **Suggestion Title** + free-text body. Apply **strict character restrictions + SQL-injection prevention** (allowlist, length cap, server-side validation). Submission must capture the **surface / URL / page / event / place** it was triggered from so admins know the context.
+- **A58.** Routes to the **admin inbox** (admin notifications).
+- **A59.** Yes — submitter receives a status update when the suggestion is actioned (best-effort; tie to existing notification system).
+- **A60.** **10 per user per day.** All suggestions land in a dedicated **admin-side suggestion inbox** with an option to **export as XLSX**.
+
+### Handle / slug (A61–A63)
+- **A61.** Warning copy confirmed: "This will break any existing links to your profile. Are you sure?"
+- **A62.** **No legacy-handle redirect.** Old handles stop resolving immediately — keeps code simple.
+- **A63.** Only **admins** may override the one-change-per-month limit.
+
+### Search term analytics (A64–A66)
+- **A64.** Show **top 10 this month**.
+- **A65.** **Raw anonymised queries** (no bucketing).
+- **A66.** Contributor-added keywords **do feed the platform autocomplete** for all users (after sanitisation).
+
+---
+
+## v2 → Implementation Plan (locked)
+
+> Foundation: Batch 16 already shipped the schema + dashboard scaffold
+> (`/c/[slug]/dashboard/{overview,planning,team,settings,broadcasts,volunteers,analytics,drafts,history,search,profile}`),
+> 12 tables, SECURITY DEFINER functions, global Suggestion button.
+> The plan below covers everything still missing or needing refinement to
+> satisfy the v2 answers in full.
+
+### Stage A — Admin access UX + safety surface
+1. Migration: extend `contributor_access_requests` with a `viewing_started_at` column for indicator + concurrency tracking.
+2. API + UI: "Request access" button on the public contributor profile for admins
+   (rendered in the same slot as the owner's "Open Dashboard" CTA, with a white
+   overlay label when no active grant).
+3. Dashboard indicator banner when an admin grant is active (uses Realtime).
+4. Admin action attribution: middleware/helper that writes `actor_role = 'admin'` + impersonated contributor id into every mutating API call while a grant is active. All inserts go through `activity_log` with the "on behalf of" framing.
+5. Contributor notification on each admin-attributed change (reuse notification system).
+6. Settings → Access: list of active grants + admin self-revoke endpoint
+   (contributor view is read-only per A48).
+
+### Stage B — Contributor theme tint
+1. Add a tonal-variant token set in `globals.css` (vivid/darker-gold tint).
+2. Wrap all `/c/[slug]/**` and contributor-owned surfaces with a `data-theme="contributor"` attribute.
+3. Add dev-only override (env flag `NEXT_PUBLIC_CONTRIBUTOR_THEME=off` or query param).
+
+### Stage C — Cover photos + carousel
+1. Storage: reuse the existing public bucket; gate per-user folder via RLS.
+2. UI: 5-slot carousel uploader inside Dashboard → Profile.
+3. Public profile: 16:9 auto-rotating carousel behind avatar.
+4. Validate MIME (PNG/JPG/SVG/GIF); SVG sanitised through DOMPurify-equivalent or rejected at upload if sanitisation cost is too high (decide on apply; log decision).
+5. Optional caption per image (separate jsonb structure).
+6. Citizens flair (crowns/balloons) scoped to a follow-up batch.
+
+### Stage D — Specialised services + keyword bank
+1. UI: per-place editor (Dashboard → Places → selected place) with a chip
+   input (predefined tag list + custom-string entry). Max 10.
+2. Strict server-side validation: allowlist `[A-Za-z0-9 ._-]`, length cap 40, NFC-normalise, dedupe per place.
+3. Contributor keywords editor in Settings (sanitisation identical).
+4. Wire both into the global search index / autocomplete (A66).
+
+### Stage E — Broadcasts wiring
+1. UI: composer on Dashboard → Broadcasts and in the per-event/per-place panels (500-char text-only).
+2. API: POST broadcast → fan-out to followers (place) or RSVPed users (event).
+3. Delivery: in-app notification + push notification + banner on event/place view card.
+4. Soft-delete + audit retention (already in schema).
+5. Reactions: skip in this batch (revisit per A34).
+
+### Stage F — Volunteers UX
+1. Add `volunteer_openings boolean` toggle on event create/edit and on place create/edit.
+   (Event side already has the column from migration 098 — extend places.)
+2. Public surfaces: render "Volunteer" pill only when the toggle is on.
+3. Citizen application form (message only) → existing `volunteer_applications` table.
+4. Dashboard → Volunteers: approve / decline (with reason), private list, withdraw flow.
+
+### Stage G — Team management UX
+1. Dashboard → Team → "+ Add team member" popup with 3 search bars (name, user_id, email).
+2. Server search endpoint with rate-limit + sanitised LIKE query.
+3. Invite flow → `team_memberships` row, in-app notification to invitee, accept/decline.
+4. Owner transfer flow (reassign `team_memberships.role = 'owner'` atomically).
+5. Public profile: render team list (removable later).
+
+### Stage H — Analytics depth + export
+1. Daily aggregation trigger or pg_cron job populating `contributor_analytics`
+   nested by place → event.
+2. Dashboard → Analytics: time-window selector (7/14/30/60/90d, 6mo, 1yr).
+3. Citizen-public vs owner-only segmentation per A19.
+4. CSV/XLSX export endpoint (use existing CSV util; XLSX via SheetJS if cost-justified — else CSV with `.xlsx` MIME left as TODO).
+5. 1-year retention + Vision-export hook (stub for now).
+
+### Stage I — Planning cards (tasks + ideas)
+1. Card open/close UI for tasks and ideas with title + body + lists + links + assigned places.
+2. Tasks: top-right completion box (green when done).
+3. Ideas: top-right delete control.
+4. Public toggle under the control to expose card to team members.
+
+### Stage J — Suggestion button polish
+1. Glass-panel composer with title + body, server-side validation (length cap, allowlist), capture trigger URL / event / place.
+2. Admin suggestion inbox view with status updates back to submitter.
+3. XLSX export.
+4. Per-user 10/day rate limit.
+
+### Stage K — Handle change rule
+1. UI warning copy on slug edit.
+2. Server enforces 1-change-per-month using `handle_changed_at`.
+3. Admin override endpoint (bypass with audit-log entry).
+
+### Stage L — Search term analytics
+1. Capture sanitised search queries in a daily-rolling table.
+2. Dashboard → Settings or Analytics: "Top 10 queries this month".
+3. Feed contributor keywords into autocomplete (A66).
+
+---
+
+### Sequencing (first cut, may re-order as we land each batch)
+
+1. **Stage A** — admin access UX + safety (security-critical).
+2. **Stage B** — contributor theme tint (low risk, sets visual baseline for next stages).
+3. **Stage C** — cover photos.
+4. **Stage F** — volunteer toggle + public CTA.
+5. **Stage E** — broadcasts fan-out + delivery.
+6. **Stage D** — specialised services + keyword bank.
+7. **Stage G** — team invite popup.
+8. **Stage I** — planning cards refinement.
+9. **Stage H** — analytics depth + export.
+10. **Stage J** — suggestion inbox polish + XLSX.
+11. **Stage K** — slug change rule.
+12. **Stage L** — search term analytics.
+
+Each stage = its own batch: migrations (if any) → API → UI → tests → architect → security → push.
+
+

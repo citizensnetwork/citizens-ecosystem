@@ -104,6 +104,51 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
 
   // Contributor branch — richer public profile.
   if (isApprovedContributor(profile)) {
+    // Dashboard CTA state — owner / admin-granted / admin-no-grant.
+    // Computed server-side so the client component never trusts role checks.
+    let dashboardMode: "owner" | "admin-granted" | "admin-no-grant" | null = null;
+    let pendingRequestId: string | null = null;
+    if (user) {
+      if (user.id === profile.id) {
+        dashboardMode = "owner";
+      } else {
+        const { data: viewerProfile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle<{ role: string }>();
+        if (viewerProfile?.role === "admin") {
+          const { data: activeGrant } = await supabase
+            .from("contributor_access_requests")
+            .select("id, status, expires_at, revoked_at")
+            .eq("contributor_id", profile.id)
+            .eq("admin_id", user.id)
+            .in("status", ["pending", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle<{
+              id: string;
+              status: string;
+              expires_at: string | null;
+              revoked_at: string | null;
+            }>();
+          if (
+            activeGrant?.status === "approved" &&
+            !activeGrant.revoked_at &&
+            activeGrant.expires_at &&
+            new Date(activeGrant.expires_at) > new Date()
+          ) {
+            dashboardMode = "admin-granted";
+          } else if (activeGrant?.status === "pending") {
+            dashboardMode = "admin-no-grant";
+            pendingRequestId = activeGrant.id;
+          } else {
+            dashboardMode = "admin-no-grant";
+          }
+        }
+      }
+    }
+
     const now = new Date().toISOString();
     const allEvents = createdEvents ?? [];
     const upcoming = allEvents.filter((e) => e.date >= now);
@@ -155,6 +200,8 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
         upcomingEvents={upcoming}
         pastEvents={pastWithRatings}
         locations={locations}
+        dashboardMode={dashboardMode}
+        dashboardPendingRequestId={pendingRequestId}
       />
     );
   }

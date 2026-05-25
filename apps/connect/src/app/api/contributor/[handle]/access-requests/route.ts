@@ -141,6 +141,12 @@ export async function POST(
     .single();
 
   if (error) {
+    // Partial unique index on (contributor_id, admin_id) where status='pending'
+    // collapses the concurrent-submit race into a 23505. Map to the same 409
+    // the pre-check would have returned.
+    if ((error as { code?: string }).code === "23505") {
+      return NextResponse.json({ error: "Request already pending" }, { status: 409 });
+    }
     console.error("[API access-requests POST]", error);
     return NextResponse.json({ error: "Failed to submit request" }, { status: 500 });
   }

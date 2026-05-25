@@ -2,6 +2,26 @@
 
 > Record of key technical choices and their rationale. Prevents future sessions from re-debating solved problems.
 
+## Contributor dashboard access UX — server-computed mode, never client-trusted role
+
+**Decision — `DashboardAccessButton` receives `mode: "owner" | "admin-granted" | "admin-no-grant"` as a server-rendered prop; the component never inspects the viewer's role client-side.** `ProfileDetailServer` resolves the mode by checking `profile.id === viewer.id`, then querying `contributor_access_requests` for `admin_id = auth.uid()` with status in (`pending`, `approved`), filtering server-side for `revoked_at IS NULL` and unexpired `expires_at`. The button only renders when mode is non-null; non-admin Citizens get no button at all. This keeps the existing RLS-first model — `is_admin()` and `auth.uid()` are evaluated inside Postgres, never inferred from a client header. Stage A.1 of `docs/plans/contributor-dashboard.md`.
+
+## Concurrent access-request submissions — DB-level uniqueness over API check
+
+**Decision — `contributor_access_requests_pending_unique` is a partial unique index on `(contributor_id, admin_id) WHERE status = 'pending' AND revoked_at IS NULL`.** The POST handler in `/api/contributor/[handle]/access-requests` had a check-then-insert pattern that two concurrent requests from the same admin could both pass, producing duplicate notifications. Pushing uniqueness into the DB collapses the race into a 23505 unique_violation which the API translates into the same 409 the pre-check already returned. Migration 102.
+
+## Place review aggregation — SECURITY INVOKER RPC over JS reduce
+
+**Decision — `get_place_review_stats(p_window_start timestamptz)` (SECURITY INVOKER, search_path = public, pg_temp) returns one pre-aggregated row per place; events page calls it via `supabase.rpc()` instead of pulling up to 5 000 reviews and reducing in JS.** The old approach silently capped at 5 000 rows (`REVIEWS_LIMIT`) — a hard ceiling that would have silently corrupted aggregates the moment review volume crossed it. Aggregating in Postgres scales linearly with row count, returns Numeric (not float), and runs under invoker semantics so RLS on `reviews` still applies (reviews are publicly readable, so anon execution is granted). Migration 101.
+
+## Browser Supabase client — module-level singleton
+
+**Decision — `createClient()` returns a cached `createBrowserClient(...)` instance keyed on the module.** Each call previously instantiated a fresh client with its own auth listener; mounting N components meant N listeners on the same browser session. The singleton is safe because `NEXT_PUBLIC_*` env vars are inlined at build time so the placeholder fallback is only used during prerender. `__resetClientForTests()` is gated by `process.env.NODE_ENV === "test"` so it is a no-op in production bundles. Commit PENDING_SHA.
+
+## MapLibre CSS — root layout, not per-component
+
+**Decision — `import "maplibre-gl/dist/maplibre-gl.css"` lives in `src/app/layout.tsx`; map components no longer import it directly.** Next.js de-dupes identical CSS imports, but co-locating the import in the root layout keeps the dependency visible and avoids subtle ordering issues when both `EventMap` and `MapBackdrop` mount in the same route. Trade-off noted: ~14 KB gz now ships on first paint for non-map routes; acceptable for a map-first product where the map is the dominant surface.
+
 ## Contributor dashboard — non-destructible audit + SECURITY DEFINER for privileged transitions
 
 **Decision — `contributor_access_requests` and `activity_log` are append-only; no DELETE RLS policies.** Admin dashboard access is gated by an approval workflow with max 2 concurrent sessions enforced inside `check_max_dashboard_sessions(uuid)` (SECURITY DEFINER). State transitions go through `approve_dashboard_access(uuid)` and `deny_dashboard_access(uuid, text)` so the audit-log INSERT and the status UPDATE are atomic; the contributor's own UPDATE RLS path is reserved for self-driven actions. `purge_old_activity_logs()` (90-day) and `purge_old_analytics()` (1-year) are SECURITY DEFINER with `REVOKE EXECUTE FROM anon, authenticated, public` so only service-role / pg_cron can run them. Migrations 100 + 100b. Function-expression uniqueness (e.g. `lower(keyword)`) must be a separate `CREATE UNIQUE INDEX`, not an inline table `UNIQUE` constraint — Postgres syntax requirement we re-confirmed during migration 100.
@@ -57,7 +77,6 @@ Pending applicants have `role='citizen'` (role is only upgraded to `'contributor
 
 **Decision — `isVerifiedContributor` (VerifiedBadge) kept as backward-compat alias.**
 Multiple test files and component callers import `isVerifiedContributor` from `VerifiedBadge`. Rather than migrating all call sites in this batch, the export is kept but delegates to `isApprovedContributor`. A `TODO` comment marks it for future removal once callers are migrated.
-
 
 
 **Decision — MessageButton removed from ContributorPublicProfile until messaging is designed.**

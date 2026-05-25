@@ -1,15 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
 import EventsView from "@/components/events/EventsView";
 import EasterEggOrchestrator from "@/components/easter/EasterEggOrchestrator";
-import type { Event, Place, Preferences, Profile, Review } from "@/types/db";
+import type { Event, Place, Preferences, Profile } from "@/types/db";
 
 export const dynamic = "force-dynamic";
+
+/** Shape of one row returned by the `get_place_review_stats` RPC.
+ *  Hoisted so future field additions land in one place. */
+type ReviewStatRow = {
+  place_id: string;
+  review_count: number;
+  total_rating: number;
+  negative_signals: number;
+};
 
 /** Cap public-bucket fetches so a mature platform with thousands of
  *  rows can't blow up first-paint payload. The map shell only needs a
  *  representative sample for search ranking + clustering. */
 const PLACES_LIMIT = 1000;
-const REVIEWS_LIMIT = 5000;
 /** Only consider reviews from the last 12 months when computing
  *  freshness / verification signals. Older signals are noise. */
 const REVIEW_WINDOW_MONTHS = 12;
@@ -50,7 +58,7 @@ export default async function EventsPage() {
   const [
     { data: publicEvents },
     { data: places },
-    { data: reviews },
+    { data: reviewStats },
     { data: contributors },
     { data: profile },
   ] = await Promise.all([
@@ -68,14 +76,8 @@ export default async function EventsPage() {
       .order("name")
       .limit(PLACES_LIMIT)
       .returns<Place[]>(),
-    supabase
-      .from("reviews")
-      .select("place_id, rating, still_exists")
-      .not("place_id", "is", null)
-      .gte("created_at", reviewWindowCutoff)
-      .order("created_at", { ascending: false })
-      .limit(REVIEWS_LIMIT)
-      .returns<Pick<Review, "place_id" | "rating" | "still_exists">[]>(),
+    // One SQL aggregate instead of 5,000 raw rows JS-reduced on the server.
+    supabase.rpc("get_place_review_stats", { p_window_start: reviewWindowCutoff }),
     supabase
       .from("profiles")
       .select(
@@ -111,29 +113,21 @@ export default async function EventsPage() {
     events = (publicEvents ?? []).filter((e) => e.visibility !== "private");
   }
 
+  // RPC returns one pre-aggregated row per place — no JS reduce needed.
+  const reviewStatRows = (reviewStats ?? []) as ReviewStatRow[];
   const reviewBuckets = new Map<
     string,
     { total: number; count: number; negativeSignals: number }
-  >();
-
-  for (const review of reviews ?? []) {
-    const placeId = review.place_id;
-    if (!placeId) continue;
-
-    const current = reviewBuckets.get(placeId) ?? {
-      total: 0,
-      count: 0,
-      negativeSignals: 0,
-    };
-
-    current.total += review.rating;
-    current.count += 1;
-    if (review.still_exists === false) {
-      current.negativeSignals += 1;
-    }
-
-    reviewBuckets.set(placeId, current);
-  }
+  >(
+    reviewStatRows.map((row) => [
+      row.place_id,
+      {
+        total: Number(row.total_rating),
+        count: Number(row.review_count),
+        negativeSignals: Number(row.negative_signals),
+      },
+    ]),
+  );
 
   const placesWithStats: Place[] = (places ?? []).map((place) => {
     const stats = reviewBuckets.get(place.id);
