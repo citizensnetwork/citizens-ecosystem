@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { Event, Profile } from "@/types/db";
 import { CATEGORY_LABELS } from "@/lib/categories";
+import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
+import type { OrgBroadcast } from "@/components/contributor/OrgBroadcastList";
 
 export const dynamic = "force-dynamic";
 
@@ -110,8 +112,23 @@ export default async function ShareableEventPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = await fetchEvent(id);
+  const supabase = await createClient();
+
+  const [event, broadcastsRes] = await Promise.all([
+    fetchEvent(id),
+    supabase
+      .from("broadcast_messages")
+      .select("id, body, created_at")
+      .eq("entity_type", "event")
+      .eq("entity_id", id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
+
   if (!event) notFound();
+
+  const broadcasts = (broadcastsRes.data ?? []) as OrgBroadcast[];
 
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
     weekday: "long",
@@ -253,6 +270,13 @@ export default async function ShareableEventPage({
                 </a>
               )}
             </div>
+          </div>
+        )}
+
+        {/* From the Organiser — broadcast messages */}
+        {broadcasts.length > 0 && (
+          <div className="mt-8">
+            <OrgBroadcastList broadcasts={broadcasts} />
           </div>
         )}
 

@@ -18,6 +18,7 @@ import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
 import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
+import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
 import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 import type { Event, Place, PlaceMedia, Review } from "@/types/db";
 
@@ -46,7 +47,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
 
   const isOwner = !!user && user.id === place.created_by;
 
-  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes, upcomingEventsRes, pastEventsRes] = await Promise.all([
+  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes, upcomingEventsRes, pastEventsRes, broadcastsRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
@@ -104,6 +105,14 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
           .limit(10)
           .returns<Pick<Event, "id" | "title" | "date" | "category" | "image_url">[]>()
       : Promise.resolve({ data: [] as Pick<Event, "id" | "title" | "date" | "category" | "image_url">[] }),
+    supabase
+      .from("broadcast_messages")
+      .select("id, body, created_at")
+      .eq("entity_type", "place")
+      .eq("entity_id", id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
   const reviews = reviewsRes.data;
@@ -114,6 +123,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
   const canEdit = isOwner || isAdmin;
   const upcomingEvents = upcomingEventsRes.data ?? [];
   const pastEvents = pastEventsRes.data ?? [];
+  const broadcasts = (broadcastsRes.data ?? []) as { id: string; body: string; created_at: string }[];
 
   const owner = (ownerRes.data ?? null) as {
     id: string;
@@ -331,6 +341,13 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
               </ul>
             </section>
           )}
+        </div>
+      )}
+
+      {/* From the Organiser — contributor broadcasts for this place */}
+      {broadcasts.length > 0 && (
+        <div className="mt-2">
+          <OrgBroadcastList broadcasts={broadcasts} />
         </div>
       )}
 

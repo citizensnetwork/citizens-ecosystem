@@ -143,7 +143,7 @@ export async function POST(
     metadata: { broadcast_id: data.id },
   });
 
-  // Notify recipients
+  // Insert in-app notifications for recipients synchronously
   const notifyPromise = entityType === "event"
     ? supabase
         .from("rsvps")
@@ -157,22 +157,47 @@ export async function POST(
 
   const { data: recipients } = await notifyPromise;
   if (recipients && recipients.length > 0) {
-    const notifications = recipients.map((r: Record<string, string>) => ({
-      user_id: "user_id" in r ? r.user_id : r.follower_id,
-      type: "event_update" as const,
-      title: "Broadcast from organiser",
-      body: text.length > 100 ? text.slice(0, 97) + "…" : text,
-      image_url: null,
-      data: {
-        broadcast_id: data.id,
-        entity_type: entityType,
-        entity_id: entityId,
-      },
-    }));
+    const notifications = recipients
+      .map((r: Record<string, string>) => ({
+        user_id: "user_id" in r ? r.user_id : r.follower_id,
+        type: "broadcast_sent" as const,
+        title: "Message from the organiser",
+        body: text.length > 100 ? text.slice(0, 97) + "…" : text,
+        image_url: null,
+        data: {
+          broadcast_id: data.id,
+          entity_type: entityType,
+          entity_id: entityId,
+        },
+      }))
+      // Exclude sender from their own broadcast
+      .filter((n) => n.user_id !== contributorId);
+
     // Batch insert in chunks to avoid Supabase payload limits
     for (let i = 0; i < notifications.length; i += 100) {
       await supabase.from("notifications").insert(notifications.slice(i, i + 100));
     }
+  }
+
+  // Fire-and-forget: edge function handles FCM push delivery (skipInApp=true)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (supabaseUrl) {
+    fetch(`${supabaseUrl}/functions/v1/notify-broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        record: {
+          id: data.id,
+          entity_type: entityType,
+          entity_id: entityId,
+          contributor_id: contributorId,
+          body: text,
+          deleted_at: null,
+        },
+      }),
+    }).catch((err) =>
+      console.error("[broadcasts POST] notify-broadcast fire-and-forget failed:", err)
+    );
   }
 
   return NextResponse.json(data, { status: 201 });

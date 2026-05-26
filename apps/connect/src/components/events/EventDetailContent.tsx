@@ -24,6 +24,8 @@ import { ReportButton } from "@/components/ui/ReportButton";
 import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import { isCancelledEvent, isDraftEvent, isCommunityEvent } from "@/lib/events/capabilities";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
+import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
+import type { OrgBroadcast } from "@/components/contributor/OrgBroadcastList";
 import type { Event, EventMedia, EventTag } from "@/types/db";
 import type { EventOrganiser } from "@/components/events/EventDetailServer";
 import type { User } from "@supabase/supabase-js";
@@ -54,6 +56,7 @@ type Props = {
   tags?: EventTag[];
   organiser?: EventOrganiser | null;
   isAdmin?: boolean;
+  broadcasts?: OrgBroadcast[];
 };
 
 export default function EventDetailContent({
@@ -67,6 +70,7 @@ export default function EventDetailContent({
   tags = [],
   organiser = null,
   isAdmin = false,
+  broadcasts = [],
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -399,6 +403,15 @@ export default function EventDetailContent({
           </div>
         );
       })()}
+
+      {/* From the Organiser — contributor dashboard broadcasts (broadcast_messages).
+          Shown whenever the contributor has sent at least one broadcast to attendees.
+          Self-hides when empty. */}
+      {broadcasts.length > 0 && (
+        <div className="mt-6 border-t pt-5">
+          <OrgBroadcastList broadcasts={broadcasts} />
+        </div>
+      )}
 
       {/* From the Organiser — organiser-authored broadcast updates.
           The composer is visible to the event owner and admins so they

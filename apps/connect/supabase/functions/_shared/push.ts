@@ -16,9 +16,16 @@ export interface PushPayload {
     | "event_update"
     | "review_prompt"
     | "contributor_approved"
-    | "contributor_rejected";
+    | "contributor_rejected"
+    | "broadcast_sent";
   image_url?: string;
   data?: Record<string, string>;
+  /**
+   * When true, skips inserting in-app notification rows.
+   * Use when the caller (e.g. an API route) has already inserted them
+   * and this function should only deliver FCM push.
+   */
+  skipInApp?: boolean;
 }
 
 // ── FCM v1 OAuth2 token management ──────────────────────────
@@ -115,7 +122,8 @@ export async function sendNotifications(
 ): Promise<void> {
   if (payload.user_ids.length === 0) return;
 
-  // 1. Insert in-app notifications
+  // 1. Insert in-app notifications (skipped when caller has already done so)
+  if (!payload.skipInApp) {
   const rows = payload.user_ids.map((user_id) => ({
     user_id,
     type: payload.type,
@@ -129,6 +137,7 @@ export async function sendNotifications(
   if (insertErr) {
     console.error("[send-push] Failed to insert notifications:", insertErr.message);
   }
+  } // end skipInApp guard
 
   // 2. Get push tokens for these users (only users with digest = 'instant')
   const { data: profiles } = await supabase

@@ -118,6 +118,21 @@ Roles: `citizen` / `contributor` (with `contributor_kind`: ministry / organizati
 - `.github/instructions/connect-ui-system.instructions.md` — UI system rules (60/30/10 white-black-gold, floating controls)
 - `.github/instructions/maplibre-maps.instructions.md` — MapLibre GL JS API patterns for map components
 - `.github/instructions/supabase-patterns.instructions.md` — Dual-client pattern, RLS, storage, migrations
+- `.github/instructions/docs-routing.instructions.md` — Documentation routing rules (where decisions are written)
+- `.github/instructions/feature-clarity.instructions.md` — Feature-area spec routing (messaging, events, profile, etc.)
+
+### Skills (domain knowledge, loaded on demand)
+- `.agents/skills/ui-system/` — Citizens Connect design system (60/30/10, floating controls, component patterns)
+- `.agents/skills/api-route/` — Next.js App Router API route conventions (auth-gate, rate-limiting, validation)
+- `.agents/skills/maplibre-patterns/` — MapLibre GL JS patterns (markers, clustering, spatial UX)
+- `.agents/skills/rls-patterns/` — Row Level Security policy patterns and auth-gated data access
+- `.agents/skills/supabase-migration/` — Migration authoring, naming, and apply workflow
+- `.agents/skills/quality-gate/` — Quality gate pipeline (tsc → vitest → lint → architect → security → push)
+- `.agents/skills/supabase/` — General Supabase (auth, realtime, storage, edge functions)
+- `.agents/skills/vibe-security/` — Security audit checklist (OWASP, RLS, input validation, auth)
+
+### Agents
+- `.github/agents/connect-auditor.agent.md` — End-to-end feature auditor (VISION + MASTER_DIRECTION aligned)
 
 ### Prompts (reusable workflows)
 - `.github/prompts/add-supabase-table.prompt.md` — Generate table with migration, types, RLS

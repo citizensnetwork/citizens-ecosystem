@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import EventDetailContent from "@/components/events/EventDetailContent";
 import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import type { Event, EventMedia, EventTag, UserRole } from "@/types/db";
+import type { OrgBroadcast } from "@/components/contributor/OrgBroadcastList";
 
 /**
  * Slim organiser summary shown on the event detail page (click to open
@@ -48,7 +49,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
     notFound();
   }
 
-  const [{ data: { user } }, { count }, { data: mediaRows }, { data: tagRows }, { data: organiserRow }] = await Promise.all([
+  const [{ data: { user } }, { count }, { data: mediaRows }, { data: tagRows }, { data: organiserRow }, { data: broadcastRows }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("rsvps")
@@ -69,6 +70,14 @@ export default async function EventDetailServer({ id }: { id: string }) {
       .select("id, full_name, role, contributor_status, contributor_slug, logo_url, avatar_url")
       .eq("id", event.created_by)
       .maybeSingle(),
+    supabase
+      .from("broadcast_messages")
+      .select("id, body, created_at")
+      .eq("entity_type", "event")
+      .eq("entity_id", id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
   const organiser: EventOrganiser | null = organiserRow
@@ -92,6 +101,8 @@ export default async function EventDetailServer({ id }: { id: string }) {
   const tags = tagRowsTyped
     .map((r) => (Array.isArray(r.tag) ? r.tag[0] : r.tag))
     .filter((t): t is EventTag => t !== null && t !== undefined && !t.is_hidden);
+
+  const broadcasts = (broadcastRows ?? []) as OrgBroadcast[];
 
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
@@ -174,6 +185,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       tags={tags}
       organiser={organiser}
       isAdmin={isAdmin}
+      broadcasts={broadcasts}
     />
   );
 }
