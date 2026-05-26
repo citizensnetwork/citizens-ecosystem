@@ -63,9 +63,9 @@
 
 ---
 
-## 2b. Previous batch — SidePanel back/dismiss split (commit `e76f449`)
+## 2b. Previous batch — SidePanel back/dismiss split (commit `e76f449` + Should-fix in `0f2cedf`)
 
-UX: split close into back-chevron (`router.back()` w/ fallback) + X (collapse stack via `router.push(fallbackHref)`). ESC + backdrop kept as back-one-step. Architect Should-fix applied (`setTimeout` bare global, `aria-labelledby`, `aria-hidden` on SVGs). tsc 0, vitest 741/741, lint clean.
+UX: split close into back-chevron (top-left, `router.back()` w/ fallback) + X (top-right, `router.push(fallbackHref)` — collapses entire panel stack). ESC + backdrop kept as back-one-step. Architect Should-fix (`setTimeout` bare global, `aria-labelledby` on dialog role, `aria-hidden` on both decorative SVGs) bundled into `0f2cedf`. tsc 0, vitest 744/744, lint clean. Architect verdict: SHIP.
 
 ---
 
