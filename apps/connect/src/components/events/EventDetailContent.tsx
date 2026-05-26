@@ -26,6 +26,8 @@ import { isCancelledEvent, isDraftEvent, isCommunityEvent } from "@/lib/events/c
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
 import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
 import type { OrgBroadcast } from "@/components/contributor/OrgBroadcastList";
+import VolunteerApplyButton from "@/components/volunteer/VolunteerApplyButton";
+import type { VolunteerStatus } from "@/components/volunteer/VolunteerApplyButton";
 import type { Event, EventMedia, EventTag } from "@/types/db";
 import type { EventOrganiser } from "@/components/events/EventDetailServer";
 import type { User } from "@supabase/supabase-js";
@@ -57,6 +59,9 @@ type Props = {
   organiser?: EventOrganiser | null;
   isAdmin?: boolean;
   broadcasts?: OrgBroadcast[];
+  volunteerStatus?: VolunteerStatus;
+  volunteerApplicationId?: string | null;
+  organiserHandle?: string | null;
 };
 
 export default function EventDetailContent({
@@ -71,6 +76,9 @@ export default function EventDetailContent({
   organiser = null,
   isAdmin = false,
   broadcasts = [],
+  volunteerStatus = "none",
+  volunteerApplicationId = null,
+  organiserHandle = null,
 }: Props) {
   const dateFmt: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -367,6 +375,21 @@ export default function EventDetailContent({
             event={event}
             isAttending={hasRsvped}
             locationSharingEnabled={locationSharingEnabled}
+          />
+        </div>
+      )}
+
+      {/* Volunteer CTA — only when the organiser has opened this event for volunteers */}
+      {event.volunteer_openings && organiserHandle && (
+        <div className="mt-4">
+          <VolunteerApplyButton
+            entityType="event"
+            entityId={event.id}
+            contributorHandle={organiserHandle}
+            userId={user?.id ?? null}
+            initialStatus={volunteerStatus}
+            initialApplicationId={volunteerApplicationId}
+            isOwner={user?.id === event.created_by}
           />
         </div>
       )}

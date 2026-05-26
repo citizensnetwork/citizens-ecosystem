@@ -34,10 +34,10 @@ export default async function TeamDashboardPage({
     supabase
       .from("volunteer_applications")
       .select(
-        "id, applicant_id, entity_type, entity_id, message, status, created_at, applicant:profiles!volunteer_applications_applicant_id_fkey(full_name, avatar_url)"
+        "id, applicant_id, entity_type, entity_id, message, response_message, status, created_at, applicant:profiles!volunteer_applications_applicant_id_fkey(full_name, avatar_url)"
       )
       .eq("contributor_id", contributor.id)
-      .in("status", ["pending", "approved"])
+      .in("status", ["pending", "approved", "declined"])
       .order("created_at", { ascending: false }),
   ]);
 
@@ -47,7 +47,7 @@ export default async function TeamDashboardPage({
   };
   type VolunteerRow = {
     id: string; applicant_id: string; entity_type: string; entity_id: string;
-    message: string | null; status: string; created_at: string;
+    message: string | null; response_message: string | null; status: string; created_at: string;
     applicant: { full_name: string | null; avatar_url: string | null } | null;
   };
 

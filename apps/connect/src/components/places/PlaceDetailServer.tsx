@@ -19,6 +19,7 @@ import FollowPlaceButton from "@/components/places/FollowPlaceButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
 import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
+import VolunteerApplyButton from "@/components/volunteer/VolunteerApplyButton";
 import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 import type { Event, Place, PlaceMedia, Review } from "@/types/db";
 
@@ -47,7 +48,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
 
   const isOwner = !!user && user.id === place.created_by;
 
-  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes, upcomingEventsRes, pastEventsRes, broadcastsRes] = await Promise.all([
+  const [reviewsRes, mediaRes, followerCountRes, userFollowRes, profileRes, ownerRes, upcomingEventsRes, pastEventsRes, broadcastsRes, volunteerAppRes] = await Promise.all([
     supabase
       .from("reviews")
       .select("*, profiles(full_name)")
@@ -113,6 +114,16 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(3),
+    // Citizen's own volunteer application for this place (only when volunteer_openings is on)
+    user && place.volunteer_openings
+      ? supabase
+          .from("volunteer_applications")
+          .select("id, status")
+          .eq("applicant_id", user.id)
+          .eq("entity_type", "place")
+          .eq("entity_id", id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const reviews = reviewsRes.data;
@@ -124,6 +135,10 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
   const upcomingEvents = upcomingEventsRes.data ?? [];
   const pastEvents = pastEventsRes.data ?? [];
   const broadcasts = (broadcastsRes.data ?? []) as { id: string; body: string; created_at: string }[];
+
+  const volunteerApp = volunteerAppRes.data as { id: string; status: string } | null;
+  const volunteerStatus = (volunteerApp?.status ?? "none") as
+    | "none" | "pending" | "approved" | "declined" | "withdrawn";
 
   const owner = (ownerRes.data ?? null) as {
     id: string;
@@ -245,10 +260,16 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
         </span>
       )}
 
-      {place.volunteer_openings && (
-        <span className="ml-2 inline-block rounded-full bg-(--gold-soft) px-2.5 py-0.5 text-xs font-semibold text-(--gold)">
-          Volunteer
-        </span>
+      {place.volunteer_openings && owner?.contributor_slug && (
+        <VolunteerApplyButton
+          entityType="place"
+          entityId={place.id}
+          contributorHandle={owner.contributor_slug}
+          userId={user?.id ?? null}
+          initialStatus={volunteerStatus}
+          initialApplicationId={volunteerApp?.id ?? null}
+          isOwner={isOwner}
+        />
       )}
 
       {place.verification_flagged && (

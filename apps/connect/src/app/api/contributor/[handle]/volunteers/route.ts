@@ -8,7 +8,7 @@ import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
-const ALLOWED_STATUSES = ["pending", "approved", "declined"] as const;
+const ALLOWED_STATUSES = ["pending", "approved", "declined", "withdrawn"] as const;
 type VolunteerStatus = (typeof ALLOWED_STATUSES)[number];
 
 function sanitize(str: string): string {
@@ -156,9 +156,17 @@ export async function POST(
       .maybeSingle();
     if (!existing) return NextResponse.json({ error: "Application not found" }, { status: 404 });
 
+    const rawResponseMsg = (body as Record<string, unknown>).response_message;
+    const responseMessage = rawResponseMsg
+      ? sanitize(String(rawResponseMsg)).slice(0, 500) || null
+      : null;
+
     const { error: updateErr } = await supabase
       .from("volunteer_applications")
-      .update({ status: newStatus })
+      .update({
+        status: newStatus,
+        ...(responseMessage !== null ? { response_message: responseMessage } : {}),
+      })
       .eq("id", String(application_id));
     if (updateErr) return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
 
@@ -187,6 +195,39 @@ export async function POST(
         body: notifBody,
         link: null,
       });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "withdraw") {
+    // Citizen withdraws their own pending or approved application.
+    // No dashboard access check needed — gated by applicant_id = user.id.
+    const { application_id } = body as Record<string, unknown>;
+    if (!application_id || !isValidUUID(String(application_id))) {
+      return NextResponse.json({ error: "Invalid application_id" }, { status: 400 });
+    }
+
+    const { data: existing } = await supabase
+      .from("volunteer_applications")
+      .select("id")
+      .eq("id", String(application_id))
+      .eq("applicant_id", user.id)
+      .in("status", ["pending", "approved"])
+      .maybeSingle();
+
+    if (!existing) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    const { error: updateErr } = await supabase
+      .from("volunteer_applications")
+      .update({ status: "withdrawn" })
+      .eq("id", String(application_id))
+      .eq("applicant_id", user.id);
+
+    if (updateErr) {
+      return NextResponse.json({ error: "Failed to withdraw application" }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });

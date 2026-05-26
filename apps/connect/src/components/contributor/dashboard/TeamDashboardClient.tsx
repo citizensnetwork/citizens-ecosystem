@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 
@@ -17,6 +17,7 @@ interface Volunteer {
   entity_type: string;
   entity_id: string;
   message: string | null;
+  response_message: string | null;
   status: string;
   created_at: string;
   applicant: { full_name: string | null; avatar_url: string | null } | null;
@@ -28,8 +29,16 @@ interface Props {
   volunteers: Volunteer[];
 }
 
-export default function TeamDashboardClient({ slug, members: initialMembers, volunteers }: Props) {
+const STATUS_CLASSES: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  approved: "bg-green-100 text-green-700",
+  declined: "bg-black/10 text-black/50",
+  withdrawn: "bg-black/10 text-black/40",
+};
+
+export default function TeamDashboardClient({ slug, members: initialMembers, volunteers: initialVolunteers }: Props) {
   const [members, setMembers] = useState(initialMembers);
+  const [volunteers, setVolunteers] = useState(initialVolunteers);
   const [tab, setTab] = useState<"members" | "volunteers">("members");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<
@@ -37,6 +46,13 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
   >([]);
   const [searching, setSearching] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
+
+  // Volunteer respond state
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [responseMsg, setResponseMsg] = useState("");
+  const [respondingAction, setRespondingAction] = useState<"approved" | "declined" | null>(null);
+  const [submittingResponse, setSubmittingResponse] = useState(false);
+  const [volunteerError, setVolunteerError] = useState("");
 
   async function searchUsers() {
     if (!searchQuery.trim() || searching) return;
@@ -97,6 +113,57 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
     if (!res.ok) setMembers(prev);
   }
 
+  async function respondToVolunteer(applicationId: string, newStatus: "approved" | "declined") {
+    setSubmittingResponse(true);
+    setVolunteerError("");
+    try {
+      const res = await fetch(`/api/contributor/${slug}/volunteers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_status",
+          application_id: applicationId,
+          status: newStatus,
+          ...(responseMsg.trim() ? { response_message: responseMsg.trim() } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setVolunteerError((err as Record<string, string>).error ?? "Failed to update status");
+        setSubmittingResponse(false);
+        return;
+      }
+      setVolunteers((prev) =>
+        prev.map((v) =>
+          v.id === applicationId
+            ? { ...v, status: newStatus, response_message: responseMsg.trim() || null }
+            : v
+        )
+      );
+      setRespondingTo(null);
+      setResponseMsg("");
+      setRespondingAction(null);
+    } catch {
+      setVolunteerError("Network error. Please try again.");
+    } finally {
+      setSubmittingResponse(false);
+    }
+  }
+
+  function openRespond(applicationId: string, action: "approved" | "declined") {
+    setRespondingTo(applicationId);
+    setRespondingAction(action);
+    setResponseMsg("");
+    setVolunteerError("");
+  }
+
+  function cancelRespond() {
+    setRespondingTo(null);
+    setRespondingAction(null);
+    setResponseMsg("");
+    setVolunteerError("");
+  }
+
   const pendingVolunteers = volunteers.filter((v) => v.status === "pending");
 
   return (
@@ -147,7 +214,7 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchUsers()}
-                placeholder="Search by name, email, or user ID…"
+                placeholder="Search by name, email, or user IDâ€¦"
                 className="flex-1 text-sm border border-[--border] rounded-xl px-4 py-2 bg-[--surface] focus:outline-none focus:border-[--gold]"
               />
               <button
@@ -155,7 +222,7 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
                 disabled={searching}
                 className="px-4 py-2 rounded-xl border border-[--border] text-sm hover:border-[--gold] transition-colors disabled:opacity-40"
               >
-                {searching ? "Searching…" : "Search"}
+                {searching ? "Searchingâ€¦" : "Search"}
               </button>
             </div>
 
@@ -239,9 +306,10 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
           {volunteers.length === 0 ? (
             <p className="text-sm text-[--foreground-soft]">No volunteer applications yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {volunteers.map((v) => (
                 <li key={v.id} className="surface-card rounded-xl p-4 space-y-2">
+                  {/* Header row */}
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-[--surface-muted] flex items-center justify-center text-xs overflow-hidden flex-shrink-0">
                       {v.applicant?.avatar_url ? (
@@ -255,20 +323,94 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
                     <span
                       className={[
                         "ml-auto text-xs px-2 py-0.5 rounded-full capitalize font-medium",
-                        v.status === "pending"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-green-100 text-green-700",
+                        STATUS_CLASSES[v.status] ?? "bg-black/10 text-black/50",
                       ].join(" ")}
                     >
                       {v.status}
                     </span>
                   </div>
+
+                  {/* Applicant message */}
                   {v.message && (
-                    <p className="text-xs text-[--foreground-soft]">{v.message}</p>
+                    <p className="text-xs text-[--foreground-soft] italic">&ldquo;{v.message}&rdquo;</p>
                   )}
+
+                  {/* Response message (shown after respond) */}
+                  {v.response_message && v.status !== "pending" && (
+                    <p className="text-xs text-[--foreground-soft]">
+                      <span className="font-medium">Your response:</span> {v.response_message}
+                    </p>
+                  )}
+
                   <div className="text-xs text-[--foreground-soft]">
-                    For: {v.entity_type} · Applied {new Date(v.created_at).toLocaleDateString()}
+                    For: {v.entity_type} Â· Applied {new Date(v.created_at).toLocaleDateString()}
                   </div>
+
+                  {/* Respond inline form (pending only) */}
+                  {v.status === "pending" && respondingTo === v.id ? (
+                    <div className="pt-2 space-y-2 border-t border-[--border]">
+                      <p className="text-xs font-medium text-[--foreground]">
+                        {respondingAction === "approved" ? "Approve volunteer?" : "Decline this applicant?"}
+                      </p>
+                      <textarea
+                        className="w-full rounded-xl border border-[--border] bg-[--surface] p-2 text-xs resize-none focus:outline-none focus:border-[--gold]"
+                        rows={2}
+                        maxLength={500}
+                        placeholder={
+                          respondingAction === "approved"
+                            ? "Optional: add a welcome noteâ€¦"
+                            : "Optional: let them know why (visible to applicant)â€¦"
+                        }
+                        value={responseMsg}
+                        onChange={(e) => setResponseMsg(e.target.value)}
+                        aria-label="Response message"
+                      />
+                      {volunteerError && respondingTo === v.id && (
+                        <p className="text-xs text-red-600" role="alert">{volunteerError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => respondToVolunteer(v.id, respondingAction!)}
+                          disabled={submittingResponse}
+                          className={[
+                            "rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                            respondingAction === "approved"
+                              ? "bg-green-600 text-white hover:bg-green-700"
+                              : "bg-red-500 text-white hover:bg-red-600",
+                          ].join(" ")}
+                        >
+                          {submittingResponse
+                            ? "Savingâ€¦"
+                            : respondingAction === "approved"
+                            ? "Confirm Approve"
+                            : "Confirm Decline"}
+                        </button>
+                        <button
+                          onClick={cancelRespond}
+                          disabled={submittingResponse}
+                          className="rounded-full border border-[--border] px-4 py-1.5 text-xs text-[--foreground-soft] hover:bg-[--surface-muted] transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : v.status === "pending" ? (
+                    /* Action buttons for pending applications */
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => openRespond(v.id, "approved")}
+                        className="rounded-full bg-green-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => openRespond(v.id, "declined")}
+                        className="rounded-full border border-red-300 px-4 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -278,3 +420,4 @@ export default function TeamDashboardClient({ slug, members: initialMembers, vol
     </div>
   );
 }
+

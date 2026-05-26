@@ -108,6 +108,8 @@ export default async function EventDetailServer({ id }: { id: string }) {
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
   let locationSharingEnabled = false;
   let isAdmin = false;
+  let volunteerStatus: "none" | "pending" | "approved" | "declined" | "withdrawn" = "none";
+  let volunteerApplicationId: string | null = null;
 
   // `rsvps.user_id` is a belongs-to FK to `profiles`, so Supabase
   // returns a single embedded object (or null), not an array.
@@ -143,6 +145,22 @@ export default async function EventDetailServer({ id }: { id: string }) {
     hasRsvped = !!rsvp;
     locationSharingEnabled = profile?.location_sharing ?? false;
     isAdmin = profileIsAdmin(profile);
+
+    // Fetch the current user's volunteer application status for this event
+    // (only when the event has volunteer_openings enabled).
+    if (event.volunteer_openings) {
+      const { data: va } = await supabase
+        .from("volunteer_applications")
+        .select("id, status")
+        .eq("applicant_id", user.id)
+        .eq("entity_type", "event")
+        .eq("entity_id", id)
+        .maybeSingle();
+      if (va) {
+        volunteerStatus = (va.status as typeof volunteerStatus) ?? "none";
+        volunteerApplicationId = va.id as string;
+      }
+    }
 
     const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
     let friendSet = new Set<string>();
@@ -186,6 +204,9 @@ export default async function EventDetailServer({ id }: { id: string }) {
       organiser={organiser}
       isAdmin={isAdmin}
       broadcasts={broadcasts}
+      volunteerStatus={volunteerStatus}
+      volunteerApplicationId={volunteerApplicationId}
+      organiserHandle={organiser?.contributor_slug ?? null}
     />
   );
 }
