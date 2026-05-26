@@ -27,6 +27,8 @@ import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
 import DashboardAccessButton from "@/components/contributor/DashboardAccessButton";
 import CoverPhotoCarousel from "@/components/contributor/CoverPhotoCarousel";
+import ContributorThemeOverride from "@/components/contributor/ContributorThemeOverride";
+import { isContributorThemeEnabled } from "@/lib/dashboard/theme";
 import { CONTRIBUTOR_KIND_LABELS } from "@/types/db";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
@@ -89,14 +91,14 @@ export function ContributorPublicProfile({
 
   // Apply contributor theme tint across the entire contributor-owned
   // public profile experience (A8). Respect dev override env flag.
-  const contributorThemeEnabled =
-    process.env.NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED !== "false";
+  const contributorThemeEnabled = isContributorThemeEnabled();
 
   return (
     <div
       data-contributor-ui={contributorThemeEnabled ? "" : undefined}
       className="bg-[#faf9f6] pb-16"
     >
+      <ContributorThemeOverride />
       {coverPhotos.length > 0 && (
         <CoverPhotoCarousel photos={coverPhotos} altLabel={displayName ?? "Contributor"} />
       )}

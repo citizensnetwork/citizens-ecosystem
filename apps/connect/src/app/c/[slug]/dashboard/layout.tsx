@@ -10,7 +10,9 @@ import DashboardNav from "@/components/contributor/dashboard/DashboardNav";
 import ActiveGrantBanner, {
   type ActiveGrant,
 } from "@/components/contributor/dashboard/ActiveGrantBanner";
+import ContributorThemeOverride from "@/components/contributor/ContributorThemeOverride";
 import { markViewingStarted } from "@/lib/dashboard/adminAttribution";
+import { isContributorThemeEnabled } from "@/lib/dashboard/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -97,14 +99,14 @@ export default async function DashboardLayout({ children, params }: Props) {
   }
 
   // Determine if contributor theme is enabled via environment variable
-  const contributorThemeEnabled =
-    process.env.NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED !== "false";
+  const contributorThemeEnabled = isContributorThemeEnabled();
 
   return (
     <div
       data-contributor-ui={contributorThemeEnabled ? "" : undefined}
       className="min-h-screen bg-[--background]"
     >
+      <ContributorThemeOverride />
       {/* Owner: Realtime banner shown when admins hold active grants */}
       {isOwner && (
         <ActiveGrantBanner
