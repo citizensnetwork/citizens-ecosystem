@@ -15,7 +15,33 @@
 
 ---
 
-## 2. What just shipped — Stage A item 7: unified contributor mutation attribution (commit `0f2cedf`)
+## 2. What just shipped — Stage B: contributor theme tint, env+query-param override (commit `f6559ea`)
+
+**Finished Stage B of the contributor-dashboard plan.** Most of Stage B (tonal-variant tokens + `data-contributor-ui` wiring on contributor-owned surfaces) shipped in batch 16b; this commit adds the remaining dev-only override.
+
+### New files
+- `src/lib/dashboard/theme.ts` — `isContributorThemeEnabled()` honours both `NEXT_PUBLIC_CONTRIBUTOR_THEME=off` and legacy `NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED=false`. Default-on.
+- `src/components/contributor/ContributorThemeOverride.tsx` (`"use client"`) — reads `?contributorTheme=on|off` via `useSearchParams()`, persists to `sessionStorage["cc:contributorTheme"]`, swaps `data-contributor-ui` ↔ `data-contributor-ui-target` on matching DOM elements. SSR-safe, whitelist-gated (only `"on"`/`"off"` reach DOM/storage), idempotent under Strict Mode.
+
+### Modified files
+- `src/app/c/[slug]/dashboard/layout.tsx` — inline env check replaced with `isContributorThemeEnabled()`; mounts `<ContributorThemeOverride />`.
+- `src/components/contributor/ContributorPublicProfile.tsx` — same.
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **744/744** (no new tests; purely additive override + helper)
+- `npx next lint --dir src` → clean
+- Supabase advisors: **86 WARN baseline unchanged** (no DB changes)
+- Architect verdict: **SHIP** — grade A across architecture, security, performance, a11y, code quality. No Should-fix.
+
+### Nice-to-haves deferred
+- Wrap `<ContributorThemeOverride />` in `<Suspense fallback={null}>` at both mount sites.
+- Rename `data-contributor-ui` → `data-theme="contributor"` to match plan doc Stage B item 2.
+- Drop legacy `NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED` env flag once migrated.
+
+---
+
+## 2a. Previous batch — Stage A item 7: unified contributor mutation attribution (commit `0f2cedf`)
 
 **Centralised every contributor-side mutation's audit trail through a single helper, then wired it into 8 routes (~18 mutation points).**
 
