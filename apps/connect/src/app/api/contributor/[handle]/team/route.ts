@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -152,12 +153,13 @@ export async function POST(
       return NextResponse.json({ error: "Failed to add team member" }, { status: 500 });
     }
 
-    await supabase.from("activity_log").insert({
-      contributor_id: contributorId,
-      actor_id: user.id,
+    await recordContributorMutation(supabase, {
+      handle,
+      access,
+      actorId: user.id,
       action: "team_member_added",
-      entity_type: "team_membership",
-      entity_id: data.id,
+      entityType: "team_membership",
+      entityId: data.id,
       metadata: { member_id: memberId, role },
     });
 
@@ -217,6 +219,14 @@ export async function PATCH(
     if (error) {
       return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
     }
+    await recordContributorMutation(supabase, {
+      handle,
+      access,
+      actorId: user.id,
+      action: "team_member_removed",
+      entityType: "team_membership",
+      entityId: membershipId,
+    });
     return NextResponse.json({ success: true });
   }
 
@@ -234,6 +244,15 @@ export async function PATCH(
     if (error) {
       return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
     }
+    await recordContributorMutation(supabase, {
+      handle,
+      access,
+      actorId: user.id,
+      action: "team_member_role_changed",
+      entityType: "team_membership",
+      entityId: membershipId,
+      metadata: { role },
+    });
     return NextResponse.json({ success: true });
   }
 

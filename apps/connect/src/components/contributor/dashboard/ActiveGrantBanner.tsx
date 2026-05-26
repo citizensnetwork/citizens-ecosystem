@@ -61,7 +61,15 @@ export default function ActiveGrantBanner({ contributorId, contributorSlug, init
       )
       .subscribe();
 
+    // Stage A nice-to-have: auto-clear banner on TTL expiry. Realtime
+    // postgres_changes does not fire when a row "expires" by timestamp, so
+    // poll every 60s as a safety net.
+    const tick = setInterval(() => {
+      void refetch();
+    }, 60_000);
+
     return () => {
+      clearInterval(tick);
       void supabase.removeChannel(channel);
     };
   }, [contributorId]);

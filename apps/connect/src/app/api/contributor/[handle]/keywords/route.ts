@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -98,6 +99,16 @@ export async function POST(
     return NextResponse.json({ error: "Failed to add keyword" }, { status: 500 });
   }
 
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "keyword_added",
+    entityType: "keyword",
+    entityId: data.id,
+    metadata: { keyword: data.keyword },
+  });
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -121,6 +132,10 @@ export async function DELETE(
 
   const { contributorId } = access;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { error } = await supabase
     .from("contributor_keywords")
@@ -131,6 +146,15 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to delete keyword" }, { status: 500 });
   }
+
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "keyword_deleted",
+    entityType: "keyword",
+    entityId: id,
+  });
 
   return NextResponse.json({ success: true });
 }

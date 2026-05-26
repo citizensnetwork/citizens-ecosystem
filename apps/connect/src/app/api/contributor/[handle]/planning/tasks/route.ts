@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -106,6 +107,15 @@ export async function POST(
     return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
   }
 
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "task_created",
+    entityType: "planning_task",
+    entityId: data.id,
+  });
+
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
 
@@ -191,6 +201,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
   }
 
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: patch.status === "completed" ? "task_completed" : "task_updated",
+    entityType: "planning_task",
+    entityId: raw.id as string,
+  });
+
   return NextResponse.json({ success: true });
 }
 
@@ -214,6 +233,10 @@ export async function DELETE(
 
   const { contributorId } = access;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { error } = await supabase
     .from("planning_tasks")
@@ -224,6 +247,15 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to delete task" }, { status: 500 });
   }
+
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "task_deleted",
+    entityType: "planning_task",
+    entityId: id,
+  });
 
   return NextResponse.json({ success: true });
 }

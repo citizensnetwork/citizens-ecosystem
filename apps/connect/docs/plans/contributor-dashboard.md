@@ -586,6 +586,15 @@ User answers v2 questions (A1–A66). Then lock v1 cut, slot after edit-fixes ba
 5. Contributor notification on each admin-attributed change (reuse notification system).
 6. Settings → Access: list of active grants + admin self-revoke endpoint
    (contributor view is read-only per A48).
+7. **Unified mutation attribution helper** (`src/lib/dashboard/activity.ts` →
+   `recordContributorMutation`): every mutating contributor route
+   (broadcasts, team, volunteers, drafts, keywords, services, planning
+   tasks/ideas, access-request revoke) delegates audit through this helper.
+   Owner writes → `activity_log.actor_role='contributor'`. Admin-with-grant
+   writes → `logAdminOnBehalfAction` (activity_log row with
+   `actor_role='admin'` + metadata.on_behalf_of, plus a notification of
+   type `admin_on_behalf_action` deep-linking the contributor to
+   `/c/{slug}/dashboard/settings`).
 
 ### Stage B — Contributor theme tint
 1. Add a tonal-variant token set in `globals.css` (vivid/darker-gold tint).
@@ -663,7 +672,7 @@ User answers v2 questions (A1–A66). Then lock v1 cut, slot after edit-fixes ba
 ### Sequencing (first cut, may re-order as we land each batch)
 
 1. **Stage A** — admin access UX + safety (security-critical).
-2. **Stage B** — contributor theme tint (low risk, sets visual baseline for next stages).
+2. **Stage B** — contributor theme tint (low risk, sets visual baseline for next stages). 
 3. **Stage C** — cover photos.
 4. **Stage F** — volunteer toggle + public CTA.
 5. **Stage E** — broadcasts fan-out + delivery.

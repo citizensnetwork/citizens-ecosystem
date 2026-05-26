@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -160,6 +161,16 @@ export async function POST(
       .update({ status: newStatus })
       .eq("id", String(application_id));
     if (updateErr) return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
+
+    await recordContributorMutation(supabase, {
+      handle,
+      access,
+      actorId: user.id,
+      action: `volunteer_${newStatus}`,
+      entityType: "volunteer_application",
+      entityId: String(application_id),
+      metadata: { applicant_id: existing.applicant_id },
+    });
 
     // Notify applicant
     const notifBody =

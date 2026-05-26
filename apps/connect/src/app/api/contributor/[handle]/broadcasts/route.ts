@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -131,13 +132,14 @@ export async function POST(
     return NextResponse.json({ error: "Failed to send broadcast" }, { status: 500 });
   }
 
-  // Log activity
-  await supabase.from("activity_log").insert({
-    contributor_id: contributorId,
-    actor_id: user.id,
+  // Log activity (owner → contributor; admin-on-behalf → admin attribution + notify contributor)
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
     action: "broadcast_sent",
-    entity_type: entityType,
-    entity_id: entityId,
+    entityType,
+    entityId,
     metadata: { broadcast_id: data.id },
   });
 
@@ -216,13 +218,13 @@ export async function DELETE(
   }
 
   // Log deletion
-  await supabase.from("activity_log").insert({
-    contributor_id: contributorId,
-    actor_id: user.id,
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
     action: "broadcast_deleted",
-    entity_type: "broadcast",
-    entity_id: broadcastId,
-    metadata: {},
+    entityType: "broadcast",
+    entityId: broadcastId,
   });
 
   return NextResponse.json({ success: true });

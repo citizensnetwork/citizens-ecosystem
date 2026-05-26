@@ -64,7 +64,7 @@ export default function SidePanel({
   const animateThen = useCallback(
     (navigate: () => void) => {
       setVisible(false);
-      window.setTimeout(navigate, 300);
+      setTimeout(navigate, 300);
     },
     [],
   );
@@ -119,7 +119,7 @@ export default function SidePanel({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title ?? "Details"}
+        aria-labelledby="sidepanel-title"
         className={`absolute right-0 top-0 flex h-dvh w-full max-w-215 flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out md:w-[60vw] md:rounded-l-2xl md:border-l md:border-(--gold)/40 ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
@@ -140,6 +140,7 @@ export default function SidePanel({
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black/70 shadow-sm ring-1 ring-black/10 transition hover:bg-(--gold-soft) hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
           >
             <svg
+              aria-hidden="true"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -167,6 +168,7 @@ export default function SidePanel({
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black/70 shadow-sm ring-1 ring-black/10 transition hover:bg-(--gold-soft) hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
           >
             <svg
+              aria-hidden="true"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
@@ -112,6 +113,16 @@ export async function POST(
     return NextResponse.json({ error: "Failed to add service" }, { status: 500 });
   }
 
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "service_added",
+    entityType: "specialised_service",
+    entityId: data.id,
+    metadata: { place_id: placeId, service: data.service },
+  });
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -135,6 +146,10 @@ export async function DELETE(
 
   const { contributorId } = access;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Verify place ownership before deleting
   const { data: place } = await supabase
@@ -156,6 +171,16 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to delete service" }, { status: 500 });
   }
+
+  await recordContributorMutation(supabase, {
+    handle,
+    access,
+    actorId: user.id,
+    action: "service_deleted",
+    entityType: "specialised_service",
+    entityId: id,
+    metadata: { place_id: placeId },
+  });
 
   return NextResponse.json({ success: true });
 }

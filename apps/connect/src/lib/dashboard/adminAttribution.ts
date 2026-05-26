@@ -80,7 +80,7 @@ export async function logAdminOnBehalfAction(
     action,
     entity_type: entityType,
     entity_id: entityId,
-    metadata: { on_behalf_of: contributorId, ...(metadata ?? {}) },
+    metadata: { ...(metadata ?? {}), on_behalf_of: contributorId },
   });
   if (logError) {
     console.error("[adminAttribution] activity_log insert failed", logError);

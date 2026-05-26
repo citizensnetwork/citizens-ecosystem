@@ -8,10 +8,18 @@ interface Keyword {
   keyword: string;
 }
 
+/** Canonical lifecycle states for `contributor_access_requests.status`. */
+export type AccessRequestStatus =
+  | "pending"
+  | "approved"
+  | "denied"
+  | "expired"
+  | "revoked";
+
 interface AccessRequest {
   id: string;
   admin_id: string;
-  status: string;
+  status: AccessRequestStatus;
   expires_at: string | null;
   revoked_at: string | null;
   viewing_started_at: string | null;
