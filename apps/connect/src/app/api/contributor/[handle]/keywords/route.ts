@@ -6,6 +6,19 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
 const MAX_KEYWORDS = 20;
+const KEYWORD_MAX_LEN = 40;
+/** Allowlist per A28: letters, digits, space, period, underscore, hyphen. */
+const KEYWORD_ALLOWLIST = /^[A-Za-z0-9 ._-]+$/;
+
+function sanitiseKeyword(raw: string): string {
+  return raw
+    .normalize("NFC")
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .replace(/  +/g, " ")
+    .trim()
+    .toLowerCase()
+    .slice(0, KEYWORD_MAX_LEN);
+}
 
 /** GET /api/contributor/[handle]/keywords — public list. */
 export async function GET(
@@ -68,12 +81,16 @@ export async function POST(
   }
 
   const raw = body as Record<string, unknown>;
-  const keyword = typeof raw.keyword === "string"
-    ? raw.keyword.replace(/[\x00-\x1F\x7F]/g, " ").trim().toLowerCase().slice(0, 50)
-    : "";
+  const keyword = typeof raw.keyword === "string" ? sanitiseKeyword(raw.keyword) : "";
 
   if (keyword.length < 2) {
     return NextResponse.json({ error: "Keyword must be at least 2 characters" }, { status: 400 });
+  }
+  if (!KEYWORD_ALLOWLIST.test(keyword)) {
+    return NextResponse.json(
+      { error: "Keyword may only contain letters, numbers, spaces, periods, underscores, and hyphens" },
+      { status: 422 }
+    );
   }
 
   // Check cap

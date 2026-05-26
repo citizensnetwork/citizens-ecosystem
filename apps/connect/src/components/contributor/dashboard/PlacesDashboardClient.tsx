@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { PREDEFINED_SERVICES } from "@/types/db";
+
+const MAX_SERVICES = 10;
+const SERVICE_MAX_LEN = 40;
+/** Mirror of server allowlist: letters, digits, space, period, underscore, hyphen. */
+const SERVICE_ALLOWLIST = /^[A-Za-z0-9 ._-]*$/;
 
 interface Place {
   id: string;
@@ -16,6 +22,11 @@ interface Place {
   place_follows: { count: number }[];
 }
 
+interface Service {
+  id: string;
+  service: string;
+}
+
 interface Props {
   slug: string;
   places: Place[];
@@ -24,6 +35,74 @@ interface Props {
 export default function PlacesDashboardClient({ slug, places }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = places.find((p) => p.id === selectedId) ?? null;
+
+  // Services state
+  const [services, setServices] = useState<Service[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [newService, setNewService] = useState("");
+  const [addingService, setAddingService] = useState(false);
+  const [removingService, setRemovingService] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+
+  const fetchServices = useCallback(async (placeId: string) => {
+    setServicesLoading(true);
+    setServiceError(null);
+    try {
+      const res = await fetch(`/api/contributor/${slug}/places/${placeId}/services`);
+      if (res.ok) {
+        const data = await res.json();
+        setServices(data.services ?? []);
+      }
+    } finally {
+      setServicesLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    if (selectedId) {
+      setServices([]);
+      setNewService("");
+      setServiceError(null);
+      fetchServices(selectedId);
+    }
+  }, [selectedId, fetchServices]);
+
+  async function addService(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedId || !newService.trim() || addingService) return;
+    setServiceError(null);
+    setAddingService(true);
+    try {
+      const res = await fetch(`/api/contributor/${slug}/places/${selectedId}/services`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service: newService.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setServiceError(data.error ?? "Failed to add service");
+      } else {
+        setServices((prev) => [...prev, { id: data.id, service: data.service }]);
+        setNewService("");
+      }
+    } finally {
+      setAddingService(false);
+    }
+  }
+
+  async function removeService(serviceId: string) {
+    if (!selectedId) return;
+    setRemovingService(serviceId);
+    try {
+      await fetch(
+        `/api/contributor/${slug}/places/${selectedId}/services?id=${serviceId}`,
+        { method: "DELETE" }
+      );
+      setServices((prev) => prev.filter((s) => s.id !== serviceId));
+    } finally {
+      setRemovingService(null);
+    }
+  }
 
   return (
     <div className="flex gap-4 h-[calc(100vh-180px)] min-h-[400px]">
@@ -107,11 +186,11 @@ export default function PlacesDashboardClient({ slug, places }: Props) {
         )}
       </div>
 
-      {/* Right: preview panel (40%) — desktop only */}
+      {/* Right: preview + services panel (40%) — desktop only */}
       <aside className="hidden lg:flex w-2/5 flex-col surface-card rounded-2xl overflow-hidden">
         {selected ? (
           <>
-            <div className="h-44 bg-[--surface-muted] overflow-hidden flex-shrink-0">
+            <div className="h-36 bg-[--surface-muted] overflow-hidden flex-shrink-0">
               {selected.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -125,18 +204,20 @@ export default function PlacesDashboardClient({ slug, places }: Props) {
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-3">
-              <h3 className="text-lg font-semibold">{selected.name}</h3>
-              {selected.address && (
-                <p className="text-sm text-[--foreground-soft]">{selected.address}</p>
-              )}
-              {selected.category && (
-                <p className="text-sm">
-                  <span className="font-medium">Category:</span>{" "}
-                  <span className="text-[--foreground-soft]">{selected.category}</span>
-                </p>
-              )}
-              <div className="flex gap-2 pt-2">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">{selected.name}</h3>
+                {selected.address && (
+                  <p className="text-sm text-[--foreground-soft] mt-0.5">{selected.address}</p>
+                )}
+                {selected.category && (
+                  <p className="text-xs text-[--foreground-soft] mt-0.5">
+                    {selected.category}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
                 <Link
                   href={`/places/${selected.id}`}
                   className="flex-1 text-center text-sm py-2 rounded-xl border border-[--border] hover:border-[--gold] transition-colors"
@@ -150,18 +231,119 @@ export default function PlacesDashboardClient({ slug, places }: Props) {
                   Edit
                 </Link>
               </div>
-              <div className="pt-2 border-t border-[--border]">
-                <Link
-                  href={`/c/${slug}/dashboard/places/${selected.id}/services`}
-                  className="text-sm text-[--gold] hover:underline"
-                >
-                  Manage services →
-                </Link>
-              </div>
+
+              {/* Specialised services */}
+              <section
+                className="border-t border-[--border] pt-4"
+                aria-label="Specialised services"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold">
+                    Specialised services{" "}
+                    <span className="font-normal text-[--foreground-soft]">
+                      ({services.length}/{MAX_SERVICES})
+                    </span>
+                  </h4>
+                </div>
+                <p className="text-xs text-[--foreground-soft] mb-3">
+                  Help citizens discover this place. Shown publicly and included in search.
+                </p>
+
+                {servicesLoading ? (
+                  <p className="text-xs text-[--foreground-soft]">Loading…</p>
+                ) : (
+                  <>
+                    {/* Current chips */}
+                    {services.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {services.map((svc) => (
+                          <span
+                            key={svc.id}
+                            className="inline-flex items-center gap-1 text-xs bg-[--surface-muted] px-2.5 py-1 rounded-full border border-[--border]"
+                          >
+                            {svc.service}
+                            <button
+                              onClick={() => removeService(svc.id)}
+                              disabled={removingService === svc.id}
+                              className="opacity-50 hover:opacity-100 transition-opacity"
+                              aria-label={`Remove ${svc.service}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add form */}
+                    {services.length < MAX_SERVICES && (
+                      <>
+                        <form onSubmit={addService} className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={newService}
+                            onChange={(e) =>
+                              setNewService(
+                                e.target.value
+                                  .replace(/[^A-Za-z0-9 ._-]/g, "")
+                                  .slice(0, SERVICE_MAX_LEN)
+                              )
+                            }
+                            placeholder="Add a service…"
+                            maxLength={SERVICE_MAX_LEN}
+                            className="flex-1 text-xs border border-[--border] rounded-xl px-3 py-1.5 bg-[--surface] focus:outline-none focus:border-[--gold]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={
+                              addingService ||
+                              !newService.trim() ||
+                              !SERVICE_ALLOWLIST.test(newService)
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-[--gold] text-black text-xs font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                          >
+                            Add
+                          </button>
+                        </form>
+                        {serviceError && (
+                          <p role="alert" className="text-xs text-red-500 mb-2">
+                            {serviceError}
+                          </p>
+                        )}
+                        {/* Predefined suggestions */}
+                        <div className="flex flex-wrap gap-1">
+                          {PREDEFINED_SERVICES.filter(
+                            (s) =>
+                              !services.some(
+                                (svc) => svc.service.toLowerCase() === s.toLowerCase()
+                              )
+                          )
+                            .slice(0, 8)
+                            .map((svc) => (
+                              <button
+                                key={svc}
+                                onClick={() => setNewService(svc)}
+                                className="text-xs px-2 py-0.5 rounded-full border border-[--border] hover:border-[--gold] transition-colors"
+                              >
+                                {svc}
+                              </button>
+                            ))}
+                        </div>
+                      </>
+                    )}
+                    {services.length >= MAX_SERVICES && (
+                      <p className="text-xs text-[--foreground-soft]">
+                        Maximum {MAX_SERVICES} services reached.
+                      </p>
+                    )}
+                  </>
+                )}
+              </section>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-sm text-[--foreground-soft]">
+
             Select a place to preview
           </div>
         )}

@@ -6,6 +6,18 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
 const MAX_SERVICES = 10;
+const SERVICE_MAX_LEN = 40;
+/** Allowlist per A28: letters, digits, space, period, underscore, hyphen. */
+const SERVICE_ALLOWLIST = /^[A-Za-z0-9 ._-]+$/;
+
+function sanitiseService(raw: string): string {
+  return raw
+    .normalize("NFC")
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .replace(/  +/g, " ")
+    .trim()
+    .slice(0, SERVICE_MAX_LEN);
+}
 
 /**
  * GET /api/contributor/[handle]/places/[placeId]/services — public.
@@ -82,12 +94,16 @@ export async function POST(
   }
 
   const raw = body as Record<string, unknown>;
-  const service = typeof raw.service === "string"
-    ? raw.service.replace(/[\x00-\x1F\x7F]/g, " ").trim().slice(0, 100)
-    : "";
+  const service = typeof raw.service === "string" ? sanitiseService(raw.service) : "";
 
   if (service.length < 2) {
     return NextResponse.json({ error: "Service name must be at least 2 characters" }, { status: 400 });
+  }
+  if (!SERVICE_ALLOWLIST.test(service)) {
+    return NextResponse.json(
+      { error: "Service name may only contain letters, numbers, spaces, periods, underscores, and hyphens" },
+      { status: 422 }
+    );
   }
 
   // Check cap
@@ -102,7 +118,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from("specialised_services")
-    .insert({ place_id: placeId, service })
+    .insert({ place_id: placeId, contributor_id: contributorId, service })
     .select("id, service")
     .single();
 
