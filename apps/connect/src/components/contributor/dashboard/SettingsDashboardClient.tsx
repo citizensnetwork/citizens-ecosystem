@@ -12,10 +12,11 @@ interface AccessRequest {
   id: string;
   admin_id: string;
   status: string;
-  approved_at: string | null;
   expires_at: string | null;
   revoked_at: string | null;
-  denied_reason: string | null;
+  viewing_started_at: string | null;
+  denial_reason: string | null;
+  updated_at: string | null;
   admin: { full_name: string | null; avatar_url: string | null } | null;
 }
 
@@ -23,9 +24,12 @@ interface Props {
   slug: string;
   keywords: Keyword[];
   accessRequests: AccessRequest[];
+  /** True when viewer is the contributor owner. Owner is read-only on the
+   *  access list per A48 — only the granting admin may revoke their session. */
+  viewerIsOwner: boolean;
 }
 
-export default function SettingsDashboardClient({ slug, keywords: initialKeywords, accessRequests: initialAccessRequests }: Props) {
+export default function SettingsDashboardClient({ slug, keywords: initialKeywords, accessRequests: initialAccessRequests, viewerIsOwner }: Props) {
   const [keywords, setKeywords] = useState(initialKeywords);
   const [newKeyword, setNewKeyword] = useState("");
   const [addingKeyword, setAddingKeyword] = useState(false);
@@ -96,7 +100,11 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
     });
     if (res.ok) {
       setAccessRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: "approved", approved_at: new Date().toISOString() } : r))
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, status: "approved", updated_at: new Date().toISOString() }
+            : r,
+        ),
       );
     }
   }
@@ -112,6 +120,16 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
       setDenyingId(null);
       setDenyReason("");
     }
+  }
+
+  function formatTimeAgo(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.max(0, Math.floor(diffMs / 60000));
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
   }
 
   const activeRequests = accessRequests.filter(
@@ -204,7 +222,7 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
           You can approve, deny, or revoke access at any time.
         </p>
 
-        {pendingRequests.length > 0 && (
+        {pendingRequests.length > 0 && viewerIsOwner && (
           <div className="mb-4">
             <h4 className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-2">
               Pending requests
@@ -274,22 +292,40 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
                 <li key={r.id} className="surface-card rounded-xl p-3 flex items-center gap-3">
                   <div className="flex-1 text-sm">
                     <span className="font-medium">{r.admin?.full_name ?? "Admin"}</span>
+                    {r.viewing_started_at ? (
+                      <span className="text-xs text-green-600 ml-2 inline-flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        viewing since {formatTimeAgo(r.viewing_started_at)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[--foreground-soft] ml-2">
+                        not viewed yet
+                      </span>
+                    )}
                     {r.expires_at && (
                       <span className="text-xs text-[--foreground-soft] ml-2">
-                        Expires {new Date(r.expires_at).toLocaleDateString()}
+                        · expires {new Date(r.expires_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() => revokeAccess(r.id)}
-                    disabled={revokingId === r.id}
-                    className="text-xs px-3 py-1 rounded-lg border border-[--border] hover:border-red-400 hover:text-red-500 transition-colors disabled:opacity-40"
-                  >
-                    {revokingId === r.id ? "Revoking…" : "Revoke"}
-                  </button>
+                  {!viewerIsOwner && (
+                    <button
+                      onClick={() => revokeAccess(r.id)}
+                      disabled={revokingId === r.id}
+                      className="text-xs px-3 py-1 rounded-lg border border-[--border] hover:border-red-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                    >
+                      {revokingId === r.id ? "Revoking…" : "End my session"}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
+            {viewerIsOwner && (
+              <p className="text-xs text-[--foreground-soft] mt-2">
+                Active sessions auto-expire after 3 days. Only the granting admin may end
+                their own session early.
+              </p>
+            )}
           </div>
         )}
 

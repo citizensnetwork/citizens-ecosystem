@@ -7,6 +7,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 import DashboardNav from "@/components/contributor/dashboard/DashboardNav";
+import ActiveGrantBanner, {
+  type ActiveGrant,
+} from "@/components/contributor/dashboard/ActiveGrantBanner";
+import { markViewingStarted } from "@/lib/dashboard/adminAttribution";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +74,26 @@ export default async function DashboardLayout({ children, params }: Props) {
 
     adminSessionActive = true;
     adminSessionExpiresAt = accessRow.expires_at;
+
+    // Idempotently stamp viewing_started_at so the contributor's Realtime
+    // banner can light up "viewing now". RPC is a no-op if already set.
+    await markViewingStarted(supabase, accessRow.id);
+  }
+
+  // Owner: pre-load active grants so the Realtime banner can render
+  // immediately on mount without an extra round-trip.
+  let initialGrants: ActiveGrant[] = [];
+  if (isOwner) {
+    const { data: grants } = await supabase
+      .from("contributor_access_requests")
+      .select(
+        "id, admin_id, viewing_started_at, expires_at, admin:profiles!contributor_access_requests_admin_id_fkey(full_name)",
+      )
+      .eq("contributor_id", contributor.id)
+      .eq("status", "approved")
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString());
+    initialGrants = (grants ?? []) as unknown as ActiveGrant[];
   }
 
   // Determine if contributor theme is enabled via environment variable
@@ -81,6 +105,15 @@ export default async function DashboardLayout({ children, params }: Props) {
       data-contributor-ui={contributorThemeEnabled ? "" : undefined}
       className="min-h-screen bg-[--background]"
     >
+      {/* Owner: Realtime banner shown when admins hold active grants */}
+      {isOwner && (
+        <ActiveGrantBanner
+          contributorId={contributor.id}
+          contributorSlug={slug}
+          initialGrants={initialGrants}
+        />
+      )}
+
       {/* Admin access banner */}
       {isAdmin && !isOwner && adminSessionActive && (
         <div className="cd-admin-banner px-4 py-2 text-sm flex items-center justify-between">

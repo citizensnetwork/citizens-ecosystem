@@ -32,6 +32,9 @@ const TYPE_ICONS: Record<string, string> = {
   new_message: "✉",
   contributor_approved: "✦",
   contributor_rejected: "✕",
+  contributor_type_change_request: "⇄",
+  admin_elevation_request: "⚡",
+  admin_on_behalf_action: "⚙",
 };
 
 /** Safely read dismissed review IDs from localStorage. */

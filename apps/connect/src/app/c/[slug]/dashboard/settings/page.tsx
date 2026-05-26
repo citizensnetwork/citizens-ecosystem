@@ -30,23 +30,31 @@ export default async function SettingsDashboardPage({
       .order("keyword", { ascending: true }),
     supabase
       .from("contributor_access_requests")
-      .select("id, admin_id, status, approved_at, expires_at, revoked_at, denied_reason, admin:profiles!contributor_access_requests_admin_id_fkey(full_name, avatar_url)")
+      .select("id, admin_id, status, expires_at, revoked_at, viewing_started_at, denial_reason, updated_at, admin:profiles!contributor_access_requests_admin_id_fkey(full_name, avatar_url)")
       .eq("contributor_id", contributor.id)
       .order("created_at", { ascending: false })
       .limit(20),
   ]);
 
   type AccessRequestRow = {
-    id: string; admin_id: string; status: string; approved_at: string | null;
-    expires_at: string | null; revoked_at: string | null; denied_reason: string | null;
+    id: string; admin_id: string; status: string;
+    expires_at: string | null; revoked_at: string | null;
+    viewing_started_at: string | null; denial_reason: string | null;
+    updated_at: string | null;
     admin: { full_name: string | null; avatar_url: string | null } | null;
   };
+
+  // Determine whether the viewer is an admin (with active grant) or the
+  // contributor owner. Owner is read-only on the access list per A48 —
+  // only the granting admin may revoke their own session.
+  const isOwner = user.id === contributor.id;
 
   return (
     <SettingsDashboardClient
       slug={slug}
       keywords={keywordsResult.data ?? []}
       accessRequests={(accessRequestsResult.data ?? []) as unknown as AccessRequestRow[]}
+      viewerIsOwner={isOwner}
     />
   );
 }

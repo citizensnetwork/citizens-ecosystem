@@ -225,8 +225,10 @@ export async function PATCH(request: NextRequest) {
               type: "admin_elevation_request",
               title: "Admin elevation awaiting approval",
               body: "A new admin elevation request needs a second admin's approval.",
-              link_url: "/admin/users#admin-elevations",
-              metadata: { request_id: inserted.id },
+              data: {
+                url: "/admin/users#admin-elevations",
+                request_id: inserted.id,
+              },
             })),
           );
         }

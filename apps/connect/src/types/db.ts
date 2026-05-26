@@ -724,25 +724,27 @@ export type IndemnitySignature = {
 
 // ── Contributor Dashboard (migration 100) ─────────────────────────────────
 
-export type AccessRequestStatus = "pending" | "approved" | "denied" | "revoked";
+export type AccessRequestStatus = "pending" | "approved" | "denied";
 
 export type ContributorAccessRequest = {
   id: string;
   contributor_id: string;
   admin_id: string;
   status: AccessRequestStatus;
-  reason: string | null;
-  denied_reason: string | null;
-  approved_at: string | null;
+  denial_reason: string | null;
   expires_at: string | null;
   revoked_at: string | null;
+  revoked_by: string | null;
+  viewing_started_at: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 export type ActivityLog = {
   id: string;
   contributor_id: string;
   actor_id: string;
+  actor_role: "contributor" | "admin" | "system" | null;
   action: string;
   entity_type: string | null;
   entity_id: string | null;

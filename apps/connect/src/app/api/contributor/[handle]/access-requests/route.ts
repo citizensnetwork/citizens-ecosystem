@@ -158,7 +158,7 @@ export async function POST(
     title: "Dashboard access requested",
     body: "An admin has requested access to your dashboard. Review in your dashboard settings.",
     image_url: null,
-    data: { request_id: data.id },
+    data: { request_id: data.id, url: `/c/${handle}/dashboard/settings` },
   });
 
   return NextResponse.json({ id: data.id }, { status: 201 });
@@ -241,7 +241,7 @@ export async function PATCH(
         .from("contributor_access_requests")
         .select("admin_id")
         .eq("id", requestId)
-        .single();
+        .maybeSingle<{ admin_id: string }>();
       if (req?.admin_id) {
         await supabase.from("notifications").insert({
           user_id: req.admin_id,
@@ -249,7 +249,7 @@ export async function PATCH(
           title: "Dashboard access granted",
           body: "Your access request has been approved. Access expires in 3 days.",
           image_url: null,
-          data: { request_id: requestId },
+          data: { request_id: requestId, url: `/c/${handle}/dashboard` },
         });
       }
       return NextResponse.json({ success: true });
@@ -276,7 +276,7 @@ export async function PATCH(
         .from("contributor_access_requests")
         .select("admin_id")
         .eq("id", requestId)
-        .single();
+        .maybeSingle<{ admin_id: string }>();
       if (req?.admin_id) {
         await supabase.from("notifications").insert({
           user_id: req.admin_id,
@@ -284,7 +284,7 @@ export async function PATCH(
           title: "Dashboard access denied",
           body: `Your access request was denied: ${reason}`,
           image_url: null,
-          data: { request_id: requestId },
+          data: { request_id: requestId, url: `/c/${handle}` },
         });
       }
       return NextResponse.json({ success: true });
@@ -304,14 +304,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Failed to revoke access" }, { status: 500 });
     }
 
-    // Log revocation
+    // Log revocation (admin self-revoke — actor_role='admin')
     await supabase.from("activity_log").insert({
       contributor_id: contributor.id,
       actor_id: user.id,
+      actor_role: "admin",
       action: "dashboard_access_revoked",
       entity_type: "access_request",
       entity_id: requestId,
-      metadata: { admin_id: user.id },
+      metadata: { admin_id: user.id, on_behalf_of: contributor.id },
+    });
+
+    // Notify the contributor that their admin session ended
+    await supabase.from("notifications").insert({
+      user_id: contributor.id,
+      type: "admin_on_behalf_action",
+      title: "Admin ended their dashboard session",
+      body: "An admin has ended their access session to your dashboard.",
+      image_url: null,
+      data: {
+        action: "dashboard_access_revoked",
+        entity_type: "access_request",
+        entity_id: requestId,
+        admin_id: user.id,
+        url: `/c/${handle}/dashboard/settings`,
+      },
     });
 
     return NextResponse.json({ success: true });
