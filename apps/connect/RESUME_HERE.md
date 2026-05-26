@@ -15,7 +15,28 @@
 
 ---
 
-## 2. What just shipped — Stage B: contributor theme tint, env+query-param override (commit `f6559ea`)
+## 2. What just shipped — Stage E.1: contributor dashboard broadcasts page + composer (commit `1098b27`)
+
+**Wires up the previously-broken `Broadcast to attendees` link** from `EventsDashboardClient.tsx` (line 251) and the `Broadcast` nav item from `DashboardHomeClient.tsx` into a real page at `/c/[slug]/dashboard/broadcasts`.
+
+### New files
+- `src/app/c/[slug]/dashboard/broadcasts/page.tsx` — server page (`dynamic = "force-dynamic"`). Resolves contributor via `resolveContributorSlug`, loads contributor-owned events (id/title/date) and places (id/name) in parallel (limit 100 each), and computes per-entity broadcast counts via a single grouped query on `broadcast_messages` (`deleted_at IS NULL`, `contributor_id = contributor.id`) bucketed in memory. Supports `?entity_type=event|place&entity_id=<uuid>` deep-link: validates ownership by intersecting with owned lists, silently degrades to directory view on invalid/non-owned. When valid, fetches up to 50 most-recent broadcasts for that entity.
+- `src/components/contributor/dashboard/BroadcastsDashboardClient.tsx` — `"use client"`. Two render modes:
+  - **Directory**: lists owned events + places with broadcast counts; each item links to entity mode (preserves other searchParams via `URLSearchParams`).
+  - **Entity**: 500-char composer (textarea with native `maxLength`, `.slice` belt-and-braces, `aria-describedby` + `aria-live="polite"` char counter, amber warning <50 left); Send POSTs to existing `/api/contributor/[handle]/broadcasts` with optimistic prepend; history list with soft-delete via DELETE `?id=<id>` and `pendingDelete` guard against double-tap; error banner with `role="alert"`.
+
+### Architect verdict
+SHIP — grades A/A/A−/A−/B+/A−. Should-fix items applied inline: char-counter a11y (`aria-describedby` + `aria-live`), native `maxLength={BROADCAST_MAX}`, collapsed duplicate `slug`/`handle` prop. Nice-to-haves deferred: `Ctrl/Cmd+Enter` to send; disable all delete buttons during pending; remove redundant `if (!user)` (layout already enforces); `.in("entity_id", ownedIds)` on counts query; client-component tests for branching + optimistic paths; `console.warn` on `(untitled)`/`(unnamed)` fallback to detect schema drift.
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **744/744** (82 files; no new tests — thin orchestrator over already-tested API)
+- `npx next lint --dir src` → clean
+- Supabase advisors: **86 WARN baseline unchanged** (no DB changes)
+
+---
+
+## 2a. Previous batch — Stage B: contributor theme tint, env+query-param override (commit `f6559ea`)
 
 **Finished Stage B of the contributor-dashboard plan.** Most of Stage B (tonal-variant tokens + `data-contributor-ui` wiring on contributor-owned surfaces) shipped in batch 16b; this commit adds the remaining dev-only override.
 
@@ -41,7 +62,7 @@
 
 ---
 
-## 2a. Previous batch — Stage A item 7: unified contributor mutation attribution (commit `0f2cedf`)
+## 2b. Previous batch — Stage A item 7: unified contributor mutation attribution (commit `0f2cedf`)
 
 **Centralised every contributor-side mutation's audit trail through a single helper, then wired it into 8 routes (~18 mutation points).**
 
@@ -89,13 +110,13 @@
 
 ---
 
-## 2b. Previous batch — SidePanel back/dismiss split (commit `e76f449` + Should-fix in `0f2cedf`)
+## 2c. Previous batch — SidePanel back/dismiss split (commit `e76f449` + Should-fix in `0f2cedf`)
 
 UX: split close into back-chevron (top-left, `router.back()` w/ fallback) + X (top-right, `router.push(fallbackHref)` — collapses entire panel stack). ESC + backdrop kept as back-one-step. Architect Should-fix (`setTimeout` bare global, `aria-labelledby` on dialog role, `aria-hidden` on both decorative SVGs) bundled into `0f2cedf`. tsc 0, vitest 744/744, lint clean. Architect verdict: SHIP.
 
 ---
 
-## 2c. Previous batch — admin attribution (commit `5ebee50`)
+## 2d. Previous batch — admin attribution (commit `5ebee50`)
 
 **Stage A items 1–6 of contributor-dashboard plan** — admin attribution + Realtime grant banner + A48 read-only enforcement.
 
@@ -148,7 +169,7 @@ Contributors are **read-only** on the access list. Only the granting admin self-
 
 - 82 test files, **744 tests**, all passing.
 - 104 migrations applied. Live DB in sync with file.
-- Latest commit on `origin/main`: `0f2cedf`.
+- Latest commit on `origin/main`: `1098b27`.
 
 ---
 
@@ -156,8 +177,9 @@ Contributors are **read-only** on the access list. Only the granting admin self-
 
 From `docs/plans/contributor-dashboard.md`:
 
-- **Stage B — Contributor theme tint.** Add tonal-variant token set in `src/app/globals.css` (vivid/darker-gold variant), wrap all `/c/[slug]/**` and contributor-owned surfaces with `data-theme="contributor"` attribute so the variant tokens activate. Dev-only override (env flag `NEXT_PUBLIC_CONTRIBUTOR_THEME=off` or query param) for A/B comparison. Full quality gate + push as separate batch.
-- **Stage C+** — see plan doc for next items.
+- **Stage E.2 — Public broadcast banner on event/place detail pages.** Render most-recent non-deleted broadcast(s) from `broadcast_messages` above comments on `/e/[id]` and `/places/[id]`. Existing public API GET `/api/contributor/[handle]/broadcasts?entity_type=...&entity_id=...` returns non-deleted; event/place pages already have the contributor handle via `created_by → profiles.handle`. **Decision needed**: add a public-by-entity endpoint (`/api/events/[id]/broadcasts`) OR derive handle on the event/place page and reuse the existing route.
+- **Stage E.3 — Push edge function `notify-broadcast`.** Mirror `notify-event-update` (uses `_shared/push.ts` + `_shared/prefs.ts`); recipient set = `rsvps.status=attending` (event) or `follows.follower_id` (place); add DB webhook on `broadcast_messages` INSERT; document in `docs/RUNBOOK.md`.
+- **Stage D and beyond** — see plan doc for next items.
 
 ### Architect Nice-to-haves to address opportunistically
 1. Reconcile volunteer status naming (code: `pending|approved|declined`; prior spec said `approved|denied|withdrawn`).
@@ -198,7 +220,8 @@ npm run dev
 
 - `/memories/repo/coding-patterns.md` — Connect patterns.
 - `/memories/repo/outstanding-items.md` — running backlog.
-- `/memories/repo/batch-stage-a-attribution-shipped.md` — this batch's summary.
+- `/memories/repo/batch-stage-e1-broadcasts-page-shipped.md` — this batch's summary.
+- `/memories/repo/batch-stage-a-attribution-shipped.md` — Stage A.
 
 ---
 
