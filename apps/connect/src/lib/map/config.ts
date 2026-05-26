@@ -119,7 +119,7 @@ export function toLngLat(latLng: [number, number]): [number, number] {
  *
  * For deeper, style-level stripping (landuse fill, font fallbacks, etc.)
  * edit the MapTiler Cloud style itself — see
- * `docs/MAP_TILER_LITE_CHECKLIST.md`.
+ * `docs/archive/MAP_TILER_LITE_CHECKLIST.md`.
  * ────────────────────────────────────────────────────────────────────── */
 
 const PRUNE_LAYER_PATTERNS: readonly RegExp[] = [

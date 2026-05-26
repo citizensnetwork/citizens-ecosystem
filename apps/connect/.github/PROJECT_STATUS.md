@@ -49,7 +49,7 @@ The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIREC
 | 14e | Audit P2 event-create-edit — boundary validation + delete error | **Shipped** `71c9085` | EventForm/EditEventForm boundary guards; handleDelete surfaces RLS errors. 703 tests. |
 | 14f | Audit P1 place-create-edit-media — length CHECKs + 6-month delete trigger | **Shipped** `2906189` | Migrations 088–091; CommentSection delete errors surfaced. 703 tests. |
 | 14g | Audit P2 messaging-dm — `.maybeSingle()` parity + rate-limit + NaN guard | **Shipped** `94dc675` | 5× `.single()` → `.maybeSingle()`; NaN-safe `?limit=`; PATCH /read rate-limit. 703 tests. |
-| 13 | Map perf — basemap pruner + MapTiler Lite checklist + DOM marker culling | **Shipped** | `pruneBasemapLayers`; `cullMarkers`; `docs/MAP_TILER_LITE_CHECKLIST.md`. 701 tests. |
+| 13 | Map perf — basemap pruner + MapTiler Lite checklist + DOM marker culling | **Shipped** | `pruneBasemapLayers`; `cullMarkers`; `docs/archive/MAP_TILER_LITE_CHECKLIST.md`. 701 tests. |
 | 1–10 | Earlier batches (FEAT-01..06, Batches 1–10) | All **Shipped** | See git log for full details. |
 
 ---

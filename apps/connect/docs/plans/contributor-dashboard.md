@@ -687,3 +687,47 @@ User answers v2 questions (A1–A66). Then lock v1 cut, slot after edit-fixes ba
 Each stage = its own batch: migrations (if any) → API → UI → tests → architect → security → push.
 
 
+
+
+---
+
+## Implementation Decisions Log
+
+> Decisions made while shipping this plan. Append new entries here as each stage is delivered; do not duplicate into `.github/DECISIONS.md`.
+> For codebase-wide rules (non-dashboard), use `.github/DECISIONS.md` instead.
+
+### Stage A — Admin attribution (server-stamped + dual audit)
+
+Stage A admin-on-behalf-of attribution lives in `src/lib/dashboard/adminAttribution.ts` and writes BOTH an `activity_log` row (with `actor_role='admin'` + `metadata.on_behalf_of`) AND a `notifications` row (type `admin_on_behalf_action` with `data.url` deep link) for every action an admin performs while operating with an active access grant. The `activity_log` row gives the contributor a non-destructible audit trail (RLS allows contributor read-only); the notification gives them real-time awareness so admin activity never feels surreptitious. Both writes are best-effort (errors logged, not rolled back) so the underlying mutation succeeds even if audit insert fails. A new SECURITY DEFINER RPC `mark_admin_viewing_started(p_request_id uuid)` stamps `viewing_started_at` once per grant (idempotent COALESCE) so the owner banner can display "viewing since Xm ago". `actor_role` is constrained `IN ('contributor','admin','system')` with a partial index `WHERE actor_role='admin'` for admin-action queries. Migration 104.
+
+### Stage A item 6 (A48) — contributor read-only on access list
+
+On the dashboard Settings page, the active-sessions list is purely informational for the contributor; only the granting admin can revoke their own session. The `viewerIsOwner` prop (computed server-side from `user.id === contributor.id`) hides the Revoke button and the pending-request approval block when the viewer is the contributor. The PATCH handler enforces the same rule server-side: `action: 'revoke'` is only valid for an admin acting on their own row (`.eq("admin_id", user.id)`). Rationale: contributors can decline before granting (the existing approve/deny flow), and grants are time-bounded (3-day expiry); allowing post-hoc termination by the contributor breaks the trust contract admins agreed to and creates a UX where admins are wary of accepting access at all.
+
+### Stage A item 7 — Unified contributor mutation attribution helper
+
+All mutating contributor API routes route their audit-log writes through `recordContributorMutation(supabase, opts)` in `src/lib/dashboard/activity.ts`, which branches on `access.isAdminWithAccess` to either insert an owner-attributed `activity_log` row (`actor_role='contributor'`) or delegate to `logAdminOnBehalfAction` (admin path: dual write of `activity_log` with `actor_role='admin'` + `metadata.on_behalf_of` AND a `notifications` row of type `admin_on_behalf_action` with `data.url`). Wired into broadcasts, team, volunteers, drafts, keywords, places/services, planning/tasks, planning/ideas — ~18 mutation points across 8 routes. Routes pass `access` (already computed by `checkDashboardAccess`) so the helper has zero extra DB cost. Writes are awaited but errors are logged-and-swallowed — never block the user mutation on audit failure. Companion invariant in `logAdminOnBehalfAction`: caller `metadata` is spread FIRST and `on_behalf_of: contributorId` LAST so callers cannot forge the on-behalf-of audit target.
+
+### Stage A.1 — Server-computed dashboard-access mode
+
+`DashboardAccessButton` receives `mode: "owner" | "admin-granted" | "admin-no-grant"` as a server-rendered prop; the component never inspects the viewer's role client-side. `ProfileDetailServer` resolves the mode by checking `profile.id === viewer.id`, then querying `contributor_access_requests` for `admin_id = auth.uid()` with status in (`pending`, `approved`), filtering server-side for `revoked_at IS NULL` and unexpired `expires_at`. The button only renders when mode is non-null; non-admin Citizens get no button at all. Keeps the RLS-first model: `is_admin()` and `auth.uid()` are evaluated inside Postgres, never inferred from a client header.
+
+### Concurrent access-request submissions — DB-level uniqueness
+
+`contributor_access_requests_pending_unique` is a partial unique index on `(contributor_id, admin_id) WHERE status = 'pending' AND revoked_at IS NULL`. The POST handler in `/api/contributor/[handle]/access-requests` had a check-then-insert pattern that two concurrent requests from the same admin could both pass, producing duplicate notifications. Pushing uniqueness into the DB collapses the race into a 23505 unique_violation which the API translates into the same 409 the pre-check already returned. Migration 102.
+
+### Stage B — Contributor theme tint env flag + dev-only query-param override
+
+Stage B accepts two env-flag forms and a client-side query-param override. `isContributorThemeEnabled()` in `src/lib/dashboard/theme.ts` is the single check; it disables when `NEXT_PUBLIC_CONTRIBUTOR_THEME=off` OR `NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED=false` (legacy from batch 16b). Both forms remain accepted until all envs migrate; consolidation is a nice-to-have. Runtime override lives in `ContributorThemeOverride` (`"use client"`) which reads `?contributorTheme=on|off` via `useSearchParams()`, whitelists the value, persists to `sessionStorage["cc:contributorTheme"]`, and toggles by swapping `data-contributor-ui` ↔ `data-contributor-ui-target` on all matching elements. Override is env-wins. No XSS surface — only the literals `"on"`/`"off"` reach DOM/storage. Mounted in `/c/[slug]/dashboard/layout.tsx` and `ContributorPublicProfile.tsx`. Plan doc Stage B item 2 calls for renaming the attribute to `data-theme="contributor"` — left as a follow-up.
+
+### Stage C — Cover photos: PNG/JPG/GIF/WebP only (SVG rejected)
+
+Stage C cover-photo uploads (`/api/contributor/cover-photos`) reuse `validateImageFile()`, which excludes SVG. A15 in the v2 Q&A asked for PNG/JPG/SVG/GIF support, but `event-images` is a public bucket that serves uploads with the user-supplied Content-Type. An attacker-uploaded SVG with inline JS would execute on the storage subdomain origin, leaking session data — same threat that already blocked SVG avatars. GIF stays in (frame-based, harmless), SVG out. Uploads go through POST `/api/contributor/cover-photos` so the storage write uses `createAdminClient()` with a server-validated `user.id` path. PATCH only accepts URLs that already exist in the contributor''s stored array, blocking off-platform URL injection.
+
+### Batch 16 foundation — Non-destructible audit + SECURITY DEFINER for privileged transitions
+
+`contributor_access_requests` and `activity_log` are append-only; no DELETE RLS policies. Admin dashboard access is gated by an approval workflow with max 2 concurrent sessions enforced inside `check_max_dashboard_sessions(uuid)` (SECURITY DEFINER). State transitions go through `approve_dashboard_access(uuid)` and `deny_dashboard_access(uuid, text)` so the audit-log INSERT and the status UPDATE are atomic; the contributor''s own UPDATE RLS path is reserved for self-driven actions. `purge_old_activity_logs()` (90-day) and `purge_old_analytics()` (1-year) are SECURITY DEFINER with `REVOKE EXECUTE FROM anon, authenticated, public` so only service-role / pg_cron can run them. Migrations 100 + 100b. Function-expression uniqueness (e.g. `lower(keyword)`) must be a separate `CREATE UNIQUE INDEX`, not an inline table `UNIQUE` constraint — Postgres syntax requirement.
+
+### Suggestions — anonymous allowed but `user_id` must match `auth.uid()` when set
+
+`suggestions_insert` policy is `user_id IS NULL OR user_id = auth.uid()`, not `WITH CHECK (true)`. Allowing `true` triggered `rls_policy_always_true` advisor and let an authenticated user spoof a suggestion as another user. The new check still permits anonymous (logged-out) submissions because `auth.uid()` returns NULL and the row''s `user_id` may be NULL, but prevents impersonation. `page_url` is validated against `^https?://` at the API layer to block `javascript:` / `data:` XSS vectors before insert. Migration 100b.
