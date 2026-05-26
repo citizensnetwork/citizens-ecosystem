@@ -9,9 +9,7 @@ import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
 import BetaBanner from "@/components/ui/BetaBanner";
 import TermsAcceptanceGate from "@/components/ui/TermsAcceptanceGate";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import dynamic from "next/dynamic";
-
-const SuggestionButton = dynamic(() => import("@/components/ui/SuggestionButton"), { ssr: false });
+import SuggestionButton from "@/components/ui/SuggestionButtonClient";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
