@@ -15,46 +15,62 @@
 
 ---
 
-## 2. What just shipped — Stage D: specialised services + keyword bank (commit `04c3118`)
+## 2. What just shipped — Stage F: Volunteers UX (commit `e3c401d`)
 
-**Completed Stage D of the contributor-dashboard plan**: services chip editor in the Places dashboard panel + tightened validation on both tables.
+**Completed Stage F of the contributor-dashboard plan**: citizen volunteer apply/withdraw flow + contributor approve/decline with reason.
 
-### Migration 106 (`106_services_keywords_rls_tighten.sql`)
-- RLS enabled on `specialised_services` and `contributor_keywords` — both were previously **unprotected** (no RLS at all).
-- Policies: `SELECT` public for both; `INSERT` gated by `contributor_id = auth.uid()`; `DELETE` by owner or admin.
-- Unique constraints: `(place_id, service)` and `(contributor_id, keyword)`.
-- Length constraints tightened from 100 → 40 chars.
-- Allowlist check constraint `[A-Za-z0-9 ._-]` added to both.
+### New component: `VolunteerApplyButton`
+- Citizen CTA rendered on event/place detail pages when `volunteer_openings=true` and `organiserHandle` is available.
+- States: none (CTA) → form (optional message, 500-char, char counter + aria-live) → submitting → status badge.
+- Status badges: pending=amber, approved=green, declined=gray ("Not selected"), withdrawn=silent.
+- Withdraw: POST `action=withdraw` → `status=withdrawn`; gated by `applicant_id=user.id` + status in `[pending, approved]`.
+- Login gate: Link to /login when `userId=null`. Owner guard: returns null when `isOwner=true`.
 
-### API hardening
-- `services/route.ts`: `sanitiseService()` — NFC-normalize, strip control chars, dedupe spaces, trim, 40-char cap. Server-side allowlist regex 422 response. `contributor_id` now passed on insert (required by new RLS policy).
-- `keywords/route.ts`: `sanitiseKeyword()` — same pattern + `.toLowerCase()`. Allowlist regex 422 response. Cap 50 → 40.
+### API changes (`volunteers/route.ts`)
+- `withdrawn` added to `ALLOWED_STATUSES`.
+- New `withdraw` action: UUID validation + ownership check (`applicant_id = user.id`) + status gate + DB update.
+- `update_status`: reads + sanitizes `response_message` from body; includes it in `.update()` when present.
 
-### UI
-- `PlacesDashboardClient.tsx`: inline chip editor in the right panel (replaces dead "Manage services →" link). Fetches services when place is selected, shows predefined suggestions from `PREDEFINED_SERVICES`, allows add/remove, enforces max 10, client-side allowlist filter mirrors server.
-- `SettingsDashboardClient.tsx`: client-side input filter updated to allow `.` and `_` (matching server allowlist); `maxLength` 50 → 40.
+### EventDetailServer + EventDetailContent
+- `EventDetailServer` fetches user's volunteer application (`maybeSingle`) when `volunteer_openings && user`.
+- Passes `volunteerStatus`, `volunteerApplicationId`, and `organiserHandle` (contributor_slug) to `EventDetailContent`.
+- `EventDetailContent` renders `VolunteerApplyButton` after LocationSharingToggle when `volunteer_openings && organiserHandle`.
+
+### PlaceDetailServer
+- Added `volunteerAppRes` to the parallel `Promise.all` queries (conditional on `user && volunteer_openings`).
+- Replaced static "Volunteer" gold pill with interactive `VolunteerApplyButton`.
+- `volunteerStatus` and `volunteerApplicationId` extracted from result.
+
+### TeamDashboardClient
+- `Volunteer` interface gains `response_message: string | null`.
+- Controlled volunteer list (`volunteerList` state) replaces prop-direct rendering.
+- Inline respond form: appears on pending rows; confirm action (approve/decline) + optional message textarea (2 rows, 500-char, `maxLength`).
+- Optimistic update: `setVolunteers(prev => prev.map(...))` on success; error displayed via `role="alert"`.
+- `response_message` shown on declined rows.
+- `STATUS_CLASSES` map for consistent status badge styling.
+
+### team/page.tsx
+- Volunteer query changed `.in("status", ["pending", "approved", "declined"])` — includes declined for private contributor view.
+- `VolunteerRow` type gains `response_message: string | null`.
 
 ### Validation
 - `npx tsc --noEmit` → **0 errors**
 - `npx vitest run` → **744/744** (82 files)
 - `npx next lint --dir src` → clean
+- Architect review: security clean — UUID validation on all IDs, `applicant_id` double-gated in both SELECT and UPDATE for withdraw, `sanitize()` on all user text input.
 - Advisors: **86 WARN unchanged**
 
 ---
 
-## 2a. Previous batch — Stage E.2+E.3: broadcast public banners + edge function (commit `c189620`)
+## 2a. Previous batch — Stage D: specialised services + keyword bank (commit `04c3118`)
 
-- New `OrgBroadcastList` component renders "From the Organiser" banners on `/e/[id]`, `/events/[id]` (EventDetailContent), and `/places/[id]`.
-- `notify-broadcast` edge function v2 deployed with correct `_shared/` bundling (per-function `deno.json` remaps `../\_shared/` → `./_shared/`).
-- `_shared/push.ts` gains `broadcast_sent` type + `skipInApp` flag.
-- Broadcasts API: `broadcast_sent` type for in-app; fire-and-forget call to `notify-broadcast` for FCM push.
-- Migration 105: widens `notifications_type_check` to include `broadcast_sent`.
+Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 100→40, allowlist `[A-Za-z0-9 ._-]`, unique constraints. Services API: `sanitiseService()`, NFC-normalize. Keywords API: `sanitiseKeyword()`. `PlacesDashboardClient`: inline chip editor. `SettingsDashboardClient`: corrected filter. 744 tests, tsc 0, lint clean.
 
 ---
 
-## 2b. Previous batch — Stage E.1: contributor dashboard broadcasts page + composer (commit `1098b27`)
+## 2b. Previous batch — Stage E.2+E.3: broadcast public banners + edge function (commit `c189620`)
 
-Wires up the previously-broken `Broadcast to attendees` link from `EventsDashboardClient.tsx` and the `Broadcast` nav item from `DashboardHomeClient.tsx` into a real page at `/c/[slug]/dashboard/broadcasts`. New `BroadcastsDashboardClient` component with directory + entity compose modes. 744 tests, tsc 0, lint clean.
+`OrgBroadcastList` renders "From the Organiser" banners on event/place detail pages. `notify-broadcast` edge function v2 with correct `_shared/` bundling. `_shared/push.ts`: `broadcast_sent` type + `skipInApp` flag. Migration 105: widens `notifications_type_check`. 744 tests, tsc 0, lint clean.
 
 ---
 
@@ -62,7 +78,7 @@ Wires up the previously-broken `Broadcast to attendees` link from `EventsDashboa
 
 - 82 test files, **744 tests**, all passing.
 - 106 migrations applied. Live DB in sync with files.
-- Latest commit on `origin/main`: **`04c3118`**.
+- Latest commit on `origin/main`: **`e3c401d`**.
 
 ---
 
@@ -93,9 +109,11 @@ npx tsc --noEmit
 npx vitest run
 npx next lint --dir src
 npm run dev
-# Dashboard → Places: select a place → right panel shows inline services chip editor
-# Dashboard → Settings: keyword editor has max 40 chars, allows . and _
-# /e/[id] or /places/[id]: "From the Organiser" banner visible if broadcasts exist
+# Dashboard → Team → Volunteers tab: pending applications show Approve/Decline buttons
+# Decline click reveals inline textarea for reason; Confirm sends POST update_status
+# /e/[id] or /places/[id] when volunteer_openings=true: VolunteerApplyButton CTA appears
+# Citizen can apply with optional message, see status badge, or withdraw pending/approved apps
+# /places/[id]: static "Volunteer" pill replaced with interactive VolunteerApplyButton
 ```
 
 ---
@@ -109,7 +127,9 @@ npm run dev
 
 ## 8. Architecture quick-orient
 
-- **Layout-level auth gating** for the dashboard lives at `src/app/c/[slug]/dashboard/layout.tsx`. It computes `isOwner` / `isAdmin` / `adminSessionActive` and decides which surfaces to render. The new banner is mounted there for owners; `markViewingStarted` is called there for admins.
+- **Layout-level auth gating** for the dashboard lives at `src/app/c/[slug]/dashboard/layout.tsx`. It computes `isOwner` / `isAdmin` / `adminSessionActive` and decides which surfaces to render.
 - **All notification deep-links** must use `data.url` (not `link_url`/`metadata` — those columns do not exist). See decision log entry "Notification deep-links — `data.url` only".
 - **Admin attribution helper** lives in `src/lib/dashboard/adminAttribution.ts`. Any mutating contributor route should call `getActiveAdminGrant` and, if non-null, `logAdminOnBehalfAction` after the mutation succeeds.
-- **A48** is encoded in `viewerIsOwner` server prop + server-side route gating. Do not allow contributors to revoke grants client-side; the route rejects it server-side anyway.
+- **A48** is encoded in `viewerIsOwner` server prop + server-side route gating.
+- **`VolunteerApplyButton`** is a client component at `src/components/volunteer/VolunteerApplyButton.tsx`. It takes `entityType/entityId/contributorHandle/userId/initialStatus/initialApplicationId/isOwner` and handles the full apply/withdraw lifecycle client-side.
+- **`withdraw` in volunteers API** is gated by `applicant_id = user.id` in BOTH the SELECT ownership check and the UPDATE WHERE clause — no dashboard access needed (citizen self-action).
