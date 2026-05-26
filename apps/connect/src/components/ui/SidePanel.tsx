@@ -61,20 +61,33 @@ export default function SidePanel({
     };
   }, [panelRef]);
 
-  const handleClose = useCallback(() => {
-    setVisible(false);
-    // Match the CSS transition duration (300ms). Small slack so the
-    // final frame of the slide-out renders before unmount.
-    window.setTimeout(() => {
-      // Always prefer router.back() so the intercepted route unwinds;
-      // fallbackHref is only used when back() would leave the app.
+  const animateThen = useCallback(
+    (navigate: () => void) => {
+      setVisible(false);
+      window.setTimeout(navigate, 300);
+    },
+    [],
+  );
+
+  // Go back one step — unwinds a single intercepted route.
+  const handleBack = useCallback(() => {
+    animateThen(() => {
       if (window.history.length > 1) {
         router.back();
       } else {
         router.push(fallbackHref);
       }
-    }, 300);
-  }, [router, fallbackHref]);
+    });
+  }, [animateThen, router, fallbackHref]);
+
+  // Close completely — navigates directly to the fallback, discarding
+  // all panel steps regardless of how deep the navigation stack is.
+  const handleDismiss = useCallback(() => {
+    animateThen(() => router.push(fallbackHref));
+  }, [animateThen, router, fallbackHref]);
+
+  // Keep a single alias so ESC and backdrop still work correctly.
+  const handleClose = handleBack;
 
   // ESC closes the drawer.
   useEffect(() => {
@@ -119,15 +132,37 @@ export default function SidePanel({
           style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
           className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-(--gold)/30 bg-white/95 px-4 pb-3 backdrop-blur-sm"
         >
+          {/* Back — goes one step back in the panel stack */}
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label="Go back"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black/70 shadow-sm ring-1 ring-black/10 transition hover:bg-(--gold-soft) hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
           <h2
             id="sidepanel-title"
             className="flex-1 truncate text-base font-semibold text-black"
           >
             {title ?? "Details"}
           </h2>
+
+          {/* Dismiss — closes the panel completely, regardless of depth */}
           <button
             type="button"
-            onClick={handleClose}
+            onClick={handleDismiss}
             aria-label="Close panel"
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black/70 shadow-sm ring-1 ring-black/10 transition hover:bg-(--gold-soft) hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold)"
           >
