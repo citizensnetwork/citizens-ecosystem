@@ -15,7 +15,61 @@
 
 ---
 
-## 2. What just shipped — Batch Stage A (commit `5ebee50`)
+## 2. What just shipped — Stage A item 7: unified contributor mutation attribution (commit `0f2cedf`)
+
+**Centralised every contributor-side mutation's audit trail through a single helper, then wired it into 8 routes (~18 mutation points).**
+
+### New file
+- `src/lib/dashboard/activity.ts` — `recordContributorMutation(supabase, opts)`. Branches on `access.isAdminWithAccess`:
+  - Owner → inserts `activity_log` with `actor_role='contributor'`.
+  - Admin → delegates to `logAdminOnBehalfAction` (dual write: `activity_log` actor_role='admin' + `metadata.on_behalf_of` AND `notifications` row of type `admin_on_behalf_action` with `data.url=/c/{slug}/dashboard/settings`).
+  - Best-effort: errors logged, never thrown.
+
+### Routes wired
+| Route | Actions |
+|---|---|
+| `broadcasts` | POST `broadcast_sent` (entity_type=event\|place), DELETE `broadcast_deleted` |
+| `team` | POST invite `team_member_added`, PATCH remove `team_member_removed`, PATCH role-change `team_member_role_changed` |
+| `volunteers` | POST update_status → `volunteer_${pending\|approved\|declined}` |
+| `drafts` | `draft_created` / `_updated` / `_deleted` |
+| `keywords` | `keyword_added` / `_deleted` |
+| `places/[placeId]/services` | `service_added` / `_deleted` (metadata={place_id}) |
+| `planning/tasks` | `task_created` / `task_updated` (or `task_completed` when status=completed) / `task_deleted` |
+| `planning/ideas` | `idea_created` / `_updated` / `_deleted` |
+
+### Nice-to-haves bundled
+- `SettingsDashboardClient` exports `AccessRequestStatus = "pending"|"approved"|"denied"|"expired"|"revoked"`; `AccessRequest.status` is now a typed enum.
+- `ActiveGrantBanner` adds `setInterval(refetch, 60_000)` as a TTL-expiry safety net (postgres_changes does not fire on timestamp expiry).
+- `/c/[slug]/dashboard/settings/page.tsx` adds defence-in-depth `.eq("admin_id", user.id)` when viewer is admin (RLS already enforces; pushed predicate guards against future policy regression).
+- `docs/plans/contributor-dashboard.md` — Stage A item 7 documented.
+
+### Architect Should-fix applied
+- `logAdminOnBehalfAction` metadata spread order flipped: caller metadata FIRST, system `on_behalf_of: contributorId` LAST. Locks the audit-trail invariant so callers cannot forge the on-behalf-of target. Zero behaviour change for current callers (none pass `on_behalf_of`).
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **744/744** (741 prior + 3 new in `activity.test.ts` covering owner / admin-with-grant / error branches)
+- `npx next lint --dir src` → clean
+- Supabase advisors: **86 WARN baseline unchanged** (no DB changes this batch)
+- Architect verdict: **SHIP** after Should-fix applied
+
+### Deferred to backlog (Architect Nice-to-haves)
+1. Reconcile volunteer status naming (`pending|approved|declined` vs prior `approved|denied|withdrawn`).
+2. Pick one verb across entities (`_added` vs `_created`).
+3. Broadcast `entity_type` asymmetry: POST uses `event|place`, DELETE uses `broadcast`.
+4. Some DELETE/PATCH handlers don't verify a row was actually affected before logging.
+5. Helper could later return `{ok, error}` for observability.
+6. Audit await is inline; can become fire-and-forget if p95 matters.
+
+---
+
+## 2b. Previous batch — SidePanel back/dismiss split (commit `e76f449`)
+
+UX: split close into back-chevron (`router.back()` w/ fallback) + X (collapse stack via `router.push(fallbackHref)`). ESC + backdrop kept as back-one-step. Architect Should-fix applied (`setTimeout` bare global, `aria-labelledby`, `aria-hidden` on SVGs). tsc 0, vitest 741/741, lint clean.
+
+---
+
+## 2c. Previous batch — admin attribution (commit `5ebee50`)
 
 **Stage A items 1–6 of contributor-dashboard plan** — admin attribution + Realtime grant banner + A48 read-only enforcement.
 
@@ -66,9 +120,9 @@ Contributors are **read-only** on the access list. Only the granting admin self-
 
 ## 3. Current platform state
 
-- 81 test files, **741 tests**, all passing.
+- 82 test files, **744 tests**, all passing.
 - 104 migrations applied. Live DB in sync with file.
-- Latest commit on `origin/main`: `5ebee50`.
+- Latest commit on `origin/main`: `0f2cedf`.
 
 ---
 
@@ -76,15 +130,16 @@ Contributors are **read-only** on the access list. Only the granting admin self-
 
 From `docs/plans/contributor-dashboard.md`:
 
-- **Stage A item 4 (broader wiring)** — `logAdminOnBehalfAction` is currently only wired into the access-requests revoke path. Wire it into ALL other mutating contributor routes (events, places, broadcasts, keywords, drafts, team_memberships, suggestions) when `getActiveAdminGrant` returns a row. The helper signature now takes `contributorSlug` so callers must pass both id + slug.
-- **Stage B+** — see plan doc for next items in the contributor-dashboard plan.
+- **Stage B — Contributor theme tint.** Add tonal-variant token set in `src/app/globals.css` (vivid/darker-gold variant), wrap all `/c/[slug]/**` and contributor-owned surfaces with `data-theme="contributor"` attribute so the variant tokens activate. Dev-only override (env flag `NEXT_PUBLIC_CONTRIBUTOR_THEME=off` or query param) for A/B comparison. Full quality gate + push as separate batch.
+- **Stage C+** — see plan doc for next items.
 
-### Nice-to-haves logged (not applied this batch)
-1. Strengthen `AccessRequest.status` in `SettingsDashboardClient.tsx` to the `AccessRequestStatus` union.
-2. Banner won't auto-clear when a grant expires by time alone (no postgres_changes event). Optional `setInterval(refetch, 60_000)` or compute `expires_at > now()` on render.
-3. Defence-in-depth: add `.eq("admin_id", user.id)` server-side in `settings/page.tsx` when viewer is admin.
-4. Mark `logAdminOnBehalfAction` + `getActiveAdminGrant` as Stage A item 7 in the plan doc so they don't bit-rot.
-5. DB-level test for `notifications_type_check` accepting `admin_on_behalf_action`.
+### Architect Nice-to-haves to address opportunistically
+1. Reconcile volunteer status naming (code: `pending|approved|declined`; prior spec said `approved|denied|withdrawn`).
+2. Verb consistency across entities (`_added` vs `_created`).
+3. Broadcast `entity_type` asymmetry (POST `event|place` vs DELETE `broadcast`).
+4. Row-affected verification before logging on DELETE/PATCH paths.
+5. `recordContributorMutation` could return `{ok, error}` for observability.
+6. Fire-and-forget audit option if p95 matters.
 
 ---
 
