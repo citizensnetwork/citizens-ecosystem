@@ -7,7 +7,7 @@
 
 const STORAGE_KEY = "cc-quick-panel-ids";
 export const QUICK_PANEL_MAX = 5;
-export const QUICK_PANEL_DEFAULT_COUNT = 4;
+export const QUICK_PANEL_DEFAULT_COUNT = 5;
 
 /** Default ordered list of quick-access tool ids (existing behaviour). */
 export const DEFAULT_QUICK_IDS: string[] = [
@@ -15,7 +15,7 @@ export const DEFAULT_QUICK_IDS: string[] = [
   "coffee",
   "runs",
   "churches",
-  "outreaches",
+  "where-to-serve",
 ];
 
 /** Read saved ids, falling back to the default set. */

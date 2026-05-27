@@ -8,6 +8,7 @@ export type QuickAccessItem = {
   color: string;
   eventCategories: EventCategory[];
   placeCategories: PlaceCategory[];
+  specialFilter?: "volunteer";
   svg: string;
 };
 
@@ -54,6 +55,14 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     color: CATEGORY_HEX["church-services"],
     eventCategories: ["church-services"],
     placeCategories: ["churches-ministries"],
+  }),
+  quickAccessItem({
+    id: "where-to-serve",
+    label: "Where to Serve",
+    color: CATEGORY_HEX["community-upliftment"],
+    eventCategories: [],
+    placeCategories: [],
+    specialFilter: "volunteer",
   }),
   quickAccessItem({
     id: "outreaches",

@@ -194,6 +194,7 @@ export const QUICK_ACCESS_ICON_IDS: Record<string, CategoryIconId> = {
   runs: "dumbbell",
   churches: "church",
   outreaches: "globe",
+  "where-to-serve": "heart-handshake",
   care: "hand-heart",
 };
 
