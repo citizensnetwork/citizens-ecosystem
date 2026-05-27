@@ -1,27 +1,16 @@
 /**
  * Events-segment loading boundary.
  *
- * Renders a neutral full-bleed backdrop — no shimmer, no fade-rise.
+ * Renders nothing so the map stays fully visible while the `@panel`
+ * parallel slot loads the `SidePanel` drawer on client-side navigation
+ * to `/events/[id]`. A white backdrop used to show here, which briefly
+ * covered the map before the panel's slide-in completed — the "ghost
+ * bar from the bottom" glitch reported by users.
  *
- * Why: when a user clicks through to `/events/[id]`, the `@panel`
- * parallel slot intercepts with `SidePanel`, which owns its own
- * slide-in. A full-viewport skeleton with a `fade-rise` animation
- * used to play here at the same time, which read as "something
- * drawing up from the bottom" a beat before the panel finished
- * sliding — the glitch reported in the session notes.
- *
- * We still need *some* placeholder so cold loads (direct deep-link
- * into `/events/[id]` without a previously painted map) don't flash
- * white. A flat backdrop matching the page's canvas colour is
- * effectively invisible behind the side panel slide but hides the
- * empty paint on cold loads.
+ * Cold loads (direct deep-link to `/events/[id]`) bypass the `@panel`
+ * intercept and render the full event page directly, so no loading
+ * placeholder is needed for that path either.
  */
 export default function EventsLoading() {
-  return (
-    <div
-      aria-hidden
-      className="h-dvh w-full bg-white"
-      data-testid="events-loading-backdrop"
-    />
-  );
+  return null;
 }

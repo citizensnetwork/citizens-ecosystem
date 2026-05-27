@@ -1402,16 +1402,9 @@ export default function EventMap({
         const now = new Date();
         const hasStarted = new Date(event.date) <= now;
 
-        const popup = new maplibregl.Popup({
-          offset: 16,
-          closeButton: true,
-          maxWidth: "280px",
-        });
-
-        // Build popup HTML lazily on open so the Join/Consider buttons
-        // reflect the user's *current* RSVP / consider state instead of a
-        // stale snapshot from marker creation. This is what makes the Join
-        // button switch to a gold "Joined" tick after the user RSVPs.
+        // Build popup HTML — refreshed on each open to pick up the latest
+        // RSVP / consider state. Also set eagerly at creation so the popup
+        // element is never briefly empty when it first appears on the map.
         const renderPopupHtml = () => {
           const isJoined = !!rsvpEventIdsRef.current?.has(event.id);
           const isConsidering = !!considerEventIdsRef.current?.has(event.id);
@@ -1460,6 +1453,12 @@ export default function EventMap({
             </div>
           </div>`;
         };
+
+        const popup = new maplibregl.Popup({
+          offset: 16,
+          closeButton: true,
+          maxWidth: "280px",
+        }).setHTML(renderPopupHtml());
 
         popup.on("open", () => {
           popup.setHTML(renderPopupHtml());
@@ -1552,52 +1551,21 @@ export default function EventMap({
         placeEl.classList.add("cc-marker-new");
         setTimeout(() => placeEl.classList.remove("cc-marker-new"), 320);
 
-        const ratingLabel =
-          avgRating != null
-            ? `${avgRating.toFixed(1)} / 5 · ${place.reviews_count ?? 0} review${(place.reviews_count ?? 0) !== 1 ? "s" : ""}`
-            : "No ratings yet";
-
-        const warning = isFlagged
-          ? '<p class="cc-popup-warning">Possibly closed - awaiting verification</p>'
-          : "";
-
-        const popup = new maplibregl.Popup({
-          offset: 16,
-          closeButton: true,
-          maxWidth: "240px",
-        }).setHTML(
-          `<div class="cc-popup"><strong>${escapeHtml(place.name)}</strong><p>${escapeHtml(place.address)}</p><p>${ratingLabel}</p>${warning}<div class="cc-popup-actions"><button class="cc-action-btn" data-action="view" title="View details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></button></div></div>`
-        );
-
-        popup.on("open", () => {
-          // Adjust popup position to follow deconflicted marker offset
-          const markerData = placeMarkerDataRef.current.find((d) => d.marker === marker);
-          if (markerData) {
-            const offset = marker.getOffset();
-            const POPUP_BASE_OFFSET = 16;
-            popup.setOffset([offset.x, offset.y - POPUP_BASE_OFFSET]);
-          }
-
-          const popupEl = popup.getElement();
-          popupEl?.querySelector(".cc-action-btn")?.addEventListener("click", () => {
-            popup.remove();
-            onSelectPlaceRef.current?.(place);
-          });
-        });
-
         const lngLat: [number, number] = [place.longitude, place.latitude];
         const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
         // Places don't have temporal dimming today — keep attribute for
         // symmetry so the clustering fade multiplies by 1 not by NaN.
         placeEl.dataset.temporalOpacity = "1";
         placeEl.style.transition = "opacity 160ms linear";
-        // See the matching note on event markers above: do NOT stop
-        // propagation here, or MapLibre's `_onMapClick` (popup toggle)
-        // never fires. The map-click handler filters out marker hits
-        // by inspecting `e.originalEvent.target`.
+        // Direct click opens place detail in the SidePanel drawer —
+        // no intermediate popup. The click navigates via the parent's
+        // onSelectPlace callback (router.push) so the @panel intercept
+        // renders the full PlaceDetailServer in a right-side drawer.
+        placeEl.addEventListener("click", () => {
+          onSelectPlaceRef.current?.(place);
+        });
         const marker = new maplibregl.Marker({ element: placeEl, anchor: "center" })
           .setLngLat(lngLat)
-          .setPopup(popup)
           .addTo(map);
 
         placeMarkersRef.current.push(marker);

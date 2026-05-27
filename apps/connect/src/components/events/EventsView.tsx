@@ -157,9 +157,9 @@ export default function EventsView({
   // Derived: quick-access panel open state (auto-opens when quick access selected)
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickPanelPage, setQuickPanelPage] = useState(0);
-  // Quick-panel preferences (localStorage) — defaults to the first 4 tools
+  // Quick-panel preferences (localStorage) — defaults to the first 5 tools
   const [quickPrefIds, setQuickPrefIds] = useState<string[]>(() =>
-    QUICK_ACCESS_ITEMS.slice(0, 4).map((i) => i.id)
+    QUICK_ACCESS_ITEMS.slice(0, 5).map((i) => i.id)
   );
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
 
@@ -460,8 +460,13 @@ export default function EventsView({
   // prompts), falling back to Pretoria so SA users see local results first.
   const quickFilteredEvents = useMemo(() => {
     if (!activeQuickItem) return [];
-    const cats = new Set(activeQuickItem.eventCategories);
-    const matched = events.filter((e) => e.category != null && cats.has(e.category));
+    const matched =
+      activeQuickItem.specialFilter === "volunteer"
+        ? events.filter((e) => e.volunteer_openings)
+        : events.filter((e) => {
+            const cats = new Set(activeQuickItem.eventCategories);
+            return e.category != null && cats.has(e.category);
+          });
     const origin: [number, number] = userLocation
       ? [userLocation.lat, userLocation.lng]
       : DEFAULT_CENTER;
@@ -478,12 +483,15 @@ export default function EventsView({
 
   const quickFilteredPlaces = useMemo(() => {
     if (!activeQuickItem) return [];
-    const matched = places.filter((p) => {
-      const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
-      return activeQuickItem.placeCategories.some((cat) =>
-        PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
-      );
-    });
+    const matched =
+      activeQuickItem.specialFilter === "volunteer"
+        ? places.filter((p) => p.volunteer_openings)
+        : places.filter((p) => {
+            const text = `${p.name} ${p.description} ${p.address} ${p.categories?.name ?? ""}`.toLowerCase();
+            return activeQuickItem.placeCategories.some((cat) =>
+              PLACE_CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))
+            );
+          });
     const origin: [number, number] = userLocation
       ? [userLocation.lat, userLocation.lng]
       : DEFAULT_CENTER;
@@ -606,6 +614,13 @@ export default function EventsView({
     };
     return events.filter((e) => {
       if (!inBbox(e.latitude, e.longitude)) return false;
+      if (
+        !isSearching &&
+        activeQuickItem?.specialFilter === "volunteer" &&
+        !e.volunteer_openings
+      ) {
+        return false;
+      }
       // "For me" hard filter: applied before category logic so it always
       // wins. When active and the user has personalised categories, an
       // event matches if its category is in the set OR its text hits any
@@ -657,7 +672,7 @@ export default function EventsView({
       }
       return false;
     });
-  }, [events, search, activeCategories, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised, weekendOnly]);
+  }, [events, search, activeCategories, activeQuickItem, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised, weekendOnly]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -670,6 +685,13 @@ export default function EventsView({
     };
     return places.filter((p) => {
       if (!inBbox(p.latitude, p.longitude)) return false;
+      if (
+        !isSearching &&
+        activeQuickItem?.specialFilter === "volunteer" &&
+        !p.volunteer_openings
+      ) {
+        return false;
+      }
       // "For me" hard filter: applied before category logic. Uses the same
       // keyword-bank text match as the existing place filter so a place
       // with category "church-services" surfaces for users into church services, etc.
@@ -698,7 +720,7 @@ export default function EventsView({
         p.description.toLowerCase().includes(q)
       );
     });
-  }, [places, search, activePlaceCategories, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
+  }, [places, search, activePlaceCategories, activeQuickItem, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
 
   // Category-panel ordering: same proximity sort as the quick-access panel
   // so users see local results first. The underlying `filtered` array
@@ -844,9 +866,10 @@ export default function EventsView({
 
   const handleSelectPlace = useCallback((place: Place) => {
     setSelectedEvent(null);
-    setSelectedPlace(place);
+    setSelectedPlace(null);
     closeCalendar();
-  }, [closeCalendar]);
+    router.push(`/places/${place.id}`);
+  }, [closeCalendar, router]);
 
   const closeDetail = useCallback(() => {
     setSelectedEvent(null);
