@@ -176,6 +176,20 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       role: string;
     }>;
 
+    // Stage H public analytics: SECURITY DEFINER RPC restricted to the
+    // public-safe metric allowlist (follows + joins). 30-day window.
+    const { data: publicAnalyticsRows } = await supabase.rpc(
+      "get_public_contributor_analytics",
+      { p_contributor_id: id, p_days: 30 },
+    );
+    const publicAnalytics: Record<string, number> = {};
+    for (const row of (publicAnalyticsRows ?? []) as Array<{
+      metric: string;
+      total: number;
+    }>) {
+      publicAnalytics[row.metric] = Number(row.total) || 0;
+    }
+
     let pastWithRatings: Array<
       Event & { avg_rating?: number | null; reviews_count?: number }
     > = past;
@@ -215,6 +229,7 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
         dashboardMode={dashboardMode}
         dashboardPendingRequestId={pendingRequestId}
         team={team}
+        publicAnalytics={publicAnalytics}
       />
     );
   }

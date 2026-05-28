@@ -62,6 +62,8 @@ export interface ContributorPublicProfileProps {
     avatar_url: string | null;
     role: string;
   }>;
+  /** Stage H public analytics totals — 30-day follows + joins. */
+  publicAnalytics?: Record<string, number>;
 }
 
 export function ContributorPublicProfile({
@@ -77,6 +79,7 @@ export function ContributorPublicProfile({
   dashboardMode = null,
   dashboardPendingRequestId = null,
   team = [],
+  publicAnalytics = {},
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
@@ -313,6 +316,24 @@ export function ContributorPublicProfile({
                 </li>
               ))}
             </ul>
+          </Section>
+        )}
+
+        {/* ── 5c. Activity (Stage H public analytics) ──── */}
+        {(publicAnalytics.follows ?? 0) + (publicAnalytics.joins ?? 0) > 0 && (
+          <Section title="Activity (30d)">
+            <div className="flex flex-wrap gap-2">
+              {(publicAnalytics.follows ?? 0) > 0 && (
+                <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
+                  {publicAnalytics.follows!.toLocaleString()} new follows
+                </span>
+              )}
+              {(publicAnalytics.joins ?? 0) > 0 && (
+                <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
+                  {publicAnalytics.joins!.toLocaleString()} joins
+                </span>
+              )}
+            </div>
           </Section>
         )}
 

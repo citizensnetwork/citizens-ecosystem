@@ -51,20 +51,16 @@ export default function AnalyticsDashboardClient({
     router.replace(`${pathname}?${sp.toString()}`);
   }
 
-  function exportCsv() {
-    const rows: string[] = ["date,metric,value"];
-    for (const [metric, series] of Object.entries(byMetric)) {
-      for (const { date, value } of series) {
-        rows.push(`${date},${metric},${value}`);
-      }
+  function buildExportUrl(format: "csv" | "xlsx") {
+    const qs = new URLSearchParams({
+      period: String(period),
+      entity_type: entityType,
+      format,
+    });
+    if (entityType !== "contributor" && entityId) {
+      qs.set("entity_id", entityId);
     }
-    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `analytics-${slug}-${period}d.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return `/api/contributor/${slug}/analytics/export?${qs.toString()}`;
   }
 
   const hasData = Object.keys(byMetric).length > 0;
@@ -132,13 +128,32 @@ export default function AnalyticsDashboardClient({
           </select>
         )}
 
-        <button
-          onClick={exportCsv}
-          disabled={!hasData}
-          className="ml-auto text-sm px-3 py-1.5 rounded-xl border border-[--border] hover:border-[--gold] transition-colors disabled:opacity-40"
-        >
-          Export CSV
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <a
+            href={hasData ? buildExportUrl("csv") : undefined}
+            aria-disabled={!hasData}
+            className={[
+              "text-sm px-3 py-1.5 rounded-xl border border-[--border] transition-colors",
+              hasData
+                ? "hover:border-[--gold]"
+                : "opacity-40 pointer-events-none",
+            ].join(" ")}
+          >
+            Export CSV
+          </a>
+          <a
+            href={hasData ? buildExportUrl("xlsx") : undefined}
+            aria-disabled={!hasData}
+            className={[
+              "text-sm px-3 py-1.5 rounded-xl border border-[--border] transition-colors",
+              hasData
+                ? "hover:border-[--gold]"
+                : "opacity-40 pointer-events-none",
+            ].join(" ")}
+          >
+            Export XLSX
+          </a>
+        </div>
       </div>
 
       {/* Summary cards */}
