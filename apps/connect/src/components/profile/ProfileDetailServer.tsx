@@ -164,6 +164,18 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       .returns<ContributorLocation[]>();
     const locations = locationRows ?? [];
 
+    // Public team list (Stage G): SECURITY DEFINER RPC returns only
+    // safe columns (member id + name + avatar + role) for active rows.
+    const { data: teamRows } = await supabase.rpc("get_public_team", {
+      p_contributor_id: id,
+    });
+    const team = (teamRows ?? []) as Array<{
+      member_id: string;
+      full_name: string | null;
+      avatar_url: string | null;
+      role: string;
+    }>;
+
     let pastWithRatings: Array<
       Event & { avg_rating?: number | null; reviews_count?: number }
     > = past;
@@ -202,6 +214,7 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
         locations={locations}
         dashboardMode={dashboardMode}
         dashboardPendingRequestId={pendingRequestId}
+        team={team}
       />
     );
   }

@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 
 const VALID_ROLES = ["editor", "viewer"] as const;
+type ValidRole = (typeof VALID_ROLES)[number];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface ProfileSearchRow {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+}
 
 /** GET /api/contributor/[handle]/team */
 export async function GET(
@@ -29,7 +40,7 @@ export async function GET(
         "id, member_id, role, status, created_at, member:profiles!team_memberships_member_id_fkey(full_name, avatar_url, email)"
       )
       .eq("contributor_id", contributorId)
-      .eq("status", "active")
+      .in("status", ["active", "pending"])
       .order("created_at", { ascending: false }),
 
     supabase
@@ -49,8 +60,11 @@ export async function GET(
 }
 
 /**
- * POST /api/contributor/[handle]/team — add member by searching profiles.
- * Body: { action: "search" | "invite", query?: string, member_id?: string, role?: "editor"|"viewer" }
+ * POST /api/contributor/[handle]/team
+ * Body shape (one of):
+ *   { action: "search", name?: string, email?: string, user_id?: string }
+ *   { action: "invite", member_id: uuid, role: "editor"|"viewer" }
+ *   { action: "propose_owner_transfer", member_id: uuid }
  */
 export async function POST(
   request: NextRequest,
@@ -85,39 +99,82 @@ export async function POST(
   const raw = body as Record<string, unknown>;
   const action = raw.action as string;
 
-  // Search for users by name, user ID, or email
+  // ── search: combined name + email + user_id ─────────────────────
   if (action === "search") {
-    const nameQuery = typeof raw.name === "string" ? raw.name.trim().slice(0, 100) : "";
+    const nameQuery = typeof raw.name === "string"
+      ? sanitiseLike(raw.name).slice(0, 100)
+      : "";
+    const emailQuery = typeof raw.email === "string"
+      ? sanitiseLike(raw.email.toLowerCase()).slice(0, 200)
+      : "";
     const idQuery = typeof raw.user_id === "string" ? raw.user_id.trim() : "";
-    const emailQuery = typeof raw.email === "string" ? raw.email.trim().toLowerCase().slice(0, 200) : "";
 
-    if (!nameQuery && !idQuery && !emailQuery) {
-      return NextResponse.json({ error: "At least one search field required" }, { status: 400 });
+    if (!nameQuery && !emailQuery && !idQuery) {
+      return NextResponse.json(
+        { error: "At least one search field required" },
+        { status: 400 }
+      );
     }
 
-    let query = supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url, email")
-      .neq("id", contributorId)
-      .limit(10);
-
-    if (idQuery && isValidUUID(idQuery)) {
-      query = query.eq("id", idQuery);
-    } else if (emailQuery) {
-      query = query.ilike("email", `%${emailQuery}%`);
-    } else if (nameQuery) {
-      query = query.ilike("full_name", `%${nameQuery}%`);
+    if (idQuery && !isValidUUID(idQuery)) {
+      return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
 
-    const { data, error } = await query;
-    if (error) {
-      return NextResponse.json({ error: "Search failed" }, { status: 500 });
+    if (emailQuery && !EMAIL_RE.test(emailQuery) && emailQuery.length < 3) {
+      // Allow short partial substrings (>=3 chars) but reject 1-2 char noise.
+      return NextResponse.json({ error: "Email search too short" }, { status: 400 });
     }
 
-    return NextResponse.json({ results: data ?? [] });
+    // Fire each scoped query in parallel; PostgREST `or()` here would force a
+    // single ILIKE across multiple columns which is harder to reason about and
+    // bypasses the per-column rate-of-results limit.
+    const queries: PromiseLike<{ data: ProfileSearchRow[] | null }>[] = [];
+    if (idQuery) {
+      queries.push(
+        supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url, email")
+          .eq("id", idQuery)
+          .neq("id", contributorId)
+          .limit(1)
+          .returns<ProfileSearchRow[]>()
+      );
+    }
+    if (emailQuery) {
+      queries.push(
+        supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url, email")
+          .ilike("email", `%${emailQuery}%`)
+          .neq("id", contributorId)
+          .limit(10)
+          .returns<ProfileSearchRow[]>()
+      );
+    }
+    if (nameQuery) {
+      queries.push(
+        supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url, email")
+          .ilike("full_name", `%${nameQuery}%`)
+          .neq("id", contributorId)
+          .limit(10)
+          .returns<ProfileSearchRow[]>()
+      );
+    }
+
+    const settled = await Promise.all(queries);
+    const merged = new Map<string, ProfileSearchRow>();
+    for (const res of settled) {
+      for (const row of res.data ?? []) {
+        if (!merged.has(row.id)) merged.set(row.id, row);
+      }
+    }
+
+    return NextResponse.json({ results: Array.from(merged.values()).slice(0, 20) });
   }
 
-  // Add a team member
+  // ── invite: create a pending team_memberships row + notify ──────
   if (action === "invite") {
     const memberId = raw.member_id as string;
     const role = raw.role as string;
@@ -125,45 +182,130 @@ export async function POST(
     if (!isValidUUID(memberId)) {
       return NextResponse.json({ error: "Invalid member_id" }, { status: 400 });
     }
-    if (!VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])) {
+    if (!VALID_ROLES.includes(role as ValidRole)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
-
-    // Prevent adding owner as a member
     if (memberId === contributorId) {
-      return NextResponse.json({ error: "Cannot add yourself as a team member" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Cannot add yourself as a team member" },
+        { status: 400 }
+      );
     }
+
+    // Block re-invite while a pending or active row exists. Upsert below would
+    // silently overwrite which is confusing for the user.
+    const { data: existing } = await supabase
+      .from("team_memberships")
+      .select("id, status")
+      .eq("contributor_id", contributorId)
+      .eq("member_id", memberId)
+      .maybeSingle<{ id: string; status: string }>();
+
+    if (existing && existing.status !== "declined" && existing.status !== "removed") {
+      return NextResponse.json(
+        { error: existing.status === "pending" ? "Invite already pending" : "Already on team" },
+        { status: 409 }
+      );
+    }
+
+    // Re-invite path: overwrite a prior declined/removed row.
+    const upsertPayload = {
+      contributor_id: contributorId,
+      member_id: memberId,
+      role,
+      status: "pending",
+      invited_by: user.id,
+      responded_at: null,
+    };
 
     const { data, error } = await supabase
       .from("team_memberships")
-      .upsert(
-        {
-          contributor_id: contributorId,
-          member_id: memberId,
-          role,
-          status: "active",
-          invited_by: user.id,
-        },
-        { onConflict: "contributor_id,member_id" }
-      )
+      .upsert(upsertPayload, { onConflict: "contributor_id,member_id" })
       .select("id")
       .single();
 
     if (error) {
-      return NextResponse.json({ error: "Failed to add team member" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to send invite" }, { status: 500 });
     }
+
+    // Fire-and-forget invitee notification. Uses service role because the
+    // notifications RLS insert policy is admin-only and contributors are not
+    // admins. Best-effort: log failure but don't fail the invite.
+    await sendInviteNotification({
+      inviteeId: memberId,
+      contributorId,
+      handle,
+      role: role as ValidRole,
+      membershipId: data.id,
+    });
 
     await recordContributorMutation(supabase, {
       handle,
       access,
       actorId: user.id,
-      action: "team_member_added",
+      action: "team_member_invited",
       entityType: "team_membership",
       entityId: data.id,
       metadata: { member_id: memberId, role },
     });
 
     return NextResponse.json({ id: data.id }, { status: 201 });
+  }
+
+  // ── propose_owner_transfer: notification-only (no schema swap yet) ──
+  if (action === "propose_owner_transfer") {
+    const memberId = raw.member_id as string;
+
+    if (!isValidUUID(memberId)) {
+      return NextResponse.json({ error: "Invalid member_id" }, { status: 400 });
+    }
+    if (memberId === contributorId) {
+      return NextResponse.json(
+        { error: "You are already the owner" },
+        { status: 400 }
+      );
+    }
+    if (!access.isOwner) {
+      return NextResponse.json(
+        { error: "Only the current owner can propose an ownership transfer" },
+        { status: 403 }
+      );
+    }
+
+    // Proposed transferee must already be an active team member. Stops random
+    // ownership-grant DMs to non-members.
+    const { data: existing } = await supabase
+      .from("team_memberships")
+      .select("id, status")
+      .eq("contributor_id", contributorId)
+      .eq("member_id", memberId)
+      .eq("status", "active")
+      .maybeSingle<{ id: string; status: string }>();
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Proposed owner must be an active team member first" },
+        { status: 400 }
+      );
+    }
+
+    await sendOwnerTransferNotification({
+      inviteeId: memberId,
+      contributorId,
+      handle,
+    });
+
+    await recordContributorMutation(supabase, {
+      handle,
+      access,
+      actorId: user.id,
+      action: "team_owner_transfer_proposed",
+      entityType: "team_membership",
+      entityId: existing.id,
+      metadata: { proposed_owner_id: memberId },
+    });
+
+    return NextResponse.json({ proposed: true }, { status: 202 });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -232,7 +374,7 @@ export async function PATCH(
 
   if (action === "change_role") {
     const role = raw.role as string;
-    if (!VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])) {
+    if (!VALID_ROLES.includes(role as ValidRole)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
     const { error } = await supabase
@@ -257,4 +399,91 @@ export async function PATCH(
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+}
+
+// ─── helpers ─────────────────────────────────────────────────────
+
+/** Strip Postgres LIKE wildcards from a user-supplied search string so they
+ *  cannot bypass `%term%` framing or DoS the planner with leading `%`. */
+function sanitiseLike(value: string): string {
+  return value
+    .replace(/[\x00-\x1F\x7F]/g, "") // control chars
+    .replace(/[%_\\]/g, "")           // LIKE wildcards
+    .trim();
+}
+
+interface SendInviteNotificationInput {
+  inviteeId: string;
+  contributorId: string;
+  handle: string;
+  role: ValidRole;
+  membershipId: string;
+}
+
+async function sendInviteNotification(input: SendInviteNotificationInput): Promise<void> {
+  const { inviteeId, contributorId, handle, role, membershipId } = input;
+
+  try {
+    const admin = createAdminClient();
+    const { data: contributor } = await admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", contributorId)
+      .maybeSingle<{ full_name: string | null }>();
+
+    const orgName = contributor?.full_name ?? "A contributor";
+
+    await admin.from("notifications").insert({
+      user_id: inviteeId,
+      type: "team_invite",
+      title: "You've been invited to a team",
+      body: `${orgName} invited you to join as ${role}.`,
+      data: {
+        membership_id: membershipId,
+        contributor_id: contributorId,
+        contributor_handle: handle,
+        role,
+        url: "/account/team-invites",
+      },
+    });
+  } catch (error) {
+    console.error("[team] sendInviteNotification failed", error);
+  }
+}
+
+interface SendOwnerTransferNotificationInput {
+  inviteeId: string;
+  contributorId: string;
+  handle: string;
+}
+
+async function sendOwnerTransferNotification(
+  input: SendOwnerTransferNotificationInput
+): Promise<void> {
+  const { inviteeId, contributorId, handle } = input;
+
+  try {
+    const admin = createAdminClient();
+    const { data: contributor } = await admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", contributorId)
+      .maybeSingle<{ full_name: string | null }>();
+
+    const orgName = contributor?.full_name ?? "A contributor";
+
+    await admin.from("notifications").insert({
+      user_id: inviteeId,
+      type: "team_owner_transfer",
+      title: "Ownership transfer proposed",
+      body: `${orgName} has proposed transferring ownership to you.`,
+      data: {
+        contributor_id: contributorId,
+        contributor_handle: handle,
+        url: "/account/team-invites",
+      },
+    });
+  } catch (error) {
+    console.error("[team] sendOwnerTransferNotification failed", error);
+  }
 }

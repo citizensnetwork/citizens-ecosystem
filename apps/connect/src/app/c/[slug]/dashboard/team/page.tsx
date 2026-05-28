@@ -22,14 +22,18 @@ export default async function TeamDashboardPage({
   const contributor = await resolveContributorSlug(slug);
   if (!contributor) redirect("/");
 
+  // viewerIsOwner controls the owner-transfer affordance (only the actual
+  // owning user — i.e. the contributor profile itself — can propose).
+  const viewerIsOwner = user.id === contributor.id;
+
   const [membersResult, volunteersResult] = await Promise.all([
     supabase
       .from("team_memberships")
       .select(
-        "id, member_id, role, status, created_at, member:profiles!team_memberships_member_id_fkey(full_name, avatar_url)"
+        "id, member_id, role, status, created_at, member:profiles!team_memberships_member_id_fkey(full_name, avatar_url, email)"
       )
       .eq("contributor_id", contributor.id)
-      .eq("status", "active")
+      .in("status", ["active", "pending"])
       .order("created_at", { ascending: false }),
     supabase
       .from("volunteer_applications")
@@ -43,7 +47,7 @@ export default async function TeamDashboardPage({
 
   type MemberRow = {
     id: string; member_id: string; role: string; status: string; created_at: string;
-    member: { full_name: string | null; avatar_url: string | null } | null;
+    member: { full_name: string | null; avatar_url: string | null; email: string | null } | null;
   };
   type VolunteerRow = {
     id: string; applicant_id: string; entity_type: string; entity_id: string;
@@ -56,6 +60,7 @@ export default async function TeamDashboardPage({
       slug={slug}
       members={(membersResult.data ?? []) as unknown as MemberRow[]}
       volunteers={(volunteersResult.data ?? []) as unknown as VolunteerRow[]}
+      viewerIsOwner={viewerIsOwner}
     />
   );
 }

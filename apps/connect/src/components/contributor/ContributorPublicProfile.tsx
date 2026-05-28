@@ -55,6 +55,13 @@ export interface ContributorPublicProfileProps {
   dashboardMode?: "owner" | "admin-granted" | "admin-no-grant" | null;
   /** Pending access request id when admin has an outstanding request. */
   dashboardPendingRequestId?: string | null;
+  /** Active team members (safe columns only — id, name, avatar, role). */
+  team?: Array<{
+    member_id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    role: string;
+  }>;
 }
 
 export function ContributorPublicProfile({
@@ -69,6 +76,7 @@ export function ContributorPublicProfile({
   locations = [],
   dashboardMode = null,
   dashboardPendingRequestId = null,
+  team = [],
 }: ContributorPublicProfileProps) {
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
@@ -271,6 +279,42 @@ export function ContributorPublicProfile({
             <EventRows events={upcomingEvents} />
           )}
         </Section>
+
+        {/* ── 5b. Team ─────────────────────────────────── */}
+        {team.length > 0 && (
+          <Section title="Team">
+            <ul className="flex flex-wrap gap-3">
+              {team.map((member) => (
+                <li
+                  key={member.member_id}
+                  className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5"
+                >
+                  {member.avatar_url ? (
+                    <Image
+                      src={member.avatar_url}
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--gold-soft) text-[11px] font-semibold uppercase text-black">
+                      {member.full_name?.[0] ?? "?"}
+                    </div>
+                  )}
+                  <span className="text-xs font-medium text-black/80">
+                    {member.full_name ?? "Member"}
+                  </span>
+                  {member.role === "owner" && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-(--gold)">
+                      Owner
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {/* ── 6. Past events ───────────────────────────── */}
         {pastEvents.length > 0 && (

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -122,14 +123,24 @@ export async function POST(
       return NextResponse.json({ error: "Failed to submit application" }, { status: 500 });
     }
 
-    // Notify contributor
-    await supabase.from("notifications").insert({
-      user_id: entity.created_by,
-      type: "system",
-      title: "New volunteer application",
-      body: "Someone has applied to volunteer at one of your events.",
-      link: null,
-    });
+    // Notify contributor (service role — notifications insert RLS is admin-only).
+    try {
+      const admin = createAdminClient();
+      await admin.from("notifications").insert({
+        user_id: entity.created_by,
+        type: "volunteer_application",
+        title: "New volunteer application",
+        body: "Someone has applied to volunteer at one of your events.",
+        data: {
+          application_id: inserted.id,
+          entity_type: String(entity_type),
+          entity_id: String(entity_id),
+          url: `/c/${handle}/dashboard/team`,
+        },
+      });
+    } catch (notifErr) {
+      console.error("[volunteers] notify-contributor insert failed", notifErr);
+    }
 
     return NextResponse.json({ id: inserted.id }, { status: 201 });
   }
@@ -180,7 +191,7 @@ export async function POST(
       metadata: { applicant_id: existing.applicant_id },
     });
 
-    // Notify applicant
+    // Notify applicant (service role — notifications insert RLS is admin-only).
     const notifBody =
       newStatus === "approved"
         ? "Your volunteer application has been approved!"
@@ -188,13 +199,22 @@ export async function POST(
         ? "Your volunteer application was not accepted this time."
         : null;
     if (notifBody) {
-      await supabase.from("notifications").insert({
-        user_id: existing.applicant_id,
-        type: "system",
-        title: newStatus === "approved" ? "Application approved" : "Application update",
-        body: notifBody,
-        link: null,
-      });
+      try {
+        const admin = createAdminClient();
+        await admin.from("notifications").insert({
+          user_id: existing.applicant_id,
+          type: "volunteer_application_response",
+          title: newStatus === "approved" ? "Application approved" : "Application update",
+          body: notifBody,
+          data: {
+            application_id: String(application_id),
+            status: newStatus,
+            url: `/c/${handle}`,
+          },
+        });
+      } catch (notifErr) {
+        console.error("[volunteers] notify-applicant insert failed", notifErr);
+      }
     }
 
     return NextResponse.json({ ok: true });

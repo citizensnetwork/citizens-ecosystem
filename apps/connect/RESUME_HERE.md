@@ -16,7 +16,54 @@
 
 ---
 
-## 2. What just shipped — Full Messaging System + Vibe-Security Audit (next commit)
+## 2. What just shipped — Stage G: Team Management UX (this commit)
+
+**Completed Stage G of the contributor-dashboard plan**: 3-search-bar add-member popup, invite flow with accept/decline notification round-trip, owner-transfer proposal (notification-only — full atomic swap deferred), public team list on contributor profile. Also fixed a latent volunteer-notification bug while in the area.
+
+### Migration 109 ([109_team_invite_owner_transfer.sql](supabase/migrations/109_team_invite_owner_transfer.sql))
+- `team_memberships.status` CHECK widened: `pending | active | declined | removed` (was `active | removed`).
+- `team_memberships.role` CHECK widened: `owner | editor | viewer` (was `editor | viewer`). Only the propose-transfer flow ever creates 'owner' rows; invites are role-restricted to editor/viewer.
+- `team_memberships.responded_at timestamptz` (NULL while status='pending').
+- `notifications.type` CHECK extended: `+team_invite, +team_invite_response, +team_owner_transfer, +volunteer_application, +volunteer_application_response`. (Volunteer types added to fix latent 'system' typo — see below.)
+- `respond_team_invite(p_membership_id uuid, p_action text)` SECURITY DEFINER RPC — member-side accept/decline. Validates `auth.uid()=member_id` + `status='pending'`, writes notification back to contributor, appends activity_log row. REVOKE/GRANT to authenticated only.
+- `get_public_team(p_contributor_id uuid)` SECURITY DEFINER RPC — returns `member_id, full_name, avatar_url, role` for active rows only. Granted to anon+authenticated. Keeps email/invited_by/created_at private while exposing the safe display columns for the public profile.
+
+### Backend ([team/route.ts](src/app/api/contributor/[handle]/team/route.ts))
+- **POST `action: "search"`** — accepts `name`, `email`, `user_id` independently (any combination). Each field fires a scoped ILIKE/eq query in parallel; results merged via Map dedupe, capped at 20. `sanitiseLike()` strips `%_\` wildcards + control chars to neutralise LIKE injection. UUID-validated. 3+ char minimum on partial email search.
+- **POST `action: "invite"`** — creates `team_memberships` row with `status='pending'`. Pre-flight existence check returns 409 for active/pending; allows re-invite over declined/removed rows via upsert on `(contributor_id, member_id)`. Service-role notification insert (notifications RLS insert is admin-only) with `type='team_invite'` and `data.url='/account/team-invites'`. Best-effort: notification failure logged but doesn't fail invite. `recordContributorMutation` writes activity_log.
+- **POST `action: "propose_owner_transfer"`** — gated on `access.isOwner` (excludes admin-with-grant impersonation). Proposed transferee must be an active team member. Notification-only this batch: `type='team_owner_transfer'` to the proposed owner with deep link to `/account/team-invites`. No schema swap — accepting just dismisses the notification. Full atomic ownership swap deferred until a follow-up reworks the `user.id === contributor.id` access model.
+
+### Backend ([team-invites/route.ts](src/app/api/team-invites/route.ts))
+- **GET** — lists `auth.uid()`'s pending team_memberships joined to contributor profile.
+- **POST** — `{membership_id, action: "accept" | "decline"}` → delegates to `respond_team_invite` RPC. Maps Postgres exceptions to 404/403/400.
+
+### UI ([AddTeamMemberPopup.tsx](src/components/contributor/dashboard/AddTeamMemberPopup.tsx))
+- New glass-overlay popup with 3 labelled search fields (name, email, user_id). Auto-focuses name. Escape closes. Results render with avatar + name + email + Invite-as-Editor / Viewer buttons. Inline error band, optimistic add to parent.
+
+### UI ([TeamDashboardClient.tsx](src/components/contributor/dashboard/TeamDashboardClient.tsx))
+- Single search input replaced with "+ Add team member" button → popup.
+- Members split into **Pending invites** (cancel button) and **Active members** sections.
+- "Make owner" button on active member rows, visible only when `viewerIsOwner` (server-computed from `user.id === contributor.id`).
+- New `viewerIsOwner` prop wired from [team/page.tsx](src/app/c/[slug]/dashboard/team/page.tsx).
+
+### UI ([account/team-invites/page.tsx](src/app/account/team-invites/page.tsx) + [TeamInvitesClient.tsx](src/components/team/TeamInvitesClient.tsx))
+- New `/account/team-invites` route — invitee-side acceptance pane listing pending invites with Accept/Decline. Notifications `type='team_invite'` deep-link here via `data.url`.
+
+### UI ([ContributorPublicProfile.tsx](src/components/contributor/ContributorPublicProfile.tsx) + [ProfileDetailServer.tsx](src/components/profile/ProfileDetailServer.tsx))
+- New **Team** section on the public contributor profile. Server-fetched via `get_public_team` RPC, rendered as avatar+name chips. Owner chip prefixed with a gold "OWNER" tag.
+
+### Drive-by fix — volunteer notifications
+- `volunteers/route.ts` was inserting `type:"system"` (not in CHECK) and `link:null` (column doesn't exist). Silent failures. Migrated both inserts to use the new `volunteer_application` / `volunteer_application_response` types (added in 109) with `data.url` deep-links. Routed through `createAdminClient()` (notifications RLS insert is admin-only).
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx next lint --dir src` → clean (Next 16 lint deprecation notice only)
+- `npx vitest run` → **745/745 passed** (82 files)
+- Sec audit (self): LIKE-injection neutralised; role enum restricts owner via invite; propose_owner_transfer gated on real owner only; RPCs validate `auth.uid()` server-side; public RPC exposes only safe columns; notification body uses React-escaped text (no XSS); concurrent invite race collapsed by `(contributor_id, member_id)` UNIQUE.
+
+---
+
+## 2-prev. Previously shipped — Full Messaging System + Vibe-Security Audit
 
 **Completed all 12 steps of the messaging product plan + ran a full vibe-security audit, fixing 2 HIGH and 2 MEDIUM findings.** Multi-session effort. `tsc 0`, lint clean, **745/745 tests**.
 
@@ -188,8 +235,8 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 ## 3. Current platform state
 
 - 82 test files, **745 tests**, all passing.
-- 108 migrations applied (107 messaging permission model + 108 contributor digest cron added this batch).
-- Latest commit on `origin/main`: **`d116ea5`** (about to be superseded by messaging commit).
+- 109 migrations applied (109_team_invite_owner_transfer added this batch).
+- Latest commit on `origin/main`: messaging commit (about to be superseded by Stage G commit).
 
 ---
 
@@ -197,7 +244,7 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 From `docs/plans/contributor-dashboard.md`:
 
-- **Stage G — Team management UX**: "+ Add team member" popup (3 search bars: name/user_id/email), invite flow → `team_memberships` row + in-app notification, accept/decline, owner transfer, public team list on contributor profile.
+- **Stage G follow-up — Full atomic owner transfer**: refactor `checkDashboardAccess` to source ownership from `team_memberships.role='owner'` instead of `user.id === contributor.id`. Bootstrap migration to seed an owner row per existing contributor profile. Live accept-flow that demotes the prior owner.
 - **Stage H — Analytics depth + export**: daily aggregation via pg_cron → `contributor_analytics`, time-window selector (7/14/30/60/90d, 6mo, 1yr), CSV export endpoint, 1-year retention.
 - **Stage I — Planning cards**: card open/close UI for tasks + ideas, completion checkbox, idea delete, public toggle.
 - **Stage J — Suggestion button polish**: glass-panel composer with server-side validation, admin suggestion inbox, XLSX export, 10/day rate limit.
