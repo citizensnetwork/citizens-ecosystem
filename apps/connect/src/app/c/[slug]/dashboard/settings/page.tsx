@@ -55,14 +55,40 @@ export default async function SettingsDashboardPage({
     accessRequestsQuery.eq("admin_id", user.id);
   }
 
-  const [keywordsResult, accessRequestsResult] = await Promise.all([
+  const [keywordsResult, accessRequestsResult, handleResult] = await Promise.all([
     supabase
       .from("contributor_keywords")
       .select("id, keyword")
       .eq("contributor_id", contributor.id)
       .order("keyword", { ascending: true }),
     accessRequestsQuery,
+    supabase
+      .from("profiles")
+      .select("handle_changed_at")
+      .eq("id", contributor.id)
+      .maybeSingle<{ handle_changed_at: string | null }>(),
   ]);
+
+  // 30-day cooldown for handle change. Compute on the server so the
+  // disabled-state is correct on first paint (no client flash).
+  let handleCooldownDaysRemaining: number | null = null;
+  if (handleResult.data?.handle_changed_at) {
+    const COOLDOWN_DAYS = 30;
+    const lastChanged = new Date(handleResult.data.handle_changed_at).getTime();
+    const elapsedDays = (Date.now() - lastChanged) / (24 * 60 * 60 * 1000);
+    const remaining = Math.ceil(COOLDOWN_DAYS - elapsedDays);
+    handleCooldownDaysRemaining = remaining > 0 ? remaining : 0;
+  }
+
+  // Viewer is admin-with-grant if not the owner but checkDashboardAccess
+  // already approved. We re-check here cheaply rather than threading the
+  // result through, to keep the prop surface narrow.
+  const { data: viewerRole } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle<{ role: string }>();
+  const viewerIsAdminWithAccess = !isOwner && viewerRole?.role === "admin";
 
   type AccessRequestRow = {
     id: string; admin_id: string; status: AccessRequestStatus;
@@ -82,6 +108,8 @@ export default async function SettingsDashboardPage({
       keywords={keywordsResult.data ?? []}
       accessRequests={(accessRequestsResult.data ?? []) as unknown as AccessRequestRow[]}
       viewerIsOwner={isOwner}
+      viewerIsAdminWithAccess={viewerIsAdminWithAccess}
+      handleCooldownDaysRemaining={handleCooldownDaysRemaining}
     />
   );
 }

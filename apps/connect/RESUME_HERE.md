@@ -16,7 +16,40 @@
 
 ---
 
-## 2. What just shipped — Stage J: Suggestion polish + admin inbox + CSV-injection hardening
+## 2. What just shipped — Stage K: Handle change rule (1/30d + admin override)
+
+**Completed Stage K of the contributor-dashboard plan**: contributor `handle` (slug) is now editable from the Settings dashboard with a server-enforced 30-day cooldown, an admin-only override that bypasses the cooldown via SECURITY DEFINER RPC, and warning copy + a two-click confirm gate on the UI.
+
+### Migration 115 ([115_contributor_slug_change.sql](supabase/migrations/115_contributor_slug_change.sql))
+- `admin_change_contributor_slug(p_contributor_id uuid, p_new_slug text, p_reason text)` SECURITY DEFINER RPC. Server-side admin role re-check (defence-in-depth — SECURITY DEFINER alone is not enough), server-side regex format guard (`^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$`), uniqueness via existing `profiles_contributor_slug_key` partial index translated to a clean `slug_taken` (23505) exception. Writes `admin_actions` (canonical admin trail) AND `activity_log` (admin-on-behalf attribution) atomically with the UPDATE. REVOKE from anon/public; GRANT to authenticated only.
+
+### Backend ([slug/route.ts](src/app/api/contributor/[handle]/slug/route.ts))
+- PATCH `/api/contributor/[handle]/slug` with `{ new_slug, reason? }`.
+- Owner path: API enforces 30-day cooldown from `profiles.handle_changed_at`; on success, atomically writes new slug + updates timestamp + records activity via `recordContributorMutation`.
+- Admin path: requires non-empty `reason`, delegates to the RPC; Postgres exception codes mapped 23505→409, 42501→403, 22023→400.
+- Rate-limited via `RATE_LIMITS.mutation`. UUID/format guard at the API matches the regex inside the RPC so a compromised admin session cannot inject arbitrary strings.
+- Per A62: no legacy-handle redirect — old handles stop resolving the instant the write commits. Client hard-navigates to `/c/{new}/dashboard/settings`.
+
+### UI ([SettingsDashboardClient.tsx](src/components/contributor/dashboard/SettingsDashboardClient.tsx) + [settings/page.tsx](src/app/c/[slug]/dashboard/settings/page.tsx))
+- New **Public handle** section at the top of Settings (owners and admin-with-grant viewers only).
+- Server-computed `handleCooldownDaysRemaining` so the disabled state and the cooldown banner are correct on first paint (no client flash).
+- Constrained input (`[a-z0-9-]` only, 40-char cap) with `/c/` prefix decoration. Two-click confirm flow with the exact A61 copy: *"This will break any existing links to your profile. Are you sure?"*
+- Admin-with-grant viewers see a reason textarea (required); button label switches to "Override handle".
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **769/769 passed** (84 files, +10 tests vs Stage J)
+- `npx next lint --dir src` → clean
+- Sec audit (self):
+  - RPC SECURITY DEFINER but re-checks admin role inside Postgres; format regex enforced both in RPC and API; UNIQUE INDEX still authoritative for collisions.
+  - Owner path can never trigger admin behaviour (`isAdminWithAccess && !isOwner` gate).
+  - API rate-limited; reason field control-char stripped and length-capped (500).
+  - UI confirm gate; input character allowlist defends against client-side experimentation; redirect uses `encodeURIComponent` even though slug is already constrained.
+  - `recordContributorMutation` handles admin-on-behalf attribution automatically when the admin (rather than owner) drives the change.
+
+---
+
+## 2-prev. Previously shipped — Stage J: Suggestion polish + admin inbox + CSV-injection hardening
 
 **Completed Stage J of the contributor-dashboard plan**: admin suggestion inbox UI, dedicated `suggestion_response` notification type, CSV/XLSX export, glass-panel composer polish, and a security-driven fix to CSV formula injection (covers both Stage J's new export and the pre-existing Stage H analytics export).
 
@@ -392,9 +425,9 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 ## 3. Current platform state
 
-- 83 test files, **759 tests**, all passing.
-- 114 migrations applied (114_suggestion_response_notification added this batch).
-- Commit pending push — Stage J just shipped.
+- 84 test files, **769 tests**, all passing.
+- 115 migrations applied (115_contributor_slug_change added this batch).
+- Commit pending push — Stage K just shipped on top of Stage J.
 
 ---
 
@@ -403,8 +436,7 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 From `docs/plans/contributor-dashboard.md`:
 
 - **Stage H follow-ups** (deferred, not blocking): add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to a real Vision endpoint. **Operator action**: run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
-- **Stage K — Handle change rule**: warning copy on slug edit, 1-change-per-month enforcement, admin override endpoint.
-- **Stage L — Search term analytics**: capture sanitised queries in rolling table, top-10 display, feed keywords into autocomplete (A66).
+- **Stage L — Search term analytics**: capture sanitised queries in rolling table, top-10 display, feed keywords into autocomplete (A66). **Last queued stage.**
 
 ---
 

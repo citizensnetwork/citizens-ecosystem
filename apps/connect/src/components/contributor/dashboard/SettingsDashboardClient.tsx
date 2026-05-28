@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PREDEFINED_SERVICES } from "@/types/db";
 
 interface Keyword {
   id: string;
   keyword: string;
 }
+
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/;
 
 /** Canonical lifecycle states for `contributor_access_requests.status`. */
 export type AccessRequestStatus =
@@ -35,9 +38,22 @@ interface Props {
   /** True when viewer is the contributor owner. Owner is read-only on the
    *  access list per A48 — only the granting admin may revoke their session. */
   viewerIsOwner: boolean;
+  /** True when viewer is an admin operating with an active access grant.
+   *  Unlocks the slug cooldown bypass (with mandatory reason). */
+  viewerIsAdminWithAccess: boolean;
+  /** Days until the owner can next change their handle. null if no prior change. */
+  handleCooldownDaysRemaining: number | null;
 }
 
-export default function SettingsDashboardClient({ slug, keywords: initialKeywords, accessRequests: initialAccessRequests, viewerIsOwner }: Props) {
+export default function SettingsDashboardClient({
+  slug,
+  keywords: initialKeywords,
+  accessRequests: initialAccessRequests,
+  viewerIsOwner,
+  viewerIsAdminWithAccess,
+  handleCooldownDaysRemaining,
+}: Props) {
+  const router = useRouter();
   const [keywords, setKeywords] = useState(initialKeywords);
   const [newKeyword, setNewKeyword] = useState("");
   const [addingKeyword, setAddingKeyword] = useState(false);
@@ -47,6 +63,54 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
   const [accessRequests, setAccessRequests] = useState(initialAccessRequests);
   const [denyingId, setDenyingId] = useState<string | null>(null);
   const [denyReason, setDenyReason] = useState("");
+
+  // Handle (slug) edit state
+  const [handleDraft, setHandleDraft] = useState(slug);
+  const [handleReason, setHandleReason] = useState("");
+  const [handleError, setHandleError] = useState<string | null>(null);
+  const [handleSaving, setHandleSaving] = useState(false);
+  const [handleConfirming, setHandleConfirming] = useState(false);
+
+  async function submitHandleChange() {
+    setHandleError(null);
+    const next = handleDraft.trim().toLowerCase();
+    if (!SLUG_RE.test(next)) {
+      setHandleError(
+        "Handle must be 2–40 lowercase letters, numbers, or hyphens, with no leading/trailing hyphen.",
+      );
+      return;
+    }
+    if (next === slug) {
+      setHandleError("That is the current handle.");
+      return;
+    }
+    if (viewerIsAdminWithAccess && !handleReason.trim()) {
+      setHandleError("Reason is required for admin overrides.");
+      return;
+    }
+    setHandleSaving(true);
+    try {
+      const res = await fetch(`/api/contributor/${slug}/slug`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          new_slug: next,
+          reason: viewerIsAdminWithAccess ? handleReason.trim() : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setHandleError(data.error ?? "Failed to change handle.");
+        return;
+      }
+      // Old handle stops resolving immediately (A62). Navigate to the new path.
+      window.location.href = `/c/${encodeURIComponent(next)}/dashboard/settings`;
+      router.refresh();
+    } finally {
+      setHandleSaving(false);
+      setHandleConfirming(false);
+    }
+  }
 
   async function addKeyword(e: React.FormEvent) {
     e.preventDefault();
@@ -149,8 +213,126 @@ export default function SettingsDashboardClient({ slug, keywords: initialKeyword
 
   const pendingRequests = accessRequests.filter((r) => r.status === "pending");
 
+  const canChangeHandle =
+    viewerIsAdminWithAccess ||
+    handleCooldownDaysRemaining === null ||
+    handleCooldownDaysRemaining <= 0;
+
   return (
     <div className="space-y-10 max-w-2xl">
+      {/* Handle / slug */}
+      {(viewerIsOwner || viewerIsAdminWithAccess) && (
+        <section>
+          <h3 className="text-sm font-semibold mb-1">Public handle</h3>
+          <p className="text-xs text-[--foreground-soft] mb-3">
+            Your dashboard and public page live at{" "}
+            <span className="font-mono">/c/{slug}</span>. Changes to your
+            handle break every existing link to your profile — search results,
+            shared cards, QR codes, embedded widgets.{" "}
+            {!viewerIsAdminWithAccess && (
+              <>You can change your handle <strong>once every 30 days</strong>.</>
+            )}
+          </p>
+
+          {handleCooldownDaysRemaining !== null && handleCooldownDaysRemaining > 0 && !viewerIsAdminWithAccess && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+              You changed your handle recently. Next change available in{" "}
+              <strong>
+                {handleCooldownDaysRemaining} day
+                {handleCooldownDaysRemaining === 1 ? "" : "s"}
+              </strong>
+              .
+            </p>
+          )}
+
+          <div className="flex gap-2 items-stretch">
+            <span className="inline-flex items-center text-sm text-[--foreground-soft] font-mono px-3 rounded-l-xl border border-r-0 border-[--border] bg-[--surface-muted]">
+              /c/
+            </span>
+            <input
+              type="text"
+              value={handleDraft}
+              onChange={(e) =>
+                setHandleDraft(
+                  e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40),
+                )
+              }
+              disabled={!canChangeHandle || handleSaving}
+              maxLength={40}
+              spellCheck={false}
+              autoComplete="off"
+              className="flex-1 text-sm border border-[--border] rounded-r-xl px-3 py-2 bg-[--surface] focus:outline-none focus:border-[--gold] disabled:opacity-40 font-mono"
+            />
+          </div>
+
+          {viewerIsAdminWithAccess && (
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-[--foreground-soft] mb-1">
+                Reason for admin override <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={handleReason}
+                onChange={(e) => setHandleReason(e.target.value.slice(0, 500))}
+                placeholder="Logged in admin_actions and activity_log."
+                rows={2}
+                maxLength={500}
+                className="w-full text-sm border border-[--border] rounded-xl px-3 py-2 bg-[--surface] focus:outline-none focus:border-[--gold] resize-none"
+              />
+            </div>
+          )}
+
+          {handleError && (
+            <p role="alert" className="text-xs text-red-600 mt-2">
+              {handleError}
+            </p>
+          )}
+
+          <div className="mt-3 flex gap-2 items-center">
+            {!handleConfirming ? (
+              <button
+                type="button"
+                disabled={
+                  !canChangeHandle ||
+                  handleSaving ||
+                  handleDraft.trim().toLowerCase() === slug ||
+                  !SLUG_RE.test(handleDraft.trim().toLowerCase()) ||
+                  (viewerIsAdminWithAccess && !handleReason.trim())
+                }
+                onClick={() => setHandleConfirming(true)}
+                className="px-4 py-2 rounded-xl bg-[--gold] text-black text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+              >
+                {viewerIsAdminWithAccess ? "Override handle" : "Change handle"}
+              </button>
+            ) : (
+              <>
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex-1">
+                  This will break any existing links to your profile. Are you sure?
+                </p>
+                <button
+                  type="button"
+                  onClick={submitHandleChange}
+                  disabled={handleSaving}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+                >
+                  {handleSaving ? "Saving…" : "Confirm change"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHandleConfirming(false);
+                    setHandleError(null);
+                  }}
+                  disabled={handleSaving}
+                  className="px-3 py-2 rounded-xl border border-[--border] text-sm text-[--foreground-soft] hover:text-[--foreground] transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Keywords */}
       <section>
         <h3 className="text-sm font-semibold mb-1">
