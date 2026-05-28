@@ -15,3 +15,44 @@ These instructions are MANDATORY and apply to every session in this repository.
 6. **Run a vibe-security check on your code.**
 
 7. **Once checks, lints, audits, checks, fixes etc are done**, push to git, update the resume-here md folder in such a way that any other conversation can pick up from EXACTLY where we left off and have complete understanding of our current project state — no lost conversation must result in a loss of context. And finally, report on what was completed, as well as what incomplete work we still have lying ahead of us.
+
+---
+
+## Session Offloading Protocol (MANDATORY)
+
+Every PR session MUST maintain a **temporary offload file** in `.claude/sessions/`.
+This folder is gitignored — deleting it entirely causes zero data loss.
+
+### When to create the file
+
+At the very start of each PR session, create `.claude/sessions/<descriptive-pr-name>.md`
+and write: objective, root cause, task list, and current context.
+
+### When to offload (write updates to the file)
+
+Offload **after each of the following triggers** — whichever comes first:
+
+- Completing a thinking/research phase
+- Beginning a new scheduled task list
+- Completing any task list item
+- Reaching ~100k tokens of conversation if none of the above apply
+
+### What to write on each offload
+
+- Current objective and status
+- Completed tasks (with outcomes)
+- Remaining tasks (ordered)
+- Key findings, decisions, file paths, line numbers
+- Any blockers or open questions
+- Quality gate results if run
+
+### After offloading
+
+Run `/compact` immediately after writing the offload. If `/compact` is unavailable,
+clear all prior conversation context and re-read the offload file to continue.
+The offload file IS the source of truth — never the conversation history.
+
+### Do NOT write to RESUME_HERE.md during a PR session
+
+`RESUME_HERE.md` is updated only at session END to reflect the final shipped state.
+Per-PR working notes, task lists, and intermediate findings go in the session file only.
