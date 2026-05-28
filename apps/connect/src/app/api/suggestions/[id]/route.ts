@@ -76,7 +76,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update suggestion" }, { status: 500 });
   }
 
-  // Notify user if their suggestion was actioned/declined
+  // Notify user if their suggestion was actioned/declined.
+  // Uses dedicated `suggestion_response` type (migration 114) instead of the
+  // prior `contributor_approved` hack. No deep-link target exists for
+  // suggestions, so `data.url` is intentionally omitted.
   if (
     data.user_id &&
     (statusRaw === "actioned" || statusRaw === "declined")
@@ -88,11 +91,11 @@ export async function PATCH(
 
     await supabase.from("notifications").insert({
       user_id: data.user_id,
-      type: "contributor_approved", // reusing notification infrastructure
+      type: "suggestion_response",
       title: statusRaw === "actioned" ? "Suggestion actioned" : "Suggestion reviewed",
       body: notificationBody,
       image_url: null,
-      data: { suggestion_id: id },
+      data: { suggestion_id: id, status: statusRaw },
     });
   }
 

@@ -43,6 +43,7 @@ export default async function AdminDashboardPage() {
   const [
     pendingAppsRes,
     openReportsRes,
+    openSuggestionsRes,
     usersRes,
     eventsRes,
     placesRes,
@@ -53,6 +54,10 @@ export default async function AdminDashboardPage() {
       .eq("status", "pending"),
     supabase
       .from("reports")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
+    supabase
+      .from("suggestions")
       .select("id", { count: "exact", head: true })
       .eq("status", "open"),
     supabase.from("profiles").select("id", { count: "exact", head: true }),
@@ -74,6 +79,13 @@ export default async function AdminDashboardPage() {
       href: "/admin/reported",
       hint: "Flagged content awaiting decision",
       emphasis: (openReportsRes.count ?? 0) > 0,
+    },
+    {
+      label: "Open suggestions",
+      value: openSuggestionsRes.count ?? 0,
+      href: "/admin/suggestions",
+      hint: "User-submitted ideas & feedback",
+      emphasis: (openSuggestionsRes.count ?? 0) > 0,
     },
     {
       label: "Total users",
@@ -113,6 +125,12 @@ export default async function AdminDashboardPage() {
       description: "Resolve user-submitted content reports.",
     },
     {
+      href: "/admin/suggestions",
+      label: "Suggestions",
+      description:
+        "Review and respond to user feedback. Action / decline notifies the submitter. CSV/XLSX export available.",
+    },
+    {
       href: "/admin/categories",
       label: "Categories",
       description: "Event + place category catalogue.",
@@ -135,7 +153,7 @@ export default async function AdminDashboardPage() {
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-6">
         <section
           aria-label="Stats"
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
         >
           {cards.map((card) => (
             <Link

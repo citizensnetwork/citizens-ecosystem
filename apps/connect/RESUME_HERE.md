@@ -16,7 +16,60 @@
 
 ---
 
-## 2. What just shipped — Stage G.2 + Stage H optional + Stage I (commit `847f3b8`)
+## 2. What just shipped — Stage J: Suggestion polish + admin inbox + CSV-injection hardening
+
+**Completed Stage J of the contributor-dashboard plan**: admin suggestion inbox UI, dedicated `suggestion_response` notification type, CSV/XLSX export, glass-panel composer polish, and a security-driven fix to CSV formula injection (covers both Stage J's new export and the pre-existing Stage H analytics export).
+
+### Migration 114 ([114_suggestion_response_notification.sql](supabase/migrations/114_suggestion_response_notification.sql))
+- Extends `notifications_type_check` to include `suggestion_response`. Replaces the prior hack where the PATCH route reused `contributor_approved` to notify submitters.
+
+### Backend ([suggestions/[id]/route.ts](src/app/api/suggestions/[id]/route.ts))
+- Notification insert now uses `type: "suggestion_response"` with `data: { suggestion_id, status }`. No `data.url` field — there is no meaningful destination page for the submitter, and the body conveys the outcome.
+
+### Admin inbox UI ([admin/suggestions/page.tsx](src/app/admin/suggestions/page.tsx) + [SuggestionsManager.tsx](src/components/admin/SuggestionsManager.tsx))
+- Mirrors `/admin/reported` UX: status tab nav (Open / In review / Actioned / Declined), server-fetched list capped at 100 rows, client manager component for status updates and inline written response.
+- **Origin-safe page-URL rendering** — `page_url` is parsed via `new URL(rawUrl, window.location.origin)`; only same-origin URLs render as Next `<Link>` (pathname + search + hash only). External URLs collapse to plain `(external)` text. Raw URL appears only in the `title` attribute. Eliminates phishing risk of clicking an attacker-supplied href on an admin surface. The check runs in a post-mount `useEffect` to avoid SSR/CSR hydration mismatch.
+- **CSV / XLSX export buttons** in the tab nav linking to the new export endpoint.
+
+### Export endpoint ([admin/suggestions/export/route.ts](src/app/api/admin/suggestions/export/route.ts))
+- GET `/api/admin/suggestions/export?format=csv|xlsx&status=open|in_review|actioned|declined|all`
+- Admin-only (role check via `profiles`), rate-limited via `RATE_LIMITS.heavy`, `Cache-Control: no-store`.
+- Stage H precedent: CSV body served with xlsx MIME (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) for the `xlsx` format. Zero new deps.
+- Hard cap 5000 rows.
+- Filename sanitised via `sanitiseExportFilename`.
+
+### CSV formula injection hardening ([admin/suggestions/export/route.ts](src/app/api/admin/suggestions/export/route.ts) + [analytics/csv.ts](src/lib/analytics/csv.ts))
+- **Self-audit finding**: a malicious submitter could put `=cmd|'/c calc'!A0` (or `@SUM(...)`, `+...`, `-...`) in a suggestion title; when an admin opens the CSV in Excel/Sheets, the formula would execute.
+- Added `neutraliseFormula()` that prefixes values starting with `=`, `+`, `-`, `@`, TAB, or CR with a single quote so spreadsheet apps render the literal text.
+- Applied to **both** the new suggestions export (Stage J) **and** the pre-existing analytics export (Stage H, shipped without this protection) — per CLAUDE.md item 3, no broken code left unaddressed.
+
+### Admin home wiring ([admin/page.tsx](src/app/admin/page.tsx))
+- New "Open suggestions" stat card with emphasis when count > 0.
+- New tools-grid tile linking to `/admin/suggestions`.
+- Grid layout bumped `lg:grid-cols-5` → `lg:grid-cols-6` to accommodate the 6th stat card.
+
+### Composer polish ([SuggestionButton.tsx](src/components/ui/SuggestionButton.tsx))
+- Glass-panel treatment: `bg-white/90 backdrop-blur-md` + gold inset ring + existing 2xl rounded card.
+- **Trigger-context preview**: post-mount effect reads `window.location.pathname + search` and renders a small italic "Submitted from <path>" line above the submit button. Builds submitter trust by confirming the platform knows which page their feedback is about (satisfies A57 "capture surface / URL / page / event / place").
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **759/759 passed** (83 files, +1 file +14 tests vs prior)
+- `npx next lint --dir src` → clean (Next 16 lint deprecation notice only)
+- Sec audit (self):
+  - PATCH notification uses dedicated type, no `data.url` injection vector.
+  - Admin export role-gated, rate-limited, filename sanitised, formula-injection neutralised.
+  - Admin inbox renders submitter-supplied URLs through origin allowlist; external URLs never rendered as `href`.
+  - `safeInternalPath` returns null on SSR + before-mount to avoid hydration mismatch.
+  - Suggestion POST input still: 10/day rate limit, control-char strip, `^https?://` page_url validation, 3+/10+ length minima.
+  - Anonymous submissions still allowed (`user_id IS NULL OR user_id = auth.uid()` RLS from migration 100b).
+
+### Operator action
+None required — migration 114 is a pure enum extension; deploy + apply.
+
+---
+
+## 2-prev. Previously shipped — Stage G.2 + Stage H optional + Stage I (commit `847f3b8`)
 
 **Completed three Stages in one batch**: full atomic owner transfer (G.2 follow-up), historic analytics backfill RPC (H optional), and expandable Planning cards with structured fields (I).
 
@@ -339,9 +392,9 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 ## 3. Current platform state
 
-- 82 test files, **745 tests**, all passing.
-- 113 migrations applied (111_team_owner_transfer_atomic, 112_backfill_contributor_analytics, 113_planning_card_fields added this batch).
-- Commit `847f3b8` pushed to `origin/main` ✓.
+- 83 test files, **759 tests**, all passing.
+- 114 migrations applied (114_suggestion_response_notification added this batch).
+- Commit pending push — Stage J just shipped.
 
 ---
 
@@ -350,7 +403,6 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 From `docs/plans/contributor-dashboard.md`:
 
 - **Stage H follow-ups** (deferred, not blocking): add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to a real Vision endpoint. **Operator action**: run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
-- **Stage J — Suggestion button polish**: glass-panel composer with server-side validation, admin suggestion inbox, XLSX export, 10/day rate limit.
 - **Stage K — Handle change rule**: warning copy on slug edit, 1-change-per-month enforcement, admin override endpoint.
 - **Stage L — Search term analytics**: capture sanitised queries in rolling table, top-10 display, feed keywords into autocomplete (A66).
 

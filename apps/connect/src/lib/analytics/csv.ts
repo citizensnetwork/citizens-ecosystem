@@ -16,13 +16,24 @@ export interface AnalyticsRow {
   entity_id: string | null;
 }
 
+/**
+ * Neutralise CSV formula injection (OWASP CSV Injection).
+ * Excel/Sheets evaluate values starting with `=`, `+`, `-`, `@` or TAB/CR
+ * as formulas. Prefix with a single quote so the spreadsheet renders the
+ * literal text. Numbers pass through untouched.
+ */
+function neutraliseFormula(str: string): string {
+  return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+}
+
 function escapeField(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const str = String(value);
-  if (/[,"\r\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
+  const raw = String(value);
+  const safe = typeof value === "number" ? raw : neutraliseFormula(raw);
+  if (/[,"\r\n]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return str;
+  return safe;
 }
 
 export function buildAnalyticsCsv(rows: AnalyticsRow[]): string {

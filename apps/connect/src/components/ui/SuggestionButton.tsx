@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface SuggestionButtonProps {
@@ -15,7 +15,15 @@ export default function SuggestionButton({ variant = "floating" }: SuggestionBut
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState<string | null>(null);
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
+
+  // Read the path post-mount so SSR/CSR markup stays identical, and refresh
+  // every time the dialog opens (covers SPA navigations between submissions).
+  useEffect(() => {
+    if (!open) return;
+    setCurrentPath(`${window.location.pathname}${window.location.search}`);
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,7 +103,7 @@ export default function SuggestionButton({ variant = "floating" }: SuggestionBut
             role="dialog"
             aria-modal="true"
             aria-labelledby="suggestion-dialog-title"
-            className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-[--border] p-6 space-y-4 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            className="w-full max-w-md bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md rounded-2xl shadow-2xl ring-1 ring-[--gold]/30 border border-[--border] p-6 space-y-4 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
           >
             <div className="flex items-center justify-between">
               <h2 id="suggestion-dialog-title" className="text-base font-semibold">Share a suggestion</h2>
@@ -146,6 +154,11 @@ export default function SuggestionButton({ variant = "floating" }: SuggestionBut
                   </div>
                 </div>
                 {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
+                {currentPath && (
+                  <p className="text-[10px] text-[--foreground-soft] italic">
+                    Submitted from <span className="font-mono">{currentPath}</span>
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={submitting}
