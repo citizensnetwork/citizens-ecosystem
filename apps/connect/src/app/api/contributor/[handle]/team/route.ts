@@ -252,7 +252,11 @@ export async function POST(
     return NextResponse.json({ id: data.id }, { status: 201 });
   }
 
-  // ── propose_owner_transfer: notification-only (no schema swap yet) ──
+  // ── propose_owner_transfer: atomic (writes team_owner_transfers row) ──
+  // Stage G.2: delegates to the SECURITY DEFINER RPC which validates that the
+  // caller is the active owner per team_memberships, that the transferee is
+  // an active non-owner member, and inserts the proposal row idempotently
+  // (cancelling any other pending proposal for this contributor).
   if (action === "propose_owner_transfer") {
     const memberId = raw.member_id as string;
 
@@ -272,40 +276,42 @@ export async function POST(
       );
     }
 
-    // Proposed transferee must already be an active team member. Stops random
-    // ownership-grant DMs to non-members.
-    const { data: existing } = await supabase
-      .from("team_memberships")
-      .select("id, status")
-      .eq("contributor_id", contributorId)
-      .eq("member_id", memberId)
-      .eq("status", "active")
-      .maybeSingle<{ id: string; status: string }>();
+    const { data: transferId, error: rpcError } = await supabase.rpc(
+      "propose_team_owner_transfer",
+      {
+        p_contributor_id: contributorId,
+        p_proposed_owner_id: memberId,
+      }
+    );
 
-    if (!existing) {
+    if (rpcError) {
+      const msg = rpcError.message ?? "";
+      if (msg.includes("not_owner")) {
+        return NextResponse.json(
+          { error: "Only the current owner can propose an ownership transfer" },
+          { status: 403 }
+        );
+      }
+      if (msg.includes("proposed_owner_not_active_member")) {
+        return NextResponse.json(
+          { error: "Proposed owner must be an active team member first" },
+          { status: 400 }
+        );
+      }
+      if (msg.includes("invalid_proposal")) {
+        return NextResponse.json(
+          { error: "Invalid proposal" },
+          { status: 400 }
+        );
+      }
+      console.error("[team] propose_team_owner_transfer failed", rpcError);
       return NextResponse.json(
-        { error: "Proposed owner must be an active team member first" },
-        { status: 400 }
+        { error: "Failed to propose transfer" },
+        { status: 500 }
       );
     }
 
-    await sendOwnerTransferNotification({
-      inviteeId: memberId,
-      contributorId,
-      handle,
-    });
-
-    await recordContributorMutation(supabase, {
-      handle,
-      access,
-      actorId: user.id,
-      action: "team_owner_transfer_proposed",
-      entityType: "team_membership",
-      entityId: existing.id,
-      metadata: { proposed_owner_id: memberId },
-    });
-
-    return NextResponse.json({ proposed: true }, { status: 202 });
+    return NextResponse.json({ proposed: true, transfer_id: transferId }, { status: 202 });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -451,39 +457,3 @@ async function sendInviteNotification(input: SendInviteNotificationInput): Promi
   }
 }
 
-interface SendOwnerTransferNotificationInput {
-  inviteeId: string;
-  contributorId: string;
-  handle: string;
-}
-
-async function sendOwnerTransferNotification(
-  input: SendOwnerTransferNotificationInput
-): Promise<void> {
-  const { inviteeId, contributorId, handle } = input;
-
-  try {
-    const admin = createAdminClient();
-    const { data: contributor } = await admin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", contributorId)
-      .maybeSingle<{ full_name: string | null }>();
-
-    const orgName = contributor?.full_name ?? "A contributor";
-
-    await admin.from("notifications").insert({
-      user_id: inviteeId,
-      type: "team_owner_transfer",
-      title: "Ownership transfer proposed",
-      body: `${orgName} has proposed transferring ownership to you.`,
-      data: {
-        contributor_id: contributorId,
-        contributor_handle: handle,
-        url: "/account/team-invites",
-      },
-    });
-  } catch (error) {
-    console.error("[team] sendOwnerTransferNotification failed", error);
-  }
-}

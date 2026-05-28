@@ -16,7 +16,74 @@
 
 ---
 
-## 2. What just shipped — Stage H: Analytics depth + export (commit `1e74b92`)
+## 2. What just shipped — Stage G.2 + Stage H optional + Stage I (pending commit)
+
+**Completed three Stages in one batch**: full atomic owner transfer (G.2 follow-up), historic analytics backfill RPC (H optional), and expandable Planning cards with structured fields (I).
+
+### Migration 111 ([111_team_owner_transfer_atomic.sql](supabase/migrations/111_team_owner_transfer_atomic.sql)) — Stage G.2
+- `team_owner_transfers` table — proposal record with status (`pending|accepted|declined|cancelled`), one pending per contributor enforced by partial unique index. RLS read-only to contributor/transferee/proposer/admins; **all writes flow through SECURITY DEFINER RPCs**.
+- **Backfill**: every approved contributor profile gets a self-owner `team_memberships` row (`member_id=contributor_id, role='owner', status='active'`) via idempotent INSERT … ON CONFLICT DO UPDATE.
+- **Trigger** `ensure_contributor_self_owner` on `profiles` — fires when `contributor_status` transitions to `'approved'`. SECURITY DEFINER so admin approval RLS doesn't block. **Guarded against re-promotion** if another active owner already exists (prevents two-owners-after-re-approval edge case).
+- `propose_team_owner_transfer(p_contributor_id, p_proposed_owner_id)` RPC — validates `auth.uid()` is the active owner per `team_memberships`; validates transferee is an active non-owner member; cancels any prior pending proposal before insert. Notifies the transferee + writes activity_log.
+- `respond_team_owner_transfer(p_transfer_id, p_action)` RPC — `auth.uid()` must equal `proposed_owner_id` and status must be `pending` (FOR UPDATE locks the row). On accept: **atomic demote of prior owner to 'editor' + promotion of acceptor to 'owner'** in a single function body. Notifies both parties + activity_log. Defensive `no_current_owner` raise if no owner row found.
+- All RPCs REVOKE from anon/public; GRANT to authenticated only.
+
+### `checkDashboardAccess` refactor ([access.ts](src/lib/dashboard/access.ts))
+- `isOwner` now sourced from `team_memberships.role='owner' AND status='active' AND member_id=auth.uid()`.
+- Self-id check (`user.id === contributor.id`) retained as a defensive fallback only — should be unreachable in steady state because the trigger covers all future approvals.
+- Same refactor applied in [team/page.tsx](src/app/c/[slug]/dashboard/team/page.tsx) and [settings/page.tsx](src/app/c/[slug]/dashboard/settings/page.tsx) for their independent `viewerIsOwner` computations.
+
+### Backend wiring ([team/route.ts](src/app/api/contributor/[handle]/team/route.ts))
+- `propose_owner_transfer` action now delegates to the `propose_team_owner_transfer` RPC. Postgres exception codes mapped to 403/400/500. Dead helper `sendOwnerTransferNotification` removed.
+- [`team-invites/route.ts`](src/app/api/team-invites/route.ts) — GET returns `{ invites, owner_transfers }`. POST accepts `kind: "invite" | "owner_transfer"` to route to the correct RPC.
+
+### UI ([TeamInvitesClient.tsx](src/components/team/TeamInvitesClient.tsx) + [team-invites/page.tsx](src/app/account/team-invites/page.tsx))
+- Renders a dedicated "Ownership transfers" section (gold-tinted border + "Owner transfer" pill) above the regular team invites. Accept/decline buttons POST to `/api/team-invites` with `kind: "owner_transfer"`.
+- Empty state copy widened to mention transfers.
+
+### Migration 112 ([112_backfill_contributor_analytics.sql](supabase/migrations/112_backfill_contributor_analytics.sql)) — Stage H optional
+- `backfill_contributor_analytics(p_days_back integer DEFAULT 90)` SECURITY DEFINER function — loops `aggregate_contributor_analytics_daily` over the last N days (clamped 1..365). Returns `(target_date, rows_written)` rows so operators see per-date progress when invoked interactively.
+- Idempotent: underlying aggregator uses REPLACE-not-increment, so re-runs self-correct.
+- REVOKE from anon/authenticated/public. **Invoke via psql with service_role**:
+  ```sql
+  SELECT * FROM public.backfill_contributor_analytics(90);
+  ```
+- Skips "today's yesterday" (handled by the existing 02:15 UTC daily cron).
+
+### Migration 113 ([113_planning_card_fields.sql](supabase/migrations/113_planning_card_fields.sql)) — Stage I
+- `planning_tasks` AND `planning_ideas` each gain: `checklist jsonb`, `links jsonb`, `assigned_place_ids uuid[]`.
+- CHECK constraints cap collection sizes (50 checklist · 20 links · 10 places) + enforce `jsonb_typeof = 'array'` so payloads can't sneak in malformed shapes. All columns default to empty so existing rows + existing inserts continue to work.
+
+### Backend wiring ([cardFields.ts](src/lib/planning/cardFields.ts) + tasks/ideas routes)
+- New shared validator module `src/lib/planning/cardFields.ts`:
+  - `sanitiseChecklist` — strips control chars, length caps text (200), dedupes by id, mints fresh UUID if client supplies a non-UUID id (blocks injected external refs), caps at 50 items.
+  - `sanitiseLinks` — enforces `^https?:\/\/` (blocks `javascript:` / `data:` schemes), length caps url (500) + label (120), dedupes, caps at 20.
+  - `sanitiseAssignedPlaceIds` — UUID-validates, dedupes, caps at 10.
+  - `filterContributorPlaceIds(supabase, contributorId, ids)` — server filters down to places this contributor owns, blocking cross-contributor assignment.
+- `tasks/route.ts` + `ideas/route.ts` accept the new fields in both POST and PATCH. PATCH supports partial updates so a single checkbox toggle ships only `{id, checklist}`.
+
+### UI ([PlanningDashboardClient.tsx](src/components/contributor/dashboard/PlanningDashboardClient.tsx))
+- **Replaced the 3-column kanban with a responsive 2-column expandable card grid**. Same tab switcher (Tasks · Ideas) up top, with counts.
+- Each card collapsed shows: title + status pill (tasks) or tag chips (ideas) + visible_to_team chip + assigned-places count. Click expands.
+- **Top-right control**:
+  - Tasks → binary completion checkbox (circle, green when complete). Toggle flips status pending ↔ completed. Legacy `in_progress` renders as "incomplete" but stays valid server-side.
+  - Ideas → delete X.
+- **Public toggle** (visible_to_team) sits below the top-right control as a small slide switch.
+- Expanded body: description textarea (onBlur save), inline checklist editor (add via Enter, toggle, remove), links editor (url + optional label, validates `^https?:\/\/`), multi-place picker (chips, capped at 10), tag editor (ideas only), due-date row (tasks only), delete button (tasks).
+- Server-fetched `places` (contributor-owned only) passed once from the page for the picker.
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **745/745 passed** (82 files)
+- `npx next lint --dir src` → clean (Next 16 lint deprecation banner only)
+- Sec audit (self):
+  - **G.2** — All ownership writes go through SECURITY DEFINER RPCs; `auth.uid()` checked server-side; FOR UPDATE locks the transfer row before mutating; partial unique index collapses concurrent proposals to 23505; trigger guarded against double-owner edge case; notification text passes through React default escaping.
+  - **H** — Backfill RPC REVOKEd from non-service roles; window clamped to [1,365]; idempotent.
+  - **I** — JSONB CHECK constraints cap collection size + enforce array shape at the DB; URL regex blocks non-http schemes; `filterContributorPlaceIds` blocks cross-contributor place assignment; checklist client-supplied ids are UUID-validated and minted fresh otherwise; links rendered with `rel="noreferrer noopener"`.
+
+---
+
+## 2-prev. Previously shipped — Stage H: Analytics depth + export (commit `1e74b92`)
 
 **Completed Stage H of the contributor-dashboard plan**: daily aggregation pg_cron job, public-safe RPC per A19, server-side CSV/XLSX export, public-profile Activity (30d) chips, Vision-export stub.
 
@@ -273,8 +340,8 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 ## 3. Current platform state
 
 - 82 test files, **745 tests**, all passing.
-- 110 migrations applied (110_analytics_aggregation_public added this batch).
-- Local commit `1e74b92` on `main`. **Push to origin pending** — blocked by auto-mode safety net; run `git push origin main` manually.
+- 113 migrations applied (111_team_owner_transfer_atomic, 112_backfill_contributor_analytics, 113_planning_card_fields added this batch).
+- Local commit pending push to `origin/main` (run `git push origin main` manually if blocked by auto-mode safety net).
 
 ---
 
@@ -282,9 +349,7 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 From `docs/plans/contributor-dashboard.md`:
 
-- **Stage G follow-up — Full atomic owner transfer**: refactor `checkDashboardAccess` to source ownership from `team_memberships.role='owner'` instead of `user.id === contributor.id`. Bootstrap migration to seed an owner row per existing contributor profile. Live accept-flow that demotes the prior owner.
-- **Stage H follow-ups** (deferred, not blocking): backfill counters for pre-aggregator history (loop `aggregate_contributor_analytics_daily` over the last 90 days); add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to real Vision endpoint.
-- **Stage I — Planning cards**: card open/close UI for tasks + ideas, completion checkbox, idea delete, public toggle.
+- **Stage H follow-ups** (deferred, not blocking): add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to a real Vision endpoint. **Operator action**: run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
 - **Stage J — Suggestion button polish**: glass-panel composer with server-side validation, admin suggestion inbox, XLSX export, 10/day rate limit.
 - **Stage K — Handle change rule**: warning copy on slug edit, 1-change-per-month enforcement, admin override endpoint.
 - **Stage L — Search term analytics**: capture sanitised queries in rolling table, top-10 display, feed keywords into autocomplete (A66).

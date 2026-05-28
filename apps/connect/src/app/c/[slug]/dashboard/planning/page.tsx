@@ -3,7 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 import { redirect } from "next/navigation";
-import PlanningDashboardClient from "@/components/contributor/dashboard/PlanningDashboardClient";
+import PlanningDashboardClient, {
+  type PlanningTaskRow,
+  type PlanningIdeaRow,
+  type PlanningPlaceRow,
+} from "@/components/contributor/dashboard/PlanningDashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -22,25 +26,40 @@ export default async function PlanningDashboardPage({
   const contributor = await resolveContributorSlug(slug);
   if (!contributor) redirect("/");
 
-  const [tasksResult, ideasResult] = await Promise.all([
+  // Fetch tasks, ideas, and the contributor's own places (for the multi-place
+  // picker on each card). Places list is small enough to ship in one shot.
+  const [tasksResult, ideasResult, placesResult] = await Promise.all([
     supabase
       .from("planning_tasks")
-      .select("id, title, description, status, due_date, visible_to_team, completed_at, sort_order, created_at")
+      .select(
+        "id, title, description, status, due_date, visible_to_team, completed_at, " +
+          "sort_order, checklist, links, assigned_place_ids, linked_place_id, " +
+          "linked_event_id, created_at"
+      )
       .eq("contributor_id", contributor.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false }),
     supabase
       .from("planning_ideas")
-      .select("id, title, description, tags, visible_to_team, created_at")
+      .select(
+        "id, title, description, tags, visible_to_team, checklist, links, " +
+          "assigned_place_ids, linked_place_id, linked_event_id, created_at"
+      )
       .eq("contributor_id", contributor.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("places")
+      .select("id, name")
+      .eq("created_by", contributor.id)
+      .order("name", { ascending: true }),
   ]);
 
   return (
     <PlanningDashboardClient
       slug={slug}
-      tasks={tasksResult.data ?? []}
-      ideas={ideasResult.data ?? []}
+      tasks={(tasksResult.data ?? []) as unknown as PlanningTaskRow[]}
+      ideas={(ideasResult.data ?? []) as unknown as PlanningIdeaRow[]}
+      places={(placesResult.data ?? []) as unknown as PlanningPlaceRow[]}
     />
   );
 }

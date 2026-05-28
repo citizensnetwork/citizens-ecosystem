@@ -24,7 +24,18 @@ export default async function SettingsDashboardPage({
   const contributor = await resolveContributorSlug(slug);
   if (!contributor) redirect("/");
 
-  const isOwner = user.id === contributor.id;
+  // Stage G.2: owner is sourced from team_memberships. Self-id check kept as
+  // a defensive fallback in case the bootstrap row is missing.
+  const { data: ownerCheck } = await supabase
+    .from("team_memberships")
+    .select("id")
+    .eq("contributor_id", contributor.id)
+    .eq("member_id", user.id)
+    .eq("role", "owner")
+    .eq("status", "active")
+    .maybeSingle<{ id: string }>();
+
+  const isOwner = ownerCheck != null || user.id === contributor.id;
 
   // Stage A defence-in-depth: when an admin is viewing this page, restrict
   // the visible access-request rows to those granted to THIS admin. RLS

@@ -1,5 +1,11 @@
 // Helper: check if a user has active dashboard access to a contributor profile
-// Returns: { isOwner, isAdminWithAccess, hasAccess }
+// Returns: { isOwner, isAdminWithAccess, hasAccess, contributorId }
+//
+// Ownership is sourced from `team_memberships.role='owner' AND status='active'`
+// (Stage G.2). The legacy `user.id === contributor.id` check is retained as a
+// defensive fallback for the rare case where migration 111's backfill missed a
+// row — the trigger covers all new approvals so this should be unreachable in
+// steady state.
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,7 +44,22 @@ export async function checkDashboardAccess(
     if (viewerProfile?.role !== "admin") return { hasAccess: false };
   }
 
-  // Owner check
+  // Owner check — team_memberships is the source of truth post Stage G.2.
+  const { data: ownerRow } = await supabase
+    .from("team_memberships")
+    .select("id")
+    .eq("contributor_id", contributor.id)
+    .eq("member_id", user.id)
+    .eq("role", "owner")
+    .eq("status", "active")
+    .maybeSingle<{ id: string }>();
+
+  if (ownerRow) {
+    return { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: contributor.id };
+  }
+
+  // Defensive fallback for contributors created before migration 111's backfill
+  // or where the trigger hasn't fired yet. Same self-id check as before.
   if (user.id === contributor.id) {
     return { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: contributor.id };
   }

@@ -22,11 +22,18 @@ export default async function TeamDashboardPage({
   const contributor = await resolveContributorSlug(slug);
   if (!contributor) redirect("/");
 
-  // viewerIsOwner controls the owner-transfer affordance (only the actual
-  // owning user — i.e. the contributor profile itself — can propose).
-  const viewerIsOwner = user.id === contributor.id;
-
-  const [membersResult, volunteersResult] = await Promise.all([
+  // viewerIsOwner controls the owner-transfer affordance. Post Stage G.2 the
+  // source of truth is the team_memberships table — the legacy self-id check
+  // remains as a defensive fallback in case migration 111's backfill missed a row.
+  const [{ data: ownerCheck }, membersResult, volunteersResult] = await Promise.all([
+    supabase
+      .from("team_memberships")
+      .select("id")
+      .eq("contributor_id", contributor.id)
+      .eq("member_id", user.id)
+      .eq("role", "owner")
+      .eq("status", "active")
+      .maybeSingle<{ id: string }>(),
     supabase
       .from("team_memberships")
       .select(
@@ -44,6 +51,8 @@ export default async function TeamDashboardPage({
       .in("status", ["pending", "approved", "declined"])
       .order("created_at", { ascending: false }),
   ]);
+
+  const viewerIsOwner = ownerCheck != null || user.id === contributor.id;
 
   type MemberRow = {
     id: string; member_id: string; role: string; status: string; created_at: string;

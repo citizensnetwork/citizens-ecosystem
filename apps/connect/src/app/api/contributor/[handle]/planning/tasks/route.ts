@@ -4,6 +4,12 @@ import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
+import {
+  sanitiseChecklist,
+  sanitiseLinks,
+  sanitiseAssignedPlaceIds,
+  filterContributorPlaceIds,
+} from "@/lib/planning/cardFields";
 
 const VALID_STATUSES = ["pending", "in_progress", "completed"] as const;
 
@@ -24,7 +30,11 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("planning_tasks")
-    .select("id, title, description, status, due_date, linked_event_id, linked_place_id, notes, visible_to_team, completed_at, sort_order, created_at, updated_at")
+    .select(
+      "id, title, description, status, due_date, linked_event_id, linked_place_id, notes, " +
+        "visible_to_team, completed_at, sort_order, checklist, links, assigned_place_ids, " +
+        "created_at, updated_at"
+    )
     .eq("contributor_id", contributorId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
@@ -88,6 +98,17 @@ export async function POST(
   const linked_place_id = isValidUUID(String(raw.linked_place_id ?? "")) ? raw.linked_place_id as string : null;
   const visible_to_team = raw.visible_to_team === true;
 
+  // Stage I: structured card fields. Server filters assigned places down to
+  // the contributor's own to prevent cross-contributor assignment.
+  const checklist = sanitiseChecklist(raw.checklist);
+  const links = sanitiseLinks(raw.links);
+  const proposedPlaces = sanitiseAssignedPlaceIds(raw.assigned_place_ids);
+  const assigned_place_ids = await filterContributorPlaceIds(
+    supabase,
+    contributorId,
+    proposedPlaces
+  );
+
   const { data, error } = await supabase
     .from("planning_tasks")
     .insert({
@@ -99,6 +120,9 @@ export async function POST(
       linked_event_id,
       linked_place_id,
       visible_to_team,
+      checklist,
+      links,
+      assigned_place_ids,
     })
     .select("id")
     .single();
@@ -189,6 +213,20 @@ export async function PATCH(
   }
   if (typeof raw.sort_order === "number" && Number.isInteger(raw.sort_order)) {
     patch.sort_order = raw.sort_order;
+  }
+  if (Array.isArray(raw.checklist)) {
+    patch.checklist = sanitiseChecklist(raw.checklist);
+  }
+  if (Array.isArray(raw.links)) {
+    patch.links = sanitiseLinks(raw.links);
+  }
+  if (Array.isArray(raw.assigned_place_ids)) {
+    const proposed = sanitiseAssignedPlaceIds(raw.assigned_place_ids);
+    patch.assigned_place_ids = await filterContributorPlaceIds(
+      supabase,
+      contributorId,
+      proposed
+    );
   }
 
   const { error } = await supabase
