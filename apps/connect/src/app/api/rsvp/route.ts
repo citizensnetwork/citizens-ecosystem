@@ -97,15 +97,29 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase
+  // `.select()` so we know whether a row actually existed — we only log a
+  // cancellation for a genuine un-RSVP, never a no-op delete.
+  const { data: deleted, error } = await supabase
     .from("rsvps")
     .delete()
     .eq("user_id", user.id)
-    .eq("event_id", eventId);
+    .eq("event_id", eventId)
+    .select("id");
 
   if (error) {
     console.error("[API rsvp DELETE]", error);
     return NextResponse.json({ error: "Failed to cancel RSVP" }, { status: 500 });
+  }
+
+  // Source-of-truth for the "cancellations" analytics metric (migration 116).
+  // Best-effort: a logging failure must never fail the user's un-RSVP.
+  if ((deleted?.length ?? 0) > 0) {
+    const { error: logError } = await supabase
+      .from("rsvp_cancellations")
+      .insert({ event_id: eventId, user_id: user.id });
+    if (logError) {
+      console.error("[API rsvp DELETE cancellation-log]", logError);
+    }
   }
 
   return NextResponse.json({ success: true });

@@ -1,7 +1,11 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { ANALYTICS_PERIOD_LABELS, type AnalyticsPeriod } from "@/types/db";
+import {
+  ANALYTICS_PERIOD_LABELS,
+  type AnalyticsPeriod,
+  type TopSearchTerm,
+} from "@/types/db";
 
 interface Props {
   slug: string;
@@ -12,6 +16,7 @@ interface Props {
   totals: Record<string, number>;
   events: { id: string; title: string }[];
   places: { id: string; name: string }[];
+  topSearchTerms: TopSearchTerm[];
 }
 
 const PERIODS: AnalyticsPeriod[] = [7, 14, 30, 60, 90, 180, 365];
@@ -37,6 +42,7 @@ export default function AnalyticsDashboardClient({
   totals,
   events,
   places,
+  topSearchTerms,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -155,6 +161,48 @@ export default function AnalyticsDashboardClient({
           </a>
         </div>
       </div>
+
+      {/* Top searches this month (platform-wide, anonymised — A64) */}
+      {topSearchTerms.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold mb-2">
+            Top searches this month
+          </h3>
+          <p className="text-xs text-[--foreground-soft] mb-2">
+            Anonymised, platform-wide. Add matching keywords in Settings so your
+            assets surface for these searches.
+          </p>
+          <div className="surface-card rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-[--border] bg-[--surface-muted]">
+                <tr>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-[--foreground-soft]">
+                    Search term
+                  </th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-[--foreground-soft]">
+                    Searches
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {topSearchTerms.map((t, i) => (
+                  <tr
+                    key={`${t.term}-${i}`}
+                    className="border-b border-[--border] last:border-0 hover:bg-[--surface-muted]/50"
+                  >
+                    <td className="px-4 py-2 text-[--foreground] truncate max-w-xs">
+                      {t.term}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium">
+                      {t.hits.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Summary cards */}
       {hasData ? (

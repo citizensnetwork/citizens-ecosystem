@@ -925,6 +925,60 @@ export default function EventsView({
   const searchIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Autocomplete suggestions (Stage L, A66) ──────────────────────
+  // Debounced prefix lookup against /api/search/autocomplete which merges
+  // contributor keywords + popular recent queries. Click or keyboard-select
+  // to fill the bar; the in-memory ranker then reacts to `search`.
+  const [acSuggestions, setAcSuggestions] = useState<
+    { suggestion: string; source: string }[]
+  >([]);
+  const [acOpen, setAcOpen] = useState(false);
+  const [acActive, setAcActive] = useState(-1);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (!searchFocused || q.length < 2) {
+      setAcSuggestions([]);
+      setAcOpen(false);
+      setAcActive(-1);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/search/autocomplete?q=${encodeURIComponent(q)}`
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          suggestions?: { suggestion: string; source: string }[];
+        };
+        if (cancelled) return;
+        const list = Array.isArray(data.suggestions) ? data.suggestions : [];
+        // Don't suggest the exact term already typed.
+        const filtered = list.filter(
+          (s) => s.suggestion.toLowerCase() !== q.toLowerCase()
+        );
+        setAcSuggestions(filtered);
+        setAcOpen(filtered.length > 0);
+        setAcActive(-1);
+      } catch {
+        /* best-effort — autocomplete never blocks search */
+      }
+    }, 180);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [search, searchFocused]);
+
+  function selectSuggestion(value: string) {
+    setSearch(value);
+    setAcOpen(false);
+    setAcActive(-1);
+    searchInputRef.current?.focus();
+  }
+
   const clearSearchIdleTimer = useCallback(() => {
     if (searchIdleTimerRef.current) {
       clearTimeout(searchIdleTimerRef.current);
@@ -1004,7 +1058,34 @@ export default function EventsView({
   }
 
   async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // ── Autocomplete keyboard navigation (takes precedence) ──
+    if (acOpen && acSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setAcActive((i) => (i + 1) % acSuggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setAcActive((i) => (i <= 0 ? acSuggestions.length - 1 : i - 1));
+        return;
+      }
+      if (e.key === "Escape") {
+        setAcOpen(false);
+        setAcActive(-1);
+        return;
+      }
+      if (e.key === "Enter" && acActive >= 0) {
+        e.preventDefault();
+        selectSuggestion(acSuggestions[acActive].suggestion);
+        return;
+      }
+    }
+
     if (e.key !== "Enter" || !search.trim() || calendarOpen) return;
+    // Selecting a suggestion above already returned; close the menu now
+    // that we're committing the typed query.
+    setAcOpen(false);
     // If the ranker extracted any taxonomy intent, the user meant a
     // semantic query ("homecells in my area", "I need counselling") — not
     // a city name, so skip geocoding and let the in-memory filter drive.
@@ -1388,6 +1469,45 @@ export default function EventsView({
                 </>
               )}
               <div className="relative flex w-full items-center">
+                {/* Autocomplete dropdown (Stage L, A66) — floats above the
+                    bottom-anchored bar. */}
+                {acOpen && acSuggestions.length > 0 && (
+                  <ul
+                    id="search-autocomplete-list"
+                    role="listbox"
+                    aria-label="Search suggestions"
+                    className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-2xl border border-black/10 bg-white/95 py-1 shadow-xl backdrop-blur"
+                  >
+                    {acSuggestions.map((s, i) => (
+                      <li key={`${s.suggestion}-${i}`} role="option" aria-selected={i === acActive}>
+                        <button
+                          type="button"
+                          // mousedown (not click) so we fire before the input
+                          // blur that would otherwise close the menu first.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectSuggestion(s.suggestion);
+                          }}
+                          onMouseEnter={() => setAcActive(i)}
+                          className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors ${
+                            i === acActive ? "bg-black/5" : "hover:bg-black/5"
+                          }`}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-black/40" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                          <span className="flex-1 truncate text-black/80">{s.suggestion}</span>
+                          {s.source === "keyword" && (
+                            <span className="shrink-0 rounded-full bg-(--gold)/15 px-2 py-0.5 text-[10px] font-medium text-(--gold)">
+                              keyword
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
@@ -1404,6 +1524,10 @@ export default function EventsView({
                 <input
                   ref={searchInputRef}
                   type="search"
+                  autoComplete="off"
+                  role="combobox"
+                  aria-expanded={acOpen}
+                  aria-controls="search-autocomplete-list"
                   aria-label="Search events, places, or city"
                   placeholder={search ? "" : SEARCH_SUGGESTIONS[suggestionIdx]}
                   value={search}

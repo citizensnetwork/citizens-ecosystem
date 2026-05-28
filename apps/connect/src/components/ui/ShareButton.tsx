@@ -2,19 +2,31 @@
 
 import { useState } from "react";
 import { share } from "@/lib/capacitor/share";
+import { logShare, type ShareEntityType } from "@/lib/analytics/logShare";
 
 type Props = {
   title: string;
   url?: string;
   className?: string;
+  /** When set, logs the share against the analytics source table. */
+  entityType?: ShareEntityType;
+  entityId?: string;
 };
 
-export default function ShareButton({ title, url, className }: Props) {
+export default function ShareButton({
+  title,
+  url,
+  className,
+  entityType,
+  entityId,
+}: Props) {
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {
     const targetUrl = url ?? window.location.href;
     const opened = await share({ title, url: targetUrl });
+
+    if (entityType && entityId) logShare(entityType, entityId);
 
     if (!opened) {
       setCopied(true);

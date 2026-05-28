@@ -272,6 +272,8 @@ export default function EventDetailContent({
         <SocialShareButtons
           title={event.title}
           description={`${new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${event.location}`}
+          entityType="event"
+          entityId={event.id}
         />
       </div>
 

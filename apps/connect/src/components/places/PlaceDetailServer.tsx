@@ -218,7 +218,7 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
               isFollowing={isFollowing}
               followerCount={followerCount}
             />
-            <ShareButton title={place.name} />
+            <ShareButton title={place.name} entityType="place" entityId={place.id} />
             {user && user.id !== place.created_by && owner && (
               <MessageButton
                 recipientId={place.created_by}

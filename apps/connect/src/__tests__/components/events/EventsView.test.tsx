@@ -142,7 +142,8 @@ describe("EventsView", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /open search/i }));
     });
-    const input = screen.getByRole("searchbox", { name: /search events, places, or city/i });
+    // The bottom search bar is an ARIA combobox (autocomplete listbox popup, Stage L).
+    const input = screen.getByRole("combobox", { name: /search events, places, or city/i });
     expect(input).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-label", "Search events, places, or city");
   });
@@ -186,7 +187,8 @@ describe("EventsView", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /open search/i }));
     });
-    const input = screen.getByRole("searchbox", { name: /search events, places, or city/i });
+    // The bottom search bar is an ARIA combobox (autocomplete listbox popup, Stage L).
+    const input = screen.getByRole("combobox", { name: /search events, places, or city/i });
     await act(async () => {
       fireEvent.change(input, { target: { value: "Youth" } });
     });

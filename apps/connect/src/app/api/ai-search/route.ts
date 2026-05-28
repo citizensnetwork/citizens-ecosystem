@@ -159,6 +159,15 @@ export async function POST(request: Request) {
   const responsePlaces = limit(rankedPlaces);
   const responseContributors = limit(rankedContributors);
 
+  // Stage L: feed the anonymised global search-term table (top-10 +
+  // autocomplete). Fires for EVERY search incl. anonymous — the RPC
+  // sanitises server-side and stores no user id. Fire-and-forget.
+  void supabase
+    .rpc("log_search_term", { p_term: query })
+    .then(({ error }) => {
+      if (error) console.error("[ai-search log_search_term]", error);
+    });
+
   // Fire-and-forget: log this search for signed-in users so we can power the
   // Rainbow "?" long-form sheet and downstream analytics. Non-blocking and
   // never surfaces errors to the client — search results take precedence.

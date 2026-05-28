@@ -901,6 +901,52 @@ export const ANALYTICS_PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
 
 export type PredefinedService = string;
 
+// ── Analytics source tables (Stage H follow-ups, migration 116) ──
+
+/** Raw un-RSVP log feeding the `cancellations` metric. */
+export type RsvpCancellation = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  cancelled_at: string;
+};
+
+export type ShareEntityType = "event" | "place" | "contributor";
+
+/** Raw share log feeding the `shares` metric. */
+export type Share = {
+  id: string;
+  entity_type: ShareEntityType;
+  entity_id: string;
+  user_id: string | null;
+  created_at: string;
+};
+
+/** Yearly nested analytics rollup exported to Citizens Vision. */
+export type ContributorAnalyticsSnapshot = {
+  id: string;
+  contributor_id: string;
+  period_label: string;
+  period_start: string;
+  period_end: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+// ── Search term analytics (Stage L, migration 117) ──
+
+/** Row returned by the get_top_search_terms RPC. */
+export type TopSearchTerm = {
+  term: string;
+  hits: number;
+};
+
+/** Row returned by the get_search_autocomplete RPC. */
+export type SearchSuggestion = {
+  suggestion: string;
+  source: "keyword" | "popular";
+};
+
 export const PREDEFINED_SERVICES: PredefinedService[] = [
   "Youth ministry",
   "Women's ministry",

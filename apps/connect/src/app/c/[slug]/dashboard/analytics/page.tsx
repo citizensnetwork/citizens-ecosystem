@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 import { redirect } from "next/navigation";
 import AnalyticsDashboardClient from "@/components/contributor/dashboard/AnalyticsDashboardClient";
-import type { AnalyticsPeriod } from "@/types/db";
+import type { AnalyticsPeriod, TopSearchTerm } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -73,8 +73,9 @@ export default async function AnalyticsDashboardPage({
     totals[row.metric] = (totals[row.metric] ?? 0) + row.value;
   }
 
-  // Fetch contributor's events and places for entity selector
-  const [eventsResult, placesResult] = await Promise.all([
+  // Fetch contributor's events and places for entity selector +
+  // platform-wide top search terms this month (Stage L, A64).
+  const [eventsResult, placesResult, topTermsResult] = await Promise.all([
     supabase
       .from("events")
       .select("id, title")
@@ -86,7 +87,10 @@ export default async function AnalyticsDashboardPage({
       .select("id, name")
       .eq("created_by", contributor.id)
       .limit(30),
+    supabase.rpc("get_top_search_terms", { p_limit: 10, p_days: 30 }),
   ]);
+
+  const topSearchTerms = (topTermsResult.data ?? []) as TopSearchTerm[];
 
   return (
     <AnalyticsDashboardClient
@@ -98,6 +102,7 @@ export default async function AnalyticsDashboardPage({
       totals={totals}
       events={eventsResult.data ?? []}
       places={placesResult.data ?? []}
+      topSearchTerms={topSearchTerms}
     />
   );
 }

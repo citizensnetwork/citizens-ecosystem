@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { share } from "@/lib/capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import { logShare, type ShareEntityType } from "@/lib/analytics/logShare";
 
 type Props = {
   title: string;
   url?: string;
   description?: string;
   className?: string;
+  /** When set, logs the share against the analytics source table. */
+  entityType?: ShareEntityType;
+  entityId?: string;
 };
 
 /**
@@ -20,8 +24,14 @@ export default function SocialShareButtons({
   url,
   description,
   className,
+  entityType,
+  entityId,
 }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
+
+  function recordShare() {
+    if (entityType && entityId) logShare(entityType, entityId);
+  }
 
   const targetUrl = typeof window !== "undefined" ? url ?? window.location.href : url ?? "";
   const encodedUrl = encodeURIComponent(targetUrl);
@@ -38,6 +48,7 @@ export default function SocialShareButtons({
   async function copyLink(label: string) {
     try {
       await navigator.clipboard.writeText(targetUrl);
+      recordShare();
       showCopied(label);
     } catch {
       showCopied("Failed");
@@ -46,6 +57,7 @@ export default function SocialShareButtons({
 
   async function handleNativeShare() {
     const opened = await share({ title, url: targetUrl });
+    recordShare();
     if (!opened) showCopied("Link copied");
   }
 
@@ -59,6 +71,7 @@ export default function SocialShareButtons({
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={recordShare}
         className="flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366] transition hover:bg-[#25D366]/20"
         title="Share on WhatsApp"
         aria-label="Share on WhatsApp"
@@ -73,6 +86,7 @@ export default function SocialShareButtons({
         href={facebookUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={recordShare}
         className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1877F2]/10 text-[#1877F2] transition hover:bg-[#1877F2]/20"
         title="Share on Facebook"
         aria-label="Share on Facebook"

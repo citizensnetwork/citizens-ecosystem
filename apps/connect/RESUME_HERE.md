@@ -16,7 +16,44 @@
 
 ---
 
-## 2. What just shipped — Stage K: Handle change rule (1/30d + admin override)
+## 2. What just shipped — Stage H follow-ups + Stage L (search term analytics)
+
+**Completed the final two queued items of the contributor-dashboard plan.** This closes out every stage (A–L) plus the deferred Stage H follow-ups. `tsc 0`, lint clean, **780/780 tests** (87 files, +11 vs Stage K).
+
+### Stage H follow-ups — Migration 116 ([116_analytics_sources_and_vision_snapshot.sql](supabase/migrations/116_analytics_sources_and_vision_snapshot.sql))
+- **`rsvp_cancellations`** + **`shares`** source-of-truth tables (RLS, indexes). Both populated at the **app layer** (no triggers — a `BEFORE DELETE` trigger on `rsvps` can't tell a user un-RSVP from event-teardown CASCADE).
+- **Aggregator v2**: `aggregate_contributor_analytics_daily` now also writes `cancellations` (per event) and `shares` (per event / place / contributor), REPLACE-not-increment like the existing metrics.
+- **Vision snapshot wired**: the migration-110 NOTICE stub is rewritten into a real materialiser that builds nested per-contributor rollups (`totals` + `places[]` + `events[]`, A17) into a new **`contributor_analytics_snapshots`** table (A21 — Vision pulls from it; no external HTTP). Yearly cron (Jan 1 03:30 UTC). Param gained `p_year` default; old zero-arg dropped.
+- `purge_old_analytics()` extended to trim raw cancellation/share logs at 90 days.
+
+### Stage H wiring (app)
+- **`DELETE /api/rsvp`** ([rsvp/route.ts](src/app/api/rsvp/route.ts)) logs `rsvp_cancellations` on a genuine un-RSVP (`.select("id")` guard — never on a no-op delete).
+- **`POST /api/shares`** ([shares/route.ts](src/app/api/shares/route.ts)) — best-effort, anon-allowed, rate-limited by user/IP, entity_type allowlist + UUID validation.
+- **`logShare`** helper ([logShare.ts](src/lib/analytics/logShare.ts)) wired into `ShareButton` (place), `SocialShareButtons` (event), `ConsiderBadge` (event — native/WhatsApp/copy paths). `EventDetailContent` + `PlaceDetailServer` pass entity props.
+
+### Stage L — Search term analytics — Migration 117 ([117_search_term_analytics.sql](supabase/migrations/117_search_term_analytics.sql))
+- **`search_term_stats`** — anonymised `(term, day)` rolling aggregate, **no `user_id`** (A65). **No RLS policies** — access is RPC-only.
+- **`log_search_term(text)`** SECURITY DEFINER sanitises server-side; `POST /api/ai-search` fires it best-effort for every search (incl. anonymous).
+- **`get_top_search_terms`** (authenticated) → dashboard "Top searches this month" panel (A64) in [AnalyticsDashboardClient.tsx](src/components/contributor/dashboard/AnalyticsDashboardClient.tsx).
+- **`get_search_autocomplete`** (anon+auth, A66) merges contributor keywords (ranked first) + popular recent terms, LIKE-metachar-escaped prefix.
+- **`GET /api/search/autocomplete`** ([autocomplete/route.ts](src/app/api/search/autocomplete/route.ts)) + a debounced combobox dropdown in the global search bar ([EventsView.tsx](src/components/events/EventsView.tsx)).
+- 180-day retention via `purge_old_search_terms()` (weekly cron).
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **780/780 passed** (87 files, +11: shares, autocomplete, rsvp-cancellation)
+- `npx next lint --dir src` → clean
+- Sec audit (self): shares anon-allowed but RLS blocks user-id forgery + polymorphic entity_id only aggregates real owned entities; cancellation log gated by `.select("id")` + `user_id=auth.uid()`; all new RPCs SECURITY DEFINER with clamped inputs + LIKE-escaping; snapshot table read-only RLS, function service-only; search-term inputs sanitised in Postgres (non-XSS). **Accepted residual**: anon `log_search_term` direct-RPC poisoning of autocomplete/top-10 (low-severity, sanitised, curated keywords outrank) — hardening path documented in the plan DECISIONS log.
+
+### Operator action (post-deploy)
+After applying migrations **116 + 117**: run from psql with service_role to hydrate the last 90 days (now incl. cancellations/shares for already-logged rows):
+```sql
+SELECT * FROM public.backfill_contributor_analytics(90);
+```
+
+---
+
+## 2-prev. Previously shipped — Stage K: Handle change rule (1/30d + admin override)
 
 **Completed Stage K of the contributor-dashboard plan**: contributor `handle` (slug) is now editable from the Settings dashboard with a server-enforced 30-day cooldown, an admin-only override that bypasses the cooldown via SECURITY DEFINER RPC, and warning copy + a two-click confirm gate on the UI.
 
@@ -425,18 +462,22 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 ## 3. Current platform state
 
-- 84 test files, **769 tests**, all passing.
-- 115 migrations applied (115_contributor_slug_change added this batch).
-- Commit pending push — Stage K just shipped on top of Stage J.
+- 87 test files, **780 tests**, all passing.
+- 117 migrations applied (116 analytics sources + Vision snapshot, 117 search-term analytics added this batch).
+- Commit pending push — Stage H follow-ups + Stage L just shipped on top of Stage K.
 
 ---
 
 ## 4. Next batches queued
 
-From `docs/plans/contributor-dashboard.md`:
+**The entire contributor-dashboard plan (Stages A–L + Stage H follow-ups) is now complete.** No further stages are queued from `docs/plans/contributor-dashboard.md`.
 
-- **Stage H follow-ups** (deferred, not blocking): add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to a real Vision endpoint. **Operator action**: run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
-- **Stage L — Search term analytics**: capture sanitised queries in rolling table, top-10 display, feed keywords into autocomplete (A66). **Last queued stage.**
+Outstanding **operator action** (post-deploy of migrations 116/117): run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
+
+Optional future hardening (non-blocking, captured in the plan DECISIONS log):
+- Move `log_search_term` behind a service-role call in the ai-search route (removes anon direct-RPC autocomplete-poisoning vector) or add per-IP RPC throttling.
+- Real XLSX (SheetJS) instead of CSV-with-xlsx-MIME for analytics/suggestions exports, if a customer needs true sheets.
+- Citizens Vision: build the actual consumer that pulls from `contributor_analytics_snapshots`.
 
 ---
 

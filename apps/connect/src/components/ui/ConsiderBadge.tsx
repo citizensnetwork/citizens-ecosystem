@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { share } from "@/lib/capacitor/share";
+import { logShare } from "@/lib/analytics/logShare";
 
 type ConsiderItem = {
   rsvp_id: string;
@@ -102,6 +103,7 @@ export default function ConsiderBadge({ userId }: Props) {
   async function handleShare(eventId: string, title: string) {
     const url = `${window.location.origin}/events/${eventId}`;
     await share({ title, url });
+    logShare("event", eventId);
     setSharePopup(null);
   }
 
@@ -325,6 +327,7 @@ export default function ConsiderBadge({ userId }: Props) {
                             "_blank",
                             "noopener,noreferrer"
                           );
+                          logShare("event", item.event_id);
                           setSharePopup(null);
                         }}
                         className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-black/80 transition hover:bg-black/5"
@@ -346,6 +349,7 @@ export default function ConsiderBadge({ userId }: Props) {
                         onClick={() => {
                           const url = `${window.location.origin}/events/${item.event_id}`;
                           navigator.clipboard.writeText(url);
+                          logShare("event", item.event_id);
                           setSharePopup(null);
                         }}
                         className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-black/80 transition hover:bg-black/5"
