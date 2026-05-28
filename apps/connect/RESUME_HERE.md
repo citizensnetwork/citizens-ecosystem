@@ -16,7 +16,45 @@
 
 ---
 
-## 2. What just shipped — Stage G: Team Management UX (this commit)
+## 2. What just shipped — Stage H: Analytics depth + export (commit `1e74b92`)
+
+**Completed Stage H of the contributor-dashboard plan**: daily aggregation pg_cron job, public-safe RPC per A19, server-side CSV/XLSX export, public-profile Activity (30d) chips, Vision-export stub.
+
+### Migration 110 ([110_analytics_aggregation_public.sql](supabase/migrations/110_analytics_aggregation_public.sql))
+- `aggregate_contributor_analytics_daily(p_target_date date)` SECURITY DEFINER — idempotent rebuild of `contributor_analytics` for one calendar date. Pulls counters from `events`, `rsvps` (attending), `consider_joins`, `comments`, `convinces`, `event_views`, `reports`, `broadcast_messages`, `follows`, `place_follows`, `places`. ON CONFLICT REPLACE (not increment) so re-runs self-correct. REVOKE from anon/authenticated/public — service_role / pg_cron only.
+- `get_public_contributor_analytics(p_contributor_id uuid, p_days integer)` SECURITY DEFINER — returns aggregated `(metric, total)` rows for the public-safe metric allowlist (`follows`, `joins`) only. `p_days` clamped to [1, 365]. Returns rollups across all `entity_type`s so callers can't enumerate per-event/per-place activity. GRANT EXECUTE to anon + authenticated.
+- `snapshot_contributor_analytics_for_vision()` — Stage H plan item 5 stub. RAISE NOTICE only; Vision endpoint wired in a follow-up. REVOKE EXECUTE from non-service roles.
+- pg_cron schedules: `contributor-analytics-daily` (`15 2 * * *` UTC = 04:15 SAST), `contributor-analytics-purge` (`0 3 * * 0` UTC — calls existing `purge_old_analytics()` for 1-year retention).
+- Metrics omitted from daily aggregator (no source table): `cancellations` (rsvps cancel via DELETE not status), `shares` (no shares table). Counters stay at whatever `increment_contributor_metric` writes from app code.
+
+### Backend ([export/route.ts](src/app/api/contributor/[handle]/analytics/export/route.ts))
+- GET `/api/contributor/[handle]/analytics/export?format=csv|xlsx&period=…&entity_type=…&entity_id=…`
+- Auth via `checkDashboardAccess` (owner OR admin-with-grant). 401 if no user; 403 if no access.
+- Whitelists `format`, `period` (7/14/30/60/90/180/365), `entity_type` (`contributor`/`event`/`place`). `entity_id` validated through `isValidUUID`.
+- Rate-limited via `RATE_LIMITS.heavy` (5/min) per user — export is heavier than the standard read endpoint.
+- CSV body built via `buildAnalyticsCsv` in [csv.ts](src/lib/analytics/csv.ts) — RFC-4180 escaping (comma/quote/CR/LF wrapped, embedded quotes doubled, CRLF row separator). Filename hardened by `sanitiseExportFilename` (strips path separators, control chars, length-capped 80).
+- `xlsx` format reuses the CSV body with the spreadsheet MIME so Excel/Numbers open it natively. Zero new deps — plan doc Stage H item 4 explicitly allows this fallback ("…else CSV with `.xlsx` MIME left as TODO").
+- `Cache-Control: no-store` prevents intermediary caching of contributor data.
+
+### Backend ([public/route.ts](src/app/api/contributor/[handle]/analytics/public/route.ts))
+- GET `/api/contributor/[handle]/analytics/public?period=…` — anon-readable. Resolves slug → contributor id via existing `resolveContributorSlug` helper, calls `get_public_contributor_analytics`. Folds the RPC's `[{metric,total}]` shape into `{ period, totals: {follows, joins} }`. Rate-limited per `user.id ?? handle` (read bucket = 120/min).
+
+### UI ([AnalyticsDashboardClient.tsx](src/components/contributor/dashboard/AnalyticsDashboardClient.tsx))
+- Replaced client-built CSV with two `<a>` buttons pointing at `/api/contributor/[handle]/analytics/export` — one for CSV, one for XLSX. Disabled (`opacity-40 pointer-events-none`) when there's no data. Query string built with `URLSearchParams` so encoding is safe.
+
+### UI ([ContributorPublicProfile.tsx](src/components/contributor/ContributorPublicProfile.tsx) + [ProfileDetailServer.tsx](src/components/profile/ProfileDetailServer.tsx))
+- New `publicAnalytics` prop on `ContributorPublicProfileProps`. `ProfileDetailServer` fetches 30-day totals via `get_public_contributor_analytics` and passes them down.
+- Renders an "Activity (30d)" section between Team and Past events when either follows or joins are non-zero. Two glass-pill chips with the formatted totals.
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **745/745 passed** (82 files)
+- `npx next lint --dir src` → clean (Next 16 lint deprecation notice only)
+- Sec audit (self): aggregator + Vision stub revoked from non-service roles; public RPC server-enforces metric allowlist + clamps window + aggregates across entities; export endpoint enforces dashboard access + validates entity_id + RFC-4180 escapes CSV + sanitises filename + sets `Cache-Control: no-store` + heavy rate-limit; public endpoint goes through SECURITY DEFINER RPC, no raw query; numeric values rendered via React-escaped `toLocaleString()`.
+
+---
+
+## 2-prev. Previously shipped — Stage G: Team Management UX (commit `028ba7a`)
 
 **Completed Stage G of the contributor-dashboard plan**: 3-search-bar add-member popup, invite flow with accept/decline notification round-trip, owner-transfer proposal (notification-only — full atomic swap deferred), public team list on contributor profile. Also fixed a latent volunteer-notification bug while in the area.
 
@@ -63,7 +101,7 @@
 
 ---
 
-## 2-prev. Previously shipped — Full Messaging System + Vibe-Security Audit
+## 2-prev2. Previously shipped — Full Messaging System + Vibe-Security Audit
 
 **Completed all 12 steps of the messaging product plan + ran a full vibe-security audit, fixing 2 HIGH and 2 MEDIUM findings.** Multi-session effort. `tsc 0`, lint clean, **745/745 tests**.
 
@@ -235,8 +273,8 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 ## 3. Current platform state
 
 - 82 test files, **745 tests**, all passing.
-- 109 migrations applied (109_team_invite_owner_transfer added this batch).
-- Latest commit on `origin/main`: messaging commit (about to be superseded by Stage G commit).
+- 110 migrations applied (110_analytics_aggregation_public added this batch).
+- Local commit `1e74b92` on `main`. **Push to origin pending** — blocked by auto-mode safety net; run `git push origin main` manually.
 
 ---
 
@@ -245,7 +283,7 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 From `docs/plans/contributor-dashboard.md`:
 
 - **Stage G follow-up — Full atomic owner transfer**: refactor `checkDashboardAccess` to source ownership from `team_memberships.role='owner'` instead of `user.id === contributor.id`. Bootstrap migration to seed an owner row per existing contributor profile. Live accept-flow that demotes the prior owner.
-- **Stage H — Analytics depth + export**: daily aggregation via pg_cron → `contributor_analytics`, time-window selector (7/14/30/60/90d, 6mo, 1yr), CSV export endpoint, 1-year retention.
+- **Stage H follow-ups** (deferred, not blocking): backfill counters for pre-aggregator history (loop `aggregate_contributor_analytics_daily` over the last 90 days); add `cancellations` + `shares` source tables; wire `snapshot_contributor_analytics_for_vision()` to real Vision endpoint.
 - **Stage I — Planning cards**: card open/close UI for tasks + ideas, completion checkbox, idea delete, public toggle.
 - **Stage J — Suggestion button polish**: glass-panel composer with server-side validation, admin suggestion inbox, XLSX export, 10/day rate limit.
 - **Stage K — Handle change rule**: warning copy on slug edit, 1-change-per-month enforcement, admin override endpoint.
