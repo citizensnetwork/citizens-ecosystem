@@ -16,7 +16,7 @@
 
 ---
 
-## 2. What just shipped — Stage G.2 + Stage H optional + Stage I (pending commit)
+## 2. What just shipped — Stage G.2 + Stage H optional + Stage I (commit `847f3b8`)
 
 **Completed three Stages in one batch**: full atomic owner transfer (G.2 follow-up), historic analytics backfill RPC (H optional), and expandable Planning cards with structured fields (I).
 
@@ -341,7 +341,7 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 - 82 test files, **745 tests**, all passing.
 - 113 migrations applied (111_team_owner_transfer_atomic, 112_backfill_contributor_analytics, 113_planning_card_fields added this batch).
-- Local commit pending push to `origin/main` (run `git push origin main` manually if blocked by auto-mode safety net).
+- Commit `847f3b8` pushed to `origin/main` ✓.
 
 ---
 
