@@ -1,8 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import LandingPage from "@/components/ui/LandingPage";
-import type { Event, Place } from "@/types/db";
 
 export const revalidate = 60;
+
+const PRETORIA_BOUNDS = {
+  latMin: -26.05,
+  latMax: -25.45,
+  lngMin: 27.95,
+  lngMax: 28.55,
+};
 
 export default async function Home() {
   const supabase = await createClient();
@@ -12,26 +18,33 @@ export default async function Home() {
   sixMonths.setMonth(sixMonths.getMonth() + 6);
   const cutoff = sixMonths.toISOString();
 
-  const [{ data: rawEvents }, { data: places }] = await Promise.all([
+  const [{ count: pretoriaEventCount }, { count: pretoriaPlaceCount }] = await Promise.all([
     supabase
       .from("events")
-      .select("*, creator:profiles!events_created_by_fkey(avatar_url, role, contributor_status)")
+      .select("id", { count: "exact", head: true })
       .eq("status", "published")
+      .neq("visibility", "private")
       .gte("date", now)
       .lte("date", cutoff)
-      .order("date", { ascending: true })
-      .returns<Event[]>(),
+      .gte("latitude", PRETORIA_BOUNDS.latMin)
+      .lte("latitude", PRETORIA_BOUNDS.latMax)
+      .gte("longitude", PRETORIA_BOUNDS.lngMin)
+      .lte("longitude", PRETORIA_BOUNDS.lngMax),
     supabase
       .from("places")
-      .select("*, categories(*)")
-      .order("name")
-      .returns<Place[]>(),
+      .select("id", { count: "exact", head: true })
+      .gte("latitude", PRETORIA_BOUNDS.latMin)
+      .lte("latitude", PRETORIA_BOUNDS.latMax)
+      .gte("longitude", PRETORIA_BOUNDS.lngMin)
+      .lte("longitude", PRETORIA_BOUNDS.lngMax),
   ]);
 
-  // Landing page only shows public events
-  const events = (rawEvents ?? []).filter((e) => e.visibility !== "private");
-
-  return <LandingPage events={events} places={places ?? []} />;
+  return (
+    <LandingPage
+      pretoriaEventCount={pretoriaEventCount ?? 0}
+      pretoriaPlaceCount={pretoriaPlaceCount ?? 0}
+    />
+  );
 }
 
 

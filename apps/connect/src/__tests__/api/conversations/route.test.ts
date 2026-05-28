@@ -134,10 +134,21 @@ describe("POST /api/conversations", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
+    // find_conversation → no existing conversation
+    mockClient.rpc.mockResolvedValueOnce({ data: null, error: null });
+    // sender profile
     mockClient._chain.maybeSingle.mockResolvedValueOnce({
-      data: { id: RECIPIENT_ID },
+      data: { id: USER_ID, role: "citizen" },
       error: null,
     });
+    // recipient profile
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
+      data: { id: RECIPIENT_ID, role: "citizen" },
+      error: null,
+    });
+    // is_blocked → not blocked
+    mockClient.rpc.mockResolvedValueOnce({ data: false, error: null });
+    // find_or_create_conversation → RPC error
     mockClient.rpc.mockResolvedValueOnce({
       data: null,
       error: { message: "RPC failed" },
@@ -147,19 +158,41 @@ describe("POST /api/conversations", () => {
     expect(response.status).toBe(500);
   });
 
+  it("returns 200 when conversation already exists", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    // find_conversation → existing conversation found
+    mockClient.rpc.mockResolvedValueOnce({ data: CONV_ID, error: null });
+
+    const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.conversation_id).toBe(CONV_ID);
+  });
+
   it("returns 201 on successful conversation creation", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({
       data: { user: { id: USER_ID } },
       error: null,
     });
+    // find_conversation → no existing conversation
+    mockClient.rpc.mockResolvedValueOnce({ data: null, error: null });
+    // sender profile
     mockClient._chain.maybeSingle.mockResolvedValueOnce({
-      data: { id: RECIPIENT_ID },
+      data: { id: USER_ID, role: "citizen" },
       error: null,
     });
-    mockClient.rpc.mockResolvedValueOnce({
-      data: CONV_ID,
+    // recipient profile
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({
+      data: { id: RECIPIENT_ID, role: "citizen" },
       error: null,
     });
+    // is_blocked → not blocked
+    mockClient.rpc.mockResolvedValueOnce({ data: false, error: null });
+    // find_or_create_conversation → success
+    mockClient.rpc.mockResolvedValueOnce({ data: CONV_ID, error: null });
 
     const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
     expect(response.status).toBe(201);

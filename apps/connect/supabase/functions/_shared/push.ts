@@ -17,7 +17,11 @@ export interface PushPayload {
     | "review_prompt"
     | "contributor_approved"
     | "contributor_rejected"
-    | "broadcast_sent";
+    | "broadcast_sent"
+    | "spam_flag"
+    | "broadcast_flood"
+    | "dm_received"
+    | "dm_response";
   image_url?: string;
   data?: Record<string, string>;
   /**

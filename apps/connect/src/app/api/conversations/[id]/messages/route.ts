@@ -68,10 +68,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Failed to load messages" }, { status: 500 });
   }
 
-  // Get other participant info
+  // Get other participant info (include deleted_at so ChatView can show strikethrough)
   const { data: otherParticipant } = await supabase
     .from("conversation_participants")
-    .select("user_id, profiles:user_id(id, full_name, avatar_url)")
+    .select("user_id, profiles:user_id(id, full_name, avatar_url, deleted_at)")
     .eq("conversation_id", conversationId)
     .neq("user_id", user.id)
     .maybeSingle();
@@ -155,6 +155,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .update({ last_read_at: new Date().toISOString() })
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id);
+
+  // Spam detection: flag if sender has sent ≥5 messages in the last 60s.
+  // We do this after a successful insert so the message is never blocked —
+  // only flagged for admin review.
+  const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+  const { count: recentCount } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("sender_id", user.id)
+    .gte("created_at", sixtySecondsAgo);
+
+  if ((recentCount ?? 0) >= 5) {
+    // Fire-and-forget: auto-file a spam report visible in the admin reports dashboard.
+    // The upsert uses ignoreDuplicates so repeat offenses within the same conversation
+    // don't create a new row (the unique_open partial index prevents it).
+    supabase
+      .from("reports")
+      .upsert(
+        {
+          reporter_id: user.id,
+          target_type: "conversation",
+          target_id: conversationId,
+          reason: "spam",
+          body: `Auto-flagged: ${recentCount} messages in 60 seconds`,
+          status: "open",
+        },
+        { onConflict: "reporter_id,target_type,target_id", ignoreDuplicates: true }
+      )
+      .then(null, (err: unknown) => console.error("[spam-flag]", err));
+  }
 
   return NextResponse.json({ message }, { status: 201 });
 }

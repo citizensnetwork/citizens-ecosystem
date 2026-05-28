@@ -25,7 +25,7 @@ export async function GET() {
   // Get all conversations the user is part of
   const { data: participations, error: partError } = await supabase
     .from("conversation_participants")
-    .select("conversation_id, last_read_at")
+    .select("conversation_id, last_read_at, muted_at")
     .eq("user_id", user.id);
 
   if (partError) {
@@ -41,8 +41,10 @@ export async function GET() {
   const lastReadMap = Object.fromEntries(
     participations.map((p) => [p.conversation_id, p.last_read_at])
   );
+  const mutedMap = Object.fromEntries(
+    participations.map((p) => [p.conversation_id, p.muted_at])
+  );
 
-  // Parallelize independent queries
   const lastReadValues = Object.values(lastReadMap).filter(Boolean) as string[];
   const minLastRead = lastReadValues.length > 0
     ? lastReadValues.reduce((min, lr) => (lr < min ? lr : min))
@@ -58,9 +60,21 @@ export async function GET() {
   }
 
   const [convResult, partResult, msgResult, unreadResult] = await Promise.all([
-    supabase.from("conversations").select("id, updated_at").in("id", convIds).order("updated_at", { ascending: false }),
-    supabase.from("conversation_participants").select("conversation_id, user_id, profiles(id, full_name, avatar_url)").in("conversation_id", convIds).neq("user_id", user.id),
-    supabase.from("messages").select("conversation_id, body, sender_id, created_at").in("conversation_id", convIds).order("created_at", { ascending: false }),
+    supabase
+      .from("conversations")
+      .select("id, updated_at, status")
+      .in("id", convIds)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("conversation_participants")
+      .select("conversation_id, user_id, profiles(id, full_name, avatar_url, deleted_at)")
+      .in("conversation_id", convIds)
+      .neq("user_id", user.id),
+    supabase
+      .from("messages")
+      .select("conversation_id, body, sender_id, created_at")
+      .in("conversation_id", convIds)
+      .order("created_at", { ascending: false }),
     unreadQuery,
   ]);
 
@@ -74,16 +88,14 @@ export async function GET() {
   const latestMessages = msgResult.data;
   const allMessages = unreadResult.data;
 
-  // Build the preview list
-  const participantMap = new Map<string, { id: string; full_name: string; avatar_url: string | null }>();
+  const participantMap = new Map<string, { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null }>();
   for (const p of allParticipants || []) {
-    const profile = p.profiles as unknown as { id: string; full_name: string; avatar_url: string | null };
+    const profile = p.profiles as unknown as { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null };
     if (profile) {
       participantMap.set(p.conversation_id, profile);
     }
   }
 
-  // Deduplicate latest messages (first occurrence per conversation_id)
   const latestMessageMap = new Map<string, { body: string; sender_id: string | null; created_at: string }>();
   for (const msg of latestMessages || []) {
     if (!latestMessageMap.has(msg.conversation_id)) {
@@ -95,7 +107,6 @@ export async function GET() {
     }
   }
 
-  // Count unread per conversation
   const unreadMap = new Map<string, number>();
   for (const msg of allMessages || []) {
     const lastRead = lastReadMap[msg.conversation_id];
@@ -108,7 +119,9 @@ export async function GET() {
     .map((conv) => ({
       id: conv.id,
       updated_at: conv.updated_at,
-      other_user: participantMap.get(conv.id) || { id: "", full_name: "Unknown", avatar_url: null },
+      status: conv.status,
+      muted: !!mutedMap[conv.id],
+      other_user: participantMap.get(conv.id) || { id: "", full_name: "Unknown", avatar_url: null, deleted_at: null },
       last_message: latestMessageMap.get(conv.id) || null,
       unread_count: unreadMap.get(conv.id) || 0,
     }))
@@ -150,21 +163,98 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  // Check recipient exists
-  const { data: recipient } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", recipient_id)
-    .maybeSingle();
+  // Check if a conversation already exists — if so, return it without re-checking permissions
+  const { data: existingConvId } = await supabase.rpc("find_conversation", {
+    user_a: user.id,
+    user_b: recipient_id,
+  });
 
-  if (!recipient) {
+  if (existingConvId) {
+    return NextResponse.json({ conversation_id: existingConvId }, { status: 200 });
+  }
+
+  // Fetch sender + recipient profiles in parallel
+  const [senderResult, recipientResult] = await Promise.all([
+    supabase.from("profiles").select("id, role").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("id, role").eq("id", recipient_id).maybeSingle(),
+  ]);
+
+  if (!recipientResult.data) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
   }
 
-  // Atomically find or create conversation (prevents TOCTOU race)
+  const senderRole = senderResult.data?.role ?? "citizen";
+  const recipientRole = recipientResult.data.role;
+
+  // Check bilateral block
+  const { data: blocked } = await supabase.rpc("is_blocked", {
+    user_a: user.id,
+    user_b: recipient_id,
+  });
+
+  if (blocked) {
+    return NextResponse.json({ error: "Cannot message this user" }, { status: 400 });
+  }
+
+  // Determine conversation status based on permission rules:
+  //   Contributor → Citizen: only allowed if citizen has prior interaction; starts as 'pending'
+  //   All other combinations: 'active'
+  let convStatus: "pending" | "active" = "active";
+
+  if (senderRole === "contributor" && recipientRole === "citizen") {
+    // Fetch events + places owned by this contributor so we can check citizen interactions
+    const [eventsResult, placesResult] = await Promise.all([
+      supabase.from("events").select("id").eq("created_by", user.id),
+      supabase.from("places").select("id").eq("created_by", user.id),
+    ]);
+
+    const eventIds = (eventsResult.data ?? []).map((e) => e.id);
+    const placeIds = (placesResult.data ?? []).map((p) => p.id);
+
+    // Check if citizen has RSVP'd any of this contributor's events, directly follows them,
+    // or follows any of their places
+    const [rsvpResult, followResult, placeFollowResult] = await Promise.all([
+      eventIds.length > 0
+        ? supabase
+            .from("rsvps")
+            .select("event_id", { count: "exact", head: true })
+            .eq("user_id", recipient_id)
+            .in("event_id", eventIds)
+        : Promise.resolve({ count: 0, error: null }),
+      supabase
+        .from("follows")
+        .select("followee_id", { count: "exact", head: true })
+        .eq("follower_id", recipient_id)
+        .eq("followee_id", user.id),
+      placeIds.length > 0
+        ? supabase
+            .from("place_follows")
+            .select("place_id", { count: "exact", head: true })
+            .eq("user_id", recipient_id)
+            .in("place_id", placeIds)
+        : Promise.resolve({ count: 0, error: null }),
+    ]);
+
+    const hasInteracted =
+      (rsvpResult.count ?? 0) > 0 ||
+      (followResult.count ?? 0) > 0 ||
+      (placeFollowResult.count ?? 0) > 0;
+
+    if (!hasInteracted) {
+      return NextResponse.json(
+        { error: "You can only message citizens who have interacted with your events or places" },
+        { status: 403 },
+      );
+    }
+
+    convStatus = "pending";
+  }
+
+  // Create the conversation with the determined status
   const { data: convId, error: rpcError } = await supabase.rpc("find_or_create_conversation", {
     user_a: user.id,
     user_b: recipient_id,
+    p_status: convStatus,
   });
 
   if (rpcError || !convId) {

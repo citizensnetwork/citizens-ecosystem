@@ -53,6 +53,8 @@ type Props = {
   user: User | null;
   hasRsvped: boolean;
   attendees?: Attendee[];
+  /** Other RSVPers who have opted in to be discoverable. Only shown when viewer has RSVPed. */
+  discoverableAttendees?: { user_id: string; full_name: string; avatar_url: string | null }[];
   locationSharingEnabled?: boolean;
   media?: EventMedia[];
   tags?: EventTag[];
@@ -70,6 +72,7 @@ export default function EventDetailContent({
   user,
   hasRsvped,
   attendees = [],
+  discoverableAttendees = [],
   locationSharingEnabled = false,
   media = [],
   tags = [],
@@ -114,6 +117,7 @@ export default function EventDetailContent({
   const isCancelled = isCancelledEvent(event);
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;
+  const canManageEvent = !!(user && (user.id === event.created_by || isAdmin));
 
   // Live event detection
   const now = new Date();
@@ -145,7 +149,7 @@ export default function EventDetailContent({
             isAuthenticated={!!user}
           />
         )}
-        {(user?.id === event.created_by || isAdmin) && (
+        {canManageEvent && (
           <Link
             href={`/events/${event.id}/edit`}
             className="text-xs text-black/60 hover:text-black border border-black/15 rounded-xl px-2.5 py-1 transition hover:bg-black/5"
@@ -427,6 +431,45 @@ export default function EventDetailContent({
         );
       })()}
 
+      {/* Discoverable attendees — opt-in only; only visible to RSVPed users */}
+      {discoverableAttendees.length > 0 && (
+        <div className="mt-5 border-t pt-4">
+          <h2 className="mb-3 text-xs font-semibold text-black/60">
+            People attending
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {discoverableAttendees.map((attendee) => (
+              <div
+                key={attendee.user_id}
+                className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] py-1 pl-1 pr-2"
+              >
+                {attendee.avatar_url ? (
+                  <Image
+                    src={attendee.avatar_url}
+                    alt={attendee.full_name}
+                    width={24}
+                    height={24}
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-[10px] font-bold uppercase text-amber-800">
+                    {attendee.full_name[0]}
+                  </div>
+                )}
+                <span className="text-xs font-medium text-black/70">
+                  {attendee.full_name.split(" ")[0]}
+                </span>
+                <MessageButton
+                  recipientId={attendee.user_id}
+                  recipientName={attendee.full_name}
+                  variant="icon"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* From the Organiser — contributor dashboard broadcasts (broadcast_messages).
           Shown whenever the contributor has sent at least one broadcast to attendees.
           Self-hides when empty. */}
@@ -436,16 +479,18 @@ export default function EventDetailContent({
         </div>
       )}
 
-      {/* From the Organiser — organiser-authored broadcast updates.
-          The composer is visible to the event owner and admins so they
-          can post directly from the detail view. The section self-hides
-          for regular viewers when there are no updates yet. */}
+      {/* Legacy event_updates are hidden from regular viewers when the newer
+          contributor-dashboard broadcast channel has content, avoiding two
+          "From the Organiser" sections in the demo flow. Owners/admins still
+          keep the composer. */}
+      {(canManageEvent || broadcasts.length === 0) && (
       <div className="mt-6 border-t pt-5">
         <EventUpdatesList
           eventId={event.id}
-          isOwner={!!(user && (user.id === event.created_by || isAdmin))}
+          isOwner={canManageEvent}
         />
       </div>
+      )}
 
       {/* Comments */}
       <div className="mt-6 border-t pt-5">

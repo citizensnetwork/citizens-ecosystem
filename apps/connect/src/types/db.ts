@@ -682,10 +682,14 @@ export type Message = {
 export type ConversationPreview = {
   id: string;
   updated_at: string;
+  /** pending = awaiting recipient Allow/Deny; active = open thread; rejected = denied */
+  status: "pending" | "active" | "rejected";
+  muted: boolean;
   other_user: {
     id: string;
     full_name: string;
     avatar_url: string | null;
+    deleted_at?: string | null;
   };
   last_message: {
     body: string;

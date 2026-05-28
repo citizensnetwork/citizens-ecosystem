@@ -4,17 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import type { Event, Place } from "@/types/db";
-import dynamic from "next/dynamic";
-
-const EventMap = dynamic(() => import("@/components/map/EventMap"), {
-  ssr: false,
-  loading: () => <div className="h-full w-full bg-black" />,
-});
 
 type Props = {
-  events: Event[];
-  places: Place[];
+  pretoriaEventCount: number;
+  pretoriaPlaceCount: number;
 };
 
 /** Rotating taglines for the "Connecting …" scroller.
@@ -26,15 +19,13 @@ type Props = {
  */
 const CONNECTING_PHRASES = [
   { text: "THE KINGDOM", anchor: true },
-  { text: "Members to Ministries", anchor: false },
-  { text: "Needs to Non-Profits", anchor: false },
-  { text: "Change-Makers to the City", anchor: false },
-  { text: "Parts to the Body", anchor: false },
-  { text: "The Scattered to Solutions", anchor: false },
-  { text: "Leaders to Purpose", anchor: false },
-  { text: "Families to Fun", anchor: false },
-  { text: "Lonely to Community", anchor: false },
-  { text: "Seekers to Christ", anchor: false },
+  { text: "Pretoria to Purpose", anchor: false },
+  { text: "Non-Profits to People", anchor: false },
+  { text: "Volunteers to Mission", anchor: false },
+  { text: "Ministries to the City", anchor: false },
+  { text: "The Hidden to the Map", anchor: false },
+  { text: "Leaders to Community", anchor: false },
+  { text: "Churches to Service", anchor: false },
 ] as const;
 
 /**
@@ -43,7 +34,7 @@ const CONNECTING_PHRASES = [
  * dropped the trailing full stops to declutter the line and let the bullets
  * carry the rhythm.
  */
-const KINGDOM_TAGLINE = "By the Kingdom · With the Kingdom · For the Kingdom";
+const KINGDOM_TAGLINE = "By the Kingdom - With the Kingdom - For the Kingdom";
 
 // Citizens platform channels — Connect is live, others are upcoming
 const PLATFORM_CHANNELS = [
@@ -97,7 +88,10 @@ const PLATFORM_CHANNELS = [
   },
 ];
 
-export default function LandingPage({ events, places }: Props) {
+export default function LandingPage({
+  pretoriaEventCount,
+  pretoriaPlaceCount,
+}: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
@@ -169,18 +163,11 @@ export default function LandingPage({ events, places }: Props) {
 
   return (
     <div className="relative h-dvh w-full overflow-hidden">
-      {/* ── Background map (always visible, blurred behind overlay) ── */}
-      <div className={`absolute inset-0${dismissed ? "" : " pointer-events-none"}`}>
-        <EventMap
-          events={events}
-          places={places}
-          onSelectPlace={() => {}}
-          onQuickAction={() => {}}
-          autoLocate
-          flyTo={null}
-          flyToZoom={undefined}
-        />
-      </div>
+      <LandingBackdrop
+        eventCount={pretoriaEventCount}
+        placeCount={pretoriaPlaceCount}
+        dismissed={dismissed}
+      />
 
       {/* ── Frosted glass overlay ── */}
       <div
@@ -246,6 +233,11 @@ export default function LandingPage({ events, places }: Props) {
               {CONNECTING_PHRASES[phraseIdx].text}
             </span>
           </div>
+          <p className="mt-4 max-w-sm text-center text-[13px] font-medium leading-relaxed text-black/72">
+            A public map for Pretoria&apos;s Christian organisations, ministries,
+            and NPOs, so people looking to serve, give, attend, or connect can
+            find the work already happening in the city.
+          </p>
         </div>
 
         {/* ── Middle section: auth forms ── */}
@@ -280,6 +272,12 @@ export default function LandingPage({ events, places }: Props) {
               >
                 {KINGDOM_TAGLINE}
               </p>
+              <a
+                href="/contributor/apply"
+                className="block text-center text-[11px] font-semibold text-black/65 underline decoration-(--gold)/60 underline-offset-4 hover:text-black"
+              >
+                Make your organisation visible
+              </a>
             </div>
           ) : (
             /* Not logged in \u2014 single Google CTA above a gray "Browse as Guest"
@@ -305,8 +303,8 @@ export default function LandingPage({ events, places }: Props) {
               {/* Slogan — the product promise. Sits directly under the
                *  Google CTA so every visitor reads it during the auth pause. */}
               <p className="text-center text-[12px] font-semibold leading-snug text-black/75">
-                Citizens Connect helps <span className="text-[var(--gold)]">YOU</span>{" "}
-                find <span className="text-[var(--gold)]">YOUR</span> place in the Kingdom.
+                Give your organisation a public Christian community presence in
+                Pretoria. First 3 months free for approved Contributors.
               </p>
 
               {/* "Connect" in its dormant state: gray, labelled "Browse as Guest",\n               *  still clickable so curious visitors can explore the map without\n               *  signing in. Once the user signs in this button lights up gold\n               *  and switches to "Connect" (see the user-branch above). */}
@@ -319,6 +317,12 @@ export default function LandingPage({ events, places }: Props) {
                 >
                   Browse as Guest
                 </button>
+                <a
+                  href="/contributor/apply"
+                  className="block rounded-2xl border border-(--gold)/60 bg-(--gold)/15 px-4 py-2 text-center text-xs font-semibold uppercase tracking-widest text-black backdrop-blur transition hover:bg-(--gold)/25 active:scale-[0.97]"
+                >
+                  Apply to Contribute
+                </a>
                 <p
                   id="connect-hint"
                   className="text-center text-[11px] font-medium tracking-[0.25em]"
@@ -367,6 +371,46 @@ export default function LandingPage({ events, places }: Props) {
                 )
               )}
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LandingBackdrop({
+  eventCount,
+  placeCount,
+  dismissed,
+}: {
+  eventCount: number;
+  placeCount: number;
+  dismissed: boolean;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={`absolute inset-0 bg-[#f7f4ec] transition-transform duration-700 ${
+        dismissed ? "scale-[1.03]" : "scale-100"
+      }`}
+    >
+      <div className="absolute inset-0 opacity-[0.28] [background-image:linear-gradient(rgba(17,17,17,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(17,17,17,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
+      <div className="absolute left-[18%] top-[18%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(212,175,55,.16)]" />
+      <div className="absolute left-[54%] top-[34%] h-2.5 w-2.5 rounded-full bg-black shadow-[0_0_0_7px_rgba(17,17,17,.1)]" />
+      <div className="absolute left-[72%] top-[58%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(212,175,55,.16)]" />
+      <div className="absolute left-[32%] top-[70%] h-2.5 w-2.5 rounded-full bg-black shadow-[0_0_0_7px_rgba(17,17,17,.1)]" />
+      <div className="absolute left-1/2 top-[48%] w-[min(82vw,520px)] -translate-x-1/2 rounded-2xl border border-black/10 bg-white/72 px-5 py-4 text-center shadow-xl backdrop-blur-md">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/50">
+          Pretoria launch density
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-2xl font-semibold text-black">{eventCount}</p>
+            <p className="text-[11px] font-medium text-black/55">upcoming events</p>
+          </div>
+          <div>
+            <p className="text-2xl font-semibold text-black">{placeCount}</p>
+            <p className="text-[11px] font-medium text-black/55">mapped places</p>
           </div>
         </div>
       </div>

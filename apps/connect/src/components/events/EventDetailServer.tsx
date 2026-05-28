@@ -106,6 +106,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
 
   let hasRsvped = false;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
+  let discoverableAttendees: { user_id: string; full_name: string; avatar_url: string | null }[] = [];
   let locationSharingEnabled = false;
   let isAdmin = false;
   let volunteerStatus: "none" | "pending" | "approved" | "declined" | "withdrawn" = "none";
@@ -162,6 +163,31 @@ export default async function EventDetailServer({ id }: { id: string }) {
       }
     }
 
+    // Fetch discoverable attendees (only when viewer has RSVPed to the event)
+    if (hasRsvped) {
+      type DiscoverableRow = {
+        user_id: string;
+        profiles: { full_name: string | null; avatar_url: string | null } | null;
+      };
+      const { data: discoverableRows } = await supabase
+        .from("rsvps")
+        .select("user_id, profiles:user_id(full_name, avatar_url, discoverable)")
+        .eq("event_id", id)
+        .neq("user_id", user.id)
+        .neq("user_id", event.created_by)
+        .limit(20);
+
+      discoverableAttendees = ((discoverableRows as unknown as (DiscoverableRow & {
+        profiles: { full_name: string | null; avatar_url: string | null; discoverable: boolean } | null;
+      })[]) ?? [])
+        .filter((r) => r.profiles?.discoverable === true)
+        .map((r) => ({
+          user_id: r.user_id,
+          full_name: r.profiles?.full_name ?? "Attendee",
+          avatar_url: r.profiles?.avatar_url ?? null,
+        }));
+    }
+
     const followeeIds = (myFollowing ?? []).map((f) => f.followee_id);
     let friendSet = new Set<string>();
     if (followeeIds.length > 0) {
@@ -198,6 +224,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       user={user}
       hasRsvped={hasRsvped}
       attendees={attendees}
+      discoverableAttendees={discoverableAttendees}
       locationSharingEnabled={locationSharingEnabled}
       media={media}
       tags={tags}

@@ -23,6 +23,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import type { ContributorKind, ContributorLocation, Event, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
+import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MediaStrip from "@/components/media/MediaStrip";
 import DashboardAccessButton from "@/components/contributor/DashboardAccessButton";
@@ -163,6 +164,13 @@ export function ContributorPublicProfile({
                 isFollowing={isFollowing}
                 isFriend={isFriend}
               />
+              {viewer.id !== profile.id && (
+                <MessageButton
+                  recipientId={profile.id}
+                  recipientName={profile.full_name || "Organiser"}
+                  variant="icon"
+                />
+              )}
               {viewer.id !== profile.id && (
                 <ReportButton
                   targetType="user"

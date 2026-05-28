@@ -34,7 +34,7 @@ function formatDateSeparator(dateStr: string): string {
 
 export default function ChatView({ conversationId, userId }: Props) {
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
-  const [otherUser, setOtherUser] = useState<{ id: string; full_name: string; avatar_url: string | null } | null>(null);
+  const [otherUser, setOtherUser] = useState<{ id: string; full_name: string; avatar_url: string | null; deleted_at?: string | null } | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -190,9 +190,16 @@ export default function ChatView({ conversationId, userId }: Props) {
           {otherUser?.full_name?.[0] || "?"}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-black">
-            {otherUser?.full_name || "Unknown"}
-          </p>
+          {otherUser?.deleted_at ? (
+            <p className="truncate text-sm font-semibold text-black/40">
+              <s>{otherUser.full_name}</s>
+              <span className="ml-1.5 text-xs font-normal text-black/30">account deleted</span>
+            </p>
+          ) : (
+            <p className="truncate text-sm font-semibold text-black">
+              {otherUser?.full_name || "Unknown"}
+            </p>
+          )}
         </div>
       </div>
 

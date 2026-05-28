@@ -8,6 +8,7 @@ import { CalendarDays, MessageSquare, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import ConsiderBadge from "@/components/ui/ConsiderBadge";
+import MessagesPanel from "@/components/messaging/MessagesPanel";
 import {
   Button,
   DropdownMenu,
@@ -31,6 +32,8 @@ import {
  */
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
+  const [messagesPanelOpen, setMessagesPanelOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -91,18 +94,31 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <ConsiderBadge userId={user.id} />
 
-              <Button
-                asChild
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-                title="Messages"
-              >
-                <Link href="/messages">
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative h-8 w-8 rounded-full"
+                  title="Messages"
+                  onClick={() => setMessagesPanelOpen((o) => !o)}
+                  aria-label={`Messages${unreadMessages > 0 ? ` (${unreadMessages} unread)` : ""}`}
+                >
                   <MessageSquare className="h-4 w-4" />
-                  <span className="sr-only">Messages</span>
-                </Link>
-              </Button>
+                  {unreadMessages > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-bold text-black">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
+                </Button>
+
+                {messagesPanelOpen && (
+                  <MessagesPanel
+                    userId={user.id}
+                    onUnreadChange={setUnreadMessages}
+                    onClose={() => setMessagesPanelOpen(false)}
+                  />
+                )}
+              </div>
 
               <div className="flex h-8 w-8 items-center justify-center rounded-full border border-black/15">
                 <NotificationBell userId={user.id} />

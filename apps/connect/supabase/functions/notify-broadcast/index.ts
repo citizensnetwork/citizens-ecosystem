@@ -119,7 +119,41 @@ serve(async (req) => {
       imageUrl = place?.image_url ?? undefined;
     }
 
-    // ── 4. Deliver push (in-app already handled by API route) ──────
+    // ── 4. Flood detection: flag to admins if source exceeds 15 broadcasts/week ──
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { count: weeklyCount } = await supabase
+      .from("broadcast_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
+      .gte("created_at", sevenDaysAgo)
+      .is("deleted_at", null);
+
+    if ((weeklyCount ?? 0) > 15) {
+      // Find admin users and notify them
+      const { data: admins } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin");
+
+      if (admins && admins.length > 0) {
+        const adminNotifications = admins.map((admin: { id: string }) => ({
+          user_id: admin.id,
+          type: "broadcast_flood",
+          data: {
+            entity_type: entityType,
+            entity_id: entityId,
+            entity_title: entityTitle,
+            contributor_id: contributorId,
+            weekly_count: (weeklyCount ?? 0) + 1,
+          },
+          read: false,
+        }));
+        await supabase.from("notifications").insert(adminNotifications);
+      }
+    }
+
+    // ── 5. Deliver push (in-app already handled by API route) ──────
     const trimmedBody =
       body.length > 140 ? body.slice(0, 137) + "…" : body;
 
@@ -138,7 +172,7 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ notified: filteredIds.length }),
+      JSON.stringify({ notified: filteredIds.length, flood_flagged: (weeklyCount ?? 0) > 15 }),
       { status: 200 },
     );
   } catch (err) {

@@ -16,7 +16,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TARGET_TYPES = ["event", "user", "place", "comment"] as const;
+const TARGET_TYPES = ["event", "user", "place", "comment", "conversation"] as const;
 const REASONS = [
   "spam",
   "harassment",

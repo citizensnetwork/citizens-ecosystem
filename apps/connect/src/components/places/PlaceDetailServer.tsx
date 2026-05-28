@@ -22,6 +22,7 @@ import OrgBroadcastList from "@/components/contributor/OrgBroadcastList";
 import VolunteerApplyButton from "@/components/volunteer/VolunteerApplyButton";
 import { isAdmin as profileIsAdmin, isApprovedContributor } from "@/lib/profiles/capabilities";
 import type { Event, Place, PlaceMedia, Review } from "@/types/db";
+import MessageButton from "@/components/messaging/MessageButton";
 
 export const getPlaceById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -218,6 +219,13 @@ export default async function PlaceDetailServer({ id }: { id: string }) {
               followerCount={followerCount}
             />
             <ShareButton title={place.name} />
+            {user && user.id !== place.created_by && owner && (
+              <MessageButton
+                recipientId={place.created_by}
+                recipientName={owner.full_name || "Owner"}
+                variant="icon"
+              />
+            )}
             {user && user.id !== place.created_by && (
               <ReportButton
                 targetType="place"

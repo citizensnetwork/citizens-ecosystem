@@ -35,13 +35,24 @@ export default async function PublicProfilePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  // Skip the Postgres round-trip on malformed IDs (clean 404 instead
-  // of a `22P02 invalid input syntax for type uuid` error surfacing
-  // through the React error boundary). Matches the guard pattern in
-  // `/profile/[id]/[mode]/page.tsx`.
-  if (!isValidUUID(id)) notFound();
+  let { id } = await params;
   const supabase = await createClient();
+
+  // Support @handle routing: /profile/@janedoe → look up by handle
+  if (id.startsWith("@")) {
+    const handle = id.slice(1).toLowerCase();
+    const { data: byHandle } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("handle", handle)
+      .maybeSingle();
+    if (!byHandle) notFound();
+    id = byHandle.id as string;
+  }
+
+  // Skip the Postgres round-trip on malformed IDs
+  if (!isValidUUID(id)) notFound();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

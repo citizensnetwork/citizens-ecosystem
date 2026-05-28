@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Event, EventCategory, PlaceCategory, FavouriteOrg, FriendAttending, FriendConsidering, Profile, TrendingEvent } from "@/types/db";
 import { EVENT_CATEGORIES, CATEGORY_HEX, PLACE_CATEGORIES, PLACE_CATEGORY_HEX, PLACE_CATEGORY_DESCRIPTIONS } from "@/lib/categories";
-import { isAdmin, isContributor, isCitizen, isApprovedContributor, isPendingContributor, isRejectedContributor } from "@/lib/profiles/capabilities";
+import { isContributor, isCitizen, isApprovedContributor, isPendingContributor, isRejectedContributor } from "@/lib/profiles/capabilities";
 import { getIconSvg } from "@/lib/categoryIcons";
 import AccordionSection from "@/components/ui/AccordionSection";
 import SuggestionButton from "@/components/ui/SuggestionButton";
@@ -495,15 +495,6 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                     Application not approved — apply again
                   </Link>
                 )}
-              {isAdmin(menuProfile) && (
-                <Link
-                  href="/admin"
-                  onClick={onClose}
-                  className="block rounded-xl border border-(--gold)/40 bg-(--gold-soft)/40 px-3 py-2 text-sm font-medium text-black transition hover:bg-(--gold-soft)/70"
-                >
-                  Admin panel →
-                </Link>
-              )}
               <button
                 type="button"
                 onClick={onLogout}

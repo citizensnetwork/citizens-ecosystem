@@ -14,6 +14,7 @@ import ProfileLogOutButton from "@/components/auth/ProfileLogOutButton";
 import PersonalizationPanel from "@/components/profile/PersonalizationPanel";
 import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 import QuickPanelPreferencesSection from "@/components/events/QuickPanelPreferencesSection";
+import ProfileDiscoverySettings from "@/components/profile/ProfileDiscoverySettings";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QUICK_ACCESS_ITEMS } from "@/lib/quickPanelOptions";
 
@@ -192,6 +193,16 @@ export default async function ProfilePage() {
           currentDigest={typedProfile.notification_digest}
           notificationEmail={typedProfile.notification_email}
           currentPrefs={typedProfile.notification_prefs ?? null}
+        />
+      </section>
+
+      {/* ── Discovery — @handle + discoverability + copy link ─── */}
+      <section className="mb-8 rounded-xl border border-black/8 bg-white/50 p-5">
+        <h2 className="text-lg font-semibold mb-4">Profile Discovery</h2>
+        <ProfileDiscoverySettings
+          userId={user.id}
+          initialHandle={(typedProfile as { handle?: string | null }).handle ?? null}
+          initialDiscoverable={(typedProfile as { discoverable?: boolean }).discoverable ?? false}
         />
       </section>
 
