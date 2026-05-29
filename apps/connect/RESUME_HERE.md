@@ -16,7 +16,56 @@
 
 ---
 
-## 2. What just shipped — Stage H follow-ups + Stage L (search term analytics)
+## 2. What just shipped — Optional hardening: `log_search_term` lockdown + real XLSX exports
+
+**Picked up the two non-blocking hardening items from the old §4 backlog** (search-term
+poisoning vector + CSV-with-xlsx-MIME fallback). `tsc 0`, lint clean, **790/790 tests**
+(88 files, +10 vs Stage L).
+
+### Search-term hardening — Migration 118 ([118_lock_log_search_term_to_service_role.sql](supabase/migrations/118_lock_log_search_term_to_service_role.sql))
+- `log_search_term(text)` is now **REVOKEd from anon + authenticated** and **GRANTed to
+  `service_role` only**. This removes the documented direct-RPC autocomplete/top-10 poisoning
+  vector (anyone with an anon key could previously call it in a loop).
+- [ai-search/route.ts](src/app/api/ai-search/route.ts) now invokes it through the
+  **service-role admin client** (`createAdminClient`) inside a try/catch fire-and-forget block.
+  Because `POST /api/ai-search` is already rate-limited **per-IP and per-user**, that endpoint is
+  now the single throttled write path into `search_term_stats`. Search never breaks if the
+  service key is absent (logs + continues). Anonymous-search logging behaviour is preserved.
+- Read side unchanged: `get_search_autocomplete` stays anon+auth (escaped, read-only),
+  `get_top_search_terms` stays authenticated.
+
+### Real XLSX exports — [xlsx.ts](src/lib/analytics/xlsx.ts) (new, zero-dep OOXML writer)
+- New `buildXlsx(sheetName, header, rows)` produces a **genuine `.xlsx`** (Content_Types + rels +
+  workbook + one worksheet) that Excel/Numbers/Sheets open natively. Replaces the old
+  CSV-body-with-xlsx-MIME fallback in **both** export endpoints
+  ([analytics export](src/app/api/contributor/[handle]/analytics/export/route.ts) +
+  [suggestions export](src/app/api/admin/suggestions/export/route.ts)).
+- **Why hand-rolled, not SheetJS:** we only *write*, never parse, so SheetJS's parse-path CVEs
+  (CVE-2023-30533 prototype pollution, CVE-2024-22363 ReDoS) don't apply — and the fixed SheetJS
+  builds aren't on npm anyway. exceljs would drag a large dep tree for a tiny job. Matches the
+  existing zero-dep `csv.ts` philosophy. **(Open to swapping to SheetJS/exceljs if a customer
+  needs richer workbooks — flagged for the user.)**
+- Implementation: STORED (uncompressed) ZIP + CRC-32 + **inline strings**. Inline strings are
+  never evaluated as formulas, so the CSV formula-injection neutraliser is deliberately NOT
+  applied on the xlsx path (it would corrupt data); the CSV path keeps `neutraliseFormula`.
+  Numbers written as numeric cells via `Number.isFinite` guard.
+
+### Validation
+- `npx tsc --noEmit` → **0 errors**
+- `npx vitest run` → **790/790 passed** (88 files; +10: 10 xlsx unit tests + 1 ai-search
+  admin-log-path test; −1 net from reworking the suggestions xlsx test to assert a real workbook)
+- `npx next lint --dir src` → clean
+- Sec audit (self): **CLEAN.** Service-role key stays server-side (never shipped to browser);
+  xlsx is write-only (no parse-path CVE surface) + XML-escaped + strips illegal control chars;
+  export access control/rate-limit/`no-store` unchanged; `workbook.buffer` is full-width
+  (`Uint8Array.from`) so no adjacent-memory leak.
+
+### Operator action
+None new. (The Stage-L/H backfill below is still the only pending operator step.)
+
+---
+
+## 2-prev. Previously shipped — Stage H follow-ups + Stage L (search term analytics)
 
 **Completed the final two queued items of the contributor-dashboard plan.** This closes out every stage (A–L) plus the deferred Stage H follow-ups. `tsc 0`, lint clean, **780/780 tests** (87 files, +11 vs Stage K).
 
@@ -462,9 +511,9 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 ## 3. Current platform state
 
-- 87 test files, **780 tests**, all passing.
-- 117 migrations applied (116 analytics sources + Vision snapshot, 117 search-term analytics added this batch).
-- Commit pending push — Stage H follow-ups + Stage L just shipped on top of Stage K.
+- 88 test files, **790 tests**, all passing.
+- 118 migrations (118 = `log_search_term` service-role lockdown added this batch).
+- Latest commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
 
 ---
 
@@ -472,12 +521,32 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 **The entire contributor-dashboard plan (Stages A–L + Stage H follow-ups) is now complete.** No further stages are queued from `docs/plans/contributor-dashboard.md`.
 
-Outstanding **operator action** (post-deploy of migrations 116/117): run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters.
+Outstanding **operator action** (post-deploy of migrations 116/117): run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters. **(Migration 118 needs applying too, but it's grant-only — no backfill.)**
 
-Optional future hardening (non-blocking, captured in the plan DECISIONS log):
-- Move `log_search_term` behind a service-role call in the ai-search route (removes anon direct-RPC autocomplete-poisoning vector) or add per-IP RPC throttling.
-- Real XLSX (SheetJS) instead of CSV-with-xlsx-MIME for analytics/suggestions exports, if a customer needs true sheets.
-- Citizens Vision: build the actual consumer that pulls from `contributor_analytics_snapshots`.
+**Optional hardening — two of three now DONE this batch** (`log_search_term` lockdown ✅, real
+XLSX ✅). Remaining:
+
+### Citizens Vision (active focus — monorepo)
+The user plans to fold **Citizens Vision** (`C:\Users\SJ\Documents\Citizen Network\citizens-vision`)
+into a **monorepo** with Connect and complete it; Vision must consume
+`contributor_analytics_snapshots`. **Inspected this session** — Vision is far along (21 migrations,
+git phases to 21+, full src tree: orgs/activities/goals/projects/advisory/timeline/map/dashboard).
+**Key tensions to resolve before integration work (scoping questions raised with user):**
+1. **DB topology** — Vision's ARCHITECTURE.md assumes a *separate* Supabase project + a
+   `sync-from-connect` Edge Function pulling into `cc_*_mirror` tables via read-only service role.
+   Connect built `contributor_analytics_snapshots` as an *in-Connect* table expecting Vision to
+   "pull from it, no external HTTP". → One shared project vs. two-project sync model is the
+   pivotal fork; it changes how the snapshot is consumed.
+2. **Version skew** — Connect = Next 15 / React 18; Vision = Next **16** / React **19**. Monorepo
+   with shared code needs reconciliation.
+3. **Monorepo tooling** — workspaces vs Turborepo/pnpm; shared packages (UI, supabase types,
+   design tokens).
+4. **Snapshot consumption shape** — yearly nested rollup (totals + places[] + events[]); surface
+   as mirror table / dashboard panel / advisory input, and at what cadence.
+
+### Other non-blocking
+- `docs/design/FIGMA_PROMPT.md` is untracked in the Connect repo (not from any recent session) —
+  awaiting user decision on whether to commit, move, or delete.
 
 ---
 

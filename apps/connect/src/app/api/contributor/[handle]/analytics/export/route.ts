@@ -8,7 +8,10 @@ import {
   sanitiseExportFilename,
   type AnalyticsRow,
 } from "@/lib/analytics/csv";
+import { buildXlsx, type XlsxCell } from "@/lib/analytics/xlsx";
 import type { AnalyticsPeriod } from "@/types/db";
+
+const EXPORT_HEADER = ["date", "metric", "value", "entity_type", "entity_id"];
 
 const VALID_PERIODS: AnalyticsPeriod[] = [7, 14, 30, 60, 90, 180, 365];
 const VALID_ENTITY_TYPES = ["contributor", "event", "place"] as const;
@@ -22,10 +25,9 @@ const VALID_FORMATS = ["csv", "xlsx"] as const;
  * `checkDashboardAccess` so all owner/admin/RLS rules apply.
  *
  * Query params:
- *   - format     : "csv" (default) | "xlsx" — both serve CSV body;
- *                  xlsx flag swaps MIME + filename suffix only.
- *                  Real XLSX is intentionally deferred (Stage H plan
- *                  item 4 — keeps zero new deps).
+ *   - format     : "csv" (default) | "xlsx". "xlsx" emits a real OOXML
+ *                  workbook via the zero-dep writer in @/lib/analytics/xlsx;
+ *                  "csv" emits RFC-4180 CSV.
  *   - period     : 7 | 14 | 30 | 60 | 90 | 180 | 365   (default 30)
  *   - entity_type: "contributor" | "event" | "place"   (default "contributor")
  *   - entity_id  : uuid, required when entity_type != "contributor"
@@ -103,21 +105,35 @@ export async function GET(
   }
 
   const rows = (data ?? []) as AnalyticsRow[];
-  const csv = buildAnalyticsCsv(rows);
 
   const safeHandle = sanitiseExportFilename(handle);
   const filename = `analytics-${safeHandle}-${period}d.${format}`;
 
-  // For xlsx the body is still CSV — Excel and Numbers open this fine.
-  // Documented in DECISIONS log so reviewers know it's intentional.
-  const contentType =
-    format === "xlsx"
-      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      : "text/csv; charset=utf-8";
+  if (format === "xlsx") {
+    // Real OOXML workbook (zero-dep writer). Numbers stay numeric; text is
+    // written as inline strings, which are never evaluated as formulas.
+    const xlsxRows: XlsxCell[][] = rows.map((r) => [
+      r.date,
+      r.metric,
+      r.value,
+      r.entity_type,
+      r.entity_id,
+    ]);
+    const workbook = buildXlsx("Analytics", EXPORT_HEADER, xlsxRows);
+    return new NextResponse(workbook.buffer as ArrayBuffer, {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
+  const csv = buildAnalyticsCsv(rows);
   return new NextResponse(csv, {
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },

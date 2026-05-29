@@ -305,7 +305,7 @@ describe("GET /api/admin/suggestions/export", () => {
     mockClient._chain._result.data = null;
   });
 
-  it("serves CSV with xlsx MIME when format=xlsx", async () => {
+  it("serves a real OOXML workbook when format=xlsx", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({
       data: { user: { id: ADMIN_ID } },
       error: null,
@@ -340,11 +340,16 @@ describe("GET /api/admin/suggestions/export", () => {
       "spreadsheetml.sheet",
     );
     expect(res.headers.get("Content-Disposition")).toContain(".xlsx");
-    const body = await res.text();
-    // Header row + escaped data row
-    expect(body).toContain("id,created_at,status,title,body");
-    expect(body).toContain('"Body, with comma"');
-    expect(body).toContain("Jane Doe");
+    // Real .xlsx: a ZIP container (PK..) carrying inline-string worksheet XML.
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf[0]).toBe(0x50); // 'P'
+    expect(buf[1]).toBe(0x4b); // 'K'
+    const text = buf.toString("latin1");
+    expect(text).toContain("xl/worksheets/sheet1.xml");
+    expect(text).toContain('<t xml:space="preserve">Hello</t>');
+    // Comma-bearing value is plain cell text (no CSV quoting in xlsx).
+    expect(text).toContain('<t xml:space="preserve">Body, with comma</t>');
+    expect(text).toContain('<t xml:space="preserve">Jane Doe</t>');
     // reset for downstream tests
     mockClient._chain._result.data = null;
   });

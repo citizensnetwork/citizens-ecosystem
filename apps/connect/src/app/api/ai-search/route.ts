@@ -13,6 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Event, Place, Profile } from "@/types/db";
 import { rankResults, type RankedResult } from "@/lib/aiSearch";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -161,12 +162,23 @@ export async function POST(request: Request) {
 
   // Stage L: feed the anonymised global search-term table (top-10 +
   // autocomplete). Fires for EVERY search incl. anonymous — the RPC
-  // sanitises server-side and stores no user id. Fire-and-forget.
-  void supabase
-    .rpc("log_search_term", { p_term: query })
-    .then(({ error }) => {
+  // sanitises server-side and stores no user id.
+  //
+  // Hardened in migration 118: log_search_term is REVOKEd from
+  // anon/authenticated and GRANTed to service_role only, so we invoke it
+  // through the admin client rather than the caller's client. This removes
+  // the direct-RPC autocomplete-poisoning vector — /api/ai-search (already
+  // rate-limited per-IP AND per-user above) is now the single throttled
+  // write path. Fire-and-forget; never blocks or surfaces to the client.
+  void (async () => {
+    try {
+      const admin = createAdminClient();
+      const { error } = await admin.rpc("log_search_term", { p_term: query });
       if (error) console.error("[ai-search log_search_term]", error);
-    });
+    } catch (err) {
+      console.error("[ai-search log_search_term]", err);
+    }
+  })();
 
   // Fire-and-forget: log this search for signed-in users so we can power the
   // Rainbow "?" long-form sheet and downstream analytics. Non-blocking and

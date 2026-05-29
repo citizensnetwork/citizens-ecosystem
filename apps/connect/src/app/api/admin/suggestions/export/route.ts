@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { sanitiseExportFilename } from "@/lib/analytics/csv";
+import { buildXlsx, type XlsxCell } from "@/lib/analytics/xlsx";
 
 const VALID_STATUSES = ["open", "in_review", "actioned", "declined", "all"] as const;
 const VALID_FORMATS = ["csv", "xlsx"] as const;
@@ -28,9 +29,8 @@ const EXPORT_COLUMNS = [
  *
  * Admin-only. Streams a flat tabular export of the suggestion inbox.
  *
- *   - format : "csv" (default) | "xlsx" — both serve a CSV body (xlsx flag
- *              swaps MIME + filename suffix only, mirroring Stage H
- *              analytics export; zero new deps).
+ *   - format : "csv" (default) | "xlsx". "xlsx" emits a real OOXML workbook
+ *              via the zero-dep writer in @/lib/analytics/xlsx.
  *   - status : `open` | `in_review` | `actioned` | `declined` | `all`
  *              (default `all`).
  *
@@ -114,20 +114,32 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const body = buildSuggestionsCsv(rows);
-
   const filename = `suggestions-${sanitiseExportFilename(status)}-${new Date()
     .toISOString()
     .slice(0, 10)}.${format}`;
 
-  const contentType =
-    format === "xlsx"
-      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      : "text/csv; charset=utf-8";
+  if (format === "xlsx") {
+    // Real OOXML workbook. All columns are text → inline strings, which are
+    // never evaluated as formulas (so the CSV formula-injection guard isn't
+    // needed on this path).
+    const xlsxRows: XlsxCell[][] = rows.map((r) =>
+      EXPORT_COLUMNS.map((col) => String(r[col] ?? "")),
+    );
+    const workbook = buildXlsx("Suggestions", [...EXPORT_COLUMNS], xlsxRows);
+    return new NextResponse(workbook.buffer as ArrayBuffer, {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
+  const body = buildSuggestionsCsv(rows);
   return new NextResponse(body, {
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },

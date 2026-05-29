@@ -8,6 +8,13 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue(mockClient),
 }));
 
+// log_search_term is now a service-role-only RPC (migration 118), invoked
+// through the admin client. Mock it so the fire-and-forget write resolves.
+const mockAdminRpc = vi.fn().mockResolvedValue({ data: null, error: null });
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: vi.fn(() => ({ rpc: mockAdminRpc })),
+}));
+
 const { POST } = await import("@/app/api/ai-search/route");
 
 function req(body: Record<string, unknown>) {
@@ -81,5 +88,21 @@ describe("POST /api/ai-search", () => {
     const json = await res.json();
     expect(json.events.length).toBeGreaterThan(0);
     expect(json.events[0].id).toBe("00000000-0000-0000-0000-000000000001");
+  });
+
+  it("logs the search term via the service-role admin client, not the caller's client", async () => {
+    const res = await POST(req({ query: "youth nights" }));
+    expect(res.status).toBe(200);
+    // Wait a microtask tick so the fire-and-forget logger runs.
+    await Promise.resolve();
+    expect(mockAdminRpc).toHaveBeenCalledWith("log_search_term", {
+      p_term: "youth nights",
+    });
+    // The caller's (anon/authenticated) client must NOT be used for logging —
+    // that was the pre-118 poisoning vector.
+    expect(mockClient.rpc).not.toHaveBeenCalledWith(
+      "log_search_term",
+      expect.anything(),
+    );
   });
 });
