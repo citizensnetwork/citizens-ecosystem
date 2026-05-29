@@ -51,13 +51,21 @@ CREATE INDEX IF NOT EXISTS idx_team_owner_transfers_proposed
 ALTER TABLE public.team_owner_transfers ENABLE ROW LEVEL SECURITY;
 
 -- The contributor (current owner), the proposed transferee, and admins can read.
-CREATE POLICY "team_owner_transfers_select" ON public.team_owner_transfers
-  FOR SELECT USING (
-    auth.uid() = contributor_id
-    OR auth.uid() = proposed_owner_id
-    OR auth.uid() = proposed_by
-    OR public.is_admin()
-  );
+-- Guarded so the migration is safely re-runnable.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'team_owner_transfers' AND policyname = 'team_owner_transfers_select'
+  ) THEN
+    CREATE POLICY "team_owner_transfers_select" ON public.team_owner_transfers
+      FOR SELECT USING (
+        auth.uid() = contributor_id
+        OR auth.uid() = proposed_owner_id
+        OR auth.uid() = proposed_by
+        OR public.is_admin()
+      );
+  END IF;
+END $$;
 
 -- No direct INSERT / UPDATE policies — all writes flow through the RPCs below.
 

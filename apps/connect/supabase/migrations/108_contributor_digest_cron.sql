@@ -16,7 +16,7 @@ BEGIN
     PERFORM cron.schedule(
       'contributor-digest',
       '0 7,10,13,16,19 * * *',
-      $$
+      $cron$
         SELECT net.http_post(
           url := current_setting('app.supabase_functions_url') || '/send-contributor-digest',
           headers := jsonb_build_object(
@@ -25,7 +25,7 @@ BEGIN
           ),
           body := '{}'::jsonb
         );
-      $$
+      $cron$
     );
   END IF;
 END $$;

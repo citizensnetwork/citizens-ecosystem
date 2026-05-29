@@ -512,8 +512,12 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 ## 3. Current platform state
 
 - 88 test files, **790 tests**, all passing.
-- 118 migrations (118 = `log_search_term` service-role lockdown added this batch).
-- Latest commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
+- 118 migrations — **all now APPLIED to the live `Citizens-Connect` Supabase project**
+  (`xyiajtrvhlxaeplsiajj`). Note: the live DB was silently stuck at 106; this session applied
+  the full **107→118** gap via the Supabase MCP (see §2 of this file's batch notes below).
+- Analytics **backfill executed** (`backfill_contributor_analytics(90)`, 2026-02-28→05-28).
+- Security advisor: **0 errors** (105 informational/by-design lints).
+- Latest pushed commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
 
 ---
 
@@ -521,32 +525,42 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 **The entire contributor-dashboard plan (Stages A–L + Stage H follow-ups) is now complete.** No further stages are queued from `docs/plans/contributor-dashboard.md`.
 
-Outstanding **operator action** (post-deploy of migrations 116/117): run `SELECT * FROM public.backfill_contributor_analytics(90);` from psql (service_role) to hydrate the last 90 days of counters. **(Migration 118 needs applying too, but it's grant-only — no backfill.)**
+~~Outstanding operator action (backfill)~~ — **DONE this session.** All migrations 107→118 are
+applied to the live Citizens-Connect DB and `backfill_contributor_analytics(90)` has been run.
+No operator DB actions are pending.
 
-**Optional hardening — two of three now DONE this batch** (`log_search_term` lockdown ✅, real
-XLSX ✅). Remaining:
+> **DB migration discovery (this session):** the live DB's migration tracker was at `106` while
+> the repo had files through `118`. Object-level probing showed **107→118 were ALL unapplied**
+> (not just 116–118). Applied them in order via Supabase MCP, one at a time, halting-on-error.
+> Found + fixed a real bug: migration **108** nested `$$` inside `DO $$` (invalid dollar-quoting)
+> — corrected to `$cron$` in the DB and the file. Also hardened file **111**'s policy create with
+> a `pg_policies` guard. All verified present; 118 grants confirmed (anon/authenticated can't
+> execute `log_search_term`, service_role can).
 
-### Citizens Vision (active focus — monorepo)
-The user plans to fold **Citizens Vision** (`C:\Users\SJ\Documents\Citizen Network\citizens-vision`)
-into a **monorepo** with Connect and complete it; Vision must consume
-`contributor_analytics_snapshots`. **Inspected this session** — Vision is far along (21 migrations,
-git phases to 21+, full src tree: orgs/activities/goals/projects/advisory/timeline/map/dashboard).
-**Key tensions to resolve before integration work (scoping questions raised with user):**
-1. **DB topology** — Vision's ARCHITECTURE.md assumes a *separate* Supabase project + a
-   `sync-from-connect` Edge Function pulling into `cc_*_mirror` tables via read-only service role.
-   Connect built `contributor_analytics_snapshots` as an *in-Connect* table expecting Vision to
-   "pull from it, no external HTTP". → One shared project vs. two-project sync model is the
-   pivotal fork; it changes how the snapshot is consumed.
-2. **Version skew** — Connect = Next 15 / React 18; Vision = Next **16** / React **19**. Monorepo
-   with shared code needs reconciliation.
-3. **Monorepo tooling** — workspaces vs Turborepo/pnpm; shared packages (UI, supabase types,
-   design tokens).
-4. **Snapshot consumption shape** — yearly nested rollup (totals + places[] + events[]); surface
-   as mirror table / dashboard panel / advisory input, and at what cadence.
+**Optional hardening — two of three now DONE** (`log_search_term` lockdown ✅, real XLSX ✅). Remaining:
+
+### Citizens Vision + ecosystem (active strategy — NEXT SESSION)
+The founder reframed the goal (2026-05-29): an **ecosystem of apps sharing data**, with **Vision as
+the back-office analytics/intelligence app** for contributors + organisations to glean analytics,
+map activity across **all** ecosystem apps (source-selectable), and receive recommendations/trends.
+Connect must stay lightweight + scale (phones via Capacitor + browser). Monorepo (Turborepo) is
+the founder's lean but to be confirmed.
+
+**Inspected this session:** Vision (`../citizens-vision`) is **largely feature-complete** — Next 16 /
+React 19, Phases **0–21b** done (incl. Connect integration + incremental sync, advisory, federation),
+separate Supabase project `Citizens-Vision` (`ijdmcudcrncmaprmzgfk`, currently INACTIVE). Its
+`README.md` is boilerplate; real docs are `ARCHITECTURE.md`, `.github/VISION.md`, `PROJECT_STATUS.md`.
+
+**→ Full context + open questions captured in
+[docs/strategy/ECOSYSTEM_AND_MONOREPO_STRATEGY.md](docs/strategy/ECOSYSTEM_AND_MONOREPO_STRATEGY.md).**
+That doc is the agenda for the dedicated strategy session: ecosystem intent, data architecture
+(linchpin), Vision scope, audiences, monorepo vs polyrepo, React/Next version reconciliation
+(founder Q2 — needs a Capacitor compatibility audit I still owe), and first-deliverable sequencing.
+**No monorepo/integration code until those decisions are made.**
 
 ### Other non-blocking
-- `docs/design/FIGMA_PROMPT.md` is untracked in the Connect repo (not from any recent session) —
-  awaiting user decision on whether to commit, move, or delete.
+- `docs/design/FIGMA_PROMPT.md` remains **untracked** in the Connect repo per founder instruction
+  (leave uncommitted).
 
 ---
 
