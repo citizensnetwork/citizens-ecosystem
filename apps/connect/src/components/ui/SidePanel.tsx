@@ -50,14 +50,36 @@ export default function SidePanel({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const drawerRoot = panelRef.current?.closest("[data-sidepanel-root]");
-    const siblings = Array.from(document.body.children).filter(
-      (el) => el !== drawerRoot && !el.hasAttribute("inert"),
-    );
-    siblings.forEach((el) => el.setAttribute("inert", ""));
+    const drawerRoot = panelRef.current?.closest("[data-sidepanel-root]") ?? null;
+
+    // Belt-and-suspenders: before marking anything inert, sweep up any `inert`
+    // a PREVIOUS panel instance may have left behind if its cleanup was skipped
+    // on a fast/interrupted navigation. A leaked `inert` on the map container is
+    // exactly what makes "icons not appear / events won't open / feels stuck",
+    // so we tag every element we freeze and always clear tagged stragglers.
+    document.querySelectorAll("[data-cc-inert-by-panel]").forEach((el) => {
+      el.removeAttribute("inert");
+      el.removeAttribute("data-cc-inert-by-panel");
+    });
+
+    // Only freeze siblings if we positively identified our own root — never
+    // risk marking the drawer (or everything) inert when the ref isn't ready.
+    const siblings = drawerRoot
+      ? Array.from(document.body.children).filter(
+          (el) => el !== drawerRoot && !el.hasAttribute("inert"),
+        )
+      : [];
+    siblings.forEach((el) => {
+      el.setAttribute("inert", "");
+      el.setAttribute("data-cc-inert-by-panel", "");
+    });
+
     return () => {
       document.body.style.overflow = prev;
-      siblings.forEach((el) => el.removeAttribute("inert"));
+      siblings.forEach((el) => {
+        el.removeAttribute("inert");
+        el.removeAttribute("data-cc-inert-by-panel");
+      });
     };
   }, [panelRef]);
 

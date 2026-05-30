@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_KEYWORDS } from "@/lib/categories";
 import { isWeekendEvent } from "@/lib/weekendTag";
 import { share } from "@/lib/capacitor/share";
-import EventPreviewPanel from "@/components/events/EventPreviewPanel";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
@@ -24,6 +23,14 @@ import { getCityLabel } from "@/lib/cityLabel";
 import { DEFAULT_CENTER } from "@/lib/map/config";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
+import GlassMapHeader from "@/components/map/glass/GlassMapHeader";
+import MapLayersPanel from "@/components/map/glass/MapLayersPanel";
+import MapFiltersPanel from "@/components/map/glass/MapFiltersPanel";
+import MapStatsFooter from "@/components/map/glass/MapStatsFooter";
+import PlacePreviewCard from "@/components/map/glass/PlacePreviewCard";
+import EventPreviewCard from "@/components/map/glass/EventPreviewCard";
+import GlassSearchResults from "@/components/map/glass/GlassSearchResults";
+import { DEFAULT_MAP_LAYERS, type MapLayerKey, type MapLayers } from "@/components/map/glass/mapLayers";
 
 const EventMap = dynamic(() => import("@/components/map/EventMap"), {
   ssr: false,
@@ -48,6 +55,9 @@ type Props = {
 
 /** Number of event cards shown per page in the category panel. */
 const CARDS_PER_PAGE = 3;
+
+/** All event categories in display order — drives the glass Filters panel. */
+const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as EventCategory[];
 
 /** Convert hex colour to rgba string (used for category panel card backgrounds). */
 function hexToRgba(hex: string, alpha: number): string {
@@ -100,6 +110,46 @@ export default function EventsView({
   // land with the search box already filled.
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // ── Glassmorphism Community Map overlay state ──
+  const [mapFiltersOpen, setMapFiltersOpen] = useState(false);
+  const [mapLayersOpen, setMapLayersOpen] = useState(false);
+  const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
+  // The Figma design moves search into the glass header and puts the stats pill
+  // at the bottom-centre, so the legacy bottom floating search is disabled by
+  // default. Flip to true to restore the advanced scope/autocomplete search bar.
+  const [legacySearchEnabled] = useState(false);
+  // Header search dropdown visibility (delayed blur so result clicks register).
+  const [headerSearchFocused, setHeaderSearchFocused] = useState(false);
+  const headerBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onHeaderSearchFocus = useCallback(() => {
+    if (headerBlurTimer.current) clearTimeout(headerBlurTimer.current);
+    setHeaderSearchFocused(true);
+  }, []);
+  const onHeaderSearchBlur = useCallback(() => {
+    headerBlurTimer.current = setTimeout(() => setHeaderSearchFocused(false), 150);
+  }, []);
+  const toggleMapLayer = useCallback((key: MapLayerKey) => {
+    setMapLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+  // Real community member count (profiles) for the glass stats footer.
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { count } = await supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true });
+        if (!cancelled && typeof count === "number") setMemberCount(count);
+      } catch {
+        /* footer falls back to dashes if the count is unavailable */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [longFormOpen, setLongFormOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set()
@@ -286,13 +336,15 @@ export default function EventsView({
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
+      if (mapLayersOpen) { setMapLayersOpen(false); return; }
+      if (mapFiltersOpen) { setMapFiltersOpen(false); return; }
       if (filtersOpen) { setFiltersOpen(false); return; }
       if (calendarOpen) { closeCalendar(); return; }
       if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
+  }, [mapLayersOpen, mapFiltersOpen, filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
 
   // Burger menu social data — load eagerly so trending data is available for the panel
   const {
@@ -740,13 +792,12 @@ export default function EventsView({
     });
   }, [filtered, userLocation]);
 
-  // Quick-access panel scoping: when the burger "Locations" tab is active
-  // the user has signalled they want to browse places — so only place
-  // tiles render. Otherwise (default events tab) only event tiles render,
-  // preventing the "tap a place → map zooms to an empty spot" bug where
-  // place markers were hidden but place tiles still surfaced in the panel.
-  const quickPanelEvents = burgerTab === "places" ? [] : quickFilteredEvents;
-  const quickPanelPlaces = burgerTab === "places" ? quickFilteredPlaces : [];
+  // Quick-access panel scoping: quick-select shows BOTH events and places that
+  // match the selected tool — no event/place exclusion. The map keeps both
+  // marker types visible too (see `placesMode` on <EventMap>), so tapping any
+  // tile flies to a marker that actually exists on the map.
+  const quickPanelEvents = quickFilteredEvents;
+  const quickPanelPlaces = quickFilteredPlaces;
   const quickPanelTotal = quickPanelEvents.length + quickPanelPlaces.length;
 
   const handleSelectEvent = useCallback(
@@ -865,11 +916,12 @@ export default function EventsView({
   );
 
   const handleSelectPlace = useCallback((place: Place) => {
+    // Open the inline glass PlacePreviewCard instead of navigating to the
+    // intercepted /places/[id] @panel route (removes the redirect-flash).
     setSelectedEvent(null);
-    setSelectedPlace(null);
+    setSelectedPlace(place);
     closeCalendar();
-    router.push(`/places/${place.id}`);
-  }, [closeCalendar, router]);
+  }, [closeCalendar]);
 
   const closeDetail = useCallback(() => {
     setSelectedEvent(null);
@@ -1111,12 +1163,20 @@ export default function EventsView({
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
-      {/* Map is always rendered — calendar (when open) overlays it. */}
-      <div className={`absolute inset-0${calendarOpen ? " pointer-events-none" : ""}`}>
+      {/* Map is always rendered — calendar (when open) overlays it.
+       * `cc-map-glass` + data-layer-* drive the Glassmorphism Community Map
+       * marker layers (Impact Glow / Activity Pulse / Connections) via CSS. */}
+      <div
+        className={`cc-map-glass absolute inset-0${calendarOpen ? " pointer-events-none" : ""}`}
+        data-layer-glow={mapLayers.glow ? "on" : "off"}
+        data-layer-pulse={mapLayers.pulse ? "on" : "off"}
+        data-layer-connections={mapLayers.connections ? "on" : "off"}
+      >
         <EventMap
           events={filtered}
           places={filteredPlaces}
           onSelectPlace={handleSelectPlace}
+          onSelectEvent={handleSelectEvent}
           onQuickAction={handleQuickAction}
           autoLocate
           flyTo={mapFlyTo}
@@ -1125,7 +1185,7 @@ export default function EventsView({
           activeCategories={activeCategories}
           activePlaceCategories={activePlaceCategories}
           markerOverrideColor={activeQuickItem?.color}
-          placesMode={burgerTab === "places"}
+          placesMode={burgerTab === "places" && !activeQuickItem}
           onBearingChange={setMapBearing}
           resetBearingToken={resetBearingToken}
           locateMeToken={locateMeToken}
@@ -1147,83 +1207,111 @@ export default function EventsView({
         />
       )}
 
-      {/* ── Floating top bar (no search — search is a floating bottom control) ────── */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 p-3 sm:p-4">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="pointer-events-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((open) => !open)}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
-                aria-label="Toggle menu"
-                aria-expanded={filtersOpen}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5">
-                  <line x1="3" y1="6" x2="21" y2="6"/>
-                  <line x1="3" y1="12" x2="21" y2="12"/>
-                  <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={handleBrandClick}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-semibold tracking-tight text-(--gold) shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 sm:text-base"
-              >
-                Citizens Connect
-              </button>
-            </div>
-
-            <div className="pointer-events-auto flex items-center gap-2">
-              {user && (
-                <div className="rounded-full border border-black/10 bg-white/95 p-1 shadow-lg backdrop-blur">
-                  <NotificationBell userId={user.id} />
-                </div>
-              )}
-              {user && !menuProfile?.preferences?.last_longform_asked_at && (
-                <button
-                  type="button"
-                  onClick={() => setLongFormOpen(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/95 shadow-lg backdrop-blur transition-all active:scale-95 hover:bg-white"
-                  aria-label="Personalise your feed"
-                  title="Tell us about you"
-                >
-                  <span
-                    className="text-xl font-extrabold leading-none"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #ff4d4d 0%, #ffb400 25%, #3dd598 50%, #2f80ed 75%, #9b51e0 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                      color: "transparent",
-                    }}
-                  >
-                    ?
-                  </span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setMapFlyTo(null);
-                  setMapFlyToZoom(undefined);
-                  setCalendarOpen((open) => !open);
+      {/* ── Glassmorphism Community Map header (brand + search + Filters/Layers) ── */}
+      {!calendarOpen && (
+        <GlassMapHeader
+          brand="Citizens Connect"
+          tagline="Connecting the Kingdom"
+          onBrandClick={handleBrandClick}
+          onMenuClick={() => setFiltersOpen((open) => !open)}
+          menuOpen={filtersOpen}
+          search={search}
+          onSearchChange={setSearch}
+          onSearchClear={() => setSearch("")}
+          onSearchFocus={onHeaderSearchFocus}
+          onSearchBlur={onHeaderSearchBlur}
+          resultsSlot={
+            headerSearchFocused && search.trim().length > 0 ? (
+              <GlassSearchResults
+                query={search}
+                events={filtered.slice(0, 5)}
+                places={filteredPlaces.slice(0, 4)}
+                contributors={topContributorMatches}
+                onSelectEvent={(e) => {
+                  setHeaderSearchFocused(false);
+                  handleSelectEvent(e);
                 }}
-                className="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-sm font-medium shadow-lg backdrop-blur transition-all active:scale-95 active:brightness-90 hover:bg-white"
-                aria-label="Toggle view mode"
-                aria-pressed={calendarOpen}
-              >
-                {!calendarOpen ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-(--gold)"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-                )}
-              </button>
+                onSelectPlace={(p) => {
+                  setHeaderSearchFocused(false);
+                  handleSelectPlace(p);
+                }}
+                onSelectContributor={(slug) => {
+                  setHeaderSearchFocused(false);
+                  router.push(`/c/${encodeURIComponent(slug)}`);
+                }}
+              />
+            ) : undefined
+          }
+          bell={user ? <NotificationBell userId={user.id} /> : undefined}
+          showPersonalize={!!(user && !menuProfile?.preferences?.last_longform_asked_at)}
+          onPersonalize={() => setLongFormOpen(true)}
+          calendarOpen={calendarOpen}
+          onToggleCalendar={() => {
+            setMapFlyTo(null);
+            setMapFlyToZoom(undefined);
+            setCalendarOpen((open) => !open);
+          }}
+          filtersOpen={mapFiltersOpen}
+          onToggleFilters={() => {
+            setMapFiltersOpen((o) => !o);
+            setMapLayersOpen(false);
+          }}
+          layersOpen={mapLayersOpen}
+          onToggleLayers={() => {
+            setMapLayersOpen((o) => !o);
+            setMapFiltersOpen(false);
+          }}
+        />
+      )}
+
+      {/* Calendar-only minimal top bar so the map↔calendar toggle stays reachable. */}
+      {calendarOpen && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 flex justify-end p-3 sm:p-4">
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(false)}
+            className="cc-glass pointer-events-auto flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-(--gold) active:scale-95"
+            aria-label="Back to map"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            Map
+          </button>
+        </div>
+      )}
+
+      {/* ── Filters / Layers glass panels (aligned with header pills) ── */}
+      {!calendarOpen && (mapFiltersOpen || mapLayersOpen) && (
+        <div className="pointer-events-none absolute inset-x-0 top-[150px] z-1100 px-3 sm:top-[160px] sm:px-4">
+          <div className="mx-auto flex w-full max-w-5xl items-start justify-between gap-3">
+            <div>
+              {mapFiltersOpen && (
+                <MapFiltersPanel
+                  categories={CATEGORY_ORDER}
+                  activeCategories={activeCategories}
+                  onToggleCategory={toggleCategory}
+                  onClear={() => {
+                    setActiveCategories(new Set());
+                    if (weekendOnly) handleToggleWeekend();
+                    clearQuickAccess();
+                  }}
+                  weekendOnly={weekendOnly}
+                  onToggleWeekend={handleToggleWeekend}
+                  onClose={() => setMapFiltersOpen(false)}
+                />
+              )}
+            </div>
+            <div>
+              {mapLayersOpen && (
+                <MapLayersPanel
+                  layers={mapLayers}
+                  onToggle={toggleMapLayer}
+                  onClose={() => setMapLayersOpen(false)}
+                />
+              )}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Floating right-side FAB stack (Phase D) ─────────────────────
        *  Compass reset appears only when the map is rotated; locate-me FAB
@@ -1287,21 +1375,8 @@ export default function EventsView({
        *    3. "Search this area"   — fallback when the user has panned
        *       the map and no personalised signal exists.                  */}
       {!calendarOpen && !hasDetail && (viewportScoped || personalised.hasSignal || showSearchAreaPill) && (
-        <div className="pointer-events-none absolute inset-x-0 top-24 z-1005 flex justify-center px-4">
-          {viewportScoped ? (
-            <button
-              type="button"
-              onClick={() => setViewportScoped(null)}
-              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/50 bg-(--gold)/15 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-(--gold)/25 active:scale-95 animate-[fadeRise_280ms_ease-out]"
-              aria-label="Clear viewport filter"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
-                <path d="M3 3h18l-7 8v6l-4 2v-8L3 3z" />
-              </svg>
-              Showing this area
-              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px]" aria-hidden="true">×</span>
-            </button>
-          ) : personalised.hasSignal ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-1005 flex justify-center px-4 sm:bottom-28">
+          {personalised.hasSignal ? (
             <button
               type="button"
               onClick={toggleForMe}
@@ -1318,6 +1393,19 @@ export default function EventsView({
               {forMeActive && (
                 <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
               )}
+            </button>
+          ) : viewportScoped ? (
+            <button
+              type="button"
+              onClick={() => setViewportScoped(null)}
+              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/50 bg-(--gold)/15 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-(--gold)/25 active:scale-95 animate-[fadeRise_280ms_ease-out]"
+              aria-label="Clear viewport filter"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
+                <path d="M3 3h18l-7 8v6l-4 2v-8L3 3z" />
+              </svg>
+              Showing this area
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px]" aria-hidden="true">×</span>
             </button>
           ) : (
             <button
@@ -1337,7 +1425,7 @@ export default function EventsView({
 
       {/* ── Quick access tools (vertical stack under the burger button) ── */}
       {!calendarOpen && visibleQuickItems.length > 0 && (
-        <div className="pointer-events-none absolute left-3 top-[108px] z-999 sm:left-4 sm:top-[116px]">
+        <div className="pointer-events-none absolute left-3 top-[206px] z-999 sm:left-4 sm:top-[214px]">
           <div className="pointer-events-auto flex flex-col items-center gap-2">
             {visibleQuickItems.map((item) => {
               const isActive = activeQuickAccess === item.id;
@@ -1370,7 +1458,7 @@ export default function EventsView({
       {/* On mobile the outer container uses a 10% horizontal gutter so the
        *  bar itself is 80% of the viewport width (user reported the bar felt
        *  too wide on phones). Desktop keeps the previous px-4 gutter. */}
-      {!hasDetail && (
+      {legacySearchEnabled && !hasDetail && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-[10%] sm:bottom-6 sm:px-4">
           {searchOpen ? (
             <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
@@ -1983,6 +2071,17 @@ export default function EventsView({
       )}
 
       {/* ── Burger Menu ──────────────────────────────── */}
+      {/* ── Bottom-centre glass stats pill (real community counts) ── */}
+      {!calendarOpen && !hasDetail && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-4 sm:bottom-6">
+          <MapStatsFooter
+            organizations={contributors?.length ?? 0}
+            members={memberCount ?? 0}
+            projects={events.length}
+          />
+        </div>
+      )}
+
       <BurgerMenu
         ref={burgerRef}
         isOpen={filtersOpen}
@@ -2015,13 +2114,19 @@ export default function EventsView({
         onTabChange={setBurgerTab}
       />
 
-      {/* ── Detail panel (event or place) ───────────────── */}
-      {hasDetail && (
-        <EventPreviewPanel
-          selectedEvent={selectedEvent}
-          selectedPlace={selectedPlace}
+      {/* ── Detail panel: events keep the full preview; places get the
+           glass Community-Map preview card (Figma "Harvest Hope" panel). ── */}
+      {selectedEvent && (
+        <EventPreviewCard
+          event={selectedEvent}
+          joined={rsvpEventIds.has(selectedEvent.id)}
+          considering={considerEventIds.has(selectedEvent.id)}
+          onAction={handleQuickAction}
           onClose={closeDetail}
         />
+      )}
+      {selectedPlace && !selectedEvent && (
+        <PlacePreviewCard place={selectedPlace} onClose={closeDetail} />
       )}
 
       {/* ── Quick-panel settings modal (glass, centered) ────────────── */}

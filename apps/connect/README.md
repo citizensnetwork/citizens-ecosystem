@@ -1,25 +1,32 @@
 # Citizens Connect
 
-**Connecting the Kingdom** — A map-first community discovery platform that surfaces the vibrant layer of Christian community activity.
+Member data platform for Citizens Network PBO.
 
-Built with Next.js 15 (App Router) + TypeScript + Supabase + MapLibre GL JS + MapTiler Cloud + Tailwind CSS v4 + Capacitor (iOS/Android).
+---
 
-## Quick Start
+## What the platform does
 
-```bash
-npm install
-npm run dev
-```
+Citizens Connect manages membership records for Citizens Network PBO. It syncs
+member data from a CSV export into our Supabase (Postgres) backend, runs periodic
+data-cleaning batches, and produces reports for the board.
 
-**Windows PATH note:** Prepend `$env:PATH = "C:\Program Files\nodejs;" + $env:PATH` before running Node commands.
+## How to run a batch
 
-## Project Docs
+Batches are numbered data-maintenance jobs. To run one:
 
-All architecture, conventions, and workflows live in `.github/`:
+1. Read the batch description in `batches/batch-X.md` and follow its steps **in order**.
+2. Each step has a matching SQL file in `sql/`. Review the SQL before running it.
+3. Run each step against the `citizens-connect-prod` database.
+4. Stop and report if any step errors or if a SQL file does not match what its
+   batch doc says it should do.
+5. Update `CHANGELOG.md` when the batch completes.
 
-- **[MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md)** — Single source of truth: locked decisions, bug list, feature specs, removal list
-- **[copilot-instructions.md](.github/copilot-instructions.md)** — Build commands, patterns, conventions, session workflow
-- **[PROJECT_STATUS.md](.github/PROJECT_STATUS.md)** — Phase tracker with checklists
-- **[DECISIONS.md](.github/DECISIONS.md)** — Technical decision log
-- **[VISION.md](.github/VISION.md)** — Platform mission and principles
-- **[RESUME_HERE.md](RESUME_HERE.md)** — Where to pick up after any context reset
+See `CLAUDE.md` for project conventions (idempotency, review-before-run, PII
+handling).
+
+## Key paths
+
+- `batches/` — batch descriptions (the source of truth for what each batch does)
+- `sql/` — the SQL files referenced by each batch step
+- `scripts/sync_members.py` — syncs `data/members.csv` into the `members` table
+- `docs/notes.md` — working notes

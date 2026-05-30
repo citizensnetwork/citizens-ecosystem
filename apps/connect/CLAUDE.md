@@ -2,6 +2,8 @@
 
 These instructions are MANDATORY and apply to every session in this repository.
 
+0. **Read [`VISION.md`](./VISION.md) FIRST — before anything else, every run.** It is our north star and conscience ("Connecting the Kingdom"). Run its alignment self-prompt against whatever we are about to do, and re-read/re-check it before shipping. If a task can't be tied to the vision, pause and ask.
+
 1. **Always start by checking the resume_here md** for the latest project information, updates, details and context.
 
 2. **Compact often** through every stage so we do not hallucinate. Do not run for more than 10mins without compacting.

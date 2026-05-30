@@ -87,6 +87,9 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
 ) {
   const [uncontrolledTab, setUncontrolledTab] = useState<BurgerTab>("events");
   const activeTab = controlledTab ?? uncontrolledTab;
+  // Category selection now lives in the external glass Filters panel, so the
+  // in-burger Categories sections are gated off. Flip to `true` to restore.
+  const [showCategorySections] = useState(false);
   const setActiveTab = (tab: BurgerTab) => {
     if (controlledTab === undefined) setUncontrolledTab(tab);
     onTabChange?.(tab);
@@ -161,8 +164,8 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
         </div>
 
         <div className="flex-1 overflow-y-auto px-4">
-          {/* Categories section — different per tab */}
-          {activeTab === "events" ? (
+          {/* Categories section — moved to the glass Filters panel; gated off here. */}
+          {showCategorySections && (activeTab === "events" ? (
           <>
             <AccordionSection
               title="Categories"
@@ -295,7 +298,7 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 })}
               </div>
             </AccordionSection>
-          )}
+          ))}
 
           {/* Shared sections: Favourites + Considerations — always visible in both tabs */}
 

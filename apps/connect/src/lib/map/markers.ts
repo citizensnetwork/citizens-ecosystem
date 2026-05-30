@@ -73,7 +73,10 @@ export function createCategoryMarkerEl(
 ): HTMLDivElement {
   const cat = category ?? "church-services";
   const icon = getCategoryIcon(cat);
-  const borderColor = overrideColor ?? CATEGORY_HEX[cat] ?? "#D4AF37";
+  // Events read as GOLD (places are black) so type is instant; the category is
+  // still conveyed by the glyph and the category-tinted pulse (--cc-pulse-color).
+  const borderColor = overrideColor ?? "#D4AF37";
+  const pulseColor = CATEGORY_HEX[cat] ?? "#D4AF37";
   const size = Math.round(BASE_SIZE * temporal.scale);
   const iconSize = Math.round(size * 0.48);
 
@@ -84,6 +87,7 @@ export function createCategoryMarkerEl(
 
   el.innerHTML = `<span class="cc-marker-outer" style="
     --cc-marker-color:${borderColor};
+    --cc-pulse-color:${pulseColor};
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
     background:#fff;
@@ -288,11 +292,11 @@ export function createPlaceMarkerEl(
   // Solid gold category glyph — white stroke provides the outline against the map
   const icon = getPlaceCategoryIcon(category as PlaceCategory | null);
 
-  // Dot-mode colour: use highlighted colour, place-category hex, or gold fallback.
-  const dotColor =
-    options?.highlightColor ??
-    (category ? PLACE_CATEGORY_HEX[category as PlaceCategory] : undefined) ??
-    "#D4AF37";
+  // Places read as BLACK (events are gold). Category still drives the pulse
+  // tint and the icon colour when a place-category filter highlights it.
+  const pulseColor =
+    (category ? PLACE_CATEGORY_HEX[category as PlaceCategory] : undefined) ?? "#D4AF37";
+  const dotColor = options?.highlightColor ?? "#111";
 
   const el = document.createElement("div");
   el.className = "cc-marker cc-place-marker";
@@ -301,6 +305,7 @@ export function createPlaceMarkerEl(
 
   el.innerHTML = `<span class="cc-marker-outer" style="
     --cc-marker-color:${dotColor};
+    --cc-pulse-color:${pulseColor};
     position:relative;
     width:${size}px;height:${size}px;
     display:flex;align-items:center;justify-content:center;
@@ -311,7 +316,7 @@ export function createPlaceMarkerEl(
     width:${iconSize}px;height:${iconSize}px;
     display:flex;align-items:center;justify-content:center;
     line-height:0;
-    color:#D4AF37;
+    color:${escapeHtml(dotColor)};
     stroke:#ffffff;
     stroke-width:1.2px;
     paint-order:stroke fill;

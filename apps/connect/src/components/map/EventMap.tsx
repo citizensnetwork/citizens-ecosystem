@@ -39,6 +39,9 @@ type Props = {
   places?: Place[];
   onSelectPlace?: (place: Place) => void;
   onQuickAction?: (action: "view" | "join" | "share" | "consider" | "visit", event: Event) => void;
+  /** When provided, clicking an event marker opens the inline glass
+   *  EventPreviewCard via this callback instead of the legacy MapLibre popup. */
+  onSelectEvent?: (event: Event) => void;
   /** Events the current user has an 'attending' RSVP on.  Used by the
    *  map marker popup to swap the Join button to a gold "Joined" state
    *  with a tick so the popup reflects existing attendance. */
@@ -173,6 +176,7 @@ export default function EventMap({
   places = [],
   onSelectPlace,
   onQuickAction,
+  onSelectEvent,
   center = DEFAULT_CENTER,
   zoom = 12,
   autoLocate = false,
@@ -206,6 +210,8 @@ export default function EventMap({
   onSelectPlaceRef.current = onSelectPlace;
   const onQuickActionRef = useRef(onQuickAction);
   onQuickActionRef.current = onQuickAction;
+  const onSelectEventRef = useRef(onSelectEvent);
+  onSelectEventRef.current = onSelectEvent;
   const activeCategoriesRef = useRef(activeCategories);
   activeCategoriesRef.current = activeCategories;
   const activePlaceCategoriesRef = useRef(activePlaceCategories);
@@ -1502,8 +1508,15 @@ export default function EventMap({
         // in the map-init effect.
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
-          .setPopup(popup)
           .addTo(map);
+        if (onSelectEventRef.current) {
+          // Figma flow: clicking the marker opens the inline glass
+          // EventPreviewCard instead of the legacy MapLibre popup.
+          el.style.cursor = "pointer";
+          el.addEventListener("click", () => onSelectEventRef.current?.(event));
+        } else {
+          marker.setPopup(popup);
+        }
         markersRef.current.push(marker);
         evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id });
         bounds.extend(lngLat);

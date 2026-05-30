@@ -16,7 +16,73 @@
 
 ---
 
-## 2. What just shipped — Optional hardening: `log_search_term` lockdown + real XLSX exports
+## 2. What just shipped — Figma glassmorphism map UX migration (Batches A–C)
+
+**Reskinned the main map (`/events`, `EventsView.tsx`) into the Figma "Glassmorphism
+Community Map" design, wired to real Supabase data, over 3 batches.** Kept the existing
+MapLibre map underneath. Build verified by the founder locally (`tsc 0`, lint clean,
+`next build` clean). ⚠️ NOT verifiable inside the Cowork sandbox — see "git" note below.
+
+### New glass component layer — `src/components/map/glass/`
+- `GlassMapHeader.tsx` — frosted brand header (hex logo + "Citizens Connect / Connecting
+  the Kingdom"), integrated search wired to the live `search` filter, Filters/Layers pills.
+- `MapFiltersPanel.tsx` — "Filter the Map" glass panel: real `CATEGORY_LABELS` multi-select
+  (→ `toggleCategory`) + Weekends-only toggle.
+- `MapLayersPanel.tsx` + `mapLayers.ts` — Impact Glow / Activity Pulse / Connections toggles;
+  drive marker visuals via `data-layer-*` on the map wrapper (CSS only, no EventMap rewrite).
+- `MapStatsFooter.tsx` — bottom pill: Organizations (contributors) / Members (live `profiles`
+  count) / Active Projects (events).
+- `PlacePreviewCard.tsx` + `EventPreviewCard.tsx` — Figma glass side panels. Event card has the
+  5 actions (View/Join/Share/Consider/Visit) wired to `handleQuickAction`.
+- `GlassSearchResults.tsx` — glass dropdown under the header search (events/places/orgs), fed by
+  the existing AI ranking (`filtered`, `filteredPlaces`, `topContributorMatches`).
+
+### Batch A (safe fixes)
+- Quick-select now shows BOTH events + places (panel + map); `placesMode` no longer hides events
+  when a quick tool is active.
+- Pill relocated above the stats bar, leads with "For me in this area".
+- Burger-menu category sections gated off (`showCategorySections=false`) — category filtering now
+  lives only in the glass Filters panel.
+
+### Batch B (event panel + inline previews)
+- Marker clicks now open the inline glass panels (new `onSelectEvent` prop on `EventMap`; place
+  clicks set `selectedPlace` instead of `router.push`) → **removed the redirect-flash** from the
+  intercepted `@panel` route. Legacy MapLibre event popup is bypassed when `onSelectEvent` is set.
+- `EventPreviewPanel` import removed from `EventsView` (events → `EventPreviewCard`).
+
+### Batch C (markers + navigation + load screen)
+- **Navigation/"stuck map" fix** — `SidePanel.tsx` hardened the `inert` logic so a leaked `inert`
+  can never freeze the map (root cause of "icons don't appear / events won't open / feels stuck").
+  Tags frozen nodes `data-cc-inert-by-panel` + sweeps strays on next open.
+- **Markers recoloured** — `lib/map/markers.ts`: events GOLD-ringed, places BLACK; each marker sets
+  `--cc-pulse-color` = category hex; `globals.css` Glow/Pulse layers tint via `color-mix` (gold
+  fallback, degrades safely).
+- **Load screen identified** — it's the intentional `LandingPage` (`/`) `LandingBackdrop` shown for
+  ~300ms during the hand-off to `/events`. Not an error.
+
+### VISION
+- `VISION.md` (root) created — north star + the Alignment Self-Prompt; wired into `CLAUDE.md` as
+  mandatory step 0 (read every run). Founder has since expanded it (scripture, ecosystem, culture).
+
+### Deferred → next session (queued)
+- **Clustering/bubble removal** (numbering/grouping/spreading/tier-hiding) — ~150 refs in
+  `EventMap.tsx` + `lib/map/clustering.ts`. Needs its own build-verified pass (zoom-reveal +
+  density best-practice). NOT done blind to protect the working build.
+- Delete now-dormant legacy popup code + the viewport-scope "Search this area" subsystem.
+- Gold-theme custom event markers (profile/logo/icon variants in `createCustomMarkerEl`).
+- Build the other surfaces from Figma — ready-to-paste prompt at `docs/FIGMA_SURFACES_PROMPT.md`
+  (org dashboard, contributor profile, event/place detail, citizen dashboard, messages, auth).
+- Working log for this whole effort: `.claude/sessions/figma-map-ux-migration.md` (gitignored).
+
+### ⚠️ git note (important)
+The Cowork Linux sandbox served **truncated** copies of the large files (`EventMap.tsx` read as
+~1752 lines vs real ~2020) and reported a whole-repo CRLF diff (~662 files). **Do not commit from
+the sandbox** — commit/push from the founder's machine where files are intact and the build passes.
+Commit message + commands were provided in chat.
+
+---
+
+## 2-prev. Previously shipped — Optional hardening: `log_search_term` lockdown + real XLSX exports
 
 **Picked up the two non-blocking hardening items from the old §4 backlog** (search-term
 poisoning vector + CSV-with-xlsx-MIME fallback). `tsc 0`, lint clean, **790/790 tests**
