@@ -130,13 +130,13 @@ export default function LandingPage({
     if (!user) return;
     router.prefetch("/events");
     setDismissed(true);
-    setTimeout(() => router.push("/events"), 300);
+    setTimeout(() => router.push("/events"), 150);
   }, [user, router]);
 
   const handleBrowse = useCallback(() => {
     router.prefetch("/events");
     setDismissed(true);
-    setTimeout(() => router.push("/events"), 300);
+    setTimeout(() => router.push("/events"), 150);
   }, [router]);
 
   async function handleGoogleAuth() {

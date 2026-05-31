@@ -53,9 +53,9 @@ export function getTemporalStyle(
 /* ── MapLibre marker element builders ────────────────────── */
 
 // Event marker base diameter in CSS pixels.  Reduced from 40→32 (−20%)
-// on 2026-04-23 to lower visual dominance on the map and make room for the
-// progressive geo-clustering bubbles that now replace individual markers
-// at lower zoom levels.
+// on 2026-04-23 to lower visual dominance on the map.  Markers reveal
+// progressively on zoom-in (dot → mid → full) rather than being grouped
+// into counted bubbles.
 const BASE_SIZE = 32;
 
 export function getCategoryIcon(category: EventCategory | null): string {
@@ -126,8 +126,12 @@ export function createCustomMarkerEl(
 ): HTMLDivElement {
   const { markerType, category, temporal, markerImageUrl, creatorAvatarUrl } = options;
   const size = Math.round(BASE_SIZE * temporal.scale);
-  const dotColor =
-    options.overrideColor ?? CATEGORY_HEX[category ?? "church-services"] ?? "#D4AF37";
+  // Events read as GOLD across every marker variant (matches
+  // createCategoryMarkerEl) so type is instant on the map; the category is
+  // carried by the category-tinted pulse (--cc-pulse-color), not the ring.
+  // A quick-tool override colour still wins for the ring + dot when set.
+  const ringColor = options.overrideColor ?? "#D4AF37";
+  const categoryPulse = CATEGORY_HEX[category ?? "church-services"] ?? "#D4AF37";
 
   // Profile photo marker
   if (markerType === "profile" && creatorAvatarUrl) {
@@ -137,12 +141,13 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
-      --cc-marker-color:${dotColor};
+      --cc-marker-color:${ringColor};
+      --cc-pulse-color:${categoryPulse};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
       border-radius:50%;
-      border:2px solid #fff;
+      border:2px solid ${ringColor};
       box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
       overflow:hidden;
@@ -159,12 +164,13 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
-      --cc-marker-color:${dotColor};
+      --cc-marker-color:${ringColor};
+      --cc-pulse-color:${categoryPulse};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       opacity:${temporal.opacity};
       border-radius:50%;
-      border:2px solid #fff;
+      border:2px solid ${ringColor};
       box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
       overflow:hidden;
@@ -185,13 +191,14 @@ export function createCustomMarkerEl(
     el.style.height = `${size}px`;
 
     el.innerHTML = `<span class="cc-marker-outer" style="
-      --cc-marker-color:${escapeHtml(fillColor)};
+      --cc-marker-color:${ringColor};
+      --cc-pulse-color:${escapeHtml(fillColor)};
       width:${size}px;height:${size}px;
       display:flex;align-items:center;justify-content:center;
       background:#fff;
       opacity:${temporal.opacity};
       border-radius:50%;
-      border:2px solid ${escapeHtml(fillColor)};
+      border:2px solid ${ringColor};
       box-shadow:0 2px 6px rgba(0,0,0,.25);
       cursor:pointer;
     "><span class="cc-marker-icon" style="
@@ -210,8 +217,7 @@ export function createCustomMarkerEl(
 /** Place marker sizing — exported so EventMap can use the same values for
  * zoom-scaling the inner icon proportionally to the outer circle. */
 // Reduced from 40→32 / 54→44 / 24→20 / 32→26 (−20%) on 2026-04-23 so place
-// markers stay visually balanced against the now-smaller event markers and
-// the new progressive geo-clustering bubbles.
+// markers stay visually balanced against the now-smaller event markers.
 export const PLACE_MARKER_SIZE = 32;
 export const PLACE_MARKER_SIZE_HIGHLIGHTED = 44;
 export const PLACE_ICON_SIZE = 20;
@@ -323,149 +329,6 @@ export function createPlaceMarkerEl(
   ">${icon}</span>${ratingBadge}${warningBadge}</span>`;
 
   return el;
-}
-
-/** Cluster badge element */
-export function createClusterEl(count: number): HTMLDivElement {
-  const el = document.createElement("div");
-  el.className = "cc-cluster";
-
-  const size = count < 10 ? 36 : count < 100 ? 42 : 48;
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
-
-  el.innerHTML = `<div style="
-    width:${size}px;height:${size}px;
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(17,17,17,0.15);
-    border-radius:50%;
-  "><div style="
-    width:${size - 8}px;height:${size - 8}px;
-    display:flex;align-items:center;justify-content:center;
-    background:#111;
-    border-radius:50%;
-    border:2px solid #D4AF37;
-    color:#D4AF37;
-    font-weight:600;
-    font-size:13px;
-    line-height:1;
-    cursor:pointer;
-  ">${count}</div></div>`;
-
-  return el;
-}
-
-/**
- * Progressive geo-clustering bubble — white fill, 2px gold border, count
- * centred in gold/black.  Used by the map's zoom-driven aggregation layer
- * (see `lib/map/clustering.ts`) to render capital/town/suburb tiers.
- *
- * Opacity is set by the caller on the returned element's style so that
- * the crossfade between tiers at overlapping zoom levels stays smooth.
- *
- * Accessibility: rendered as `role="button"` with a readable `aria-label`
- * and `tabindex="0"` so keyboard users can drill through tiers via the
- * same press-to-split behaviour attached by callers.
- */
-export function createGeoClusterBubbleEl(
-  count: number,
-  size: number,
-): HTMLDivElement {
-  const el = document.createElement("div");
-  el.className = "cc-geo-cluster";
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
-  el.style.cursor = "pointer";
-  el.style.willChange = "opacity, transform";
-  el.style.transition = "opacity 160ms linear";
-  el.setAttribute("role", "button");
-  el.setAttribute("tabindex", "0");
-  el.setAttribute("aria-expanded", "false");
-  el.dataset.ccBubbleCount = String(count);
-  el.setAttribute(
-    "aria-label",
-    `${count} items in this area. Activate to split into smaller groups.`,
-  );
-  // Safe because `count` and `size` are typed numbers (not user-controlled
-  // strings) — template has no injection surface.
-  el.innerHTML = `<div data-cc-bubble-body style="
-    width:${size}px;height:${size}px;
-    display:flex;align-items:center;justify-content:center;
-    background:#ffffff;
-    border:2px solid #D4AF37;
-    border-radius:50%;
-    color:#111111;
-    font-weight:700;
-    font-size:${Math.max(11, Math.round(size * 0.34))}px;
-    line-height:1;
-    box-shadow:0 2px 6px rgba(0,0,0,.22);
-  ">${count}</div>`;
-  return el;
-}
-
-/**
- * Toggle the visual "expanded" state of a parent bubble — when a user
- * clicks a bubble it splits into children, and the parent itself is
- * dimmed/hidden so the children read clearly above the rest of the map.
- *
- * `expanded === true`  → fade parent out, disable pointer events on it.
- * `expanded === false` → restore parent to normal opacity (recouple).
- *
- * The opacity here is multiplied with the tier crossfade applied by
- * EventMap; the easing transition is already set on element creation.
- */
-export function setBubbleExpanded(
-  el: HTMLElement,
-  expanded: boolean,
-): void {
-  el.setAttribute("aria-expanded", expanded ? "true" : "false");
-  const count = el.dataset.ccBubbleCount ?? "";
-  if (expanded) {
-    el.setAttribute(
-      "aria-label",
-      `${count} items expanded — press Escape or click the map to collapse.`,
-    );
-    el.style.opacity = "0";
-    el.style.pointerEvents = "none";
-    el.style.visibility = "hidden";
-  } else {
-    el.setAttribute(
-      "aria-label",
-      `${count} items in this area. Activate to split into smaller groups.`,
-    );
-    // Defer to the next tier-opacity pass to restore the correct value.
-    el.style.opacity = "";
-    el.style.visibility = "";
-    el.style.pointerEvents = "";
-  }
-}
-
-/**
- * Update a bubble's inner text + size in place without recreating the
- * outer element.  Keeps any attached listeners / MapLibre marker binding
- * intact when the underlying count changes between re-renders.
- */
-export function updateGeoClusterBubbleEl(
-  el: HTMLDivElement,
-  count: number,
-  size: number,
-): void {
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
-  el.dataset.ccBubbleCount = String(count);
-  const isExpanded = el.getAttribute("aria-expanded") === "true";
-  el.setAttribute(
-    "aria-label",
-    isExpanded
-      ? `${count} items expanded — press Escape or click the map to collapse.`
-      : `${count} items in this area. Activate to split into smaller groups.`,
-  );
-  const body = el.querySelector<HTMLDivElement>("[data-cc-bubble-body]");
-  if (!body) return;
-  body.style.width = `${size}px`;
-  body.style.height = `${size}px`;
-  body.style.fontSize = `${Math.max(11, Math.round(size * 0.34))}px`;
-  body.textContent = String(count);
 }
 
 /* ── HTML escaping for popup content ─────────────────────── */

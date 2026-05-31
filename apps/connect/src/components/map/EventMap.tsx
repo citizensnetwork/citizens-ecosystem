@@ -8,31 +8,13 @@ import {
   createCategoryMarkerEl,
   createCustomMarkerEl,
   createPlaceMarkerEl,
-  createGeoClusterBubbleEl,
-  updateGeoClusterBubbleEl,
-  setBubbleExpanded,
   getTemporalStyle,
-  escapeHtml,
   PLACE_MARKER_SIZE,
   PLACE_ICON_RATIO,
 } from "@/lib/map/markers";
 import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
-import { isCommunityEvent, isCancelledEvent } from "@/lib/events/capabilities";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
-import {
-  bucketPoints,
-  tierOpacityAt,
-  markerOpacityAt,
-  bubbleSizeForCount,
-  visibleTiersAt,
-  childTierOf,
-  pointsInBubble,
-  bucketKeyOf,
-  MARKER_FADE_IN_END,
-  type ClusterBubble,
-  type ClusterPoint,
-} from "@/lib/map/clustering";
 
 type Props = {
   events: Event[];
@@ -89,12 +71,9 @@ type Props = {
 /* ── Persist map viewpoint across navigations ── */
 const MAP_VIEW_KEY = "cc-map-viewpoint";
 
-/** Minimum zoom level at which place markers become freely visible.
- *  Aligned with `MARKER_FADE_IN_END` (12) so events and places light up
- *  together at the bubble→marker handover.  Below this zoom places (and
- *  events) stay hidden behind the totalling bubble layers and only
- *  appear when the user "decouples" a suburb cluster (lifted-marker
- *  path in `updateGeoClusterOpacity` / `updatePlaceVisibility`). */
+/** Minimum zoom level at which place markers reveal on zoom-in.  Below
+ *  this zoom places stay hidden (events remain visible as density dots);
+ *  the Locations tab and place-category filters override the gate. */
 const PLACE_ZOOM_MIN = 12;
 
 /** Below this zoom, run marker deconfliction with leader lines. */
@@ -105,22 +84,6 @@ const MIN_GAP_PX = 0;
 
 /** Number of force-simulation iterations for deconfliction. */
 const DECONFLICT_ITERATIONS = 4;
-
-/**
- * Tier ordering for zoom-band collapse decisions. Lower rank = more
- * outward (capital is the broadest tier; marker is the most zoomed-in
- * presentation). Used by the `zoomend` handler to decide whether a
- * band crossing is a zoom-OUT (rank decreased) and therefore should
- * collapse open expansions, or a zoom-IN (rank increased) which keeps
- * them. Hoisted to module scope so the handler doesn't reallocate the
- * record on every zoom event.
- */
-const BAND_RANK = {
-  capital: 0,
-  town: 1,
-  suburb: 2,
-  marker: 3,
-} as const;
 
 /** Returns a scale factor [0.55 – 1.0] based on current zoom.
  *  Markers stay at their default size across normal viewing zooms and only
@@ -150,7 +113,8 @@ const DOT_MODE_SIZE = 10;
  * falloff. It was removed because the edge-pinned markers dimmed icons
  * when zoomed out, drifted to unhelpful positions during panning, and
  * only reconciled on drag-release. Markers now always render at their
- * real coordinates — clustering handles density at low zoom.
+ * real coordinates — dot-mode sizing + deconfliction handle density at
+ * low zoom (no counted clustering bubbles).
  */
 
 /** Returns true when the user has opted into reduced motion. Used to bypass
@@ -260,566 +224,6 @@ export default function EventMap({
     if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
   }, []);
 
-  /* ── Progressive geo-clustering (see lib/map/clustering.ts) ──
-   * Per-tier bubble markers keyed by `tier:gridX:gridY` so re-renders
-   * reuse MapLibre marker elements instead of remounting every frame.
-   * Populated by `rebuildGeoClusters`, opacity adjusted by `updateGeoClusterOpacity`. */
-  const geoClusterMarkersRef = useRef<
-    Map<string, { marker: maplibregl.Marker; el: HTMLDivElement; bubble: ClusterBubble }>
-  >(new Map());
-
-  const clearGeoClusters = useCallback(() => {
-    geoClusterMarkersRef.current.forEach(({ marker }) => marker.remove());
-    geoClusterMarkersRef.current.clear();
-  }, []);
-
-  /* ── Bubble click-to-split / recouple state ──
-   * When a user clicks a bubble it splits into the child tier (or into
-   * individual events/places at the suburb tier).  The parent bubble is
-   * hidden while expanded, and child markers are spawned with a fly-out
-   * animation that originates from the parent's screen position.
-   *
-   * Expand rules (April 2026 spec):
-   *   - ALL tiers multi-expand. Opening another bubble at any tier
-   *     never auto-collapses an already-open one. A staged outside
-   *     map-click (see `collapseInnermostTier`) or a zoom-OUT across
-   *     a tier band boundary are the only triggers that recouple.
-   *
-   * For non-suburb expansions `childMarkers` holds the spawned bubble
-   * markers.  For suburb expansions `childMarkers` is empty — the visual
-   * is provided by lifting the existing event/place markers (forcing
-   * their opacity + visibility on regardless of zoom-fade).
-   */
-  type ExpansionState = {
-    parent: ClusterBubble;
-    childMarkers: { marker: maplibregl.Marker; el: HTMLDivElement }[];
-  };
-  const expansionsRef = useRef<Map<string, ExpansionState>>(new Map());
-
-  /** Memoised set of suburb bucket-keys that are currently expanded.
-   *  Reset every time the expansion map is mutated by `expandBubble` /
-   *  `collapseExpansion` / `collapseAllExpansions` (see
-   *  `liftedSuburbKeysRef.current = null` calls).  The opacity /
-   *  visibility passes call `liftedSuburbKeys()` which lazily builds
-   *  the set once per change and reuses it across all marker iterations
-   *  in that pass — turns the per-marker per-frame cost from
-   *  O(open-suburbs) into O(1). */
-  const liftedSuburbKeysRef = useRef<Set<string> | null>(null);
-  const liftedSuburbKeys = (): Set<string> => {
-    if (liftedSuburbKeysRef.current) return liftedSuburbKeysRef.current;
-    const out = new Set<string>();
-    for (const { parent } of expansionsRef.current.values()) {
-      if (parent.tier === "suburb") out.add(parent.key);
-    }
-    liftedSuburbKeysRef.current = out;
-    return out;
-  };
-
-  /** True when (lat, lng) falls inside any currently-expanded suburb's
-   *  grid cell — used by the opacity / visibility passes to keep the
-   *  lifted event/place markers visible. */
-  const isPointLiftedBySuburb = useCallback(
-    (lat: number, lng: number): boolean => {
-      const keys = liftedSuburbKeys();
-      if (keys.size === 0) return false;
-      // Only one suburb-grid lookup per call — bucketKeyOf is two
-      // Math.floors on the same constant grid size for every check.
-      return keys.has(bucketKeyOf("suburb", lat, lng));
-    },
-    [],
-  );
-
-  /**
-   * Fade-fn helper — composes the individual marker's zoom-based opacity
-   * crossfade (`markerOpacityAt`) with the temporal styling already
-   * baked in at marker creation (`temporal.opacity`), which we stash on
-   * `data-temporal-opacity` so we can recover it without recomputing.
-   * Without this multiply, past-event dimming is lost during tier handover.
-   */
-  const applyComposedOpacity = (el: HTMLElement, markerOp: number) => {
-    const raw = el.dataset.temporalOpacity;
-    const temporal = raw ? parseFloat(raw) : 1;
-    const t = Number.isFinite(temporal) ? temporal : 1;
-    // When both are at their natural max, clear the override so any other
-    // code paths (future highlights, etc.) can keep acting on opacity.
-    if (markerOp >= 1 && t >= 1) {
-      el.style.opacity = "";
-    } else {
-      el.style.opacity = String(t * markerOp);
-    }
-  };
-
-  /**
-   * Apply zoom-driven opacity to bubble markers + individual event/place
-   * markers.  Called on every zoom change so tiers crossfade smoothly.
-   * Honours the active expansion state: parent bubbles that are currently
-   * "split open" stay hidden, and the markers lifted under expanded
-   * suburbs stay fully visible regardless of the zoom-fade.
-   * Pure presentation — does not add/remove markers.
-   */
-  const updateGeoClusterOpacity = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const z = map.getZoom();
-
-    geoClusterMarkersRef.current.forEach(({ el, bubble }) => {
-      // An expanded parent stays hidden until the user recouples — we
-      // don't want it pulsing back through the tier-fade ramp.
-      if (expansionsRef.current.has(bubble.key)) {
-        el.style.opacity = "0";
-        el.style.pointerEvents = "none";
-        el.style.visibility = "hidden";
-        return;
-      }
-      const o = tierOpacityAt(bubble.tier, z);
-      el.style.opacity = String(o);
-      // Hide entirely when fully invisible so pointer events don't block
-      // the individual markers that have taken over.
-      el.style.pointerEvents = o > 0.02 ? "auto" : "none";
-      el.style.visibility = o > 0.01 ? "visible" : "hidden";
-    });
-
-    // When filters / placesMode are active, clustering is off and the user
-    // should see their filtered markers at every zoom.  Skip the fade.
-    const filtersActive =
-      placesModeRef.current ||
-      (activeCategoriesRef.current && activeCategoriesRef.current.size > 0) ||
-      (activePlaceCategoriesRef.current &&
-        activePlaceCategoriesRef.current.size > 0);
-    if (filtersActive) {
-      markersRef.current.forEach((m) => {
-        const el = m.getElement() as HTMLElement;
-        applyComposedOpacity(el, 1);
-      });
-      placeMarkersRef.current.forEach((m) => {
-        const el = m.getElement() as HTMLElement;
-        applyComposedOpacity(el, 1);
-      });
-      return;
-    }
-
-    // Fade individual markers in as bubbles fade out.  Composed with the
-    // temporal opacity so past/live dimming still reads during handover.
-    // Markers lifted by an expanded suburb skip the fade and force-show.
-    //
-    // NOTE on visibility: below zoom 12 `markerOp === 0`, which clears
-    // opacity but leaves the DOM element hit-testable and prone to
-    // clutter the view behind the totalling bubbles.  We explicitly
-    // flip `visibility` so events + places are truly hidden at city
-    // zooms — only lifted (suburb-expansion) or filter-active markers
-    // bypass the gate.
-    const markerOp = markerOpacityAt(z);
-    const hideBelowMarkerZoom = markerOp === 0;
-    evtMarkerDataRef.current.forEach(({ marker, lngLat }) => {
-      const el = marker.getElement() as HTMLElement;
-      const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
-      if (lifted) {
-        el.style.visibility = "";
-        el.style.opacity = "1";
-        el.style.zIndex = "20";
-      } else if (hideBelowMarkerZoom) {
-        el.style.visibility = "hidden";
-        el.style.zIndex = "";
-      } else {
-        el.style.visibility = "";
-        el.style.zIndex = "";
-        applyComposedOpacity(el, markerOp);
-      }
-    });
-    placeMarkerDataRef.current.forEach(({ marker, lngLat }) => {
-      const el = marker.getElement() as HTMLElement;
-      const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
-      if (lifted) {
-        el.style.visibility = "";
-        el.style.opacity = "1";
-        el.style.zIndex = "20";
-      } else if (hideBelowMarkerZoom) {
-        // `updatePlaceVisibility` owns the authoritative visibility for
-        // places (it factors in placesMode + category filters + the
-        // PLACE_ZOOM_MIN threshold).  Defer to it rather than stomping
-        // visibility here.
-        el.style.zIndex = "";
-        applyComposedOpacity(el, 0);
-      } else {
-        el.style.zIndex = "";
-        applyComposedOpacity(el, markerOp);
-      }
-    });
-  }, [isPointLiftedBySuburb]);
-
-  /* ── Bubble split / recouple internals ────────────────── */
-
-  /**
-   * Animate a freshly-spawned child element to fly out from `originPx`
-   * (the parent bubble's screen position) to its own real position.
-   *
-   * Uses inner-div transform so MapLibre's translate on the marker root
-   * stays untouched — same trick used by `cc-marker-new` for the existing
-   * drop-in animation.  Skipped when the user prefers reduced motion.
-   */
-  const animateChildSpawn = (
-    childEl: HTMLElement,
-    originPx: { x: number; y: number },
-    targetPx: { x: number; y: number },
-  ) => {
-    if (prefersReducedMotion()) return;
-    const dx = originPx.x - targetPx.x;
-    const dy = originPx.y - targetPx.y;
-    // Animate the OUTER bubble element — a single transform-able layer
-    // that doesn't fight MapLibre (the bubble has no `.cc-marker-outer`
-    // child, so target the root directly).  We pre-set the start
-    // transform off-frame via `style.transform` then transition into
-    // place on the next animation frame.
-    const body = childEl.querySelector<HTMLElement>(
-      "[data-cc-bubble-body]",
-    );
-    const target = body ?? childEl;
-    target.style.transition = "none";
-    target.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(0.4)`;
-    target.style.opacity = "0";
-    requestAnimationFrame(() => {
-      target.style.transition =
-        "transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 220ms ease";
-      target.style.transform = "translate(0px, 0px) scale(1)";
-      target.style.opacity = "1";
-    });
-  };
-
-  /** Returns the union of every event + place point currently on the
-   *  map as `ClusterPoint`s — used both by clustering and by point
-   *  filtering during expansion. */
-  const collectAllPoints = useCallback((): ClusterPoint[] => {
-    const out: ClusterPoint[] = [];
-    for (const e of events) {
-      if (e.latitude == null || e.longitude == null) continue;
-      out.push({ id: e.id, lat: e.latitude, lng: e.longitude });
-    }
-    for (const p of places) {
-      out.push({ id: `place:${p.id}`, lat: p.latitude, lng: p.longitude });
-    }
-    return out;
-  }, [events, places]);
-
-  /** Look up a bubble element by its `ClusterBubble.key` across both the
-   *  top-level `geoClusterMarkersRef` (built by `rebuildGeoClusters`) and
-   *  any open expansion's `childMarkers` (spawned by `expandBubble`).
-   *
-   *  Why both? When the user clicks a child bubble (e.g. a town's
-   *  spawned suburb child) to expand it further, that child only lives
-   *  in its parent's `expansionsRef` state — it is NOT a key in
-   *  `geoClusterMarkersRef`. Without this lookup, `setBubbleExpanded`
-   *  could never hide it and the parent number stayed plastered over
-   *  the lifted markers it had just released. */
-  const findBubbleEl = useCallback((key: string): HTMLDivElement | null => {
-    const rec = geoClusterMarkersRef.current.get(key);
-    if (rec) return rec.el;
-    for (const exp of expansionsRef.current.values()) {
-      for (const child of exp.childMarkers) {
-        if (child.el.dataset.ccBubbleKey === key) return child.el;
-      }
-    }
-    return null;
-  }, []);
-
-  /** Tear down a single expansion: remove its child markers, restore the
-   *  parent bubble's natural state.  Safe to call with an unknown key. */
-  const collapseExpansion = useCallback((key: string) => {
-    const exp = expansionsRef.current.get(key);
-    if (!exp) return;
-    for (const { marker, el } of exp.childMarkers) {
-      // Brief fade-out so the recouple feels intentional.
-      if (!prefersReducedMotion()) {
-        const body = el.querySelector<HTMLElement>("[data-cc-bubble-body]");
-        const target = body ?? el;
-        target.style.transition = "transform 180ms ease, opacity 180ms ease";
-        target.style.transform = "scale(0.4)";
-        target.style.opacity = "0";
-        setTimeout(() => marker.remove(), 180);
-      } else {
-        marker.remove();
-      }
-    }
-    expansionsRef.current.delete(key);
-    liftedSuburbKeysRef.current = null;
-    // Restore parent bubble visibility on next opacity pass — works for
-    // both top-level bubbles and bubbles that were spawned as children
-    // of another expansion (see `findBubbleEl`).
-    const parentEl = findBubbleEl(key);
-    if (parentEl) setBubbleExpanded(parentEl, false);
-  }, [findBubbleEl]);
-
-  /** Tear down every expansion (used by outside-click recouple + zoom
-   *  band changes). */
-  const collapseAllExpansions = useCallback(() => {
-    const keys = [...expansionsRef.current.keys()];
-    for (const k of keys) collapseExpansion(k);
-    // Repaint markers/place visibility now that nothing is lifted.
-    updateGeoClusterOpacityRef.current();
-    updatePlaceVisibilityRef.current();
-  }, [collapseExpansion]);
-
-  const collapseAllExpansionsRef = useRef<() => void>(() => {});
-  collapseAllExpansionsRef.current = collapseAllExpansions;
-
-  /**
-   * Staged recouple — collapses only the *innermost* open tier.
-   *
-   * Tier nesting (outer → inner): capital ⟶ town ⟶ suburb ⟶ marker.
-   * Opening a town bubble reveals suburb bubbles; opening a suburb
-   * bubble lifts the underlying event / place markers. So if the user
-   * has expanded a capital (→ towns) and then one of those towns
-   * (→ suburbs) and then one of those suburbs (→ lifted markers), a
-   * single outside map click should collapse the suburb expansion
-   * first (re-show the suburb bubbles), the next click collapses the
-   * town expansion (re-show the town bubble), and so on — reversing
-   * the drill-down one level at a time.
-   *
-   * This replaces the prior "one map click collapses everything"
-   * behaviour that the user found too aggressive (it also killed
-   * suburb expansions when the user just clicked an event marker that
-   * happened to have its MapLibre canvas click bubble up).
-   *
-   * Returns true if any collapse happened.
-   */
-  const collapseInnermostTier = useCallback((): boolean => {
-    const exp = expansionsRef.current;
-    if (exp.size === 0) return false;
-    // Priority: suburb expansions are "innermost" (they lift markers),
-    // then town, then capital. Single pass: track the innermost tier
-    // seen so far + the keys at that tier; if a more-inner tier is
-    // encountered, restart the bucket.
-    const priority: Record<ClusterBubble["tier"], number> = {
-      suburb: 0,
-      town: 1,
-      capital: 2,
-    };
-    let innermostRank = Infinity;
-    const innermostKeys: string[] = [];
-    for (const [k, s] of exp) {
-      const rank = priority[s.parent.tier];
-      if (rank === undefined) continue;
-      if (rank < innermostRank) {
-        innermostRank = rank;
-        innermostKeys.length = 0;
-        innermostKeys.push(k);
-      } else if (rank === innermostRank) {
-        innermostKeys.push(k);
-      }
-    }
-    if (innermostKeys.length === 0) return false;
-    for (const k of innermostKeys) collapseExpansion(k);
-    updateGeoClusterOpacityRef.current();
-    updatePlaceVisibilityRef.current();
-    return true;
-  }, [collapseExpansion]);
-
-  const collapseInnermostTierRef = useRef<() => boolean>(() => false);
-  collapseInnermostTierRef.current = collapseInnermostTier;
-
-  /**
-   * Open a bubble — split it into its child tier (or into individual
-   * events/places at the suburb tier).  Enforces the single-expand /
-   * multi-expand rules from the spec.
-   *
-   * Implementation notes:
-   *  - For non-suburb expansions we spawn fresh `createGeoClusterBubbleEl`
-   *    markers for each child bucket.  Those children are themselves
-   *    clickable, allowing further drill-down.
-   *  - For suburb expansions we DON'T spawn child markers — instead we
-   *    leave the implicit "lifted" state (tracked via expansionsRef) and
-   *    let `updateGeoClusterOpacity` + `updatePlaceVisibility` force the
-   *    underlying event/place markers visible.  This keeps the user's
-   *    real category-coloured icons on screen instead of generic count-1
-   *    bubbles.
-   */
-  const expandBubble = useCallback(
-    (parent: ClusterBubble) => {
-      const map = mapRef.current;
-      if (!map) return;
-      // Already expanded? Toggle off (recouple this one specifically).
-      if (expansionsRef.current.has(parent.key)) {
-        collapseExpansion(parent.key);
-        updateGeoClusterOpacityRef.current();
-        updatePlaceVisibilityRef.current();
-        return;
-      }
-
-      // Multi-expand across every tier (spec change, April 2026):
-      // opening another cluster should NEVER auto-collapse an already
-      // open one. Only an outside map-click or a zoom-out across a
-      // tier boundary triggers recouple, and even then it's staged
-      // one level at a time.
-
-      const childTier = childTierOf(parent.tier);
-      const allPoints = collectAllPoints();
-      const member = pointsInBubble(parent, allPoints);
-
-      const state: ExpansionState = { parent, childMarkers: [] };
-
-      if (childTier !== null) {
-        // Build child bubbles within the parent's grid cell.
-        const childBuckets = bucketPoints(member, childTier);
-        const originPx = map.project([parent.lng, parent.lat]);
-        for (const child of childBuckets) {
-          const size = bubbleSizeForCount(child.count);
-          const el = createGeoClusterBubbleEl(child.count, size);
-          el.classList.add("cc-geo-cluster-child");
-          // Stamp the bucket key so `findBubbleEl` can resolve this
-          // spawned child later — without it, expanding a spawned
-          // sub-bubble (e.g. a town's child suburb) leaves the
-          // bubble plastered on top of its lifted children. */
-          el.dataset.ccBubbleKey = child.key;
-          attachBubbleClickHandlerRef.current(el, child);
-          const marker = new maplibregl.Marker({
-            element: el,
-            anchor: "center",
-          })
-            .setLngLat([child.lng, child.lat])
-            .addTo(map);
-          const targetPx = map.project([child.lng, child.lat]);
-          animateChildSpawn(el, originPx, targetPx);
-          state.childMarkers.push({ marker, el });
-        }
-      }
-      // For suburb (childTier === null) we rely on the lifted-marker
-      // path — registering the expansion is enough.
-
-      expansionsRef.current.set(parent.key, state);
-      liftedSuburbKeysRef.current = null;
-
-      // Hide the parent bubble + repaint dependent layers. The bubble
-      // element may live in `geoClusterMarkersRef` (top-level) OR in
-      // another expansion's `childMarkers` (when this parent is itself
-      // a spawned child). `findBubbleEl` checks both.
-      const parentEl = findBubbleEl(parent.key);
-      if (parentEl) setBubbleExpanded(parentEl, true);
-      updateGeoClusterOpacityRef.current();
-      updatePlaceVisibilityRef.current();
-    },
-    [collapseExpansion, collectAllPoints, findBubbleEl],
-  );
-
-  /**
-   * Attach click + keyboard handlers that split the bubble in place.
-   * Replaces the previous "drill the camera in by 2 zooms" behaviour.
-   */
-  const attachBubbleClickHandler = (
-    el: HTMLElement,
-    b: ClusterBubble,
-  ) => {
-    const onClick = (ev: MouseEvent) => {
-      ev.stopPropagation();
-      expandBubble(b);
-    };
-    el.addEventListener("click", onClick);
-    el.addEventListener("keydown", (ev) => {
-      const e = ev as KeyboardEvent;
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        expandBubble(b);
-      }
-    });
-  };
-  const attachBubbleClickHandlerRef = useRef<
-    (el: HTMLElement, b: ClusterBubble) => void
-  >(() => {});
-  attachBubbleClickHandlerRef.current = attachBubbleClickHandler;
-
-  /**
-   * Rebuild bubble markers from the current event + place set.  Bubbles
-   * are computed for every tier with non-zero opacity at the current
-   * zoom, so we don't waste work on tiers that would be invisible.
-   * Re-uses existing markers by key to avoid DOM churn when the user is
-   * just zooming around with the same data.
-   *
-   * Preserves expansion state across rebuilds: if a parent bubble that
-   * is currently expanded still exists in the new tier set, we leave
-   * its expansion in place; if it has gone out of scope, we collapse it
-   * silently so we don't leak stale child markers.
-   */
-  const rebuildGeoClusters = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    // Skip bubbles when the user has filtered or is in "Places" mode —
-    // clustering is a discovery affordance, not a filter UI.  When off,
-    // `updateGeoClusterOpacity` restores marker opacity (filtersActive branch).
-    if (placesModeRef.current) {
-      collapseAllExpansionsRef.current();
-      clearGeoClusters();
-      updateGeoClusterOpacityRef.current();
-      return;
-    }
-    const activeCats = activeCategoriesRef.current;
-    const activePlaceCats = activePlaceCategoriesRef.current;
-    if ((activeCats && activeCats.size > 0) || (activePlaceCats && activePlaceCats.size > 0)) {
-      collapseAllExpansionsRef.current();
-      clearGeoClusters();
-      updateGeoClusterOpacityRef.current();
-      return;
-    }
-
-    const points = collectAllPoints();
-
-    const z = map.getZoom();
-    const tiers = visibleTiersAt(z);
-    const wantedKeys = new Set<string>();
-    const wantedBubbles: ClusterBubble[] = [];
-    for (const tier of tiers) {
-      const buckets = bucketPoints(points, tier);
-      for (const b of buckets) {
-        // Note: we keep singleton buckets (count === 1) too.  If we
-        // suppressed them, isolated rural events would disappear at
-        // zoom 11 where `markerOpacityAt` has only just started fading
-        // them in.
-        wantedKeys.add(b.key);
-        wantedBubbles.push(b);
-      }
-    }
-
-    // Remove bubbles no longer wanted — but if a bubble is currently
-    // expanded, drop its expansion first so we don't leak children.
-    for (const [key, rec] of geoClusterMarkersRef.current) {
-      if (!wantedKeys.has(key)) {
-        if (expansionsRef.current.has(key)) {
-          collapseExpansion(key);
-        }
-        rec.marker.remove();
-        geoClusterMarkersRef.current.delete(key);
-      }
-    }
-
-    // Add / update bubbles.
-    for (const b of wantedBubbles) {
-      const size = bubbleSizeForCount(b.count);
-      const existing = geoClusterMarkersRef.current.get(b.key);
-      if (existing) {
-        if (existing.bubble.count !== b.count) {
-          // In-place update preserves the attached listeners + marker binding.
-          updateGeoClusterBubbleEl(existing.el, b.count, size);
-          // Refresh the stored bubble so next count-diff sees the new count.
-          existing.bubble = b;
-        }
-        continue;
-      }
-      const el = createGeoClusterBubbleEl(b.count, size);
-      attachBubbleClickHandlerRef.current(el, b);
-      const marker = new maplibregl.Marker({
-        element: el,
-        anchor: "center",
-      })
-        .setLngLat([b.lng, b.lat])
-        .addTo(map);
-      geoClusterMarkersRef.current.set(b.key, { marker, el, bubble: b });
-    }
-
-    updateGeoClusterOpacityRef.current();
-  }, [collapseExpansion, collectAllPoints, clearGeoClusters]);
-
-  const rebuildGeoClustersRef = useRef<() => void>(() => {});
-  rebuildGeoClustersRef.current = rebuildGeoClusters;
-  const updateGeoClusterOpacityRef = useRef<() => void>(() => {});
-  updateGeoClusterOpacityRef.current = updateGeoClusterOpacity;
-
   const saveMapView = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -838,11 +242,11 @@ export default function EventMap({
     } catch { return null; }
   }, []);
 
-  /** Authoritative visibility gate for event + place markers.
-   *  Below zoom 12 the totalling bubbles own the view, so individual
-   *  markers are hidden except when (a) lifted by an open suburb
-   *  expansion, or (b) filters / places-mode are active.  Above zoom 12
-   *  markers become visible and the bubble tiers fade out.
+  /** Visibility gate for event + place markers (zoom-reveal model).
+   *  Events render at every zoom (dot-mode handles density when far out);
+   *  they are hidden only while the user is explicitly browsing places.
+   *  Places reveal on zoom-in: shown on the Locations tab, when place
+   *  categories are selected, or once zoomed past PLACE_ZOOM_MIN.
    *
    *  Name is kept for historical reasons (place-visibility was added
    *  first); the function now owns both layers' visibility. */
@@ -853,34 +257,18 @@ export default function EventMap({
     const placeCats = activePlaceCategoriesRef.current;
     const hasPlaceCatsSelected = placeCats && placeCats.size > 0;
     const inPlacesMode = placesModeRef.current;
-    // Show places when: the user is on the burger "Locations" tab (always),
-    // OR explicit place categories are selected, OR they've zoomed in deeply.
-    const shouldShow = inPlacesMode || hasPlaceCatsSelected || z >= PLACE_ZOOM_MIN;
-    placeMarkerDataRef.current.forEach(({ marker, lngLat }) => {
+    const shouldShowPlaces = inPlacesMode || hasPlaceCatsSelected || z >= PLACE_ZOOM_MIN;
+    placeMarkerDataRef.current.forEach(({ marker }) => {
       const el = marker.getElement() as HTMLElement;
-      const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
-      el.style.visibility = lifted || shouldShow ? "" : "hidden";
+      el.style.visibility = shouldShowPlaces ? "" : "hidden";
     });
-    // Hide event markers when place categories are selected (user is
-    // browsing places), OR when we're at a city zoom where the totalling
-    // bubbles own the view.  Suburb-expansion lifts override both gates.
-    const hideEventsForZoom = z < MARKER_FADE_IN_END;
-    evtMarkerDataRef.current.forEach(({ marker, lngLat }) => {
+    // Event markers stay visible at all zooms unless the user is browsing
+    // places (a place-category filter is active).
+    evtMarkerDataRef.current.forEach(({ marker }) => {
       const el = marker.getElement() as HTMLElement;
-      const lifted = isPointLiftedBySuburb(lngLat[1], lngLat[0]);
-      if (lifted) {
-        el.style.visibility = "";
-        return;
-      }
-      if (hasPlaceCatsSelected || hideEventsForZoom) {
-        el.style.visibility = "hidden";
-      } else {
-        el.style.visibility = "";
-      }
+      el.style.visibility = hasPlaceCatsSelected ? "hidden" : "";
     });
-  }, [isPointLiftedBySuburb]);
-  const updatePlaceVisibilityRef = useRef<() => void>(() => {});
-  updatePlaceVisibilityRef.current = updatePlaceVisibility;
+  }, []);
 
   /** Force-directed deconfliction: spread overlapping markers, draw leader lines. */
   const runDeconfliction = useCallback(() => {
@@ -1151,71 +539,13 @@ export default function EventMap({
 
     map.on("moveend", saveMapView);
 
-    /* ── Bubble band tracker for split/recouple ──
-     * When the user zooms across a tier boundary (capital → town →
-     * suburb → marker), any open expansions belong to the previous
-     * tier and should snap shut so the user sees the new tier cleanly.
-     * Tracked via the band a zoom level falls into; ignores intra-band
-     * zooming. */
-    const bandFor = (z: number): "capital" | "town" | "suburb" | "marker" => {
-      if (z < 8) return "capital";
-      if (z < 11) return "town";
-      if (z < 12) return "suburb";
-      return "marker";
-    };
-    let lastBand = bandFor(map.getZoom());
-
-    // Map-canvas click anywhere outside a bubble — staged recouple.
-    // We can't rely on bubble/marker `stopPropagation()` to gate this
-    // (markers must NOT stop propagation, otherwise MapLibre's own
-    // `_onMapClick` popup toggle never fires — see marker creation
-    // notes). Instead we inspect the click's DOM target: if it landed
-    // inside a marker, cluster bubble, or popup, leave the open
-    // expansions alone. Each "real" canvas click collapses one tier
-    // (innermost first) so the user drills back out the way they
-    // drilled in, rather than having a single click vaporise a deep
-    // expansion tree.
-    const SKIP_COLLAPSE_SELECTOR =
-      ".cc-marker, .cc-place-marker, .cc-geo-cluster, .maplibregl-popup";
-    map.on("click", (e) => {
-      if (expansionsRef.current.size === 0) return;
-      const target = e.originalEvent?.target as Element | null;
-      if (target && typeof target.closest === "function" && target.closest(SKIP_COLLAPSE_SELECTOR)) {
-        return;
-      }
-      collapseInnermostTierRef.current();
-    });
-
-    // Zoom-gate place visibility, resize markers, and run deconfliction on zoom changes.
+    // Reveal/hide markers by zoom (zoom-reveal), resize them, and run
+    // deconfliction on zoom changes. No counted clustering — markers
+    // simply resolve from dots to full pins as the user zooms in.
     map.on("zoomend", () => {
       updatePlaceVisibility();
       updateMarkerSizesRef.current();
       runDeconflictionRef.current();
-      // Crossing into a new tier band on *zoom-out* recouples open
-      // expansions (the prior tier no longer owns the view). Zooming
-      // *in* never collapses — the user is drilling deeper into the
-      // data and their expansions should stay put.
-      const newBand = bandFor(map.getZoom());
-      if (newBand !== lastBand) {
-        const zoomedOut = BAND_RANK[newBand] < BAND_RANK[lastBand];
-        lastBand = newBand;
-        if (zoomedOut && expansionsRef.current.size > 0) {
-          collapseAllExpansionsRef.current();
-        }
-      }
-      // Recompute bubbles (tiers come in / out of play) and re-apply
-      // opacity crossfade.
-      rebuildGeoClustersRef.current();
-    });
-
-    // Smooth-crossfade bubble opacity during the zoom animation, not just
-    // at zoomend, so the tier handover reads as gradual.
-    let zoomOpacityRaf = 0;
-    map.on("zoom", () => {
-      if (zoomOpacityRaf) cancelAnimationFrame(zoomOpacityRaf);
-      zoomOpacityRaf = requestAnimationFrame(() => {
-        updateGeoClusterOpacityRef.current();
-      });
     });
 
     // Continuously re-run deconfliction and marker sizing during panning so
@@ -1298,22 +628,9 @@ export default function EventMap({
         });
     }
 
-    // W2: keyboard recouple — Escape collapses every open expansion so
-    // keyboard users can undo a split without having to zoom across a
-    // tier band.  Bound on the document so it works regardless of
-    // current focus target (map canvas, bubble, surrounding UI).
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (expansionsRef.current.size === 0) return;
-      collapseAllExpansionsRef.current();
-    };
-    document.addEventListener("keydown", onEsc);
-
     return () => {
       readyRef.current = false;
       if (deconflictRaf) cancelAnimationFrame(deconflictRaf);
-      if (zoomOpacityRaf) cancelAnimationFrame(zoomOpacityRaf);
-      document.removeEventListener("keydown", onEsc);
       saveMapView();
       map.remove();
       mapRef.current = null;
@@ -1397,126 +714,16 @@ export default function EventMap({
         el.classList.add("cc-marker-new");
         setTimeout(() => el.classList.remove("cc-marker-new"), 320);
 
-        const dateStr = new Date(event.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-        const hasWebsite = event.website_url && /^https?:\/\//i.test(event.website_url);
-        const now = new Date();
-        const hasStarted = new Date(event.date) <= now;
-
-        // Build popup HTML — refreshed on each open to pick up the latest
-        // RSVP / consider state. Also set eagerly at creation so the popup
-        // element is never briefly empty when it first appears on the map.
-        const renderPopupHtml = () => {
-          const isJoined = !!rsvpEventIdsRef.current?.has(event.id);
-          const isConsidering = !!considerEventIdsRef.current?.has(event.id);
-
-          const joinIcon = isJoined
-            ? // Person + tick
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>'
-            : // Person + plus
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>';
-
-          const considerIcon = isConsidering
-            ? // Circle + tick
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12.5 11 15 16 9.5"/></svg>'
-            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
-
-          const joinClass = `cc-action-btn${hasStarted ? " cc-action-disabled" : ""}${isJoined ? " cc-action-done" : ""}`;
-          const considerClass = `cc-action-btn${isConsidering ? " cc-action-done" : ""}`;
-
-          return `<div class="cc-popup">
-            ${isCancelledEvent(event) ? '<span class="cc-chip-cancelled" title="This event has been cancelled">Cancelled</span>' : ""}
-            ${isCommunityEvent(event) ? '<span class="cc-chip-community" title="Community-organised by a Citizen">★ Community</span>' : ""}
-            <strong>${escapeHtml(event.title)}</strong>
-            <p>${dateStr}</p>
-            <p>${escapeHtml(event.location)}</p>
-            <div class="cc-popup-actions">
-              <button class="cc-action-btn" data-action="view" title="View details">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <span>View</span>
-              </button>
-              <button class="${joinClass}" data-action="join" title="${hasStarted ? "Event started" : isJoined ? "You're going" : "Join event"}"${hasStarted ? " disabled" : ""}>
-                ${joinIcon}
-                <span>${isJoined ? "Joined" : "Join"}</span>
-              </button>
-              <button class="cc-action-btn" data-action="share" title="Share event">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                <span>Share</span>
-              </button>
-              <button class="${considerClass}" data-action="consider" title="${isConsidering ? "Considering" : "Consider"}">
-                ${considerIcon}
-                <span>${isConsidering ? "Considering" : "Consider"}</span>
-              </button>
-              <button class="cc-action-btn${hasWebsite ? "" : " cc-action-disabled"}" data-action="visit" title="${hasWebsite ? "Visit website" : "No website"}"${hasWebsite ? "" : " disabled"}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span>Visit</span>
-              </button>
-            </div>
-          </div>`;
-        };
-
-        const popup = new maplibregl.Popup({
-          offset: 16,
-          closeButton: true,
-          maxWidth: "280px",
-        }).setHTML(renderPopupHtml());
-
-        popup.on("open", () => {
-          popup.setHTML(renderPopupHtml());
-          // Adjust popup position to follow deconflicted marker offset.
-          // Subtracts 16px (the popup's base offset from the marker anchor)
-          // so the popup tip points at the displaced marker, not empty space.
-          const markerData = evtMarkerDataRef.current.find((d) => d.marker === marker);
-          if (markerData) {
-            const offset = marker.getOffset();
-            const POPUP_BASE_OFFSET = 16;
-            popup.setOffset([offset.x, offset.y - POPUP_BASE_OFFSET]);
-          }
-
-          const popupEl = popup.getElement();
-          popupEl?.querySelectorAll(".cc-action-btn").forEach((btn) => {
-            btn.addEventListener("click", () => {
-              const action = btn.getAttribute("data-action") as "view" | "join" | "share" | "consider" | "visit";
-              if (action) {
-                popup.remove();
-                onQuickActionRef.current?.(action, event);
-              }
-            });
-          });
-        });
-
         const lngLat: [number, number] = [event.longitude!, event.latitude!];
         const baseSize = parseInt(el.style.width || "40") || 40;
-        // Stash the temporal opacity + register a fade transition once so
-        // the geo-clustering fade layer can multiply (not clobber) it and
-        // we don't rewrite `transition` on every zoom frame.
-        el.dataset.temporalOpacity = String(temporal.opacity);
-        el.style.transition = "opacity 160ms linear";
-        // NOTE: We deliberately do NOT call `e.stopPropagation()` on the
-        // marker click here. MapLibre's marker→popup toggle is wired via
-        // `map.on('click', ...)` and depends on the click bubbling up the
-        // DOM to the canvas container (see maplibre-gl marker.ts:347 +
-        // `_onMapClick`). Stopping propagation kills the popup. Instead,
-        // the map-click handler itself inspects `e.originalEvent.target`
-        // and skips the staged collapse when the click landed on a
-        // marker / bubble / popup. See the `map.on("click", ...)` block
-        // in the map-init effect.
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(lngLat)
           .addTo(map);
-        if (onSelectEventRef.current) {
-          // Figma flow: clicking the marker opens the inline glass
-          // EventPreviewCard instead of the legacy MapLibre popup.
-          el.style.cursor = "pointer";
-          el.addEventListener("click", () => onSelectEventRef.current?.(event));
-        } else {
-          marker.setPopup(popup);
-        }
+        // Glass flow: clicking an event marker opens the inline
+        // EventPreviewCard via onSelectEvent. EventsView (the only consumer)
+        // always provides it; the legacy MapLibre popup has been removed.
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => onSelectEventRef.current?.(event));
         markersRef.current.push(marker);
         evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id });
         bounds.extend(lngLat);
@@ -1566,10 +773,6 @@ export default function EventMap({
 
         const lngLat: [number, number] = [place.longitude, place.latitude];
         const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
-        // Places don't have temporal dimming today — keep attribute for
-        // symmetry so the clustering fade multiplies by 1 not by NaN.
-        placeEl.dataset.temporalOpacity = "1";
-        placeEl.style.transition = "opacity 160ms linear";
         // Direct click opens place detail in the SidePanel drawer —
         // no intermediate popup. The click navigates via the parent's
         // onSelectPlace callback (router.push) so the @panel intercept
@@ -1589,23 +792,6 @@ export default function EventMap({
 
       // Apply zoom-based visibility to freshly placed place markers
       updatePlaceVisibility();
-
-      // C1 fix: when the underlying event/place set changes, any open
-      // capital/town expansion's spawned child bubbles are computed against
-      // a now-stale point set.  Suburb expansions self-heal because they
-      // rely on the lifted-marker pass which re-runs over the fresh
-      // marker refs.  Cheapest correct fix: collapse non-suburb
-      // expansions before the cluster rebuild.
-      const openKeys = [...expansionsRef.current.keys()];
-      for (const k of openKeys) {
-        const exp = expansionsRef.current.get(k);
-        if (exp && exp.parent.tier !== "suburb") {
-          collapseExpansion(k);
-        }
-      }
-
-      // Build progressive geo-clustering bubbles over the fresh point set.
-      rebuildGeoClustersRef.current();
 
       // ── Fit bounds (skip if user had a stored viewpoint) ──
       if (hasPoints && !hasRestoredView.current) {
@@ -1644,15 +830,13 @@ export default function EventMap({
       return () => {
         map.off("load", handler);
         clearMarkers();
-        clearGeoClusters();
       };
     }
 
     return () => {
       clearMarkers();
-      clearGeoClusters();
     };
-  }, [events, places, clearMarkers, clearGeoClusters, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode, collapseExpansion]);
+  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   // `flyToToken` is included in the dependency array so that tapping the

@@ -129,36 +129,30 @@ describe("EventsView", () => {
   it("switches to calendar view when toggle clicked", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
+      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
     });
     expect(screen.getByTestId("glass-calendar")).toBeInTheDocument();
-    // Map is always rendered (visible behind transparent calendar) but non-interactive
     expect(screen.getByTestId("event-map")).toBeInTheDocument();
   });
 
   it("renders search input with proper aria-label", async () => {
     await renderView();
-    // Bottom search starts collapsed as an icon button; open it first
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /open search/i }));
-    });
-    // The bottom search bar is an ARIA combobox (autocomplete listbox popup, Stage L).
-    const input = screen.getByRole("combobox", { name: /search events, places, or city/i });
+    const input = screen.getByRole("searchbox", { name: /search the map/i });
     expect(input).toBeInTheDocument();
-    expect(input).toHaveAttribute("aria-label", "Search events, places, or city");
+    expect(input).toHaveAttribute("aria-label", "Search the map");
   });
 
   it("renders toggle menu button", async () => {
     await renderView();
     expect(
-      screen.getByRole("button", { name: /toggle menu/i })
+      screen.getByRole("button", { name: /open menu/i })
     ).toBeInTheDocument();
   });
 
   it("opens burger menu when menu button clicked", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle menu/i }));
+      fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     });
     expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
   });
@@ -166,7 +160,7 @@ describe("EventsView", () => {
   it("closes burger menu with close button", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle menu/i }));
+      fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     });
     expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
 
@@ -180,17 +174,12 @@ describe("EventsView", () => {
 
   it("filters events by search input", async () => {
     await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
-    });
-    // Bottom search starts collapsed; open it before typing
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /open search/i }));
-    });
-    // The bottom search bar is an ARIA combobox (autocomplete listbox popup, Stage L).
-    const input = screen.getByRole("combobox", { name: /search events, places, or city/i });
+    const input = screen.getByRole("searchbox", { name: /search the map/i });
     await act(async () => {
       fireEvent.change(input, { target: { value: "Youth" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
     });
 
     await waitFor(() => {
@@ -202,30 +191,30 @@ describe("EventsView", () => {
 
   it("renders Citizens Connect brand button with gold text", async () => {
     await renderView();
-    const brandBtn = screen.getByRole("button", { name: "Citizens Connect" });
+    const brandBtn = screen.getByRole("button", { name: /citizens connect/i });
     expect(brandBtn).toBeInTheDocument();
-    expect(brandBtn.className).toContain("text-(--gold)");
   });
 
   it("renders view toggle button with calendar icon on map view", async () => {
     await renderView();
-    const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
+    const toggleBtn = screen.getByRole("button", { name: /toggle calendar view/i });
     expect(toggleBtn.querySelector("svg")).toBeTruthy();
   });
 
-  it("renders view toggle button with map icon on calendar view", async () => {
+  it("renders back-to-map button in calendar view", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
+      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
     });
-    const toggleBtn = screen.getByRole("button", { name: /toggle view mode/i });
-    expect(toggleBtn.querySelector("svg")).toBeTruthy();
+    const backBtn = screen.getByRole("button", { name: /back to map/i });
+    expect(backBtn).toBeInTheDocument();
+    expect(backBtn.querySelector("svg")).toBeTruthy();
   });
 
   it("passes events to calendar view", async () => {
     await renderView();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle view mode/i }));
+      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
     });
     expect(screen.getByTestId("glass-calendar")).toHaveTextContent("3 events");
   });

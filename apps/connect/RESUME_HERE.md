@@ -64,21 +64,42 @@ MapLibre map underneath. Build verified by the founder locally (`tsc 0`, lint cl
 - `VISION.md` (root) created — north star + the Alignment Self-Prompt; wired into `CLAUDE.md` as
   mandatory step 0 (read every run). Founder has since expanded it (scripture, ecosystem, culture).
 
+### Batch C-2 — DONE (2026-05-31): clustering removal + dead-code excision + gold markers
+The previously-deferred Batch C items are now shipped (founder asked for "everything remaining"),
+build-verified in-sandbox (`tsc --noEmit` → **0 errors**; ESLint clean on all changed files).
+- **Clustering/bubbles removed → zoom-reveal.** Deleted `src/lib/map/clustering.ts` and its test
+  `src/__tests__/lib/map/clustering.test.ts`. Gutted the entire bubble engine from `EventMap.tsx`
+  (geo-cluster refs, expansion/lift state, `updateGeoClusterOpacity`, `expandBubble`/collapse/
+  `rebuildGeoClusters`, band tracker, map-click-collapse + Esc recouple + zoom-crossfade handlers,
+  `BAND_RANK`). Density now comes only from the kept primitives: **dot-mode (<z7) → mid (z7–10) →
+  full (z10+)** + force-deconfliction + viewport culling. `updatePlaceVisibility` simplified to a
+  plain zoom-reveal gate (events show at all zooms unless a place-cat filter is active; places
+  reveal at `z>=PLACE_ZOOM_MIN`). Removed dead bubble helpers + `createClusterEl` from `markers.ts`
+  and `.cc-geo-cluster*` from `globals.css`.
+- **Legacy popup + viewport-scope deleted.** Removed the MapLibre event popup entirely (marker
+  click now always → `onSelectEvent`/`EventPreviewCard`). Removed the "Search this area" subsystem
+  from `EventsView.tsx` (`viewportScoped`/`mapBounds`/`showSearchAreaPill` state, the pan handlers,
+  the bbox filters in both memos, the `onMoveEnd`/`onBoundsChange` props); the top pill is now just
+  the single **"For me in this area"** variant.
+- **Custom event markers gold-themed.** `createCustomMarkerEl` profile/logo/icon variants now use a
+  GOLD ring + category/custom `--cc-pulse-color` (matches `createCategoryMarkerEl`).
+- **LandingPage hand-off** shortened 300ms → 150ms.
+- Residual (non-blocking): `EventMap` still *declares* `onQuickAction`/`rsvpEventIds`/
+  `considerEventIds` props (EventsView still passes them) — now unused inside EventMap (were
+  popup-only); harmless optional API, candidate for a later tidy.
+
 ### Deferred → next session (queued)
-- **Clustering/bubble removal** (numbering/grouping/spreading/tier-hiding) — ~150 refs in
-  `EventMap.tsx` + `lib/map/clustering.ts`. Needs its own build-verified pass (zoom-reveal +
-  density best-practice). NOT done blind to protect the working build.
-- Delete now-dormant legacy popup code + the viewport-scope "Search this area" subsystem.
-- Gold-theme custom event markers (profile/logo/icon variants in `createCustomMarkerEl`).
 - Build the other surfaces from Figma — ready-to-paste prompt at `docs/FIGMA_SURFACES_PROMPT.md`
   (org dashboard, contributor profile, event/place detail, citizen dashboard, messages, auth).
 - Working log for this whole effort: `.claude/sessions/figma-map-ux-migration.md` (gitignored).
 
-### ⚠️ git note (important)
-The Cowork Linux sandbox served **truncated** copies of the large files (`EventMap.tsx` read as
-~1752 lines vs real ~2020) and reported a whole-repo CRLF diff (~662 files). **Do not commit from
-the sandbox** — commit/push from the founder's machine where files are intact and the build passes.
-Commit message + commands were provided in chat.
+### ⚠️ git note (important — still applies after Batch C-2)
+The Cowork Linux sandbox still reports a **whole-repo CRLF diff** (~660 files show as modified from
+line-ending churn alone), so a sandbox commit would be destructive. **Commit/push from the founder's
+machine.** New this session: editing certain files through the sandbox intermittently left **trailing
+NUL-byte padding** (EventsView.tsx) or a **mid-file truncation** (LandingPage.tsx, restored from git);
+both were detected and repaired, and the final `tsc`/ESLint passes confirm the on-disk files are
+intact. After pulling these edits, re-run the local quality gate before committing (commands below).
 
 ---
 
@@ -583,12 +604,36 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
   the full **107→118** gap via the Supabase MCP (see §2 of this file's batch notes below).
 - Analytics **backfill executed** (`backfill_contributor_analytics(90)`, 2026-02-28→05-28).
 - Security advisor: **0 errors** (105 informational/by-design lints).
-- Latest pushed commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
+- Latest **pushed** commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
+- ⚠️ **The Figma glassmorphism map UX migration (Batches A–C, §2 above) is NOT yet pushed.** It exists
+  on the founder's working tree, build-clean locally (`tsc`/lint/`next build`), but could not be
+  committed from the Cowork sandbox (truncated-file + whole-repo CRLF artifact). **First action next
+  session: confirm those changes are committed + pushed from the founder's machine** (commit message
+  was provided in chat). If `git log` already shows them, this is done.
 
 ---
 
 ## 4. Next batches queued
 
+### Map UX (Figma migration) — Batch C-2 DONE; remaining follow-ups
+Batch C-2 (clustering removal, dead-code excision, gold custom markers, landing hand-off) shipped
+this session — see §2 "Batch C-2 — DONE" above (tsc 0 / ESLint clean). Items 1–3 + the optional
+hand-off are complete. Still queued:
+1. ~~Remove clustering/bubbles~~ ✅ DONE — replaced with dot→mid→full zoom-reveal + deconfliction.
+2. ~~Delete dead legacy popup + viewport-scope~~ ✅ DONE.
+3. ~~Gold-theme custom event markers~~ ✅ DONE.
+4. **Build the other surfaces from Figma** — paste `docs/FIGMA_SURFACES_PROMPT.md` into the Figma
+   Make file, generate one surface at a time, then wire to real data. Highest-value first:
+   the **Organisation Dashboard** (the "Hearts United Foundation" preview). NOTE: its
+   Impact Score / Lives Impacted metrics don't exist in the schema — decide real columns vs proxies
+   before building (VISION: honour real data).
+5. Optional polish: ~~shorten the LandingPage→/events hand-off~~ ✅ (300→150ms); still open — wire
+   Next 15 View Transitions + per-route glass `loading.tsx` skeletons for snappier navigation.
+6. Optional tidy: drop the now-unused `onQuickAction`/`rsvpEventIds`/`considerEventIds` props from
+   `EventMap` (popup-only; EventsView still passes them harmlessly).
+- Full working log: `.claude/sessions/figma-map-ux-migration.md` (gitignored).
+
+### Contributor dashboard
 **The entire contributor-dashboard plan (Stages A–L + Stage H follow-ups) is now complete.** No further stages are queued from `docs/plans/contributor-dashboard.md`.
 
 ~~Outstanding operator action (backfill)~~ — **DONE this session.** All migrations 107→118 are

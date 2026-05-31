@@ -169,13 +169,6 @@ export default function EventsView({
   // the EventMap — when "places" is active, only place markers render).
   const [burgerTab, setBurgerTab] = useState<"events" | "places">("events");
 
-  // "Search this area" pill + viewport-scope state. Declared up-front (rather
-  // than beside the floating-chrome state further down) because the filter
-  // memos below read `viewportScoped` to narrow results to the map bbox.
-  const [showSearchAreaPill, setShowSearchAreaPill] = useState(false);
-  const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
-  const [viewportScoped, setViewportScoped] = useState<[number, number, number, number] | null>(null);
-
   // Snapshot of the category/quick-access filters taken the moment the user
   // begins a search. Restored when the search input is cleared so the
   // previously-selected filters come back intact.
@@ -656,16 +649,7 @@ export default function EventsView({
   }, [isSearching]);
 
   const filtered = useMemo(() => {
-    const bbox = viewportScoped;
-    const inBbox = (lat: number | null, lng: number | null) => {
-      if (!bbox || lat == null || lng == null) return true;
-      const [w, s, e, n] = bbox;
-      // Handle antimeridian-crossing viewports (west > east).
-      const lngInRange = w <= e ? lng >= w && lng <= e : lng >= w || lng <= e;
-      return lng != null && lat >= s && lat <= n && lngInRange;
-    };
     return events.filter((e) => {
-      if (!inBbox(e.latitude, e.longitude)) return false;
       if (
         !isSearching &&
         activeQuickItem?.specialFilter === "volunteer" &&
@@ -724,19 +708,11 @@ export default function EventsView({
       }
       return false;
     });
-  }, [events, search, activeCategories, activeQuickItem, rankedEventIds, isSearching, viewportScoped, forMeActive, personalised, weekendOnly]);
+  }, [events, search, activeCategories, activeQuickItem, rankedEventIds, isSearching, forMeActive, personalised, weekendOnly]);
 
   const filteredPlaces = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const bbox = viewportScoped;
-    const inBbox = (lat: number | null, lng: number | null) => {
-      if (!bbox || lat == null || lng == null) return true;
-      const [w, s, e, n] = bbox;
-      const lngInRange = w <= e ? lng >= w && lng <= e : lng >= w || lng <= e;
-      return lng != null && lat >= s && lat <= n && lngInRange;
-    };
     return places.filter((p) => {
-      if (!inBbox(p.latitude, p.longitude)) return false;
       if (
         !isSearching &&
         activeQuickItem?.specialFilter === "volunteer" &&
@@ -772,7 +748,7 @@ export default function EventsView({
         p.description.toLowerCase().includes(q)
       );
     });
-  }, [places, search, activePlaceCategories, activeQuickItem, rankedPlaceIds, isSearching, viewportScoped, forMeActive, personalised]);
+  }, [places, search, activePlaceCategories, activeQuickItem, rankedPlaceIds, isSearching, forMeActive, personalised]);
 
   // Category-panel ordering: same proximity sort as the quick-access panel
   // so users see local results first. The underlying `filtered` array
@@ -936,38 +912,12 @@ export default function EventsView({
   const [resetBearingToken, setResetBearingToken] = useState(0);
   // Locate-me FAB: increments a token the map watches.
   const [locateMeToken, setLocateMeToken] = useState(0);
-  // "Search this area" pill: surfaces once the camera has moved since the
-  // last search/filter change. Tapping it toggles viewport-scoped results:
-  // the filter memos narrow events + places to those whose lat/lng sit
-  // inside the current map bbox. Filters and results auto-reset when the
-  // user changes search terms or category selection.
-  // (State itself is hoisted above the filter memos — see top of component.)
-  // Reset the pill + any active viewport scope whenever filters change
-  // (fresh search is implicit — the user is expressing new intent).
+  // Reset quick-panel pagination whenever filters change so a tab/category
+  // switch doesn't leave the carousel scrolled off the end of a now-shorter
+  // result set.
   useEffect(() => {
-    setShowSearchAreaPill(false);
-    setViewportScoped(null);
-    // Reset quick-panel pagination so a tab/category switch doesn't leave
-    // the carousel scrolled off the end of a now-shorter result set.
     setQuickPanelPage(0);
   }, [activeCategories, activePlaceCategories, activeQuickAccess, search, burgerTab]);
-  const handleMapMoveEnd = useCallback(() => {
-    // Only surface the pill once per pan, not every moveend tick.
-    setShowSearchAreaPill(true);
-  }, []);
-  const handleMapBoundsChange = useCallback(
-    (bbox: [number, number, number, number]) => {
-      setMapBounds(bbox);
-      // If the user has viewport-scoping active, keep the scope in lock-step
-      // with the current view so panning continues to narrow the list.
-      setViewportScoped((prev) => (prev ? bbox : prev));
-    },
-    [],
-  );
-  const activateViewportScope = useCallback(() => {
-    if (mapBounds) setViewportScoped(mapBounds);
-    setShowSearchAreaPill(false);
-  }, [mapBounds]);
 
   // ── Bottom floating search: auto-expand/collapse behaviour ────────
   // initial: collapsed icon button for 5s → expands to bar for 60s idle → collapses back.
@@ -1189,8 +1139,6 @@ export default function EventsView({
           onBearingChange={setMapBearing}
           resetBearingToken={resetBearingToken}
           locateMeToken={locateMeToken}
-          onMoveEnd={handleMapMoveEnd}
-          onBoundsChange={handleMapBoundsChange}
           highlightedEventId={hoveredEventId}
           rsvpEventIds={rsvpEventIds}
           considerEventIds={considerEventIds}
@@ -1363,63 +1311,30 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Top-centre context pill ────────────────────────────────
-       *  Only ONE of these three variants is shown at a time (priority
-       *  order top to bottom):
-       *    1. "Showing this area"  — when the user has an active
-       *       viewport-bbox filter.  Tap the × to clear.
-       *    2. "For me in this area" — when personalisation has a clear
-       *       signal (≥60% in some category).  Replaces the Google-
-       *       style search-this-area pill entirely so we don't double
-       *       up on nearly-identical top chrome.
-       *    3. "Search this area"   — fallback when the user has panned
-       *       the map and no personalised signal exists.                  */}
-      {!calendarOpen && !hasDetail && (viewportScoped || personalised.hasSignal || showSearchAreaPill) && (
+      {/* ── Top-centre "For me in this area" pill ──────────────────────
+       *  Shown only when personalisation has a clear signal (≥60% affinity
+       *  in some category). Toggling it hard-filters events + places to the
+       *  user's high-affinity categories. (The legacy Google-style
+       *  "Search this area" viewport-scope pill has been removed.) */}
+      {!calendarOpen && !hasDetail && personalised.hasSignal && (
         <div className="pointer-events-none absolute inset-x-0 bottom-20 z-1005 flex justify-center px-4 sm:bottom-28">
-          {personalised.hasSignal ? (
-            <button
-              type="button"
-              onClick={toggleForMe}
-              className={
-                forMeActive
-                  ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
-                  : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
-              }
-              aria-pressed={forMeActive}
-              aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
-            >
-              <span aria-hidden="true">✨</span>
-              {forMeActive ? "For me — tap to clear" : "For me in this area"}
-              {forMeActive && (
-                <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
-              )}
-            </button>
-          ) : viewportScoped ? (
-            <button
-              type="button"
-              onClick={() => setViewportScoped(null)}
-              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/50 bg-(--gold)/15 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-(--gold)/25 active:scale-95 animate-[fadeRise_280ms_ease-out]"
-              aria-label="Clear viewport filter"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
-                <path d="M3 3h18l-7 8v6l-4 2v-8L3 3z" />
-              </svg>
-              Showing this area
-              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px]" aria-hidden="true">×</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={activateViewportScope}
-              className="pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-(--gold)" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              Search this area
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleForMe}
+            className={
+              forMeActive
+                ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
+                : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
+            }
+            aria-pressed={forMeActive}
+            aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
+          >
+            <span aria-hidden="true">✨</span>
+            {forMeActive ? "For me — tap to clear" : "For me in this area"}
+            {forMeActive && (
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
+            )}
+          </button>
         </div>
       )}
 
