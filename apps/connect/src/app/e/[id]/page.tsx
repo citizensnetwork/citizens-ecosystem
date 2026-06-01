@@ -128,7 +128,34 @@ export default async function ShareableEventPage({
 
   if (!event) notFound();
 
-  const broadcasts = (broadcastsRes.data ?? []) as OrgBroadcast[];
+  let broadcasts = (broadcastsRes.data ?? []) as OrgBroadcast[];
+
+  // Attach aggregate, identity-free reaction counts for the broadcast cards.
+  if (broadcasts.length > 0) {
+    const { data: reactionRows } = await supabase
+      .from("broadcast_reactions")
+      .select("broadcast_id, emoji, count")
+      .in(
+        "broadcast_id",
+        broadcasts.map((b) => b.id),
+      );
+    if (reactionRows && reactionRows.length > 0) {
+      const byId = new Map<string, Record<string, number>>();
+      for (const r of reactionRows as Array<{
+        broadcast_id: string;
+        emoji: string;
+        count: number;
+      }>) {
+        const m = byId.get(r.broadcast_id) ?? {};
+        m[r.emoji] = r.count;
+        byId.set(r.broadcast_id, m);
+      }
+      broadcasts = broadcasts.map((b) => ({
+        ...b,
+        reactions: byId.get(b.id) ?? {},
+      }));
+    }
+  }
 
   const dateStr = new Date(event.date).toLocaleDateString("en-US", {
     weekday: "long",
@@ -276,7 +303,7 @@ export default async function ShareableEventPage({
         {/* From the Organiser — broadcast messages */}
         {broadcasts.length > 0 && (
           <div className="mt-8">
-            <OrgBroadcastList broadcasts={broadcasts} />
+            <OrgBroadcastList broadcasts={broadcasts} showReactions />
           </div>
         )}
 

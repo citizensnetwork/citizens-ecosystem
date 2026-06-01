@@ -102,7 +102,34 @@ export default async function EventDetailServer({ id }: { id: string }) {
     .map((r) => (Array.isArray(r.tag) ? r.tag[0] : r.tag))
     .filter((t): t is EventTag => t !== null && t !== undefined && !t.is_hidden);
 
-  const broadcasts = (broadcastRows ?? []) as OrgBroadcast[];
+  let broadcasts = (broadcastRows ?? []) as OrgBroadcast[];
+
+  // Attach aggregate, identity-free reaction counts for the event-view cards.
+  if (broadcasts.length > 0) {
+    const { data: reactionRows } = await supabase
+      .from("broadcast_reactions")
+      .select("broadcast_id, emoji, count")
+      .in(
+        "broadcast_id",
+        broadcasts.map((b) => b.id),
+      );
+    if (reactionRows && reactionRows.length > 0) {
+      const byId = new Map<string, Record<string, number>>();
+      for (const r of reactionRows as Array<{
+        broadcast_id: string;
+        emoji: string;
+        count: number;
+      }>) {
+        const m = byId.get(r.broadcast_id) ?? {};
+        m[r.emoji] = r.count;
+        byId.set(r.broadcast_id, m);
+      }
+      broadcasts = broadcasts.map((b) => ({
+        ...b,
+        reactions: byId.get(b.id) ?? {},
+      }));
+    }
+  }
 
   let hasRsvped = false;
   let notifyUpdates = true;

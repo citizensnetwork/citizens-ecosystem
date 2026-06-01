@@ -484,7 +484,7 @@ export default function EventDetailContent({
           Self-hides when empty. */}
       {broadcasts.length > 0 && (
         <div className="mt-6 border-t pt-5">
-          <OrgBroadcastList broadcasts={broadcasts} />
+          <OrgBroadcastList broadcasts={broadcasts} showReactions />
         </div>
       )}
 

@@ -8,11 +8,15 @@
  *
  * Returns null when there are no broadcasts — callers need not guard.
  */
+import BroadcastReactions from "@/components/contributor/BroadcastReactions";
+import type { BroadcastReactionCounts } from "@/lib/broadcasts";
 
 export type OrgBroadcast = {
   id: string;
   body: string;
   created_at: string;
+  /** Aggregate, identity-free reaction counts (event view only). */
+  reactions?: BroadcastReactionCounts;
 };
 
 function timeAgo(iso: string): string {
@@ -55,11 +59,17 @@ type Props = {
   broadcasts: OrgBroadcast[];
   /** Renders with a slightly lighter border — useful inside dark hero sections. */
   variant?: "default" | "subtle";
+  /**
+   * Show anonymous emoji reactions beneath each broadcast. Enabled in the
+   * event view per the notification spec; off elsewhere (e.g. places).
+   */
+  showReactions?: boolean;
 };
 
 export default function OrgBroadcastList({
   broadcasts,
   variant = "default",
+  showReactions = false,
 }: Props) {
   if (broadcasts.length === 0) return null;
 
@@ -91,6 +101,12 @@ export default function OrgBroadcastList({
           >
             <p className="text-sm leading-relaxed text-black/80">{b.body}</p>
             <p className="mt-0.5 text-[11px] text-black/40">{timeAgo(b.created_at)}</p>
+            {showReactions && (
+              <BroadcastReactions
+                broadcastId={b.id}
+                initialCounts={b.reactions}
+              />
+            )}
           </li>
         ))}
       </ul>
