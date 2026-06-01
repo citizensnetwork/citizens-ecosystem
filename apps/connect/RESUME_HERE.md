@@ -53,8 +53,12 @@ fills the gold ring (flat sides touch the border). Profile variant already fille
   clears `selectedEvent`/`selectedPlace` before `router.push`.
 - Wrote **[docs/NAVIGATION_SURFACES.md](docs/NAVIGATION_SURFACES.md)** (the founder-requested map of
   every overlay over the map: state-driven glass cards vs URL-driven `@panel` SidePanel, z-index,
-  open/close triggers, collisions). **Proposed but NOT applied** (await founder): SidePanel-X also
-  clears EventsView card state via a module emitter; swap the 300ms close `setTimeout` → `transitionend`.
+  open/close triggers, collisions).
+- **Nav hardening — APPLIED** (commit `c41d4d8`): new singleton `src/lib/map/panelBus.ts` — SidePanel
+  **X** publishes `publishPanelClosed()`, `EventsView` subscribes → `closeDetail()` (surfaces can't
+  desync on deep-linked/nested panels). SidePanel `animateThen` now hands off on the drawer's real
+  `transform` `transitionend` (guarded 400ms fallback) instead of a fixed 300ms timer — no more
+  navigating mid-animation / "stuck" feel.
 
 ### Not a bug (confirmed)
 "All my events adopted my new profile photo" — expected: profile/logo markers pull the creator's
