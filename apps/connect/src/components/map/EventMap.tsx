@@ -109,7 +109,7 @@ const DOT_MODE_SIZE = 10;
  *  viewport get a larger thumbnail treatment (the "big icon with picture"
  *  look). Capped so the map never turns into a wall of photos and the
  *  DOM/image cost stays bounded. */
-const PHOTO_TIER_CAP = 4;
+const PHOTO_TIER_CAP = 8;
 /** Diameter (px) of a photo-tier marker. */
 const PHOTO_TIER_SIZE = 56;
 

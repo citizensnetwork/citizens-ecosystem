@@ -225,7 +225,9 @@ body {
  * glyph is partially faded so both the category colour and its icon read
  * clearly without dominating. EventMap toggles this class based on zoom. */
 .cc-marker-mid .cc-marker-icon {
-  opacity: 0.55;
+  /* No dimming (founder preference) — markers read crisp at every tier.
+   * Previously 0.55, which made mid-zoom icons look dull / "white-washed". */
+  opacity: 1;
 }
 .cc-marker-mid .cc-marker-outer {
   /* Thinner border for a lighter regional look. */
