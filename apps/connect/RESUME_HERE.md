@@ -65,10 +65,19 @@ DB-internal — **zero app/map-runtime cost** (the lightest path). Backfill valu
   guarded by `IF EXISTS (SELECT 1 FROM cron.job WHERE jobname=…)` — NOT the `WHERE TRUE`
   the prior migrations used (those only worked because their outer pg_extension guard meant
   the unschedule never ran while cron was off).
-- **Follow-up available:** now that pg_cron is on, the **dormant analytics/digest/purge
-  jobs** from migrations 107/108/110/116/117 are still NOT registered (their schedule DO
-  blocks already ran + skipped). They can be re-registered in a small follow-up to fully
-  automate the contributor dashboards / retention purges. Kept out of 120 to stay scoped.
+- **Dormant crons revived — migration 121**
+  ([121_register_dormant_crons.sql](supabase/migrations/121_register_dormant_crons.sql)).
+  All 5 DB-internal jobs from 107/110/116/117 are now registered + `active=true`:
+  `messaging-purge-60d` (daily 03:00), `contributor-analytics-daily` (02:15),
+  `contributor-analytics-purge` (Sun 03:00), `contributor-analytics-vision-snapshot`
+  (1 Jan 03:30), `search-term-stats-purge` (Sun 03:30). Verified the aggregator runs
+  clean (manual `aggregate_contributor_analytics_daily()` → 3 rows, no error). cron.job
+  now lists 6 active jobs total (incl. map-prominence-recompute).
+- **STILL EXCLUDED — `contributor-digest` (108):** uses `net.http_post` but **pg_net is
+  NOT installed**, and its two GUCs (`app.supabase_functions_url`/`app.supabase_anon_key`)
+  are **unset**; it also has user-facing side effects (digests 5×/day). Reviving needs:
+  (1) enable `pg_net`, (2) `ALTER DATABASE … SET app.supabase_functions_url/anon_key`,
+  (3) a product decision. Left for an explicitly-approved follow-up.
 
 ### Phase 5 — DONE, reframed as a performance pass (founder priority: speed/lightweight)
 The original cosmetic Phase 5 was dropped on purpose: dot **desaturation contradicts the
