@@ -16,7 +16,64 @@
 
 ---
 
-## 2. What just shipped — Map prominence tiering (zoom + prominence layers) (2026-06-01)
+## 2. What just shipped - Notification clarity, weekly contributor digest, and source mutes (2026-06-01)
+
+**Notification decisions from the feature-clarity session are now encoded in docs and backend fan-out rules.**
+Feature commit: **`05f9c97`** (`feat(notifications): apply weekly digest and mute rules`).
+
+### Product decisions captured
+- `docs/feature-clarity/notifications.md` is now the notification source of truth:
+  contributor/admin digests only, weekly analytics cadence, material-event push rules,
+  per-user map-bubble dismissal, contributor/event mute direction, admin push for
+  moderation/security items, and anonymous broadcast reactions.
+- `docs/feature-clarity/messaging.md` no longer promises 5-times-daily contributor/admin
+  digests; it now references weekly analytics summaries.
+
+### Implementation
+- `send-contributor-digest` now uses a 7-day window and writes titled/body notifications
+  summarising connects, considers, RSVP cancellations, followers, place follows,
+  volunteer applications, DMs, and comments.
+- Migration `123_weekly_contributor_digest_schedule.sql` unschedules any legacy
+  `contributor-digest` cron and re-registers it weekly (`0 6 * * 1`) only when
+  `pg_cron`, `pg_net`, and the Supabase function URL/anon-key GUCs are available.
+- `muted_source_ids` is now validated through `/api/notifications/preferences` and typed
+  in `src/types/db.ts`.
+- Broadcast notification fan-out respects source mutes:
+  event broadcasts check event mutes only; place broadcasts check place and org mutes.
+- Broadcast-flood admin alerts now go through `sendNotifications`, so admins with instant
+  push enabled can receive push as well as in-app rows.
+
+### Verification
+- `npx.cmd tsc --noEmit` -> 0 errors.
+- `npx.cmd vitest run` -> **794/794 tests** across 91 files.
+- `npx.cmd next lint --dir src` -> clean.
+- Focused rerun after final edge-function count cleanup:
+  `npx.cmd vitest run src/__tests__/api/notifications/preferences/route.test.ts src/__tests__/lib/notifications/sourceMutes.test.ts src/__tests__/api/contributor-broadcasts.test.ts`
+  -> 22/22 tests.
+- Supabase advisors were **not runnable** in this session: Supabase MCP advisor tool was
+  unavailable, and the local `supabase` CLI executable was not on PATH.
+
+### Security notes
+- New preference writes are authenticated, rate-limited, UUID-validated, bounded to 100
+  source mutes, and update only the caller's own `profiles` row through the existing
+  RLS-scoped server client.
+- Broadcast fan-out reads mute state through the server/service path and fails open on
+  lookup errors so notification delivery does not silently disappear during DB issues.
+- No service-role key was introduced into client code.
+
+### Follow-ups
+- The weekly contributor digest cron will not register in environments missing `pg_net`
+  or the `app.supabase_functions_url` / `app.supabase_anon_key` GUCs; configure those
+  before expecting scheduled delivery.
+- Consider-to-connect conversions are documented as a desired digest metric, but there is
+  no direct conversion timestamp in the current RSVP model. The current digest reports
+  connects and considers separately.
+- UI controls for event/contributor/place mutes can now be built on top of
+  `muted_source_ids`.
+
+---
+
+## 2-prev. Previously shipped - Map prominence tiering (zoom + prominence layers) (2026-06-01)
 
 **Markers now reveal in tiers (dot → mid → full → photo) driven by `zoom + a prominence
 score`, the way Google Maps layers POIs — not zoom alone.** `tsc 0`, lint clean,

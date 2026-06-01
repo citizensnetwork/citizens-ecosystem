@@ -12,6 +12,11 @@
 
 ## Cross-cutting code rules
 
+### Notification digests and source mutes
+**Decision:** Contributor/admin digests are weekly analytics summaries, not 5-times-daily notification batches. Per-source notification mutes are stored on `profiles.muted_source_ids` as `{"type":"event"|"place"|"org","id":"<uuid>"}`. Event broadcasts check event mutes only, so a user can mute a contributor but still receive updates for a specific event they care about. Place broadcasts check both place and org mutes.
+**Why:** Citizens should not receive digest noise by default, while contributors/admins need periodic operational insight. Source mutes give followers a low-friction way to reduce contributor noise without losing event-specific safety or commitment updates.
+**Date:** 2026-06-01, notification-weekly-digest-and-mutes.
+
 ### `.maybeSingle()` for all read-one queries
 **Decision:** Reserve `.single()` for inserts and RPCs that are contractually guaranteed to return exactly one row. All read-one paths must use `.maybeSingle()` and explicitly handle the `null` case.
 **Why:** `.single()` throws PGRST116 on zero rows, which masks legitimate "not found" cases as 500s. `.maybeSingle()` returns `data: null` and lets the route decide the correct HTTP status. Architect Batch 14g flagged 41 call sites; all converted.
