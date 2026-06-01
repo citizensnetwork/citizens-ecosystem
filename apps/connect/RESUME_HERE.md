@@ -16,13 +16,28 @@
 
 ---
 
-## 2. What just shipped — Notification matrix Batches 1 & 2 (2026-06-02)
+## 2. What just shipped — Notification matrix Batches 1–3 (2026-06-02)
 
 Implementing the 4 remaining notification-matrix features in order, one batch each
 through the full quality gate + push. **Price field skipped entirely** (events have no
-price column). Next migration number: **128**.
+price column). Next migration number: **129**.
 
-### Batch 2 — Material-change push filtering — commit `f35535a` (latest)
+### Batch 3 — Anonymous broadcast reactions — commit `a307bad` (latest)
+- **Migration 128** (applied live): aggregate-only `broadcast_reactions(broadcast_id,
+  emoji, count)` — PK `(broadcast_id, emoji)`, **no user id column** (identity-free by
+  construction), five-emoji check constraint, RLS SELECT-public + no write policy.
+  SECURITY DEFINER `increment_broadcast_reaction(p_broadcast_id, p_emoji)` validates
+  auth + emoji whitelist + live broadcast, atomic `on conflict … count+1`.
+- New `src/lib/broadcasts.ts` is the single source for the five emoji (🙏❤️🎉🙌🔥),
+  shared by table/RPC/route/UI. POST `/api/broadcasts/[id]/react` (auth + UUID +
+  rate-limit + emoji guard → RPC; 404 on missing broadcast). New `BroadcastReactions`
+  client component (optimistic, rollback) wired into `OrgBroadcastList` behind a
+  `showReactions` prop — event views only (`EventDetailContent` + `/e/[id]`, both server
+  fetchers attach per-broadcast counts). 7-case route test.
+- Gates: tsc 0, vitest **809/809** (93 files), lint clean. Advisors 107 WARN / 51
+  auth-secdef (+1 = the new RPC, accepted SECURITY DEFINER pattern).
+
+### Batch 2 — Material-change push filtering — commit `f35535a`
 - **Migration 127** (applied live): `event_updates.is_material boolean default false`;
   `notify_event_field_changes()` now also watches `volunteer_openings` and stamps every
   synthetic field-change row `is_material = true`; trigger recreated to fire on
@@ -45,9 +60,6 @@ price column). Next migration number: **128**.
   and `notify-broadcast` (v4) exclude `notify_updates=false` rows. 6-case route test.
 
 ### Next batches (queued, not started)
-- **Batch 3 — Anonymous broadcast reactions** (migration 128): aggregate-only
-  `broadcast_reactions(broadcast_id, emoji, count)` table, atomic increment RPC, POST route,
-  5 fixed-emoji UI with counts under the broadcast card in `OrgBroadcastList.tsx`.
 - **Batch 4 — Map update bubbles** (migration 129): bubbles table + per-user dismissals,
   ~24h expiry, dismiss route, MapLibre overlay above markers at z12+, trigger on
   `event_updates`/broadcast inserts.
