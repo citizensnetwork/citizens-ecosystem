@@ -54,19 +54,34 @@ feature committed (see git note below).
   `0.5 + prominence` so the heavier (more prominent) marker yields less. Equal-prominence
   behaviour is mathematically identical to before (no regression).
 
-### ⚠️ Operator action — pg_cron NOT installed on this project
-`pg_extension` shows **pg_cron is not installed**, so migration 119's daily schedule (like
-the prior analytics-cron migrations 110/116/117) was silently skipped by its `IF EXISTS`
-guard. The feature works now (backfill populated real values: 22/191 events, 2/40 places
-scored), but **`prominence_base` won't auto-refresh** until either pg_cron is enabled OR
-`SELECT public.recompute_map_prominence();` is run periodically (service_role). Decide:
-enable pg_cron project-wide (also activates the dormant analytics crons) vs. manual/app
-refresh. Not done unilaterally — it's a project-wide infra change.
+### pg_cron ENABLED — refresh now automated (migration 120)
+Founder approved "the cron". Migration 120
+([120_enable_pg_cron.sql](supabase/migrations/120_enable_pg_cron.sql)) ran
+`CREATE EXTENSION pg_cron` (was not installed) and registered
+**`map-prominence-recompute`** (daily 02:45 UTC, verified `active=true`). The refresh is
+DB-internal — **zero app/map-runtime cost** (the lightest path). Backfill values sane:
+22/191 events scored, 2/40 places, max event base 0.36.
+- **Gotcha fixed:** `cron.unschedule(name)` RAISES if the job is absent, so it must be
+  guarded by `IF EXISTS (SELECT 1 FROM cron.job WHERE jobname=…)` — NOT the `WHERE TRUE`
+  the prior migrations used (those only worked because their outer pg_extension guard meant
+  the unschedule never ran while cron was off).
+- **Follow-up available:** now that pg_cron is on, the **dormant analytics/digest/purge
+  jobs** from migrations 107/108/110/116/117 are still NOT registered (their schedule DO
+  blocks already ran + skipped). They can be re-registered in a small follow-up to fully
+  automate the contributor dashboards / retention purges. Kept out of 120 to stay scoped.
 
-### Deferred (optional polish — Phase 5)
-Fractional-zoom tier cross-fade + low-prominence dot desaturation were scoped out to keep
-this change focused/safe. Mid-tier already cross-fades. Pick up from
-`.claude/sessions/map-prominence-tiering.md` if wanted.
+### Phase 5 — DONE, reframed as a performance pass (founder priority: speed/lightweight)
+The original cosmetic Phase 5 was dropped on purpose: dot **desaturation contradicts the
+documented founder preference for crisp/"illuminous" markers** (dimming was already removed
+once for looking dull — see `markers.ts` + the mid-tier `opacity:1` revert), and a
+fractional-zoom fade needs a per-frame zoom listener that risks the pan smoothness. Instead
+Phase 5 hardened the real hot path:
+- **Deconfliction now skips off-screen markers.** `runDeconfliction` filtered `n` to only
+  on-screen markers (`display:none`/`visibility:hidden` excluded) before the O(n²) force
+  loop + projection. Off-screen markers can't visually overlap, so this is a pure win that
+  **grows with zoom and dataset size** — the scaling lever as events/places multiply.
+- **Early-out** when <2 on-screen markers (resets the lone offset, skips the loop).
+- Equal-prominence collision behaviour remains mathematically identical (no visual regression).
 
 ### git note (this session)
 A concurrent founder commit (`3fba76e`) swept the bulk of this work in (prominence.ts,

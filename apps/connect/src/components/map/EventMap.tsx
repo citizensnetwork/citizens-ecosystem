@@ -309,14 +309,28 @@ export default function EventMap({
       return;
     }
 
-    // Combine event + visible place markers for unified deconfliction
+    // Combine event + place markers for unified deconfliction, but only the
+    // ones actually on screen. Off-screen markers are `display:none` (viewport
+    // culling) or `visibility:hidden` (place-gating/filters) and can never
+    // visually overlap, so excluding them shrinks `n` in the O(n²) spread loop
+    // — the map's heaviest per-frame cost while panning. The win grows with
+    // zoom (most markers off-screen) and with the dataset, so this is the
+    // scaling lever, not a micro-optimisation.
+    const onScreen = (marker: maplibregl.Marker): boolean => {
+      const el = marker.getElement() as HTMLElement;
+      return el.style.visibility !== "hidden" && el.dataset.cculled !== "1";
+    };
     const allMarkerData = [
-      ...evtMarkerDataRef.current,
-      ...placeMarkerDataRef.current.filter(({ marker }) => {
-        const el = marker.getElement() as HTMLElement;
-        return el.style.visibility !== "hidden";
-      }),
+      ...evtMarkerDataRef.current.filter(({ marker }) => onScreen(marker)),
+      ...placeMarkerDataRef.current.filter(({ marker }) => onScreen(marker)),
     ];
+
+    // Fewer than two on-screen markers can't overlap — reset any residual
+    // offset on the lone marker and skip the spread loop entirely.
+    if (allMarkerData.length < 2) {
+      allMarkerData.forEach(({ marker }) => marker.setOffset([0, 0]));
+      return;
+    }
 
     // Project lat/lng → screen px. `weight` biases collisions by prominence
     // (Google-style importance): a heavier marker yields less, so the more
