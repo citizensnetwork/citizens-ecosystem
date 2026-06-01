@@ -676,17 +676,24 @@ body {
  * (.cc-map-glass). They restyle the EXISTING markers — no map rewrite. */
 
 /* Impact Glow — static concentric rings, tinted by the marker's category
- * (--cc-pulse-color, set per-marker; falls back to gold). */
-.cc-map-glass[data-layer-glow="on"] .cc-marker-outer {
+ * (--cc-pulse-color, set per-marker; falls back to gold).
+ *
+ * Scoped to EVENT markers only (`:not(.cc-place-marker)`). Places are constant,
+ * not "active/impactful in time", so they carry no activity overlay — and,
+ * critically, a place's `.cc-marker-outer` has no border-radius, so a box-shadow
+ * on it rendered as an ugly SQUARE halo around the pin. Excluding places fixes
+ * that and keeps place icons clean. */
+.cc-map-glass[data-layer-glow="on"] .cc-marker:not(.cc-place-marker) .cc-marker-outer {
   box-shadow:
     0 0 0 4px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 22%, transparent),
     0 0 0 11px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 12%, transparent),
     0 0 20px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 40%, transparent) !important;
 }
 
-/* Activity Pulse — animated expanding ring (overrides glow when both on). */
+/* Activity Pulse — animated expanding ring (overrides glow when both on).
+ * Event markers only, same reasoning as Impact Glow above (square-halo fix). */
 @media (prefers-reduced-motion: no-preference) {
-  .cc-map-glass[data-layer-pulse="on"] .cc-marker-outer {
+  .cc-map-glass[data-layer-pulse="on"] .cc-marker:not(.cc-place-marker) .cc-marker-outer {
     animation: ccActivityPulse 2.4s ease-out infinite !important;
   }
 }
