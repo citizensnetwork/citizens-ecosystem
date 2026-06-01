@@ -92,11 +92,19 @@ Phase 5 hardened the real hot path:
 - **Early-out** when <2 on-screen markers (resets the lone offset, skips the loop).
 - Equal-prominence collision behaviour remains mathematically identical (no visual regression).
 
-### git note (this session)
-A concurrent founder commit (`3fba76e`) swept the bulk of this work in (prominence.ts,
-migration 119, db.ts, most of EventMap/CSS) and is **already on origin**. Local commit
-`9267510` holds only a trailing 4-line linter delta and is **unpushed** — push at will.
-Working tree clean; cumulative HEAD is the validated state (`tsc 0`/782 tests/lint clean).
+### git — all committed + pushed
+**origin/main @ `8845eb7`** (working tree clean). This session's commits:
+- `9267510` — tiering + photo tier wiring (bulk also swept into founder commit `3fba76e`).
+- `a5c3bf9` — Phase 5 deconfliction perf + migration 120 (enable pg_cron).
+- `8845eb7` — migration 121 (re-register dormant crons).
+
+Migrations applied to live: **119** (prominence base), **120** (enable pg_cron),
+**121** (register dormant jobs). Final gate: `tsc 0` · **782/782 tests** · lint clean ·
+vibe-security CLEAN.
+
+> ⚠️ **Repo git-identity hook:** commits are rejected unless
+> `git config --local user.name "Citizens Network"` and
+> `user.email "citizensnetworkpbo@gmail.com"` are set. Set them once per clone.
 
 ---
 
