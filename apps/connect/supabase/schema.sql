@@ -1427,6 +1427,7 @@ create table if not exists public.event_updates (
   author_id uuid not null references public.profiles(id) on delete cascade,
   body text not null check (char_length(body) between 1 and 1000),
   is_system boolean not null default false,
+  is_material boolean not null default false,
   created_at timestamptz not null default now()
 );
 

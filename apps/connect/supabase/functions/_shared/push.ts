@@ -30,6 +30,12 @@ export interface PushPayload {
    * and this function should only deliver FCM push.
    */
   skipInApp?: boolean;
+  /**
+   * When true, skips FCM push delivery and only inserts in-app rows.
+   * Use to give some recipients an in-app bell notification without a
+   * push (e.g. considering RSVPs on a non-material event update).
+   */
+  skipPush?: boolean;
 }
 
 // ── FCM v1 OAuth2 token management ──────────────────────────
@@ -142,6 +148,9 @@ export async function sendNotifications(
     console.error("[send-push] Failed to insert notifications:", insertErr.message);
   }
   } // end skipInApp guard
+
+  // Caller wants in-app only (no push for this recipient set).
+  if (payload.skipPush) return;
 
   // 2. Get push tokens for these users (only users with digest = 'instant')
   const { data: profiles } = await supabase
