@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import RSVPButton from "./RSVPButton";
+import EventNotifyToggle from "./EventNotifyToggle";
 import CommentSection from "./CommentSection";
 import EventUpdatesList from "./EventUpdatesList";
 import WhoIsAttending from "./WhoIsAttending";
@@ -52,6 +53,8 @@ type Props = {
   count: number;
   user: User | null;
   hasRsvped: boolean;
+  /** Current per-event notification opt-in for the viewer's RSVP. */
+  notifyUpdates?: boolean;
   attendees?: Attendee[];
   /** Other RSVPers who have opted in to be discoverable. Only shown when viewer has RSVPed. */
   discoverableAttendees?: { user_id: string; full_name: string; avatar_url: string | null }[];
@@ -71,6 +74,7 @@ export default function EventDetailContent({
   count,
   user,
   hasRsvped,
+  notifyUpdates = true,
   attendees = [],
   discoverableAttendees = [],
   locationSharingEnabled = false,
@@ -344,6 +348,9 @@ export default function EventDetailContent({
         ) : user ? (
           <>
             <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
+            {hasRsvped && !isCancelled && (
+              <EventNotifyToggle eventId={event.id} initial={notifyUpdates} />
+            )}
             {hasRsvped && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <a

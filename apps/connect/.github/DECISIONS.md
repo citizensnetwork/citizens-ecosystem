@@ -12,6 +12,11 @@
 
 ## Cross-cutting code rules
 
+### Per-event notification opt-out via column-scoped SECURITY DEFINER RPC
+**Decision:** RSVP'd/considering users mute a single event's updates + organiser broadcasts via `rsvps.notify_updates boolean not null default true` (migration 126). The only write path is the SECURITY DEFINER RPC `set_rsvp_notify_updates(p_event_id, p_notify)`, which updates `notify_updates` on the caller's own row (`user_id = auth.uid()`) and nothing else. No broad UPDATE RLS policy is opened on `rsvps`. Fan-out queries in `notify-event-update` and `notify-broadcast` (event branch) exclude rows with `.neq("notify_updates", false)`. Event *cancellations* are unaffected — they fan out from the separate `notify-event-cancelled` function, which intentionally ignores the opt-out (cancellation is always safety-critical).
+**Why:** A column-blind UPDATE policy on `rsvps` would also let a user flip `status` (considering↔attending) and bypass the capacity checks enforced by `safe_rsvp`/`toggle_consider`. A column-scoped RPC keeps the mute self-service while preserving those invariants. The resulting `authenticated_security_definer_function_executable` advisory is the same accepted pattern as the ~49 other column-scoped RPCs; switching to SECURITY INVOKER would break it by design.
+**Date:** 2026-06-02, notif-matrix Batch 1.
+
 ### Scheduled edge-function crons use inline config, not GUCs
 **Decision:** Postgres cron jobs that invoke edge functions via `pg_net` (e.g. the weekly `contributor-digest`) embed the function URL and publishable anon key as inline literals in the `cron.schedule` command (migration 125), rather than reading `app.supabase_functions_url` / `app.supabase_anon_key` GUCs. The anon/publishable key is committed inline in the migration.
 **Why:** `ALTER DATABASE ... SET` is denied to the Supabase management role on this project, so GUC-based config (the approach in migration 123) always short-circuits and never registers the cron. Inline literals are safe under the RLS-first model — RLS, not key secrecy, enforces access; the anon key only lets the gateway accept the scheduled call, and the function itself runs with its own service-role env key. `pg_net` is installed in `public` because it does not support `SET SCHEMA`; the resulting `extension_in_public` WARN advisory is an accepted, known exception.

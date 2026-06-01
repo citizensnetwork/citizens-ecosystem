@@ -108,11 +108,13 @@ serve(async (req) => {
 
     if (entityType === "event") {
       // Event broadcast → users who RSVPed as attending or considering.
+      // Per-event opt-out (migration 126): exclude rows with notify_updates=false.
       const { data: rsvpRows } = await supabase
         .from("rsvps")
         .select("user_id")
         .eq("event_id", entityId)
-        .in("status", ["attending", "considering"]);
+        .in("status", ["attending", "considering"])
+        .neq("notify_updates", false);
 
       rawUserIds = (rsvpRows ?? []).map((r) => r.user_id as string);
     } else {

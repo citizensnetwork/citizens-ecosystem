@@ -991,6 +991,47 @@ $$;
 revoke all on function public.safe_rsvp(uuid, uuid) from public;
 grant execute on function public.safe_rsvp(uuid, uuid) to authenticated;
 
+-- Per-event notification opt-out for RSVP'd / considering users (migration 126).
+alter table public.rsvps
+  add column if not exists notify_updates boolean not null default true;
+
+create index if not exists rsvps_notify_updates_muted_idx
+  on public.rsvps(event_id)
+  where notify_updates = false;
+
+create or replace function public.set_rsvp_notify_updates(
+  p_event_id uuid,
+  p_notify boolean
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_rows integer;
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '28000';
+  end if;
+  if p_event_id is null or p_notify is null then
+    raise exception 'invalid_arguments' using errcode = '22023';
+  end if;
+
+  update public.rsvps
+    set notify_updates = p_notify
+    where user_id = v_uid
+      and event_id = p_event_id;
+
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
+end;
+$$;
+
+revoke all on function public.set_rsvp_notify_updates(uuid, boolean) from public, anon;
+grant execute on function public.set_rsvp_notify_updates(uuid, boolean) to authenticated;
+
 -- ══════════════════════════════════════════════
 -- Interest Groups
 -- ══════════════════════════════════════════════

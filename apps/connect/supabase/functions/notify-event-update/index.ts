@@ -39,10 +39,12 @@ serve(async (req) => {
 
     // Gather all RSVP user_ids (attending + considering both live in the
     // same `rsvps` table, differentiated by the `status` column).
+    // Per-event opt-out (migration 126): exclude rows with notify_updates=false.
     const { data: rsvpRows } = await supabase
       .from("rsvps")
-      .select("user_id")
-      .eq("event_id", eventId);
+      .select("user_id, notify_updates")
+      .eq("event_id", eventId)
+      .neq("notify_updates", false);
 
     const rawUserIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
       .filter((id) => id !== authorId); // author shouldn't ping themselves

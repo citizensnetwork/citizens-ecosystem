@@ -105,6 +105,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
   const broadcasts = (broadcastRows ?? []) as OrgBroadcast[];
 
   let hasRsvped = false;
+  let notifyUpdates = true;
   let attendees: { user_id: string; full_name: string; isFriend: boolean }[] = [];
   let discoverableAttendees: { user_id: string; full_name: string; avatar_url: string | null }[] = [];
   let locationSharingEnabled = false;
@@ -124,7 +125,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       await Promise.all([
         supabase
           .from("rsvps")
-          .select("id")
+          .select("id, notify_updates")
           .eq("user_id", user.id)
           .eq("event_id", id)
           .maybeSingle(),
@@ -144,6 +145,8 @@ export default async function EventDetailServer({ id }: { id: string }) {
       ]);
 
     hasRsvped = !!rsvp;
+    notifyUpdates =
+      (rsvp as { notify_updates?: boolean } | null)?.notify_updates ?? true;
     locationSharingEnabled = profile?.location_sharing ?? false;
     isAdmin = profileIsAdmin(profile);
 
@@ -223,6 +226,7 @@ export default async function EventDetailServer({ id }: { id: string }) {
       count={count ?? 0}
       user={user}
       hasRsvped={hasRsvped}
+      notifyUpdates={notifyUpdates}
       attendees={attendees}
       discoverableAttendees={discoverableAttendees}
       locationSharingEnabled={locationSharingEnabled}
