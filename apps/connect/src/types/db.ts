@@ -64,6 +64,11 @@ export type Event = {
   category_id: string | null;
   created_by: string;
   created_at: string;
+  /** Map tiering: server-maintained popularity score [0,1] (migration 119).
+   *  Combined client-side with live time-proximity + newcomer boost to pick
+   *  a marker's tier. Optional so partially-constructed events stay valid;
+   *  absent/null is treated as 0 (fairness floor — still shown as a dot). */
+  prominence_base?: number;
   /** True when this event was created by a Citizen (not an approved
    *  Contributor).  UI renders a "Community-organised" chip so viewers
    *  can distinguish editorially-curated events from community ones.
@@ -430,6 +435,9 @@ export type Place = {
   reviews_count?: number;
   negative_signals?: number;
   created_at: string;
+  /** Map tiering: server-maintained popularity score [0,1] (migration 119).
+   *  See Event.prominence_base. Absent/null treated as 0 (fairness floor). */
+  prominence_base?: number;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
   /** True when the place advertises an ongoing need for volunteers

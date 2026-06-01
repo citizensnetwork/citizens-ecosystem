@@ -15,6 +15,7 @@ import {
 import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
+import { computeProminence, markerTier } from "@/lib/map/prominence";
 
 type Props = {
   events: Event[];
@@ -95,17 +96,22 @@ function zoomScale(z: number): number {
   return 0.55 + ((z - 4) / (10 - 4)) * (1 - 0.55);
 }
 
-/** Below this zoom, markers collapse to solid category-coloured dots so many
- *  points across a province/country remain distinguishable without clutter. */
-const DOT_MODE_ZOOM = 7;
-
-/** Between DOT_MODE_ZOOM and this zoom, markers are shown at full size but
- *  the inner glyph is slightly faded — a Google-Maps-style "mid tier" that
- *  cross-fades between dot and full marker presentation. */
-const MID_MODE_ZOOM = 10;
+// DOT_MODE_ZOOM / MID_MODE_ZOOM now live in @/lib/map/prominence (single
+// source of truth), since the tier decision is per-marker (zoom + prominence)
+// rather than a global zoom cut-off. A prominence-0 marker still uses these
+// exact base thresholds; higher-prominence markers reveal a couple of zoom
+// levels earlier (Google-Maps-style importance promotion).
 
 /** Size (px) of a dot-mode marker regardless of base size — small and uniform. */
 const DOT_MODE_SIZE = 10;
+
+/** Photo tier: the top-N most-prominent *full-tier* markers currently in the
+ *  viewport get a larger thumbnail treatment (the "big icon with picture"
+ *  look). Capped so the map never turns into a wall of photos and the
+ *  DOM/image cost stays bounded. */
+const PHOTO_TIER_CAP = 4;
+/** Diameter (px) of a photo-tier marker. */
+const PHOTO_TIER_SIZE = 56;
 
 /* ── Event markers render at their true lat/lng at every zoom level ──
  * The previous "sticky 50 km ring" feature pinned off-screen markers to
@@ -200,8 +206,12 @@ export default function EventMap({
   considerEventIdsRef.current = considerEventIds;
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string }[]>([]);
-  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number }[]>([]);
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; prominence: number; photoUrl: string | null }[]>([]);
+  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; prominence: number; photoUrl: string | null }[]>([]);
+  /** Markers currently promoted to the photo tier (top-N by prominence in the
+   *  viewport). Recomputed on every settle by updatePhotoTier. */
+  const photoMarkersRef = useRef<Set<maplibregl.Marker>>(new Set());
+  const updatePhotoTierRef = useRef<() => void>(() => {});
   const svgOverlayRef = useRef<SVGSVGElement | null>(null);
   const runDeconflictionRef = useRef<() => void>(() => {});
   const updateMarkerSizesRef = useRef<() => void>(() => {});
@@ -262,11 +272,18 @@ export default function EventMap({
       const el = marker.getElement() as HTMLElement;
       el.style.visibility = shouldShowPlaces ? "" : "hidden";
     });
-    // Event markers stay visible at all zooms unless the user is browsing
-    // places (a place-category filter is active).
+    // Event markers stay visible at all zooms. They are hidden ONLY during a
+    // pure place-browse (place categories selected with NO event categories) —
+    // e.g. the burger "Places" tab or a place-only quick tool. A quick-access
+    // tool that carries BOTH event + place categories (Coffee, Churches, Runs…)
+    // must show events AND places together, so the presence of event categories
+    // keeps events on the map. (Was: hid events whenever any place cat was set,
+    // which wiped events off the map for every "both" quick tool.)
+    const hasEventCatsSelected = (activeCategoriesRef.current?.size ?? 0) > 0;
+    const hideEvents = hasPlaceCatsSelected && !hasEventCatsSelected;
     evtMarkerDataRef.current.forEach(({ marker }) => {
       const el = marker.getElement() as HTMLElement;
-      el.style.visibility = hasPlaceCatsSelected ? "hidden" : "";
+      el.style.visibility = hideEvents ? "hidden" : "";
     });
   }, []);
 
@@ -301,12 +318,15 @@ export default function EventMap({
       }),
     ];
 
-    // Project lat/lng → screen px
-    const items = allMarkerData.map(({ marker, lngLat }) => {
+    // Project lat/lng → screen px. `weight` biases collisions by prominence
+    // (Google-style importance): a heavier marker yields less, so the more
+    // prominent of two overlapping markers keeps its spot and the lower one
+    // gives way — instead of both splitting the displacement 50/50.
+    const items = allMarkerData.map(({ marker, lngLat, prominence }) => {
       const px = map.project(lngLat as maplibregl.LngLatLike);
       const el = marker.getElement() as HTMLElement;
       const size = parseInt(el.style.width || "40") || 40;
-      return { marker, origX: px.x, origY: px.y, x: px.x, y: px.y, size };
+      return { marker, origX: px.x, origY: px.y, x: px.x, y: px.y, size, weight: 0.5 + prominence };
     });
 
     // Iterative force spread (DECONFLICT_ITERATIONS iterations)
@@ -322,13 +342,18 @@ export default function EventMap({
           const dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0 && dist < minDist) {
-            const push = ((minDist - dist) / 2) * DAMPING;
+            const push = (minDist - dist) * DAMPING;
             const nx = dx / dist;
             const ny = dy / dist;
-            a.x -= nx * push;
-            a.y -= ny * push;
-            b.x += nx * push;
-            b.y += ny * push;
+            // Split the push inversely to weight: each marker moves a share
+            // proportional to the *other's* weight (heavier ⇒ moves less).
+            const total = a.weight + b.weight;
+            const aShare = b.weight / total;
+            const bShare = a.weight / total;
+            a.x -= nx * push * aShare;
+            a.y -= ny * push * aShare;
+            b.x += nx * push * bShare;
+            b.y += ny * push * bShare;
           }
         }
       }
@@ -357,21 +382,22 @@ export default function EventMap({
     });
   }, []);
 
-  /** Resize event marker elements based on current zoom level.
-   *  Scales the outer container, the inner white circle, and the icon glyph
-   *  together so the ring-to-icon gap stays visually consistent.
-   *  Below DOT_MODE_ZOOM each marker collapses to a small solid category-
-   *  coloured dot (via the .cc-marker-dot CSS class). */
+  /** Resize marker elements for the current zoom, with the tier (dot → mid →
+   *  full) decided per-marker by zoom + prominence. Scales the outer
+   *  container, inner white circle, and icon glyph together so the
+   *  ring-to-icon gap stays consistent. High-prominence markers leave
+   *  dot-mode and reach full presentation earlier (Google-style importance
+   *  promotion); a prominence-0 marker still collapses to a solid category
+   *  dot below DOT_MODE_ZOOM and never gets stuck hidden (fairness floor). */
   const updateMarkerSizes = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     const z = map.getZoom();
     const scale = zoomScale(z);
-    const dotMode = z < DOT_MODE_ZOOM;
-    const midMode = !dotMode && z < MID_MODE_ZOOM;
 
-    const resize = (el: HTMLElement, baseSize: number, iconRatio: number) => {
-      if (dotMode) {
+    const resize = (el: HTMLElement, baseSize: number, iconRatio: number, prominence: number) => {
+      const tier = markerTier(z, prominence);
+      if (tier === "dot") {
         el.classList.add("cc-marker-dot");
         el.classList.remove("cc-marker-mid");
         el.style.width = `${DOT_MODE_SIZE}px`;
@@ -385,7 +411,7 @@ export default function EventMap({
       }
 
       el.classList.remove("cc-marker-dot");
-      if (midMode) {
+      if (tier === "mid") {
         el.classList.add("cc-marker-mid");
       } else {
         el.classList.remove("cc-marker-mid");
@@ -406,11 +432,11 @@ export default function EventMap({
       }
     };
 
-    evtMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio }) => {
-      resize(marker.getElement() as HTMLElement, baseSize, iconRatio);
+    evtMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio, prominence }) => {
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence);
     });
-    placeMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio }) => {
-      resize(marker.getElement() as HTMLElement, baseSize, iconRatio);
+    placeMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio, prominence }) => {
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence);
     });
   }, []);
 
@@ -454,6 +480,72 @@ export default function EventMap({
     for (const m of placeMarkersRef.current) cull(m);
   }, []);
   cullMarkersRef.current = cullMarkers;
+
+  /** Photo tier: promote the top-N most-prominent full-tier markers that are
+   *  currently on-screen to a larger thumbnail ("big icon with picture"),
+   *  everything else stays its normal pin. Recomputed on each settle because
+   *  the candidate set depends on what's in the viewport at this zoom.
+   *
+   *  Visual is an overlay <img> centred on the marker (added once, idempotent)
+   *  toggled by the `cc-marker-photo` class — variant-agnostic and fully
+   *  reversible, so it never fights the per-zoom inline sizing on the host. */
+  const updatePhotoTier = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const z = map.getZoom();
+
+    type PhotoCand = { marker: maplibregl.Marker; prominence: number; photoUrl: string };
+    const candidates: PhotoCand[] = [];
+    const consider = (d: { marker: maplibregl.Marker; prominence: number; photoUrl: string | null }) => {
+      if (!d.photoUrl) return;
+      // Only full-tier markers can wear a photo (no point on a dot/mid).
+      if (markerTier(z, d.prominence) !== "full") return;
+      const el = d.marker.getElement() as HTMLElement;
+      if (el.dataset.cculled === "1" || el.style.display === "none") return; // off-screen
+      if (el.style.visibility === "hidden") return; // place-gated / filtered out
+      if (el.dataset.photoFailed === "1") return; // image 404'd earlier — keep the pin
+      candidates.push({ marker: d.marker, prominence: d.prominence, photoUrl: d.photoUrl });
+    };
+    evtMarkerDataRef.current.forEach(consider);
+    placeMarkerDataRef.current.forEach(consider);
+
+    candidates.sort((a, b) => b.prominence - a.prominence);
+    const winners = new Set(candidates.slice(0, PHOTO_TIER_CAP).map((c) => c.marker));
+
+    const promote = (el: HTMLElement, url: string) => {
+      let img = el.querySelector<HTMLImageElement>(".cc-marker-photo-img");
+      if (!img) {
+        img = document.createElement("img");
+        img.className = "cc-marker-photo-img";
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        // Drop the promotion if the image fails to load — fall back to the pin
+        // and remember the failure so it isn't re-promoted on the next settle.
+        img.addEventListener("error", () => {
+          el.dataset.photoFailed = "1";
+          el.classList.remove("cc-marker-photo");
+        }, { once: true });
+        el.appendChild(img);
+      }
+      if (img.getAttribute("src") !== url) img.src = url; // src setter encodes safely
+      el.style.setProperty("--cc-photo-size", `${PHOTO_TIER_SIZE}px`);
+      el.classList.add("cc-marker-photo");
+    };
+    const demote = (el: HTMLElement) => {
+      if (el.classList.contains("cc-marker-photo")) el.classList.remove("cc-marker-photo");
+    };
+
+    const apply = (d: { marker: maplibregl.Marker; photoUrl: string | null }) => {
+      const el = d.marker.getElement() as HTMLElement;
+      if (d.photoUrl && winners.has(d.marker)) promote(el, d.photoUrl);
+      else demote(el);
+    };
+    evtMarkerDataRef.current.forEach(apply);
+    placeMarkerDataRef.current.forEach(apply);
+    photoMarkersRef.current = winners;
+  }, []);
+  updatePhotoTierRef.current = updatePhotoTier;
 
   /** Sticky 50 km nearby-event ring — REMOVED.
    *  Previously pinned off-screen markers to the viewport edge with a
@@ -545,6 +637,7 @@ export default function EventMap({
     map.on("zoomend", () => {
       updatePlaceVisibility();
       updateMarkerSizesRef.current();
+      updatePhotoTierRef.current();
       runDeconflictionRef.current();
     });
 
@@ -564,6 +657,7 @@ export default function EventMap({
     // After panning stops, do a final deconfliction pass
     map.on("moveend", () => {
       cullMarkersRef.current();
+      updatePhotoTierRef.current();
       runDeconflictionRef.current();
       onMoveEndRef.current?.();
       if (onBoundsChangeRef.current) {
@@ -725,7 +819,17 @@ export default function EventMap({
         el.style.cursor = "pointer";
         el.addEventListener("click", () => onSelectEventRef.current?.(event));
         markersRef.current.push(marker);
-        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id });
+        // Prominence: server popularity base + live time-proximity + newcomer
+        // boost. Drives the per-marker tier (dot/mid/full) and collision/photo
+        // priority. Fairness floor lives inside computeProminence (never 0-hides).
+        const prominence = computeProminence({
+          base: event.prominence_base,
+          dateStr: event.date,
+          endDateStr: event.end_time,
+          createdAt: event.created_at,
+        });
+        const photoUrl = event.image_url ?? event.marker_image_url ?? creator?.avatar_url ?? null;
+        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id, prominence, photoUrl });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -785,7 +889,13 @@ export default function EventMap({
           .addTo(map);
 
         placeMarkersRef.current.push(marker);
-        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO });
+        // Places have no expiry — computeProminence uses a neutral time term;
+        // popularity base + newcomer boost still differentiate them.
+        const prominence = computeProminence({
+          base: place.prominence_base,
+          createdAt: place.created_at,
+        });
+        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO, prominence, photoUrl: place.image_url ?? null });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -813,8 +923,9 @@ export default function EventMap({
       // sessions (safety-net; no-op on fresh markers).
       setTimeout(() => {
         updateMarkerSizesRef.current();
-        runDeconflictionRef.current();
         cullMarkersRef.current();
+        updatePhotoTierRef.current();
+        runDeconflictionRef.current();
         clearLegacyRingStateRef.current();
       }, 300);
     };

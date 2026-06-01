@@ -45,23 +45,36 @@ export default function SidePanel({
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // Lock body scroll and mark siblings inert while mounted so
-  // screen readers and keyboards stay inside the drawer. We inert
-  // every immediate child of <body> except this drawer itself.
+  // Lock body scroll and mark siblings inert ONLY while the drawer is actually
+  // visible (screen readers / keyboards stay inside the drawer). Keying this to
+  // `visible` — not just mount — is what unsticks the map: the instant the user
+  // dismisses, we release `inert` + the scroll-lock even if Next keeps the
+  // intercepted @panel slot mounted for a beat after the route change. A
+  // closed-but-lingering overlay was leaving the map frozen ("closes perfectly,
+  // but nothing works after"). We also drop pointer-events on the root while
+  // closing (see render) so the fading overlay can never eat map clicks.
   useEffect(() => {
+    const clearStrays = () => {
+      document.querySelectorAll("[data-cc-inert-by-panel]").forEach((el) => {
+        el.removeAttribute("inert");
+        el.removeAttribute("data-cc-inert-by-panel");
+      });
+    };
+
+    if (!visible) {
+      // Closing / closed — guarantee nothing stays frozen.
+      clearStrays();
+      document.body.style.overflow = "";
+      return;
+    }
+
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const drawerRoot = panelRef.current?.closest("[data-sidepanel-root]") ?? null;
 
-    // Belt-and-suspenders: before marking anything inert, sweep up any `inert`
-    // a PREVIOUS panel instance may have left behind if its cleanup was skipped
-    // on a fast/interrupted navigation. A leaked `inert` on the map container is
-    // exactly what makes "icons not appear / events won't open / feels stuck",
-    // so we tag every element we freeze and always clear tagged stragglers.
-    document.querySelectorAll("[data-cc-inert-by-panel]").forEach((el) => {
-      el.removeAttribute("inert");
-      el.removeAttribute("data-cc-inert-by-panel");
-    });
+    // Belt-and-suspenders: sweep up any `inert` a PREVIOUS panel instance may
+    // have left behind if its cleanup was skipped on a fast/interrupted nav.
+    clearStrays();
 
     // Only freeze siblings if we positively identified our own root — never
     // risk marking the drawer (or everything) inert when the ref isn't ready.
@@ -82,7 +95,7 @@ export default function SidePanel({
         el.removeAttribute("data-cc-inert-by-panel");
       });
     };
-  }, [panelRef]);
+  }, [visible, panelRef]);
 
   // Slide the drawer out, THEN navigate — but drive the hand-off off the real
   // `transitionend` rather than a fixed 300ms timer, so a slow device can't
@@ -150,7 +163,14 @@ export default function SidePanel({
   }, [handleClose]);
 
   return (
-    <div data-sidepanel-root className="fixed inset-0 z-1700">
+    <div
+      data-sidepanel-root
+      // Once dismissal starts (visible→false) the root stops intercepting
+      // pointer events, so the fading full-screen overlay can never block the
+      // map — the user keeps interacting with the map immediately on close,
+      // even if Next hasn't torn down the @panel slot yet.
+      className={`fixed inset-0 z-1700 ${visible ? "" : "pointer-events-none"}`}
+    >
       {/* Backdrop — full opacity on mobile (covers the whole screen),
           translucent on desktop so the exposed 40vw of map stays
           readable and the drawer reads as an overlay, not a modal. */}

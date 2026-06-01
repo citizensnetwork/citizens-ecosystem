@@ -258,6 +258,53 @@ body {
   animation-duration: 2.2s !important;
 }
 
+/* ── Photo tier: top-N most-prominent full markers in view ──
+ * EventMap's updatePhotoTier toggles .cc-marker-photo on the marker root and
+ * appends a single .cc-marker-photo-img overlay. The overlay is centred on
+ * the marker point and sized by --cc-photo-size, so it never disturbs the
+ * per-zoom inline sizing on the host (fully reversible). The underlying pin
+ * is hidden while the photo shows; clicks still hit the host element. */
+.cc-marker-photo-img {
+  display: none;
+}
+.cc-marker-photo .cc-marker-photo-img {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--cc-photo-size, 56px);
+  height: var(--cc-photo-size, 56px);
+  border-radius: 50%;
+  object-fit: cover;
+  /* Gold ring keeps events/places reading on-brand even as photos. */
+  border: 2px solid #d4af37;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  background: #fff;
+  pointer-events: none;
+  z-index: 3;
+  animation: markerPhotoIn 220ms ease;
+}
+/* Hide the normal pin (ring + glyph) while the photo overlay is shown. */
+.cc-marker-photo .cc-marker-outer {
+  visibility: hidden;
+}
+@keyframes markerPhotoIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-marker-photo .cc-marker-photo-img {
+    animation: none;
+  }
+}
+
 /* The "sticky 50 km ring" (cc-ring-edge) edge-pinning feature was removed
  * because it dimmed markers at low zoom, drifted during pans, and only
  * reconciled on drag-release. Markers now render at their true lat/lng at
