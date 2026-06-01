@@ -16,13 +16,35 @@
 
 ---
 
-## 2. What just shipped — Notification matrix Batches 1–3 (2026-06-02)
+## 2. What just shipped — Notification matrix Batches 1–4 ✅ COMPLETE (2026-06-02)
 
-Implementing the 4 remaining notification-matrix features in order, one batch each
-through the full quality gate + push. **Price field skipped entirely** (events have no
-price column). Next migration number: **129**.
+All 4 remaining notification-matrix features shipped, one batch each through the full
+quality gate + push. **Price field skipped entirely** (events have no price column).
+The notification matrix is now fully implemented. Next migration number: **130**.
 
-### Batch 3 — Anonymous broadcast reactions — commit `a307bad` (latest)
+### Batch 4 — Map update bubbles — commit `9ac16c5` (latest, FINAL matrix item)
+- **Migration 129** (applied live): `map_bubbles(event_id, body≤160,
+  source∈{event_update,broadcast}, created_at, expires_at default now()+24h)` +
+  `bubble_dismissals(bubble_id, user_id)` PK. RLS: bubbles public-readable only while
+  `expires_at > now()` (no client writes); dismissals own-row only. AFTER-INSERT SECURITY
+  DEFINER triggers `tg_bubble_from_event_update` / `tg_bubble_from_broadcast` (event-only)
+  auto-create a snippet bubble on every event update / event broadcast — both trigger fns
+  have EXECUTE **revoked** from public/anon/authenticated (REST-RPC hardening). SECURITY
+  DEFINER `get_active_map_bubbles()` (anon+authenticated) returns live, non-dismissed
+  bubbles (anon callers get all live); `dismiss_map_bubble(uuid)` (authenticated) records a
+  per-user dismissal idempotently.
+- POST `/api/map/bubbles/[id]/dismiss` (auth + UUID + rate-limit → RPC). `createBubbleEl` +
+  `BUBBLE_MIN_ZOOM=12` in `markers.ts` (escapeHtml-sanitised speech bubble + dismiss ×).
+  `.cc-bubble` CSS in globals.css. EventsView fetches via `rpc("get_active_map_bubbles")`,
+  keeps one bubble per event, passes `bubbles` + `onDismissBubble` to EventMap, which renders
+  an **isolated** bubble marker layer (separate ref + own zoom listener, not entangled with
+  marker deconfliction), anchored above each event, revealed z12+. 4-case dismiss route test;
+  EventsView test mock gained `rpc`.
+- Gates: tsc 0, vitest **813/813** (94 files), lint clean. Advisors 110 WARN / 53 auth-secdef
+  (+3 vs baseline 107 — the 3 intentional SECURITY DEFINER RPCs; the 4 would-be trigger-fn
+  exposures were hardened away).
+
+### Batch 3 — Anonymous broadcast reactions — commit `a307bad`
 - **Migration 128** (applied live): aggregate-only `broadcast_reactions(broadcast_id,
   emoji, count)` — PK `(broadcast_id, emoji)`, **no user id column** (identity-free by
   construction), five-emoji check constraint, RLS SELECT-public + no write policy.
@@ -60,12 +82,14 @@ price column). Next migration number: **129**.
   and `notify-broadcast` (v4) exclude `notify_updates=false` rows. 6-case route test.
 
 ### Next batches (queued, not started)
-- **Batch 4 — Map update bubbles** (migration 129): bubbles table + per-user dismissals,
-  ~24h expiry, dismiss route, MapLibre overlay above markers at z12+, trigger on
-  `event_updates`/broadcast inserts.
+- **Notification matrix is COMPLETE** — all 4 items shipped (Batches 1–4). No queued
+  notification-matrix work remains.
 
-> **Verify webhook wiring:** confirm the `event_updates` INSERT DB webhook actually targets
-> the `notify-event-update` function (it was deployed for the first time in Batch 1).
+> **Verify webhook wiring (carried over, still unverified):** confirm the `event_updates`
+> INSERT DB webhook actually targets the `notify-event-update` function (it was deployed for
+> the first time in Batch 1). Also note: Batch 4 now adds a DB trigger on the same
+> `event_updates` INSERT (bubble creation) — independent of the webhook, so it works
+> regardless, but the push webhook itself remains unverified.
 
 ---
 
