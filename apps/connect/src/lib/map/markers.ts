@@ -175,7 +175,7 @@ export function createCustomMarkerEl(
       cursor:pointer;
       overflow:hidden;
       background:#fff;
-    "><img class="cc-marker-icon" src="${escapeHtml(markerImageUrl)}" alt="" style="width:80%;height:80%;object-fit:contain;" /></span>`;
+    "><img class="cc-marker-icon" src="${escapeHtml(markerImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></span>`;
     return el;
   }
 

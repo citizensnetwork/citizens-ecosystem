@@ -5,9 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES } from "@/lib/categories";
-import { validateImageFile, safeImageExtension, sanitizeSocialUrl } from "@/lib/validation";
+import { validateImageFile, sanitizeSocialUrl } from "@/lib/validation";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadEventMedia } from "@/lib/eventMedia";
+import { uploadMediaFile } from "@/lib/uploadMedia";
 import MediaGalleryUploader, { type SelectedMedia } from "./MediaGalleryUploader";
 import SearchProfilePicker from "./SearchProfilePicker";
 import TagPicker from "./TagPicker";
@@ -213,13 +214,9 @@ export default function EditEventForm({ event }: Props) {
 
     let image_url = event.image_url;
     if (imageFile) {
-      const safeExt = safeImageExtension(imageFile.name);
-      const path = `${user.id}/${Date.now()}.${safeExt}`;
-      const { error: upErr } = await supabase.storage
-        .from("event-images")
-        .upload(path, imageFile, { upsert: true });
-      if (upErr) { setError("Image upload failed: " + upErr.message); setLoading(false); return; }
-      image_url = supabase.storage.from("event-images").getPublicUrl(path).data.publicUrl;
+      const uploaded = await uploadMediaFile(imageFile, { scope: "event-cover" });
+      if ("error" in uploaded) { setError("Image upload failed: " + uploaded.error); setLoading(false); return; }
+      image_url = uploaded.url;
     }
 
     const { error: updateErr } = await supabase

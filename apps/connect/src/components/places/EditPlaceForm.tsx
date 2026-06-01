@@ -8,7 +8,8 @@ import type { Category, Place, PlaceMedia } from "@/types/db";
 import type { SearchProfile } from "@/lib/searchProfile";
 import SearchProfilePicker from "@/components/events/SearchProfilePicker";
 import MediaGalleryUploader, { type SelectedMedia } from "@/components/media/MediaGalleryUploader";
-import { validateImageFile, safeImageExtension } from "@/lib/validation";
+import { validateImageFile } from "@/lib/validation";
+import { uploadMediaFile } from "@/lib/uploadMedia";
 import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { uploadPlaceMedia } from "@/lib/placeMedia";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -140,22 +141,13 @@ export default function EditPlaceForm({ place, categories, media = [] }: Props) 
 
     let image_url: string | null = removeImage ? null : (place.image_url ?? null);
     if (imageFile) {
-      const safeExt = safeImageExtension(imageFile.name);
-      const path = `${user.id}/covers/${Date.now()}.${safeExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("place-images")
-        .upload(path, imageFile, { upsert: true });
-
-      if (uploadError) {
-        setError("Image upload failed: " + uploadError.message);
+      const uploaded = await uploadMediaFile(imageFile, { scope: "place-cover" });
+      if ("error" in uploaded) {
+        setError("Image upload failed: " + uploaded.error);
         setLoading(false);
         return;
       }
-
-      const { data: urlData } = supabase.storage
-        .from("place-images")
-        .getPublicUrl(path);
-      image_url = urlData.publicUrl;
+      image_url = uploaded.url;
     }
 
     const selectedCategory = categories.find((c) => c.id === categoryId);

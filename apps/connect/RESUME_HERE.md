@@ -16,7 +16,53 @@
 
 ---
 
-## 2. What just shipped — Figma glassmorphism map UX migration (Batches A–C)
+## 2. What just shipped — Image-upload RLS fix + marker fill + panel-nav (2026-06-01)
+
+**Fixed the long-standing "new row violates row-level security policy" on event/place image
+uploads, the square-in-circle map marker, and the "X reopens the panel / surfaces get confused"
+navigation bug.** `tsc 0`, lint clean, **762/762 tests** (87 files). Build-green; founder to
+browser-test then it's ready (committed this session).
+
+### Root cause (durable — see `memory/storage-uploads-must-be-server-side.md`)
+The **browser** Supabase client (`@supabase/ssr`) has an unreliable JWT **at the Storage endpoint** —
+uploads arrive as `anon` → bucket RLS denies them. PostgREST/DB writes from the same client are fine;
+only Storage fails. Avatars already dodged this via the server route `/api/avatar`. Event/place
+covers + galleries still uploaded client-side → failed. Live storage INSERT policy verified correct
+via MCP (`foldername[1] = auth.uid() OR is_admin()`); impersonation test returned `path_ok = true`.
+
+### The fix — all binary uploads now go server-side
+- **New `POST /api/media/upload`** ([route.ts](src/app/api/media/upload/route.ts)) — auth + per-user
+  `RATE_LIMITS.heavy` + `validateMediaFile` (image/video) + **service-role admin-client upload**.
+  Path is server-built and always `${user.id}`-prefixed; `scope` enum picks the bucket
+  (`event-images`/`place-images`) so callers can't write to arbitrary buckets or escape their folder.
+- **Client helper** [uploadMedia.ts](src/lib/uploadMedia.ts) (`uploadMediaFile`) — posts FormData,
+  returns `{ url, kind } | { error }`.
+- Rewired the 4 cover sites (`EventForm`, `EditEventForm`, `PlaceForm`, `EditPlaceForm`) + the shared
+  gallery lib [mediaUpload.ts](src/lib/mediaUpload.ts) to the route. Metadata rows
+  (`event_photos`/`place_media`) still insert client-side under the user's RLS session (ownership
+  enforced there — no regression). Updated `placeMedia.test.ts` to the server-route path.
+
+### Marker square-in-circle — FIXED
+[markers.ts](src/lib/map/markers.ts) logo variant img `80%/contain` → **`100%/cover`** so the image
+fills the gold ring (flat sides touch the border). Profile variant already filled.
+
+### Panel-nav "X reopens the panel / surfaces confused" — FIXED + mapped
+- Cause: the **View** action (`handleQuickAction` case `"view"`, `EventsView.tsx`) pushed the
+  `/events/[id]` SidePanel route but left `selectedEvent` set, so the inline glass card (z-1200)
+  stayed mounted under the SidePanel (z-1700); closing one revealed the other. **Fix:** `"view"` now
+  clears `selectedEvent`/`selectedPlace` before `router.push`.
+- Wrote **[docs/NAVIGATION_SURFACES.md](docs/NAVIGATION_SURFACES.md)** (the founder-requested map of
+  every overlay over the map: state-driven glass cards vs URL-driven `@panel` SidePanel, z-index,
+  open/close triggers, collisions). **Proposed but NOT applied** (await founder): SidePanel-X also
+  clears EventsView card state via a module emitter; swap the 300ms close `setTimeout` → `transitionend`.
+
+### Not a bug (confirmed)
+"All my events adopted my new profile photo" — expected: profile/logo markers pull the creator's
+avatar. Working as designed.
+
+---
+
+## 2-prev. Previously shipped — Figma glassmorphism map UX migration (Batches A–C)
 
 **Reskinned the main map (`/events`, `EventsView.tsx`) into the Figma "Glassmorphism
 Community Map" design, wired to real Supabase data, over 3 batches.** Kept the existing
@@ -598,18 +644,19 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 ## 3. Current platform state
 
-- 88 test files, **790 tests**, all passing.
+- 87 test files, **762 tests**, all passing. (Count dropped from 790: the Figma Batch C-2 removed
+  the clustering engine + its test file.)
 - 118 migrations — **all now APPLIED to the live `Citizens-Connect` Supabase project**
   (`xyiajtrvhlxaeplsiajj`). Note: the live DB was silently stuck at 106; this session applied
   the full **107→118** gap via the Supabase MCP (see §2 of this file's batch notes below).
 - Analytics **backfill executed** (`backfill_contributor_analytics(90)`, 2026-02-28→05-28).
 - Security advisor: **0 errors** (105 informational/by-design lints).
-- Latest **pushed** commit on `main`: optional hardening (search-term lockdown + real XLSX) on top of Stage L.
-- ⚠️ **The Figma glassmorphism map UX migration (Batches A–C, §2 above) is NOT yet pushed.** It exists
-  on the founder's working tree, build-clean locally (`tsc`/lint/`next build`), but could not be
-  committed from the Cowork sandbox (truncated-file + whole-repo CRLF artifact). **First action next
-  session: confirm those changes are committed + pushed from the founder's machine** (commit message
-  was provided in chat). If `git log` already shows them, this is done.
+- The Figma glassmorphism map UX migration (Batches A–C + C-2) **is now committed on `main`**
+  (`e74346a`, `4934c5b`) — the old "not yet pushed" warning is resolved.
+- Latest commit on `main`: the 2026-06-01 image-upload RLS fix + marker fill + panel-nav (§2 above).
+  Committed from the founder's Windows machine (no CRLF-churn artifact here — only real changes diff).
+  **Founder to-do:** browser-test a real event/place cover + gallery upload to confirm end-to-end,
+  then `git push` if not already pushed.
 
 ---
 

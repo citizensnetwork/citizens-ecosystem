@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { EVENT_CATEGORIES, CATEGORY_LABELS } from "@/lib/categories";
-import { validateImageFile, safeImageExtension, sanitizeSocialUrl } from "@/lib/validation";
+import { validateImageFile, sanitizeSocialUrl } from "@/lib/validation";
+import { uploadMediaFile } from "@/lib/uploadMedia";
 import { compressImageIfNeeded, SKIP_IF_SMALLER_THAN } from "@/lib/imageCompression";
 import { suggestCategory } from "@/lib/categorySuggest";
 import { uploadEventMedia } from "@/lib/eventMedia";
@@ -285,25 +286,17 @@ export default function EventForm({ isVendor = false, placeCategories = [] }: Pr
       return;
     }
 
-    // Upload image if provided
+    // Upload image if provided (via server route — browser-client JWT is
+    // unreliable at the Storage endpoint, see uploadMediaFile).
     let image_url: string | null = null;
     if (imageFile) {
-      const safeExt = safeImageExtension(imageFile.name);
-      const path = `${user.id}/${Date.now()}.${safeExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("event-images")
-        .upload(path, imageFile, { upsert: true });
-
-      if (uploadError) {
-        setError("Image upload failed: " + uploadError.message);
+      const uploaded = await uploadMediaFile(imageFile, { scope: "event-cover" });
+      if ("error" in uploaded) {
+        setError("Image upload failed: " + uploaded.error);
         setLoading(false);
         return;
       }
-
-      const { data: urlData } = supabase.storage
-        .from("event-images")
-        .getPublicUrl(path);
-      image_url = urlData.publicUrl;
+      image_url = uploaded.url;
     }
 
     // If vendor is adding a new place, create it first

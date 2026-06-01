@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { safeMediaExtension, type MediaKind } from "@/lib/validation";
+import { type MediaKind } from "@/lib/validation";
+import { uploadMediaFile, type UploadScope } from "@/lib/uploadMedia";
 
 export type SelectedMedia = {
   file: File;
@@ -46,32 +47,26 @@ export async function uploadEntityMedia(
   } = opts;
   if (items.length === 0) return null;
 
+  // The browser Supabase client's JWT is unreliable at the Storage endpoint, so
+  // the bytes go through the server route (admin client) via uploadMediaFile.
+  // The `bucket` param is retained for the caller's type-safety but the route
+  // derives the bucket from the scope below.
+  void bucket;
+  const scope: UploadScope = storageFolder === "events" ? "event-gallery" : "place-gallery";
+
   const rows: UploadedMediaRow[] = [];
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const ext = safeMediaExtension(item.file.name, item.kind);
-    const rand = Math.random().toString(36).slice(2, 8);
-    const path = `${userId}/gallery/${storageFolder}/${entityId}/${Date.now()}-${i}-${rand}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(path, item.file, {
-        upsert: true,
-        contentType: item.file.type || undefined,
-      });
-
-    if (uploadError) {
-      return `Gallery upload failed: ${uploadError.message}`;
+    const uploaded = await uploadMediaFile(item.file, { scope, entityId });
+    if ("error" in uploaded) {
+      return `Gallery upload failed: ${uploaded.error}`;
     }
-
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(path);
 
     rows.push({
       [entityIdColumn]: entityId,
-      url: publicUrl,
+      url: uploaded.url,
       kind: item.kind,
       thumbnail_url: null,
       title: item.title.trim() ? item.title.trim() : null,

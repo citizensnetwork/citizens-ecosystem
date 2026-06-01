@@ -828,6 +828,11 @@ export default function EventsView({
       try {
         switch (action) {
           case "view":
+            // Close the inline glass preview first so the SidePanel route and
+            // the preview card don't stack (closing one would otherwise reveal
+            // the other — "X reopens the panel / surfaces get confused").
+            setSelectedEvent(null);
+            setSelectedPlace(null);
             router.push(`/events/${event.id}`);
             break;
           case "join": {
