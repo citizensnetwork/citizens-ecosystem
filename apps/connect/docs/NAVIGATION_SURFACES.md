@@ -68,14 +68,16 @@ This should now behave. If "stuck" recurs, the prime suspects, in order:
      unwinds only one level but the user expected a full close — prefer the **X**
      (full dismiss) over **Back** for "get me out".
 
-### Recommended next hardening (for discussion, not yet applied)
-- Make SidePanel's **X** also defensively clear any lingering EventsView card
-  state. Today they live in different trees, so the cleanest path is a tiny
-  module event (e.g. an `easterEggs/bus`-style emitter) that `EventsView`
-  listens to and runs `closeDetail()`. Low risk, removes the last way A and B
-  can desync on a deep-linked panel.
-- Consider replacing the fixed 300 ms `setTimeout` close with a
-  `transitionend` listener so a slow device can't navigate mid-animation.
+### Hardening applied (2026-06-01) ✅
+- **SidePanel X also clears EventsView card state.** A tiny singleton bus
+  (`src/lib/map/panelBus.ts`, mirrors `easterEggs/bus`) — `handleDismiss`
+  publishes `publishPanelClosed()`, `EventsView` subscribes and runs
+  `closeDetail()`. Removes the last way surfaces A and B can desync on a
+  deep-linked / nested panel.
+- **Close hand-off is driven by `transitionend`, not a fixed timer.**
+  `animateThen` listens for the drawer's `transform` `transitionend` before
+  navigating, with a guarded 400 ms fallback (reduced motion / unmounted node /
+  `display:none`). A slow device can no longer navigate mid-animation.
 
 ## Quick mental model
 - **Card open** = a piece of React state (`selectedEvent`/`selectedPlace`).

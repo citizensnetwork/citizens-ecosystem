@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { publishPanelClosed } from "@/lib/map/panelBus";
 
 export interface SidePanelProps {
   /** Accessible label for the panel (usually the detail title). */
@@ -83,12 +84,34 @@ export default function SidePanel({
     };
   }, [panelRef]);
 
+  // Slide the drawer out, THEN navigate — but drive the hand-off off the real
+  // `transitionend` rather than a fixed 300ms timer, so a slow device can't
+  // navigate mid-animation (which left the surface feeling "stuck"). A guarded
+  // fallback timeout still fires if the transition never does (reduced motion,
+  // the node being unmounted, `display:none`, etc.) so we never wedge.
   const animateThen = useCallback(
     (navigate: () => void) => {
       setVisible(false);
-      setTimeout(navigate, 300);
+      const node = panelRef.current;
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        navigate();
+      };
+      if (node) {
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target === node && e.propertyName === "transform") {
+            node.removeEventListener("transitionend", onEnd);
+            run();
+          }
+        };
+        node.addEventListener("transitionend", onEnd);
+      }
+      // Fallback — slightly longer than the 300ms CSS transition.
+      setTimeout(run, 400);
     },
-    [],
+    [panelRef],
   );
 
   // Go back one step — unwinds a single intercepted route.
@@ -103,8 +126,11 @@ export default function SidePanel({
   }, [animateThen, router, fallbackHref]);
 
   // Close completely — navigates directly to the fallback, discarding
-  // all panel steps regardless of how deep the navigation stack is.
+  // all panel steps regardless of how deep the navigation stack is. Also
+  // signals the map so any lingering inline glass-card state is cleared
+  // (the two overlay surfaces must never both be open — see panelBus).
   const handleDismiss = useCallback(() => {
+    publishPanelClosed();
     animateThen(() => router.push(fallbackHref));
   }, [animateThen, router, fallbackHref]);
 

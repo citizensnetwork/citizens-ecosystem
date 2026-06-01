@@ -29,6 +29,7 @@ import MapFiltersPanel from "@/components/map/glass/MapFiltersPanel";
 import MapStatsFooter from "@/components/map/glass/MapStatsFooter";
 import PlacePreviewCard from "@/components/map/glass/PlacePreviewCard";
 import EventPreviewCard from "@/components/map/glass/EventPreviewCard";
+import { subscribePanelClosed } from "@/lib/map/panelBus";
 import GlassSearchResults from "@/components/map/glass/GlassSearchResults";
 import { DEFAULT_MAP_LAYERS, type MapLayerKey, type MapLayers } from "@/components/map/glass/mapLayers";
 
@@ -908,6 +909,11 @@ export default function EventsView({
     setSelectedEvent(null);
     setSelectedPlace(null);
   }, []);
+
+  // When the intercepted-route SidePanel is fully dismissed (its X), defensively
+  // clear any lingering inline glass-card state so the two overlay surfaces can
+  // never both be open / desync (see src/lib/map/panelBus.ts).
+  useEffect(() => subscribePanelClosed(closeDetail), [closeDetail]);
 
   // City search / geocoding state is declared above next to handleFocusEventOnMap.
 
