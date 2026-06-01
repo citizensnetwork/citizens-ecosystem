@@ -16,7 +16,67 @@
 
 ---
 
-## 2. What just shipped — Image-upload RLS fix + marker fill + panel-nav (2026-06-01)
+## 2. What just shipped — Map prominence tiering (zoom + prominence layers) (2026-06-01)
+
+**Markers now reveal in tiers (dot → mid → full → photo) driven by `zoom + a prominence
+score`, the way Google Maps layers POIs — not zoom alone.** `tsc 0`, lint clean,
+**782/782 tests** (88 files, +20 prominence unit tests). Migration 119 applied to live;
+feature committed (see git note below).
+
+### The model (hybrid, founder-chosen)
+- **Server (heavy, precomputed):** `events.prominence_base` + `places.prominence_base`
+  ∈ [0,1] — a saturating-log popularity score (`raw = Σ wᵢ·ln(1+countᵢ)`, `base =
+  raw/(raw+K)`; row-independent so one viral item can't bury the rest). Events:
+  rsvps/comments/views(90d). Places: follows/reviews. Migration 119
+  ([119_map_prominence.sql](supabase/migrations/119_map_prominence.sql)):
+  `recompute_map_prominence()` SECURITY-DEFINER, service-only, + a guarded daily
+  pg_cron schedule + one-time backfill. Flows to the client free via the existing
+  `events`/`places` `select("*")` in [events/page.tsx](src/app/events/page.tsx).
+- **Client (live):** [src/lib/map/prominence.ts](src/lib/map/prominence.ts) folds in
+  **time-proximity** (dominant, W_TIME 0.6) + **newcomer boost** (decays over 7d) on top
+  of the base (W_POP 0.4). `computeProminence` + `markerTier(zoom, prominence)`, pure +
+  unit-tested ([prominence.test.ts](src/__tests__/lib/map/prominence.test.ts), 20 tests).
+- **Fairness floor (VISION "don't bury the small"):** prominence only sets *tier* and
+  *collision/photo priority* — it NEVER hides. Every item is always ≥ a dot; a
+  prominence-0 marker still reaches full at MID_MODE_ZOOM. Newcomer boost + time-dominant
+  weighting lift fresh/small items.
+
+### Wiring ([EventMap.tsx](src/components/map/EventMap.tsx))
+- `DOT_MODE_ZOOM`/`MID_MODE_ZOOM` moved into prominence.ts (single source of truth); tier
+  is now per-marker (`markerTier`) — high-prominence markers reveal a couple zoom levels
+  earlier (Google-style promotion).
+- **Photo tier** — top-`PHOTO_TIER_CAP` (4) most-prominent *full-tier* markers in the
+  viewport get a larger thumbnail overlay (`.cc-marker-photo` + `.cc-marker-photo-img`,
+  56px), events AND places, recomputed on settle (zoomend/moveend). Reversible overlay
+  (doesn't fight per-zoom inline sizing); falls back to the pin + remembers failure if the
+  image 404s. CSS in [globals.css](src/app/globals.css).
+- **Collision by prominence** — `runDeconfliction` weights the force-push by
+  `0.5 + prominence` so the heavier (more prominent) marker yields less. Equal-prominence
+  behaviour is mathematically identical to before (no regression).
+
+### ⚠️ Operator action — pg_cron NOT installed on this project
+`pg_extension` shows **pg_cron is not installed**, so migration 119's daily schedule (like
+the prior analytics-cron migrations 110/116/117) was silently skipped by its `IF EXISTS`
+guard. The feature works now (backfill populated real values: 22/191 events, 2/40 places
+scored), but **`prominence_base` won't auto-refresh** until either pg_cron is enabled OR
+`SELECT public.recompute_map_prominence();` is run periodically (service_role). Decide:
+enable pg_cron project-wide (also activates the dormant analytics crons) vs. manual/app
+refresh. Not done unilaterally — it's a project-wide infra change.
+
+### Deferred (optional polish — Phase 5)
+Fractional-zoom tier cross-fade + low-prominence dot desaturation were scoped out to keep
+this change focused/safe. Mid-tier already cross-fades. Pick up from
+`.claude/sessions/map-prominence-tiering.md` if wanted.
+
+### git note (this session)
+A concurrent founder commit (`3fba76e`) swept the bulk of this work in (prominence.ts,
+migration 119, db.ts, most of EventMap/CSS) and is **already on origin**. Local commit
+`9267510` holds only a trailing 4-line linter delta and is **unpushed** — push at will.
+Working tree clean; cumulative HEAD is the validated state (`tsc 0`/782 tests/lint clean).
+
+---
+
+## 2-prev. Previously shipped — Image-upload RLS fix + marker fill + panel-nav (2026-06-01)
 
 **Fixed the long-standing "new row violates row-level security policy" on event/place image
 uploads, the square-in-circle map marker, and the "X reopens the panel / surfaces get confused"
@@ -650,9 +710,14 @@ Migration 106: RLS on `specialised_services` + `contributor_keywords`, length 10
 
 - 87 test files, **762 tests**, all passing. (Count dropped from 790: the Figma Batch C-2 removed
   the clustering engine + its test file.)
-- 118 migrations — **all now APPLIED to the live `Citizens-Connect` Supabase project**
-  (`xyiajtrvhlxaeplsiajj`). Note: the live DB was silently stuck at 106; this session applied
-  the full **107→118** gap via the Supabase MCP (see §2 of this file's batch notes below).
+- 119 migrations — **all now APPLIED to the live `Citizens-Connect` Supabase project**
+  (`xyiajtrvhlxaeplsiajj`). Note: the live DB was silently stuck at 106; a prior session applied
+  the **107→118** gap. **Migration 119 (`map_prominence`) applied 2026-06-01** — adds
+  `events/places.prominence_base` + `recompute_map_prominence()` + backfill (22 events / 2 places
+  scored; rest at fairness-floor 0). ⚠️ **pg_cron is NOT installed on this project**, so the daily
+  `map-prominence-recompute` (and the older analytics cron schedules) never registered — prominence
+  must be refreshed by calling `select public.recompute_map_prominence();` manually (or install
+  pg_cron). 119 was authored in a prior session but left untracked; committed 2026-06-01.
 - Analytics **backfill executed** (`backfill_contributor_analytics(90)`, 2026-02-28→05-28).
 - Security advisor: **0 errors** (105 informational/by-design lints).
 - The Figma glassmorphism map UX migration (Batches A–C + C-2) **is now committed on `main`**
