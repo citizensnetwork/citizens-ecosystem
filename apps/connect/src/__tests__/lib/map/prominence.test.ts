@@ -6,8 +6,12 @@ import {
   computeProminence,
   markerTier,
   DOT_MODE_ZOOM,
-  MID_MODE_ZOOM,
-  PROMINENCE_ZOOM_SPAN,
+  EVENT_MARKER_MIN_ZOOM,
+  EVENT_MID_MARKER_ZOOM,
+  EVENT_FULL_MARKER_ZOOM,
+  EVENT_FOLLOWED_LIVE_FULL_ZOOM,
+  PLACE_MARKER_MIN_ZOOM,
+  PLACE_FULL_MARKER_ZOOM,
   NEWCOMER_WINDOW_DAYS,
 } from "@/lib/map/prominence";
 
@@ -90,7 +94,7 @@ describe("computeProminence", () => {
     const lo = computeProminence({ base: 0, dateStr: iso(3 * DAY), createdAt: iso(-30 * DAY), now: NOW });
     const hi = computeProminence({ base: 1, dateStr: iso(3 * DAY), createdAt: iso(-30 * DAY), now: NOW });
     expect(hi).toBeGreaterThan(lo);
-    expect(hi - lo).toBeCloseTo(0.4, 5); // W_POP applied to full base delta
+    expect(hi - lo).toBeCloseTo(0.08, 5); // prominence is the final, lightest ranking nudge
   });
 
   it("newcomer boost lifts a brand-new small item", () => {
@@ -101,12 +105,33 @@ describe("computeProminence", () => {
 
   it("treats places (no dateStr) with neutral time-proximity", () => {
     const place = computeProminence({ base: 0.5, createdAt: iso(-30 * DAY), now: NOW });
-    // 0.6*0.5 (neutral) + 0.4*0.5 = 0.5
-    expect(place).toBeCloseTo(0.5, 5);
+    // 0.35*0.5 neutral activity + 0.2*0.5 base prominence.
+    expect(place).toBeCloseTo(0.275, 5);
+  });
+
+  it("ranks follow ahead of time for events", () => {
+    const followedFar = computeProminence({ base: 0, dateStr: iso(30 * DAY), isFollowed: true, createdAt: iso(-30 * DAY), now: NOW });
+    const soonUnfollowed = computeProminence({ base: 0, dateStr: iso(2 * 60 * 60 * 1000), createdAt: iso(-30 * DAY), now: NOW });
+    expect(followedFar).toBeGreaterThan(soonUnfollowed);
+  });
+
+  it("nudges places by following and activity", () => {
+    const inactive = computeProminence({ base: 0, createdAt: iso(-30 * DAY), placeActivity: 0, now: NOW });
+    const followedActive = computeProminence({ base: 0, createdAt: iso(-30 * DAY), isFollowed: true, placeActivity: 1, now: NOW });
+    expect(followedActive).toBeGreaterThan(inactive);
   });
 
   it("never exceeds 1 even at max everything", () => {
-    const p = computeProminence({ base: 1, dateStr: iso(-30 * 60 * 1000), endDateStr: iso(60 * 60 * 1000), createdAt: iso(0), now: NOW });
+    const p = computeProminence({
+      base: 1,
+      dateStr: iso(-30 * 60 * 1000),
+      endDateStr: iso(60 * 60 * 1000),
+      createdAt: iso(0),
+      isFollowed: true,
+      isEngaged: true,
+      hasFriendActivity: true,
+      now: NOW,
+    });
     expect(p).toBe(1);
   });
 
@@ -118,26 +143,40 @@ describe("computeProminence", () => {
 });
 
 describe("markerTier", () => {
+  it("documents the first event marker reveal zoom", () => {
+    expect(EVENT_MARKER_MIN_ZOOM).toBe(6);
+    expect(EVENT_MARKER_MIN_ZOOM).toBeLessThan(DOT_MODE_ZOOM);
+  });
+
   it("uses base thresholds at prominence 0", () => {
-    expect(markerTier(DOT_MODE_ZOOM - 0.5, 0)).toBe("dot");
-    expect(markerTier(DOT_MODE_ZOOM + 0.5, 0)).toBe("mid");
-    expect(markerTier(MID_MODE_ZOOM + 0.5, 0)).toBe("full");
+    expect(markerTier(EVENT_MID_MARKER_ZOOM - 0.5, 0)).toBe("dot");
+    expect(markerTier(EVENT_MID_MARKER_ZOOM + 0.5, 0)).toBe("mid");
+    expect(markerTier(EVENT_FULL_MARKER_ZOOM, 0)).toBe("full");
   });
 
-  it("promotes high-prominence markers earlier", () => {
-    // At a zoom that's 'dot' for prominence 0, a top item is already 'mid' or 'full'.
-    const z = DOT_MODE_ZOOM - 1; // = 6
+  it("does not let prominence alone break event zoom rules", () => {
+    const z = EVENT_MID_MARKER_ZOOM - 1;
     expect(markerTier(z, 0)).toBe("dot");
-    expect(markerTier(z, 1)).not.toBe("dot");
+    expect(markerTier(z, 1)).toBe("dot");
   });
 
-  it("a prominence-0 marker still reaches full at MID_MODE_ZOOM (fairness floor)", () => {
-    expect(markerTier(MID_MODE_ZOOM, 0)).toBe("full");
+  it("lets live-and-followed events become full markers at zoom 8", () => {
+    expect(markerTier(EVENT_FOLLOWED_LIVE_FULL_ZOOM, 0, {
+      kind: "event",
+      isFollowed: true,
+      isLive: true,
+    })).toBe("full");
+    expect(markerTier(EVENT_FOLLOWED_LIVE_FULL_ZOOM, 1, {
+      kind: "event",
+      isFollowed: false,
+      isLive: true,
+    })).toBe("dot");
   });
 
-  it("max prominence shifts thresholds down by PROMINENCE_ZOOM_SPAN", () => {
-    expect(markerTier(MID_MODE_ZOOM - PROMINENCE_ZOOM_SPAN, 1)).toBe("full");
-    expect(markerTier(MID_MODE_ZOOM - PROMINENCE_ZOOM_SPAN - 0.5, 1)).toBe("mid");
+  it("keeps places as dots from zoom 10 until full place reveal at zoom 12", () => {
+    expect(PLACE_MARKER_MIN_ZOOM).toBe(10);
+    expect(markerTier(PLACE_MARKER_MIN_ZOOM, 1, { kind: "place" })).toBe("dot");
+    expect(markerTier(PLACE_FULL_MARKER_ZOOM, 0, { kind: "place" })).toBe("full");
   });
 
   it("is monotonic in zoom for fixed prominence", () => {

@@ -20,6 +20,7 @@
  */
 
 export type MarkerTier = "dot" | "mid" | "full";
+export type MarkerKind = "event" | "place";
 
 /* ── Tier zoom thresholds (single source of truth; EventMap imports these) ──
  * Base thresholds for a prominence-0 marker. Higher prominence subtracts up
@@ -27,14 +28,29 @@ export type MarkerTier = "dot" | "mid" | "full";
  * reaches full presentation sooner. */
 export const DOT_MODE_ZOOM = 7;
 export const MID_MODE_ZOOM = 10;
+export const EVENT_MID_MARKER_ZOOM = 9;
+export const EVENT_FULL_MARKER_ZOOM = 12;
+export const EVENT_FOLLOWED_LIVE_FULL_ZOOM = 8;
+export const EVENT_FOLLOWED_SOON_PHOTO_ZOOM = 11;
+/** Hide event markers entirely below this zoom. Farther out, a city-activity
+ * glow layer can carry the map without overwhelming citizens with noise. */
+export const EVENT_MARKER_MIN_ZOOM = 6;
+export const PLACE_MARKER_MIN_ZOOM = 10;
+export const PLACE_FULL_MARKER_ZOOM = 12;
 /** Max zoom levels a maximally-prominent marker is promoted by. */
 export const PROMINENCE_ZOOM_SPAN = 3;
 
 /* ── Score weights ─────────────────────────────────────────── */
-/** Time-proximity is the dominant signal (founder decision: don't let
- *  popularity bury the small). Popularity is the secondary nudge. */
-const W_TIME = 0.6;
-const W_POP = 0.4;
+/** Personal relevance order: follow first, time second, consider/friend
+ *  activity equal, platform prominence last. */
+const W_FOLLOW = 0.32;
+const W_TIME = 0.28;
+const W_ENGAGED = 0.16;
+const W_FRIEND = 0.16;
+const W_POP = 0.08;
+const W_PLACE_FOLLOW = 0.35;
+const W_PLACE_ACTIVITY = 0.35;
+const W_PLACE_POP = 0.2;
 /** Places have no expiry — they are "always relevant", so they take a
  *  neutral, mid time-proximity rather than 0. Keeps event↔place collision
  *  and photo-tier comparisons on a fair common scale. */
@@ -113,6 +129,14 @@ export type ProminenceInput = {
   endDateStr?: string | null;
   /** Item creation ISO string — drives the newcomer boost. */
   createdAt?: string | null;
+  /** User follows the event's contributor or the place itself. */
+  isFollowed?: boolean;
+  /** User has RSVP'd / considered / otherwise directly engaged. */
+  isEngaged?: boolean;
+  /** Mutual friend activity exists for this item. */
+  hasFriendActivity?: boolean;
+  /** Place-owned upcoming event activity, normalized to [0,1]. */
+  placeActivity?: number | null;
   /** Current time in ms (injected for testability). Defaults to Date.now(). */
   now?: number;
 };
@@ -124,11 +148,26 @@ export type ProminenceInput = {
 export function computeProminence(input: ProminenceInput): number {
   const now = input.now ?? Date.now();
   const base = clamp01(input.base ?? 0);
-  const timeProx = input.dateStr
-    ? timeProximity(input.dateStr, input.endDateStr, now)
-    : PLACE_TIME_PROXIMITY;
   const boost = newcomerBoost(input.createdAt, now);
-  return clamp01(W_TIME * timeProx + W_POP * base + boost);
+  if (!input.dateStr) {
+    const activity = clamp01(input.placeActivity ?? PLACE_TIME_PROXIMITY);
+    return clamp01(
+      W_PLACE_FOLLOW * (input.isFollowed ? 1 : 0) +
+      W_PLACE_ACTIVITY * activity +
+      W_PLACE_POP * base +
+      boost
+    );
+  }
+
+  const timeProx = timeProximity(input.dateStr, input.endDateStr, now);
+  return clamp01(
+    W_FOLLOW * (input.isFollowed ? 1 : 0) +
+    W_TIME * timeProx +
+    W_ENGAGED * (input.isEngaged ? 1 : 0) +
+    W_FRIEND * (input.hasFriendActivity ? 1 : 0) +
+    W_POP * base +
+    boost
+  );
 }
 
 /**
@@ -138,11 +177,28 @@ export function computeProminence(input: ProminenceInput): number {
  * A prominence-0 marker still becomes full at MID_MODE_ZOOM — never trapped
  * as a dot (fairness floor).
  */
-export function markerTier(zoom: number, prominence: number): MarkerTier {
-  const shift = PROMINENCE_ZOOM_SPAN * clamp01(prominence);
-  const dotMax = DOT_MODE_ZOOM - shift;
-  const midMax = MID_MODE_ZOOM - shift;
-  if (zoom < dotMax) return "dot";
-  if (zoom < midMax) return "mid";
+export function markerTier(
+  zoom: number,
+  prominence: number,
+  options: {
+    kind?: MarkerKind;
+    isFollowed?: boolean;
+    isLive?: boolean;
+  } = {}
+): MarkerTier {
+  const kind = options.kind ?? "event";
+  if (kind === "place") {
+    return zoom < PLACE_FULL_MARKER_ZOOM ? "dot" : "full";
+  }
+
+  if (
+    options.isFollowed &&
+    options.isLive &&
+    zoom >= EVENT_FOLLOWED_LIVE_FULL_ZOOM
+  ) {
+    return "full";
+  }
+  if (zoom < EVENT_MID_MARKER_ZOOM) return "dot";
+  if (zoom < EVENT_FULL_MARKER_ZOOM) return "mid";
   return "full";
 }

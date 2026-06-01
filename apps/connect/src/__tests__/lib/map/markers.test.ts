@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getTemporalStyle, escapeHtml } from "@/lib/map/markers";
+import { getTemporalStyle, escapeHtml, createCustomMarkerEl } from "@/lib/map/markers";
 
 describe("getTemporalStyle", () => {
   it("returns live state when event is happening now", () => {
@@ -126,5 +126,31 @@ describe("escapeHtml", () => {
     expect(escapeHtml(`<div class="test" data-name='a&b'>`)).toBe(
       "&lt;div class=&quot;test&quot; data-name=&#39;a&amp;b&#39;&gt;"
     );
+  });
+});
+
+describe("createCustomMarkerEl", () => {
+  it("adds a category SVG fallback for profile-photo markers in mid tier", () => {
+    const el = createCustomMarkerEl({
+      markerType: "profile",
+      category: "worship-prayer",
+      temporal: { opacity: 1, scale: 1, isLive: false, isToday: false, isInSession: false },
+      creatorAvatarUrl: "https://example.com/avatar.jpg",
+    });
+
+    expect(el.querySelector(".cc-marker-img")).toBeTruthy();
+    expect(el.querySelector(".cc-marker-mid-icon")).toBeTruthy();
+  });
+
+  it("adds a category SVG fallback for logo markers in mid tier", () => {
+    const el = createCustomMarkerEl({
+      markerType: "logo",
+      category: "outreach-missions",
+      temporal: { opacity: 1, scale: 1, isLive: false, isToday: false, isInSession: false },
+      markerImageUrl: "https://example.com/logo.jpg",
+    });
+
+    expect(el.querySelector(".cc-marker-img")).toBeTruthy();
+    expect(el.querySelector(".cc-marker-mid-icon")).toBeTruthy();
   });
 });

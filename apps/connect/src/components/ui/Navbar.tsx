@@ -10,6 +10,10 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import ConsiderBadge from "@/components/ui/ConsiderBadge";
 import MessagesPanel from "@/components/messaging/MessagesPanel";
 import {
+  OPEN_MESSAGE_THREAD_EVENT,
+  type OpenMessageThreadDetail,
+} from "@/lib/messaging/messagePanelBus";
+import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +37,7 @@ import {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [messagesPanelOpen, setMessagesPanelOpen] = useState(false);
+  const [conversationIdToOpen, setConversationIdToOpen] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
@@ -56,8 +61,30 @@ export default function Navbar() {
     router.refresh();
   }, [router, supabase]);
 
+  useEffect(() => {
+    function handleOpenThread(event: Event) {
+      const { conversationId } = (event as CustomEvent<OpenMessageThreadDetail>).detail ?? {};
+      if (!conversationId) return;
+      setConversationIdToOpen(conversationId);
+      setMessagesPanelOpen(true);
+    }
+
+    window.addEventListener(OPEN_MESSAGE_THREAD_EVENT, handleOpenThread);
+    return () => window.removeEventListener(OPEN_MESSAGE_THREAD_EVENT, handleOpenThread);
+  }, []);
+
   if (pathname === "/events" || pathname === "/") {
-    return null;
+    return user && messagesPanelOpen ? (
+      <MessagesPanel
+        userId={user.id}
+        conversationIdToOpen={conversationIdToOpen}
+        onUnreadChange={setUnreadMessages}
+        onClose={() => {
+          setConversationIdToOpen(null);
+          setMessagesPanelOpen(false);
+        }}
+      />
+    ) : null;
   }
 
   const displayName =
@@ -100,7 +127,10 @@ export default function Navbar() {
                   size="icon"
                   className="relative h-8 w-8 rounded-full"
                   title="Messages"
-                  onClick={() => setMessagesPanelOpen((o) => !o)}
+                  onClick={() => {
+                    setConversationIdToOpen(null);
+                    setMessagesPanelOpen((o) => !o);
+                  }}
                   aria-label={`Messages${unreadMessages > 0 ? ` (${unreadMessages} unread)` : ""}`}
                 >
                   <MessageSquare className="h-4 w-4" />
@@ -114,8 +144,12 @@ export default function Navbar() {
                 {messagesPanelOpen && (
                   <MessagesPanel
                     userId={user.id}
+                    conversationIdToOpen={conversationIdToOpen}
                     onUnreadChange={setUnreadMessages}
-                    onClose={() => setMessagesPanelOpen(false)}
+                    onClose={() => {
+                      setConversationIdToOpen(null);
+                      setMessagesPanelOpen(false);
+                    }}
                   />
                 )}
               </div>

@@ -12,6 +12,11 @@
 
 ## Cross-cutting code rules
 
+### Scheduled edge-function crons use inline config, not GUCs
+**Decision:** Postgres cron jobs that invoke edge functions via `pg_net` (e.g. the weekly `contributor-digest`) embed the function URL and publishable anon key as inline literals in the `cron.schedule` command (migration 125), rather than reading `app.supabase_functions_url` / `app.supabase_anon_key` GUCs. The anon/publishable key is committed inline in the migration.
+**Why:** `ALTER DATABASE ... SET` is denied to the Supabase management role on this project, so GUC-based config (the approach in migration 123) always short-circuits and never registers the cron. Inline literals are safe under the RLS-first model — RLS, not key secrecy, enforces access; the anon key only lets the gateway accept the scheduled call, and the function itself runs with its own service-role env key. `pg_net` is installed in `public` because it does not support `SET SCHEMA`; the resulting `extension_in_public` WARN advisory is an accepted, known exception.
+**Date:** 2026-06-02, notification-batch-deploy.
+
 ### Notification digests and source mutes
 **Decision:** Contributor/admin digests are weekly analytics summaries, not 5-times-daily notification batches. Per-source notification mutes are stored on `profiles.muted_source_ids` as `{"type":"event"|"place"|"org","id":"<uuid>"}`. Event broadcasts check event mutes only, so a user can mute a contributor but still receive updates for a specific event they care about. Place broadcasts check both place and org mutes.
 **Why:** Citizens should not receive digest noise by default, while contributors/admins need periodic operational insight. Source mutes give followers a low-friction way to reduce contributor noise without losing event-specific safety or commitment updates.

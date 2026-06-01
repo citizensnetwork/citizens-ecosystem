@@ -15,7 +15,13 @@ import {
 import { getMapStyle, getMapStyleInfo, toLngLat, DEFAULT_CENTER, attachBasemapPruner } from "@/lib/map/config";
 import { getCurrentPosition } from "@/lib/capacitor/geolocation";
 import { PLACE_CATEGORY_KEYWORDS, PLACE_CATEGORY_HEX } from "@/lib/categories";
-import { computeProminence, markerTier } from "@/lib/map/prominence";
+import {
+  computeProminence,
+  markerTier,
+  EVENT_FOLLOWED_SOON_PHOTO_ZOOM,
+  EVENT_MARKER_MIN_ZOOM,
+  PLACE_MARKER_MIN_ZOOM,
+} from "@/lib/map/prominence";
 
 type Props = {
   events: Event[];
@@ -32,6 +38,12 @@ type Props = {
   /** Events the current user is 'considering'.  Swaps the Consider
    *  button into a gold "Considering" state when set. */
   considerEventIds?: Set<string>;
+  /** Contributor profile ids followed by the current user. */
+  followedCreatorIds?: Set<string>;
+  /** Place ids followed by the current user. */
+  followedPlaceIds?: Set<string>;
+  /** Upcoming event counts keyed by contributor id, used to nudge active places. */
+  contributorUpcomingEventCounts?: Map<string, number>;
   center?: [number, number];
   zoom?: number;
   autoLocate?: boolean;
@@ -75,7 +87,10 @@ const MAP_VIEW_KEY = "cc-map-viewpoint";
 /** Minimum zoom level at which place markers reveal on zoom-in.  Below
  *  this zoom places stay hidden (events remain visible as density dots);
  *  the Locations tab and place-category filters override the gate. */
-const PLACE_ZOOM_MIN = 12;
+const PLACE_ZOOM_MIN = PLACE_MARKER_MIN_ZOOM;
+const PROMINENT_MARKER_THRESHOLD = 0.56;
+const PROMINENT_BASE_THRESHOLD = 0.75;
+const DAY_MS = 86_400_000;
 
 /** Below this zoom, run marker deconfliction with leader lines. */
 const DECONFLICT_MAX_ZOOM = 13;
@@ -94,6 +109,24 @@ function zoomScale(z: number): number {
   if (z >= 10) return 1;
   if (z <= 4) return 0.55;
   return 0.55 + ((z - 4) / (10 - 4)) * (1 - 0.55);
+}
+
+function isSoonEvent(dateStr: string, endDateStr: string | null | undefined): boolean {
+  const now = Date.now();
+  const start = new Date(dateStr).getTime();
+  if (!Number.isFinite(start)) return false;
+  const end = endDateStr ? new Date(endDateStr).getTime() : start + 2 * 60 * 60 * 1000;
+  if (Number.isFinite(end) && end <= now) return false;
+  return start >= now && start - now <= 7 * DAY_MS;
+}
+
+function normaliseActivityCount(count: number | undefined): number {
+  if (!count || count <= 0) return 0;
+  return Math.min(1, count / 5);
+}
+
+function isProminentMarker(score: number, base: number | null | undefined): boolean {
+  return score >= PROMINENT_MARKER_THRESHOLD || (base ?? 0) >= PROMINENT_BASE_THRESHOLD;
 }
 
 // DOT_MODE_ZOOM / MID_MODE_ZOOM now live in @/lib/map/prominence (single
@@ -165,6 +198,9 @@ export default function EventMap({
   highlightedEventId = null,
   rsvpEventIds,
   considerEventIds,
+  followedCreatorIds,
+  followedPlaceIds,
+  contributorUpcomingEventCounts,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -204,9 +240,15 @@ export default function EventMap({
   rsvpEventIdsRef.current = rsvpEventIds;
   const considerEventIdsRef = useRef(considerEventIds);
   considerEventIdsRef.current = considerEventIds;
+  const followedCreatorIdsRef = useRef(followedCreatorIds);
+  followedCreatorIdsRef.current = followedCreatorIds;
+  const followedPlaceIdsRef = useRef(followedPlaceIds);
+  followedPlaceIdsRef.current = followedPlaceIds;
+  const contributorUpcomingEventCountsRef = useRef(contributorUpcomingEventCounts);
+  contributorUpcomingEventCountsRef.current = contributorUpcomingEventCounts;
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; prominence: number; photoUrl: string | null }[]>([]);
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; prominence: number; photoUrl: string | null; isFollowed: boolean; isLive: boolean; isSoon: boolean }[]>([]);
   const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; prominence: number; photoUrl: string | null }[]>([]);
   /** Markers currently promoted to the photo tier (top-N by prominence in the
    *  viewport). Recomputed on every settle by updatePhotoTier. */
@@ -280,7 +322,9 @@ export default function EventMap({
     // keeps events on the map. (Was: hid events whenever any place cat was set,
     // which wiped events off the map for every "both" quick tool.)
     const hasEventCatsSelected = (activeCategoriesRef.current?.size ?? 0) > 0;
-    const hideEvents = hasPlaceCatsSelected && !hasEventCatsSelected;
+    const hideEvents =
+      z < EVENT_MARKER_MIN_ZOOM ||
+      (hasPlaceCatsSelected && !hasEventCatsSelected);
     evtMarkerDataRef.current.forEach(({ marker }) => {
       const el = marker.getElement() as HTMLElement;
       el.style.visibility = hideEvents ? "hidden" : "";
@@ -409,8 +453,14 @@ export default function EventMap({
     const z = map.getZoom();
     const scale = zoomScale(z);
 
-    const resize = (el: HTMLElement, baseSize: number, iconRatio: number, prominence: number) => {
-      const tier = markerTier(z, prominence);
+    const resize = (
+      el: HTMLElement,
+      baseSize: number,
+      iconRatio: number,
+      prominence: number,
+      options?: { kind?: "event" | "place"; isFollowed?: boolean; isLive?: boolean }
+    ) => {
+      const tier = markerTier(z, prominence, options);
       if (tier === "dot") {
         el.classList.add("cc-marker-dot");
         el.classList.remove("cc-marker-mid");
@@ -435,22 +485,26 @@ export default function EventMap({
       el.style.width = `${newSize}px`;
       el.style.height = `${newSize}px`;
       const outer = el.querySelector<HTMLElement>(".cc-marker-outer");
-      const icon = el.querySelector<HTMLElement>(".cc-marker-icon");
+      const icons = el.querySelectorAll<HTMLElement>(".cc-marker-icon");
       if (outer) {
         outer.style.width = `${newSize}px`;
         outer.style.height = `${newSize}px`;
       }
-      if (icon) {
+      icons.forEach((icon) => {
         icon.style.width = `${iconSize}px`;
         icon.style.height = `${iconSize}px`;
-      }
+      });
     };
 
-    evtMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio, prominence }) => {
-      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence);
+    evtMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio, prominence, isFollowed, isLive }) => {
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence, {
+        kind: "event",
+        isFollowed,
+        isLive,
+      });
     });
     placeMarkerDataRef.current.forEach(({ marker, baseSize, iconRatio, prominence }) => {
-      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence);
+      resize(marker.getElement() as HTMLElement, baseSize, iconRatio, prominence, { kind: "place" });
     });
   }, []);
 
@@ -510,10 +564,10 @@ export default function EventMap({
 
     type PhotoCand = { marker: maplibregl.Marker; prominence: number; photoUrl: string };
     const candidates: PhotoCand[] = [];
-    const consider = (d: { marker: maplibregl.Marker; prominence: number; photoUrl: string | null }) => {
+    const consider = (d: { marker: maplibregl.Marker; prominence: number; photoUrl: string | null; isFollowed: boolean; isLive: boolean; isSoon: boolean }) => {
       if (!d.photoUrl) return;
-      // Only full-tier markers can wear a photo (no point on a dot/mid).
-      if (markerTier(z, d.prominence) !== "full") return;
+      if (!d.isFollowed || !d.isSoon || z < EVENT_FOLLOWED_SOON_PHOTO_ZOOM) return;
+      if (markerTier(z, d.prominence, { kind: "event", isFollowed: d.isFollowed, isLive: d.isLive }) !== "full") return;
       const el = d.marker.getElement() as HTMLElement;
       if (el.dataset.cculled === "1" || el.style.display === "none") return; // off-screen
       if (el.style.visibility === "hidden") return; // place-gated / filtered out
@@ -521,7 +575,6 @@ export default function EventMap({
       candidates.push({ marker: d.marker, prominence: d.prominence, photoUrl: d.photoUrl });
     };
     evtMarkerDataRef.current.forEach(consider);
-    placeMarkerDataRef.current.forEach(consider);
 
     candidates.sort((a, b) => b.prominence - a.prominence);
     const winners = new Set(candidates.slice(0, PHOTO_TIER_CAP).map((c) => c.marker));
@@ -785,6 +838,11 @@ export default function EventMap({
         // with an avatar on file. This keeps organiser branding on the map
         // without requiring every event to be opted-in manually.
         const creator = event.creator;
+        const isFollowed = followedCreatorIdsRef.current?.has(event.created_by) ?? false;
+        const isEngaged =
+          (rsvpEventIdsRef.current?.has(event.id) ?? false) ||
+          (considerEventIdsRef.current?.has(event.id) ?? false);
+        const isSoon = isSoonEvent(event.date, event.end_time);
         const autoProfileMarker =
           (!event.marker_type || event.marker_type === "category") &&
           !!creator?.avatar_url &&
@@ -841,9 +899,25 @@ export default function EventMap({
           dateStr: event.date,
           endDateStr: event.end_time,
           createdAt: event.created_at,
+          isFollowed,
+          isEngaged,
         });
+        if (isProminentMarker(prominence, event.prominence_base)) {
+          el.classList.add("cc-marker-prominent");
+        }
         const photoUrl = event.image_url ?? event.marker_image_url ?? creator?.avatar_url ?? null;
-        evtMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: 0.48, eventId: event.id, prominence, photoUrl });
+        evtMarkerDataRef.current.push({
+          marker,
+          lngLat,
+          baseSize,
+          iconRatio: 0.48,
+          eventId: event.id,
+          prominence,
+          photoUrl,
+          isFollowed,
+          isLive: temporal.isLive,
+          isSoon,
+        });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -908,7 +982,14 @@ export default function EventMap({
         const prominence = computeProminence({
           base: place.prominence_base,
           createdAt: place.created_at,
+          isFollowed: followedPlaceIdsRef.current?.has(place.id) ?? false,
+          placeActivity: normaliseActivityCount(
+            contributorUpcomingEventCountsRef.current?.get(place.created_by)
+          ),
         });
+        if (isProminentMarker(prominence, place.prominence_base)) {
+          placeEl.classList.add("cc-marker-prominent");
+        }
         placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO, prominence, photoUrl: place.image_url ?? null });
         bounds.extend(lngLat);
         hasPoints = true;
@@ -961,7 +1042,19 @@ export default function EventMap({
     return () => {
       clearMarkers();
     };
-  }, [events, places, clearMarkers, activeCategories, activePlaceCategories, updatePlaceVisibility, markerOverrideColor, placesMode]);
+  }, [
+    events,
+    places,
+    clearMarkers,
+    activeCategories,
+    activePlaceCategories,
+    updatePlaceVisibility,
+    markerOverrideColor,
+    placesMode,
+    followedCreatorIds,
+    followedPlaceIds,
+    contributorUpcomingEventCounts,
+  ]);
 
   /* ── Fly to coordinates when flyTo prop changes ─────── */
   // `flyToToken` is included in the dependency array so that tapping the

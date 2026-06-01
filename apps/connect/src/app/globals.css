@@ -220,6 +220,50 @@ body {
   50%      { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0), 0 0 14px rgba(212, 175, 55, .4), 0 2px 6px rgba(0, 0, 0, .25); }
 }
 
+/* Prominence pulse: a gold signal emitted from beneath the marker. It lives on
+ * the marker root instead of the inner icon, so places do not regain square
+ * halos and photo markers can still inherit the same attention cue. */
+.cc-marker-prominent::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(18px, 105%);
+  height: max(18px, 105%);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.26);
+  transform: translate(-50%, -50%) scale(0.72);
+  pointer-events: none;
+  z-index: 0;
+  animation: ccProminencePulse 2.1s ease-out infinite;
+}
+.cc-marker-prominent .cc-marker-outer,
+.cc-marker-prominent .cc-marker-photo-img {
+  position: relative;
+  z-index: 1;
+}
+@keyframes ccProminencePulse {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  72% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.75);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.75);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-marker-prominent::before {
+    animation: none;
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
 /* ── Mid-tier marker style (z7 → z10) ──
  * Between dot-mode and full markers, show a smaller pin where the inner
  * glyph is partially faded so both the category colour and its icon read
@@ -232,6 +276,14 @@ body {
 .cc-marker-mid .cc-marker-outer {
   /* Thinner border for a lighter regional look. */
   border-width: 1.5px !important;
+  background: #fff !important;
+  overflow: hidden !important;
+}
+.cc-marker-mid .cc-marker-img {
+  display: none !important;
+}
+.cc-marker-mid .cc-marker-mid-icon {
+  display: flex !important;
 }
 
 /* ── Dot mode: at far zoom markers collapse to a solid category-coloured dot ──
@@ -341,6 +393,7 @@ body {
 .cc-marker {
   background: transparent !important;
   border: none !important;
+  position: relative;
   z-index: 3 !important;
   will-change: transform;
   contain: layout style;
@@ -683,7 +736,7 @@ body {
  * critically, a place's `.cc-marker-outer` has no border-radius, so a box-shadow
  * on it rendered as an ugly SQUARE halo around the pin. Excluding places fixes
  * that and keeps place icons clean. */
-.cc-map-glass[data-layer-glow="on"] .cc-marker:not(.cc-place-marker) .cc-marker-outer {
+.cc-map-glass[data-layer-glow="on"] .cc-marker:not(.cc-place-marker):not(.cc-marker-prominent) .cc-marker-outer {
   box-shadow:
     0 0 0 4px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 22%, transparent),
     0 0 0 11px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 12%, transparent),
@@ -693,7 +746,7 @@ body {
 /* Activity Pulse — animated expanding ring (overrides glow when both on).
  * Event markers only, same reasoning as Impact Glow above (square-halo fix). */
 @media (prefers-reduced-motion: no-preference) {
-  .cc-map-glass[data-layer-pulse="on"] .cc-marker:not(.cc-place-marker) .cc-marker-outer {
+  .cc-map-glass[data-layer-pulse="on"] .cc-marker:not(.cc-place-marker):not(.cc-marker-prominent) .cc-marker-outer {
     animation: ccActivityPulse 2.4s ease-out infinite !important;
   }
 }

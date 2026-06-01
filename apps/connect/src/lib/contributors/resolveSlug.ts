@@ -28,7 +28,7 @@ export const resolveContributorSlug = cache(
       .from("profiles")
       .select("id, full_name, role, contributor_status, bio")
       .eq("contributor_slug", slug)
-      .eq("role", "contributor")
+      .in("role", ["contributor", "admin"])
       .eq("contributor_status", "approved")
       .maybeSingle<ContributorSlugLookup>();
     return data;

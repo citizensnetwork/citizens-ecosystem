@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import ManageEventsView from "@/components/events/ManageEventsView";
 import BillPreviewCard from "@/components/contributor/BillPreviewCard";
+import { CONTRIBUTOR_ROLES } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,11 @@ export default async function ContributorDashboardPage() {
   // The dashboard is an approved-contributor surface. Citizens and
   // not-yet-approved contributors get a friendly redirect rather than a
   // 403 — we'd rather guide them than slam a door.
-  if (!profile || profile.role !== "contributor" || profile.contributor_status !== "approved") {
+  if (
+    !profile ||
+    !CONTRIBUTOR_ROLES.includes(profile.role) ||
+    profile.contributor_status !== "approved"
+  ) {
     redirect("/profile");
   }
 

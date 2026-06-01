@@ -16,7 +16,39 @@
 
 ---
 
-## 2. What just shipped - Notification clarity, weekly contributor digest, and source mutes (2026-06-01)
+## 2. What just shipped - Notification batch DEPLOYED end-to-end (2026-06-02)
+
+**The notification batch is now live in Supabase, not just in code.** The prior session
+left the migrations/cron/edge functions undeployed; this session applied and verified them.
+
+### Deployment completion (this session)
+- **Migrations applied to live:** `122` (storage bucket size/MIME limits), `123`
+  (weekly digest schedule + `muted_source_ids` comment), `124` (enable `pg_net`),
+  `125` (register the weekly `contributor-digest` cron with **inline** function URL +
+  anon key — `123`'s GUC-based path always short-circuits because `ALTER DATABASE` is
+  denied to the management role on this project).
+- **`pg_net` enabled** so Postgres cron can issue the outbound HTTP POST.
+- **`send-contributor-digest` edge function deployed** (v1, ACTIVE, `verify_jwt=true`).
+- **Weekly digest cron is registered and active:** `contributor-digest`, schedule
+  `0 6 * * 1` (Mon 06:00 UTC / 08:00 SAST), `active=true`. **Smoke-tested end-to-end** via
+  `net.http_post` → gateway accepted the anon JWT → function returned `200 {"digests":0}`
+  (correctly found no reportable 7-day activity).
+- **`notify-broadcast` redeployed** (v3, ACTIVE, `verify_jwt=false`) — the previously
+  deployed v2 was stale: it lacked source-mute filtering and only notified `attending`
+  (not `considering`). The live version now matches the repo source.
+- **Security advisors re-run:** the only NEW advisory is `extension_in_public` (WARN) for
+  `pg_net`, which is **unfixable** (pg_net does not support `SET SCHEMA`) and is a known,
+  accepted low-severity exception common to all Supabase projects using pg_net. No new
+  ERROR-level findings.
+
+> **Note on the inline anon key (migration 125):** the anon/publishable key is committed
+> inline in the cron command. This is safe under the platform's RLS-first model — RLS, not
+> key secrecy, enforces access. The key only lets the Supabase gateway accept the scheduled
+> invocation; the edge function runs with its own service-role key from its environment.
+
+---
+
+### Feature work (prior session) — Notification clarity, weekly contributor digest, and source mutes (2026-06-01)
 
 **Notification decisions from the feature-clarity session are now encoded in docs and backend fan-out rules.**
 Feature commit: **`05f9c97`** (`feat(notifications): apply weekly digest and mute rules`).
@@ -50,8 +82,9 @@ Feature commit: **`05f9c97`** (`feat(notifications): apply weekly digest and mut
 - Focused rerun after final edge-function count cleanup:
   `npx.cmd vitest run src/__tests__/api/notifications/preferences/route.test.ts src/__tests__/lib/notifications/sourceMutes.test.ts src/__tests__/api/contributor-broadcasts.test.ts`
   -> 22/22 tests.
-- Supabase advisors were **not runnable** in this session: Supabase MCP advisor tool was
-  unavailable, and the local `supabase` CLI executable was not on PATH.
+- Supabase advisors were **not runnable** in the prior session; this session ran them via
+  the Supabase MCP — see "Deployment completion" above (only the known `pg_net`
+  `extension_in_public` WARN is new).
 
 ### Security notes
 - New preference writes are authenticated, rate-limited, UUID-validated, bounded to 100
@@ -62,9 +95,9 @@ Feature commit: **`05f9c97`** (`feat(notifications): apply weekly digest and mut
 - No service-role key was introduced into client code.
 
 ### Follow-ups
-- The weekly contributor digest cron will not register in environments missing `pg_net`
-  or the `app.supabase_functions_url` / `app.supabase_anon_key` GUCs; configure those
-  before expecting scheduled delivery.
+- The weekly contributor digest cron is now registered and active (see "Deployment
+  completion"); it fires Mondays 06:00 UTC. `pg_net` + the inline cron (migration 125)
+  replace the GUC requirement.
 - Consider-to-connect conversions are documented as a desired digest metric, but there is
   no direct conversion timestamp in the current RSVP model. The current digest reports
   connects and considers separately.

@@ -255,6 +255,8 @@ export default function EventsView({
   rsvpEventIdsRef.current = rsvpEventIds;
   const [considerEventIds, setConsiderEventIds] = useState<Set<string>>(new Set());
   const [considerVersion, setConsiderVersion] = useState(0);
+  const [followedCreatorIds, setFollowedCreatorIds] = useState<Set<string>>(new Set());
+  const [followedPlaceIds, setFollowedPlaceIds] = useState<Set<string>>(new Set());
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const panelSwipeStartY = useRef(0);
@@ -279,27 +281,29 @@ export default function EventsView({
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       if (user) {
-        supabase
-          .from("rsvps")
-          .select("event_id,status")
-          .eq("user_id", user.id)
-          .then(({ data }) => {
-            if (!data) return;
-            setRsvpEventIds(
-              new Set(
-                data
-                  .filter((r) => (r as { status?: string }).status !== "considering")
-                  .map((r) => r.event_id)
-              )
-            );
-            setConsiderEventIds(
-              new Set(
-                data
-                  .filter((r) => (r as { status?: string }).status === "considering")
-                  .map((r) => r.event_id)
-              )
-            );
-          });
+        Promise.all([
+          supabase.from("rsvps").select("event_id,status").eq("user_id", user.id),
+          supabase.from("follows").select("followee_id").eq("follower_id", user.id),
+          supabase.from("place_follows").select("place_id").eq("user_id", user.id),
+        ]).then(([rsvpRes, followsRes, placeFollowsRes]) => {
+          const rsvps = rsvpRes.data ?? [];
+          setRsvpEventIds(
+            new Set(
+              rsvps
+                .filter((r) => (r as { status?: string }).status !== "considering")
+                .map((r) => r.event_id)
+            )
+          );
+          setConsiderEventIds(
+            new Set(
+              rsvps
+                .filter((r) => (r as { status?: string }).status === "considering")
+                .map((r) => r.event_id)
+            )
+          );
+          setFollowedCreatorIds(new Set((followsRes.data ?? []).map((r) => r.followee_id)));
+          setFollowedPlaceIds(new Set((placeFollowsRes.data ?? []).map((r) => r.place_id)));
+        });
       }
     });
     const {
@@ -309,6 +313,8 @@ export default function EventsView({
       if (!session?.user) {
         setRsvpEventIds(new Set());
         setConsiderEventIds(new Set());
+        setFollowedCreatorIds(new Set());
+        setFollowedPlaceIds(new Set());
       }
     });
     return () => subscription.unsubscribe();
@@ -322,6 +328,14 @@ export default function EventsView({
     user?.user_metadata?.full_name?.split(" ")[0] ??
     user?.email?.split("@")[0] ??
     "Account";
+
+  const contributorUpcomingEventCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const event of events) {
+      counts.set(event.created_by, (counts.get(event.created_by) ?? 0) + 1);
+    }
+    return counts;
+  }, [events]);
 
   // Focus traps for drawers
   const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
@@ -1153,6 +1167,9 @@ export default function EventsView({
           highlightedEventId={hoveredEventId}
           rsvpEventIds={rsvpEventIds}
           considerEventIds={considerEventIds}
+          followedCreatorIds={followedCreatorIds}
+          followedPlaceIds={followedPlaceIds}
+          contributorUpcomingEventCounts={contributorUpcomingEventCounts}
         />
       </div>
 

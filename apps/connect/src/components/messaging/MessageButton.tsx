@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { openMessageThread } from "@/lib/messaging/messagePanelBus";
 
 type Props = {
   recipientId: string;
@@ -31,7 +32,7 @@ export default function MessageButton({
 
       if (res.ok) {
         const { conversation_id } = await res.json();
-        router.push(`/messages/${conversation_id}`);
+        openMessageThread(conversation_id);
       } else if (res.status === 401) {
         router.push("/login");
       } else {

@@ -25,6 +25,7 @@ function timeAgo(dateStr: string): string {
 
 interface Props {
   userId: string;
+  conversationIdToOpen?: string | null;
   /** Total unread count — passed up to parent (Navbar) for the badge */
   onUnreadChange?: (count: number) => void;
   onClose: () => void;
@@ -39,7 +40,12 @@ interface Props {
  * backdrop-blur-sm. The blur is applied progressively; on low-end devices
  * the browser degrades gracefully to the solid bg-white/90 fallback.
  */
-export default function MessagesPanel({ userId, onUnreadChange, onClose }: Props) {
+export default function MessagesPanel({
+  userId,
+  conversationIdToOpen,
+  onUnreadChange,
+  onClose,
+}: Props) {
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,6 +84,13 @@ export default function MessagesPanel({ userId, onUnreadChange, onClose }: Props
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, fetchConversations]);
+
+  useEffect(() => {
+    if (conversationIdToOpen) {
+      setSelectedId(conversationIdToOpen);
+      fetchConversations();
+    }
+  }, [conversationIdToOpen, fetchConversations]);
 
   function removeConversation(id: string) {
     setConversations((prev) => prev.filter((c) => c.id !== id));
@@ -126,7 +139,7 @@ export default function MessagesPanel({ userId, onUnreadChange, onClose }: Props
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/[0.07] px-4 py-3">
-          {selectedId && selectedConv ? (
+          {selectedId ? (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedId(null)}
@@ -136,15 +149,15 @@ export default function MessagesPanel({ userId, onUnreadChange, onClose }: Props
                 <ArrowLeft size={16} />
               </button>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-xs font-bold uppercase text-amber-800">
-                {selectedConv.other_user.full_name?.[0] || "?"}
+                {selectedConv?.other_user.full_name?.[0] || "?"}
               </div>
-              {selectedConv.other_user.deleted_at ? (
+              {selectedConv?.other_user.deleted_at ? (
                 <span className="truncate text-sm font-semibold text-black/40">
                   <s>{selectedConv.other_user.full_name}</s>
                 </span>
               ) : (
                 <span className="truncate text-sm font-semibold text-black">
-                  {selectedConv.other_user.full_name || "Unknown"}
+                  {selectedConv?.other_user.full_name || "Chat"}
                 </span>
               )}
             </div>

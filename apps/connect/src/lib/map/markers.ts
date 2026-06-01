@@ -139,6 +139,8 @@ export function createCustomMarkerEl(
     el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}`;
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
+    const fallbackIcon = getCategoryIcon(category ?? "church-services");
+    const iconSize = Math.round(size * 0.48);
 
     el.innerHTML = `<span class="cc-marker-outer" style="
       --cc-marker-color:${ringColor};
@@ -152,7 +154,12 @@ export function createCustomMarkerEl(
       cursor:pointer;
       overflow:hidden;
       background:#fff;
-    "><img class="cc-marker-icon" src="${escapeHtml(creatorAvatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></span>`;
+    "><img class="cc-marker-icon cc-marker-img" src="${escapeHtml(creatorAvatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /><span class="cc-marker-icon cc-marker-mid-icon" style="
+      width:${iconSize}px;height:${iconSize}px;
+      color:${categoryPulse};
+      display:none;align-items:center;justify-content:center;
+      line-height:0;
+    ">${fallbackIcon}</span></span>`;
     return el;
   }
 
@@ -162,6 +169,8 @@ export function createCustomMarkerEl(
     el.className = `cc-marker${temporal.isLive ? " cc-marker-live" : ""}`;
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
+    const fallbackIcon = getCategoryIcon(category ?? "church-services");
+    const iconSize = Math.round(size * 0.48);
 
     el.innerHTML = `<span class="cc-marker-outer" style="
       --cc-marker-color:${ringColor};
@@ -175,7 +184,12 @@ export function createCustomMarkerEl(
       cursor:pointer;
       overflow:hidden;
       background:#fff;
-    "><img class="cc-marker-icon" src="${escapeHtml(markerImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></span>`;
+    "><img class="cc-marker-icon cc-marker-img" src="${escapeHtml(markerImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" /><span class="cc-marker-icon cc-marker-mid-icon" style="
+      width:${iconSize}px;height:${iconSize}px;
+      color:${categoryPulse};
+      display:none;align-items:center;justify-content:center;
+      line-height:0;
+    ">${fallbackIcon}</span></span>`;
     return el;
   }
 

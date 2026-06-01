@@ -8,6 +8,7 @@
 // steady state.
 
 import { createClient } from "@/lib/supabase/server";
+import { CONTRIBUTOR_ROLES } from "@/types/db";
 
 export type DashboardAccessResult =
   | { hasAccess: true; isOwner: boolean; isAdminWithAccess: boolean; contributorId: string }
@@ -32,7 +33,7 @@ export async function checkDashboardAccess(
 
   if (!contributor) return { hasAccess: false };
   if (
-    contributor.role !== "contributor" ||
+    !CONTRIBUTOR_ROLES.includes(contributor.role as (typeof CONTRIBUTOR_ROLES)[number]) ||
     contributor.contributor_status !== "approved"
   ) {
     // Admins can still access unapproved contributors (for review)
