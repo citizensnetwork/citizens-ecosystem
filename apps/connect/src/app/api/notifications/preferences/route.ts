@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { validateSourceMutes } from "@/lib/notifications/sourceMutes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,12 +49,14 @@ export async function PATCH(request: NextRequest) {
 
   const update: {
     notification_digest?: string;
+    muted_source_ids?: ReturnType<typeof validateSourceMutes>;
   } = {};
 
   const hasDigest = "notification_digest" in body;
   const hasPrefs = "notification_prefs" in body;
+  const hasMutedSources = "muted_source_ids" in body;
 
-  if (!hasDigest && !hasPrefs) {
+  if (!hasDigest && !hasPrefs && !hasMutedSources) {
     return NextResponse.json(
       { error: "No preference fields provided" },
       { status: 400 },
@@ -73,6 +76,18 @@ export async function PATCH(request: NextRequest) {
       );
     }
     update.notification_digest = digest;
+  }
+
+  // --- muted_source_ids (optional full replacement) ---
+  if (hasMutedSources) {
+    const mutedSourceIds = validateSourceMutes(body.muted_source_ids);
+    if (!mutedSourceIds) {
+      return NextResponse.json(
+        { error: "Invalid muted notification sources" },
+        { status: 400 },
+      );
+    }
+    update.muted_source_ids = mutedSourceIds;
   }
 
   // --- notification_prefs (optional partial merge) ---
@@ -122,11 +137,19 @@ export async function PATCH(request: NextRequest) {
     mergedPrefs = (merged as Record<string, unknown> | null) ?? null;
   }
 
-  // --- notification_digest update (if supplied) ---
+  // --- profile-column update (if supplied) ---
+  const profileUpdate: Record<string, unknown> = {};
   if (update.notification_digest !== undefined) {
+    profileUpdate.notification_digest = update.notification_digest;
+  }
+  if (update.muted_source_ids !== undefined) {
+    profileUpdate.muted_source_ids = update.muted_source_ids;
+  }
+
+  if (Object.keys(profileUpdate).length > 0) {
     const { error } = await supabase
       .from("profiles")
-      .update({ notification_digest: update.notification_digest })
+      .update(profileUpdate)
       .eq("id", user.id);
 
     if (error) {
@@ -143,6 +166,9 @@ export async function PATCH(request: NextRequest) {
     updated: {
       ...(update.notification_digest !== undefined
         ? { notification_digest: update.notification_digest }
+        : {}),
+      ...(update.muted_source_ids !== undefined
+        ? { muted_source_ids: update.muted_source_ids }
         : {}),
       ...(mergedPrefs !== null ? { notification_prefs: mergedPrefs } : {}),
     },

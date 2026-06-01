@@ -236,6 +236,9 @@ export type Profile = {
   /** Per-type notification toggles. Missing keys default to true. Added in
    *  migration 049. Cancellation notices are not gated — always delivered. */
   notification_prefs?: NotificationPrefs;
+  /** Per-user muted notification sources. Event mutes apply to event fan-out;
+   *  place mutes and org mutes apply to place/contributor fan-out. */
+  muted_source_ids?: NotificationSourceMute[];
   location_sharing: boolean;
   instagram_handle: string | null;
   facebook_url: string | null;
@@ -585,6 +588,11 @@ export type EventUpdate = {
 };
 
 export type NotificationDigest = "instant" | "daily" | "off";
+
+export type NotificationSourceMute = {
+  type: "event" | "place" | "org";
+  id: string;
+};
 
 /**
  * Per-type notification toggles stored in `profiles.notification_prefs`

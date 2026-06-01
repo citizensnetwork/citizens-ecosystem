@@ -2,8 +2,8 @@
 // Triggered by DB webhook on broadcast_messages INSERT.
 //
 // Fan-out rules (per contributor-dashboard.md A30–A31):
-//   event broadcast → RSVPed users (status = 'attending')
-//   place broadcast → followers of the contributor who owns the place
+//   event broadcast → RSVPed users (status = 'attending' or 'considering')
+//   place broadcast → followers of the place + followers of the contributor
 //
 // Delivery: push notification only.
 // In-app notifications are already inserted synchronously by the API route
@@ -14,6 +14,60 @@ import { serve } from "std/http";
 import { sendNotifications } from "../_shared/push.ts";
 import { createServiceClient } from "../_shared/client.ts";
 import { filterUserIdsByPref } from "../_shared/prefs.ts";
+
+type MutedSource = {
+  type?: unknown;
+  id?: unknown;
+};
+
+function isMutedSource(
+  mutedSourceIds: unknown,
+  entityType: "event" | "place",
+  entityId: string,
+  contributorId: string,
+): boolean {
+  if (!Array.isArray(mutedSourceIds)) return false;
+  return mutedSourceIds.some((raw: MutedSource) => {
+    if (!raw || typeof raw !== "object") return false;
+    if (entityType === "event") {
+      return raw.type === "event" && raw.id === entityId;
+    }
+    return (
+      (raw.type === "place" && raw.id === entityId) ||
+      (raw.type === "org" && raw.id === contributorId)
+    );
+  });
+}
+
+async function filterUserIdsBySourceMute(
+  supabase: ReturnType<typeof createServiceClient>,
+  userIds: string[],
+  entityType: "event" | "place",
+  entityId: string,
+  contributorId: string,
+): Promise<string[]> {
+  if (userIds.length === 0) return [];
+
+  const allowed = new Set(userIds);
+  for (let i = 0; i < userIds.length; i += 500) {
+    const batch = userIds.slice(i, i + 500);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, muted_source_ids")
+      .in("id", batch);
+    if (error) {
+      console.error("[notify-broadcast] muted source lookup failed", error);
+      continue;
+    }
+    for (const profile of data ?? []) {
+      if (isMutedSource(profile.muted_source_ids, entityType, entityId, contributorId)) {
+        allowed.delete(profile.id as string);
+      }
+    }
+  }
+
+  return [...allowed];
+}
 
 serve(async (req) => {
   try {
@@ -53,22 +107,31 @@ serve(async (req) => {
     let rawUserIds: string[] = [];
 
     if (entityType === "event") {
-      // Event broadcast → users who RSVPed as attending
+      // Event broadcast → users who RSVPed as attending or considering.
       const { data: rsvpRows } = await supabase
         .from("rsvps")
         .select("user_id")
         .eq("event_id", entityId)
-        .eq("status", "attending");
+        .in("status", ["attending", "considering"]);
 
       rawUserIds = (rsvpRows ?? []).map((r) => r.user_id as string);
     } else {
-      // Place broadcast → followers of the contributor (user who owns the place)
-      const { data: followRows } = await supabase
-        .from("follows")
-        .select("follower_id")
-        .eq("followee_id", contributorId);
+      // Place broadcast → followers of the place and of the contributor.
+      const [{ data: placeFollowRows }, { data: contributorFollowRows }] = await Promise.all([
+        supabase
+          .from("place_follows")
+          .select("user_id")
+          .eq("place_id", entityId),
+        supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("followee_id", contributorId),
+      ]);
 
-      rawUserIds = (followRows ?? []).map((r) => r.follower_id as string);
+      rawUserIds = [
+        ...(placeFollowRows ?? []).map((r) => r.user_id as string),
+        ...(contributorFollowRows ?? []).map((r) => r.follower_id as string),
+      ];
     }
 
     // Exclude the sender from their own broadcast
@@ -84,10 +147,17 @@ serve(async (req) => {
     const dedupedIds = [...new Set(rawUserIds)];
 
     // ── 2. Honour contributor_updates notification preference ──────
-    const filteredIds = await filterUserIdsByPref(
+    const prefFilteredIds = await filterUserIdsByPref(
       supabase,
       dedupedIds,
       "contributor_updates",
+    );
+    const filteredIds = await filterUserIdsBySourceMute(
+      supabase,
+      prefFilteredIds,
+      entityType as "event" | "place",
+      entityId,
+      contributorId,
     );
 
     if (filteredIds.length === 0) {
@@ -137,19 +207,20 @@ serve(async (req) => {
         .eq("role", "admin");
 
       if (admins && admins.length > 0) {
-        const adminNotifications = admins.map((admin: { id: string }) => ({
-          user_id: admin.id,
+        await sendNotifications(supabase, {
+          user_ids: admins.map((admin: { id: string }) => admin.id),
           type: "broadcast_flood",
+          title: "Broadcast flood detected",
+          body: `${entityTitle} has sent ${weeklyCount ?? 0} broadcasts this week.`,
           data: {
             entity_type: entityType,
             entity_id: entityId,
             entity_title: entityTitle,
             contributor_id: contributorId,
-            weekly_count: (weeklyCount ?? 0) + 1,
+            weekly_count: weeklyCount ?? 0,
+            url: "/admin",
           },
-          read: false,
-        }));
-        await supabase.from("notifications").insert(adminNotifications);
+        });
       }
     }
 
@@ -167,6 +238,7 @@ serve(async (req) => {
         broadcast_id: broadcastId,
         entity_type: entityType,
         entity_id: entityId,
+        url: entityType === "event" ? `/events/${entityId}` : `/places/${entityId}`,
       },
       skipInApp: true,
     });

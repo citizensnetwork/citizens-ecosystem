@@ -16,7 +16,7 @@
 | 4 | Content types | Text only for now. |
 | 5 | Group messaging | Event page comment/update thread = public group communication for now. Private groups: future stage. |
 | 6 | Read receipts | Not now. Feature upgrade later. |
-| 7 | Notifications | In-app badge on message icon. Push: app badge count, lock screen banner, pull-down banner. Contributor digests at 09:00, 12:00, 15:00, 18:00, 21:00 SAST. Admin notifications at same slots. Mute available on all messages. |
+| 7 | Notifications | In-app badge on message icon. Push: app badge count, lock screen banner, pull-down banner. Contributor/admin digests are weekly analytics summaries only, not 5-times-daily notification batches. Mute available on all messages. |
 | 8 | Retention & deletion | No message deletion for now. 60-day history auto-delete. Deleted account: username shown with ~~strikethrough~~ greyed; messages auto-deleted 30 days after account deletion. |
 | 9 | Blocked users | Blocked users can still see old messages they received. Block option on every message card. |
 | 10 | Contributor broadcast | Broadcast from every org/personal/place/event profile. All followers + RSVPers receive notifications. Users can mute a source. Admin flagged if >15 broadcasts/week from one source. |
@@ -156,13 +156,14 @@ Muting a broadcast source stored as `muted_sources` on `profiles` (jsonb array o
 
 ### Step 10 — Notification Enhancements
 
-**Contributor digest (5× daily):**
+**Contributor digest (weekly analytics):**
 - New edge function: `supabase/functions/send-contributor-digest/`
-- Scheduled via pg_cron at 09:00, 12:00, 15:00, 18:00, 21:00 SAST
-- Content: RSVPs, event follows, comments, volunteer applications, DMs since last digest
+- Scheduled weekly once product scheduling is approved
+- Content: RSVP/connect counts, cancellations, considers, consider-to-connect conversions, messages, comments, volunteer applications, and other citizen activity for the contributor's own events/places
 
-**Admin notifications (same 5 slots):**
-- Types: `spam_flag`, `broadcast_flood`, `security_flag`, `contributor_application`, `dm_received`, `dm_response`
+**Admin digest (weekly analytics):**
+- Content: reports, applications, new entries, new users, total new events/places, total deleted events, average attendance overall where available from cheap/precomputed aggregates
+- Instant admin notifications still apply for operationally important events such as `spam_flag`, `broadcast_flood`, `security_flag`, `contributor_application`, `dm_received`, and `dm_response`
 
 **Push notification payloads (Citizens + Contributors):**
 - `badge` count (app icon)
@@ -217,7 +218,7 @@ When sender's `profiles.deleted_at IS NOT NULL`:
 | `src/app/places/[id]/page.tsx` | MessageButton touchpoint |
 | `src/app/profile/page.tsx` + `[id]/page.tsx` | @handle setting + copy profile link |
 | `supabase/functions/notify-broadcast/index.ts` | Broadcast flood detection |
-| `supabase/functions/send-contributor-digest/` | **New** — 5× daily digest function |
+| `supabase/functions/send-contributor-digest/` | **New** — weekly contributor analytics digest function |
 
 ---
 
@@ -233,6 +234,6 @@ When sender's `profiles.deleted_at IS NOT NULL`:
 8. **Block**: Block a user → cannot initiate new conversation → thread hidden
 9. **Retention display**: Deleted account → sender shown as ~~username~~ greyed
 10. **Push notifications**: New message → badge + lock screen banner + pull-down banner on device
-11. **Contributor digest**: Invoke edge function manually → digest notification created for contributor
+11. **Contributor digest**: Invoke edge function manually → weekly analytics digest created for contributor
 12. **@handle**: Set handle in profile → URL `/profile/@handle` resolves → copy link button copies it
 13. **Attendee list**: RSVP to event + set discoverable → appear on "People attending" with message icon

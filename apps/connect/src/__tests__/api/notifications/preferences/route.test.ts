@@ -178,6 +178,28 @@ describe("PATCH /api/notifications/preferences", () => {
     expect(body.updated.notification_prefs).toEqual({ weekly_digest: false });
   });
 
+  it("accepts muted notification sources", async () => {
+    authed();
+    const muted = [{ type: "event", id: "33333333-3333-4333-8333-333333333333" }];
+
+    const response = await PATCH(makeRequest({ muted_source_ids: muted }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.updated.muted_source_ids).toEqual(muted);
+  });
+
+  it("returns 400 for malformed muted notification sources", async () => {
+    authed();
+
+    const response = await PATCH(
+      makeRequest({ muted_source_ids: [{ type: "event", id: "not-a-uuid" }] }),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/muted notification sources/i);
+  });
+
   it("returns 500 when the RPC fails", async () => {
     authed();
     mockClient.rpc.mockResolvedValueOnce({

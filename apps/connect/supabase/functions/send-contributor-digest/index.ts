@@ -1,23 +1,24 @@
 // Edge Function: send-contributor-digest
 //
-// Runs 5× daily at 09:00, 12:00, 15:00, 18:00, 21:00 SAST (07:00, 10:00, 13:00, 16:00, 19:00 UTC).
-// pg_cron schedule: "0 7,10,13,16,19 * * *"
+// Runs weekly as a contributor analytics summary.
+// pg_cron schedule: "0 6 * * 1" (Monday 08:00 SAST).
 //
 // Delivers an in-app activity summary to each approved Contributor showing
-// what happened across their events/places since the previous digest window
-// (~3 hours ago). Only delivers if there is actual activity to report.
+// what happened across their events/places in the previous 7 days. Only
+// delivers if there is actual activity to report.
 //
 // Summary includes:
-//   - New RSVPs on their events
-//   - New followers of their profile/org
+//   - New connects (attending RSVPs) and considers on their events
+//   - New RSVP cancellations where available
 //   - New place follows
 //   - New volunteer applications
 //   - New direct messages received
+//   - New comments on their events
 
 import { serve } from "std/http";
 import { createServiceClient } from "../_shared/client.ts";
 
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 serve(async (req) => {
   // Defense in depth: pg_cron passes the Supabase anon key as a Bearer token
@@ -30,7 +31,7 @@ serve(async (req) => {
 
   try {
     const supabase = createServiceClient();
-    const since = new Date(Date.now() - THREE_HOURS_MS).toISOString();
+    const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
     // Get all approved contributors (excluding soft-deleted accounts)
     const { data: contributors, error: contribErr } = await supabase
@@ -68,14 +69,39 @@ serve(async (req) => {
         .eq("user_id", cid);
       const convIds = (convs ?? []).map((c: { conversation_id: string }) => c.conversation_id);
 
-      // Count activity since last digest window
-      const [rsvpRes, followerRes, placeFollowRes, volunteerRes, dmRes] = await Promise.all([
+      // Count activity since the weekly digest window opened.
+      const [
+        connectRes,
+        considerRes,
+        cancellationRes,
+        followerRes,
+        placeFollowRes,
+        volunteerRes,
+        dmRes,
+        commentRes,
+      ] = await Promise.all([
         eventIds.length > 0
           ? supabase
               .from("rsvps")
               .select("id", { count: "exact", head: true })
               .in("event_id", eventIds)
+              .eq("status", "attending")
               .gte("created_at", since)
+          : Promise.resolve({ count: 0 }),
+        eventIds.length > 0
+          ? supabase
+              .from("rsvps")
+              .select("id", { count: "exact", head: true })
+              .in("event_id", eventIds)
+              .eq("status", "considering")
+              .gte("created_at", since)
+          : Promise.resolve({ count: 0 }),
+        eventIds.length > 0
+          ? supabase
+              .from("rsvp_cancellations")
+              .select("id", { count: "exact", head: true })
+              .in("event_id", eventIds)
+              .gte("cancelled_at", since)
           : Promise.resolve({ count: 0 }),
         supabase
           .from("follows")
@@ -102,26 +128,47 @@ serve(async (req) => {
               .gte("created_at", since)
               .in("conversation_id", convIds)
           : Promise.resolve({ count: 0 }),
+        eventIds.length > 0
+          ? supabase
+              .from("comments")
+              .select("id", { count: "exact", head: true })
+              .in("event_id", eventIds)
+              .gte("created_at", since)
+          : Promise.resolve({ count: 0 }),
       ]);
 
-      const newRsvps = rsvpRes.count ?? 0;
+      const newConnects = connectRes.count ?? 0;
+      const newConsiders = considerRes.count ?? 0;
+      const newCancellations = cancellationRes.count ?? 0;
       const newFollowers = followerRes.count ?? 0;
       const newPlaceFollows = placeFollowRes.count ?? 0;
       const newVolunteers = volunteerRes.count ?? 0;
       const newDms = dmRes.count ?? 0;
+      const newComments = commentRes.count ?? 0;
 
-      const total = newRsvps + newFollowers + newPlaceFollows + newVolunteers + newDms;
+      const total =
+        newConnects +
+        newConsiders +
+        newCancellations +
+        newFollowers +
+        newPlaceFollows +
+        newVolunteers +
+        newDms +
+        newComments;
 
       // Skip if nothing to report
       if (total === 0) continue;
 
       // Build summary lines
       const lines: string[] = [];
-      if (newRsvps > 0) lines.push(`${newRsvps} new RSVP${newRsvps !== 1 ? "s" : ""}`);
+      if (newConnects > 0) lines.push(`${newConnects} new connect${newConnects !== 1 ? "s" : ""}`);
+      if (newConsiders > 0) lines.push(`${newConsiders} new consider${newConsiders !== 1 ? "s" : ""}`);
+      if (newCancellations > 0) lines.push(`${newCancellations} cancellation${newCancellations !== 1 ? "s" : ""}`);
       if (newFollowers > 0) lines.push(`${newFollowers} new follower${newFollowers !== 1 ? "s" : ""}`);
       if (newPlaceFollows > 0) lines.push(`${newPlaceFollows} new place follow${newPlaceFollows !== 1 ? "s" : ""}`);
       if (newVolunteers > 0) lines.push(`${newVolunteers} volunteer application${newVolunteers !== 1 ? "s" : ""}`);
       if (newDms > 0) lines.push(`${newDms} new message${newDms !== 1 ? "s" : ""}`);
+      if (newComments > 0) lines.push(`${newComments} comment${newComments !== 1 ? "s" : ""}`);
 
       const summaryBody = lines.join(" · ");
 
@@ -129,13 +176,20 @@ serve(async (req) => {
       await supabase.from("notifications").insert({
         user_id: cid,
         type: "event_update",
+        title: "Your weekly contributor update",
+        body: summaryBody,
         data: {
           digest: true,
-          new_rsvps: newRsvps,
+          period: "weekly",
+          window_days: 7,
+          new_connects: newConnects,
+          new_considers: newConsiders,
+          new_cancellations: newCancellations,
           new_followers: newFollowers,
           new_place_follows: newPlaceFollows,
           new_volunteers: newVolunteers,
           new_dms: newDms,
+          new_comments: newComments,
           summary: summaryBody,
         },
         read: false,

@@ -1,11 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
+import { isSourceMuted } from "@/lib/notifications/sourceMutes";
 
 const BROADCAST_MAX = 500;
+
+async function filterMutedRecipients(
+  admin: ReturnType<typeof createAdminClient>,
+  recipientIds: string[],
+  entityType: "event" | "place",
+  entityId: string,
+  contributorId: string,
+) {
+  if (recipientIds.length === 0) return [];
+
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, muted_source_ids")
+    .in("id", recipientIds);
+
+  if (error || !profiles) {
+    if (error) console.error("[API broadcasts POST] muted source lookup failed", error);
+    return recipientIds;
+  }
+
+  const muted = new Set(
+    profiles
+      .filter((profile: { muted_source_ids?: unknown }) =>
+        isSourceMuted(profile.muted_source_ids, entityType, entityId, contributorId),
+      )
+      .map((profile: { id: string }) => profile.id),
+  );
+
+  return recipientIds.filter((id) => !muted.has(id));
+}
 
 /**
  * GET /api/contributor/[handle]/broadcasts?entity_type=event|place&entity_id=uuid
@@ -143,39 +175,75 @@ export async function POST(
     metadata: { broadcast_id: data.id },
   });
 
-  // Insert in-app notifications for recipients synchronously
+  // Insert in-app notifications for recipients synchronously. Notifications
+  // are service-role inserted because their RLS INSERT policy is admin-only.
   const notifyPromise = entityType === "event"
     ? supabase
         .from("rsvps")
         .select("user_id")
         .eq("event_id", entityId)
-        .eq("status", "attending")
-    : supabase
-        .from("follows")
-        .select("follower_id")
-        .eq("followee_id", contributorId);
+        .in("status", ["attending", "considering"])
+    : Promise.all([
+        supabase
+          .from("place_follows")
+          .select("user_id")
+          .eq("place_id", entityId),
+        supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("followee_id", contributorId),
+      ]).then(([placeFollowers, contributorFollowers]) => ({
+        data: [
+          ...(placeFollowers.data ?? []),
+          ...(contributorFollowers.data ?? []),
+        ],
+        error: placeFollowers.error ?? contributorFollowers.error,
+      }));
 
-  const { data: recipients } = await notifyPromise;
+  const { data: recipients, error: recipientError } = await notifyPromise;
+  if (recipientError) {
+    console.error("[API broadcasts POST] recipient lookup failed", recipientError);
+  }
   if (recipients && recipients.length > 0) {
-    const notifications = recipients
-      .map((r: Record<string, string>) => ({
-        user_id: "user_id" in r ? r.user_id : r.follower_id,
+    const admin = createAdminClient();
+    const entityPath = entityType === "event" ? `/events/${entityId}` : `/places/${entityId}`;
+    const recipientIds = [
+      ...new Set(
+        recipients
+          .map((r: Record<string, string>) => ("user_id" in r ? r.user_id : r.follower_id))
+          .filter((id) => id && id !== contributorId),
+      ),
+    ];
+    const unmutedRecipientIds = await filterMutedRecipients(
+      admin,
+      recipientIds,
+      entityType as "event" | "place",
+      entityId,
+      contributorId,
+    );
+    const notifications = unmutedRecipientIds
+      .map((userId) => ({
+        user_id: userId,
         type: "broadcast_sent" as const,
         title: "Message from the organiser",
-        body: text.length > 100 ? text.slice(0, 97) + "…" : text,
+        body: text.length > 100 ? text.slice(0, 97) + "..." : text,
         image_url: null,
         data: {
           broadcast_id: data.id,
           entity_type: entityType,
           entity_id: entityId,
+          url: entityPath,
         },
-      }))
-      // Exclude sender from their own broadcast
-      .filter((n) => n.user_id !== contributorId);
+      }));
 
     // Batch insert in chunks to avoid Supabase payload limits
     for (let i = 0; i < notifications.length; i += 100) {
-      await supabase.from("notifications").insert(notifications.slice(i, i + 100));
+      const { error: notificationError } = await admin
+        .from("notifications")
+        .insert(notifications.slice(i, i + 100));
+      if (notificationError) {
+        console.error("[API broadcasts POST] notification insert failed", notificationError);
+      }
     }
   }
 
