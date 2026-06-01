@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface SuggestionButtonProps {
@@ -17,6 +18,14 @@ export default function SuggestionButton({ variant = "floating" }: SuggestionBut
   const [error, setError] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  const pathname = usePathname();
+
+  // The floating pill sits bottom-left, where it collides with the map's
+  // glass stats footer + "For me in this area" control on the /events map
+  // (especially on phones). Hide the floating variant there; inline variants
+  // and other pages are unaffected.
+  const hideFloatingHere =
+    variant === "floating" && !!pathname && pathname.startsWith("/events");
 
   // Read the path post-mount so SSR/CSR markup stays identical, and refresh
   // every time the dialog opens (covers SPA navigations between submissions).
@@ -69,6 +78,9 @@ export default function SuggestionButton({ variant = "floating" }: SuggestionBut
     setOpen(false);
     setError(null);
   }
+
+  // After all hooks have run (Rules of Hooks), bail out on the map surface.
+  if (hideFloatingHere) return null;
 
   const trigger =
     variant === "floating" ? (
