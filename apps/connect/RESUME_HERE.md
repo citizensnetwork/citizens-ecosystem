@@ -16,7 +16,48 @@
 
 ---
 
-## 2. What just shipped - Notification batch DEPLOYED end-to-end (2026-06-02)
+## 2. What just shipped — Notification matrix Batches 1 & 2 (2026-06-02)
+
+Implementing the 4 remaining notification-matrix features in order, one batch each
+through the full quality gate + push. **Price field skipped entirely** (events have no
+price column). Next migration number: **128**.
+
+### Batch 2 — Material-change push filtering — commit `f35535a` (latest)
+- **Migration 127** (applied live): `event_updates.is_material boolean default false`;
+  `notify_event_field_changes()` now also watches `volunteer_openings` and stamps every
+  synthetic field-change row `is_material = true`; trigger recreated to fire on
+  `volunteer_openings` too. Mirrored into `supabase/schema.sql`.
+- **`_shared/push.ts`**: new `skipPush` flag → inserts in-app rows then returns before FCM.
+- **`notify-event-update` (redeployed v2, `verify_jwt=false`)**: reads `record.is_material`,
+  splits attending vs considering RSVPs, delivers **in-app** to all pref-allowed recipients
+  (attending+considering minus per-event opt-outs), delivers **push** to all only when
+  material, otherwise attending only. Two `sendNotifications` calls (skipPush, then skipInApp).
+- Cancellations untouched (separate `notify-event-cancelled`). Gates: tsc 0, vitest 802/802,
+  lint clean. Advisors 106 WARN / 50 auth-secdef = identical to baseline (no new findings).
+
+### Batch 1 — Per-event opt-out for RSVP'd/considering users — commit `6b0775b`
+- **Migration 126** (applied live): `rsvps.notify_updates boolean default true` + partial
+  muted index + SECURITY DEFINER RPC `set_rsvp_notify_updates(p_event_id, p_notify)`
+  (column-scoped to caller's own row; no broad UPDATE policy).
+- `PATCH /api/events/[id]/notify-preference` (auth + UUID + rate-limit + boolean → RPC; 409
+  when no RSVP). `EventNotifyToggle` switch under RSVPButton. `EventDetailServer` selects
+  `notify_updates`. Edge fns `notify-event-update` (deployed **v1 — never deployed before!**)
+  and `notify-broadcast` (v4) exclude `notify_updates=false` rows. 6-case route test.
+
+### Next batches (queued, not started)
+- **Batch 3 — Anonymous broadcast reactions** (migration 128): aggregate-only
+  `broadcast_reactions(broadcast_id, emoji, count)` table, atomic increment RPC, POST route,
+  5 fixed-emoji UI with counts under the broadcast card in `OrgBroadcastList.tsx`.
+- **Batch 4 — Map update bubbles** (migration 129): bubbles table + per-user dismissals,
+  ~24h expiry, dismiss route, MapLibre overlay above markers at z12+, trigger on
+  `event_updates`/broadcast inserts.
+
+> **Verify webhook wiring:** confirm the `event_updates` INSERT DB webhook actually targets
+> the `notify-event-update` function (it was deployed for the first time in Batch 1).
+
+---
+
+## 2b. Earlier — Notification batch DEPLOYED end-to-end (2026-06-02)
 
 **The notification batch is now live in Supabase, not just in code.** The prior session
 left the migrations/cron/edge functions undeployed; this session applied and verified them.
