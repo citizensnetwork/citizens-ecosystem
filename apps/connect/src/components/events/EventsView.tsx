@@ -257,6 +257,8 @@ export default function EventsView({
   const [considerVersion, setConsiderVersion] = useState(0);
   const [followedCreatorIds, setFollowedCreatorIds] = useState<Set<string>>(new Set());
   const [followedPlaceIds, setFollowedPlaceIds] = useState<Set<string>>(new Set());
+  // Active map update bubbles keyed by event id (newest non-dismissed per event).
+  const [mapBubbles, setMapBubbles] = useState<Map<string, { id: string; body: string }>>(new Map());
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
   const panelSwipeStartY = useRef(0);
@@ -320,7 +322,48 @@ export default function EventsView({
     return () => subscription.unsubscribe();
   }, []);
 
-  // List → map sync: hovering a result card highlights its marker with a
+  // Active map update bubbles (z12+ speech banners above event markers).
+  // Refetched whenever the signed-in user changes so per-user dismissals apply.
+  useEffect(() => {
+    const supabase = supabaseRef.current!;
+    let cancelled = false;
+    supabase
+      .rpc("get_active_map_bubbles")
+      .then(({ data }: { data: { id: string; event_id: string; body: string; created_at: string }[] | null }) => {
+        if (cancelled) return;
+        const next = new Map<string, { id: string; body: string; created_at: string }>();
+        for (const row of data ?? []) {
+          const existing = next.get(row.event_id);
+          if (!existing || row.created_at > existing.created_at) {
+            next.set(row.event_id, { id: row.id, body: row.body, created_at: row.created_at });
+          }
+        }
+        const trimmed = new Map<string, { id: string; body: string }>();
+        for (const [eventId, v] of next) trimmed.set(eventId, { id: v.id, body: v.body });
+        setMapBubbles(trimmed);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const handleDismissBubble = useCallback((bubbleId: string) => {
+    // Optimistically remove the bubble for its event, then persist.
+    setMapBubbles((prev) => {
+      const next = new Map(prev);
+      for (const [eventId, b] of next) {
+        if (b.id === bubbleId) {
+          next.delete(eventId);
+          break;
+        }
+      }
+      return next;
+    });
+    fetch(`/api/map/bubbles/${bubbleId}/dismiss`, { method: "POST" }).catch(() => {
+      /* best-effort; bubble already hidden locally and will not re-fetch this session */
+    });
+  }, []);
+
   // gold ring pulse (desktop affordance; silent no-op on touch devices).
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
 
@@ -1170,6 +1213,8 @@ export default function EventsView({
           followedCreatorIds={followedCreatorIds}
           followedPlaceIds={followedPlaceIds}
           contributorUpcomingEventCounts={contributorUpcomingEventCounts}
+          bubbles={mapBubbles}
+          onDismissBubble={handleDismissBubble}
         />
       </div>
 

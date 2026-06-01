@@ -355,3 +355,29 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/* ── Map update bubbles (z12+) ───────────────────────────── */
+
+/** Minimum zoom at which update bubbles reveal above their event marker. */
+export const BUBBLE_MIN_ZOOM = 12;
+
+/**
+ * Builds a speech-bubble element for a map update bubble. The bubble carries a
+ * short snippet plus a dismiss (×) control. Handlers are attached by the caller
+ * via the `.cc-bubble-dismiss` (dismiss) and `.cc-bubble-body` (open) children,
+ * mirroring the marker pattern where EventMap owns interaction wiring.
+ */
+export function createBubbleEl(text: string): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "cc-bubble";
+  // Trim to a compact snippet; the DB already caps at 160 chars.
+  const snippet = text.length > 90 ? `${text.slice(0, 89).trimEnd()}…` : text;
+  el.innerHTML = `
+    <button type="button" class="cc-bubble-dismiss" aria-label="Dismiss update">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+    <span class="cc-bubble-body">${escapeHtml(snippet)}</span>
+  `;
+  return el;
+}
+

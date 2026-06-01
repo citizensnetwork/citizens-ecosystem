@@ -21,6 +21,7 @@ vi.mock("@/lib/supabase/client", () => ({
       })),
       signOut: vi.fn().mockResolvedValue({}),
     },
+    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
   }),
 }));
 

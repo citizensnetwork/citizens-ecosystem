@@ -8,6 +8,8 @@ import {
   createCategoryMarkerEl,
   createCustomMarkerEl,
   createPlaceMarkerEl,
+  createBubbleEl,
+  BUBBLE_MIN_ZOOM,
   getTemporalStyle,
   PLACE_MARKER_SIZE,
   PLACE_ICON_RATIO,
@@ -79,6 +81,12 @@ type Props = {
   /** When set, the marker with this event id gets a pulsing gold ring
    *  (list-to-map sync). */
   highlightedEventId?: string | null;
+  /** Active map update bubbles keyed by event id. Each event shows at most
+   *  one speech-bubble banner above its marker, revealed from zoom 12+. */
+  bubbles?: Map<string, { id: string; body: string }>;
+  /** Called when the user dismisses a bubble (× control). Receives the
+   *  bubble id; the parent persists the per-user dismissal. */
+  onDismissBubble?: (bubbleId: string) => void;
 };
 
 /* ── Persist map viewpoint across navigations ── */
@@ -201,6 +209,8 @@ export default function EventMap({
   followedCreatorIds,
   followedPlaceIds,
   contributorUpcomingEventCounts,
+  bubbles,
+  onDismissBubble,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -246,6 +256,11 @@ export default function EventMap({
   followedPlaceIdsRef.current = followedPlaceIds;
   const contributorUpcomingEventCountsRef = useRef(contributorUpcomingEventCounts);
   contributorUpcomingEventCountsRef.current = contributorUpcomingEventCounts;
+
+  // Bubble layer: dismiss callback kept in a ref so click handlers stay fresh.
+  const onDismissBubbleRef = useRef(onDismissBubble);
+  onDismissBubbleRef.current = onDismissBubble;
+  const bubbleMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
   const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; prominence: number; photoUrl: string | null; isFollowed: boolean; isLive: boolean; isSoon: boolean }[]>([]);
@@ -1143,6 +1158,84 @@ export default function EventMap({
       }
     });
   }, [highlightedEventId, events]);
+
+  /* ── Map update bubbles (z12+) ─────────────────────────
+   * Isolated overlay layer that is intentionally NOT entangled with the
+   * event-marker deconfliction / culling system. Each active bubble is a
+   * standalone MapLibre marker anchored above its event, revealed only at
+   * zoom >= BUBBLE_MIN_ZOOM. Rebuilds whenever the bubble set or the event
+   * coordinates change. */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const clearBubbles = () => {
+      bubbleMarkersRef.current.forEach((m) => m.remove());
+      bubbleMarkersRef.current = [];
+    };
+
+    const build = () => {
+      clearBubbles();
+      if (!bubbles || bubbles.size === 0) return;
+
+      // Index event coordinates for fast lookup.
+      const coords = new Map<string, [number, number]>();
+      for (const e of events) {
+        if (e.latitude != null && e.longitude != null) {
+          coords.set(e.id, [e.longitude, e.latitude]);
+        }
+      }
+
+      for (const [eventId, bubble] of bubbles) {
+        const lngLat = coords.get(eventId);
+        if (!lngLat) continue; // event not in current viewport/filter set
+
+        const el = createBubbleEl(bubble.body);
+        const marker = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -34] })
+          .setLngLat(lngLat)
+          .addTo(map);
+        bubbleMarkersRef.current.push(marker);
+
+        // Dismiss control — stop propagation so it never opens the event.
+        const dismissBtn = el.querySelector(".cc-bubble-dismiss");
+        dismissBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          marker.remove();
+          bubbleMarkersRef.current = bubbleMarkersRef.current.filter((m) => m !== marker);
+          onDismissBubbleRef.current?.(bubble.id);
+        });
+        // Tapping the body opens the event detail panel.
+        const body = el.querySelector(".cc-bubble-body");
+        body?.addEventListener("click", () => {
+          const evt = events.find((e) => e.id === eventId);
+          if (evt) onSelectEventRef.current?.(evt);
+        });
+      }
+
+      applyZoom();
+    };
+
+    // Reveal bubbles only when zoomed in enough to make them legible & useful.
+    const applyZoom = () => {
+      const visible = map.getZoom() >= BUBBLE_MIN_ZOOM;
+      bubbleMarkersRef.current.forEach((m) => {
+        (m.getElement() as HTMLElement).style.display = visible ? "" : "none";
+      });
+    };
+
+    if (readyRef.current) {
+      build();
+    } else {
+      map.once("load", build);
+    }
+    map.on("zoom", applyZoom);
+
+    return () => {
+      map.off("zoom", applyZoom);
+      map.off("load", build);
+      clearBubbles();
+    };
+  }, [bubbles, events]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">
