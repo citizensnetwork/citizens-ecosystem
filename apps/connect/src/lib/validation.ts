@@ -77,13 +77,43 @@ export const MAX_MEDIA_PER_UPLOAD = 10;
 export type MediaKind = "image" | "video";
 
 /**
- * Classify a file as image or video based on its MIME type.
+ * Classify a media item as image or video from its MIME type string.
+ * Returns `null` if it's neither a supported image nor a supported video.
+ *
+ * Used server-side at sign time, where only the *claimed* content type is known
+ * (the bytes go straight to Storage via a signed URL). The bucket-level
+ * `allowed_mime_types` list (migration 121) is the hard backstop against a client
+ * lying about the type.
+ */
+export function detectMediaKindByType(type: string): MediaKind | null {
+  if (ALLOWED_IMAGE_TYPES.includes(type)) return "image";
+  if (ALLOWED_VIDEO_TYPES.includes(type)) return "video";
+  return null;
+}
+
+/**
+ * Validate media metadata (content type + size) for gallery upload.
+ * Returns an error message string if invalid, or `null` if acceptable.
+ */
+export function validateMediaMeta(type: string, size: number): string | null {
+  const kind = detectMediaKindByType(type);
+  if (kind === "image") {
+    if (size > MAX_IMAGE_SIZE) return "Images must be smaller than 15 MB.";
+    return null;
+  }
+  if (kind === "video") {
+    if (size > MAX_VIDEO_SIZE) return "Videos must be smaller than 100 MB.";
+    return null;
+  }
+  return "Only JPEG, PNG, GIF, WebP, MP4, WebM, or MOV files are allowed.";
+}
+
+/**
+ * Classify a `File` as image or video based on its MIME type.
  * Returns `null` if it's neither a supported image nor a supported video.
  */
 export function detectMediaKind(file: File): MediaKind | null {
-  if (ALLOWED_IMAGE_TYPES.includes(file.type)) return "image";
-  if (ALLOWED_VIDEO_TYPES.includes(file.type)) return "video";
-  return null;
+  return detectMediaKindByType(file.type);
 }
 
 /**
@@ -91,16 +121,7 @@ export function detectMediaKind(file: File): MediaKind | null {
  * Returns an error message string if invalid, or `null` if acceptable.
  */
 export function validateMediaFile(file: File): string | null {
-  const kind = detectMediaKind(file);
-  if (kind === "image") {
-    if (file.size > MAX_IMAGE_SIZE) return "Images must be smaller than 15 MB.";
-    return null;
-  }
-  if (kind === "video") {
-    if (file.size > MAX_VIDEO_SIZE) return "Videos must be smaller than 100 MB.";
-    return null;
-  }
-  return "Only JPEG, PNG, GIF, WebP, MP4, WebM, or MOV files are allowed.";
+  return validateMediaMeta(file.type, file.size);
 }
 
 /** Sanitise a media filename extension. Falls back based on detected kind. */
