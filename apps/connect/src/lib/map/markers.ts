@@ -52,6 +52,20 @@ export function getTemporalStyle(
 
 /* ── MapLibre marker element builders ────────────────────── */
 
+/**
+ * Appends a small red "live" badge to a marker root when the event is live.
+ * Added as a child of the root `.cc-marker` (NOT the inner `.cc-marker-outer`,
+ * which is `overflow:hidden` on profile/logo markers and would clip the dot),
+ * mirroring the Figma EventPin live badge + the legend's "Live now" red dot.
+ */
+function appendLiveBadge(el: HTMLDivElement, isLive: boolean): void {
+  if (!isLive) return;
+  const badge = document.createElement("span");
+  badge.className = "cc-marker-live-badge";
+  badge.setAttribute("aria-hidden", "true");
+  el.appendChild(badge);
+}
+
 // Event marker base diameter in CSS pixels.  Reduced from 40→32 (−20%)
 // on 2026-04-23 to lower visual dominance on the map.  Markers reveal
 // progressively on zoom-in (dot → mid → full) rather than being grouped
@@ -104,6 +118,7 @@ export function createCategoryMarkerEl(
     line-height:0;
   ">${icon}</span></span>`;
 
+  appendLiveBadge(el, temporal.isLive);
   return el;
 }
 
@@ -160,6 +175,7 @@ export function createCustomMarkerEl(
       display:none;align-items:center;justify-content:center;
       line-height:0;
     ">${fallbackIcon}</span></span>`;
+    appendLiveBadge(el, temporal.isLive);
     return el;
   }
 
@@ -190,6 +206,7 @@ export function createCustomMarkerEl(
       display:none;align-items:center;justify-content:center;
       line-height:0;
     ">${fallbackIcon}</span></span>`;
+    appendLiveBadge(el, temporal.isLive);
     return el;
   }
 
@@ -221,6 +238,7 @@ export function createCustomMarkerEl(
       display:flex;align-items:center;justify-content:center;
       line-height:0;
     ">${iconSvg}</span></span>`;
+    appendLiveBadge(el, temporal.isLive);
     return el;
   }
 

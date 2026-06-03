@@ -541,13 +541,148 @@ h1, h2, h3, h4, .font-display {
   touch-action: manipulation;
 }
 
+/* Live marker pulse — a crisp double expanding ring (Figma EventPin uses a
+ * pair of staggered animate-ping rings). Two box-shadow stops give the
+ * outward "breathing" cue without adding extra DOM. */
 @keyframes markerPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.5);
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(201, 168, 76, 0.55),
+      0 0 0 0 rgba(201, 168, 76, 0.4);
   }
-  50% {
-    box-shadow: 0 0 0 12px rgba(201, 168, 76, 0);
+  70% {
+    box-shadow:
+      0 0 0 10px rgba(201, 168, 76, 0),
+      0 0 0 16px rgba(201, 168, 76, 0);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(201, 168, 76, 0),
+      0 0 0 0 rgba(201, 168, 76, 0);
+  }
+}
+
+/* ── Live badge — small red dot on live event markers ──
+ * Mirrors the Figma EventPin live badge and the "Live now" red dot in the
+ * Map Key legend, so the legend and the markers speak the same vocabulary.
+ * Appended by markers.ts as a child of the marker root (never the
+ * overflow-hidden inner span, so profile/logo markers don't clip it). */
+.cc-marker-live-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  pointer-events: none;
+}
+.cc-marker-live-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #ef4444;
+  animation: markerLivePing 1.6s ease-out infinite;
+}
+@keyframes markerLivePing {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-marker-live-badge::before {
+    animation: none;
+  }
+}
+
+/* ── Selected marker (Figma EventPin "isSelected") ──
+ * Clicking a marker scales it up, fills the ring with a category-tinted
+ * gradient, raises it above siblings, and drops a small glass label tooltip
+ * beneath it. EventMap toggles `.cc-marker-selected` + injects/removes the
+ * `.cc-marker-label` child in its selection effect. */
+.cc-marker-selected {
+  z-index: 7 !important;
+}
+/* Event markers (have a bordered, filled circular outer). */
+.cc-marker-selected:not(.cc-place-marker) .cc-marker-outer {
+  transform: scale(1.24);
+  border-color: #fff !important;
+  background: linear-gradient(
+    135deg,
+    var(--cc-pulse-color, #c9a84c),
+    color-mix(in srgb, var(--cc-pulse-color, #c9a84c) 78%, #000)
+  ) !important;
+  box-shadow:
+    0 6px 22px color-mix(in srgb, var(--cc-pulse-color, #c9a84c) 50%, transparent),
+    0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+}
+.cc-marker-selected:not(.cc-place-marker) .cc-marker-icon {
+  color: #fff !important;
+}
+/* Place markers (transparent outer, just a shadowed SVG glyph) — scale + a
+ * soft category-tinted glow instead of a square box-shadow. */
+.cc-marker-selected.cc-place-marker .cc-marker-outer {
+  transform: scale(1.24);
+  filter:
+    drop-shadow(0 0 7px color-mix(in srgb, var(--cc-pulse-color, #c9a84c) 75%, transparent))
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)) !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cc-marker-selected .cc-marker-outer {
+    transition:
+      transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 220ms ease;
+  }
+}
+/* Glass label tooltip beneath the selected marker. */
+.cc-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 9px;
+  padding: 3px 9px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.35);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--foreground, #0a0908);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 8;
+  animation: ccMarkerLabelIn 0.22s ease-out;
+}
+@keyframes ccMarkerLabelIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-marker-label {
+    animation: none;
   }
 }
 

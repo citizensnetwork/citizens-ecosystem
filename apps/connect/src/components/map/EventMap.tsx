@@ -81,6 +81,12 @@ type Props = {
   /** When set, the marker with this event id gets a pulsing gold ring
    *  (list-to-map sync). */
   highlightedEventId?: string | null;
+  /** Currently-open event id — gets the Figma "selected" pin treatment
+   *  (scale-up + category-tinted gradient fill + white ring + glass label
+   *  tooltip beneath). Driven by the inline EventPreviewCard selection. */
+  selectedEventId?: string | null;
+  /** Currently-open place id — same selected treatment as events. */
+  selectedPlaceId?: string | null;
   /** Active map update bubbles keyed by event id. Each event shows at most
    *  one speech-bubble banner above its marker, revealed from zoom 12+. */
   bubbles?: Map<string, { id: string; body: string }>;
@@ -204,6 +210,8 @@ export default function EventMap({
   onMoveEnd,
   onBoundsChange,
   highlightedEventId = null,
+  selectedEventId = null,
+  selectedPlaceId = null,
   rsvpEventIds,
   considerEventIds,
   followedCreatorIds,
@@ -263,8 +271,8 @@ export default function EventMap({
   const bubbleMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Deconfliction data: stores each event/place marker + its lat/lng + icon-to-outer ratio
-  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; prominence: number; photoUrl: string | null; isFollowed: boolean; isLive: boolean; isSoon: boolean }[]>([]);
-  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; prominence: number; photoUrl: string | null }[]>([]);
+  const evtMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; eventId: string; title: string; prominence: number; photoUrl: string | null; isFollowed: boolean; isLive: boolean; isSoon: boolean }[]>([]);
+  const placeMarkerDataRef = useRef<{ marker: maplibregl.Marker; lngLat: [number, number]; baseSize: number; iconRatio: number; placeId: string; name: string; prominence: number; photoUrl: string | null }[]>([]);
   /** Markers currently promoted to the photo tier (top-N by prominence in the
    *  viewport). Recomputed on every settle by updatePhotoTier. */
   const photoMarkersRef = useRef<Set<maplibregl.Marker>>(new Set());
@@ -927,6 +935,7 @@ export default function EventMap({
           baseSize,
           iconRatio: 0.48,
           eventId: event.id,
+          title: event.title,
           prominence,
           photoUrl,
           isFollowed,
@@ -1005,7 +1014,7 @@ export default function EventMap({
         if (isProminentMarker(prominence, place.prominence_base)) {
           placeEl.classList.add("cc-marker-prominent");
         }
-        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO, prominence, photoUrl: place.image_url ?? null });
+        placeMarkerDataRef.current.push({ marker, lngLat, baseSize, iconRatio: PLACE_ICON_RATIO, placeId: place.id, name: place.name, prominence, photoUrl: place.image_url ?? null });
         bounds.extend(lngLat);
         hasPoints = true;
       });
@@ -1158,6 +1167,37 @@ export default function EventMap({
       }
     });
   }, [highlightedEventId, events]);
+
+  /* ── Selected marker (Figma EventPin "isSelected") ─────
+   * The currently-open event/place marker scales up, gains a category-tinted
+   * gradient fill + white ring, and shows a small glass label tooltip with its
+   * title beneath it. Runs directly on the marker DOM (no re-render); the label
+   * is set via textContent so titles can never inject markup. */
+  useEffect(() => {
+    const setSelected = (el: HTMLElement, label: string | null) => {
+      const existing = el.querySelector(".cc-marker-label");
+      if (label != null) {
+        el.classList.add("cc-marker-selected");
+        if (existing) {
+          existing.textContent = label;
+        } else {
+          const node = document.createElement("span");
+          node.className = "cc-marker-label";
+          node.textContent = label;
+          el.appendChild(node);
+        }
+      } else {
+        el.classList.remove("cc-marker-selected");
+        existing?.remove();
+      }
+    };
+    evtMarkerDataRef.current.forEach(({ marker, eventId, title }) => {
+      setSelected(marker.getElement() as HTMLElement, eventId === selectedEventId ? title : null);
+    });
+    placeMarkerDataRef.current.forEach(({ marker, placeId, name }) => {
+      setSelected(marker.getElement() as HTMLElement, placeId === selectedPlaceId ? name : null);
+    });
+  }, [selectedEventId, selectedPlaceId, events, places]);
 
   /* ── Map update bubbles (z12+) ─────────────────────────
    * Isolated overlay layer that is intentionally NOT entangled with the

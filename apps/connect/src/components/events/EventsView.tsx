@@ -68,8 +68,10 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-/** Glass-like inactive background for quick access buttons (white 60%). */
-const QUICK_ACCESS_INACTIVE_BG = "rgba(255,255,255,0.60)";
+/** Rainbow sweep used for the thin "For me" personalisation pill outline
+ *  (matches the rainbow "?" personalise control in the glass header). */
+const RAINBOW_GRADIENT =
+  "linear-gradient(135deg, #ff4d4d 0%, #ffb400 25%, #3dd598 50%, #2f80ed 75%, #9b51e0 100%)";
 
 export default function EventsView({
   events,
@@ -1208,6 +1210,8 @@ export default function EventsView({
           resetBearingToken={resetBearingToken}
           locateMeToken={locateMeToken}
           highlightedEventId={hoveredEventId}
+          selectedEventId={selectedEvent?.id ?? null}
+          selectedPlaceId={selectedPlace?.id ?? null}
           rsvpEventIds={rsvpEventIds}
           considerEventIds={considerEventIds}
           followedCreatorIds={followedCreatorIds}
@@ -1300,9 +1304,9 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Filters / Layers glass panels (aligned with header pills) ── */}
+      {/* ── Filters / Layers glass panels (open below the quick-filter row) ── */}
       {!calendarOpen && (mapFiltersOpen || mapLayersOpen) && (
-        <div className="pointer-events-none absolute inset-x-0 top-[150px] z-1100 px-3 sm:top-[160px] sm:px-4">
+        <div className="pointer-events-none absolute inset-x-0 top-[200px] z-1100 px-3 sm:top-[210px] sm:px-4">
           <div className="mx-auto flex w-full max-w-5xl items-start justify-between gap-3">
             <div>
               {mapFiltersOpen && (
@@ -1384,61 +1388,105 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Top-centre "For me in this area" pill ──────────────────────
-       *  Shown only when personalisation has a clear signal (≥60% affinity
-       *  in some category). Toggling it hard-filters events + places to the
-       *  user's high-affinity categories. (The legacy Google-style
-       *  "Search this area" viewport-scope pill has been removed.) */}
-      {!calendarOpen && !hasDetail && personalised.hasSignal && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-1005 flex justify-center px-4 sm:bottom-28">
-          <button
-            type="button"
-            onClick={toggleForMe}
-            className={
-              forMeActive
-                ? "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold) bg-(--gold) px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition active:scale-95 animate-[fadeRise_280ms_ease-out]"
-                : "pointer-events-auto flex items-center gap-2 rounded-full border border-(--gold)/40 bg-white/90 px-4 py-2 text-xs font-semibold text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95 animate-[fadeRise_280ms_ease-out]"
-            }
-            aria-pressed={forMeActive}
-            aria-label={forMeActive ? "Show everything in this area" : "Show only what's For me in this area"}
-          >
-            <span aria-hidden="true">✨</span>
-            {forMeActive ? "For me — tap to clear" : "For me in this area"}
-            {forMeActive && (
-              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]" aria-hidden="true">×</span>
-            )}
-          </button>
+      {/* ── Map Key legend (Figma "Kingdom Connect") ───────────────────
+       *  Bottom-left glass card decoding the marker vocabulary. Offset above
+       *  the mobile bottom-nav (bottom-28) and the desktop bottom edge. */}
+      {!calendarOpen && !hasDetail && (
+        <div className="pointer-events-none absolute bottom-28 left-3 z-999 sm:bottom-8 sm:left-4">
+          <div className="cc-glass space-y-1.5 rounded-2xl px-3 py-2.5 shadow-lg">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.14em] text-(--foreground-soft)">
+              Map Key
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <span className="text-[10px] text-(--foreground-soft)">Live now</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full border-2 border-(--gold) bg-white" />
+              <span className="text-[10px] text-(--foreground-soft)">Event</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-[#111]" />
+              <span className="text-[10px] text-(--foreground-soft)">Place</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── Quick access tools (vertical stack under the burger button) ── */}
-      {!calendarOpen && visibleQuickItems.length > 0 && (
-        <div className="pointer-events-none absolute left-3 top-[206px] z-999 sm:left-4 sm:top-[214px]">
-          <div className="pointer-events-auto flex flex-col items-center gap-2">
-            {visibleQuickItems.map((item) => {
-              const isActive = activeQuickAccess === item.id;
-              return (
+      {/* ── Quick-filter pill row (Figma "quick filters") ──────────────
+       *  Horizontal, scrollable strip beneath the header. Re-dresses the old
+       *  vertical quick-access tools column into Figma pills, and folds the
+       *  personalisation "For me" control in as a rainbow-outlined pill at the
+       *  head of the row (replaces the former floating mid-screen pill).
+       *  Tapping a category pill reuses the full quick-access behaviour
+       *  (event + place filtering + the bottom card panel). */}
+      {!calendarOpen && (personalised.hasSignal || visibleQuickItems.length > 0) && (
+        <div className="pointer-events-none absolute inset-x-0 top-[150px] z-1004 sm:top-[160px]">
+          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4">
+            <div className="scrollbar-hide pointer-events-auto flex items-center gap-2 overflow-x-auto pb-1">
+              {/* "For me" — thin rainbow-outlined personalisation pill */}
+              {personalised.hasSignal && (
                 <button
-                  key={item.id}
                   type="button"
-                  onClick={() => toggleQuickAccess(item.id)}
-                  className="group flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all active:scale-90"
+                  onClick={toggleForMe}
+                  aria-pressed={forMeActive}
+                  aria-label={
+                    forMeActive
+                      ? "Show everything — clear the For me filter"
+                      : "Filter the map to what's For me"
+                  }
+                  className="relative flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold whitespace-nowrap shadow-lg transition-all active:scale-95"
                   style={{
-                    background: isActive ? hexToRgba(item.color, 0.25) : QUICK_ACCESS_INACTIVE_BG,
-                    border: isActive ? `2px solid ${item.color}` : "1px solid rgba(0,0,0,0.08)",
+                    background: `linear-gradient(${
+                      forMeActive ? "var(--gold-soft), var(--gold-soft)" : "#fff, #fff"
+                    }) padding-box, ${RAINBOW_GRADIENT} border-box`,
+                    border: "1.5px solid transparent",
+                    color: "var(--foreground)",
                   }}
-                  aria-label={item.label}
-                  aria-pressed={isActive}
-                  title={item.label}
                 >
-                  <span
-                    className="flex h-4 w-4 items-center justify-center"
-                    style={{ color: isActive ? item.color : "rgba(30,30,30,0.7)" }}
-                    dangerouslySetInnerHTML={{ __html: item.svg }}
-                  />
+                  <span aria-hidden="true">✨</span>
+                  For me
+                  {forMeActive && (
+                    <span
+                      className="flex h-4 w-4 items-center justify-center rounded-full bg-black/15 text-[10px]"
+                      aria-hidden="true"
+                    >
+                      ×
+                    </span>
+                  )}
                 </button>
-              );
-            })}
+              )}
+
+              {/* User's chosen quick-filter categories (Settings, ≤5) */}
+              {visibleQuickItems.map((item) => {
+                const isActive = activeQuickAccess === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleQuickAccess(item.id)}
+                    aria-pressed={isActive}
+                    title={item.label}
+                    className={
+                      isActive
+                        ? "flex flex-shrink-0 scale-105 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold whitespace-nowrap text-white shadow-xl transition-all active:scale-95"
+                        : "cc-glass flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold whitespace-nowrap text-black/70 shadow-lg transition-all active:scale-95"
+                    }
+                    style={isActive ? { background: item.color } : undefined}
+                  >
+                    <span
+                      className="flex h-3.5 w-3.5 items-center justify-center"
+                      style={{ color: isActive ? "#fff" : item.color }}
+                      dangerouslySetInnerHTML={{ __html: item.svg }}
+                    />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
