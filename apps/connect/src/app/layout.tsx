@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Playfair_Display, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "maplibre-gl/dist/maplibre-gl.css";
-import Navbar from "@/components/ui/Navbar";
+import AppShell from "@/components/ui/AppShell";
 import CapacitorInit from "@/components/ui/CapacitorInit";
 import ApplicationPendingBannerServer from "@/components/ui/ApplicationPendingBannerServer";
 import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
@@ -11,10 +11,16 @@ import TermsAcceptanceGate from "@/components/ui/TermsAcceptanceGate";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import SuggestionButton from "@/components/ui/SuggestionButtonClient";
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -51,19 +57,23 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${montserrat.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="map-bg min-h-full flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <CapacitorInit />
         <ServiceWorkerRegister />
         {Object.values(FEATURE_FLAGS).some(Boolean) && <BetaBanner />}
-        <Navbar />
-        <ApplicationPendingBannerServer />
-        <main className="flex-1">{children}</main>
-        {/* Parallel @panel slot — renders intercepted detail views
-            (event, profile, messages) as a right-side drawer without
-            leaving the underlying page. */}
-        {panel}
+        <AppShell />
+        {/* Content column — offset right of the collapsible desktop sidebar via
+            the --cc-sidebar-w var AppShell maintains (0 on mobile / collapsed). */}
+        <div className="flex flex-1 flex-col transition-[padding] duration-300 md:pl-[var(--cc-sidebar-w,0px)]">
+          <ApplicationPendingBannerServer />
+          <main className="flex-1">{children}</main>
+          {/* Parallel @panel slot — renders intercepted detail views
+              (event, profile, messages) as a right-side drawer without
+              leaving the underlying page. */}
+          {panel}
+        </div>
         <TermsAcceptanceGate />
         <SuggestionButton variant="floating" />
       </body>

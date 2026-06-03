@@ -98,7 +98,7 @@ function createAttendeeMarkerEl(
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 2px solid #D4AF37;
+    border: 2px solid #C9A84C;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     cursor: pointer;
@@ -127,7 +127,7 @@ function createAttendeeMarkerEl(
     right: -1px;
     width: 10px;
     height: 10px;
-    background: #D4AF37;
+    background: #C9A84C;
     border: 2px solid white;
     border-radius: 50%;
   `;
@@ -151,7 +151,7 @@ function createInitialsEl(name: string): HTMLDivElement {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #D4AF37;
+    background: #C9A84C;
     color: white;
     font-size: 12px;
     font-weight: 700;

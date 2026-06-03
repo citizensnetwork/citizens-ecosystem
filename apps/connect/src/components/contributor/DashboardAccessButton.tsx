@@ -42,7 +42,7 @@ export default function DashboardAccessButton({
     return (
       <Link
         href={DASHBOARD_PATH(slug)}
-        className="inline-flex items-center justify-center rounded-full bg-(--gold,#D4AF37) px-4 py-1.5 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold,#D4AF37)"
+        className="inline-flex items-center justify-center rounded-full bg-(--gold,#C9A84C) px-4 py-1.5 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold,#C9A84C)"
       >
         Open Dashboard
       </Link>
@@ -57,7 +57,7 @@ export default function DashboardAccessButton({
           type="button"
           disabled
           aria-label="Dashboard access request pending"
-          className="inline-flex items-center justify-center rounded-full bg-(--gold,#D4AF37) px-4 py-1.5 text-sm font-semibold text-black/40 opacity-60"
+          className="inline-flex items-center justify-center rounded-full bg-(--gold,#C9A84C) px-4 py-1.5 text-sm font-semibold text-black/40 opacity-60"
         >
           Open Dashboard
         </button>
@@ -102,7 +102,7 @@ export default function DashboardAccessButton({
           onClick={onClick}
           disabled={submitting}
           aria-label="Request dashboard access"
-          className="inline-flex items-center justify-center rounded-full bg-(--gold,#D4AF37) px-4 py-1.5 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold,#D4AF37) disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-full bg-(--gold,#C9A84C) px-4 py-1.5 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--gold,#C9A84C) disabled:opacity-60"
         >
           Open Dashboard
         </button>

@@ -395,9 +395,9 @@ function LandingBackdrop({
       }`}
     >
       <div className="absolute inset-0 opacity-[0.28] [background-image:linear-gradient(rgba(17,17,17,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(17,17,17,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
-      <div className="absolute left-[18%] top-[18%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(212,175,55,.16)]" />
+      <div className="absolute left-[18%] top-[18%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(201, 168, 76,.16)]" />
       <div className="absolute left-[54%] top-[34%] h-2.5 w-2.5 rounded-full bg-black shadow-[0_0_0_7px_rgba(17,17,17,.1)]" />
-      <div className="absolute left-[72%] top-[58%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(212,175,55,.16)]" />
+      <div className="absolute left-[72%] top-[58%] h-2 w-2 rounded-full bg-(--gold) shadow-[0_0_0_6px_rgba(201, 168, 76,.16)]" />
       <div className="absolute left-[32%] top-[70%] h-2.5 w-2.5 rounded-full bg-black shadow-[0_0_0_7px_rgba(17,17,17,.1)]" />
       <div className="absolute left-1/2 top-[48%] w-[min(82vw,520px)] -translate-x-1/2 rounded-2xl border border-black/10 bg-white/72 px-5 py-4 text-center shadow-xl backdrop-blur-md">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/50">

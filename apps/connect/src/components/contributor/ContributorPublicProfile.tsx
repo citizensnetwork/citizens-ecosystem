@@ -137,7 +137,7 @@ export function ContributorPublicProfile({
                 {displayName}
               </h1>
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-(--gold,#D4AF37) px-2.5 py-0.5 text-[11px] font-semibold text-black"
+                className="inline-flex items-center gap-1 rounded-full bg-(--gold,#C9A84C) px-2.5 py-0.5 text-[11px] font-semibold text-black"
                 title="Approved Citizens Connect Contributor"
               >
                 <VerifiedIcon /> Contributor

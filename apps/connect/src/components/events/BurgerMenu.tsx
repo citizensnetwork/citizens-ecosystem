@@ -222,14 +222,14 @@ const BurgerMenu = forwardRef<HTMLElement, Props>(function BurgerMenu(
                 onClick={onToggleWeekend}
                 className={`mt-2 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition ${
                   weekendOnly
-                    ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 font-medium text-black"
+                    ? "border-[#C9A84C]/55 bg-[#C9A84C]/10 font-medium text-black"
                     : "border-transparent text-black/70 hover:bg-black/[.04]"
                 }`}
               >
                 <span
                   className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border transition-all"
                   style={weekendOnly
-                    ? { borderColor: "#D4AF37", backgroundColor: "rgba(212,175,55,0.30)" }
+                    ? { borderColor: "#C9A84C", backgroundColor: "rgba(201, 168, 76,0.30)" }
                     : { borderColor: "rgba(0,0,0,0.18)", backgroundColor: "transparent" }
                   }
                 >

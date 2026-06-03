@@ -1502,7 +1502,7 @@ export default function EventsView({
                       key={p.id}
                       href={`/c/${encodeURIComponent(p.contributor_slug!)}`}
                       role="listitem"
-                      className="flex items-center gap-1.5 rounded-full border border-(--gold,#D4AF37) bg-white/95 px-2.5 py-1 text-[11px] font-medium text-black shadow-md backdrop-blur transition hover:bg-white"
+                      className="flex items-center gap-1.5 rounded-full border border-(--gold,#C9A84C) bg-white/95 px-2.5 py-1 text-[11px] font-medium text-black shadow-md backdrop-blur transition hover:bg-white"
                       title={`Open ${p.full_name}`}
                     >
                       {p.logo_url || p.avatar_url ? (
@@ -1772,7 +1772,7 @@ export default function EventsView({
                     >
                       {sortedCategoryPanelEvents.map((event) => {
                         const cat = (event.category ?? "church-services") as EventCategory;
-                        const hex = CATEGORY_HEX[cat] ?? "#D4AF37";
+                        const hex = CATEGORY_HEX[cat] ?? "#C9A84C";
                         const isConvinced = incomingConvinceEventIds.has(event.id);
                         const cityCode = getCityLabel(event.location, event.latitude, event.longitude);
                         return (

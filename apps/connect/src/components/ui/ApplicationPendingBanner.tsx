@@ -25,7 +25,7 @@ export function ApplicationPendingBanner({
     return (
       <div
         role="status"
-        className="sticky top-0 z-40 w-full border-b border-(--gold,#D4AF37)/40 bg-(--gold,#D4AF37)/10 text-black"
+        className="sticky top-0 z-40 w-full border-b border-(--gold,#C9A84C)/40 bg-(--gold,#C9A84C)/10 text-black"
       >
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2 text-sm">
           <button
@@ -51,7 +51,7 @@ export function ApplicationPendingBanner({
           <span className="flex flex-1 items-center gap-2">
             <span
               aria-hidden={true}
-              className="inline-block h-2 w-2 animate-pulse rounded-full bg-(--gold,#D4AF37)"
+              className="inline-block h-2 w-2 animate-pulse rounded-full bg-(--gold,#C9A84C)"
             />
             <span>
               <strong className="font-semibold">Under review.</strong> Your

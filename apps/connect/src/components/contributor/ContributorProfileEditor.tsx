@@ -193,7 +193,7 @@ export function ContributorProfileEditor({ profile }: { profile: Profile }) {
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex items-center rounded-xl bg-(--gold,#D4AF37) px-5 py-2.5 text-sm font-semibold text-black shadow-sm hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center rounded-xl bg-(--gold,#C9A84C) px-5 py-2.5 text-sm font-semibold text-black shadow-sm hover:opacity-90 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save changes"}
         </button>
@@ -203,7 +203,7 @@ export function ContributorProfileEditor({ profile }: { profile: Profile }) {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black placeholder:text-black/40 focus:border-(--gold,#D4AF37) focus:outline-none focus:ring-1 focus:ring-(--gold,#D4AF37)";
+  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black placeholder:text-black/40 focus:border-(--gold,#C9A84C) focus:outline-none focus:ring-1 focus:ring-(--gold,#C9A84C)";
 
 function Section({
   title,

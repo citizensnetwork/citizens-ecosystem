@@ -33,7 +33,7 @@ export default function MiniMap({ latitude, longitude, eventId }: Props) {
     attachBasemapPruner(map);
     map.on("load", () => setMapReady(true));
 
-    new maplibregl.Marker({ color: "#D4AF37" })
+    new maplibregl.Marker({ color: "#C9A84C" })
       .setLngLat([longitude, latitude])
       .addTo(map);
 

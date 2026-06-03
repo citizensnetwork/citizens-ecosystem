@@ -53,7 +53,7 @@ export default function WeekendChip({ size = "sm", className = "" }: Props) {
     <span
       title="Weekend event"
       aria-label="Weekend event"
-      className={`inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-transparent ${padding} ${textSize} font-medium text-[#8B7500] ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full border border-[#C9A84C]/55 bg-transparent ${padding} ${textSize} font-medium text-[#8B7500] ${className}`}
     >
       <CalendarDaysIcon className={iconSize} />
       Weekend

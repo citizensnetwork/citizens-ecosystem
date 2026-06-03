@@ -43,7 +43,7 @@ function formatWhen(iso: string): string {
  */
 export default function EventPreviewCard({ event, joined, considering, onAction, onClose }: Props) {
   const [imgOk, setImgOk] = useState(true);
-  const hex = event.category ? CATEGORY_HEX[event.category] : "#D4AF37";
+  const hex = event.category ? CATEGORY_HEX[event.category] : "#C9A84C";
   const categoryLabel = event.category ? CATEGORY_LABELS[event.category] : "Event";
   const hasWebsite = !!event.website_url && /^https?:\/\//i.test(event.website_url);
 

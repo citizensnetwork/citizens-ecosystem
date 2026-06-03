@@ -130,7 +130,7 @@ export function ContributorReviewCard({ app }: { app: PendingApplication }) {
             className="h-14 w-14 rounded-lg object-cover"
           />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-(--gold,#D4AF37)/15 text-lg font-semibold text-black">
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-(--gold,#C9A84C)/15 text-lg font-semibold text-black">
             {app.display_name.charAt(0).toUpperCase()}
           </div>
         )}
@@ -199,7 +199,7 @@ export function ContributorReviewCard({ app }: { app: PendingApplication }) {
             rows={3}
             maxLength={600}
             placeholder="Reason (visible to applicant)"
-            className="w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm focus:border-(--gold,#D4AF37) focus:outline-none focus:ring-1 focus:ring-(--gold,#D4AF37)"
+            className="w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm focus:border-(--gold,#C9A84C) focus:outline-none focus:ring-1 focus:ring-(--gold,#C9A84C)"
           />
           <div className="flex justify-end gap-2">
             <button
@@ -271,7 +271,7 @@ export function ContributorReviewCard({ app }: { app: PendingApplication }) {
             type="button"
             onClick={() => submit("approve")}
             disabled={mode === "working"}
-            className="rounded-lg bg-(--gold,#D4AF37) px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-(--gold,#C9A84C) px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
           >
             {mode === "working" ? "Working…" : "Approve"}
           </button>

@@ -174,7 +174,7 @@ export default function GlassMapHeader({
             onClick={onToggleFilters}
             aria-pressed={filtersOpen}
             className="cc-glass pointer-events-auto flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-black transition active:scale-95"
-            style={filtersOpen ? { background: "rgba(212,175,55,0.16)" } : undefined}
+            style={filtersOpen ? { background: "rgba(201, 168, 76,0.16)" } : undefined}
           >
             <SlidersHorizontal className="h-4 w-4 text-(--gold)" />
             Filters
@@ -184,7 +184,7 @@ export default function GlassMapHeader({
             onClick={onToggleLayers}
             aria-pressed={layersOpen}
             className="cc-glass pointer-events-auto flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-black transition active:scale-95"
-            style={layersOpen ? { background: "rgba(212,175,55,0.16)" } : undefined}
+            style={layersOpen ? { background: "rgba(201, 168, 76,0.16)" } : undefined}
           >
             <Layers className="h-4 w-4 text-(--gold)" />
             Layers

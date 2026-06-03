@@ -146,7 +146,7 @@ function SuggestionCard({ row }: { row: SuggestionRow }) {
         {internalPath ? (
           <Link
             href={internalPath}
-            className="underline text-[color:var(--gold,#D4AF37)]"
+            className="underline text-[color:var(--gold,#C9A84C)]"
             title={row.page_url}
           >
             {internalPath}

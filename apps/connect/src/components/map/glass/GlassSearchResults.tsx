@@ -61,8 +61,8 @@ export default function GlassSearchResults({
                     <span
                       className="flex h-8 w-8 items-center justify-center rounded-lg"
                       style={{
-                        background: `${e.category ? CATEGORY_HEX[e.category] : "#D4AF37"}1f`,
-                        color: e.category ? CATEGORY_HEX[e.category] : "#D4AF37",
+                        background: `${e.category ? CATEGORY_HEX[e.category] : "#C9A84C"}1f`,
+                        color: e.category ? CATEGORY_HEX[e.category] : "#C9A84C",
                       }}
                     >
                       <CalendarDays className="h-4 w-4" />

@@ -132,7 +132,7 @@ function ReportCard({ row }: { row: ReportRow }) {
         {href ? (
           <>
             {" "}·{" "}
-            <Link href={href} className="underline text-[color:var(--gold,#D4AF37)]">
+            <Link href={href} className="underline text-[color:var(--gold,#C9A84C)]">
               View target
             </Link>
           </>

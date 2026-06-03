@@ -61,7 +61,7 @@ export default function PersonalizationPanel({ percentages }: Props) {
               (CATEGORY_LABELS as Record<string, string>)[slug] ??
               slug.replace(/-/g, " ");
             const color =
-              (CATEGORY_HEX as Record<string, string>)[slug] ?? "#D4AF37";
+              (CATEGORY_HEX as Record<string, string>)[slug] ?? "#C9A84C";
             const width = Math.max(4, Math.min(100, Math.round(pct)));
             return (
               <li key={slug}>

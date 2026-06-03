@@ -2,21 +2,37 @@
 @import "tw-animate-css";
 
 :root {
-  --background: #FFFFFF;
+  /* Figma "Kingdom Connect" palette — warm cream canvas, antique gold accent.
+   * --surface stays pure white so cards/sheets read as white-on-cream (matches
+   * the Figma `card: rgba(255,255,255,0.82)` treatment). */
+  --background: #F7F4EE;
   --surface: #FFFFFF;
-  --surface-muted: #F5F5F5;
-  --foreground: #000000;
+  --surface-muted: #EDE8DC;
+  --foreground: #0A0908;
   --foreground-soft: #3d3d3d;
-  --gold: #D4AF37;
-  --gold-soft: #f4ead2;
+  /* Brand gold (antique) — single source of truth. Category colours live in
+   * src/lib/categories.ts and are intentionally independent of this. */
+  --gold: #C9A84C;
+  --gold-light: #E8D48B;
+  --gold-dark: #8B6914;
+  --gold-soft: #F2E8CC;
   --border: #e5e5e5;
   --ring: #000000;
+
+  /* Width the collapsible desktop sidebar reserves in the content column.
+   * Maintained at runtime by AppShell; 0 on mobile / collapsed / bare routes. */
+  --cc-sidebar-w: 0px;
 
   /* ── Citizens Transparency System ── */
   --glass-30: rgba(255,255,255,0.30);
   --glass-60: rgba(255,255,255,0.60);
   --glass-20: rgba(255,255,255,0.20);
   --glass-10: rgba(255,255,255,0.10);
+
+  /* Figma glass tokens (named to match the Make export's utilities). */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-dark: rgba(10, 9, 8, 0.6);
 
   /* ── shadcn-compat aliases (additive; wired to Citizens palette) ──
    * These names are what shadcn primitives reach for. Pointing them at
@@ -64,16 +80,26 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Montserrat", var(--font-montserrat), "Segoe UI", sans-serif;
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  --font-serif: var(--font-playfair), "Playfair Display", Georgia, serif;
   --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Montserrat", "Segoe UI", sans-serif;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Playfair Display for display headings — the Figma serif voice. Opt-in via the
+ * `.font-display` utility or the h1–h4 defaults below so we don't restyle every
+ * incidental heading inside dense UI. */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-playfair), "Playfair Display", Georgia, serif;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 * {
@@ -88,7 +114,7 @@ body {
 
 .gold-glow {
   box-shadow:
-    0 8px 24px rgba(212, 175, 55, 0.24),
+    0 8px 24px rgba(201, 168, 76, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
@@ -116,7 +142,7 @@ body {
   background: linear-gradient(
     100deg,
     rgba(0, 0, 0, 0.04) 0%,
-    rgba(212, 175, 55, 0.10) 44%,
+    rgba(201, 168, 76, 0.10) 44%,
     rgba(0, 0, 0, 0.04) 100%
   );
   background-size: 200% 100%;
@@ -216,8 +242,8 @@ body {
 }
 
 @keyframes markerSyncPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.55), 0 2px 6px rgba(0, 0, 0, .25); }
-  50%      { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0), 0 0 14px rgba(212, 175, 55, .4), 0 2px 6px rgba(0, 0, 0, .25); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.55), 0 2px 6px rgba(0, 0, 0, .25); }
+  50%      { box-shadow: 0 0 0 10px rgba(201, 168, 76, 0), 0 0 14px rgba(201, 168, 76, .4), 0 2px 6px rgba(0, 0, 0, .25); }
 }
 
 /* Prominence pulse: a gold signal emitted from beneath the marker. It lives on
@@ -231,7 +257,7 @@ body {
   width: max(18px, 105%);
   height: max(18px, 105%);
   border-radius: 999px;
-  background: rgba(212, 175, 55, 0.26);
+  background: rgba(201, 168, 76, 0.26);
   transform: translate(-50%, -50%) scale(0.72);
   pointer-events: none;
   z-index: 0;
@@ -275,7 +301,7 @@ body {
   padding: 6px 9px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(212, 175, 55, 0.55);
+  border: 1px solid rgba(201, 168, 76, 0.55);
   box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.35);
   font-size: 11.5px;
   line-height: 1.35;
@@ -294,8 +320,8 @@ body {
   width: 11px;
   height: 11px;
   background: rgba(255, 255, 255, 0.96);
-  border-right: 1px solid rgba(212, 175, 55, 0.55);
-  border-bottom: 1px solid rgba(212, 175, 55, 0.55);
+  border-right: 1px solid rgba(201, 168, 76, 0.55);
+  border-bottom: 1px solid rgba(201, 168, 76, 0.55);
   transform: translateX(-50%) rotate(45deg);
 }
 .cc-bubble-body {
@@ -370,7 +396,7 @@ body {
  *  the inner icon is hidden. Works for event, custom (profile/logo/icon) and
  *  place markers thanks to the shared --cc-marker-color CSS variable. */
 .cc-marker-dot .cc-marker-outer {
-  background: var(--cc-marker-color, #D4AF37) !important;
+  background: var(--cc-marker-color, #C9A84C) !important;
   border: 1px solid rgba(255, 255, 255, 0.85) !important;
   border-radius: 50% !important;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4)) !important;
@@ -410,7 +436,7 @@ body {
   border-radius: 50%;
   object-fit: cover;
   /* Gold ring keeps events/places reading on-brand even as photos. */
-  border: 2px solid #d4af37;
+  border: 2px solid #C9A84C;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   background: #fff;
   pointer-events: none;
@@ -444,10 +470,10 @@ body {
 
 @keyframes markerGlow {
   0%, 100% {
-    box-shadow: 0 0 0 3px rgba(212,175,55,0.7), 0 2px 6px rgba(0,0,0,.25);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76,0.7), 0 2px 6px rgba(0,0,0,.25);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(212,175,55,0.25), 0 0 18px rgba(212,175,55,0.45), 0 2px 6px rgba(0,0,0,.25);
+    box-shadow: 0 0 0 8px rgba(201, 168, 76,0.25), 0 0 18px rgba(201, 168, 76,0.45), 0 2px 6px rgba(0,0,0,.25);
   }
 }
 
@@ -518,10 +544,10 @@ body {
 @keyframes markerPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5);
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.5);
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(212, 175, 55, 0);
+    box-shadow: 0 0 0 12px rgba(201, 168, 76, 0);
   }
 }
 
@@ -554,8 +580,8 @@ body {
   font-size: 10px;
   font-weight: 600;
   color: #8a6d1c;
-  background: rgba(212, 175, 55, 0.12);
-  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.45);
   border-radius: 999px;
   padding: 1px 7px;
   margin-bottom: 4px;
@@ -666,7 +692,7 @@ body {
 /* ── Contributor Dashboard theme variant ───────────────────────────────────
  * Applied via the `data-contributor-ui` attribute on the layout root div.
  * Subtle warm-gold tint only — NOT dark mode. Respects NEXT_PUBLIC_CONTRIBUTOR_THEME_ENABLED.
- * Override: vivid gold (#C9A227) replaces the lighter #D4AF37 token for
+ * Override: vivid gold (#C9A227) replaces the lighter #C9A84C token for
  * action buttons, accent lines, and active nav tabs.                       */
 [data-contributor-ui] {
   --gold: #C9A227;
@@ -724,9 +750,9 @@ body {
 /* Map-like background for non-map pages (subtle topo gradient) */
 .map-bg {
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76,0.06) 0%, transparent 60%),
     radial-gradient(ellipse at 80% 30%, rgba(0,0,0,0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(212,175,55,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 80%, rgba(201, 168, 76,0.04) 0%, transparent 60%),
     linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 25%, #e5e5e5 50%, #ebebeb 75%, #e8e8e8 100%);
   background-size: 100% 100%, 100% 100%, 100% 100%, 200% 200%;
 }
@@ -756,7 +782,7 @@ body {
 /* Brand hexagon logo (gold gradient, Figma top-left mark) */
 .cc-hex-logo {
   background: linear-gradient(135deg, #F7CF5E 0%, #E6B53C 45%, #C9920E 100%);
-  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 14px rgba(201, 168, 76, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.55);
   clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%);
 }
 
@@ -816,9 +842,9 @@ body {
  * that and keeps place icons clean. */
 .cc-map-glass[data-layer-glow="on"] .cc-marker:not(.cc-place-marker):not(.cc-marker-prominent) .cc-marker-outer {
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 22%, transparent),
-    0 0 0 11px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 12%, transparent),
-    0 0 20px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 40%, transparent) !important;
+    0 0 0 4px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 22%, transparent),
+    0 0 0 11px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 12%, transparent),
+    0 0 20px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 40%, transparent) !important;
 }
 
 /* Activity Pulse — animated expanding ring (overrides glow when both on).
@@ -830,13 +856,13 @@ body {
 }
 @keyframes ccActivityPulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 45%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 45%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 16px color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 0%, transparent);
+    box-shadow: 0 0 0 16px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 0%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #D4AF37) 0%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 0%, transparent);
   }
 }
 
@@ -846,7 +872,7 @@ body {
 }
 .cc-map-glass[data-layer-connections="on"] .cc-leader-svg line,
 .cc-map-glass[data-layer-connections="on"] .cc-leader-svg path {
-  stroke: rgba(212, 175, 55, 0.7) !important;
+  stroke: rgba(201, 168, 76, 0.7) !important;
   stroke-dasharray: 3 3;
 }
 
@@ -878,4 +904,71 @@ body {
 .trending-card-v {
   width: 100%;
   flex-shrink: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Figma "Kingdom Connect" design utilities (ported from the Make export).
+ * Frosted glass, gold gradients, and the lightweight motion vocabulary that
+ * gives the whole app its smooth feel. CSS-only — no JS, GPU-friendly.
+ * ────────────────────────────────────────────────────────────────────────── */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+}
+.glass-dark {
+  background: var(--glass-dark);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.gold-gradient {
+  background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, var(--gold-dark) 100%);
+}
+.gold-text {
+  background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 60%, var(--gold-dark) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Map pin pulse — used by the live-event marker treatment. */
+.pin-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.3;
+  animation: pinPulse 2s ease-out infinite;
+}
+@keyframes pinPulse {
+  0%   { transform: scale(1);   opacity: 0.3; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+
+.broadcast-bubble { animation: bubbleBounce 0.8s ease-in-out infinite alternate; }
+@keyframes bubbleBounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-4px); }
+}
+
+.slide-up { animation: slideUp 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.fade-in { animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-pulse::before,
+  .broadcast-bubble,
+  .slide-up,
+  .fade-in { animation: none; }
 }

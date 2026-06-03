@@ -33,7 +33,7 @@ export function VerifiedBadge({
       title={title}
       aria-label={title}
       role="img"
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[color:var(--gold,#D4AF37)] text-black ${box} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[color:var(--gold,#C9A84C)] text-black ${box} ${className}`}
     >
       {/* Crown icon */}
       <svg

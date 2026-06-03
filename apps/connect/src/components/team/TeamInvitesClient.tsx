@@ -109,14 +109,14 @@ export default function TeamInvitesClient({
 
       {transfers.length > 0 && (
         <section className="mb-6">
-          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-(--gold,#D4AF37)">
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-(--gold,#C9A84C)">
             Ownership transfers
           </h2>
           <ul className="space-y-3">
             {transfers.map((transfer) => (
               <li
                 key={transfer.id}
-                className="surface-card rounded-xl border border-(--gold,#D4AF37)/40 bg-white p-4 flex items-center gap-3"
+                className="surface-card rounded-xl border border-(--gold,#C9A84C)/40 bg-white p-4 flex items-center gap-3"
               >
                 <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {transfer.contributor?.avatar_url ? (
@@ -145,7 +145,7 @@ export default function TeamInvitesClient({
                     ) : (
                       transfer.contributor?.full_name ?? "Contributor"
                     )}
-                    <span className="rounded-full bg-(--gold,#D4AF37)/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-(--gold,#D4AF37) uppercase">
+                    <span className="rounded-full bg-(--gold,#C9A84C)/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-(--gold,#C9A84C) uppercase">
                       Owner transfer
                     </span>
                   </div>
@@ -159,7 +159,7 @@ export default function TeamInvitesClient({
                   <button
                     onClick={() => respondTransfer(transfer, "accept")}
                     disabled={busyId === transfer.id}
-                    className="rounded-full bg-(--gold,#D4AF37) text-black text-xs font-semibold px-4 py-1.5 hover:opacity-90 disabled:opacity-40"
+                    className="rounded-full bg-(--gold,#C9A84C) text-black text-xs font-semibold px-4 py-1.5 hover:opacity-90 disabled:opacity-40"
                   >
                     {busyId === transfer.id ? "…" : "Accept"}
                   </button>
@@ -228,7 +228,7 @@ export default function TeamInvitesClient({
                   <button
                     onClick={() => respondInvite(invite, "accept")}
                     disabled={busyId === invite.id}
-                    className="rounded-full bg-(--gold,#D4AF37) text-black text-xs font-semibold px-4 py-1.5 hover:opacity-90 disabled:opacity-40"
+                    className="rounded-full bg-(--gold,#C9A84C) text-black text-xs font-semibold px-4 py-1.5 hover:opacity-90 disabled:opacity-40"
                   >
                     {busyId === invite.id ? "…" : "Accept"}
                   </button>

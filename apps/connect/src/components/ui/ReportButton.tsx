@@ -173,7 +173,7 @@ export function ReportButton({
                 <p>You need to be signed in to report content.</p>
                 <Link
                   href="/login"
-                  className="inline-block rounded-full bg-[color:var(--gold,#D4AF37)] px-4 py-2 text-sm font-medium text-black hover:brightness-95"
+                  className="inline-block rounded-full bg-[color:var(--gold,#C9A84C)] px-4 py-2 text-sm font-medium text-black hover:brightness-95"
                   onClick={close}
                 >
                   Sign in

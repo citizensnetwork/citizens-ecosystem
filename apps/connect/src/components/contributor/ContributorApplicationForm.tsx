@@ -255,7 +255,7 @@ export function ContributorApplicationForm({
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex items-center rounded-xl bg-(--gold,#D4AF37) px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center rounded-xl bg-(--gold,#C9A84C) px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? "Submitting…" : "Submit application"}
         </button>
@@ -265,7 +265,7 @@ export function ContributorApplicationForm({
 }
 
 const inputCls =
-  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black placeholder:text-black/40 focus:border-[color:var(--gold,#D4AF37)] focus:outline-none focus:ring-1 focus:ring-[color:var(--gold,#D4AF37)]";
+  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black placeholder:text-black/40 focus:border-[color:var(--gold,#C9A84C)] focus:outline-none focus:ring-1 focus:ring-[color:var(--gold,#C9A84C)]";
 
 function Section({
   title,
@@ -299,7 +299,7 @@ function Field({
     <label className="block space-y-1.5">
       <span className="block text-xs font-medium text-black/70">
         {label}
-        {required ? <span className="ml-0.5 text-(--gold,#D4AF37)">*</span> : null}
+        {required ? <span className="ml-0.5 text-(--gold,#C9A84C)">*</span> : null}
       </span>
       {children}
     </label>

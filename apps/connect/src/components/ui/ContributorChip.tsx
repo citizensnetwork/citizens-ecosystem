@@ -21,8 +21,8 @@ export function ContributorChip({
   // official Contributors.
   const styles =
     variant === "community"
-      ? "border border-[color:var(--gold,#D4AF37)] text-black bg-white"
-      : "border border-transparent bg-[color:var(--gold,#D4AF37)] text-black";
+      ? "border border-[color:var(--gold,#C9A84C)] text-black bg-white"
+      : "border border-transparent bg-[color:var(--gold,#C9A84C)] text-black";
 
   return (
     <span

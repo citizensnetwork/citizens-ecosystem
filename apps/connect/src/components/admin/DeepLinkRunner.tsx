@@ -80,7 +80,7 @@ export function DeepLinkRunner(props: {
           onChange={(e) => setRejectReason(e.target.value)}
           rows={4}
           maxLength={600}
-          className="mt-3 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm focus:border-(--gold,#D4AF37) focus:outline-none focus:ring-1 focus:ring-(--gold,#D4AF37)"
+          className="mt-3 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm focus:border-(--gold,#C9A84C) focus:outline-none focus:ring-1 focus:ring-(--gold,#C9A84C)"
         />
         {state === "error" && (
           <p className="mt-2 text-sm text-red-700">{message}</p>

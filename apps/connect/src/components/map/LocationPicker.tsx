@@ -72,7 +72,7 @@ export default function LocationPicker({
     attachBasemapPruner(map);
 
     if (position) {
-      markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })
+      markerRef.current = new maplibregl.Marker({ color: "#C9A84C" })
         .setLngLat([position[1], position[0]])
         .addTo(map);
     }
@@ -83,7 +83,7 @@ export default function LocationPicker({
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat]);
       } else {
-        markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })
+        markerRef.current = new maplibregl.Marker({ color: "#C9A84C" })
           .setLngLat([lng, lat])
           .addTo(map);
       }
@@ -174,7 +174,7 @@ export default function LocationPicker({
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat]);
       } else {
-        markerRef.current = new maplibregl.Marker({ color: "#D4AF37" })
+        markerRef.current = new maplibregl.Marker({ color: "#C9A84C" })
           .setLngLat([lng, lat])
           .addTo(map);
       }
