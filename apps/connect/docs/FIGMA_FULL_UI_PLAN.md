@@ -80,9 +80,12 @@
 - Notifications (filter chips, rows, mark-all-read, deep-links) on our notifications.
 - Settings (profile, privacy, notif prefs, interests, quick-filters≤5, sharing) wired to prefs.
 
-### Phase 4 — Contributor Dashboard
-- Reskin tabs/stats/feed/charts/tools; wire to existing contributor analytics + broadcasts.
-- Broadcast composer → existing broadcast API.
+### Phase 4 — Contributor Dashboard ✅ COMPLETE (2026-06-04, commit 14451cc)
+- Glass header (avatar + name + involvement badge + settings). 4-stat cards (Connected/Considering/Events/Places).
+- 4 in-page tabs (Overview/Events/Messages/Tools). recharts BarChart (7-day connects+views).
+- Activity feed, event cards (cover/stats/View/Edit/Broadcast), places mini-list.
+- Messages tab: lazy-fetches conversations; Tools tab: broadcast composer wired to API + 6 tool tiles.
+- DashboardNav reskinned; page.tsx expanded with events/places/weekly-analytics/involvement data.
 
 ### Phase 5 — Kingdom Projects / Community (UI-complete)
 - New `/community` route + sidebar entry. Voting/projects/submit tabs rendered with real,

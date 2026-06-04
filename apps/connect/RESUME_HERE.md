@@ -16,7 +16,36 @@
 
 ---
 
-## 2. What just shipped — Figma UI Phase 3 (Personal surfaces) ✅ (2026-06-04)
+## 2. What just shipped — Figma UI Phase 4 (Contributor Dashboard) ✅ (2026-06-04)
+
+Commit **`14451cc`**. No DB migrations — next migration # still **130**. Suite **816/816** · tsc 0 · lint clean · vibe-security CLEAN.
+Working log: `.claude/sessions/phase4-contributor-dashboard.md`.
+
+### Dashboard home reskin (`/c/[slug]/dashboard`)
+- [DashboardHomeClient.tsx](src/components/contributor/dashboard/DashboardHomeClient.tsx) — complete Figma rewrite:
+  - **Glass header**: contributor avatar + name + computed **involvement badge** (Seed/Shepherd/Pillar/Beacon from real signals) + settings icon link
+  - **4-stat cards**: Connected (RSVPs), Considering, Events, Places — coloured values (gold / purple / green / blue)
+  - **4 in-page tabs** (client state, not routing): Overview / Events / Messages / Tools
+- **Overview tab**: recharts `BarChart` (7-day connects + views from `contributor_analytics`, auto-labelled Mon–Sun) + colour legend; recent activity feed (coloured icon rows with timeAgo); "View Public Profile" gold CTA; full analytics link tile
+- **Events tab**: Create event CTA; event cover-photo cards (category badge overlay, RSVP/consider stats, View/Edit/Broadcast action row); places mini-list; "Broadcast" button pre-fills the entity in the Tools tab
+- **Messages tab**: lazy-fetches top-3 conversations from `/api/conversations` on tab open (org ✦ badge, unread dot, timeAgo); "View All Messages" link to `/messages`
+- **Tools tab**: broadcast composer (entity dropdown → events + places; char counter; wired to existing `/api/contributor/[handle]/broadcasts`; success state + "Send Another"); 6 tool tiles linking to sub-pages (Create Event / Add Place / Volunteer Manager / Analytics / Team / Planning)
+
+### Dashboard nav reskin
+- [DashboardNav.tsx](src/components/contributor/dashboard/DashboardNav.tsx) — glass backdrop, Playfair heading, gold active-tab underline, compact admin pill
+
+### Data fetching expanded
+- [page.tsx](src/app/c/[slug]/dashboard/page.tsx) — now fetches: `avatar_url`, full events list (with rsvp + consider counts), places list, 7-day weekly analytics (rsvps + views), involvement signals; computes involvement level server-side
+
+### Dependency added
+- `recharts ^3.8.1` for the weekly bar chart
+
+### NEXT → Phase 5 (Kingdom Projects / Community) — see [docs/FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md)
+New `/community` route + sidebar entry. Voting/projects/submit tabs rendered with real, honest data; submit wired to existing suggestion intake. Add to nav.
+
+---
+
+## 2-prev. What just shipped — Figma UI Phase 3 (Personal surfaces) ✅ (2026-06-04)
 
 Commit **`afc18ee`**. No DB migrations — next migration # still **130**. Suite **816/816** · tsc 0 · lint clean · vibe-security CLEAN.
 Working log: `.claude/sessions/phase3-personal-surfaces.md`.
@@ -38,9 +67,6 @@ Working log: `.claude/sessions/phase3-personal-surfaces.md`.
 - `ConversationPreview.other_user.is_contributor` — org badge flag
 - `Preferences.quick_panel_ids`, `Preferences.interests` — explicit typed fields
 - `Profile.handle`, `Profile.discoverable` — fields added to type (existed in DB since migration 107)
-
-### NEXT → Phase 4 (Contributor Dashboard reskin) — see [docs/FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md)
-The contributor dashboard at `/c/[slug]/dashboard` needs the Figma reskin: involvement badge, quick stats, tab row (Overview/Events/Messages/Tools), weekly bar chart (recharts), activity feed, event cards, broadcast composer wired to our API.
 
 ---
 
