@@ -16,7 +16,63 @@
 
 ---
 
-## 2. What just shipped — Notification matrix Batches 1–4 ✅ COMPLETE (2026-06-02)
+## 2. What just shipped — Figma UI re-design: Phase 1 (Map) ✅ COMPLETE (2026-06-04)
+
+Phase 1 of the Figma full-UI re-design is **merged to main**. The whole map surface
+(`/events` → `EventsView.tsx` + `EventMap.tsx` + `lib/map/markers.ts` + `components/map/glass/`)
+now wears the Figma "Glassmorphism Community Map" look; every control was adapted or removed
+(founder **OVERRIDING DIRECTIVE** — nothing left in the old visual style). Durable plan:
+[`docs/FIGMA_FULL_UI_PLAN.md`](docs/FIGMA_FULL_UI_PLAN.md) (7 phases, 0–6). Working log (gitignored):
+`.claude/sessions/figma-full-ui-adaptation.md`. **No DB migrations in Phase 1 — next migration # still 130.**
+
+### What shipped
+- **Quick-filter pill row** (horizontal, under the header): reuses `visibleQuickItems` +
+  `toggleQuickAccess` (full event+place filtering + the bottom card panel are preserved; only the
+  old *vertical* quick-access column was retired). Active pill = category-colour fill + scale-up.
+- **"For me" pill** — a thin **rainbow-outlined** pill at the head of the pill row
+  (padding-box/border-box gradient), toggles the personalisation hard-filter; replaced the old
+  floating mid-screen pill.
+- **Pin selection** — `EventMap` tracks `selectedEventId`/`selectedPlaceId` → `.cc-marker-selected`
+  (scale + category-gradient fill + white ring for events; scale + tinted glow for places) plus a
+  glass `.cc-marker-label` tooltip (set via `textContent` — no markup injection). Refined live
+  pulse (double ring) + red `.cc-marker-live-badge` (markers.ts `appendLiveBadge`) matching the
+  legend's "Live now".
+- **Header** (`GlassMapHeader`) — Figma top bar: search row is `[search] [Filters tile] [avatar]`.
+  Avatar → `/profile` (or `/login`); Filters tile opens the bottom-sheet + shows a `filterCount`
+  badge. Brand + tagline + bell + personalise + calendar KEPT in the header. Old Filters/Layers
+  pill row removed.
+- **Filters bottom-sheet** (`MapFiltersPanel` rewritten) — slide-up over a dimmed backdrop:
+  category GRID with live per-category counts, Weekends-only chip, and the map **layers folded in**
+  (Impact Glow / Activity Pulse / Connections). Fixes categories being hidden behind the pills.
+  `MapLayersPanel.tsx` DELETED.
+- **FABs** — locate/compass re-dressed to the `cc-glass` token (no +/- zoom).
+- **Legacy bottom search REMOVED** — −400 lines of disabled dead code + its autocomplete machinery.
+  Orgs still discoverable via the header search (AI ranker + `GlassSearchResults`). `OrgSearchPanel`
+  (pg_trgm fuzzy org search) KEPT in-tree with its test for a future header search mode.
+- **Preview cards** (`EventPreviewCard`/`PlacePreviewCard`) — Figma cover treatment: title over the
+  photo behind a gradient scrim, solid category badge, LIVE badge on live events, verified check on
+  the place title overlay. Kept the wired 5-action row + real-data body.
+- **Map Key legend** (earlier in Phase 1) — bottom-left glass card (Live / Event / Place).
+
+### Commits (now on main): `88fcf29`, `457c81b`, `3aa226e`, `df076f1`, `e251ec6` (+ docs).
+### Quality: tsc 0 · full suite **811/811** (94 files) · lint clean · vibe-security clean.
+
+### ⚠️ Incident this phase (resolved): a parallel session destructively rewrote the header — stripped
+the brand, crammed calendar/burger/layers into the avatar drawer, floated the pills mid-screen. It
+was reverted to the last good commit; the shipped Phase 1 above is the correct, founder-approved state.
+Two unrelated working-tree changes were left uncommitted (not Phase 1, not mine): the
+`@vercel/speed-insights` dependency in `package.json`/lock.
+
+### NEXT → Phase 2 (Detail surfaces) — see [`docs/FIGMA_FULL_UI_PLAN.md`](docs/FIGMA_FULL_UI_PLAN.md):
+- EventProfile + PlaceProfile reskin (full page + `@panel` drawer variants), real data.
+- ContributorProfile reskin + involvement-level badge as a **computed proxy** (no fabricated numbers).
+- Carry-over from Phase 1: add Figma's **organiser row** (avatar + name → profile) to
+  `EventPreviewCard` — needs creator name/avatar passed into the card (trivial once Phase 2 has
+  contributor data in hand).
+
+---
+
+## 2-prev. What just shipped — Notification matrix Batches 1–4 ✅ COMPLETE (2026-06-02)
 
 All 4 remaining notification-matrix features shipped, one batch each through the full
 quality gate + push. **Price field skipped entirely** (events have no price column).

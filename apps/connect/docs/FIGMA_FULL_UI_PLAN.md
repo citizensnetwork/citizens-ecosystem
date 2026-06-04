@@ -70,6 +70,17 @@
 - Schema (ideas, votes w/ thresholds, status machine), RLS, SECURITY-DEFINER RPCs, map
   "Ideas" layer wiring, involvement-level persistence, "convince"/idea notifications.
 
+## ⚠️ OVERRIDING DIRECTIVE (founder, Phase 1) — WHOLE REPLACEMENT
+**The UI must FULLY, COMPLETELY, WHOLLY replace our current design with the Figma
+design (sibling repo `Christiancommunitymapapp`). NO surface, panel, control or nav
+element may be left in the old visual style.** "Reuse" of an existing component is only
+acceptable if that component is restyled to match the Figma look. Where we retain
+*functionality* Figma doesn't depict (locate-me, compass, calendar, "For me",
+personalization, org search), it must be re-dressed in the Figma visual language
+(glass, #C9A84C gold, Playfair/Jakarta, fully-rounded) — never left untouched. Each phase
+must AUDIT every existing element on its surfaces and adapt or remove it; nothing
+"non-discussed" is silently kept.
+
 ## Cross-cutting rules
 - A+ quality, light/fast, scale-ready (CLAUDE.md). Reuse existing components/APIs; no dupes.
 - Vibe-security each batch (no service-role in client, RLS-first, input validation).
