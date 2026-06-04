@@ -16,7 +16,62 @@
 
 ---
 
-## 2. What just shipped — Figma UI re-design: Phase 1 (Map) ✅ COMPLETE (2026-06-04)
+## 2. What just shipped — Sticky sidebar + Figma UI Phase 2 (Detail surfaces) ✅ COMPLETE (2026-06-04)
+
+This session shipped a nav refinement **and all of Phase 2**. Four commits on main, each
+fully gated (tsc 0 · lint clean · vibe-security clean) and pushed. Final suite: **816/816**
+(95 files, +5 from the new involvement-proxy test). **No DB migrations — next migration # still 130.**
+Working log (gitignored): `.claude/sessions/sticky-sidenav-and-phase2.md`.
+
+### Batch A — Sticky icon-rail sidebar — commit `ace0906`
+- Founder changed the locked Phase-0 nav decision: the desktop sidebar no longer folds away to
+  a crown button on collapse — it now collapses to a **sticky 72px icon-only rail** (`w-64` ↔
+  `w-[4.5rem]`) with a bottom chevron toggle, hover tooltips, and corner badge dots. Pulled
+  straight from the adjusted Figma `Root.tsx` (sibling repo `Christiancommunitymapapp` @ `193fd45`,
+  which I pulled this session). [AppShell.tsx](src/components/ui/AppShell.tsx) rewritten; crown-reopen
+  removed; `--cc-sidebar-w` content offset = 72px when collapsed. Mobile bottom nav + category pills untouched.
+- **Role surfaces noted for FUTURE phases** (not built) in [FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md):
+  `UserContext`, `ProfilePanel` ("profile button in nav and map"), `AdminDashboard`, role-gated nav —
+  each mapped to its phase, with a VISION note that real roles come from Supabase, never a client toggle.
+
+### Phase 2a — EventProfile reskin — commit `dc673bd`
+- [EventDetailContent.tsx](src/components/events/EventDetailContent.tsx) (shared by full `/events/[id]`
+  **and** the `@panel` drawer) restructured into the Figma layout: cover hero + scrim + HAPPENING-NOW
+  badge + category-hex/Volunteer badges + title/organiser overlay → RSVP action block → Date/Time/Location
+  cards → **About / Gallery / Updates tabs**. ALL wired features preserved + re-dressed. Omitted Figma's
+  considering/upcoming-dates stats (no real data for single events — VISION honesty).
+
+### Phase 2b — PlaceProfile reskin — commit `310c28d`
+- Split into [PlaceDetailServer.tsx](src/components/places/PlaceDetailServer.tsx) (fetch) → new client
+  [PlaceDetailContent.tsx](src/components/places/PlaceDetailContent.tsx) (Figma layout, About/Events/Gallery
+  tabs), mirroring the Event pattern. Omitted Figma "Hours" (no field) → real Followers + Rating stats.
+  Category badge uses real `categories.color`/`emoji`. Events tab = organiser's upcoming + past events.
+
+### Phase 2c — ContributorProfile reskin + involvement proxy — commit `e6e9019`
+- [ContributorPublicProfile.tsx](src/components/contributor/ContributorPublicProfile.tsx) (the
+  `/c/[slug]` + `/profile/[id]` contributor surface) restructured to Figma: cover hero, overlapping
+  header card (logo + name + **involvement badge** + Contributor chip + kind), Followers/Events/Places
+  stats, action row, **About / Events / Places / Team tabs**. Every real section kept + re-dressed.
+- New [involvement.ts](src/lib/contributors/involvement.ts) — documented **computed proxy** (Seed/Shepherd/
+  Pillar/Beacon) from real public signals (followers + events + places + team; events/places weighted 5×),
+  unit-tested ([involvement.test.ts](src/__tests__/lib/involvement.test.ts)). Never stored/fabricated; the
+  smallest contributor still gets an honest Seed. Added a real Places fetch (by `created_by`) in
+  [ProfileDetailServer.tsx](src/components/profile/ProfileDetailServer.tsx). Figma "Friends" tab → About
+  (no collab data). Citizen `/profile/[id]` body left as-is — Figma defines no citizen profile; not invented.
+
+### NEXT → Phase 3 (Personal surfaces) — see [docs/FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md):
+- **Messages** (glass bubbles, convo list, thread, empty state) on our messaging backend — Figma `pages/Messages.tsx`.
+- **Notifications** (filter chips, rows, mark-all-read, deep-links) on our notifications — Figma `pages/Notifications.tsx`.
+- **Settings** (profile, privacy, notif prefs, interests, quick-filters ≤5, sharing) — Figma `pages/Settings.tsx`.
+- Carry-over (deferred): organiser row (avatar + name → profile) on the map `EventPreviewCard` — needs
+  creator data plumbed through `EventsView`.
+
+### ⚠️ Uncommitted (not ours, pre-existing): `package.json` + `package-lock.json` (`@vercel/speed-insights`).
+Left unstaged across all four commits this session, as noted since the Phase 1 incident.
+
+---
+
+## 2-prev. Previously shipped — Figma UI re-design: Phase 1 (Map) ✅ COMPLETE (2026-06-04)
 
 Phase 1 of the Figma full-UI re-design is **merged to main**. The whole map surface
 (`/events` → `EventsView.tsx` + `EventMap.tsx` + `lib/map/markers.ts` + `components/map/glass/`)
