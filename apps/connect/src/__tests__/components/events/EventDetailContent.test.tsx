@@ -263,11 +263,8 @@ describe("EventDetailContent", () => {
         hasRsvped={false}
       />
     );
-    const editLink = screen.getByText(/edit event/i);
-    expect(editLink.closest("a")).toHaveAttribute(
-      "href",
-      "/events/evt-detail-1/edit"
-    );
+    const editLink = screen.getByRole("link", { name: /^edit$/i });
+    expect(editLink).toHaveAttribute("href", "/events/evt-detail-1/edit");
   });
 
   it("hides Edit button for non-owner", () => {

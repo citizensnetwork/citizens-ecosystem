@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Globe,
+  Mail,
+  Phone,
+  Camera,
+  Radio,
+  ChevronRight,
+} from "lucide-react";
 import RSVPButton from "./RSVPButton";
 import EventNotifyToggle from "./EventNotifyToggle";
 import CommentSection from "./CommentSection";
@@ -17,7 +28,7 @@ import MessageButton from "@/components/messaging/MessageButton";
 import LocationSharingToggle from "./LocationSharingToggle";
 import EventMediaStrip from "./EventMediaStrip";
 import TagChipList from "./TagChipList";
-import { CATEGORY_LABELS, CATEGORY_BADGE_CLASSES } from "@/lib/categories";
+import { CATEGORY_LABELS, CATEGORY_HEX } from "@/lib/categories";
 import WeekendChip from "@/components/events/WeekendChip";
 import { isWeekendEvent } from "@/lib/weekendTag";
 import { ContributorChip } from "@/components/ui/ContributorChip";
@@ -69,6 +80,8 @@ type Props = {
   organiserHandle?: string | null;
 };
 
+type DetailTab = "about" | "gallery" | "updates";
+
 export default function EventDetailContent({
   event,
   count,
@@ -96,8 +109,6 @@ export default function EventDetailContent({
     minute: "2-digit",
   };
 
-  const startStr = new Date(event.date).toLocaleDateString("en-US", dateFmt);
-
   const endStr = event.end_time
     ? (() => {
         const start = new Date(event.date);
@@ -113,15 +124,27 @@ export default function EventDetailContent({
       })()
     : null;
 
-  const dateStr = endStr ? `${startStr} – ${endStr}` : startStr;
-
+  const dayStr = new Date(event.date).toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const timeStr = new Date(event.date).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const hasCoords = event.latitude != null && event.longitude != null;
   const cat = event.category ?? "church-services";
+  const catHex = CATEGORY_HEX[cat];
   const isWeekend = isWeekendEvent(event);
   const isCancelled = isCancelledEvent(event);
   const isFull =
     event.max_attendees != null && count >= event.max_attendees;
   const canManageEvent = !!(user && (user.id === event.created_by || isAdmin));
+  const isCommunity = isCommunityEvent({
+    community_contributor: event.community_contributor,
+    creator: organiser,
+  });
 
   // Live event detection
   const now = new Date();
@@ -142,381 +165,475 @@ export default function EventDetailContent({
   const searchParams = useSearchParams();
   const autoFocusReview = searchParams?.get("review") === "1";
 
+  const [activeTab, setActiveTab] = useState<DetailTab>("about");
+  const friendAttendees = attendees.filter((a) => a.isFriend);
+
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 py-6">
-      <div className="glass-panel w-full max-w-2xl px-5 py-6 sm:px-6">
-      <div className="flex items-center justify-end gap-2 mb-3">
-        {user && user.id !== event.created_by && (
-          <ReportButton
-            targetType="event"
-            targetId={event.id}
-            isAuthenticated={!!user}
-          />
-        )}
-        {canManageEvent && (
-          <Link
-            href={`/events/${event.id}/edit`}
-            className="text-xs text-black/60 hover:text-black border border-black/15 rounded-xl px-2.5 py-1 transition hover:bg-black/5"
-          >
-            Edit Event
-          </Link>
-        )}
-      </div>
-
-      {/* Cancelled banner */}
-      {isCancelled && (
-        <div className="bg-red-100 border border-red-300 text-red-800 px-3 py-2 rounded-lg mb-3 text-center text-xs font-semibold">
-          This event has been cancelled
-        </div>
-      )}
-
-      {/* Draft banner */}
-      {isDraftEvent(event) && (
-        <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-lg mb-3 text-center text-xs font-medium">
-          Draft — only you can see this event
-        </div>
-      )}
-
-      {/* Cover image */}
-      {event.image_url && (
-        <div className="relative w-full h-48 mb-3">
-          <Image
-            src={event.image_url}
-            alt={event.title}
-            fill
-            className="object-cover rounded-xl"
-            sizes="(max-width: 768px) 100vw, 720px"
-          />
-        </div>
-      )}
-
-      {/* Organiser media gallery (photos + videos) */}
-      <EventMediaStrip media={media} />
-
-      {(event.category || event.community_contributor || isWeekend) && (
-        <div className="mb-1.5 flex flex-wrap items-center gap-2">
-          {event.category && (
-            <span
-              className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${CATEGORY_BADGE_CLASSES[cat]}`}
-            >
-              {CATEGORY_LABELS[cat]}
-            </span>
-          )}
-          {isWeekend && <WeekendChip />}
-          {isCommunityEvent({ community_contributor: event.community_contributor, creator: organiser }) && (
-              <ContributorChip variant="community" />
-          )}
-          {isLive && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-              {isInSession ? "In Session" : "Live"}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-xl font-bold leading-tight">{event.title}</h1>
-      </div>
-
-      {/* Organised by — links to the contributor/citizen profile of the
-          event's creator. Hidden if we don't know who the organiser is
-          (e.g. deleted profile). */}
-      {organiser && (
-        <p className="mt-1 text-xs text-black/60">
-          Organised by{" "}
-          <Link
-            href={
-              isApprovedContributor(organiser) &&
-              organiser.contributor_slug
-                ? `/c/${organiser.contributor_slug}`
-                : `/profile/${organiser.id}`
-            }
-            prefetch={false}
-            className="font-semibold text-(--gold) hover:underline focus:underline focus:outline-none"
-          >
-            {organiser.full_name || "Organiser"}
-          </Link>
-        </p>
-      )}
-
-      {tags.length > 0 && (
-        <div className="mt-1.5">
-          <TagChipList tags={tags} />
-        </div>
-      )}
-
-      {/* Inline star rating — only shown once the event has started.
-          Ratings are for past / live experiences; showing them on
-          upcoming events biases the signal and confuses attendees. */}
-      {hasStarted && (
-        <div className="mt-0.5">
-          <InlineEventRating eventId={event.id} isAuthenticated={!!user} autoFocus={autoFocusReview} />
-        </div>
-      )}
-
-      {/* Aggregate attendee count — lives right under the rating in light
-          text as a subtle social-proof signal, intentionally small so it
-          doesn't compete with the event title. */}
-      <p className="mt-0.5 text-xs font-medium text-black/40">
-        {count === 0
-          ? "No one attending yet"
-          : `${count} attending${
-              event.max_attendees ? ` / ${event.max_attendees}` : ""
-            }`}
-        {isFull && (
-          <span className="ml-1.5 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-            Sold Out
-          </span>
-        )}
-      </p>
-
-      {/* Social sharing */}
-      <div className="mt-2">
-        <SocialShareButtons
-          title={event.title}
-          description={`${new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${event.location}`}
-          entityType="event"
-          entityId={event.id}
-        />
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2 text-black/60 text-xs">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span>{dateStr}</span>
-        </div>
-        <div className="flex items-center gap-2 text-black/60 text-xs">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <span>{event.location}</span>
-        </div>
-
-        {/* Contact info */}
-        {event.website_url && /^https?:\/\//i.test(event.website_url) && (
-          <div className="flex items-center gap-2 text-gray-600 text-xs">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <a
-              href={event.website_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-(--gold) hover:underline"
-            >
-              {(() => { try { return new URL(event.website_url).hostname; } catch { return event.website_url; } })()}
-            </a>
-          </div>
-        )}
-        {event.contact_email && (
-          <div className="flex items-center gap-2 text-gray-600 text-xs">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            <a
-              href={`mailto:${event.contact_email}`}
-              className="text-(--gold) hover:underline"
-            >
-              {event.contact_email}
-            </a>
-          </div>
-        )}
-        {event.contact_phone && (
-          <div className="flex items-center gap-2 text-gray-600 text-xs">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            <a
-              href={`tel:${event.contact_phone}`}
-              className="text-(--gold) hover:underline"
-            >
-              {event.contact_phone}
-            </a>
-          </div>
-        )}
-      </div>
-
-      {hasCoords && (
-        <div className="mt-4">
-          <MiniMap latitude={event.latitude!} longitude={event.longitude!} eventId={hasRsvped ? event.id : undefined} />
-        </div>
-      )}
-
-      <div className="mt-4">
-        <h2 className="text-sm font-semibold mb-1">About this event</h2>
-        <p className="text-xs text-black/70 whitespace-pre-wrap leading-relaxed">{event.description}</p>
-      </div>
-
-      <div className="mt-6">
-        {isCancelled ? (
-          <div className="text-black/40 text-xs font-medium">RSVP is disabled for cancelled events.</div>
-        ) : hasStarted && !hasRsvped ? (
-          <div className="text-black/40 text-xs font-medium">This event has already started. RSVP is no longer available.</div>
-        ) : user ? (
-          <>
-            <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
-            {hasRsvped && !isCancelled && (
-              <EventNotifyToggle eventId={event.id} initial={notifyUpdates} />
-            )}
-            {hasRsvped && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <a
-                  href={buildGoogleCalendarUrl(event)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black hover:bg-(--gold)/20 transition"
-                >
-                  Add to Google Calendar
-                </a>
-                <a
-                  href={`/api/events/${event.id}/ical`}
-                  download
-                  className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black hover:bg-(--gold)/20 transition"
-                >
-                  Download .ics
-                </a>
-              </div>
-            )}
-          </>
-        ) : (
-          <Link
-            href="/login"
-            className="inline-block rounded-lg bg-(--gold) px-5 py-1.5 text-xs font-semibold text-black transition hover:brightness-105"
-          >
-            Log in to RSVP
-          </Link>
-        )}
-      </div>
-
-      {/* Live Location Sharing */}
-      {user && hasRsvped && (
-        <div className="mt-3">
-          <LocationSharingToggle
-            event={event}
-            isAttending={hasRsvped}
-            locationSharingEnabled={locationSharingEnabled}
-          />
-        </div>
-      )}
-
-      {/* Volunteer CTA — only when the organiser has opened this event for volunteers */}
-      {event.volunteer_openings && organiserHandle && (
-        <div className="mt-4">
-          <VolunteerApplyButton
-            entityType="event"
-            entityId={event.id}
-            contributorHandle={organiserHandle}
-            userId={user?.id ?? null}
-            initialStatus={volunteerStatus}
-            initialApplicationId={volunteerApplicationId}
-            isOwner={user?.id === event.created_by}
-          />
-        </div>
-      )}
-
-      {/* Message Organizer */}
-      {user && user.id !== event.created_by && (
-        <div className="mt-4">
-          <MessageButton
-            recipientId={event.created_by}
-            recipientName={organiser?.full_name || "Organiser"}
-          />
-        </div>
-      )}
-
-      {/* Friends attending — intentionally compact (friends only, no full
-          attendee roster). The aggregate count lives directly beneath the
-          rating at the top of the panel; this section only surfaces when
-          at least one friend is going so it never adds empty visual noise. */}
-      {(() => {
-        const friendAttendees = attendees.filter((a) => a.isFriend);
-        if (friendAttendees.length === 0) return null;
-        return (
-          <div className="mt-5 border-t pt-4">
-            <h2 className="mb-2 text-xs font-semibold text-black/60">
-              Friends attending
-            </h2>
-            <WhoIsAttending
-              attendees={friendAttendees}
-              totalCount={friendAttendees.length}
-              visibility="public"
-              isAuthenticated={!!user}
-              hideCountHeader
+    <div className="flex items-start justify-center sm:px-4 sm:py-6">
+      <article className="w-full max-w-2xl overflow-hidden bg-white shadow-xl sm:rounded-3xl">
+        {/* ── Hero ─────────────────────────────────────────────── */}
+        <div className="relative h-60 shrink-0 overflow-hidden sm:h-72">
+          {event.image_url ? (
+            <Image
+              src={event.image_url}
+              alt={event.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 720px"
+              priority
             />
-          </div>
-        );
-      })()}
+          ) : (
+            <div className="h-full w-full gold-gradient" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-      {/* Discoverable attendees — opt-in only; only visible to RSVPed users */}
-      {discoverableAttendees.length > 0 && (
-        <div className="mt-5 border-t pt-4">
-          <h2 className="mb-3 text-xs font-semibold text-black/60">
-            People attending
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {discoverableAttendees.map((attendee) => (
-              <div
-                key={attendee.user_id}
-                className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] py-1 pl-1 pr-2"
+          {/* Live badge */}
+          {isLive && (
+            <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-red-500 px-3 py-1 shadow-lg">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+              <span className="text-[11px] font-bold uppercase tracking-wide text-white">
+                {isInSession ? "In Session" : "Happening Now"}
+              </span>
+            </div>
+          )}
+
+          {/* Top-right glass actions (kept functionality, re-dressed) */}
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            {user && user.id !== event.created_by && (
+              <ReportButton
+                targetType="event"
+                targetId={event.id}
+                isAuthenticated={!!user}
+              />
+            )}
+            {canManageEvent && (
+              <Link
+                href={`/events/${event.id}/edit`}
+                className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/60"
               >
-                {attendee.avatar_url ? (
-                  <Image
-                    src={attendee.avatar_url}
-                    alt={attendee.full_name}
-                    width={24}
-                    height={24}
-                    className="h-6 w-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-[10px] font-bold uppercase text-amber-800">
-                    {attendee.full_name[0]}
+                Edit
+              </Link>
+            )}
+          </div>
+
+          {/* Title block */}
+          <div className="absolute inset-x-0 bottom-0 px-5 pb-5">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              {event.category && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow"
+                  style={{ background: catHex }}
+                >
+                  {CATEGORY_LABELS[cat]}
+                </span>
+              )}
+              {event.volunteer_openings && (
+                <span className="rounded-full bg-(--gold) px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                  Volunteer Spots
+                </span>
+              )}
+              {isWeekend && <WeekendChip />}
+              {isCommunity && <ContributorChip variant="community" />}
+            </div>
+            <h1 className="font-display text-2xl font-bold leading-tight text-white drop-shadow-lg">
+              {event.title}
+            </h1>
+            {organiser && (
+              <p className="mt-1 text-xs text-white/80">
+                Organised by{" "}
+                <Link
+                  href={
+                    isApprovedContributor(organiser) && organiser.contributor_slug
+                      ? `/c/${organiser.contributor_slug}`
+                      : `/profile/${organiser.id}`
+                  }
+                  prefetch={false}
+                  className="font-semibold text-(--gold-light) hover:underline focus:underline focus:outline-none"
+                >
+                  {organiser.full_name || "Organiser"}
+                </Link>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Body ─────────────────────────────────────────────── */}
+        <div className="px-5 py-5 sm:px-6">
+          {/* Status banners */}
+          {isCancelled && (
+            <div className="mb-3 rounded-xl border border-red-300 bg-red-100 px-3 py-2 text-center text-xs font-semibold text-red-800">
+              This event has been cancelled
+            </div>
+          )}
+          {isDraftEvent(event) && (
+            <div className="mb-3 rounded-xl border border-yellow-300 bg-yellow-50 px-3 py-2 text-center text-xs font-medium text-yellow-800">
+              Draft — only you can see this event
+            </div>
+          )}
+
+          {/* Primary action — RSVP / Connect */}
+          <div className="border-b border-black/10 pb-4">
+            {isCancelled ? (
+              <div className="text-xs font-medium text-black/40">
+                RSVP is disabled for cancelled events.
+              </div>
+            ) : hasStarted && !hasRsvped ? (
+              <div className="text-xs font-medium text-black/40">
+                This event has already started. RSVP is no longer available.
+              </div>
+            ) : user ? (
+              <>
+                <RSVPButton eventId={event.id} hasRsvped={hasRsvped} />
+                {hasRsvped && !isCancelled && (
+                  <EventNotifyToggle eventId={event.id} initial={notifyUpdates} />
+                )}
+                {hasRsvped && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <a
+                      href={buildGoogleCalendarUrl(event)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black transition hover:bg-(--gold)/20"
+                    >
+                      Add to Google Calendar
+                    </a>
+                    <a
+                      href={`/api/events/${event.id}/ical`}
+                      download
+                      className="inline-flex items-center gap-1 rounded-xl border border-(--gold)/40 bg-(--gold-soft) px-2.5 py-1 text-[10px] font-medium text-black transition hover:bg-(--gold)/20"
+                    >
+                      Download .ics
+                    </a>
                   </div>
                 )}
-                <span className="text-xs font-medium text-black/70">
-                  {attendee.full_name.split(" ")[0]}
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-block rounded-xl bg-(--gold) px-5 py-2 text-xs font-semibold text-black transition hover:brightness-105"
+              >
+                Log in to RSVP
+              </Link>
+            )}
+          </div>
+
+          {/* Key info cards */}
+          <div className="grid grid-cols-2 gap-3 py-4">
+            <div className="surface-card rounded-2xl p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Calendar size={14} className="text-(--gold)" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-black/50">
+                  Date
                 </span>
-                <MessageButton
-                  recipientId={attendee.user_id}
-                  recipientName={attendee.full_name}
-                  variant="icon"
-                />
               </div>
+              <p className="text-sm font-semibold text-foreground">{dayStr}</p>
+            </div>
+            <div className="surface-card rounded-2xl p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Clock size={14} className="text-(--gold)" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-black/50">
+                  Time
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-foreground">
+                {endStr ? `${timeStr} – ${endStr}` : timeStr}
+              </p>
+            </div>
+            <div className="surface-card col-span-2 rounded-2xl p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <MapPin size={14} className="text-(--gold)" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-black/50">
+                  Location
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-foreground">{event.location}</p>
+            </div>
+          </div>
+
+          {/* Attendance + rating (real data only — no fabricated stats) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
+            <p className="text-xs font-medium text-black/50">
+              {count === 0
+                ? "No one attending yet"
+                : `${count} attending${event.max_attendees ? ` / ${event.max_attendees}` : ""}`}
+              {isFull && (
+                <span className="ml-1.5 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                  Sold Out
+                </span>
+              )}
+            </p>
+            {hasStarted && (
+              <InlineEventRating
+                eventId={event.id}
+                isAuthenticated={!!user}
+                autoFocus={autoFocusReview}
+              />
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="mb-4 flex gap-0 rounded-xl bg-(--gold-soft)/40 p-1">
+            {(["about", "gallery", "updates"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize transition ${
+                  activeTab === tab
+                    ? "bg-white text-foreground shadow"
+                    : "text-black/50 hover:text-foreground"
+                }`}
+              >
+                {tab}
+              </button>
             ))}
           </div>
+
+          {/* ── About tab ── */}
+          {activeTab === "about" && (
+            <div className="fade-in space-y-5">
+              <div>
+                <h2 className="mb-1 text-sm font-semibold">About this event</h2>
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-black/70">
+                  {event.description}
+                </p>
+              </div>
+
+              {tags.length > 0 && <TagChipList tags={tags} />}
+
+              {/* Share */}
+              <SocialShareButtons
+                title={event.title}
+                description={`${new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${event.location}`}
+                entityType="event"
+                entityId={event.id}
+              />
+
+              {/* Contact */}
+              {(event.website_url || event.contact_email || event.contact_phone) && (
+                <div className="space-y-2">
+                  {event.website_url && /^https?:\/\//i.test(event.website_url) && (
+                    <div className="flex items-center gap-2 text-xs text-black/60">
+                      <Globe size={14} className="shrink-0 text-(--gold)" />
+                      <a
+                        href={event.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-(--gold) hover:underline"
+                      >
+                        {(() => {
+                          try {
+                            return new URL(event.website_url).hostname;
+                          } catch {
+                            return event.website_url;
+                          }
+                        })()}
+                      </a>
+                    </div>
+                  )}
+                  {event.contact_email && (
+                    <div className="flex items-center gap-2 text-xs text-black/60">
+                      <Mail size={14} className="shrink-0 text-(--gold)" />
+                      <a href={`mailto:${event.contact_email}`} className="text-(--gold) hover:underline">
+                        {event.contact_email}
+                      </a>
+                    </div>
+                  )}
+                  {event.contact_phone && (
+                    <div className="flex items-center gap-2 text-xs text-black/60">
+                      <Phone size={14} className="shrink-0 text-(--gold)" />
+                      <a href={`tel:${event.contact_phone}`} className="text-(--gold) hover:underline">
+                        {event.contact_phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {hasCoords && (
+                <MiniMap
+                  latitude={event.latitude!}
+                  longitude={event.longitude!}
+                  eventId={hasRsvped ? event.id : undefined}
+                />
+              )}
+
+              {/* Organiser card */}
+              {organiser && (
+                <div>
+                  <h3 className="mb-2 text-sm font-bold">Organised by</h3>
+                  <Link
+                    href={
+                      isApprovedContributor(organiser) && organiser.contributor_slug
+                        ? `/c/${organiser.contributor_slug}`
+                        : `/profile/${organiser.id}`
+                    }
+                    prefetch={false}
+                    className="surface-card flex items-center gap-3 rounded-2xl p-3 transition hover:border-(--gold)/40"
+                  >
+                    {organiser.logo_url || organiser.avatar_url ? (
+                      <Image
+                        src={(organiser.logo_url || organiser.avatar_url)!}
+                        alt={organiser.full_name || "Organiser"}
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-(--gold-soft) text-base font-bold uppercase text-(--gold-dark)">
+                        {(organiser.full_name || "O").charAt(0)}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-foreground">
+                        {organiser.full_name || "Organiser"}
+                      </span>
+                      {isApprovedContributor(organiser) && (
+                        <span className="block text-xs font-semibold text-(--gold)">
+                          Contributor
+                        </span>
+                      )}
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-black/30" />
+                  </Link>
+                </div>
+              )}
+
+              {/* Volunteer CTA */}
+              {event.volunteer_openings && organiserHandle && (
+                <VolunteerApplyButton
+                  entityType="event"
+                  entityId={event.id}
+                  contributorHandle={organiserHandle}
+                  userId={user?.id ?? null}
+                  initialStatus={volunteerStatus}
+                  initialApplicationId={volunteerApplicationId}
+                  isOwner={user?.id === event.created_by}
+                />
+              )}
+
+              {/* Message organiser */}
+              {user && user.id !== event.created_by && (
+                <MessageButton
+                  recipientId={event.created_by}
+                  recipientName={organiser?.full_name || "Organiser"}
+                />
+              )}
+
+              {/* Live location sharing */}
+              {user && hasRsvped && (
+                <LocationSharingToggle
+                  event={event}
+                  isAttending={hasRsvped}
+                  locationSharingEnabled={locationSharingEnabled}
+                />
+              )}
+
+              {/* Friends attending */}
+              {friendAttendees.length > 0 && (
+                <div className="border-t border-black/10 pt-4">
+                  <h3 className="mb-2 text-xs font-semibold text-black/60">Friends attending</h3>
+                  <WhoIsAttending
+                    attendees={friendAttendees}
+                    totalCount={friendAttendees.length}
+                    visibility="public"
+                    isAuthenticated={!!user}
+                    hideCountHeader
+                  />
+                </div>
+              )}
+
+              {/* Discoverable attendees (opt-in, RSVPed viewers only) */}
+              {discoverableAttendees.length > 0 && (
+                <div className="border-t border-black/10 pt-4">
+                  <h3 className="mb-3 text-xs font-semibold text-black/60">People attending</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {discoverableAttendees.map((attendee) => (
+                      <div
+                        key={attendee.user_id}
+                        className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] py-1 pl-1 pr-2"
+                      >
+                        {attendee.avatar_url ? (
+                          <Image
+                            src={attendee.avatar_url}
+                            alt={attendee.full_name}
+                            width={24}
+                            height={24}
+                            className="h-6 w-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-[10px] font-bold uppercase text-amber-800">
+                            {attendee.full_name[0]}
+                          </div>
+                        )}
+                        <span className="text-xs font-medium text-black/70">
+                          {attendee.full_name.split(" ")[0]}
+                        </span>
+                        <MessageButton
+                          recipientId={attendee.user_id}
+                          recipientName={attendee.full_name}
+                          variant="icon"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Gallery tab ── */}
+          {activeTab === "gallery" && (
+            <div className="fade-in">
+              {media.length > 0 ? (
+                <EventMediaStrip media={media} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Camera size={32} className="mb-3 text-black/20" />
+                  <p className="text-sm text-black/50">No gallery photos yet</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Updates tab ── */}
+          {activeTab === "updates" && (
+            <div className="fade-in space-y-5">
+              {broadcasts.length > 0 ? (
+                <OrgBroadcastList broadcasts={broadcasts} showReactions />
+              ) : (
+                !canManageEvent && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Radio size={32} className="mb-3 text-black/20" />
+                    <p className="text-sm text-black/50">No broadcast updates yet</p>
+                  </div>
+                )
+              )}
+              {/* Legacy event_updates — kept for owners/admins (composer) and
+                  when there are no contributor broadcasts, to avoid two
+                  "From the Organiser" feeds. */}
+              {(canManageEvent || broadcasts.length === 0) && (
+                <EventUpdatesList eventId={event.id} isOwner={canManageEvent} />
+              )}
+            </div>
+          )}
+
+          {/* Comments — always available, re-dressed */}
+          <div className="mt-6 border-t border-black/10 pt-5">
+            <CommentSection eventId={event.id} user={user} />
+          </div>
+
+          {/* Live location tracking prompt */}
+          {user && hasRsvped && (
+            <LiveTrackingPrompt
+              eventId={event.id}
+              eventDate={event.date}
+              hasRsvped={hasRsvped}
+              locationSharingEnabled={locationSharingEnabled}
+            />
+          )}
         </div>
-      )}
-
-      {/* From the Organiser — contributor dashboard broadcasts (broadcast_messages).
-          Shown whenever the contributor has sent at least one broadcast to attendees.
-          Self-hides when empty. */}
-      {broadcasts.length > 0 && (
-        <div className="mt-6 border-t pt-5">
-          <OrgBroadcastList broadcasts={broadcasts} showReactions />
-        </div>
-      )}
-
-      {/* Legacy event_updates are hidden from regular viewers when the newer
-          contributor-dashboard broadcast channel has content, avoiding two
-          "From the Organiser" sections in the demo flow. Owners/admins still
-          keep the composer. */}
-      {(canManageEvent || broadcasts.length === 0) && (
-      <div className="mt-6 border-t pt-5">
-        <EventUpdatesList
-          eventId={event.id}
-          isOwner={canManageEvent}
-        />
-      </div>
-      )}
-
-      {/* Comments */}
-      <div className="mt-6 border-t pt-5">
-        <CommentSection eventId={event.id} user={user} />
-      </div>
-
-      {/* Live location tracking prompt */}
-      {user && hasRsvped && (
-        <LiveTrackingPrompt
-          eventId={event.id}
-          eventDate={event.date}
-          hasRsvped={hasRsvped}
-          locationSharingEnabled={locationSharingEnabled}
-        />
-      )}
-      </div>
+      </article>
     </div>
   );
 }
-
