@@ -317,7 +317,7 @@ export default function DashboardHomeClient({
               {/* Weekly bar chart */}
               <div className="bg-card rounded-2xl p-4 border border-border">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm font-bold text-foreground">This Week's Activity</p>
+                  <p className="text-sm font-bold text-foreground">This Week&apos;s Activity</p>
                   <span className="text-xs text-[#C9A84C] font-semibold flex items-center gap-1">
                     <TrendingUp size={12} />
                     {period}d
