@@ -16,6 +16,7 @@ import {
   Radio,
   ChevronRight,
 } from "lucide-react";
+import BackButton from "@/components/ui/BackButton";
 import RSVPButton from "./RSVPButton";
 import EventNotifyToggle from "./EventNotifyToggle";
 import CommentSection from "./CommentSection";
@@ -186,6 +187,9 @@ export default function EventDetailContent({
             <div className="h-full w-full gold-gradient" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+          {/* Back (Figma in-hero) */}
+          <BackButton className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60" />
 
           {/* Live badge */}
           {isLive && (

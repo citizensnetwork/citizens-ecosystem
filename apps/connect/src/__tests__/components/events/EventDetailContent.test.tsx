@@ -4,6 +4,11 @@ import EventDetailContent from "@/components/events/EventDetailContent";
 import { makeEvent } from "../../helpers/fixtures";
 
 // Mock child components to isolate DetailContent tests
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("next/dynamic", () => ({
   default: () => {
     const Stub = (p: { latitude: number; longitude: number }) => (

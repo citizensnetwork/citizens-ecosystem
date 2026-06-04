@@ -1,16 +1,12 @@
 // /c/[slug] — canonical vanity URL for approved Contributors.
 //
-// Previously this redirected to /profile/[id], which broke the
-// @panel drawer intercept on soft navigations (the server redirect
-// fires before the interceptor can match). We now resolve the slug
-// to a profile id server-side and render ProfileDetailServer
-// in-place, matching the /profile/[id] page. The @panel intercept
-// at @panel/(.)c/[slug] handles drawer presentation on soft nav.
+// Resolves the slug to a profile id server-side and renders
+// ProfileDetailServer in-place as a full page (Figma model — no drawer),
+// matching the /profile/[id] page.
 
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
 import ProfileDetailServer from "@/components/profile/ProfileDetailServer";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 
@@ -56,10 +52,7 @@ export default async function ContributorSlugPage({
   } = await supabase.auth.getUser();
   if (user?.id === profile.id) redirect("/profile");
 
-  return (
-    <>
-      <PageHeader title={profile.full_name ?? "Contributor"} fallbackHref="/events" />
-      <ProfileDetailServer id={profile.id} />
-    </>
-  );
+  // Full-page detail (Figma model) — the profile renders its own hero with an
+  // in-hero back arrow, so no separate page-header chrome is needed.
+  return <ProfileDetailServer id={profile.id} />;
 }

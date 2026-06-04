@@ -989,10 +989,9 @@ export default function EventMap({
 
         const lngLat: [number, number] = [place.longitude, place.latitude];
         const baseSize = parseInt(placeEl.style.width || String(PLACE_MARKER_SIZE)) || PLACE_MARKER_SIZE;
-        // Direct click opens place detail in the SidePanel drawer —
-        // no intermediate popup. The click navigates via the parent's
-        // onSelectPlace callback (router.push) so the @panel intercept
-        // renders the full PlaceDetailServer in a right-side drawer.
+        // Direct click opens the inline glass place preview card via the
+        // parent's onSelectPlace callback (no popup, no drawer). "View" on
+        // that card then navigates to the full place page (Figma model).
         placeEl.addEventListener("click", () => {
           onSelectPlaceRef.current?.(place);
         });

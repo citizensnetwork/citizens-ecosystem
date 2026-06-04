@@ -1,11 +1,9 @@
-// Server component that fetches and renders the full event detail
-// body (without any page chrome). Used by both the standalone
-// `/events/[id]` page and the intercepted `@panel/(.)events/[id]`
-// drawer so the two stay in sync with zero duplication.
+// Server component that fetches the event and renders the full detail
+// body for the `/events/[id]` full page (Figma model — detail opens
+// full-page in the content column, no drawer).
 //
-// `cache()` wraps the top-level fetch so if Next.js renders both
-// the `children` and `@panel` slots in the same request, we share
-// one DB round-trip instead of two.
+// `cache()` wraps the top-level fetch so the page body and its
+// generateMetadata share one DB round-trip per request.
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";

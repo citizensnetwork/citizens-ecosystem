@@ -23,6 +23,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Globe, ChevronRight, MapPin, BadgeCheck } from "lucide-react";
 import type { ContributorKind, ContributorLocation, Event, Place, Profile } from "@/types/db";
+import BackButton from "@/components/ui/BackButton";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
@@ -132,11 +133,15 @@ export function ContributorPublicProfile({
       <ContributorThemeOverride />
 
       {/* ── Cover hero ── */}
-      {coverPhotos.length > 0 ? (
-        <CoverPhotoCarousel photos={coverPhotos} altLabel={displayName ?? "Contributor"} />
-      ) : (
-        <div className="h-40 w-full gold-gradient sm:h-52" />
-      )}
+      <div className="relative">
+        {coverPhotos.length > 0 ? (
+          <CoverPhotoCarousel photos={coverPhotos} altLabel={displayName ?? "Contributor"} />
+        ) : (
+          <div className="h-40 w-full gold-gradient sm:h-52" />
+        )}
+        {/* Back (Figma in-hero) */}
+        <BackButton className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60" />
+      </div>
 
       {/* ── Header card (overlaps the cover) ── */}
       <div className="mx-auto -mt-12 max-w-4xl px-4">

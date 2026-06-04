@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import { PageHeader } from "@/components/ui/PageHeader";
 import ProfileDetailServer from "@/components/profile/ProfileDetailServer";
 import { isValidUUID } from "@/lib/validation";
 import type { Metadata } from "next";
@@ -56,16 +55,11 @@ export default async function PublicProfilePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // Only the standalone page redirects to /profile for self-view;
-  // the intercepted drawer renders the public profile as-is.
+  // Self-view redirects to the owner's editable /profile page.
   if (user?.id === id) redirect("/profile");
 
-  // Body (and title) come from the shared ProfileDetailServer — we
-  // only need the PageHeader chrome on the full-page route.
-  return (
-    <>
-      <PageHeader title="Profile" fallbackHref="/events" />
-      <ProfileDetailServer id={id} />
-    </>
-  );
+  // Full-page detail (Figma model). The contributor branch renders its own
+  // hero with an in-hero back arrow; the citizen branch renders its own back
+  // affordance — so no separate page-header chrome is needed.
+  return <ProfileDetailServer id={id} />;
 }

@@ -4,8 +4,8 @@
 // layout (cover hero, Follow/Message action row, real stats, and
 // About / Events / Gallery tabs). Rendered by the server component
 // `PlaceDetailServer`, which does all the data fetching and passes the
-// already-resolved props in. Shared by both the full `/places/[id]`
-// page and the intercepted `@panel/(.)places/[id]` drawer.
+// already-resolved props in. Shown on the `/places/[id]` full page
+// (Figma model — full-page in the content column, no drawer).
 
 import { useState } from "react";
 import Link from "next/link";
@@ -22,6 +22,7 @@ import {
   BadgeCheck,
   AlertTriangle,
 } from "lucide-react";
+import BackButton from "@/components/ui/BackButton";
 import ShareButton from "@/components/ui/ShareButton";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReverifyPlaceButton from "@/components/places/ReverifyPlaceButton";
@@ -109,6 +110,9 @@ export default function PlaceDetailContent({
             <div className="h-full w-full gold-gradient" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+          {/* Back (Figma in-hero) */}
+          <BackButton className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60" />
 
           {/* Top-right glass actions */}
           <div className="absolute right-4 top-4 flex items-center gap-2">

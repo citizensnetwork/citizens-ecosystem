@@ -1,16 +1,15 @@
 // Server component that fetches and renders the public profile body
-// (contributor or standard) without page chrome. Shared by the
-// standalone `/profile/[id]` page and the intercepted
-// `@panel/(.)profile/[id]` drawer.
+// (contributor or standard) for the `/profile/[id]` and `/c/[slug]`
+// full pages (Figma model — full-page in the content column, no drawer).
 //
-// `cache()` wraps the profile fetch so if Next.js renders both slots
-// in the same request (standalone page + drawer), we share one
-// DB round-trip instead of two.
+// `cache()` wraps the profile fetch so the page body and metadata
+// generation in the same request share one DB round-trip.
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackButton from "@/components/ui/BackButton";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
@@ -256,6 +255,7 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
   // Standard profile body.
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
+      <BackButton className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/60 transition hover:bg-black/5" />
       <div className="flex items-start gap-4">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-(--gold-soft) text-2xl font-bold uppercase text-black">
           {(displayName as string)?.[0] ?? "?"}

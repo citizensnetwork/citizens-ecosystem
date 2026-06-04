@@ -49,10 +49,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-  panel,
 }: Readonly<{
   children: React.ReactNode;
-  panel: React.ReactNode;
 }>) {
   return (
     <html
@@ -69,10 +67,6 @@ export default function RootLayout({
         <div className="flex flex-1 flex-col transition-[padding] duration-300 md:pl-[var(--cc-sidebar-w,0px)]">
           <ApplicationPendingBannerServer />
           <main className="flex-1">{children}</main>
-          {/* Parallel @panel slot — renders intercepted detail views
-              (event, profile, messages) as a right-side drawer without
-              leaving the underlying page. */}
-          {panel}
         </div>
         <TermsAcceptanceGate />
         <SuggestionButton variant="floating" />

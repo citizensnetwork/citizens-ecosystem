@@ -1,5 +1,4 @@
 import EventDetailServer, { getEventById } from "@/components/events/EventDetailServer";
-import { PageHeader } from "@/components/ui/PageHeader";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -54,13 +53,8 @@ export default async function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  // The page body is rendered by EventDetailServer (shared with the
-  // side-drawer intercept) — we only need PageHeader chrome here.
-  return (
-    <>
-      <PageHeader title="Event" fallbackHref="/events" />
-      <EventDetailServer id={id} />
-    </>
-  );
+  // Full-page detail (Figma model) — EventDetailContent renders its own hero
+  // with an in-hero back arrow, so no separate page-header chrome is needed.
+  return <EventDetailServer id={id} />;
 }
 

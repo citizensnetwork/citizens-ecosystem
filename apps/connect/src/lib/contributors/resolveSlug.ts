@@ -1,8 +1,7 @@
 // Shared server helper — resolves a contributor vanity slug to a
 // lightweight profile row. Extracted out of the /c/[slug] page so it
-// can be imported by both the standalone page and the @panel drawer
-// intercept without tripping Next.js 15's "no arbitrary exports from
-// page files" rule.
+// can be imported by the page and its generateMetadata without tripping
+// Next.js 15's "no arbitrary exports from page files" rule.
 //
 // Wrapped in React `cache()` so if Next renders both the page shell
 // and the drawer in the same request they share one DB round-trip.

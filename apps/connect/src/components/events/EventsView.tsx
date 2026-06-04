@@ -25,7 +25,6 @@ import MapFiltersPanel from "@/components/map/glass/MapFiltersPanel";
 import MapStatsFooter from "@/components/map/glass/MapStatsFooter";
 import PlacePreviewCard from "@/components/map/glass/PlacePreviewCard";
 import EventPreviewCard from "@/components/map/glass/EventPreviewCard";
-import { subscribePanelClosed } from "@/lib/map/panelBus";
 import GlassSearchResults from "@/components/map/glass/GlassSearchResults";
 import { DEFAULT_MAP_LAYERS, type MapLayerKey, type MapLayers } from "@/components/map/glass/mapLayers";
 
@@ -875,9 +874,9 @@ export default function EventsView({
       try {
         switch (action) {
           case "view":
-            // Close the inline glass preview first so the SidePanel route and
-            // the preview card don't stack (closing one would otherwise reveal
-            // the other — "X reopens the panel / surfaces get confused").
+            // Close the inline glass preview, then navigate to the full event
+            // page (Figma model — detail opens full-page in the content column,
+            // no drawer).
             setSelectedEvent(null);
             setSelectedPlace(null);
             router.push(`/events/${event.id}`);
@@ -944,8 +943,8 @@ export default function EventsView({
   );
 
   const handleSelectPlace = useCallback((place: Place) => {
-    // Open the inline glass PlacePreviewCard instead of navigating to the
-    // intercepted /places/[id] @panel route (removes the redirect-flash).
+    // Open the inline glass PlacePreviewCard; its "View" then navigates to the
+    // full /places/[id] page (Figma model — no drawer).
     setSelectedEvent(null);
     setSelectedPlace(place);
     closeCalendar();
@@ -955,11 +954,6 @@ export default function EventsView({
     setSelectedEvent(null);
     setSelectedPlace(null);
   }, []);
-
-  // When the intercepted-route SidePanel is fully dismissed (its X), defensively
-  // clear any lingering inline glass-card state so the two overlay surfaces can
-  // never both be open / desync (see src/lib/map/panelBus.ts).
-  useEffect(() => subscribePanelClosed(closeDetail), [closeDetail]);
 
   // City search / geocoding state is declared above next to handleFocusEventOnMap.
 

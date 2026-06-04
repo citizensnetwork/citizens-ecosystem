@@ -1,11 +1,9 @@
-// Server component that fetches and renders the full place detail
-// body (without any page chrome). Used by both the standalone
-// `/places/[id]` page and the intercepted `@panel/(.)places/[id]`
-// drawer so the two stay in sync with zero duplication.
+// Server component that fetches the place and delegates rendering to the
+// client `PlaceDetailContent` for the `/places/[id]` full page (Figma model
+// — detail opens full-page in the content column, no drawer).
 //
-// `cache()` wraps the top-level fetch so if Next.js renders both
-// the `children` and `@panel` slots in the same request, we share
-// one DB round-trip instead of two.
+// `cache()` wraps the top-level fetch so the page and any other consumer in
+// the same request share one DB round-trip.
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
