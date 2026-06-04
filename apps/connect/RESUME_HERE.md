@@ -16,13 +16,37 @@
 
 ---
 
-## 2. What just shipped — Removed old SidePanel drawer; detail views go full-page (Figma) ✅ (2026-06-04)
+## 2. What just shipped — Figma UI Phase 3 (Personal surfaces) ✅ (2026-06-04)
 
-Founder directive: scrap the old `@panel` side-drawer entirely (broken esc/back, delays,
-`panelBus`) and navigate detail views the way Figma does — **full pages in the content column
-beside the sticky sidebar, with an in-hero back arrow. No drawer.** Commit **`9b9a092`** (pushed).
-**No DB migrations — next migration # still 130.** Suite **816/816** · tsc 0 · lint clean.
-Working log: `.claude/sessions/remove-old-sidepanel.md`.
+Commit **`afc18ee`**. No DB migrations — next migration # still **130**. Suite **816/816** · tsc 0 · lint clean · vibe-security CLEAN.
+Working log: `.claude/sessions/phase3-personal-surfaces.md`.
+
+### Messages reskin
+- [MessagesPageClient.tsx](src/components/messaging/MessagesPageClient.tsx) — Figma split-panel: desktop shows conversation list (search, org ✦ badge, unread count) + inline ChatView; mobile shows list only (clicking navigates to `/messages/[id]`).
+- [ChatView.tsx](src/components/messaging/ChatView.tsx) — glass bubbles reskin: dark `bg-foreground text-background rounded-br-sm` for sent, `glass border border-white/60 rounded-bl-sm` for received; active dot in header; `showBack/onBack` props.
+- `messages/page.tsx` / `messages/[id]/page.tsx` — no more `PageHeader` chrome. `[id]` route kept for mobile threads and deep links.
+- Org ✦ badge in conversation list wired to real `is_contributor` flag (conversations API now joins `contributor_status`).
+
+### Notifications
+- [NotificationsPageClient.tsx](src/components/notifications/NotificationsPageClient.tsx) — replaced `ComingSoon`. Bell header + unread count, filter chips (All / Broadcasts / Messages / Friends / Convince / Events), typed icon rows with photo/badge overlay, mark-all-read, deep-link routing via `data.url` (relative paths only), realtime subscription filtered to `user_id`.
+
+### Settings
+- [SettingsPageClient.tsx](src/components/settings/SettingsPageClient.tsx) — replaced `ComingSoon`. Avatar upload (`/api/avatar`), name/bio (save button), discoverable toggle (immediate), notification prefs (auto-save per toggle via `/api/notifications/preferences`), interests chips (17 event categories), quick-filters ≤5 (saves to `profiles.preferences.quick_panel_ids` + syncs localStorage so map updates instantly), weekly contribution card (citizens only), profile sharing copy.
+
+### Types updated
+- `NotificationType` union: 10 new types from Phase 3+ migrations (`dm_received`, `team_invite`, `suggestion_response`, etc.)
+- `ConversationPreview.other_user.is_contributor` — org badge flag
+- `Preferences.quick_panel_ids`, `Preferences.interests` — explicit typed fields
+- `Profile.handle`, `Profile.discoverable` — fields added to type (existed in DB since migration 107)
+
+### NEXT → Phase 4 (Contributor Dashboard reskin) — see [docs/FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md)
+The contributor dashboard at `/c/[slug]/dashboard` needs the Figma reskin: involvement badge, quick stats, tab row (Overview/Events/Messages/Tools), weekly bar chart (recharts), activity feed, event cards, broadcast composer wired to our API.
+
+---
+
+## 2-prev. What just shipped — Removed old SidePanel drawer; detail views go full-page (Figma) ✅ (2026-06-04)
+
+Commit `9b9a092`. **No DB migrations — next migration # still 130.** Suite **816/816** · tsc 0 · lint clean.
 
 - **Removed:** `src/app/@panel/**` (all 12 intercept routes), `SidePanel.tsx`, `lib/map/panelBus.ts`,
   and the parallel `panel` slot in `layout.tsx`. `EventsView` dropped the dead `panelBus`
@@ -38,11 +62,9 @@ Working log: `.claude/sessions/remove-old-sidepanel.md`.
   slide-over). Per founder: replace-then-delete, never ad-hoc mid-phase.
 - Test fix: `EventDetailContent.test.tsx` now mocks `next/navigation` (BackButton uses `useRouter`).
 
-### NEXT → Phase 3 (Personal surfaces) — Messages / Notifications / Settings (see FIGMA_FULL_UI_PLAN.md).
-
 ---
 
-## 2-prev. What just shipped — Sticky sidebar + Figma UI Phase 2 (Detail surfaces) ✅ COMPLETE (2026-06-04)
+## 2-prev2. What just shipped — Sticky sidebar + Figma UI Phase 2 (Detail surfaces) ✅ COMPLETE (2026-06-04)
 
 This session shipped a nav refinement **and all of Phase 2**. Four commits on main, each
 fully gated (tsc 0 · lint clean · vibe-security clean) and pushed. Final suite: **816/816**
