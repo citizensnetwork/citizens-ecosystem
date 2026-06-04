@@ -16,9 +16,10 @@ import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
 import MutualFriends from "@/components/social/MutualFriends";
 import { ContributorPublicProfile } from "@/components/contributor/ContributorPublicProfile";
-import type { ContributorLocation, Event, Profile, UserRole } from "@/types/db";
+import type { ContributorLocation, Event, Place, Profile, UserRole } from "@/types/db";
 import { ORGANISER_ROLES, getRoleDisplayLabel } from "@/types/db";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
+import { computeInvolvementLevel } from "@/lib/contributors/involvement";
 
 export const getProfileById = cache(async (id: string) => {
   const supabase = await createClient();
@@ -176,6 +177,15 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       role: string;
     }>;
 
+    // Places hosted by this contributor — powers the Places tab + stat.
+    const { data: placeRows } = await supabase
+      .from("places")
+      .select("id, name, address, image_url, verified")
+      .eq("created_by", id)
+      .order("created_at", { ascending: false })
+      .returns<Pick<Place, "id" | "name" | "address" | "image_url" | "verified">[]>();
+    const places = placeRows ?? [];
+
     // Stage H public analytics: SECURITY DEFINER RPC restricted to the
     // public-safe metric allowlist (follows + joins). 30-day window.
     const { data: publicAnalyticsRows } = await supabase.rpc(
@@ -215,6 +225,13 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
       });
     }
 
+    const involvementLevel = computeInvolvementLevel({
+      followers: followersCount ?? 0,
+      events: allEvents.length,
+      places: places.length,
+      teamSize: team.length,
+    });
+
     return (
       <ContributorPublicProfile
         profile={profile}
@@ -225,11 +242,13 @@ export default async function ProfileDetailServer({ id }: { id: string }) {
         followingCount={followingCount ?? 0}
         upcomingEvents={upcoming}
         pastEvents={pastWithRatings}
+        places={places}
         locations={locations}
         dashboardMode={dashboardMode}
         dashboardPendingRequestId={pendingRequestId}
         team={team}
         publicAnalytics={publicAnalytics}
+        involvementLevel={involvementLevel}
       />
     );
   }

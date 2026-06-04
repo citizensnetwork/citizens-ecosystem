@@ -17,11 +17,12 @@
 // `ssr: false` in Server Components.
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import type { ContributorKind, ContributorLocation, Event, Profile } from "@/types/db";
+import { Globe, ChevronRight, MapPin, BadgeCheck } from "lucide-react";
+import type { ContributorKind, ContributorLocation, Event, Place, Profile } from "@/types/db";
 import FollowButton from "@/components/social/FollowButton";
 import MessageButton from "@/components/messaging/MessageButton";
 import { ReportButton } from "@/components/ui/ReportButton";
@@ -31,6 +32,15 @@ import CoverPhotoCarousel from "@/components/contributor/CoverPhotoCarousel";
 import ContributorThemeOverride from "@/components/contributor/ContributorThemeOverride";
 import { isContributorThemeEnabled } from "@/lib/dashboard/theme";
 import { CONTRIBUTOR_KIND_LABELS } from "@/types/db";
+import {
+  INVOLVEMENT_COLORS,
+  INVOLVEMENT_DESCRIPTIONS,
+  type InvolvementLevel,
+} from "@/lib/contributors/involvement";
+
+type ContributorPlace = Pick<Place, "id" | "name" | "address" | "image_url" | "verified">;
+
+type ProfileTab = "about" | "events" | "places" | "team";
 
 // Mini-map is a client-only MapLibre component.  Dynamic import with
 // SSR off matches the pattern in `MiniMap.tsx`.
@@ -48,6 +58,10 @@ export interface ContributorPublicProfileProps {
   followingCount: number;
   upcomingEvents: Event[];
   pastEvents: Array<Event & { avg_rating?: number | null; reviews_count?: number }>;
+  /** Places hosted by this contributor — powers the Places tab + stat. */
+  places?: ContributorPlace[];
+  /** Computed involvement-level proxy (see lib/contributors/involvement). */
+  involvementLevel: InvolvementLevel;
   /** Additional venues (migration 060). Primary venue still uses
    *  `profile.physical_address` + lat/lng. */
   locations?: ContributorLocation[];
@@ -72,15 +86,17 @@ export function ContributorPublicProfile({
   isFollowing,
   isFriend,
   followersCount,
-  followingCount,
   upcomingEvents,
   pastEvents,
+  places = [],
+  involvementLevel,
   locations = [],
   dashboardMode = null,
   dashboardPendingRequestId = null,
   team = [],
   publicAnalytics = {},
 }: ContributorPublicProfileProps) {
+  const [activeTab, setActiveTab] = useState<ProfileTab>("about");
   const displayName = profile.full_name || profile.email;
   const firstName = profile.full_name?.split(" ")[0] ?? "them";
   const coverPhotos = Array.isArray(profile.cover_photo_urls)
@@ -105,64 +121,91 @@ export function ContributorPublicProfile({
   // public profile experience (A8). Respect dev override env flag.
   const contributorThemeEnabled = isContributorThemeEnabled();
 
+  const eventCount = upcomingEvents.length + pastEvents.length;
+  const tabs: ProfileTab[] = ["about", "events", "places", "team"];
+
   return (
     <div
       data-contributor-ui={contributorThemeEnabled ? "" : undefined}
       className="bg-[#faf9f6] pb-16"
     >
       <ContributorThemeOverride />
-      {coverPhotos.length > 0 && (
+
+      {/* ── Cover hero ── */}
+      {coverPhotos.length > 0 ? (
         <CoverPhotoCarousel photos={coverPhotos} altLabel={displayName ?? "Contributor"} />
+      ) : (
+        <div className="h-40 w-full gold-gradient sm:h-52" />
       )}
-      {/* ── 1. Header band ─────────────────────────────── */}
-      <header className="border-b border-black/10 bg-white">
-        <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-start sm:gap-6 sm:py-8">
-          {profile.logo_url || profile.avatar_url ? (
-            <Image
-              src={(profile.logo_url ?? profile.avatar_url) as string}
-              alt=""
-              width={96}
-              height={96}
-              className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-24 sm:w-24"
-            />
-          ) : (
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-(--gold-soft) text-3xl font-bold uppercase text-black sm:h-24 sm:w-24">
-              {displayName?.[0] ?? "?"}
-            </div>
-          )}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold text-black sm:text-3xl">
-                {displayName}
-              </h1>
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-(--gold,#C9A84C) px-2.5 py-0.5 text-[11px] font-semibold text-black"
-                title="Approved Citizens Connect Contributor"
-              >
-                <VerifiedIcon /> Contributor
-              </span>
-            </div>
-            <ContributorKindLink contributorKind={profile.contributor_kind} />
-
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-black/70">
-              <span>
-                <strong className="text-black">{followersCount}</strong>{" "}
-                {followersCount === 1 ? "follower" : "followers"}
-              </span>
-              <span>
-                <strong className="text-black">{followingCount}</strong> following
-              </span>
-              {isFriend && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-(--gold-soft) px-2 py-0.5 text-xs font-semibold text-black">
-                  Friends
+      {/* ── Header card (overlaps the cover) ── */}
+      <div className="mx-auto -mt-12 max-w-4xl px-4">
+        <div className="relative rounded-3xl border border-black/5 bg-white p-5 shadow-lg sm:p-6">
+          <div className="flex items-end gap-4">
+            {profile.logo_url || profile.avatar_url ? (
+              <Image
+                src={(profile.logo_url ?? profile.avatar_url) as string}
+                alt=""
+                width={96}
+                height={96}
+                className="-mt-16 h-20 w-20 shrink-0 rounded-2xl object-cover shadow-lg ring-4 ring-white sm:h-24 sm:w-24"
+              />
+            ) : (
+              <div className="-mt-16 flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-(--gold-soft) text-3xl font-bold uppercase text-black shadow-lg ring-4 ring-white sm:h-24 sm:w-24">
+                {displayName?.[0] ?? "?"}
+              </div>
+            )}
+            <div className="min-w-0 flex-1 pb-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate font-display text-2xl font-bold text-black sm:text-3xl">
+                  {displayName}
+                </h1>
+                <span
+                  className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow"
+                  style={{ background: INVOLVEMENT_COLORS[involvementLevel] }}
+                  title={INVOLVEMENT_DESCRIPTIONS[involvementLevel]}
+                >
+                  {involvementLevel}
                 </span>
-              )}
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-(--gold) px-2.5 py-0.5 text-[11px] font-semibold text-black"
+                  title="Approved Citizens Connect Contributor"
+                >
+                  <VerifiedIcon /> Contributor
+                </span>
+                {isFriend && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-(--gold-soft) px-2 py-0.5 text-[11px] font-semibold text-black">
+                    Friends
+                  </span>
+                )}
+              </div>
+              <ContributorKindLink contributorKind={profile.contributor_kind} />
             </div>
           </div>
 
-          {viewer && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* Stats */}
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            <div className="surface-card rounded-2xl p-3">
+              <p className="text-base font-bold text-foreground">
+                {followersCount.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-black/50">
+                {followersCount === 1 ? "Follower" : "Followers"}
+              </p>
+            </div>
+            <div className="surface-card rounded-2xl p-3">
+              <p className="text-base font-bold text-foreground">{eventCount}</p>
+              <p className="text-[10px] text-black/50">Events</p>
+            </div>
+            <div className="surface-card rounded-2xl p-3">
+              <p className="text-base font-bold text-foreground">{places.length}</p>
+              <p className="text-[10px] text-black/50">Places</p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          {viewer ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               {dashboardMode && profile.contributor_slug && (
                 <DashboardAccessButton
                   slug={profile.contributor_slug}
@@ -182,181 +225,252 @@ export function ContributorPublicProfile({
                   variant="icon"
                 />
               )}
+              {profile.website_url && /^https?:\/\//i.test(profile.website_url) && (
+                <a
+                  href={profile.website_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Website"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/15 text-black/60 transition hover:border-(--gold) hover:text-(--gold)"
+                >
+                  <Globe size={16} />
+                </a>
+              )}
               {viewer.id !== profile.id && (
-                <ReportButton
-                  targetType="user"
-                  targetId={profile.id}
-                  isAuthenticated={true}
-                />
+                <ReportButton targetType="user" targetId={profile.id} isAuthenticated={true} />
+              )}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-black/10 bg-(--gold-soft)/30 px-4 py-3 text-center text-sm text-black/70">
+              <Link href="/login" className="font-semibold text-(--gold) hover:underline">
+                Log in
+              </Link>{" "}
+              to follow and message {firstName}.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="mx-auto max-w-4xl px-4">
+        <div className="mb-4 mt-5 flex gap-0 overflow-x-auto rounded-xl bg-(--gold-soft)/40 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold capitalize transition ${
+                activeTab === tab
+                  ? "bg-white text-foreground shadow"
+                  : "text-black/50 hover:text-foreground"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="pb-4">
+          {/* About */}
+          {activeTab === "about" && (
+            <div className="fade-in space-y-6">
+              {profile.bio && (
+                <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-black/80">
+                  {profile.bio}
+                </p>
+              )}
+              <SocialLinksRow profile={profile} standalone />
+
+              {(profile.physical_address || hasCoords || locations.length > 0) && (
+                <Section title="Find us">
+                  {profile.physical_address && (
+                    <div>
+                      {locations.length > 0 && (
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
+                          Main
+                        </p>
+                      )}
+                      <p className="text-sm text-black/70">{profile.physical_address}</p>
+                    </div>
+                  )}
+                  {hasCoords && (
+                    <div className="mt-3 h-48 w-full overflow-hidden rounded-xl">
+                      <MiniMap
+                        latitude={profile.physical_latitude as number}
+                        longitude={profile.physical_longitude as number}
+                      />
+                    </div>
+                  )}
+                  {locations.length > 0 && (
+                    <ul className="mt-4 space-y-3 border-t border-black/5 pt-4">
+                      {locations.map((loc) => (
+                        <li key={loc.id}>
+                          {loc.label && (
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
+                              {loc.label}
+                            </p>
+                          )}
+                          <p className="text-sm text-black/70">{loc.address}</p>
+                          {typeof loc.latitude === "number" &&
+                            typeof loc.longitude === "number" && (
+                              <div className="mt-2 h-40 w-full overflow-hidden rounded-xl">
+                                <MiniMap latitude={loc.latitude} longitude={loc.longitude} />
+                              </div>
+                            )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Section>
+              )}
+
+              {galleryMedia.length > 0 && (
+                <Section title="Gallery">
+                  <MediaStrip
+                    media={galleryMedia}
+                    ariaLabel="Contributor media gallery"
+                    plainImages
+                  />
+                </Section>
+              )}
+
+              {(publicAnalytics.follows ?? 0) + (publicAnalytics.joins ?? 0) > 0 && (
+                <Section title="Activity (30d)">
+                  <div className="flex flex-wrap gap-2">
+                    {(publicAnalytics.follows ?? 0) > 0 && (
+                      <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
+                        {publicAnalytics.follows!.toLocaleString()} new follows
+                      </span>
+                    )}
+                    {(publicAnalytics.joins ?? 0) > 0 && (
+                      <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
+                        {publicAnalytics.joins!.toLocaleString()} joins
+                      </span>
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {!profile.bio &&
+                !profile.physical_address &&
+                !hasCoords &&
+                locations.length === 0 &&
+                galleryMedia.length === 0 &&
+                (publicAnalytics.follows ?? 0) + (publicAnalytics.joins ?? 0) === 0 && (
+                  <p className="py-8 text-center text-sm text-black/50">No details yet.</p>
+                )}
+            </div>
+          )}
+
+          {/* Events */}
+          {activeTab === "events" && (
+            <div className="fade-in space-y-6">
+              <div>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/60">
+                  Upcoming
+                </h2>
+                {upcomingEvents.length === 0 ? (
+                  <p className="text-sm text-black/55">Nothing scheduled right now.</p>
+                ) : (
+                  <EventRows events={upcomingEvents} />
+                )}
+              </div>
+              {pastEvents.length > 0 && (
+                <div>
+                  <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/60">
+                    Past
+                  </h2>
+                  <EventRows events={pastEvents} showRatings />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Places */}
+          {activeTab === "places" && (
+            <div className="fade-in space-y-3">
+              {places.length === 0 ? (
+                <p className="py-8 text-center text-sm text-black/50">No places yet.</p>
+              ) : (
+                places.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/places/${p.id}`}
+                    className="surface-card flex items-center gap-3 rounded-2xl p-3 transition hover:border-(--gold)/40"
+                  >
+                    {p.image_url ? (
+                      <Image
+                        src={p.image_url}
+                        alt={p.name}
+                        width={56}
+                        height={56}
+                        className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <span className="h-14 w-14 shrink-0 rounded-xl gold-gradient" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1 text-sm font-bold text-foreground">
+                        <span className="truncate">{p.name}</span>
+                        {p.verified && (
+                          <BadgeCheck size={13} className="shrink-0 text-emerald-500" />
+                        )}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-1 text-xs text-black/55">
+                        <MapPin size={11} className="shrink-0" />
+                        <span className="truncate">{p.address}</span>
+                      </span>
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-black/30" />
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Team */}
+          {activeTab === "team" && (
+            <div className="fade-in">
+              {team.length === 0 ? (
+                <p className="py-8 text-center text-sm text-black/50">
+                  No team members listed.
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-3">
+                  {team.map((member) => (
+                    <li
+                      key={member.member_id}
+                      className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5"
+                    >
+                      {member.avatar_url ? (
+                        <Image
+                          src={member.avatar_url}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="h-6 w-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--gold-soft) text-[11px] font-semibold uppercase text-black">
+                          {member.full_name?.[0] ?? "?"}
+                        </div>
+                      )}
+                      <span className="text-xs font-medium text-black/80">
+                        {member.full_name ?? "Member"}
+                      </span>
+                      {member.role === "owner" && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-(--gold)">
+                          Owner
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}
         </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl space-y-10 px-4 py-8">
-        {/* ── 2. About ──────────────────────────────────── */}
-        {profile.bio ? (
-          <Section title="About">
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-black/80">
-              {profile.bio}
-            </p>
-            <SocialLinksRow profile={profile} />
-          </Section>
-        ) : (
-          <SocialLinksRow profile={profile} standalone />
-        )}
-
-        {/* ── 3. Find us ────────────────────────────────── */}
-        {(profile.physical_address || hasCoords || locations.length > 0) && (
-          <Section
-            title={
-              locations.length > 0 ? "Find us" : "Find us"
-            }
-          >
-            {/* Primary venue (from the profile row). */}
-            {profile.physical_address && (
-              <div>
-                {locations.length > 0 && (
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
-                    Main
-                  </p>
-                )}
-                <p className="text-sm text-black/70">
-                  {profile.physical_address}
-                </p>
-              </div>
-            )}
-            {hasCoords && (
-              <div className="mt-3 h-48 w-full overflow-hidden rounded-xl">
-                <MiniMap
-                  latitude={profile.physical_latitude as number}
-                  longitude={profile.physical_longitude as number}
-                />
-              </div>
-            )}
-
-            {/* Additional venues (migration 060). */}
-            {locations.length > 0 && (
-              <ul className="mt-4 space-y-3 border-t border-black/5 pt-4">
-                {locations.map((loc) => (
-                  <li key={loc.id}>
-                    {loc.label && (
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-black/50">
-                        {loc.label}
-                      </p>
-                    )}
-                    <p className="text-sm text-black/70">{loc.address}</p>
-                    {typeof loc.latitude === "number" &&
-                      typeof loc.longitude === "number" && (
-                        <div className="mt-2 h-40 w-full overflow-hidden rounded-xl">
-                          <MiniMap
-                            latitude={loc.latitude}
-                            longitude={loc.longitude}
-                          />
-                        </div>
-                      )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-        )}
-
-        {/* ── 4. Gallery ────────────────────────────────── */}
-        {galleryMedia.length > 0 && (
-          <Section title="Gallery">
-            <MediaStrip
-              media={galleryMedia}
-              ariaLabel="Contributor media gallery"
-              plainImages
-            />
-          </Section>
-        )}
-
-        {/* ── 5. Upcoming events ───────────────────────── */}
-        <Section title={`Upcoming events from ${firstName}`}>
-          {upcomingEvents.length === 0 ? (
-            <p className="text-sm text-black/60">Nothing scheduled right now.</p>
-          ) : (
-            <EventRows events={upcomingEvents} />
-          )}
-        </Section>
-
-        {/* ── 5b. Team ─────────────────────────────────── */}
-        {team.length > 0 && (
-          <Section title="Team">
-            <ul className="flex flex-wrap gap-3">
-              {team.map((member) => (
-                <li
-                  key={member.member_id}
-                  className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5"
-                >
-                  {member.avatar_url ? (
-                    <Image
-                      src={member.avatar_url}
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--gold-soft) text-[11px] font-semibold uppercase text-black">
-                      {member.full_name?.[0] ?? "?"}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-black/80">
-                    {member.full_name ?? "Member"}
-                  </span>
-                  {member.role === "owner" && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-(--gold)">
-                      Owner
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {/* ── 5c. Activity (Stage H public analytics) ──── */}
-        {(publicAnalytics.follows ?? 0) + (publicAnalytics.joins ?? 0) > 0 && (
-          <Section title="Activity (30d)">
-            <div className="flex flex-wrap gap-2">
-              {(publicAnalytics.follows ?? 0) > 0 && (
-                <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
-                  {publicAnalytics.follows!.toLocaleString()} new follows
-                </span>
-              )}
-              {(publicAnalytics.joins ?? 0) > 0 && (
-                <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-black/80">
-                  {publicAnalytics.joins!.toLocaleString()} joins
-                </span>
-              )}
-            </div>
-          </Section>
-        )}
-
-        {/* ── 6. Past events ───────────────────────────── */}
-        {pastEvents.length > 0 && (
-          <Section title="Past events">
-            <EventRows events={pastEvents} showRatings />
-          </Section>
-        )}
-
-        {/* ── 7. Contact fallback for unauthenticated ──── */}
-        {!viewer && (
-          <div className="rounded-xl border border-black/10 bg-white p-4 text-center text-sm text-black/70">
-            <Link
-              href="/login"
-              className="font-semibold text-(--gold) hover:underline"
-            >
-              Log in
-            </Link>{" "}
-            to follow and message {firstName}.
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }
