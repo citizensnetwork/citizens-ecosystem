@@ -16,7 +16,33 @@
 
 ---
 
-## 2. What just shipped — Sticky sidebar + Figma UI Phase 2 (Detail surfaces) ✅ COMPLETE (2026-06-04)
+## 2. What just shipped — Removed old SidePanel drawer; detail views go full-page (Figma) ✅ (2026-06-04)
+
+Founder directive: scrap the old `@panel` side-drawer entirely (broken esc/back, delays,
+`panelBus`) and navigate detail views the way Figma does — **full pages in the content column
+beside the sticky sidebar, with an in-hero back arrow. No drawer.** Commit **`9b9a092`** (pushed).
+**No DB migrations — next migration # still 130.** Suite **816/816** · tsc 0 · lint clean.
+Working log: `.claude/sessions/remove-old-sidepanel.md`.
+
+- **Removed:** `src/app/@panel/**` (all 12 intercept routes), `SidePanel.tsx`, `lib/map/panelBus.ts`,
+  and the parallel `panel` slot in `layout.tsx`. `EventsView` dropped the dead `panelBus`
+  subscription (kept `closeDetail` for the inline Figma preview cards). Stale `@panel`/drawer
+  comments scrubbed (EventMap, events/loading, detail servers, resolveSlug).
+- **Full-page wrappers:** `events/[id]`, `places/[id]` (also dropped a redundant double glass-panel +
+  Suspense), `c/[slug]`, `profile/[id]` no longer render the old `PageHeader` chrome. New
+  [BackButton.tsx](src/components/ui/BackButton.tsx) (Figma's `ArrowLeft` glass circle) added to the
+  Event/Place/Contributor detail heroes + a light variant atop the citizen profile body.
+- **Old-UI cleanup catalogue:** [docs/OLD_UI_ARTIFACTS.md](docs/OLD_UI_ARTIFACTS.md) created — tracks
+  the remaining old artifacts to **delete at the END of the transformation** (PageHeader — still used by
+  admin/forms/messages; old search bar; old "Citizen Central" logo; old burger; MessagesPanel bus
+  slide-over). Per founder: replace-then-delete, never ad-hoc mid-phase.
+- Test fix: `EventDetailContent.test.tsx` now mocks `next/navigation` (BackButton uses `useRouter`).
+
+### NEXT → Phase 3 (Personal surfaces) — Messages / Notifications / Settings (see FIGMA_FULL_UI_PLAN.md).
+
+---
+
+## 2-prev. What just shipped — Sticky sidebar + Figma UI Phase 2 (Detail surfaces) ✅ COMPLETE (2026-06-04)
 
 This session shipped a nav refinement **and all of Phase 2**. Four commits on main, each
 fully gated (tsc 0 · lint clean · vibe-security clean) and pushed. Final suite: **816/816**
