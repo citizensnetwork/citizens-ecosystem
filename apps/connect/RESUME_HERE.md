@@ -16,7 +16,29 @@
 
 ---
 
-## 2. What just shipped — Figma UI Phase 4 (Contributor Dashboard) ✅ (2026-06-04)
+## 2. What just shipped — Figma UI Phase 5 (Kingdom Projects / Community) ✅ (2026-06-04)
+
+Commit **`5001925`**. No DB migrations — next migration # still **130**. Suite **821/821** · tsc 0 · lint clean · vibe-security CLEAN.
+Working log: `.claude/sessions/phase5-community.md`.
+
+### Community page (`/community`)
+- [CommunityPageClient.tsx](src/components/community/CommunityPageClient.tsx) — full Figma-faithful client:
+  - **Glass header**: Lightbulb icon, "Kingdom Projects" (Playfair), subtitle "Impact Ideas · Community Collaboration"
+  - **3 stats cards**: Voting (blue) / In Process (amber) / Confirmed (green) — real counts from DB
+  - **3 in-page tabs**: Voting / Projects / + Submit Idea
+- **Voting tab**: Phase 6 info banner + "Ideas on the Board" section. Idea cards: category badge (parsed from body prefix), title, description, submitter + timeAgo. Vote + Collab buttons disabled (`title="Voting opens in Phase 6"`). Honest empty state → "Submit an Idea" CTA.
+- **Projects tab**: In Process section (amber border) + Confirmed Projects section (green tint). Empty state → "View Ideas" CTA.
+- **Submit tab**: "What is an Impact Idea?" gold explainer card. Form: title, description (char counter), all 17 category chips. Submit → `POST /api/suggestions` with body encoded as `[cat:slug]\n\nDescription` and `page_url = origin + "/community"`. Success state with "View Ideas Board" CTA.
+- [page.tsx](src/app/community/page.tsx) — server component: admin-client read of `suggestions` where `page_url ILIKE '%/community'` and `status IN (open, in_review, actioned)`. FK join on `profiles!suggestions_user_id_fkey` for author name/avatar.
+- [parseIdea.ts](src/lib/community/parseIdea.ts) — extracts `[cat:category-id]` prefix from body for display; 5 unit tests.
+- **Drive-by fix**: escaped apostrophe in `DashboardHomeClient.tsx:320` (pre-existing lint ERROR, now clean).
+
+### NEXT → Phase 6 (Impact-Ideas voting backend) — separate founder approval required
+Schema (ideas table with votes + thresholds + status machine), RLS, SECURITY-DEFINER RPCs, map "Ideas" layer wiring.
+
+---
+
+## 2-prev. What just shipped — Figma UI Phase 4 (Contributor Dashboard) ✅ (2026-06-04)
 
 Commit **`14451cc`**. No DB migrations — next migration # still **130**. Suite **816/816** · tsc 0 · lint clean · vibe-security CLEAN.
 Working log: `.claude/sessions/phase4-contributor-dashboard.md`.
@@ -39,9 +61,6 @@ Working log: `.claude/sessions/phase4-contributor-dashboard.md`.
 
 ### Dependency added
 - `recharts ^3.8.1` for the weekly bar chart
-
-### NEXT → Phase 5 (Kingdom Projects / Community) — see [docs/FIGMA_FULL_UI_PLAN.md](docs/FIGMA_FULL_UI_PLAN.md)
-New `/community` route + sidebar entry. Voting/projects/submit tabs rendered with real, honest data; submit wired to existing suggestion intake. Add to nav.
 
 ---
 

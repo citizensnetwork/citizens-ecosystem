@@ -87,10 +87,13 @@
 - Messages tab: lazy-fetches conversations; Tools tab: broadcast composer wired to API + 6 tool tiles.
 - DashboardNav reskinned; page.tsx expanded with events/places/weekly-analytics/involvement data.
 
-### Phase 5 — Kingdom Projects / Community (UI-complete)
-- New `/community` route + sidebar entry. Voting/projects/submit tabs rendered with real,
-  honest data (no fake vote totals); submit wired to existing suggestion intake if suitable,
-  else clearly marked pending Phase 6. Add to nav.
+### Phase 5 — Kingdom Projects / Community ✅ COMPLETE (2026-06-04, commit 5001925)
+- `/community` stub replaced with full Figma-faithful client.
+- Voting tab: "Ideas on the Board" + Phase 6 banner + real idea cards (no fake vote counts).
+- Projects tab: In Process (amber) + Confirmed (green) sections from real DB status.
+- Submit tab: 17 category chips + form → /api/suggestions + success state.
+- Server page: admin-client read, filtered by page_url ILIKE '%/community'.
+- parseIdea.ts: `[cat:slug]\n\nDescription` body format, 5 unit tests.
 
 ### Phase 6 — Impact-Ideas voting backend (DEFERRED — separate founder approval)
 - Schema (ideas, votes w/ thresholds, status machine), RLS, SECURITY-DEFINER RPCs, map
