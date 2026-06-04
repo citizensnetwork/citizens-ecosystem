@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Event, EventCategory, PlaceCategory, Place, Profile } from "@/types/db";
 import { createClient } from "@/lib/supabase/client";
@@ -12,13 +11,11 @@ import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import BurgerMenu from "./BurgerMenu";
 import GlassCalendar from "./GlassCalendar";
-import OrgSearchPanel from "@/components/contributor/OrgSearchPanel";
 import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
 import { QUICK_ACCESS_ITEMS, type QuickAccessItem } from "@/lib/quickPanelOptions";
 import { rankResults, distanceKm, type RankedResult } from "@/lib/aiSearch";
-import { describeIntent } from "@/lib/searchProfile";
 import { getCityLabel } from "@/lib/cityLabel";
 import { DEFAULT_CENTER } from "@/lib/map/config";
 import dynamic from "next/dynamic";
@@ -85,14 +82,6 @@ export default function EventsView({
   const [calendarOpen, setCalendarOpen] = useState(
     () => searchParams.get("view") === "calendar"
   );
-  // Bottom search bar mode. "everything" preserves the original ranker
-  // (events + places + contributor chips). "organisations" swaps in the
-  // pg_trgm-backed OrgSearchPanel for typo-tolerant org discovery. The
-  // free-text input value is shared either way so toggling between modes
-  // keeps the user's query intact.
-  const [searchMode, setSearchMode] = useState<"everything" | "organisations">(
-    "everything"
-  );
   // Wrapper for closing the calendar that also strips the `?view=calendar`
   // URL param (Batch 2 N1). Using replace() avoids polluting browser
   // history while still keeping deep-links shareable when the calendar is
@@ -115,10 +104,6 @@ export default function EventsView({
   // ── Glassmorphism Community Map overlay state ──
   const [mapFiltersOpen, setMapFiltersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
-  // The Figma design moves search into the glass header and puts the stats pill
-  // at the bottom-centre, so the legacy bottom floating search is disabled by
-  // default. Flip to true to restore the advanced scope/autocomplete search bar.
-  const [legacySearchEnabled] = useState(false);
   // Header search dropdown visibility (delayed blur so result clicks register).
   const [headerSearchFocused, setHeaderSearchFocused] = useState(false);
   const headerBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -662,10 +647,6 @@ export default function EventsView({
     for (const r of ranked.places) m.set(r.id, r);
     return m;
   }, [ranked]);
-  const intentLabel = useMemo(
-    () => (ranked.intent.hasSignal ? describeIntent(ranked.intent) : ""),
-    [ranked.intent],
-  );
 
   // Top contributors matching the current search — only shown while
   // searching, capped at 3 so the search bar doesn't get busy. Each chip
@@ -995,137 +976,6 @@ export default function EventsView({
     setQuickPanelPage(0);
   }, [activeCategories, activePlaceCategories, activeQuickAccess, search, burgerTab]);
 
-  // ── Bottom floating search: auto-expand/collapse behaviour ────────
-  // initial: collapsed icon button for 5s → expands to bar for 60s idle → collapses back.
-  // While the user is focused/typing, the bar stays open and the idle timer resets.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const searchIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Autocomplete suggestions (Stage L, A66) ──────────────────────
-  // Debounced prefix lookup against /api/search/autocomplete which merges
-  // contributor keywords + popular recent queries. Click or keyboard-select
-  // to fill the bar; the in-memory ranker then reacts to `search`.
-  const [acSuggestions, setAcSuggestions] = useState<
-    { suggestion: string; source: string }[]
-  >([]);
-  const [acOpen, setAcOpen] = useState(false);
-  const [acActive, setAcActive] = useState(-1);
-
-  useEffect(() => {
-    const q = search.trim();
-    if (!searchFocused || q.length < 2) {
-      setAcSuggestions([]);
-      setAcOpen(false);
-      setAcActive(-1);
-      return;
-    }
-    let cancelled = false;
-    const id = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/search/autocomplete?q=${encodeURIComponent(q)}`
-        );
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as {
-          suggestions?: { suggestion: string; source: string }[];
-        };
-        if (cancelled) return;
-        const list = Array.isArray(data.suggestions) ? data.suggestions : [];
-        // Don't suggest the exact term already typed.
-        const filtered = list.filter(
-          (s) => s.suggestion.toLowerCase() !== q.toLowerCase()
-        );
-        setAcSuggestions(filtered);
-        setAcOpen(filtered.length > 0);
-        setAcActive(-1);
-      } catch {
-        /* best-effort — autocomplete never blocks search */
-      }
-    }, 180);
-    return () => {
-      cancelled = true;
-      clearTimeout(id);
-    };
-  }, [search, searchFocused]);
-
-  function selectSuggestion(value: string) {
-    setSearch(value);
-    setAcOpen(false);
-    setAcActive(-1);
-    searchInputRef.current?.focus();
-  }
-
-  const clearSearchIdleTimer = useCallback(() => {
-    if (searchIdleTimerRef.current) {
-      clearTimeout(searchIdleTimerRef.current);
-      searchIdleTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleSearchCollapse = useCallback((ms: number) => {
-    clearSearchIdleTimer();
-    searchIdleTimerRef.current = setTimeout(() => {
-      // Only collapse if not focused (searchFocused is captured fresh via effect re-binding)
-      if (searchFocused) return;
-      setSearchOpen(false);
-    }, ms);
-  }, [clearSearchIdleTimer, searchFocused]);
-
-  // Initial reveal: after 5s show the expanded search bar once, then stay for 60s idle.
-  useEffect(() => {
-    const revealId = setTimeout(() => {
-      setSearchOpen(true);
-      // After initial reveal, schedule collapse after 60s if idle
-      scheduleSearchCollapse(60_000);
-    }, 5_000);
-    return () => {
-      clearTimeout(revealId);
-      clearSearchIdleTimer();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Reset the 60s idle timer on any interaction (typing / focus).
-  useEffect(() => {
-    if (!searchOpen) return;
-    if (searchFocused || search.trim().length > 0) {
-      clearSearchIdleTimer(); // locked open while focused / text present
-      return;
-    }
-    scheduleSearchCollapse(60_000);
-    return clearSearchIdleTimer;
-  }, [searchOpen, searchFocused, search, scheduleSearchCollapse, clearSearchIdleTimer]);
-
-  function openSearchBar() {
-    setSearchOpen(true);
-    // focus once the input mounts
-    setTimeout(() => searchInputRef.current?.focus(), 50);
-  }
-
-  // ── Rotating italic placeholder for bottom search bar ────────────
-  const SEARCH_SUGGESTIONS = useMemo(
-    () => [
-      "Homecells in my area",
-      "Good coffee places nearby",
-      "Christian businesses in my area",
-      "Any fitness events I can join?",
-      "Looking for new friends",
-      "I need counselling",
-      "Marriage advice",
-    ],
-    []
-  );
-  const [suggestionIdx, setSuggestionIdx] = useState(0);
-  useEffect(() => {
-    if (!searchOpen) return;
-    const id = setInterval(() => {
-      setSuggestionIdx((i) => (i + 1) % SEARCH_SUGGESTIONS.length);
-    }, 3_000);
-    return () => clearInterval(id);
-  }, [searchOpen, SEARCH_SUGGESTIONS.length]);
-
   // "Citizens Connect" chip → zoom to all of South Africa
   function handleBrandClick() {
     // South Africa center, zoom 5.5 shows full country
@@ -1133,55 +983,6 @@ export default function EventsView({
     setMapFlyToZoom(5.5);
     setMapFlyToToken((t) => t + 1);
     closeCalendar();
-  }
-
-  async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // ── Autocomplete keyboard navigation (takes precedence) ──
-    if (acOpen && acSuggestions.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setAcActive((i) => (i + 1) % acSuggestions.length);
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setAcActive((i) => (i <= 0 ? acSuggestions.length - 1 : i - 1));
-        return;
-      }
-      if (e.key === "Escape") {
-        setAcOpen(false);
-        setAcActive(-1);
-        return;
-      }
-      if (e.key === "Enter" && acActive >= 0) {
-        e.preventDefault();
-        selectSuggestion(acSuggestions[acActive].suggestion);
-        return;
-      }
-    }
-
-    if (e.key !== "Enter" || !search.trim() || calendarOpen) return;
-    // Selecting a suggestion above already returned; close the menu now
-    // that we're committing the typed query.
-    setAcOpen(false);
-    // If the ranker extracted any taxonomy intent, the user meant a
-    // semantic query ("homecells in my area", "I need counselling") — not
-    // a city name, so skip geocoding and let the in-memory filter drive.
-    if (ranked.intent.hasSignal) return;
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}&limit=1`,
-        { headers: { "User-Agent": "CitizensConnect/1.0" } }
-      );
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setMapFlyTo([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
-        setMapFlyToZoom(undefined); // let EventMap use its default
-        setMapFlyToToken((t) => t + 1);
-      }
-    } catch {
-      /* geocoding failed — ignore */
-    }
   }
 
   // Close glance panel when detail opens
@@ -1477,207 +1278,6 @@ export default function EventsView({
               })}
             </div>
           </div>
-        </div>
-      )}
-      {/* ── Bottom floating search — collapses to icon after 60s idle, re-expands on click ── */}
-      {/* On mobile the outer container uses a 10% horizontal gutter so the
-       *  bar itself is 80% of the viewport width (user reported the bar felt
-       *  too wide on phones). Desktop keeps the previous px-4 gutter. */}
-      {legacySearchEnabled && !hasDetail && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-[10%] sm:bottom-6 sm:px-4">
-          {searchOpen ? (
-            <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-1.5">
-              {/* Segmented mode toggle. Lives above the input so the user
-               *  understands what scope their query searches before they
-               *  type. "Organisations" hides the event/place ranker and
-               *  drops in the pg_trgm-backed contributor panel. */}
-              <div
-                role="tablist"
-                aria-label="Search scope"
-                className="flex w-full max-w-[18rem] items-center rounded-full border border-black/10 bg-white/80 p-0.5 text-[11px] font-medium shadow-md backdrop-blur"
-              >
-                {(
-                  [
-                    { value: "everything", label: "Everything" },
-                    { value: "organisations", label: "Organisations" },
-                  ] as const
-                ).map((opt) => {
-                  const active = searchMode === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setSearchMode(opt.value)}
-                      className={`flex-1 rounded-full px-3 py-1 transition active:scale-95 ${
-                        active
-                          ? "bg-(--gold) text-black shadow-sm"
-                          : "text-black/60 hover:bg-black/5 hover:text-black"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {searchMode === "organisations" ? (
-                <OrgSearchPanel
-                  query={search}
-                  onSelect={() => setSearchOpen(false)}
-                />
-              ) : (
-                <>
-                  {topContributorMatches.length > 0 && (
-                <div
-                  className="flex max-w-full flex-wrap items-center justify-center gap-1.5"
-                  role="list"
-                  aria-label="Matching contributors"
-                >
-                  {topContributorMatches.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/c/${encodeURIComponent(p.contributor_slug!)}`}
-                      role="listitem"
-                      className="flex items-center gap-1.5 rounded-full border border-(--gold,#C9A84C) bg-white/95 px-2.5 py-1 text-[11px] font-medium text-black shadow-md backdrop-blur transition hover:bg-white"
-                      title={`Open ${p.full_name}`}
-                    >
-                      {p.logo_url || p.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.logo_url || p.avatar_url || ""}
-                          alt=""
-                          aria-hidden="true"
-                          className="h-4 w-4 rounded-full object-cover"
-                        />
-                      ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-3 w-3 text-(--gold)"
-                          aria-hidden="true"
-                        >
-                          <polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2" />
-                        </svg>
-                      )}
-                      <span className="max-w-35 truncate">
-                        {p.full_name}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              {intentLabel && (
-                <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-black/70 shadow-md backdrop-blur">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-(--gold)" aria-hidden="true">
-                    <polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/>
-                  </svg>
-                  <span>Matching: {intentLabel}</span>
-                </div>
-              )}
-                </>
-              )}
-              <div className="relative flex w-full items-center">
-                {/* Autocomplete dropdown (Stage L, A66) — floats above the
-                    bottom-anchored bar. */}
-                {acOpen && acSuggestions.length > 0 && (
-                  <ul
-                    id="search-autocomplete-list"
-                    role="listbox"
-                    aria-label="Search suggestions"
-                    className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-2xl border border-black/10 bg-white/95 py-1 shadow-xl backdrop-blur"
-                  >
-                    {acSuggestions.map((s, i) => (
-                      <li key={`${s.suggestion}-${i}`} role="option" aria-selected={i === acActive}>
-                        <button
-                          type="button"
-                          // mousedown (not click) so we fire before the input
-                          // blur that would otherwise close the menu first.
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            selectSuggestion(s.suggestion);
-                          }}
-                          onMouseEnter={() => setAcActive(i)}
-                          className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors ${
-                            i === acActive ? "bg-black/5" : "hover:bg-black/5"
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-black/40" aria-hidden="true">
-                            <circle cx="11" cy="11" r="7" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                          </svg>
-                          <span className="flex-1 truncate text-black/80">{s.suggestion}</span>
-                          {s.source === "keyword" && (
-                            <span className="shrink-0 rounded-full bg-(--gold)/15 px-2 py-0.5 text-[10px] font-medium text-(--gold)">
-                              keyword
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="pointer-events-none absolute left-4 h-4 w-4 text-black/50"
-                  aria-hidden="true"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  autoComplete="off"
-                  role="combobox"
-                  aria-expanded={acOpen}
-                  aria-controls="search-autocomplete-list"
-                  aria-label="Search events, places, or city"
-                  placeholder={search ? "" : SEARCH_SUGGESTIONS[suggestionIdx]}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  onKeyDown={handleSearchKeyDown}
-                  className="cc-bottom-search w-full rounded-full border border-black/10 bg-white/95 px-11 py-3 text-sm italic font-light text-black placeholder:italic placeholder:font-light placeholder:text-black/50 shadow-lg outline-none backdrop-blur focus:not-italic focus:border-black/30"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => { setSearch(""); searchInputRef.current?.focus(); }}
-                    className="absolute right-3 rounded-full p-1 text-black/40 transition hover:bg-black/5 hover:text-black"
-                    aria-label="Clear search"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <line x1="18" y1="6" x2="6" y2="18"/>
-                      <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={openSearchBar}
-              aria-label="Open search"
-              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/70 shadow-lg backdrop-blur transition hover:bg-white active:scale-95"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
-          )}
         </div>
       )}
 
