@@ -1,19 +1,35 @@
 import type { Metadata } from "next";
-import { Settings as SettingsIcon } from "lucide-react";
-import ComingSoon from "@/components/ui/ComingSoon";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import type { Profile } from "@/types/db";
+import SettingsPageClient from "@/components/settings/SettingsPageClient";
 
 export const metadata: Metadata = {
   title: "Settings · Citizens Connect",
   description: "Your Citizen profile, privacy, notifications and map preferences.",
 };
 
-export default function SettingsPage() {
-  return (
-    <ComingSoon
-      title="Settings"
-      subtitle="Your Citizen profile, privacy, notification preferences, interests and map quick-filters will live here."
-      icon={<SettingsIcon size={26} strokeWidth={2.2} />}
-      phase="Arriving soon"
-    />
-  );
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile) {
+    redirect("/login");
+  }
+
+  return <SettingsPageClient profile={profile as Profile} userId={user.id} />;
 }

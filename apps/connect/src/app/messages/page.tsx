@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import ConversationList from "@/components/messaging/ConversationList";
-import { PageHeader } from "@/components/ui/PageHeader";
+import MessagesPageClient from "@/components/messaging/MessagesPageClient";
 
 export const metadata = {
   title: "Messages — Citizens Connect",
@@ -18,14 +17,5 @@ export default async function MessagesPage() {
     redirect("/login");
   }
 
-  return (
-    <>
-      <PageHeader title="Messages" fallbackHref="/events" />
-      <div className="flex min-h-[calc(100dvh-6.5rem)] items-start justify-center px-4 py-6">
-        <div className="glass-panel w-full max-w-2xl overflow-hidden">
-          <ConversationList userId={user.id} />
-        </div>
-      </div>
-    </>
-  );
+  return <MessagesPageClient userId={user.id} />;
 }

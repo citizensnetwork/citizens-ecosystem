@@ -240,6 +240,10 @@ export type Profile = {
    *  place mutes and org mutes apply to place/contributor fan-out. */
   muted_source_ids?: NotificationSourceMute[];
   location_sharing: boolean;
+  /** @handle for citizen discovery opt-in (migration 107). `null` = no handle set. */
+  handle?: string | null;
+  /** Whether this citizen is discoverable at shared events (migration 107). */
+  discoverable?: boolean;
   instagram_handle: string | null;
   facebook_url: string | null;
   tiktok_handle: string | null;
@@ -363,6 +367,11 @@ export type Preferences = {
   leadership_interest?: boolean | null;
   /** Timestamp of the last time the Rainbow "?" long-form sheet was shown. */
   last_longform_asked_at?: string | null;
+  /** User-selected quick-filter category IDs (≤5) shown as pills on the map.
+   *  Written by Settings; read by the map via localStorage (synced on save). */
+  quick_panel_ids?: string[];
+  /** User-selected interest category IDs. Used to personalise map layers. */
+  interests?: string[];
   /** Any other forward-compatible keys clients may start writing. */
   [key: string]: unknown;
 };
@@ -521,7 +530,18 @@ export type NotificationType =
   // Admin / contributor pipeline (DB CHECK in migrations 069 + 085).
   | "admin_elevation_request"
   | "contributor_approved"
-  | "contributor_rejected";
+  | "contributor_rejected"
+  // Phase 3 types added in migrations 107+ (messaging, team, volunteers, suggestions).
+  | "spam_flag"
+  | "broadcast_flood"
+  | "dm_received"
+  | "dm_response"
+  | "suggestion_response"
+  | "volunteer_application"
+  | "volunteer_application_response"
+  | "team_invite"
+  | "team_invite_response"
+  | "team_owner_transfer";
 
 /**
  * FEAT-04 Convince row — one per (from, to, event); permanent UNIQUE.
@@ -706,6 +726,8 @@ export type ConversationPreview = {
     full_name: string;
     avatar_url: string | null;
     deleted_at?: string | null;
+    /** True when the other participant is an approved contributor (org ✦ badge). */
+    is_contributor?: boolean;
   };
   last_message: {
     body: string;

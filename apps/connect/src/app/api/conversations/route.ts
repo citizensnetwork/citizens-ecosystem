@@ -67,7 +67,7 @@ export async function GET() {
       .order("updated_at", { ascending: false }),
     supabase
       .from("conversation_participants")
-      .select("conversation_id, user_id, profiles(id, full_name, avatar_url, deleted_at)")
+      .select("conversation_id, user_id, profiles(id, full_name, avatar_url, deleted_at, contributor_status)")
       .in("conversation_id", convIds)
       .neq("user_id", user.id),
     supabase
@@ -88,11 +88,14 @@ export async function GET() {
   const latestMessages = msgResult.data;
   const allMessages = unreadResult.data;
 
-  const participantMap = new Map<string, { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null }>();
+  const participantMap = new Map<string, { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null; is_contributor: boolean }>();
   for (const p of allParticipants || []) {
-    const profile = p.profiles as unknown as { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null };
+    const profile = p.profiles as unknown as { id: string; full_name: string; avatar_url: string | null; deleted_at: string | null; contributor_status?: string | null };
     if (profile) {
-      participantMap.set(p.conversation_id, profile);
+      participantMap.set(p.conversation_id, {
+        ...profile,
+        is_contributor: profile.contributor_status === "approved",
+      });
     }
   }
 
@@ -121,7 +124,7 @@ export async function GET() {
       updated_at: conv.updated_at,
       status: conv.status,
       muted: !!mutedMap[conv.id],
-      other_user: participantMap.get(conv.id) || { id: "", full_name: "Unknown", avatar_url: null, deleted_at: null },
+      other_user: participantMap.get(conv.id) || { id: "", full_name: "Unknown", avatar_url: null, deleted_at: null, is_contributor: false },
       last_message: latestMessageMap.get(conv.id) || null,
       unread_count: unreadMap.get(conv.id) || 0,
     }))
