@@ -38,8 +38,8 @@ export default function PlacePreviewCard({ place, onClose }: Props) {
   return (
     <div className="pointer-events-none absolute inset-y-0 right-0 z-1200 flex items-start justify-end p-3 sm:p-4">
       <div className="cc-glass cc-glass-enter-right pointer-events-auto mt-20 flex w-80 max-w-[88vw] flex-col overflow-hidden rounded-3xl">
-        {/* Image header */}
-        <div className="relative h-36 w-full">
+        {/* Cover photo with title overlay (Figma EventPreviewPanel) */}
+        <div className="relative h-40 w-full">
           {place.image_url && imgOk ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -49,13 +49,16 @@ export default function PlacePreviewCard({ place, onClose }: Props) {
               onError={() => setImgOk(false)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-black/10 to-black/5 text-black/25">
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#1a1a1a] to-[#3a3328] text-white/40">
               <ImageIcon className="h-9 w-9" />
             </div>
           )}
 
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-black/80 shadow-sm backdrop-blur">
-            <span className="h-2 w-2 rounded-full bg-(--gold)" />
+          {/* Scrim so the overlaid title + badge read on any photo */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-black/20" />
+
+          {/* Category badge (places read black/gold) */}
+          <span className="absolute left-3 top-3 rounded-full bg-(--gold) px-2.5 py-1 text-[10px] font-bold text-black shadow-lg">
             {categoryLabel(place)}
           </span>
 
@@ -63,25 +66,27 @@ export default function PlacePreviewCard({ place, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close preview"
-            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/85 text-black/60 shadow-sm backdrop-blur transition hover:text-black"
+            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white shadow-sm backdrop-blur transition hover:bg-black/60"
           >
             <X className="h-4 w-4" />
           </button>
+
+          {/* Title overlay */}
+          <div className="absolute inset-x-3 bottom-3 flex items-start gap-1.5">
+            <h2 className="font-display text-base font-bold leading-tight text-white drop-shadow-lg line-clamp-2">
+              {place.name}
+            </h2>
+            {place.verified && (
+              <BadgeCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-(--gold) drop-shadow" aria-label="Verified" />
+            )}
+          </div>
         </div>
 
         {/* Body */}
         <div className="flex flex-col gap-3 p-4">
-          <div>
-            <div className="flex items-start gap-1.5">
-              <h2 className="text-lg font-bold leading-tight text-black">{place.name}</h2>
-              {place.verified && (
-                <BadgeCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-(--gold)" aria-label="Verified" />
-              )}
-            </div>
-            {place.description && (
-              <p className="mt-1 line-clamp-2 text-sm text-black/55">{place.description}</p>
-            )}
-          </div>
+          {place.description && (
+            <p className="line-clamp-2 text-sm text-black/55">{place.description}</p>
+          )}
 
           {/* Real stat columns */}
           <div className="grid grid-cols-2 gap-3">
