@@ -1337,7 +1337,7 @@ export default function EventsView({
             <button
               type="button"
               onClick={() => setResetBearingToken((t) => t + 1)}
-              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95"
+              className="cc-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-black/70 shadow-lg transition hover:text-black active:scale-95"
               aria-label="Reset map orientation to north"
               title="Reset north"
             >
@@ -1362,7 +1362,7 @@ export default function EventsView({
           <button
             type="button"
             onClick={() => setLocateMeToken((t) => t + 1)}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-(--gold)/40 bg-white/85 text-(--gold) shadow-lg backdrop-blur-md transition hover:bg-white active:scale-95"
+            className="cc-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-(--gold) shadow-lg transition active:scale-95"
             aria-label="Find my location"
             title="Find my location"
           >
