@@ -24,7 +24,6 @@ import { DEFAULT_CENTER } from "@/lib/map/config";
 import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 import GlassMapHeader from "@/components/map/glass/GlassMapHeader";
-import MapLayersPanel from "@/components/map/glass/MapLayersPanel";
 import MapFiltersPanel from "@/components/map/glass/MapFiltersPanel";
 import MapStatsFooter from "@/components/map/glass/MapStatsFooter";
 import PlacePreviewCard from "@/components/map/glass/PlacePreviewCard";
@@ -115,7 +114,6 @@ export default function EventsView({
   const [filtersOpen, setFiltersOpen] = useState(false);
   // ── Glassmorphism Community Map overlay state ──
   const [mapFiltersOpen, setMapFiltersOpen] = useState(false);
-  const [mapLayersOpen, setMapLayersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
   // The Figma design moves search into the glass header and puts the stats pill
   // at the bottom-centre, so the legacy bottom floating search is disabled by
@@ -382,6 +380,15 @@ export default function EventsView({
     return counts;
   }, [events]);
 
+  // Per-category event counts for the Filters bottom-sheet grid badges.
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of events) {
+      if (e.category) counts[e.category] = (counts[e.category] ?? 0) + 1;
+    }
+    return counts;
+  }, [events]);
+
   // Focus traps for drawers
   const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
 
@@ -389,7 +396,6 @@ export default function EventsView({
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
-      if (mapLayersOpen) { setMapLayersOpen(false); return; }
       if (mapFiltersOpen) { setMapFiltersOpen(false); return; }
       if (filtersOpen) { setFiltersOpen(false); return; }
       if (calendarOpen) { closeCalendar(); return; }
@@ -397,7 +403,7 @@ export default function EventsView({
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [mapLayersOpen, mapFiltersOpen, filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
+  }, [mapFiltersOpen, filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
 
   // Burger menu social data — load eagerly so trending data is available for the panel
   const {
@@ -1277,15 +1283,11 @@ export default function EventsView({
             setCalendarOpen((open) => !open);
           }}
           filtersOpen={mapFiltersOpen}
-          onToggleFilters={() => {
-            setMapFiltersOpen((o) => !o);
-            setMapLayersOpen(false);
-          }}
-          layersOpen={mapLayersOpen}
-          onToggleLayers={() => {
-            setMapLayersOpen((o) => !o);
-            setMapFiltersOpen(false);
-          }}
+          onToggleFilters={() => setMapFiltersOpen((o) => !o)}
+          filterCount={activeCategories.size + (weekendOnly ? 1 : 0)}
+          avatarUrl={menuProfile?.avatar_url ?? menuProfile?.logo_url ?? null}
+          avatarInitial={displayName.charAt(0).toUpperCase()}
+          onAvatarClick={() => router.push(user ? "/profile" : "/login")}
         />
       )}
 
@@ -1304,38 +1306,25 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Filters / Layers glass panels (open below the quick-filter row) ── */}
-      {!calendarOpen && (mapFiltersOpen || mapLayersOpen) && (
-        <div className="pointer-events-none absolute inset-x-0 top-[200px] z-1100 px-3 sm:top-[210px] sm:px-4">
-          <div className="mx-auto flex w-full max-w-5xl items-start justify-between gap-3">
-            <div>
-              {mapFiltersOpen && (
-                <MapFiltersPanel
-                  categories={CATEGORY_ORDER}
-                  activeCategories={activeCategories}
-                  onToggleCategory={toggleCategory}
-                  onClear={() => {
-                    setActiveCategories(new Set());
-                    if (weekendOnly) handleToggleWeekend();
-                    clearQuickAccess();
-                  }}
-                  weekendOnly={weekendOnly}
-                  onToggleWeekend={handleToggleWeekend}
-                  onClose={() => setMapFiltersOpen(false)}
-                />
-              )}
-            </div>
-            <div>
-              {mapLayersOpen && (
-                <MapLayersPanel
-                  layers={mapLayers}
-                  onToggle={toggleMapLayer}
-                  onClose={() => setMapLayersOpen(false)}
-                />
-              )}
-            </div>
-          </div>
-        </div>
+      {/* ── Filters bottom-sheet (Figma "Categories") — categories + timing
+           + map layers, opened from the header Filters tile. ── */}
+      {!calendarOpen && mapFiltersOpen && (
+        <MapFiltersPanel
+          categories={CATEGORY_ORDER}
+          activeCategories={activeCategories}
+          onToggleCategory={toggleCategory}
+          categoryCounts={categoryCounts}
+          onClear={() => {
+            setActiveCategories(new Set());
+            if (weekendOnly) handleToggleWeekend();
+            clearQuickAccess();
+          }}
+          weekendOnly={weekendOnly}
+          onToggleWeekend={handleToggleWeekend}
+          layers={mapLayers}
+          onToggleLayer={toggleMapLayer}
+          onClose={() => setMapFiltersOpen(false)}
+        />
       )}
 
       {/* ── Floating right-side FAB stack (Phase D) ─────────────────────
@@ -1424,7 +1413,7 @@ export default function EventsView({
        *  Tapping a category pill reuses the full quick-access behaviour
        *  (event + place filtering + the bottom card panel). */}
       {!calendarOpen && (personalised.hasSignal || visibleQuickItems.length > 0) && (
-        <div className="pointer-events-none absolute inset-x-0 top-[150px] z-1004 sm:top-[160px]">
+        <div className="pointer-events-none absolute inset-x-0 top-[130px] z-1004 sm:top-[140px]">
           <div className="mx-auto w-full max-w-5xl px-3 sm:px-4">
             <div className="scrollbar-hide pointer-events-auto flex items-center gap-2 overflow-x-auto pb-1">
               {/* "For me" — thin rainbow-outlined personalisation pill */}
