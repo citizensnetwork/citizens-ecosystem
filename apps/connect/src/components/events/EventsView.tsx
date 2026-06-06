@@ -8,11 +8,8 @@ import { CATEGORY_LABELS, CATEGORY_HEX, PLACE_CATEGORY_KEYWORDS, EVENT_CATEGORY_
 import { isWeekendEvent } from "@/lib/weekendTag";
 import { share } from "@/lib/capacitor/share";
 import { useBurgerMenuData } from "@/hooks/useBurgerMenuData";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
-import BurgerMenu from "./BurgerMenu";
 import GlassCalendar from "./GlassCalendar";
 import QuickPanelSettings, { type QuickPanelOption } from "./QuickPanelSettings";
-import NotificationBell from "@/components/notifications/NotificationBell";
 import { loadQuickIds } from "@/lib/quickPanelPrefs";
 import { QUICK_ACCESS_ITEMS, type QuickAccessItem } from "@/lib/quickPanelOptions";
 import { rankResults, distanceKm, type RankedResult } from "@/lib/aiSearch";
@@ -22,23 +19,14 @@ import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 import GlassMapHeader from "@/components/map/glass/GlassMapHeader";
 import MapFiltersPanel from "@/components/map/glass/MapFiltersPanel";
-import MapStatsFooter from "@/components/map/glass/MapStatsFooter";
 import PlacePreviewCard from "@/components/map/glass/PlacePreviewCard";
 import EventPreviewCard from "@/components/map/glass/EventPreviewCard";
 import GlassSearchResults from "@/components/map/glass/GlassSearchResults";
-import { DEFAULT_MAP_LAYERS, type MapLayerKey, type MapLayers } from "@/components/map/glass/mapLayers";
 
 const EventMap = dynamic(() => import("@/components/map/EventMap"), {
   ssr: false,
   loading: () => <div className="skeleton h-full w-full" />,
 });
-
-// Lazy-loaded: only ever needed when a signed-in user taps the rainbow "?"
-// control, so we keep it out of the main bundle.
-const LongFormPersonalizationSheet = dynamic(
-  () => import("@/components/easter/LongFormPersonalizationSheet"),
-  { ssr: false }
-);
 
 type Props = {
   events: Event[];
@@ -76,8 +64,8 @@ export default function EventsView({
   const router = useRouter();
   const searchParams = useSearchParams();
   // Calendar is now a frosted overlay on top of the map (FEAT-02).
-  // The `?view=calendar` URL param (still emitted by the global Navbar link)
-  // simply auto-opens the overlay; the map stays mounted underneath.
+  // The `?view=calendar` URL param (emitted by the sidebar Calendar link)
+  // auto-opens the overlay; the map stays mounted underneath.
   const [calendarOpen, setCalendarOpen] = useState(
     () => searchParams.get("view") === "calendar"
   );
@@ -96,13 +84,17 @@ export default function EventsView({
       });
     }
   }, [router, searchParams]);
+  // Open the calendar when the sidebar Calendar link adds `?view=calendar`
+  // via a soft navigation (the useState initialiser above only runs on first
+  // mount, so a client-side nav while already on /events needs this sync).
+  useEffect(() => {
+    if (searchParams.get("view") === "calendar") setCalendarOpen(true);
+  }, [searchParams]);
   // Pre-populate search from ?q= param so contributor type-label links
   // land with the search box already filled.
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   // ── Glassmorphism Community Map overlay state ──
   const [mapFiltersOpen, setMapFiltersOpen] = useState(false);
-  const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_MAP_LAYERS);
   // Header search dropdown visibility (delayed blur so result clicks register).
   const [headerSearchFocused, setHeaderSearchFocused] = useState(false);
   const headerBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,29 +105,6 @@ export default function EventsView({
   const onHeaderSearchBlur = useCallback(() => {
     headerBlurTimer.current = setTimeout(() => setHeaderSearchFocused(false), 150);
   }, []);
-  const toggleMapLayer = useCallback((key: MapLayerKey) => {
-    setMapLayers((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
-  // Real community member count (profiles) for the glass stats footer.
-  const [memberCount, setMemberCount] = useState<number | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { count } = await supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true });
-        if (!cancelled && typeof count === "number") setMemberCount(count);
-      } catch {
-        /* footer falls back to dashes if the count is unavailable */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const [longFormOpen, setLongFormOpen] = useState(false);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set()
   );
@@ -149,10 +118,6 @@ export default function EventsView({
   // attribute (see src/lib/weekendTag.ts), never a stored slug.
   const [weekendOnly, setWeekendOnly] = useState(false);
   const handleToggleWeekend = useCallback(() => setWeekendOnly((w) => !w), []);
-
-  // Burger menu Event / Place tab (lifted here so placesMode can be wired to
-  // the EventMap — when "places" is active, only place markers render).
-  const [burgerTab, setBurgerTab] = useState<"events" | "places">("events");
 
   // Snapshot of the category/quick-access filters taken the moment the user
   // begins a search. Restored when the search input is cleared so the
@@ -238,7 +203,6 @@ export default function EventsView({
   const rsvpEventIdsRef = useRef<Set<string>>(new Set());
   rsvpEventIdsRef.current = rsvpEventIds;
   const [considerEventIds, setConsiderEventIds] = useState<Set<string>>(new Set());
-  const [considerVersion, setConsiderVersion] = useState(0);
   const [followedCreatorIds, setFollowedCreatorIds] = useState<Set<string>>(new Set());
   const [followedPlaceIds, setFollowedPlaceIds] = useState<Set<string>>(new Set());
   // Active map update bubbles keyed by event id (newest non-dismissed per event).
@@ -373,33 +337,24 @@ export default function EventsView({
     return counts;
   }, [events]);
 
-  // Focus traps for drawers
-  const burgerRef = useFocusTrap<HTMLElement>(filtersOpen);
-
   // Escape key closes drawers and detail panels
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (mapFiltersOpen) { setMapFiltersOpen(false); return; }
-      if (filtersOpen) { setFiltersOpen(false); return; }
       if (calendarOpen) { closeCalendar(); return; }
       if (selectedEvent || selectedPlace) { setSelectedEvent(null); setSelectedPlace(null); }
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [mapFiltersOpen, filtersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
+  }, [mapFiltersOpen, calendarOpen, selectedEvent, selectedPlace, closeCalendar]);
 
-  // Burger menu social data — load eagerly so trending data is available for the panel
+  // User profile + convince state (powers the map preview/quick panels and the
+  // header avatar / personalisation). The wider social fields this hook also
+  // returns are no longer surfaced on the map (the burger menu was retired).
   const {
-    trending,
-    favouriteOrgs,
-    friends,
-    friendConsiderings,
-    userConsidering,
     incomingConvinceEventIds,
-    outgoingConvinceKeys,
     profile: menuProfile,
-    loading: menuLoading,
     refetch: refetchBurgerData,
   } = useBurgerMenuData(user?.id ?? null, true);
 
@@ -433,13 +388,6 @@ export default function EventsView({
     return { eventCats, placeCats, hasSignal: eventCats.size > 0 || placeCats.size > 0 };
   }, [menuProfile]);
 
-  async function handleLogout() {
-    await supabaseRef.current!.auth.signOut();
-    setUser(null);
-    setFiltersOpen(false);
-    router.push("/");
-    router.refresh();
-  }
 
   /** Clear quick-access selection and its derived state (shared by multiple handlers). */
   function clearQuickAccess() {
@@ -507,18 +455,6 @@ export default function EventsView({
       setCategoryPanelOpen(false);
     }
   }, [activeCategories]);
-
-  function togglePlaceCategory(cat: PlaceCategory) {
-    setActivePlaceCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) {
-        next.delete(cat);
-      } else {
-        next.add(cat);
-      }
-      return next;
-    });
-  }
 
   // Quick-access toggle: sets both event + place categories, clears regular selections.
   // NOTE: Quick access items map to DB event categories by slug (e.g. "education-equipping", "church-services").
@@ -924,7 +860,6 @@ export default function EventsView({
                   return next;
                 });
               }
-              setConsiderVersion((v) => v + 1);
               refetchBurgerData();
             }
             break;
@@ -968,30 +903,16 @@ export default function EventsView({
   // result set.
   useEffect(() => {
     setQuickPanelPage(0);
-  }, [activeCategories, activePlaceCategories, activeQuickAccess, search, burgerTab]);
-
-  // "Citizens Connect" chip → zoom to all of South Africa
-  function handleBrandClick() {
-    // South Africa center, zoom 5.5 shows full country
-    setMapFlyTo([-28.7, 25.5]);
-    setMapFlyToZoom(5.5);
-    setMapFlyToToken((t) => t + 1);
-    closeCalendar();
-  }
+  }, [activeCategories, activePlaceCategories, activeQuickAccess, search]);
 
   // Close glance panel when detail opens
   const hasDetail = selectedEvent || selectedPlace;
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-(--surface)">
-      {/* Map is always rendered — calendar (when open) overlays it.
-       * `cc-map-glass` + data-layer-* drive the Glassmorphism Community Map
-       * marker layers (Impact Glow / Activity Pulse / Connections) via CSS. */}
+      {/* Map is always rendered — calendar (when open) overlays it. */}
       <div
-        className={`cc-map-glass absolute inset-0${calendarOpen ? " pointer-events-none" : ""}`}
-        data-layer-glow={mapLayers.glow ? "on" : "off"}
-        data-layer-pulse={mapLayers.pulse ? "on" : "off"}
-        data-layer-connections={mapLayers.connections ? "on" : "off"}
+        className={`absolute inset-0${calendarOpen ? " pointer-events-none" : ""}`}
       >
         <EventMap
           events={filtered}
@@ -1006,7 +927,6 @@ export default function EventsView({
           activeCategories={activeCategories}
           activePlaceCategories={activePlaceCategories}
           markerOverrideColor={activeQuickItem?.color}
-          placesMode={burgerTab === "places" && !activeQuickItem}
           onBearingChange={setMapBearing}
           resetBearingToken={resetBearingToken}
           locateMeToken={locateMeToken}
@@ -1033,14 +953,9 @@ export default function EventsView({
         />
       )}
 
-      {/* ── Glassmorphism Community Map header (brand + search + Filters/Layers) ── */}
+      {/* ── Glassmorphism Community Map header (search + filter + avatar) ── */}
       {!calendarOpen && (
         <GlassMapHeader
-          brand="Citizens Connect"
-          tagline="Connecting the Kingdom"
-          onBrandClick={handleBrandClick}
-          onMenuClick={() => setFiltersOpen((open) => !open)}
-          menuOpen={filtersOpen}
           search={search}
           onSearchChange={setSearch}
           onSearchClear={() => setSearch("")}
@@ -1068,15 +983,6 @@ export default function EventsView({
               />
             ) : undefined
           }
-          bell={user ? <NotificationBell userId={user.id} /> : undefined}
-          showPersonalize={!!(user && !menuProfile?.preferences?.last_longform_asked_at)}
-          onPersonalize={() => setLongFormOpen(true)}
-          calendarOpen={calendarOpen}
-          onToggleCalendar={() => {
-            setMapFlyTo(null);
-            setMapFlyToZoom(undefined);
-            setCalendarOpen((open) => !open);
-          }}
           filtersOpen={mapFiltersOpen}
           onToggleFilters={() => setMapFiltersOpen((o) => !o)}
           filterCount={activeCategories.size + (weekendOnly ? 1 : 0)}
@@ -1091,7 +997,7 @@ export default function EventsView({
         <div className="pointer-events-none absolute inset-x-0 top-0 z-1000 flex justify-end p-3 sm:p-4">
           <button
             type="button"
-            onClick={() => setCalendarOpen(false)}
+            onClick={closeCalendar}
             className="cc-glass pointer-events-auto flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-(--gold) active:scale-95"
             aria-label="Back to map"
           >
@@ -1101,8 +1007,8 @@ export default function EventsView({
         </div>
       )}
 
-      {/* ── Filters bottom-sheet (Figma "Categories") — categories + timing
-           + map layers, opened from the header Filters tile. ── */}
+      {/* ── Filters bottom-sheet (Figma "Categories") — categories + timing,
+           opened from the header Filters tile. ── */}
       {!calendarOpen && mapFiltersOpen && (
         <MapFiltersPanel
           categories={CATEGORY_ORDER}
@@ -1116,8 +1022,6 @@ export default function EventsView({
           }}
           weekendOnly={weekendOnly}
           onToggleWeekend={handleToggleWeekend}
-          layers={mapLayers}
-          onToggleLayer={toggleMapLayer}
           onClose={() => setMapFiltersOpen(false)}
         />
       )}
@@ -1689,50 +1593,6 @@ export default function EventsView({
         </>
       )}
 
-      {/* ── Burger Menu ──────────────────────────────── */}
-      {/* ── Bottom-centre glass stats pill (real community counts) ── */}
-      {!calendarOpen && !hasDetail && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-1006 flex justify-center px-4 sm:bottom-6">
-          <MapStatsFooter
-            organizations={contributors?.length ?? 0}
-            members={memberCount ?? 0}
-            projects={events.length}
-          />
-        </div>
-      )}
-
-      <BurgerMenu
-        ref={burgerRef}
-        isOpen={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
-        user={user}
-        displayName={displayName}
-        activeCategories={activeCategories}
-        onToggleCategory={toggleCategory}
-        onClearCategories={() => { setActiveCategories(new Set()); clearQuickAccess(); }}
-        activePlaceCategories={activePlaceCategories}
-        onTogglePlaceCategory={togglePlaceCategory}
-        onClearPlaceCategories={() => { setActivePlaceCategories(new Set()); clearQuickAccess(); }}
-        weekendOnly={weekendOnly}
-        onToggleWeekend={handleToggleWeekend}
-        trending={trending}
-        favouriteOrgs={favouriteOrgs}
-        friends={friends}
-        friendConsiderings={friendConsiderings}
-        userConsidering={userConsidering}
-        outgoingConvinceKeys={outgoingConvinceKeys}
-        onAfterAction={refetchBurgerData}
-        menuProfile={menuProfile}
-        menuLoading={menuLoading}
-        onSelectEvent={handleSelectEvent}
-        filteredCount={filtered.length}
-        filteredPlacesCount={filteredPlaces.length}
-        onLogout={handleLogout}
-        considerVersion={considerVersion}
-        activeTab={burgerTab}
-        onTabChange={setBurgerTab}
-      />
-
       {/* ── Detail panel: events keep the full preview; places get the
            glass Community-Map preview card (Figma "Harvest Hope" panel). ── */}
       {selectedEvent && (
@@ -1755,11 +1615,6 @@ export default function EventsView({
         onClose={() => setQuickSettingsOpen(false)}
         onSaved={(next) => setQuickPrefIds(next)}
       />
-
-      {/* ── Long-form personalisation sheet (rainbow "?" entry-point) ── */}
-      {longFormOpen && (
-        <LongFormPersonalizationSheet onClose={() => setLongFormOpen(false)} />
-      )}
     </div>
   );
 }

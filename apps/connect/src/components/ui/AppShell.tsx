@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   Map as MapIcon,
+  CalendarDays,
   Sparkles,
   MessageCircle,
   Bell,
@@ -63,6 +64,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/events", label: "Discover", short: "Discover", icon: MapIcon },
+  { href: "/events?view=calendar", label: "Calendar", short: "Calendar", icon: CalendarDays, desktopOnly: true },
   { href: "/community", label: "Kingdom Projects", short: "Kingdom", icon: Sparkles },
   { href: "/messages", label: "Messages", short: "Messages", icon: MessageCircle, badge: "messages" },
   { href: "/notifications", label: "Notifications", short: "Alerts", icon: Bell, badge: "notifs" },

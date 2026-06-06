@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  SlidersHorizontal,
-  X,
-  CalendarDays,
-  TrendingUp,
-  Activity,
-  Share2,
-} from "lucide-react";
+import { SlidersHorizontal, X, CalendarDays } from "lucide-react";
 import type { EventCategory } from "@/types/db";
 import { CATEGORY_LABELS, CATEGORY_HEX } from "@/lib/categories";
 import { getEventCategoryIcon } from "@/lib/categoryIcons";
-import type { MapLayerKey, MapLayers } from "./mapLayers";
 
 type Props = {
   /** All selectable event categories, in display order. */
@@ -23,23 +15,8 @@ type Props = {
   onClear: () => void;
   weekendOnly: boolean;
   onToggleWeekend: () => void;
-  /** Map visualisation layers, folded into the sheet (Figma has no separate
-   *  Layers control). */
-  layers: MapLayers;
-  onToggleLayer: (key: MapLayerKey) => void;
   onClose: () => void;
 };
-
-const LAYER_ROWS: {
-  key: MapLayerKey;
-  label: string;
-  desc: string;
-  Icon: typeof TrendingUp;
-}[] = [
-  { key: "glow", label: "Impact Glow", desc: "Show organization reach", Icon: TrendingUp },
-  { key: "pulse", label: "Activity Pulse", desc: "Animated activity rings", Icon: Activity },
-  { key: "connections", label: "Connections", desc: "Show collaborations", Icon: Share2 },
-];
 
 /** hex → rgba helper for the soft category-tile backgrounds. */
 function softBg(hex: string): string {
@@ -52,8 +29,8 @@ function softBg(hex: string): string {
 /**
  * Figma "Categories" bottom-sheet, wired to the real Citizens Connect filters.
  * Slides up from the bottom on mobile (centres on desktop) over a dimmed
- * backdrop. Multi-select category grid with live per-category counts, a
- * Weekends-only timing chip, and the map-visualisation layers folded in.
+ * backdrop. Multi-select category grid with live per-category counts and a
+ * Weekends-only timing chip.
  */
 export default function MapFiltersPanel({
   categories,
@@ -63,8 +40,6 @@ export default function MapFiltersPanel({
   onClear,
   weekendOnly,
   onToggleWeekend,
-  layers,
-  onToggleLayer,
   onClose,
 }: Props) {
   const activeCount = activeCategories.size;
@@ -94,7 +69,7 @@ export default function MapFiltersPanel({
             <h2 className="font-display text-base font-bold leading-tight text-black">
               Filter the Map
             </h2>
-            <p className="text-xs text-black/50">Refine by category, timing &amp; layers</p>
+            <p className="text-xs text-black/50">Refine by category &amp; timing</p>
           </div>
           <button
             type="button"
@@ -170,41 +145,6 @@ export default function MapFiltersPanel({
             <CalendarDays className="h-3.5 w-3.5" />
             Weekends only
           </button>
-
-          {/* Map layers (folded in from the old Layers pill) */}
-          <p className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wide text-black/45">
-            Map layers
-          </p>
-          <div className="flex flex-col gap-1">
-            {LAYER_ROWS.map(({ key, label, desc, Icon }) => {
-              const lon = layers[key];
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 rounded-2xl px-2 py-2.5 transition hover:bg-black/[0.03]"
-                >
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-(--gold)/10 text-(--gold)">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-tight text-black">{label}</p>
-                    <p className="text-xs text-black/45">{desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={lon}
-                    aria-label={`${label}: ${lon ? "on" : "off"}`}
-                    data-on={lon}
-                    onClick={() => onToggleLayer(key)}
-                    className="cc-switch"
-                  >
-                    <span />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-black/5 p-3 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

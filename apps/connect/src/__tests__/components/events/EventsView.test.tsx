@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { forwardRef } from "react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import EventsView from "@/components/events/EventsView";
 import { makeEvent } from "../../helpers/fixtures";
 
@@ -45,30 +44,10 @@ vi.mock("@/components/events/GlassCalendar", () => ({
   }) => <div data-testid="glass-calendar">{events.length} events</div>,
 }));
 
-vi.mock("@/components/events/BurgerMenu", () => {
-  return {
-    default: forwardRef(function BurgerMenuStub(
-      { isOpen, onClose }: { isOpen: boolean; onClose: () => void },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      _ref: React.Ref<HTMLElement>
-    ) {
-      return isOpen ? (
-        <div data-testid="burger-menu">
-          <button onClick={onClose}>Close Menu</button>
-        </div>
-      ) : null;
-    }),
-  };
-});
-
 vi.mock("@/components/events/EventFeed", () => ({
   default: ({ events }: { events: unknown[] }) => (
     <div data-testid="event-feed">{(events as { id: string }[]).length} items</div>
   ),
-}));
-
-vi.mock("@/components/notifications/NotificationBell", () => ({
-  default: () => <div data-testid="notification-bell" />,
 }));
 
 vi.mock("@/lib/capacitor/share", () => ({
@@ -77,15 +56,8 @@ vi.mock("@/lib/capacitor/share", () => ({
 
 vi.mock("@/hooks/useBurgerMenuData", () => ({
   useBurgerMenuData: () => ({
-    trending: [],
-    favouriteOrgs: [],
-    friends: [],
-    friendConsiderings: [],
-    userConsidering: [],
     incomingConvinceEventIds: new Set<string>(),
-    outgoingConvinceKeys: new Set<string>(),
     profile: null,
-    loading: false,
     refetch: () => {},
   }),
 }));
@@ -127,13 +99,15 @@ describe("EventsView", () => {
     expect(screen.getByTestId("event-map")).toBeInTheDocument();
   });
 
-  it("switches to calendar view when toggle clicked", async () => {
-    await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
-    });
-    expect(screen.getByTestId("glass-calendar")).toBeInTheDocument();
-    expect(screen.getByTestId("event-map")).toBeInTheDocument();
+  it("shows calendar over the map when ?view=calendar is set", async () => {
+    mockSearchParams.set("view", "calendar");
+    try {
+      await renderView();
+      expect(screen.getByTestId("glass-calendar")).toBeInTheDocument();
+      expect(screen.getByTestId("event-map")).toBeInTheDocument();
+    } finally {
+      mockSearchParams.delete("view");
+    }
   });
 
   it("renders search input with proper aria-label", async () => {
@@ -143,81 +117,52 @@ describe("EventsView", () => {
     expect(input).toHaveAttribute("aria-label", "Search the map");
   });
 
-  it("renders toggle menu button", async () => {
+  it("renders the Figma map header (filter + profile)", async () => {
     await renderView();
     expect(
-      screen.getByRole("button", { name: /open menu/i })
+      screen.getByRole("button", { name: /filter the map/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /your profile/i })
     ).toBeInTheDocument();
   });
 
-  it("opens burger menu when menu button clicked", async () => {
-    await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
-    });
-    expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
-  });
-
-  it("closes burger menu with close button", async () => {
-    await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
-    });
-    expect(screen.getByTestId("burger-menu")).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("Close Menu"));
-    });
-    await waitFor(() => {
-      expect(screen.queryByTestId("burger-menu")).not.toBeInTheDocument();
-    });
-  });
-
-  it("filters events by search input", async () => {
-    await renderView();
-    const input = screen.getByRole("searchbox", { name: /search the map/i });
-    await act(async () => {
-      fireEvent.change(input, { target: { value: "Youth" } });
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("glass-calendar")).toHaveTextContent(
-        "1 events"
-      );
-    });
-  });
-
-  it("renders Citizens Connect brand button with gold text", async () => {
-    await renderView();
-    const brandBtn = screen.getByRole("button", { name: /citizens connect/i });
-    expect(brandBtn).toBeInTheDocument();
-  });
-
-  it("renders view toggle button with calendar icon on map view", async () => {
-    await renderView();
-    const toggleBtn = screen.getByRole("button", { name: /toggle calendar view/i });
-    expect(toggleBtn.querySelector("svg")).toBeTruthy();
+  it("filters events by the ?q= search query into the calendar", async () => {
+    mockSearchParams.set("q", "Youth");
+    mockSearchParams.set("view", "calendar");
+    try {
+      await renderView();
+      await waitFor(() => {
+        expect(screen.getByTestId("glass-calendar")).toHaveTextContent(
+          "1 events"
+        );
+      });
+    } finally {
+      mockSearchParams.delete("q");
+      mockSearchParams.delete("view");
+    }
   });
 
   it("renders back-to-map button in calendar view", async () => {
-    await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
-    });
-    const backBtn = screen.getByRole("button", { name: /back to map/i });
-    expect(backBtn).toBeInTheDocument();
-    expect(backBtn.querySelector("svg")).toBeTruthy();
+    mockSearchParams.set("view", "calendar");
+    try {
+      await renderView();
+      const backBtn = screen.getByRole("button", { name: /back to map/i });
+      expect(backBtn).toBeInTheDocument();
+      expect(backBtn.querySelector("svg")).toBeTruthy();
+    } finally {
+      mockSearchParams.delete("view");
+    }
   });
 
   it("passes events to calendar view", async () => {
-    await renderView();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /toggle calendar view/i }));
-    });
-    expect(screen.getByTestId("glass-calendar")).toHaveTextContent("3 events");
+    mockSearchParams.set("view", "calendar");
+    try {
+      await renderView();
+      expect(screen.getByTestId("glass-calendar")).toHaveTextContent("3 events");
+    } finally {
+      mockSearchParams.delete("view");
+    }
   });
 
   it("opens calendar automatically when ?view=calendar is set", async () => {

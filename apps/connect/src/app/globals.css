@@ -963,54 +963,6 @@ h1, h2, h3, h4, .font-display {
   transform: translateX(1.25rem);
 }
 
-/* ── Marker visualization layers ──────────────────────────
- * Toggled from the Layers panel via data-attributes on the map wrapper
- * (.cc-map-glass). They restyle the EXISTING markers — no map rewrite. */
-
-/* Impact Glow — static concentric rings, tinted by the marker's category
- * (--cc-pulse-color, set per-marker; falls back to gold).
- *
- * Scoped to EVENT markers only (`:not(.cc-place-marker)`). Places are constant,
- * not "active/impactful in time", so they carry no activity overlay — and,
- * critically, a place's `.cc-marker-outer` has no border-radius, so a box-shadow
- * on it rendered as an ugly SQUARE halo around the pin. Excluding places fixes
- * that and keeps place icons clean. */
-.cc-map-glass[data-layer-glow="on"] .cc-marker:not(.cc-place-marker):not(.cc-marker-prominent) .cc-marker-outer {
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 22%, transparent),
-    0 0 0 11px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 12%, transparent),
-    0 0 20px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 40%, transparent) !important;
-}
-
-/* Activity Pulse — animated expanding ring (overrides glow when both on).
- * Event markers only, same reasoning as Impact Glow above (square-halo fix). */
-@media (prefers-reduced-motion: no-preference) {
-  .cc-map-glass[data-layer-pulse="on"] .cc-marker:not(.cc-place-marker):not(.cc-marker-prominent) .cc-marker-outer {
-    animation: ccActivityPulse 2.4s ease-out infinite !important;
-  }
-}
-@keyframes ccActivityPulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 45%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 16px color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 0%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cc-pulse-color, #C9A84C) 0%, transparent);
-  }
-}
-
-/* Connections — surface the existing displaced-marker leader lines in gold. */
-.cc-map-glass[data-layer-connections="on"] .cc-leader-svg {
-  opacity: 1;
-}
-.cc-map-glass[data-layer-connections="on"] .cc-leader-svg line,
-.cc-map-glass[data-layer-connections="on"] .cc-leader-svg path {
-  stroke: rgba(201, 168, 76, 0.7) !important;
-  stroke-dasharray: 3 3;
-}
-
 /* Slide/fade entrance for the floating glass panels. */
 .cc-glass-enter {
   animation: ccGlassIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;

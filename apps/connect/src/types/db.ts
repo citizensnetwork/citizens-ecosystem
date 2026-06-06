@@ -558,8 +558,8 @@ export type Convince = {
 
 /**
  * FEAT-04 Friends-considering aggregate: one event + the list of mutual
- * friends who are currently considering it. Powers the "Friends" tab of
- * the Considerations section in BurgerMenu.
+ * friends who are currently considering it. Returned by `useBurgerMenuData`
+ * (retained for future social surfaces; the burger menu itself was retired).
  */
 export type FriendConsidering = {
   event: Event;

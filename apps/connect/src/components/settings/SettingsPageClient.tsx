@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Globe, Lock, Crown, Check } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Camera, Globe, Lock, Crown, Check, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { validateImageFile } from "@/lib/validation";
@@ -9,6 +10,13 @@ import { compressImageIfNeeded } from "@/lib/imageCompression";
 import { CATEGORY_LABELS, CATEGORY_HEX } from "@/lib/categories";
 import { saveQuickIds } from "@/lib/quickPanelPrefs";
 import type { EventCategory, NotificationPrefKey, NotificationPrefs, Preferences, Profile } from "@/types/db";
+
+// Lazy-loaded deep-dive personalisation sheet (the former map "?" entry point,
+// relocated here). Kept out of the main Settings bundle.
+const LongFormPersonalizationSheet = dynamic(
+  () => import("@/components/easter/LongFormPersonalizationSheet"),
+  { ssr: false }
+);
 
 const PREF_LABELS: Record<NotificationPrefKey, { label: string; desc: string }> = {
   event_reminders:     { label: "Event Updates",    desc: "Reminders and updates for events you follow" },
@@ -56,6 +64,9 @@ export default function SettingsPageClient({ profile, userId }: Props) {
   // Quick-filters (≤5)
   const currentQf = (profile.preferences?.quick_panel_ids ?? []) as string[];
   const [quickFilters, setQuickFilters] = useState<string[]>(currentQf);
+
+  // Deep-dive personalisation sheet (relocated from the map "?" control)
+  const [personalizeOpen, setPersonalizeOpen] = useState(false);
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -332,7 +343,7 @@ export default function SettingsPageClient({ profile, userId }: Props) {
             Interests
           </p>
           <p className="text-xs text-muted-foreground mb-4">
-            We&apos;ll use these to personalise your map layers
+            We&apos;ll use these to personalise your map and feed
           </p>
           <div className="flex flex-wrap gap-2">
             {(Object.entries(CATEGORY_LABELS) as [EventCategory, string][]).map(([id, label]) => {
@@ -355,6 +366,15 @@ export default function SettingsPageClient({ profile, userId }: Props) {
               );
             })}
           </div>
+
+          {/* Deep-dive personalisation (relocated from the map "?" control) */}
+          <button
+            onClick={() => setPersonalizeOpen(true)}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#C9A84C]/40 bg-[#C9A84C]/10 px-4 py-3 text-xs font-bold text-[#8B6914] transition hover:bg-[#C9A84C]/20"
+          >
+            <Sparkles size={14} />
+            Personalise my feed — quick questions
+          </button>
         </div>
 
         {/* ── Quick Filters ────────────────────────── */}
@@ -480,6 +500,13 @@ export default function SettingsPageClient({ profile, userId }: Props) {
           </p>
         </div>
       </div>
+
+      {personalizeOpen && (
+        <LongFormPersonalizationSheet
+          prefs={profile.preferences ?? undefined}
+          onClose={() => setPersonalizeOpen(false)}
+        />
+      )}
     </div>
   );
 }
