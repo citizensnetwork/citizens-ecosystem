@@ -16,7 +16,53 @@
 
 ---
 
-## 2. What just shipped — Figma UI Phase 5 (Kingdom Projects / Community) ✅ (2026-06-04)
+## 2. What just shipped — Legacy map-chrome cleanup (pre-Phase-6) ✅ (2026-06-06)
+
+Commit **`131e03f`** (pushed to main). No DB migrations — next migration # still **130**.
+Suite **817/817** (96 files) · tsc 0 · lint clean · vibe-security CLEAN.
+Working log: `.claude/sessions/phase6prep-bugfix-legacy-cleanup.md`.
+
+### Founder-reported issues
+1. **No events/places on desktop** + 2. **Google login broken** → ONE root cause, NOT code:
+   prod build lacked `NEXT_PUBLIC_SUPABASE_URL` (+ anon key) so the client fell back to
+   `https://placeholder.supabase.co` (see `src/lib/supabase/{client,server}.ts`,
+   `src/middleware.ts`). Placeholder host = no data loads + OAuth authorize hits placeholder.
+   **Founder fixed the Vercel env vars + redeployed.** No code change needed.
+3. **Legacy map artifacts discarded** (matched to latest Figma `Christiancommunitymapapp@b708e35`):
+   - **Floating legacy search bar** = `GlassMapHeader`. Stripped to the current Figma row
+     **`[search] [filter] [avatar]`** — removed the burger, Sparkles brand + tagline, calendar
+     toggle, notifications bell, rainbow personalise "?". (Those all live in `AppShell` now.)
+   - **"Organizations / Members / Active Projects" pill** = `MapStatsFooter` → **DELETED**.
+   - **"Impact Glow / Activity Pulse / Connections"** = map layers → **DELETED** (`mapLayers.ts`,
+     the `MapFiltersPanel` block, the `globals.css` rules, the `data-layer-*` attrs).
+
+### Also done
+- **`BurgerMenu` DELETED** (founder choice). `useBurgerMenuData` KEPT (still powers the map
+  preview/quick panels + header avatar/personalisation; only the burger-only destructures dropped).
+- **Calendar relocated** → `AppShell` sidebar entry (`/events?view=calendar`, desktopOnly).
+  EventsView added an effect to open the overlay on the `view` param via soft-nav; the
+  in-calendar "Map" button now uses `closeCalendar` (strips the param so refresh won't reopen).
+- **Personalise** deep-dive sheet relocated → Settings ("Personalise my feed" button).
+- Cleaned orphans (`togglePlaceCategory`, `considerVersion`, `handleBrandClick`, `handleLogout`,
+  `filtersOpen`, `burgerTab`, `placesMode` prop, `memberCount` fetch, dead `cc-map-glass` class).
+- `OLD_UI_ARTIFACTS.md` updated (search bar / logo / burger marked resolved).
+- Tests reworked (`EventsView.test.tsx`): burger/brand/header-calendar-toggle tests replaced
+  with param-driven calendar tests + a new Figma-header test.
+
+### ⚠️ Debt created (rehome in a later phase)
+- **BurgerMenu social features dropped:** trending events, favourite orgs, friends-considering +
+  **convince-from-map**. (Convince still exists in Notifications.) These are VISION-relevant
+  (cit↔cit connection) — need a Figma-faithful home. `useBurgerMenuData` still returns the data.
+- **Calendar is desktop-sidebar only** (no mobile bottom-nav slot — the 5 slots are full). If
+  mobile calendar access is wanted, decide where it goes.
+
+### NEXT → Phase 6 (Impact-Ideas voting backend) — still deferred, separate founder approval
+Schema (ideas table with votes + thresholds + status machine), RLS, SECURITY-DEFINER RPCs,
+map "Ideas" layer wiring.
+
+---
+
+## 2-prev. What just shipped — Figma UI Phase 5 (Kingdom Projects / Community) ✅ (2026-06-04)
 
 Commit **`5001925`**. No DB migrations — next migration # still **130**. Suite **821/821** · tsc 0 · lint clean · vibe-security CLEAN.
 Working log: `.claude/sessions/phase5-community.md`.
