@@ -49,6 +49,7 @@
     const [myApplication, setMyApplication] = useState(null); // {id,status,...}
     const [myContributor, setMyContributor] = useState(null); // contributor obj once onboarded
     const [assistMode, setAssistMode] = useState(false); // admin assisting as a contributor
+    const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
 
     // citizen RSVP state
     const [connected, setConnected] = useState(() => new Set(['e1', 'e4']));
@@ -74,7 +75,7 @@
     const activeContributorId = myContributor ? myContributor.id : 'c1';
     const activeContributor = contributors.find((c) => c.id === activeContributorId);
 
-    const user =
+    const baseUser =
       role === 'admin' ? ADMIN_BASE
       : role === 'contributor'
         ? {
@@ -84,6 +85,15 @@
             followerCount: activeContributor.followerCount, orgId: activeContributor.id,
           }
         : CITIZEN_BASE;
+    // Overlay the signed-in person's real identity for citizen/admin (the
+    // contributor view still draws org data from the contributor record until
+    // that is wired in a later phase).
+    const user = (realUser && role !== 'contributor')
+      ? { ...baseUser,
+          id: realUser.id || baseUser.id,
+          name: realUser.name || baseUser.name,
+          profilePhoto: realUser.avatarUrl || baseUser.profilePhoto }
+      : baseUser;
 
     // ── actions ─────────────────────────────────────────────────────
     const submitApplication = useCallback((form) => {
@@ -221,8 +231,18 @@
     //  supabase-auth.js). Here they set local session state.
     const signIn = useCallback((intent) => {
       // intent: 'citizen' (default) | 'contributor'
-      // Everyone signs in as a citizen. Contributor access is granted only
-      // after the apply -> admin-approval -> onboarding flow completes.
+      // Real path: Google OAuth via Supabase. This navigates away to Google
+      // and returns to the app; the bootstrap effect below resolves the
+      // session + role (from profiles.role) on return. Contributor access is
+      // still only granted after apply -> admin-approval -> onboarding.
+      if (window.CC_AUTH) {
+        window.CC_AUTH.signInWithGoogle(intent).catch((e) => {
+          console.error('[signIn]', e);
+          toast('Sign-in failed \u2014 please try again.', 'red');
+        });
+        return;
+      }
+      // Fallback (no Supabase configured): local demo session only.
       setAuthed(true);
       setRole('citizen');
       setMyContributor(null);
@@ -248,6 +268,8 @@
     }, []);
 
     const signOut = useCallback(() => {
+      if (window.CC_AUTH) { window.CC_AUTH.signOut().catch(() => {}); }
+      setRealUser(null);
       setAuthed(false);
       setRole('citizen');
       setMyContributor(null);
@@ -255,6 +277,36 @@
       setAssistMode(false);
       setNav({ page: 'home', params: {} });
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    }, []);
+
+    // ── real Supabase session bootstrap (no-op in demo mode) ──
+    //  Source of truth when CC_AUTH is present: resolves the session + role on
+    //  load and on every auth change (incl. the OAuth redirect return).
+    useEffect(() => {
+      if (!window.CC_AUTH) return;
+      let active = true;
+      const apply = async () => {
+        const s = await window.CC_AUTH.loadSession();
+        if (!active) return;
+        if (s) {
+          setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email });
+          setAuthed(true);
+          setRole(s.role || 'citizen');
+          if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); setNav({ page: 'apply', params: {} }); }
+        } else {
+          setRealUser(null);
+          setAuthed(false);
+        }
+      };
+      apply();
+      const sub = window.CC_AUTH.onAuthChange((event) => {
+        if (event === 'SIGNED_OUT') { setRealUser(null); setAuthed(false); setRole('citizen'); }
+        else { apply(); }
+      });
+      return () => {
+        active = false;
+        if (sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe();
+      };
     }, []);
 
     useEffect(() => {

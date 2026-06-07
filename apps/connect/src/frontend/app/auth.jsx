@@ -111,9 +111,9 @@
     const onGoogle = () => {
       if (loading) return;
       setLoading(true);
-      // Mocked OAuth round-trip. In production this is a redirect to Google
-      // via Supabase (see supabase-auth.js) — there is no artificial delay.
-      setTimeout(() => signIn(intent), 650);
+      // Real Google OAuth redirect (auth-client.js → store.signIn). In demo
+      // mode signIn resolves locally and this screen unmounts. No fake delay.
+      signIn(intent);
     };
 
     return h('div', { className: 'relative h-full w-full overflow-y-auto', 'data-screen-label': 'Sign in' },
@@ -175,8 +175,7 @@
               h(Icon, { name: 'Info', size: 13, className: 'shrink-0 mt-0.5' }),
               h('p', { className: 'text-[11px] leading-relaxed' }, 'You\u2019ll sign in first, then set up your contributor application for an admin to review.')),
 
-            h('p', { className: 'text-center text-[10px] text-muted-foreground/80 leading-relaxed mt-4 px-2' },
-              'By continuing you agree to our Community Covenant & Privacy Policy.')),
+            null),
 
           // ─────────────────────────────────────────────────────────────
           //  DEMO ROLE PREVIEW — review shortcut. Delete this whole block
