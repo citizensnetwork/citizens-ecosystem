@@ -16,7 +16,65 @@
 
 ---
 
-## 2. What just shipped — Legacy map-chrome cleanup (pre-Phase-6) ✅ (2026-06-06)
+## ⚠️ STRATEGIC PIVOT (2026-06-07) — read before trusting older sections
+
+The **in-place Figma reskin of the Next.js components (Phases 1–5 below) is ABANDONED.**
+Founder decision: it wasn't landing as wanted; the app was redesigned in Claude design
+(the `Citizens Connect Map` zip). We are now **replacing the Next.js frontend entirely**
+with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-only**.
+
+- New source of truth: **[docs/HTML_FRONTEND_WIRING_SPEC.md](docs/HTML_FRONTEND_WIRING_SPEC.md)**
+  (+ ARCHITECTURE_AND_MIGRATION_STRATEGY.md, HTML_FRONTEND_MIGRATION_PLAN.md, memory/CC_SESSION_MEMORY.md).
+- Build order: Phase 0 (done — see below) → 1 auth → 2 map+home → 3 screens → 4 advanced → 5 Capacitor.
+- Everything in **§2-prev and older describes the OLD frontend** that Phase 1 will delete
+  (`src/app/(pages)`, `layout.tsx`, `globals.css`, `src/components/`, `src/hooks/`). The backend
+  history (migrations, API routes, edge functions, RLS) all **still applies** and stays untouched.
+
+---
+
+## 2. What just shipped — Phase 0: HTML frontend wiring kickoff ✅ (2026-06-07)
+
+Two commits on `main` (local — **push to origin still pending founder approval**):
+`fd00214` (docs) + `35faf3f` (Phase 0). Working log: `.claude/sessions/phase0-html-frontend-wiring.md`.
+Gates: **tsc 0 · lint exit 0** (only pre-existing no-img warns) · **security advisors 0 ERROR**.
+
+### Migration 130 — Kingdom Projects / Impact Ideas voting foundation (APPLIED LIVE)
+`supabase/migrations/130_kingdom_projects_voting.sql` (live name `kingdom_projects_voting_foundation`).
+Next migration # is now **131**.
+- `suggestions` += `tier`, `tier_label`, `vote_threshold`, `idea_status`, `project_lead_id`,
+  `associated_event_id`. New `idea_votes` table (RLS: own insert/delete, public select).
+  `rsvps.location_snapshot`. `vote_on_idea(uuid)` SECURITY DEFINER toggle RPC.
+- **Deliberate deviations from the spec's literal SQL (verified vs live schema):**
+  (a) used **`idea_status`** not `status` — `suggestions.status` already exists
+  (open/in_review/actioned) and powers the existing suggestions + Phase-5 community feature;
+  (b) only added the `rsvps.location_snapshot` column — `profiles.location` does NOT exist
+  (profile has connect_home_province + lat/long + physical_address); the snapshot SOURCE is a
+  Phase-4 decision; (c) **auto-transition DEFERRED to Phase 4** — `events.date` is NOT NULL with
+  no default and an idea carries no date, so event synthesis needs a product decision.
+  `vote_on_idea` returns `auto_eligible` so Phase 4 wires `transition_idea_to_in_process()`
+  with no API change. Advisor delta: +1 WARN (the secdef RPC — accepted pattern).
+
+### Frontend dropped in + API CORS
+- `src/frontend/` — the standalone app: `Citizens Connect.html` + 19 `app/*.jsx` (browser
+  React 18 + Babel-standalone + Tailwind, all via CDN; **all screens still MOCK data**) +
+  `supabase-auth.js` (Phase-1 wiring reference). Heavy zip reference (screenshots/, uploads/
+  figma_src, figma tokens) left in the zip to keep the dir lean. Excluded from tsc + eslint.
+- `next.config.ts` — CORS on `/api/(.*)` (`ALLOWED_FRONTEND_ORIGIN` env → set in Vercel for F3;
+  localhost:3001 dev fallback; credentials true; specific origin, not wildcard; `Vary: Origin`).
+
+### NEXT → Phase 1 (auth wiring) — **DESTRUCTIVE deletions begin here.** Decisions needed first:
+1. **How does the no-build browser app receive env (Supabase URL + anon key)?** The HTML loads
+   jsx via Babel-standalone over CDN; `@supabase/supabase-js` isn't even in the script tags yet.
+   Need a `config.js` / `window.__ENV` pattern + add the supabase-js CDN script.
+2. **F3** — production frontend origin (CORS value + Supabase OAuth redirect allowlist).
+3. **F4** — Community Covenant link target on the auth screen (→ `/terms`?).
+   Then wire `auth.jsx`/`store.jsx` to real Supabase OAuth (use `supabase-auth.js` as the spec),
+   and per spec Part 6 delete the OLD frontend (keep `src/app/api`, `middleware.ts`, `src/lib`,
+   `src/types`, `supabase/`).
+
+---
+
+## 2-prev. What just shipped — Legacy map-chrome cleanup (pre-Phase-6) ✅ (2026-06-06)
 
 Commit **`131e03f`** (pushed to main). No DB migrations — next migration # still **130**.
 Suite **817/817** (96 files) · tsc 0 · lint clean · vibe-security CLEAN.
