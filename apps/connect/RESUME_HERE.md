@@ -62,15 +62,39 @@ Next migration # is now **131**.
 - `next.config.ts` — CORS on `/api/(.*)` (`ALLOWED_FRONTEND_ORIGIN` env → set in Vercel for F3;
   localhost:3001 dev fallback; credentials true; specific origin, not wildcard; `Vary: Origin`).
 
-### NEXT → Phase 1 (auth wiring) — **DESTRUCTIVE deletions begin here.** Decisions needed first:
-1. **How does the no-build browser app receive env (Supabase URL + anon key)?** The HTML loads
-   jsx via Babel-standalone over CDN; `@supabase/supabase-js` isn't even in the script tags yet.
-   Need a `config.js` / `window.__ENV` pattern + add the supabase-js CDN script.
-2. **F3** — production frontend origin (CORS value + Supabase OAuth redirect allowlist).
-3. **F4** — Community Covenant link target on the auth screen (→ `/terms`?).
-   Then wire `auth.jsx`/`store.jsx` to real Supabase OAuth (use `supabase-auth.js` as the spec),
-   and per spec Part 6 delete the OLD frontend (keep `src/app/api`, `middleware.ts`, `src/lib`,
-   `src/types`, `supabase/`).
+---
+
+## 2b. Phase 1 — auth wiring ✅ (real Google OAuth wired; verified booting) (2026-06-07)
+
+Commit `ac85e2d` on `origin/main`. Founder decisions applied: config.js env approach;
+F4 covenant **removed for now**; F3 not blocking dev (localhost fallback).
+
+- `src/frontend/auth-client.js` — browser adaptation of `supabase-auth.js` (the reference is
+  Vite/`import.meta`, unusable in the no-build app). `window.CC_AUTH` = signInWithGoogle /
+  loadSession / signOut / onAuthChange (+ client). PKCE + detectSessionInUrl. Role from
+  `profiles.role`; routing uses `contributor_status` (**live profiles has no `wants_contributor`** —
+  the reference file was wrong). Unconfigured → `CC_AUTH=null` + demo fallback so the app still runs.
+- `config.example.js` (committed) + `config.js` (gitignored: `/src/frontend/config.js`) → `window.__CC_ENV`.
+- **`index.html`** — RENAMED from `Citizens Connect.html` (static hosting / Capacitor webDir / clean
+  OAuth redirect, no `%20`). Loads supabase-js UMD + config + auth-client before the Babel app.
+- `store.jsx` — signIn → real OAuth redirect (demo fallback); signOut → supabase signOut; session
+  bootstrap (loadSession on mount + onAuthChange + routeToApply); overlays real user name/avatar for
+  citizen/admin (contributor still mock org data until a later phase).
+- `auth.jsx` — Google button → real redirect (no fake delay); covenant `<p>` → `null`.
+- **Verified** (python http.server :3001 + preview): boots, **0 console errors**, auth screen renders,
+  CC_AUTH initialises. NOT yet testable: the real Google round-trip (needs the steps below).
+
+### Phase 1 REMAINING (blocks "done"):
+1. **Supabase dashboard (founder):** enable the **Google** provider; add redirect URLs under
+   Auth → URL Configuration — dev `http://localhost:3001/`, prod = F3 origin. Set
+   `ALLOWED_FRONTEND_ORIGIN` in Vercel when F3 is known.
+2. **Verify** the Google sign-in round-trip end-to-end (login → session → role).
+3. **Then DELETE the old Next.js frontend** (spec Part 6): `src/app/(pages)`, `layout.tsx`,
+   `globals.css`, `src/components/`, `src/hooks/` — first confirm no `src/app/api` route imports them.
+   KEEP `src/app/api`, `middleware.ts`, `src/lib`, `src/types`, `supabase/`. (Deferred until #2 passes.)
+4. Strip `SHOW_DEMO` (auth.jsx) + `signInDemo` (store.jsx) before launch.
+
+### NEXT → Phase 2: MapLibre GL + MapTiler map + home screen wired to `/api/map/bubbles` + `/api/v1/events`.
 
 ---
 
