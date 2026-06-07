@@ -11,7 +11,10 @@ const eslintConfig = [
     "next/typescript"
   ),
   {
-    ignores: [".next/**", "out/**", "build/**", "android/**", "ios/**", "next-env.d.ts"],
+    // src/frontend/** is the standalone HTML/React frontend (browser React + Babel
+    // via CDN, no module imports). It is not part of the Next.js API build and must
+    // not be linted by the API's TypeScript/React rules.
+    ignores: [".next/**", "out/**", "build/**", "android/**", "ios/**", "src/frontend/**", "next-env.d.ts"],
   },
 ];
 

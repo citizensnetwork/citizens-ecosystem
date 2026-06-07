@@ -52,6 +52,25 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // CORS for the standalone HTML frontend (Capacitor app + hosted web build).
+      // Credentialed requests (Supabase auth cookie) forbid a wildcard origin, so we
+      // echo a single configured origin. Set ALLOWED_FRONTEND_ORIGIN in Vercel to the
+      // production HTML-frontend domain (open question F3) before that frontend ships;
+      // the localhost fallback covers local dev. Preflight (OPTIONS) handling for the
+      // auth-bearing routes is verified in Phase 1 alongside the auth wiring.
+      {
+        source: "/api/(.*)",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: process.env.ALLOWED_FRONTEND_ORIGIN || "http://localhost:3001",
+          },
+          { key: "Access-Control-Allow-Methods", value: "GET,POST,PATCH,DELETE,OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
+          { key: "Access-Control-Allow-Credentials", value: "true" },
+          { key: "Vary", value: "Origin" },
+        ],
+      },
     ];
   },
 };
