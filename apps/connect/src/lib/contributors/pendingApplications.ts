@@ -12,7 +12,7 @@
 // added in Batch P does this; `/admin/applications` just logs).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PendingApplication } from "@/components/admin/ContributorReviewCard";
+import type { PendingApplication } from "@/types/contributors";
 
 const SELECT_COLUMNS =
   "id, user_id, display_name, contributor_kind, bio, website_url, instagram_handle, facebook_url, tiktok_handle, youtube_url, physical_address, logo_url, motivation_text, submitted_at, profiles:contributor_applications_user_id_fkey(email, full_name)";
