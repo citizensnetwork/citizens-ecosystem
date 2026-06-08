@@ -9,7 +9,7 @@
   // ── Preview panel (on pin click) ──
   function PreviewPanel({ id, type, onClose }) {
     const app = window.useApp();
-    const { events, places, impactIdeas, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, contributors, toast } = app;
+    const { events, places, impactIdeas, connected, considering, followedPlaces, toggleConnect, toggleConsider, togglePlaceFollow, go, startConversationWith, contributors, toast } = app;
     let item, cat, isEvent = type === 'event', isIdea = type === 'idea';
     if (isEvent) item = events.find((e) => e.id === id);
     else if (type === 'place') item = places.find((p) => p.id === id);
@@ -36,7 +36,7 @@
             React.createElement(Button, { variant: 'outline', icon: 'X', onClick: onClose }, 'Dismiss'))));
     }
 
-    const isConnected = connected.has(id), isConsidered = considering.has(id);
+    const isConnected = connected.has(id), isConsidered = considering.has(id), isFollowingPlace = followedPlaces.has(id);
     // ── category-adaptive palette ──
     const hex = cat ? cat.hex : '#C9A84C';
     const mix = (a, p, b) => `color-mix(in srgb, ${a} ${p}%, ${b})`;
@@ -106,8 +106,8 @@
                 React.createElement(Icon, { name: isConnected ? 'Check' : 'CalendarCheck', size: 15, strokeWidth: 2.6 }), isConnected ? 'Connected' : 'Connect'),
               React.createElement('button', { onClick: () => toggleConsider(id), className: 'flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-colors', style: isConsidered ? { background: soft, color: softInk } : { border: `1px solid ${mix(hex, 30, 'transparent')}`, color: hexInk } },
                 React.createElement(Icon, { name: 'Bookmark', size: 15, strokeWidth: 2.4, fill: isConsidered ? 'currentColor' : 'none' }), 'Consider'))
-          : React.createElement('button', { onClick: () => toast('Now following ' + item.name, 'gold'), className: 'w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold text-white transition-transform active:scale-[0.98]', style: { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` } },
-              React.createElement(Icon, { name: 'Heart', size: 15, strokeWidth: 2.4 }), 'Follow'),
+          : React.createElement('button', { onClick: () => togglePlaceFollow(id, item.name), className: 'w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-transform active:scale-[0.98]' + (isFollowingPlace ? '' : ' text-white'), style: isFollowingPlace ? { background: soft, color: softInk } : { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` } },
+              React.createElement(Icon, { name: 'Heart', size: 15, strokeWidth: 2.4, fill: isFollowingPlace ? 'currentColor' : 'none' }), isFollowingPlace ? 'Following' : 'Follow'),
 
         // view profile + circle actions
         React.createElement('div', { className: 'flex items-center gap-2' },
@@ -152,7 +152,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, user, role } = app;
+    const { events, places, user, role, dismissBubble } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -175,7 +175,7 @@
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
-        React.createElement(window.StylizedMap, { markers, routes, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); } })),
+        React.createElement(window.StylizedMap, { markers, routes, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); }, onDismissBubble: dismissBubble })),
 
       // broadcast bubbles + selected label — sibling overlay (paints over the map's heavy subtree)
       React.createElement(window.MapFloatersLayer, { markers, filterCategory: filter, selectedId: selected }),

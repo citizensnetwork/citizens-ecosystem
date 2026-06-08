@@ -2,9 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isContributor } from "@/lib/profiles/capabilities";
 
-/** Routes that require authentication — redirect to /login if no session */
-const PROTECTED_ROUTES = ["/profile", "/events/new", "/messages", "/admin"];
-
 /** Routes that a contributor with `bio_setup_required = true` is allowed to
  *  hit before completing setup. Everything else redirects to /contributor/setup. */
 const BIO_SETUP_ALLOW = [
@@ -31,6 +28,18 @@ function redirectWithCookies(target: URL, supabaseResponse: NextResponse): NextR
 }
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // API routes authenticate themselves — the cross-origin static frontend
+  // presents `Authorization: Bearer <token>` (see src/lib/supabase/route.ts),
+  // and each route returns its own 401 JSON when unauthenticated. Middleware is
+  // cookie-based, so running it on `/api/*` would (a) waste a getUser() call on
+  // every public read and (b) risk redirecting an API request to a (now-deleted)
+  // page route. Skip it entirely and let the route handlers gate access.
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
@@ -57,15 +66,6 @@ export async function middleware(request: NextRequest) {
 
   // Refresh the session so it doesn't expire
   const { data: { user } } = await supabase.auth.getUser();
-
-  // Enforce authentication on protected routes
-  const pathname = request.nextUrl.pathname;
-  if (!user && PROTECTED_ROUTES.some((route) => pathname.startsWith(route))) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
 
   // Post-auth role / bio-setup enforcement (Batch E).
   if (

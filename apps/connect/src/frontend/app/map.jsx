@@ -106,6 +106,20 @@
       txt.style.cssText = 'font-size:9px;font-weight:600;color:#0A0908;overflow:hidden;text-overflow:ellipsis;';
       txt.textContent = m.broadcast.message;
       b.appendChild(dot); b.appendChild(txt);
+      // Dismiss × — only for real (dismissible) bubbles with a handler wired.
+      if (m.broadcast.bubbleId && opts.onDismissBubble) {
+        const x = document.createElement('button');
+        x.textContent = '×';
+        x.setAttribute('aria-label', 'Dismiss update');
+        x.style.cssText = 'flex:0 0 auto;margin-left:2px;width:15px;height:15px;line-height:13px;' +
+          'border:none;border-radius:50%;background:rgba(0,0,0,.06);color:#0A0908;font-size:13px;' +
+          'cursor:pointer;padding:0;';
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          opts.onDismissBubble(m.broadcast.bubbleId, m.id);
+        });
+        b.appendChild(x);
+      }
       inner.appendChild(b);
     }
 
@@ -123,7 +137,7 @@
   }
 
   // ── The map component ──────────────────────────────────────────────
-  function StylizedMap({ markers, filterCategory, selectedId, onSelect }) {
+  function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble }) {
     const { pinStyle } = window.useApp();
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -131,6 +145,8 @@
     const userMovedRef = useRef(false);     // stop auto-framing once the user takes control
     const onSelectRef = useRef(onSelect);
     onSelectRef.current = onSelect;
+    const onDismissBubbleRef = useRef(onDismissBubble);
+    onDismissBubbleRef.current = onDismissBubble;
 
     // init the map once
     useEffect(() => {
@@ -170,7 +186,7 @@
         const cat = window.DATA.getCategory(m.category);
         const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
         const selected = selectedId === m.id;
-        const el = buildPin(m, cat, { selected, dim, pinStyle });
+        const el = buildPin(m, cat, { selected, dim, pinStyle, onDismissBubble: onDismissBubbleRef.current });
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           onSelectRef.current && onSelectRef.current(m.id, m.type);

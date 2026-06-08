@@ -94,9 +94,10 @@
   // ── Place ──
   function PlaceProfilePage({ id }) {
     const app = window.useApp();
-    const { places, events, contributors, go, startConversationWith, toast } = app;
+    const { places, events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith, toast } = app;
     const pl = places.find((p) => p.id === id);
     if (!pl) return h(Empty, { icon: 'MapPinOff', title: 'Place not found' });
+    const isFollowingPlace = followedPlaces.has(id);
     const cat = window.DATA.getCategory(pl.category);
     const org = contributors.find((c) => c.id === pl.organizerId) || null;
     const orgName = (org && org.name) || pl.organizerName || '';
@@ -112,7 +113,7 @@
             h('h1', { className: 'text-white text-2xl font-display drop-shadow' }, pl.name))),
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
           h('div', { className: 'flex gap-2' },
-            h(Button, { variant: 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toast('Now following ' + pl.name, 'gold') }, 'Follow'),
+            h(Button, { variant: isFollowingPlace ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => togglePlaceFollow(id, pl.name) }, isFollowingPlace ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true) }, 'Message'),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') })),
           h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
@@ -133,11 +134,12 @@
   // ── Contributor ──
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
-    const { contributors, events, places, go, startConversationWith, toast, user } = app;
+    const { contributors, events, places, followedOrgs, toggleFollow, go, startConversationWith, toast, user } = app;
     // Honest not-found rather than silently showing the first (wrong) org —
     // misrepresenting identity would violate the vision's integrity.
     const c = contributors.find((x) => x.id === id);
     if (!c) return h(Empty, { icon: 'UserX', title: 'Contributor not found' });
+    const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getCategory(c.category);
     const cEvents = events.filter((e) => e.organizerId === c.id);
     const cPlaces = places.filter((p) => p.organizerId === c.id);
@@ -158,7 +160,7 @@
               cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.name),
               h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, c.followerCount.toLocaleString() + ' followers'))),
           h('div', { className: 'flex gap-2 mb-4' },
-            h(Button, { variant: 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toast('Now following ' + c.name, 'gold') }, 'Follow'),
+            h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true) }, 'Message'),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Profile link copied', 'gold') })),
           h('div', { className: 'space-y-4' },

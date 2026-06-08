@@ -64,22 +64,21 @@ describe("middleware", () => {
     expect(response).toBe(mockNextResponse);
   });
 
-  it("redirects unauthenticated users on protected routes", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
+  it("skips /api routes entirely — they authenticate themselves (Bearer or cookie)", async () => {
     const { middleware } = await import("@/middleware");
-    const { NextResponse } = await import("next/server");
-
-    await middleware(makeRequest("/profile") as never);
-    expect(NextResponse.redirect).toHaveBeenCalled();
+    const response = await middleware(makeRequest("/api/rsvp") as never);
+    // Early pass-through: no cookie session work is done for API routes.
+    expect(response).toBe(mockNextResponse);
+    expect(mockGetUser).not.toHaveBeenCalled();
   });
 
-  it("allows authenticated users on protected routes", async () => {
+  it("passes authenticated users through on normal page routes", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "test-user-id" } },
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const response = await middleware(makeRequest("/profile") as never);
+    const response = await middleware(makeRequest("/events") as never);
     expect(response).toBe(mockNextResponse);
   });
 

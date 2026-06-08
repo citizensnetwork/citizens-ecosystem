@@ -68,6 +68,19 @@
     };
   }
 
+  // Current access token (for cross-origin authenticated API calls — the API
+  // can't read our localStorage session cookie, so mutations send this as a
+  // `Authorization: Bearer` header). Null when signed out. autoRefreshToken
+  // keeps the session fresh, so getSession returns a live (non-expired) token.
+  async function getAccessToken() {
+    try {
+      var sres = await client.auth.getSession();
+      return sres.data && sres.data.session ? sres.data.session.access_token : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function signOut() {
     try { await client.auth.signOut(); } catch (e) {}
     try { localStorage.removeItem(PENDING); } catch (e) {}
@@ -85,6 +98,7 @@
   window.CC_AUTH = {
     signInWithGoogle: signInWithGoogle,
     loadSession: loadSession,
+    getAccessToken: getAccessToken,
     signOut: signOut,
     onAuthChange: onAuthChange,
     clearPendingIntent: clearPendingIntent,
