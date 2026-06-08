@@ -136,13 +136,44 @@
     return wrap;
   }
 
+  // ── Cluster badge (grid deconfliction at low zoom) ──────────────────
+  //  Dense areas (e.g. Gauteng at national zoom) overlap heavily, so below
+  //  CLUSTER_MAX_ZOOM we bucket nearby pins into one gold count badge. Live
+  //  events, active broadcasts and the selected pin are NEVER folded in — we
+  //  don't bury what's happening now (VISION: make the unseen seen).
+  const CLUSTER_CELL = 56;       // px grid for bucketing nearby pins
+  const CLUSTER_MAX_ZOOM = 12;   // at/above this zoom, every pin shows individually
+
+  function buildCluster(count, onClick) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'cursor:pointer;line-height:0;';
+    const inner = document.createElement('div');
+    inner.style.cssText = 'position:relative;line-height:0;';
+    wrap.appendChild(inner);
+    const d = count >= 100 ? 46 : count >= 25 ? 42 : 38;
+    const ring = document.createElement('span');
+    ring.style.cssText = 'position:absolute;left:50%;top:50%;width:' + (d + 10) + 'px;height:' + (d + 10) +
+      'px;margin:-' + ((d + 10) / 2) + 'px 0 0 -' + ((d + 10) / 2) + 'px;border-radius:50%;background:rgba(201,168,76,.18);';
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
+      'px;border-radius:50%;border:2.5px solid #fff;background:linear-gradient(135deg,#E4C765,#C9A84C 60%,#A8842F);' +
+      'color:#fff;font-weight:800;font-size:' + (count >= 1000 ? 12 : 13) + 'px;box-shadow:0 4px 12px rgba(0,0,0,.28);';
+    badge.textContent = count >= 1000 ? (Math.round(count / 100) / 10) + 'k' : String(count);
+    inner.appendChild(ring);
+    inner.appendChild(badge);
+    wrap.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return wrap;
+  }
+
   // ── The map component ──────────────────────────────────────────────
   function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble }) {
     const { pinStyle } = window.useApp();
     const containerRef = useRef(null);
     const mapRef = useRef(null);
-    const markerObjs = useRef(new Map());   // id → maplibre Marker
-    const userMovedRef = useRef(false);     // stop auto-framing once the user takes control
+    const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
+    const clusterObjs = useRef(new Map());   // cellKey → maplibre Marker (cluster badge)
+    const userMovedRef = useRef(false);      // stop auto-framing once the user takes control
+    const renderRef = useRef(() => {});      // latest render fn, so moveend can re-cluster
     const onSelectRef = useRef(onSelect);
     onSelectRef.current = onSelect;
     const onDismissBubbleRef = useRef(onDismissBubble);
@@ -169,54 +200,119 @@
       const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
       map.on('dragstart', onUserMove);
       map.on('zoomstart', onUserMove);
+      // Re-cluster after any pan/zoom settles — clustering is computed in screen
+      // space, so cell membership shifts as the viewport moves.
+      map.on('moveend', () => renderRef.current());
       mapRef.current = map;
       return () => { map.remove(); mapRef.current = null; };
     }, []);
 
-    // (re)render markers whenever inputs change
+    // (re)render pins + clusters whenever inputs change
     useEffect(() => {
       const map = mapRef.current;
       if (!map || !window.maplibregl) return;
 
-      const seen = new Set();
-      markers.forEach((m) => {
-        const coords = coordsFor(m);
-        if (!coords) return;
-        seen.add(m.id);
-        const cat = window.DATA.getCategory(m.category);
-        const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
-        const selected = selectedId === m.id;
-        const el = buildPin(m, cat, { selected, dim, pinStyle, onDismissBubble: onDismissBubbleRef.current });
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          onSelectRef.current && onSelectRef.current(m.id, m.type);
-        });
-        const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
+      const renderMarkers = () => {
+        const mp = mapRef.current;
+        if (!mp || !window.maplibregl) return;
+        const clustering = mp.getZoom() < CLUSTER_MAX_ZOOM;
 
-        const existing = markerObjs.current.get(m.id);
-        // Reuse the marker only while its anchor is unchanged; the anchor is
-        // fixed at construction, so a pinStyle switch (teardrop↔center) must
-        // rebuild the marker or it would render off its coordinate.
-        if (existing && existing._ccAnchor === anchor) {
-          existing.getElement().replaceWith(el);
-          existing._element = el;                 // keep ref in sync
-          existing.setLngLat(coords);
+        // Resolve coords once; skip anything that can't be placed.
+        const items = [];
+        markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
+
+        // Decide which items render as individual pins vs fold into clusters.
+        const pinItems = [];
+        const clusters = [];   // { key, items:[{m,coords}] }
+        if (clustering) {
+          const cells = new Map();
+          items.forEach((it) => {
+            const m = it.m;
+            // Never bury a live event, an active broadcast, or the selected pin.
+            const always = selectedId === m.id || m.isLive || (m.broadcast && m.broadcast.message);
+            if (always) { pinItems.push(it); return; }
+            const p = mp.project(it.coords);
+            const key = Math.floor(p.x / CLUSTER_CELL) + ':' + Math.floor(p.y / CLUSTER_CELL);
+            if (!cells.has(key)) cells.set(key, []);
+            cells.get(key).push(it);
+          });
+          cells.forEach((arr, key) => {
+            if (arr.length === 1) pinItems.push(arr[0]);
+            else clusters.push({ key, items: arr });
+          });
         } else {
-          if (existing) existing.remove();
-          const mk = new window.maplibregl.Marker({ element: el, anchor }).setLngLat(coords).addTo(map);
-          mk._ccAnchor = anchor;
-          markerObjs.current.set(m.id, mk);
+          items.forEach((it) => pinItems.push(it));
         }
-      });
 
-      // drop markers no longer present
-      markerObjs.current.forEach((mk, id) => {
-        if (!seen.has(id)) { mk.remove(); markerObjs.current.delete(id); }
-      });
+        // ── individual pins ──
+        const seenPins = new Set();
+        pinItems.forEach(({ m, coords }) => {
+          seenPins.add(m.id);
+          const cat = window.DATA.getCategory(m.category);
+          const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
+          const selected = selectedId === m.id;
+          const el = buildPin(m, cat, { selected, dim, pinStyle, onDismissBubble: onDismissBubbleRef.current });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onSelectRef.current && onSelectRef.current(m.id, m.type);
+          });
+          const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
+          const existing = markerObjs.current.get(m.id);
+          // Reuse the marker only while its anchor is unchanged; the anchor is
+          // fixed at construction, so a pinStyle switch (teardrop↔center) must
+          // rebuild the marker or it would render off its coordinate.
+          if (existing && existing._ccAnchor === anchor) {
+            existing.getElement().replaceWith(el);
+            existing._element = el;                 // keep ref in sync
+            existing.setLngLat(coords);
+          } else {
+            if (existing) existing.remove();
+            const mk = new window.maplibregl.Marker({ element: el, anchor }).setLngLat(coords).addTo(mp);
+            mk._ccAnchor = anchor;
+            markerObjs.current.set(m.id, mk);
+          }
+        });
+        markerObjs.current.forEach((mk, id) => {
+          if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
+        });
+
+        // ── cluster badges ──
+        const seenClusters = new Set();
+        clusters.forEach(({ key, items: members }) => {
+          seenClusters.add(key);
+          // Average the member coords for a stable badge anchor.
+          let sx = 0, sy = 0;
+          members.forEach((it) => { sx += it.coords[0]; sy += it.coords[1]; });
+          const center = [sx / members.length, sy / members.length];
+          const onClick = () => {
+            userMovedRef.current = true;
+            const b = new window.maplibregl.LngLatBounds(members[0].coords, members[0].coords);
+            members.forEach((it) => b.extend(it.coords));
+            mp.fitBounds(b, { padding: 80, maxZoom: CLUSTER_MAX_ZOOM + 2, duration: 400 });
+          };
+          const el = buildCluster(members.length, onClick);
+          const existing = clusterObjs.current.get(key);
+          if (existing) {
+            existing.getElement().replaceWith(el);
+            existing._element = el;
+            existing.setLngLat(center);
+          } else {
+            const mk = new window.maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(center).addTo(mp);
+            clusterObjs.current.set(key, mk);
+          }
+        });
+        clusterObjs.current.forEach((mk, key) => {
+          if (!seenClusters.has(key)) { mk.remove(); clusterObjs.current.delete(key); }
+        });
+      };
+
+      renderRef.current = renderMarkers;
+      renderMarkers();
 
       // Auto-frame all markers until the user takes manual control. This
       // re-fits when the live feed replaces the seed data, so we always open
       // on the real spread instead of latching onto whatever loaded first.
+      // (fitBounds fires moveend → renderRef re-clusters at the framed zoom.)
       if (!userMovedRef.current) {
         const coordsList = markers.map(coordsFor).filter(Boolean);
         if (coordsList.length) {

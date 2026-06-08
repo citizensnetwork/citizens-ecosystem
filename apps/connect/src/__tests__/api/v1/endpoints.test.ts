@@ -24,6 +24,7 @@ const eventsMod = await import("@/app/api/v1/events/route");
 const eventDetailMod = await import("@/app/api/v1/events/[id]/route");
 const categoriesMod = await import("@/app/api/v1/categories/route");
 const analyticsMod = await import("@/app/api/v1/analytics/community/route");
+const placesMod = await import("@/app/api/v1/places/route");
 
 describe("/api/v1/events", () => {
   beforeEach(() => {
@@ -112,6 +113,62 @@ describe("/api/v1/categories", () => {
     const j = await res.json();
     expect(Array.isArray(j.data)).toBe(true);
     expect(j.meta).toHaveProperty("count");
+  });
+});
+
+describe("/api/v1/places", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient._chain._result = { data: [], error: null, count: 0 };
+  });
+
+  it("returns 200 with envelope + meta", async () => {
+    const res = await placesMod.GET(
+      new Request("http://localhost/api/v1/places"),
+    );
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(j).toHaveProperty("data");
+    expect(j).toHaveProperty("meta");
+    expect(j.meta.limit).toBe(50);
+    expect(j.meta.offset).toBe(0);
+  });
+
+  it("clamps oversized limit to 100", async () => {
+    const res = await placesMod.GET(
+      new Request("http://localhost/api/v1/places?limit=10000"),
+    );
+    const j = await res.json();
+    expect(j.meta.limit).toBe(100);
+  });
+
+  it("ignores invalid created_by silently", async () => {
+    const res = await placesMod.GET(
+      new Request("http://localhost/api/v1/places?created_by=not-a-uuid"),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("flattens the embedded category onto the row", async () => {
+    mockClient._chain._result = {
+      data: [
+        {
+          id: "p1",
+          name: "Grace City",
+          categories: { slug: "worship", emoji: "🙏", color: "#abc" },
+        },
+      ],
+      error: null,
+      count: 1,
+    };
+    const res = await placesMod.GET(
+      new Request("http://localhost/api/v1/places"),
+    );
+    const j = await res.json();
+    expect(j.data[0].category).toBe("worship");
+    expect(j.data[0].category_emoji).toBe("🙏");
+    expect(j.data[0].category_color).toBe("#abc");
+    expect(j.data[0]).not.toHaveProperty("categories");
   });
 });
 

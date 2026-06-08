@@ -32,7 +32,7 @@
   //  the event window. Coordinates carry through as lat/lng for the real map.
   const FALLBACK_COVER = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=500&fit=crop';
   const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=200&h=200&fit=crop';
-  const fmtTime = (d) => d ? d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : '';
+  const fmtTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
   function adaptEvent(r) {
     const dt = r.date ? new Date(r.date) : null;
     const endDt = r.end_time ? new Date(r.end_time) : null;
@@ -87,6 +87,35 @@
       collaborators: [],
       members: [],
       verified: true,
+    };
+  }
+
+  // API place row (public /api/v1/places) → app place shape. Places carry real
+  // lat/lng (NOT NULL in the DB) so they anchor on the map directly. The public
+  // row is sparse, so follower counts / associated events get honest defaults
+  // (never fabricated). organizerId = created_by → resolves its real organiser
+  // identity against the merged contributors directory (same path as events).
+  function adaptPlace(r) {
+    return {
+      id: r.id,
+      name: r.name || 'Place',
+      category: r.category || r.custom_category || '',
+      description: r.description || '',
+      address: r.address || '',
+      organizerName: '', organizerId: r.created_by || null,
+      coverPhoto: r.image_url || FALLBACK_COVER,
+      gallery: [],
+      openHours: '',
+      website: r.website || '', phone: r.phone || '',
+      volunteeringEnabled: !!r.volunteer_openings,
+      followerCount: 0,
+      verified: !!r.verified,
+      // No event↔place FK exists (events carry free-text location + created_by,
+      // not a place_id), so we cannot honestly list "events at this place" yet.
+      associatedEventIds: [],
+      lat: typeof r.latitude === 'number' ? r.latitude : null,
+      lng: typeof r.longitude === 'number' ? r.longitude : null,
+      tags: [],
     };
   }
 
@@ -556,6 +585,21 @@
             const adapted = ((json && json.data) || []).map(adaptEvent);
             if (active && adapted.length) setEvents(adapted);
           } catch (e) { console.warn('[events] live fetch failed — keeping demo data', e); }
+        })();
+      }
+
+      // 1b) Real places — replace the demo (bbox-projected) places with real DB
+      //     places at real coordinates. Same fail-open contract as events: only
+      //     swap when real rows arrive, otherwise keep the demo data offline.
+      if (base) {
+        (async () => {
+          try {
+            const res = await fetch(base + '/api/v1/places?limit=100');
+            if (!res.ok) return;
+            const json = await res.json();
+            const adapted = ((json && json.data) || []).map(adaptPlace);
+            if (active && adapted.length) setPlaces(adapted);
+          } catch (e) { console.warn('[places] live fetch failed — keeping demo data', e); }
         })();
       }
 

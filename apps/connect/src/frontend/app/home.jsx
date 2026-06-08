@@ -66,7 +66,6 @@
           item.isLive && React.createElement('span', { className: 'flex items-center gap-1.5 bg-red-500 pl-2 pr-2.5 py-1 rounded-full shadow-lg' },
             React.createElement('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }),
             React.createElement('span', { className: 'text-[10px] font-bold text-white tracking-wide' }, 'LIVE')),
-          item.isMobile && React.createElement('span', { className: 'flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold text-white shadow-lg', style: { background: hex } }, React.createElement(Icon, { name: 'Route', size: 10 }), 'ROUTE'),
           React.createElement('button', { onClick: onClose, className: 'w-8 h-8 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center hover:bg-black/60 transition-colors' }, React.createElement(Icon, { name: 'X', size: 15 }))),
         // title
         React.createElement('p', { className: 'absolute bottom-3 left-4 right-4 text-white font-bold text-xl leading-tight drop-shadow-lg font-display' }, item.title || item.name)),
@@ -91,13 +90,25 @@
                 React.createElement(Icon, { name: 'Heart', size: 14, style: { color: hexInk }, className: 'shrink-0' }),
                 React.createElement('span', null, React.createElement('b', { className: 'text-foreground' }, (item.followerCount || 0).toLocaleString()), ' followers'))),
 
-        // organizer (tappable → profile)
-        React.createElement('button', { onClick: () => go('profile', { id: item.organizerId }), className: 'w-full flex items-center gap-2.5 py-2.5 border-t border-black/[0.06] text-left' },
-          React.createElement(Avatar, { src: org.profilePhoto, size: 30, rounded: 'full' }),
-          React.createElement('span', { className: 'flex-1 min-w-0 flex items-center gap-1.5' },
-            React.createElement('span', { className: 'text-[13px] font-bold text-foreground truncate' }, item.organizerName),
-            React.createElement(Icon, { name: 'BadgeCheck', size: 13, style: { color: hexInk }, className: 'shrink-0' })),
-          React.createElement(Icon, { name: 'ChevronRight', size: 17, className: 'text-muted-foreground shrink-0' })),
+        // organizer row — crash-safe for real data:
+        //  • real directory contributor → tappable row to its profile (+ verified tick)
+        //  • only a name (community-posted, no directory match) → name-only, not tappable
+        //  • no organiser at all → omit the row entirely (never an empty/broken nav)
+        (() => {
+          const orgResolved = !!(org && org.id);
+          const orgName = item.organizerName || (orgResolved ? org.name : '');
+          if (!orgResolved && !orgName) return null;
+          const inner = [
+            React.createElement(Avatar, { key: 'a', src: org.profilePhoto, size: 30, rounded: 'full' }),
+            React.createElement('span', { key: 'n', className: 'flex-1 min-w-0 flex items-center gap-1.5' },
+              React.createElement('span', { className: 'text-[13px] font-bold text-foreground truncate' }, orgName),
+              orgResolved && React.createElement(Icon, { name: 'BadgeCheck', size: 13, style: { color: hexInk }, className: 'shrink-0' })),
+            orgResolved && React.createElement(Icon, { key: 'c', name: 'ChevronRight', size: 17, className: 'text-muted-foreground shrink-0' }),
+          ];
+          return orgResolved
+            ? React.createElement('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-2.5 py-2.5 border-t border-black/[0.06] text-left' }, inner)
+            : React.createElement('div', { className: 'w-full flex items-center gap-2.5 py-2.5 border-t border-black/[0.06]' }, inner);
+        })(),
 
         // primary actions
         isEvent
@@ -166,16 +177,15 @@
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
     const markers = [
-      ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, isMobile: e.isMobile, route: e.route })),
+      ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
       ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
       ...(showIdeas ? window.DATA.impactIdeas.filter((i) => i.status === 'voting').map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
-    const routes = events.filter((e) => e.isMobile && e.route && matches(e));
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
-        React.createElement(window.StylizedMap, { markers, routes, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); }, onDismissBubble: dismissBubble })),
+        React.createElement(window.StylizedMap, { markers, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); }, onDismissBubble: dismissBubble })),
 
       // broadcast bubbles + selected label — sibling overlay (paints over the map's heavy subtree)
       React.createElement(window.MapFloatersLayer, { markers, filterCategory: filter, selectedId: selected }),
@@ -212,10 +222,7 @@
           React.createElement('p', { className: 'text-[8px] font-bold text-muted-foreground uppercase tracking-widest' }, 'Map Key'),
           React.createElement(LegendRow, { color: '#ef4444', label: 'Live', pulse: true }),
           React.createElement(LegendRow, { label: 'Place', square: true }),
-          React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }),
-          React.createElement('div', { className: 'flex items-center gap-1.5' },
-            React.createElement('span', { className: 'w-3 h-0.5 rounded-full', style: { background: '#1ABC9C' } }),
-            React.createElement('span', { className: 'text-[10px] text-foreground/70' }, 'Route')))),
+          React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }))),
 
       selected && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }),
       showCats && React.createElement(CategoryPanel, { selected: filter, onSelect: setFilter, onClose: () => setShowCats(false) }));

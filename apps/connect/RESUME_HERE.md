@@ -143,14 +143,12 @@ driven by the live public events API + active map-bubbles RPC. Verified end-to-e
 ### Phase 2b — next increment (refine the live map)
 1. ✅ **Organiser identity — SHIPPED (2026-06-08, see §2e).** Real contributors fetched + merged;
    organiser row resolves on the event profile; this also fixed a hard crash.
-2. **Real places + ideas** — fetch real places (and Impact Ideas once Phase 4/6 land) instead of the mock
-   ones still projected into the Pretoria bbox.
-3. **Marker density** — Gauteng events overlap heavily at national zoom; add clustering or deconfliction.
-4. **Polish** — time format (add AM/PM), drop the "Route" legend row (real events have no routes), default
-   framing decision (national reach vs Pretoria-first). Carry-over: organiser row on the map preview /
-   `EventPreviewCard` (data now available via the merged contributors).
-5. **Authenticated mutations** (Connect/Consider/Follow/dismiss-bubble) — see the cross-origin Bearer note
-   below; the read path needs none, but writes do.
+2. ✅ **Real places — SHIPPED (2026-06-09, see §2g).** New public `/api/v1/places` + `adaptPlace`;
+   mock bbox projection gone. (Impact Ideas on the map still deferred to Phase 4/6 voting backend.)
+3. ✅ **Marker clustering — SHIPPED (2026-06-09, see §2g).** Grid deconfliction below zoom 12.
+4. ✅ **Polish — SHIPPED (2026-06-09, see §2g).** AM/PM time, Route legend dropped, crash-safe
+   organiser row on the map preview card.
+5. ✅ **Authenticated mutations — SHIPPED (2026-06-08, see §2f).**
 
 ### Cross-origin auth (still relevant for mutations, NOT the read path)
 - Map READ path needs NO Bearer auth: `/api/v1/events` is public (gateV1 = rate-limit only); bubbles via
@@ -261,6 +259,72 @@ auth-client.js or any app/*.jsx** so the preview/deployed clients load fresh cod
   (fresh browser / hard refresh): sign in → Connect/Consider an event → reload (state persists) →
   Follow a real contributor → dismiss a live bubble. Network tab: each mutation = 2xx carrying
   `Authorization: Bearer …`; preflight OPTIONS = 204.
+
+---
+
+## 2g. Phase 2b COMPLETE — real places + marker clustering + polish ✅ (2026-06-09)
+
+The whole map phase (Phase 2) is now done: the last mock map layer is gone, dense areas cluster,
+and the polish items are shipped. **Commit on branch `phase2b-map-anchor-organiser-identity`
+(pushed to origin as a feature branch; NOT merged to main — main merge needs founder action).**
+Working log: `.claude/sessions/phase2b-real-places.md`. Backend gated; `src/frontend/` excluded
+from tsc/eslint/vitest as always.
+
+### Real places (increment #1) — drop the mock bbox projection
+- **NEW [src/app/api/v1/places/route.ts](src/app/api/v1/places/route.ts)** — public, read-only places
+  directory (mirrors events/contributors): gateV1 rate-limit, anon/RLS client, `{data, meta}` envelope,
+  60s s-maxage cache. Embeds `categories(slug,emoji,color)` and **flattens** it onto each row
+  (`category` slug + `category_emoji`/`category_color`). Params: `created_by` (UUID-validated),
+  `q` (allowlist-escaped ilike on name/description), `limit` (1..100/50), `offset`.
+- **⚠️ LIVE SCHEMA DRIFT caught & handled:** `places.verification_flagged` is in `schema.sql` but
+  **does NOT exist on the live DB** — filtering on it would have 500'd production. Removed it; live
+  places are public via the existing RLS SELECT policy. The live table also HAS `volunteer_openings`
+  (now mapped → `volunteeringEnabled`) and `prominence_base` (unused). **`schema.sql` is ahead of
+  live for `places` — trust the live DB, not schema.sql, here.**
+- **[store.jsx](src/frontend/app/store.jsx)** — `adaptPlace(r)` (real lat/lng, category slug, honest
+  0 followerCount, organizerId=created_by → resolves via merged contributors, empty associatedEventIds
+  since there's NO event↔place FK yet). Places fetch block in the live-data effect (replace mock only
+  when real rows arrive; fail open). `togglePlaceFollow` was already `isRealId`-guarded → **place-follow
+  now writes through for real place UUIDs** (the increment it was waiting on).
+- **Verified live** (`next dev` + `curl /api/v1/places`): 40 real places at real national coords
+  (JHB/PTA/Gqeberha), category embed flattens, no-category rows fall back to `custom_category`.
+
+### Marker clustering (increment #2) — [map.jsx](src/frontend/app/map.jsx)
+- Grid deconfliction below zoom 12 (`CLUSTER_CELL=56px`, `CLUSTER_MAX_ZOOM=12`). Gold count badge
+  (`buildCluster`); clicking a cluster `fitBounds` to its members (zoom in/split). Re-clusters on
+  `moveend` via a `renderRef`. **Never clusters live events, active broadcasts, or the selected pin**
+  (VISION: don't bury what's happening now). Preserves the §2e anchor-fix invariant (cluster wrap sets
+  no `position`; anchor `center`). Individual pins reused/removed by seen-set exactly as before.
+
+### Polish (increment #3)
+- **AM/PM time** (store.jsx `fmtTime` → `en-US` `hour12`). **Dropped the "Route" legend row** + ALL
+  dead route code (`routes` const + prop, `isMobile`/`route` marker fields, the ROUTE cover badge) —
+  real events have no routes. Default framing = frame-to-data (honest national spread) kept.
+- **Preview-panel organiser row made crash-safe** (home.jsx `PreviewPanel`): real directory contributor
+  → tappable to its profile (+ verified tick); only-a-name (community-posted, no directory match) →
+  non-tappable name row; no organiser → row omitted. Mirrors the §2e profile-page fix — real events/
+  places no longer risk an empty/broken nav. (This is the carried-over "organiser row on the preview".)
+
+### Gates / verification
+- **tsc 0 · next lint 0 · vitest 628/628** (71 files; +4 new `/api/v1/places` route tests incl. the
+  category-flatten path). Live `curl` verified the route end-to-end against the real DB.
+- **Security advisors: 0 ERROR** (111 WARN / 2 INFO — unchanged baseline; no `places` findings). No DB
+  changes / no migration → **next migration # still 131**. Vibe-security: read-only, rate-limited,
+  anon/RLS-scoped, `q` allowlisted, `created_by` UUID-validated, no secrets, no new writes.
+- index.html cache-bust bumped `?v=20260608b` → **`?v=20260609a`** (20 refs).
+
+### Deferred / next (post-Phase-2)
+- **Impact Ideas on the map** = the remaining "real" layer; deferred until Phase 4/6 voting backend
+  lands (ideas are still mock `window.DATA.impactIdeas`). Real places = DONE; ideas were always the
+  Phase-4/6 half of old increment #2.
+- **Event↔place association**: no FK exists (events carry free-text `location` + `created_by`, not a
+  `place_id`), so place profiles can't yet list "events here" and `associatedEventIds` is honestly
+  empty. Needs a product+schema decision if wanted.
+- **`schema.sql` drift**: reconcile `schema.sql`'s `places` block with live (it has a phantom
+  `verification_flagged`; lacks `volunteer_openings`/`prominence_base`). Housekeeping, non-blocking.
+- **Manual (founder, can't be scripted — live Google OAuth):** hard-refresh localhost → real places at
+  real coords; zoom out → gold clusters over Gauteng, click one to zoom/split; live & selected pins
+  never hide; sign in → Follow a real place → reload (persists). Then **merge the branch to main**.
 
 ---
 
