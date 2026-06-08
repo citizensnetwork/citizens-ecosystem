@@ -84,17 +84,49 @@ F4 covenant **removed for now**; F3 not blocking dev (localhost fallback).
 - **Verified** (python http.server :3001 + preview): boots, **0 console errors**, auth screen renders,
   CC_AUTH initialises. NOT yet testable: the real Google round-trip (needs the steps below).
 
-### Phase 1 REMAINING (blocks "done"):
-1. **Supabase dashboard (founder):** enable the **Google** provider; add redirect URLs under
-   Auth → URL Configuration — dev `http://localhost:3001/`, prod = F3 origin. Set
-   `ALLOWED_FRONTEND_ORIGIN` in Vercel when F3 is known.
-2. **Verify** the Google sign-in round-trip end-to-end (login → session → role).
-3. **Then DELETE the old Next.js frontend** (spec Part 6): `src/app/(pages)`, `layout.tsx`,
-   `globals.css`, `src/components/`, `src/hooks/` — first confirm no `src/app/api` route imports them.
-   KEEP `src/app/api`, `middleware.ts`, `src/lib`, `src/types`, `supabase/`. (Deferred until #2 passes.)
-4. Strip `SHOW_DEMO` (auth.jsx) + `signInDemo` (store.jsx) before launch.
+### Phase 1 status: Google OAuth **VERIFIED WORKING** ✅ (founder, localhost 2026-06-07)
+Supabase fix that unblocked it: Site URL + Redirect URLs must be full `https://` (scheme-less value
+made Supabase treat the redirect as a path → `{"error":"requested path is invalid"}`). Allow-list now
+has `http://localhost:3001/**` + `https://www.citizenscentral.co.za/**`.
 
-### NEXT → Phase 2: MapLibre GL + MapTiler map + home screen wired to `/api/map/bubbles` + `/api/v1/events`.
+**Resolved decisions:** F3 frontend origin = `https://www.citizenscentral.co.za`. F4 covenant = removed.
+Topology = frontend on www, API on `https://citizens-connect.vercel.app` (baked into config.example.js).
+
+---
+
+## ▶ START HERE IN THE NEW CHAT — finish Phase 1: strip the old Next.js frontend (make it API-only)
+
+This is the one big remaining step. Pre-verified safe; do it as one focused batch + a FULL `next build`.
+
+**1. Pre-delete fix (only keeper→frontend import):** move the `PendingApplication` type out of
+`src/components/admin/ContributorReviewCard` into `src/types`, and update
+`src/lib/contributors/pendingApplications.ts:15` to import from there.
+
+**2. DELETE (the old frontend):**
+- `src/app/` page route dirs: `account, admin, c, community, contributor, dashboard, e, events, login,
+  messages, notifications, places, profile, settings, signup, terms`
+- `src/app/page.tsx, layout.tsx, default.tsx, error.tsx, loading.tsx, globals.css`
+- `src/components/` (all) · `src/hooks/` (all)
+
+**3. KEEP (the backend):** `src/app/api/` (all) · `src/app/auth/callback/route.ts` (route handler, not a
+page) · `src/app/favicon.ico` · `src/middleware.ts` · `src/lib/` · `src/types/` · `supabase/`.
+
+**4. Verified safe already:** no `src/app/api` / `middleware.ts` / `src/types` import from
+`@/components|@/hooks`; `src/lib` only the 1 type import in step 1.
+
+**5. Salvage BEFORE deleting `src/hooks/`** (reference for later, don't lose the logic):
+`useLocationTracking.ts` (map geolocation → Phase 2) and `usePushNotifications.ts` (Capacitor → Phase 5).
+Copy them into `docs/` or `src/frontend/` reference as needed.
+
+**6. Verify:** `npx tsc --noEmit` + `npx next lint --dir src` + **`npx next build`** (the real proof an
+App-Router project builds with only route handlers, no pages/layout). Fix any dangling refs.
+
+**7. Also before launch (not blocking):** strip `SHOW_DEMO` (auth.jsx) + `signInDemo` (store.jsx).
+
+### THEN → Phase 2: MapLibre GL + MapTiler map + home wired to `/api/map/bubbles` + `/api/v1/events`.
+Note: frontend is cross-origin to the API + uses Supabase localStorage session (not SSR cookies), so
+data calls must send the Supabase access token as `Authorization: Bearer` (middleware is cookie-based —
+revisit how the API authenticates the static frontend).
 
 ---
 
