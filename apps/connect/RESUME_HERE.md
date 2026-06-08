@@ -199,10 +199,68 @@ Frontend-only changes (`src/frontend/` is excluded from tsc/eslint/vitest, so th
   through to the **correct** contributor profile; no-organiser event → row omitted, no crash; mock place
   unchanged. Test DB: 100 events / 10 approved contributors (13 events match a contributor).
 
-### Phase 2b remaining (NOT done this session — next increments)
+### Phase 2b remaining (after §2f below — next increments)
 Real places + Impact Ideas (drop mock bbox projection) · marker clustering at national zoom · polish
 (AM/PM time, drop Route legend, default framing) + the map-preview/`EventPreviewCard` organiser row
-(data now available) · authenticated mutations (cross-origin Bearer — see §2d note).
+(data now available). **Authenticated mutations: SHIPPED — see §2f.**
+
+---
+
+## 2f. Phase 2b (part 2) SHIPPED — authenticated cross-origin mutations (Bearer) + real-state seeding ✅ (2026-06-08)
+
+All five authenticated mutations now work end-to-end from the cross-origin static frontend:
+**Connect/RSVP, Consider, Follow (org), Follow (place), Dismiss bubble.** The static app keeps its
+Supabase session in localStorage (no cookie), so the cookie-based API routes returned 401; they now
+accept a Bearer token. **Commit `4c75143` — LOCAL on branch `phase2b-map-anchor-organiser-identity`
+(NOT pushed; main push needs founder auth).** Working log: `.claude/sessions/phase2b-authenticated-mutations.md`.
+
+### Backend
+- **NEW [src/lib/supabase/route.ts](src/lib/supabase/route.ts)** — `getRouteAuth(request)`: reads
+  `Authorization: Bearer <jwt>` → user-scoped client (token on every PostgREST/RPC call so RLS runs
+  as that user), validated via `getUser(jwt)` (server-side check, not a local decode); **falls back
+  to the cookie path** (`createClient()`) when no Bearer. Single place that knows how a request proves
+  identity — so routes stay uniform.
+- **5 routes refactored** to `const { supabase, user } = await getRouteAuth(request)`: rsvp (POST+DELETE),
+  consider (POST+PUT), follow (POST+DELETE), place-follow (POST+DELETE), map/bubbles/[id]/dismiss (POST).
+  No other logic changed.
+- **[middleware.ts](src/middleware.ts)** — early-returns for `/api/*` (routes self-authenticate; stops a
+  wasted cookie `getUser()` on every public read + the dead redirect-to-deleted-page risk). Removed the
+  `PROTECTED_ROUTES` block (those pages were deleted in Phase 1). force_reauth/bio-setup gates kept.
+
+### Frontend
+- **auth-client.js** — `getAccessToken()` on `window.CC_AUTH`.
+- **store.jsx** — `authedFetch` (API base + Bearer + JSON); `followedOrgs`/`followedPlaces` Sets; a
+  **seeding effect** (keyed on realUser) reads the user's own rsvps(split by status)/follows/place_follows
+  via the authed client (RLS) and replaces the mock seeds so buttons reflect reality. `toggleConnect`/
+  `toggleConsider` are now **mutually-exclusive optimistic write-throughs with rollback** (Connect &
+  Consider are one rsvps row; transitions clear the other side first — clearing 'considering' via the
+  consider endpoint, NOT rsvp DELETE, so no false `rsvp_cancellations` log). New `toggleFollow` /
+  `togglePlaceFollow` / `dismissBubble`. **Guard: only real UUID ids write through** — mock entities stay
+  local (places are still mock; real places = the deferred increment). Bubble `id` now carried on `broadcast`.
+- **home.jsx / profiles.jsx** — wired the previously toast-only Follow buttons (home preview place +
+  place & contributor profiles) and a new **dismiss × on the map bubble** (map.jsx threads `onDismissBubble`).
+
+### Backend facts (for the next session)
+- Connect=`rsvps.status='attending'`, Consider=`='considering'` — ONE row. `safe_rsvp` 409s if any row
+  exists (no upgrade); `toggle_consider` adds/removes considering, noops on attending. `get_active_map_bubbles`
+  returns `id,event_id,body,created_at`. `/api/v1/contributors` returns `id`=profiles.id (Follow-org FK ok).
+- **No public `/api/v1/places`** yet — the deferred "real places" increment must add it first.
+
+### index.html cache-busting (founder's flagged gotcha — DONE)
+Local scripts now carry `?v=20260608b`. The static host sends no cache headers, so browsers served
+stale copies after edits (this bit verification this session). **Bump the `?v=` token whenever you edit
+auth-client.js or any app/*.jsx** so the preview/deployed clients load fresh code.
+
+### Gates / verification
+- **tsc 0 · next lint 0 · vitest FULL suite exit 0** (middleware.test.ts updated: an `/api`-skip test
+  replaces the old deleted-page redirect test) · **0 console errors on a fresh preview load** ·
+  served auth-client.js confirmed current · `getAccessToken` live after cache-bust. No DB changes →
+  Supabase advisors unchanged. Vibe-security: token validated server-side, RLS-scoped, no service-role
+  in client, Bearer only sent to the CORS-restricted API, all ids UUID-validated + rate-limited.
+- **NOT auto-verifiable (founder manual step):** the live Google OAuth round-trip. On localhost
+  (fresh browser / hard refresh): sign in → Connect/Consider an event → reload (state persists) →
+  Follow a real contributor → dismiss a live bubble. Network tab: each mutation = 2xx carrying
+  `Authorization: Bearer …`; preflight OPTIONS = 204.
 
 ---
 
