@@ -20,6 +20,12 @@ window.__CC_ENV = {
   // the app is served from (recommended).
   //   Production frontend origin: https://www.citizenscentral.co.za
   FRONTEND_ORIGIN: "",
+
+  // MapTiler Cloud — powers the real map basemap (MapLibre GL). The key is a
+  // PUBLIC client key; restrict it by allowed origin in the MapTiler dashboard
+  // for production. MAPTILER_STYLE is the custom style ID (Citizens basemap).
+  MAPTILER_KEY: "REPLACE_WITH_YOUR_MAPTILER_KEY",
+  MAPTILER_STYLE: "REPLACE_WITH_YOUR_MAPTILER_STYLE_ID",
 };
 
 // ── Decided production topology (2026-06-07) ─────────────────────────

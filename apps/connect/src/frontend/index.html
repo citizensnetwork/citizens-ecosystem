@@ -11,6 +11,10 @@
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- MapLibre GL JS — real geographic basemap (MapTiler tiles). CSS + UMD global. -->
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
   tailwind.config = {
     theme: {
@@ -80,6 +84,11 @@
     background: inherit; opacity:.35; animation: pinPulse 2s ease-out infinite; z-index:-1;
   }
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
+  /* real-map marker pulse ring (MapLibre DOM markers) */
+  .cc-pin-pulse { animation: pinPulse 2s ease-out infinite; pointer-events:none; }
+  /* MapLibre overrides — keep our glass overlays above the canvas, mute default chrome */
+  .maplibregl-ctrl-bottom-right { margin-bottom: 88px; }
+  .maplibregl-ctrl-attrib { font-size: 9px; }
   .bubble-bob { animation: bubbleBob .9s ease-in-out infinite alternate; }
   @keyframes bubbleBob { from{transform:translateY(0)} to{transform:translateY(-4px)} }
   .fade-in { animation: fadeIn .3s ease-out; }

@@ -166,9 +166,9 @@
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
     const markers = [
-      ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, isMobile: e.isMobile, route: e.route })),
-      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
-      ...(showIdeas ? window.DATA.impactIdeas.filter((i) => i.status === 'voting').map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, mapX: i.mapX, mapY: i.mapY })) : []),
+      ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, isMobile: e.isMobile, route: e.route })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
+      ...(showIdeas ? window.DATA.impactIdeas.filter((i) => i.status === 'voting').map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     const routes = events.filter((e) => e.isMobile && e.route && matches(e));
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });

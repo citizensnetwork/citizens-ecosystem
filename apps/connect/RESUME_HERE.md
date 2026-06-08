@@ -94,39 +94,103 @@ Topology = frontend on www, API on `https://citizens-connect.vercel.app` (baked 
 
 ---
 
-## ▶ START HERE IN THE NEW CHAT — finish Phase 1: strip the old Next.js frontend (make it API-only)
+## 2c. Phase 1 COMPLETE — old Next.js frontend stripped; app is now API-only ✅ (2026-06-08)
 
-This is the one big remaining step. Pre-verified safe; do it as one focused batch + a FULL `next build`.
+Commit **`470166d`** (LOCAL — **push to origin was BLOCKED by the auto-mode classifier**:
+direct push to `main` needs explicit founder authorization. The commit is safe locally;
+push it or authorize the push next.). Working log: `.claude/sessions/phase1-strip-old-frontend.md`.
 
-**1. Pre-delete fix (only keeper→frontend import):** move the `PendingApplication` type out of
-`src/components/admin/ContributorReviewCard` into `src/types`, and update
-`src/lib/contributors/pendingApplications.ts:15` to import from there.
+### What shipped
+- **Moved** `PendingApplication` view-model type → [src/types/contributors.ts](src/types/contributors.ts);
+  repointed the one keeper import ([pendingApplications.ts:15](src/lib/contributors/pendingApplications.ts)).
+- **Salvaged** `useLocationTracking` (Phase 2 map geo) + `usePushNotifications` (Phase 5 Capacitor)
+  → `docs/salvage/*.ts.ref` (named `.ts.ref` so they stay out of tsc/build).
+- **Deleted** the old frontend: 16 App-Router page dirs, root `page/layout/default/error/loading/globals.css`,
+  all of `src/components/`, all of `src/hooks/`, and the 25 now-dead `src/__tests__/components/` tests.
+- **`src/app/` now = `api/` + `auth/` + `favicon.ico` only.** Backend (lib, types, middleware, supabase) untouched.
+- **Gates:** `tsc 0` · `next lint 0` · **`next build` EXIT 0** (proved the App-Router project builds with only
+  route handlers, no pages/layout — had to clear stale `.next/types`) · `vitest 624/624` (71 files; the dropped
+  ~193 were the deleted component tests). Vibe-security: attack surface reduced, `config.js` gitignored, no new secrets.
 
-**2. DELETE (the old frontend):**
-- `src/app/` page route dirs: `account, admin, c, community, contributor, dashboard, e, events, login,
-  messages, notifications, places, profile, settings, signup, terms`
-- `src/app/page.tsx, layout.tsx, default.tsx, error.tsx, loading.tsx, globals.css`
-- `src/components/` (all) · `src/hooks/` (all)
+### Deferred (non-blocking, "before launch"): strip `SHOW_DEMO` (auth.jsx) + `signInDemo` (store.jsx).
+Kept for now — the demo fallback lets the HTML app boot during Phase 2 dev without full Supabase config.
 
-**3. KEEP (the backend):** `src/app/api/` (all) · `src/app/auth/callback/route.ts` (route handler, not a
-page) · `src/app/favicon.ico` · `src/middleware.ts` · `src/lib/` · `src/types/` · `supabase/`.
+---
 
-**4. Verified safe already:** no `src/app/api` / `middleware.ts` / `src/types` import from
-`@/components|@/hooks`; `src/lib` only the 1 type import in step 1.
+## 2d. Phase 2a SHIPPED — real MapLibre + MapTiler map, wired to live `/api/v1/events` ✅ (2026-06-08)
 
-**5. Salvage BEFORE deleting `src/hooks/`** (reference for later, don't lose the logic):
-`useLocationTracking.ts` (map geolocation → Phase 2) and `usePushNotifications.ts` (Capacitor → Phase 5).
-Copy them into `docs/` or `src/frontend/` reference as needed.
+The decorative SVG prototype map is replaced with a **real geographic MapLibre GL + MapTiler map**,
+driven by the live public events API + active map-bubbles RPC. Verified end-to-end in preview.
 
-**6. Verify:** `npx tsc --noEmit` + `npx next lint --dir src` + **`npx next build`** (the real proof an
-App-Router project builds with only route handlers, no pages/layout). Fix any dangling refs.
+- **[index.html](src/frontend/index.html)** — maplibre-gl CDN (CSS + UMD JS) + `.cc-pin-pulse` keyframe.
+- **[app/map.jsx](src/frontend/app/map.jsx)** — full rewrite. Keeps the `window.StylizedMap` interface
+  (markers/routes/filterCategory/selectedId/onSelect) so the home screen barely changed. Native maplibre
+  markers built as DOM pins mirroring the teardrop/dot/glass styles + live pulse + broadcast bubble +
+  selected label. Geo bridge: real lat/lng when present, else legacy mapX/mapY projected into a greater-
+  Pretoria bbox (mock places/ideas during the mock→real migration). Auto-frames all markers until the
+  user pans/zooms. NavigationControl + GeolocateControl. `MapFloatersLayer` → no-op (bubbles ride markers).
+- **[app/store.jsx](src/frontend/app/store.jsx)** — `adaptEvent` (API row → app event shape: latitude→lat,
+  longitude→lng, image_url→coverPhoto, date→time, isLive computed; honest 0 counts / blank organiser).
+  One effect: fetch `${API_BASE}/api/v1/events?limit=100` and `setEvents` immediately; separately attach
+  active bubbles via the anon `get_active_map_bubbles` RPC. Fails open → keeps demo data offline.
+- **[app/home.jsx](src/frontend/app/home.jsx)** — passes `lat`/`lng` on the marker objects.
+- **config.example.js** — `MAPTILER_KEY` + `MAPTILER_STYLE` placeholders. Real values live ONLY in the
+  gitignored `config.js` (key never committed). `.claude/launch.json` has a local `frontend`+`api` config.
+- **Verified** (preview, frontend :3001 + `next dev` :3000): real basemap, 103 markers at real coords
+  (national spread, Gauteng-dense = real test data), category colours correct, marker click → real-data
+  preview panel, **0 console errors**.
 
-**7. Also before launch (not blocking):** strip `SHOW_DEMO` (auth.jsx) + `signInDemo` (store.jsx).
+### Phase 2b — next increment (refine the live map)
+1. **Organiser identity** — real events show a blank organiser (created_by is a UUID; mock contributors
+   don't match). Resolve names/avatars (batch `/api/v1/contributors` or a profiles lookup) → fill the
+   preview-panel organiser row + the carried-over "organiser row on EventPreviewCard".
+2. **Real places + ideas** — fetch real places (and Impact Ideas once Phase 4/6 land) instead of the mock
+   ones still projected into the Pretoria bbox.
+3. **Marker density** — Gauteng events overlap heavily at national zoom; add clustering or deconfliction.
+4. **Polish** — time format (add AM/PM), drop the "Route" legend row (real events have no routes), default
+   framing decision (national reach vs Pretoria-first).
+5. **Authenticated mutations** (Connect/Consider/Follow/dismiss-bubble) — see the cross-origin Bearer note
+   below; the read path needs none, but writes do.
 
-### THEN → Phase 2: MapLibre GL + MapTiler map + home wired to `/api/map/bubbles` + `/api/v1/events`.
-Note: frontend is cross-origin to the API + uses Supabase localStorage session (not SSR cookies), so
-data calls must send the Supabase access token as `Authorization: Bearer` (middleware is cookie-based —
-revisit how the API authenticates the static frontend).
+### Cross-origin auth (still relevant for mutations, NOT the read path)
+- Map READ path needs NO Bearer auth: `/api/v1/events` is public (gateV1 = rate-limit only); bubbles via
+  anon RPC; CORS for `/api/(.*)` set in next.config.ts.
+- Authenticated MUTATIONS need `Authorization: Bearer <supabase access token>`: `createClient()` +
+  `middleware.ts` are cookie-based and see no cookie from the localStorage-session static frontend. Also
+  prune middleware's PROTECTED_ROUTES / bio-setup redirects (they point at deleted page routes; harmless
+  for `/api/*` but should become API-appropriate 401 JSON when auth is wired).
+
+---
+
+## (archived) Phase 2 kickoff plan — superseded by 2d above
+
+**Recon done this session — the path is clearer than the old note implied:**
+
+- **Map READ path needs NO Bearer auth.** `/api/v1/events` is **public read-only** (gated by `gateV1` =
+  rate-limit only; API key optional). Map bubbles are read via the anon-allowed Supabase RPC
+  `get_active_map_bubbles` directly from the client. CORS for `/api/(.*)` is already set (next.config.ts, Phase 0).
+- **The cross-origin `Authorization: Bearer <access_token>` question only bites for authenticated MUTATIONS**
+  (dismiss bubble, RSVP, follow…) — `createClient()` + `middleware.ts` are cookie-based and see no cookie from the
+  localStorage-session static frontend. Solve that when wiring interactions (Phase 2b/3), NOT for the read path.
+  (Also note: middleware still redirects PROTECTED_ROUTES / bio-setup to deleted page routes — harmless for `/api/*`
+  but should be pruned to API-appropriate 401 JSON when we touch auth.)
+
+**Current frontend map is a DECORATIVE SVG PROTOTYPE** ([src/frontend/app/map.jsx](src/frontend/app/map.jsx), 158
+lines): markers placed by mock `mapX`/`mapY` % from `window.DATA`; pin/bubble styles already themeable. Phase 2 =
+swap it for a real geographic MapLibre GL + MapTiler map driven by real `latitude`/`longitude`.
+
+**Build steps (proposed):**
+1. **Add `MAPTILER_KEY` to `config.example.js`** (+ founder adds the value to gitignored `config.js`). ⛔ BLOCKER:
+   need the MapTiler key — it was in the deleted Next.js `.env`/Vercel (`NEXT_PUBLIC_MAPTILER_KEY`).
+2. Load MapLibre GL JS via CDN in `index.html` (no-build, like supabase-js).
+3. New real-map module: init MapLibre centred on Pretoria, MapTiler style; render native markers from data.
+4. **Data layer:** fetch `GET {API_BASE_URL}/api/v1/events` → map rows → markers; bubbles via `get_active_map_bubbles`
+   RPC. Reuse the existing category colours / pin+bubble style tweaks.
+5. Keep the prominence/tiering idea (logic was in the deleted `src/lib/map/prominence.ts` — recover from git if wanted).
+6. **Verify** with preview (real map renders, markers at real coords, 0 console errors); screenshot for the founder.
+
+**Then → Phase 3** (screens), **Phase 4** (advanced incl. idea→event auto-transition deferred from migration 130),
+**Phase 5** (Capacitor).
 
 ---
 

@@ -8,6 +8,35 @@
   const today = () => new Date().toISOString().slice(0, 10);
   const uid = (p) => p + Math.random().toString(36).slice(2, 7);
 
+  // ── Live data adapter: /api/v1/events row → app event shape ──────────
+  //  The public API is sparse (no organiser name / connect counts yet), so we
+  //  fill honest defaults (0 counts, blank organiser) and compute `isLive` from
+  //  the event window. Coordinates carry through as lat/lng for the real map.
+  const FALLBACK_COVER = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=500&fit=crop';
+  const fmtTime = (d) => d ? d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : '';
+  function adaptEvent(r) {
+    const dt = r.date ? new Date(r.date) : null;
+    const endDt = r.end_time ? new Date(r.end_time) : null;
+    const now = new Date();
+    const validDt = dt && !isNaN(dt.getTime()) ? dt : null;
+    const validEnd = endDt && !isNaN(endDt.getTime()) ? endDt : null;
+    return {
+      id: r.id, title: r.title || 'Untitled event', category: r.category,
+      description: r.description || '',
+      date: validDt ? validDt.toISOString().slice(0, 10) : '',
+      time: fmtTime(validDt), endTime: fmtTime(validEnd),
+      location: r.location || '', address: r.location || '',
+      organizerName: '', organizerId: r.created_by || null,
+      isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
+      isBusy: false, connectCount: 0, considerCount: 0, volunteeringEnabled: false,
+      coverPhoto: r.image_url || FALLBACK_COVER,
+      gallery: [], broadcast: null, website: r.website_url || '',
+      lat: typeof r.latitude === 'number' ? r.latitude : null,
+      lng: typeof r.longitude === 'number' ? r.longitude : null,
+      tags: [], upcomingDates: [],
+    };
+  }
+
   // ── session persistence (login survives refresh) ──
   const SESSION_KEY = 'cc_session_v1';
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch (e) { return null; } };
@@ -315,6 +344,44 @@
         else localStorage.removeItem(SESSION_KEY);
       } catch (e) {}
     }, [authed, role]);
+
+    // ── Live events + map bubbles (Phase 2) ──────────────────────────
+    //  Replace the demo events with the real public feed when reachable, then
+    //  attach any active broadcast bubbles (anon RPC). Fails open: on any error
+    //  we keep the demo data so the app still runs offline / without the API.
+    useEffect(() => {
+      const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+      let active = true;
+
+      // 1) Real events — set as soon as they arrive (do NOT wait on bubbles).
+      if (base) {
+        (async () => {
+          try {
+            const res = await fetch(base + '/api/v1/events?limit=100');
+            if (!res.ok) return;
+            const json = await res.json();
+            const adapted = ((json && json.data) || []).map(adaptEvent);
+            if (active && adapted.length) setEvents(adapted);
+          } catch (e) { console.warn('[events] live fetch failed — keeping demo data', e); }
+        })();
+      }
+
+      // 2) Active map bubbles (anon RPC) — attach to whatever events are loaded.
+      (async () => {
+        try {
+          const sb = window.CC_SUPABASE;
+          if (!sb) return;
+          const { data } = await sb.rpc('get_active_map_bubbles');
+          if (!active || !Array.isArray(data) || !data.length) return;
+          const byEvent = new Map(data.map((b) => [b.event_id, b]));
+          setEvents((prev) => prev.map((e) => (byEvent.has(e.id)
+            ? { ...e, broadcast: { message: byEvent.get(e.id).body, minsAgo: 0 } }
+            : e)));
+        } catch (e) { /* bubbles are optional */ }
+      })();
+
+      return () => { active = false; };
+    }, []);
 
     const unreadNotifs = notifications.filter((n) => !n.read).length;
     const unreadMsgs = conversations.reduce((a, c) => a + c.unread, 0);

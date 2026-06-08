@@ -1,157 +1,208 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — stylized prototype map
+//  Citizens Connect — REAL map (MapLibre GL + MapTiler)
+//  ------------------------------------------------------------------
+//  Phase 2: replaces the decorative SVG prototype with a real geographic
+//  map. Keeps the same public interface the home screen consumes:
+//    window.StylizedMap({ markers, routes, filterCategory, selectedId, onSelect })
+//    window.MapFloatersLayer(...)  → now a no-op (bubbles ride the markers).
+//  Markers are native MapLibre markers built as small DOM pins that mirror
+//  the teardrop / dot / glass styles from the prototype (+ live pulse +
+//  broadcast bubble + selected label). Coordinates use real lat/lng when an
+//  item has them; legacy mock items (only mapX/mapY) are projected into a
+//  greater-Pretoria bounding box so they still place sensibly during the
+//  mock→real data migration.
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { useMemo } = React;
-  const { cx } = window.UI;
-  const Icon = window.Icon;
+  const { useRef, useEffect } = React;
+  const env = window.__CC_ENV || {};
 
-  // ── Decorative street network (deterministic) ──
-  function MapBackdrop() {
-    // pseudo-random but fixed road set
-    const roads = [];
-    const seed = (n) => ((Math.sin(n * 999.13) * 43758.5453) % 1 + 1) % 1;
-    for (let i = 0; i < 9; i++) {
-      const y = 6 + i * 10.5 + (seed(i) - 0.5) * 4;
-      roads.push({ d: `M -4 ${y} Q 30 ${y + (seed(i + 1) - 0.5) * 8}, 55 ${y} T 104 ${y + (seed(i + 2) - 0.5) * 6}`, w: i % 3 === 0 ? 2.4 : 1.2 });
+  // ── Geo frame ──────────────────────────────────────────────────────
+  const PRETORIA = [28.2293, -25.7479];           // [lng, lat] — Church Square
+  // Greater-Pretoria bbox used only to project legacy % coords (mock items).
+  const BBOX = { west: 28.10, east: 28.36, south: -25.86, north: -25.66 };
+
+  function coordsFor(m) {
+    if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
+      return [m.lng, m.lat];
     }
-    for (let i = 0; i < 9; i++) {
-      const x = 6 + i * 10.5 + (seed(i + 20) - 0.5) * 4;
-      roads.push({ d: `M ${x} -4 Q ${x + (seed(i + 21) - 0.5) * 8} 30, ${x} 55 T ${x + (seed(i + 22) - 0.5) * 6} 104`, w: i % 4 === 0 ? 2.4 : 1.1 });
+    if (typeof m.mapX === 'number' && typeof m.mapY === 'number') {
+      const lng = BBOX.west + (m.mapX / 100) * (BBOX.east - BBOX.west);
+      const lat = BBOX.north - (m.mapY / 100) * (BBOX.north - BBOX.south);
+      return [lng, lat];
     }
-    return React.createElement('svg', { className: 'absolute inset-0 w-full h-full', viewBox: '0 0 100 100', preserveAspectRatio: 'none', style: { display: 'block' } },
-      React.createElement('defs', null,
-        React.createElement('linearGradient', { id: 'mapwash', x1: '0', y1: '0', x2: '1', y2: '1' },
-          React.createElement('stop', { offset: '0', stopColor: '#EFE7D5' }),
-          React.createElement('stop', { offset: '1', stopColor: '#E7DCC4' }))),
-      React.createElement('rect', { x: 0, y: 0, width: 100, height: 100, fill: 'url(#mapwash)' }),
-      // water (river)
-      React.createElement('path', { d: 'M -5 78 Q 25 70 45 82 T 105 74 L 105 110 L -5 110 Z', fill: '#CBDDDD', opacity: 0.8 }),
-      React.createElement('path', { d: 'M -5 78 Q 25 70 45 82 T 105 74', fill: 'none', stroke: '#B7CCcc', strokeWidth: 0.5 }),
-      // parks
-      React.createElement('ellipse', { cx: 18, cy: 24, rx: 9, ry: 7, fill: '#D6E2C4', opacity: 0.9 }),
-      React.createElement('ellipse', { cx: 82, cy: 58, rx: 8, ry: 10, fill: '#D6E2C4', opacity: 0.9 }),
-      React.createElement('rect', { x: 60, y: 14, width: 14, height: 11, rx: 2, fill: '#D6E2C4', opacity: 0.75 }),
-      // road casings (soft)
-      roads.map((r, i) => React.createElement('path', { key: 'c' + i, d: r.d, fill: 'none', stroke: '#E4D9C0', strokeWidth: r.w + 1.4, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke', opacity: 0.6 })),
-      // roads
-      roads.map((r, i) => React.createElement('path', { key: 'r' + i, d: r.d, fill: 'none', stroke: '#FBF7EE', strokeWidth: r.w, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' })),
-      // gold center-lines on majors
-      roads.filter((r) => r.w > 2).map((r, i) => React.createElement('path', { key: 'g' + i, d: r.d, fill: 'none', stroke: '#C9A84C', strokeWidth: 0.35, strokeDasharray: '2 3', vectorEffect: 'non-scaling-stroke', opacity: 0.35 })));
+    return null;
   }
 
-  // ── A single map marker ──
-  function Marker({ m, cat, selected, dim, pinStyle, bubbleStyle, onClick }) {
-    const color = cat ? cat.hex : '#C9A84C';
+  function styleUrl() {
+    const key = env.MAPTILER_KEY;
+    if (!key || key.indexOf('REPLACE_WITH') === 0) return null;
+    const style = env.MAPTILER_STYLE || 'streets-v2';
+    return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
+  }
+
+  // ── DOM pin builder (mirrors the prototype's teardrop / dot / glass) ──
+  function buildPin(m, cat, opts) {
+    const selected = opts.selected, pinStyle = opts.pinStyle;
     const isIdea = m.type === 'idea';
-    const fill = isIdea ? '#C9A84C' : color;
+    const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
 
-    const inner = pinStyle === 'dot'
-      ? React.createElement('span', {
-          className: 'block rounded-full border-[2.5px] border-white shadow-lg transition-transform',
-          style: { width: selected ? 22 : 16, height: selected ? 22 : 16, background: fill },
-        })
-      : pinStyle === 'glass'
-      ? React.createElement('span', {
-          className: 'flex items-center justify-center rounded-2xl shadow-lg backdrop-blur-md transition-all',
-          style: { width: selected ? 40 : 32, height: selected ? 40 : 32, background: fill + 'E6', border: '1.5px solid rgba(255,255,255,0.7)' },
-        }, React.createElement(Icon, { name: isIdea ? 'Lightbulb' : (m.type === 'place' ? 'MapPin' : (cat ? cat.icon : 'Circle')), size: selected ? 18 : 15, className: 'text-white', strokeWidth: 2.4 }))
-      : React.createElement('span', { // teardrop
-          className: 'flex items-center justify-center shadow-lg transition-all',
-          style: {
-            width: selected ? 38 : 30, height: selected ? 38 : 30,
-            background: fill, border: '2.5px solid #fff',
-            borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.22)',
-          },
-        }, React.createElement('span', { style: { transform: 'rotate(45deg)', display: 'flex' } },
-            React.createElement(Icon, { name: isIdea ? 'Lightbulb' : (m.type === 'place' ? 'MapPin' : (cat ? cat.icon : 'Circle')), size: selected ? 16 : 13, className: 'text-white', strokeWidth: 2.4 })));
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;cursor:pointer;line-height:0;transition:opacity .2s;';
+    if (opts.dim) wrap.style.opacity = '0.3';
 
-    const anchorY = pinStyle === 'teardrop' ? '-100%' : '-50%';
+    // live / busy pulse ring (behind the pin)
+    if (m.isLive || m.isBusy) {
+      const ring = document.createElement('span');
+      const c = m.isLive ? '#ef4444' : fill;
+      const sz = m.isLive ? 16 : 14;
+      ring.className = 'cc-pin-pulse';
+      ring.style.cssText = 'position:absolute;left:50%;top:50%;width:' + sz + 'px;height:' + sz +
+        'px;margin:-' + (sz / 2) + 'px 0 0 -' + (sz / 2) + 'px;border-radius:50%;background:' + c + ';';
+      wrap.appendChild(ring);
+    }
 
-    return React.createElement('button', {
-      onClick: (e) => { e.stopPropagation(); onClick(m.id, m.type); },
-      className: cx('absolute group transition-opacity', dim && 'opacity-25'),
-      style: { left: m.mapX + '%', top: m.mapY + '%', transform: `translate(-50%, ${anchorY})`, zIndex: selected ? 60 : m.broadcast ? 40 : 20 },
-    },
-      // live pulse ring
-      m.isLive && React.createElement('span', {
-        className: 'absolute left-1/2 rounded-full pin-pulse',
-        style: { width: 16, height: 16, background: '#ef4444', top: pinStyle === 'teardrop' ? '100%' : '50%', transform: 'translate(-50%,-50%)' },
-      }),
-      // busy subtle ring
-      !m.isLive && m.isBusy && React.createElement('span', {
-        className: 'absolute left-1/2 rounded-full pin-pulse',
-        style: { width: 14, height: 14, background: fill, top: pinStyle === 'teardrop' ? '100%' : '50%', transform: 'translate(-50%,-50%)' },
-      }),
-      inner);
+    const pin = document.createElement('span');
+    if (pinStyle === 'dot') {
+      const d = selected ? 22 : 16;
+      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
+        'px;border:2.5px solid #fff;border-radius:50%;background:' + fill +
+        ';box-shadow:0 3px 8px rgba(0,0,0,.28);transition:all .15s;';
+    } else if (pinStyle === 'glass') {
+      const d = selected ? 40 : 32;
+      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
+        'px;border:1.5px solid rgba(255,255,255,.7);border-radius:16px;background:' + fill +
+        'E6;box-shadow:0 4px 10px rgba(0,0,0,.22);transition:all .15s;';
+    } else { // teardrop
+      const d = selected ? 38 : 30;
+      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
+        'px;border:2.5px solid #fff;background:' + fill +
+        ';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 10px rgba(0,0,0,.24);transition:all .15s;';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'position:absolute;left:50%;top:42%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.9);';
+      pin.appendChild(dot);
+    }
+    wrap.appendChild(pin);
+
+    // broadcast bubble (above the pin)
+    if (m.broadcast && m.broadcast.message) {
+      const b = document.createElement('div');
+      b.className = 'cc-pin-bubble';
+      b.style.cssText = 'position:absolute;left:50%;bottom:100%;margin-bottom:10px;' +
+        'transform:translateX(-50%);max-width:170px;display:flex;align-items:center;gap:4px;' +
+        'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:14px 14px 14px 4px;' +
+        'padding:4px 8px;box-shadow:0 6px 16px rgba(0,0,0,.16);white-space:nowrap;overflow:hidden;';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#C9A84C;flex:0 0 auto;';
+      const txt = document.createElement('span');
+      txt.style.cssText = 'font-size:9px;font-weight:600;color:#0A0908;overflow:hidden;text-overflow:ellipsis;';
+      txt.textContent = m.broadcast.message;
+      b.appendChild(dot); b.appendChild(txt);
+      wrap.appendChild(b);
+    }
+
+    // selected title label (below the pin)
+    if (selected && m.title) {
+      const l = document.createElement('div');
+      l.style.cssText = 'position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;' +
+        'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
+        'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.18);';
+      l.textContent = m.title;
+      wrap.appendChild(l);
+    }
+
+    return wrap;
   }
 
-  // ── Broadcast bubble + selected label (rendered in own non-transformed layer) ──
-  function Floaters({ m, cat, selected, pinStyle, bubbleStyle }) {
-    const fill = cat ? cat.hex : '#C9A84C';
-    const headUp = pinStyle === 'teardrop' ? 32 : 22;
-    const bubble = m.broadcast && (bubbleStyle === 'minimal' && !selected
-      ? React.createElement('span', { className: 'flex items-center justify-center rounded-full gold-gradient shadow-lg bubble-bob', style: { width: 18, height: 18 } }, React.createElement(Icon, { name: 'Radio', size: 10, className: 'text-white' }))
-      : bubbleStyle === 'tag'
-      ? React.createElement('span', { className: 'bubble-bob flex items-center gap-1 px-2 py-0.5 rounded-md shadow-lg max-w-[150px]', style: { background: fill } },
-          React.createElement(Icon, { name: 'Radio', size: 9, className: 'text-white shrink-0' }),
-          React.createElement('span', { className: 'text-[9px] font-bold text-white truncate' }, m.broadcast.message))
-      : React.createElement('span', { className: 'bubble-bob flex max-w-[160px] items-center gap-1 bg-white border border-gold/25 rounded-2xl rounded-bl-sm px-2 py-1 shadow-xl' },
-          React.createElement(Icon, { name: 'Radio', size: 10, className: 'text-gold-dark shrink-0' }),
-          React.createElement('span', { className: 'text-[9px] font-semibold text-foreground/90 truncate' }, m.broadcast.message)));
-    return React.createElement(React.Fragment, null,
-      bubble && React.createElement('div', { className: 'absolute pointer-events-none', style: { left: m.mapX + '%', top: m.mapY + '%', transform: `translate(-50%, calc(-100% - ${headUp}px))`, zIndex: 65 } }, bubble),
-      selected && React.createElement('div', { className: 'absolute pointer-events-none whitespace-nowrap bg-white border border-gold/25 rounded-full px-2.5 py-1 text-[10px] font-bold text-foreground shadow-lg scale-in', style: { left: m.mapX + '%', top: m.mapY + '%', transform: 'translate(-50%, 10px)', zIndex: 66 } }, m.title));
-  }
+  // ── The map component ──────────────────────────────────────────────
+  function StylizedMap({ markers, filterCategory, selectedId, onSelect }) {
+    const { pinStyle } = window.useApp();
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    const markerObjs = useRef(new Map());   // id → maplibre Marker
+    const userMovedRef = useRef(false);     // stop auto-framing once the user takes control
+    const onSelectRef = useRef(onSelect);
+    onSelectRef.current = onSelect;
 
-  // ── Route track (mobile events) ──
-  function RouteTrack({ ev, cat }) {
-    const color = cat ? cat.hex : '#C9A84C';
-    const pts = ev.route;
-    const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-    const start = pts[0], finish = pts[pts.length - 1];
-    return React.createElement(React.Fragment, null,
-      React.createElement('svg', { className: 'absolute inset-0 w-full h-full pointer-events-none', viewBox: '0 0 100 100', preserveAspectRatio: 'none', style: { zIndex: 15 } },
-        React.createElement('path', { d, fill: 'none', stroke: '#fff', strokeWidth: 5, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke', opacity: 0.7 }),
-        React.createElement('path', { d, fill: 'none', stroke: color, strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke', className: 'dash-flow' })),
-      React.createElement('div', { className: 'absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full bg-white shadow-md text-[8px] font-bold', style: { left: start.x + '%', top: start.y + '%', width: 18, height: 18, color, border: `2px solid ${color}`, zIndex: 18 } }, 'S'),
-      React.createElement('div', { className: 'absolute -translate-x-1/2 -translate-y-full flex items-center justify-center rounded-md shadow-md', style: { left: finish.x + '%', top: finish.y + '%', width: 20, height: 20, background: color, zIndex: 18 } },
-        React.createElement(Icon, { name: 'Flag', size: 11, className: 'text-white' })));
-  }
+    // init the map once
+    useEffect(() => {
+      if (mapRef.current || !containerRef.current) return;
+      if (!window.maplibregl) { console.error('[map] maplibre-gl not loaded'); return; }
+      const style = styleUrl();
+      if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
+      const map = new window.maplibregl.Map({
+        container: containerRef.current,
+        style,
+        center: PRETORIA,
+        zoom: 11,
+        attributionControl: { compact: true },
+      });
+      map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+      map.addControl(new window.maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
+      }), 'bottom-right');
+      // Once the user pans/zooms by hand, stop auto-framing the data.
+      const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
+      map.on('dragstart', onUserMove);
+      map.on('zoomstart', onUserMove);
+      mapRef.current = map;
+      return () => { map.remove(); mapRef.current = null; };
+    }, []);
 
-  // ── Map ──
-  function StylizedMap({ markers, routes, filterCategory, selectedId, onSelect, loading }) {
-    const { pinStyle, bubbleStyle } = window.useApp();
-    return React.createElement('div', { className: 'absolute inset-0 overflow-hidden', style: { background: 'var(--map-bg)' } },
-      React.createElement(MapBackdrop),
-      // routes under markers
-      (routes || []).filter((r) => !filterCategory || r.category === filterCategory).map((r) =>
-        React.createElement(RouteTrack, { key: 'rt' + r.id, ev: r, cat: window.DATA.getCategory(r.category) })),
-      // markers
-      markers.map((m) => {
+    // (re)render markers whenever inputs change
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !window.maplibregl) return;
+
+      const seen = new Set();
+      markers.forEach((m) => {
+        const coords = coordsFor(m);
+        if (!coords) return;
+        seen.add(m.id);
         const cat = window.DATA.getCategory(m.category);
-        const dim = filterCategory && m.category !== filterCategory && m.type !== 'idea';
-        return React.createElement(Marker, {
-          key: m.id, m, cat, selected: selectedId === m.id, dim,
-          pinStyle, bubbleStyle, onClick: onSelect,
+        const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
+        const selected = selectedId === m.id;
+        const el = buildPin(m, cat, { selected, dim, pinStyle });
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onSelectRef.current && onSelectRef.current(m.id, m.type);
         });
-      }),
-      // soft vignette
-      React.createElement('div', { className: 'absolute inset-0 pointer-events-none', style: { boxShadow: 'inset 0 0 120px rgba(120,100,60,0.18)' } }));
+        const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
+
+        const existing = markerObjs.current.get(m.id);
+        if (existing) {
+          existing.getElement().replaceWith(el);
+          existing._element = el;                 // keep ref in sync
+          existing.setLngLat(coords);
+        } else {
+          const mk = new window.maplibregl.Marker({ element: el, anchor }).setLngLat(coords).addTo(map);
+          markerObjs.current.set(m.id, mk);
+        }
+      });
+
+      // drop markers no longer present
+      markerObjs.current.forEach((mk, id) => {
+        if (!seen.has(id)) { mk.remove(); markerObjs.current.delete(id); }
+      });
+
+      // Auto-frame all markers until the user takes manual control. This
+      // re-fits when the live feed replaces the seed data, so we always open
+      // on the real spread instead of latching onto whatever loaded first.
+      if (!userMovedRef.current) {
+        const coordsList = markers.map(coordsFor).filter(Boolean);
+        if (coordsList.length) {
+          const b = new window.maplibregl.LngLatBounds(coordsList[0], coordsList[0]);
+          coordsList.forEach((c) => b.extend(c));
+          map.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
+        }
+      }
+    }, [markers, filterCategory, selectedId, pinStyle]);
+
+    return React.createElement('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } });
   }
 
-  // ── Floaters overlay — rendered as a SIBLING of the map, outside its heavy
-  //    composited subtree. Nesting bubbles inside StylizedMap (amid the big
-  //    backdrop SVG + 10 transformed marker layers) makes this renderer drop
-  //    them at composite time. A clean sibling overlay paints reliably — same
-  //    pattern the legend, search bar and preview panel already use. ──
-  function MapFloatersLayer({ markers, filterCategory, selectedId }) {
-    const { pinStyle, bubbleStyle } = window.useApp();
-    const list = markers.filter((m) => (m.broadcast || selectedId === m.id) && !(filterCategory && m.category !== filterCategory && m.type !== 'idea'));
-    return React.createElement('div', { className: 'absolute inset-0 pointer-events-none z-[25]' },
-      list.map((m) => React.createElement(Floaters, { key: 'fl' + m.id, m, cat: window.DATA.getCategory(m.category), selected: selectedId === m.id, pinStyle, bubbleStyle })));
-  }
+  // Bubbles + selected labels now ride the markers themselves, so the old
+  // sibling floaters overlay is a no-op. Kept exported so home.jsx is unchanged.
+  function MapFloatersLayer() { return null; }
 
   window.StylizedMap = StylizedMap;
   window.MapFloatersLayer = MapFloatersLayer;
