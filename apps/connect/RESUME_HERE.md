@@ -141,14 +141,14 @@ driven by the live public events API + active map-bubbles RPC. Verified end-to-e
   preview panel, **0 console errors**.
 
 ### Phase 2b — next increment (refine the live map)
-1. **Organiser identity** — real events show a blank organiser (created_by is a UUID; mock contributors
-   don't match). Resolve names/avatars (batch `/api/v1/contributors` or a profiles lookup) → fill the
-   preview-panel organiser row + the carried-over "organiser row on EventPreviewCard".
+1. ✅ **Organiser identity — SHIPPED (2026-06-08, see §2e).** Real contributors fetched + merged;
+   organiser row resolves on the event profile; this also fixed a hard crash.
 2. **Real places + ideas** — fetch real places (and Impact Ideas once Phase 4/6 land) instead of the mock
    ones still projected into the Pretoria bbox.
 3. **Marker density** — Gauteng events overlap heavily at national zoom; add clustering or deconfliction.
 4. **Polish** — time format (add AM/PM), drop the "Route" legend row (real events have no routes), default
-   framing decision (national reach vs Pretoria-first).
+   framing decision (national reach vs Pretoria-first). Carry-over: organiser row on the map preview /
+   `EventPreviewCard` (data now available via the merged contributors).
 5. **Authenticated mutations** (Connect/Consider/Follow/dismiss-bubble) — see the cross-origin Bearer note
    below; the read path needs none, but writes do.
 
@@ -159,6 +159,50 @@ driven by the live public events API + active map-bubbles RPC. Verified end-to-e
   `middleware.ts` are cookie-based and see no cookie from the localStorage-session static frontend. Also
   prune middleware's PROTECTED_ROUTES / bio-setup redirects (they point at deleted page routes; harmless
   for `/api/*` but should become API-appropriate 401 JSON when auth is wired).
+
+---
+
+## 2e. Phase 2b (part 1) SHIPPED — marker-anchor fix + organiser identity (+ crash fix) ✅ (2026-06-08)
+
+Founder-flagged bug + Phase 2b #1, verified end-to-end in a fresh preview (0 console errors).
+**Commit: LOCAL on branch `phase2b-map-anchor-organiser-identity` (NOT pushed — main push needs founder
+auth, per the Phase-1 classifier block).** Working log: `.claude/sessions/phase2b-map-refine.md`.
+Frontend-only changes (`src/frontend/` is excluded from tsc/eslint/vitest, so those gates are unchanged;
+**tsc 0 · next lint 0** re-run to prove the backend was untouched).
+
+### 1. Map markers floated/drifted on zoom — FIXED (the founder-reported bug)
+- **Root cause:** `buildPin()` set the MapLibre marker element to inline `position:relative`, which
+  overrode maplibre 4.7.1's `.maplibregl-marker { position:absolute }` rule. With the element in normal
+  flow, maplibre's `transform: translate(x,y)` offset from the wrong origin → pins drifted instead of
+  anchoring to their lng/lat.
+- **Fix** ([map.jsx](src/frontend/app/map.jsx)): the outer element handed to maplibre now carries NO
+  `position` (absolute rule wins); all decorations (pulse ring, broadcast bubble, selected label) moved
+  onto an inner `position:relative` wrapper. Also: recreate the marker when `pinStyle` flips the required
+  `anchor` (teardrop=bottom ↔ center), since anchor is fixed at construction.
+- **Verified:** `position:absolute` restored, no `relative` inline; on a programmatic zoom all sampled
+  markers reposition (glued to coordinates), not floating in screen space.
+
+### 2. Organiser identity (Phase 2b #1) — and it fixed a hard crash
+- **Crash found while verifying:** `EventProfilePage`/`PlaceProfilePage` dereferenced `org.*` with no
+  guard. Real events' `organizerId` is a `created_by` UUID that matches no mock contributor → `org`
+  undefined → **tapping any real event crashed the whole app** (no error boundary → blank screen).
+- **Fix** ([store.jsx](src/frontend/app/store.jsx) + [profiles.jsx](src/frontend/app/profiles.jsx)):
+  - `adaptContributor` + merge-fetch `GET /api/v1/contributors?limit=100` into the `contributors`
+    state (merge, not replace — mock places still resolve their mock orgs during the migration; real row
+    wins on id collision). Real org name + logo now resolve.
+  - `adaptEvent.organizerName` falls back to `community_contributor` (name for community-posted events).
+  - Event/Place organiser blocks: clickable row when the org is a real directory profile; non-clickable
+    name-only row when we only have a name; omitted entirely when there's no organiser — never crash.
+  - `ContributorProfilePage`: honest "not found" Empty instead of silently showing `contributors[0]`
+    (the wrong org) — VISION integrity (don't misrepresent identity).
+- **Verified:** matched-org event → clickable "POPUP Skills Development Centre · 0 followers" → taps
+  through to the **correct** contributor profile; no-organiser event → row omitted, no crash; mock place
+  unchanged. Test DB: 100 events / 10 approved contributors (13 events match a contributor).
+
+### Phase 2b remaining (NOT done this session — next increments)
+Real places + Impact Ideas (drop mock bbox projection) · marker clustering at national zoom · polish
+(AM/PM time, drop Route legend, default framing) + the map-preview/`EventPreviewCard` organiser row
+(data now available) · authenticated mutations (cross-origin Bearer — see §2d note).
 
 ---
 

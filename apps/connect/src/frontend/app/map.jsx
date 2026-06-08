@@ -46,9 +46,18 @@
     const isIdea = m.type === 'idea';
     const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
 
+    // Outer element handed to MapLibre. It must NOT set `position` — MapLibre's
+    // `.maplibregl-marker { position:absolute }` rule anchors the pin to its
+    // lng/lat via a transform. An inline `position:relative` here would override
+    // that rule and the pin would drift on zoom/pan instead of staying glued.
+    // All decoration is positioned relative to `inner` instead.
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative;cursor:pointer;line-height:0;transition:opacity .2s;';
+    wrap.style.cssText = 'cursor:pointer;line-height:0;';
     if (opts.dim) wrap.style.opacity = '0.3';
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'position:relative;line-height:0;';
+    wrap.appendChild(inner);
 
     // live / busy pulse ring (behind the pin)
     if (m.isLive || m.isBusy) {
@@ -58,7 +67,7 @@
       ring.className = 'cc-pin-pulse';
       ring.style.cssText = 'position:absolute;left:50%;top:50%;width:' + sz + 'px;height:' + sz +
         'px;margin:-' + (sz / 2) + 'px 0 0 -' + (sz / 2) + 'px;border-radius:50%;background:' + c + ';';
-      wrap.appendChild(ring);
+      inner.appendChild(ring);
     }
 
     const pin = document.createElement('span');
@@ -81,7 +90,7 @@
       dot.style.cssText = 'position:absolute;left:50%;top:42%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.9);';
       pin.appendChild(dot);
     }
-    wrap.appendChild(pin);
+    inner.appendChild(pin);
 
     // broadcast bubble (above the pin)
     if (m.broadcast && m.broadcast.message) {
@@ -97,7 +106,7 @@
       txt.style.cssText = 'font-size:9px;font-weight:600;color:#0A0908;overflow:hidden;text-overflow:ellipsis;';
       txt.textContent = m.broadcast.message;
       b.appendChild(dot); b.appendChild(txt);
-      wrap.appendChild(b);
+      inner.appendChild(b);
     }
 
     // selected title label (below the pin)
@@ -107,7 +116,7 @@
         'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
         'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.18);';
       l.textContent = m.title;
-      wrap.appendChild(l);
+      inner.appendChild(l);
     }
 
     return wrap;
@@ -169,12 +178,17 @@
         const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
 
         const existing = markerObjs.current.get(m.id);
-        if (existing) {
+        // Reuse the marker only while its anchor is unchanged; the anchor is
+        // fixed at construction, so a pinStyle switch (teardrop↔center) must
+        // rebuild the marker or it would render off its coordinate.
+        if (existing && existing._ccAnchor === anchor) {
           existing.getElement().replaceWith(el);
           existing._element = el;                 // keep ref in sync
           existing.setLngLat(coords);
         } else {
+          if (existing) existing.remove();
           const mk = new window.maplibregl.Marker({ element: el, anchor }).setLngLat(coords).addTo(map);
+          mk._ccAnchor = anchor;
           markerObjs.current.set(m.id, mk);
         }
       });

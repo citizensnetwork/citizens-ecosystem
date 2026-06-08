@@ -32,7 +32,12 @@
     const ev = events.find((e) => e.id === id);
     if (!ev) return h(Empty, { icon: 'CalendarX', title: 'Event not found' });
     const cat = window.DATA.getCategory(ev.category);
-    const org = contributors.find((c) => c.id === ev.organizerId);
+    // Organiser may not be an approved Contributor in the directory (real events
+    // created by citizens/community). Resolve to the directory row when present,
+    // else fall back to the event's own organiser name — never crash, never
+    // misrepresent by linking to the wrong org.
+    const org = contributors.find((c) => c.id === ev.organizerId) || null;
+    const orgName = (org && org.name) || ev.organizerName || '';
     const isC = connected.has(id), isCo = considering.has(id);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'event' },
       h(Scroll, null,
@@ -50,10 +55,17 @@
           h('div', { className: 'w-8 h-8 rounded-xl gold-gradient flex items-center justify-center shrink-0' }, h(Icon, { name: 'Radio', size: 14, className: 'text-white' })),
           h('div', null, h('p', { className: 'text-[10px] font-bold uppercase tracking-wide text-gold-dark' }, 'Latest broadcast'), h('p', { className: 'text-sm text-foreground' }, ev.broadcast.message))),
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
-          h('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
+          // Organiser row: clickable when the org is a real directory profile;
+          // a non-clickable identity row when we only have a name; omitted entirely
+          // when the event carries no organiser at all.
+          org ? h('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
             h(Avatar, { src: org.profilePhoto, size: 40, rounded: 'xl' }),
-            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, org.followerCount.toLocaleString() + ' followers')),
-            h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' })),
+            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, (org.followerCount || 0).toLocaleString() + ' followers')),
+            h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))
+            : orgName ? h('div', { className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
+              h('div', { className: 'w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center shrink-0' }, h(Icon, { name: 'Users', size: 18, className: 'text-gold-dark' })),
+              h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, orgName), h('p', { className: 'text-xs text-muted-foreground' }, 'Organiser')))
+            : null,
           h('div', { className: 'grid grid-cols-2 gap-2' },
             h(Button, { variant: isC ? 'success' : 'gold', icon: isC ? 'Check' : 'CalendarCheck', onClick: () => toggleConnect(id) }, isC ? 'Connected' : 'Connect'),
             h(Button, { variant: isCo ? 'soft' : 'outline', icon: 'Star', onClick: () => toggleConsider(id) }, isCo ? 'Considering' : 'Consider')),
@@ -74,7 +86,7 @@
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Upcoming dates'),
             h('div', { className: 'flex flex-wrap gap-2' }, ev.upcomingDates.map((d, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' }, new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))))),
           h('div', { className: 'grid grid-cols-3 gap-2' },
-            h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(org.name, org.profilePhoto, true) }, 'Message'),
+            h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true) }, 'Message'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => toast('Opening ' + ev.website) }, 'Website'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') }, 'Share')))));
   }
@@ -86,7 +98,8 @@
     const pl = places.find((p) => p.id === id);
     if (!pl) return h(Empty, { icon: 'MapPinOff', title: 'Place not found' });
     const cat = window.DATA.getCategory(pl.category);
-    const org = contributors.find((c) => c.id === pl.organizerId);
+    const org = contributors.find((c) => c.id === pl.organizerId) || null;
+    const orgName = (org && org.name) || pl.organizerName || '';
     const assoc = events.filter((e) => (pl.associatedEventIds || []).includes(e.id));
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'place' },
       h(Scroll, null,
@@ -100,9 +113,9 @@
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
           h('div', { className: 'flex gap-2' },
             h(Button, { variant: 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toast('Now following ' + pl.name, 'gold') }, 'Follow'),
-            h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(org.name, org.profilePhoto, true) }, 'Message'),
+            h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true) }, 'Message'),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') })),
-          h('p', { className: 'text-xs text-muted-foreground' }, pl.followerCount.toLocaleString() + ' followers · by ' + pl.organizerName),
+          h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
             h(InfoRow, { icon: 'Clock', label: 'Opening hours', value: pl.openHours || 'Not specified' })),
@@ -121,7 +134,10 @@
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
     const { contributors, events, places, go, startConversationWith, toast, user } = app;
-    const c = contributors.find((x) => x.id === id) || contributors[0];
+    // Honest not-found rather than silently showing the first (wrong) org —
+    // misrepresenting identity would violate the vision's integrity.
+    const c = contributors.find((x) => x.id === id);
+    if (!c) return h(Empty, { icon: 'UserX', title: 'Contributor not found' });
     const cat = window.DATA.getCategory(c.category);
     const cEvents = events.filter((e) => e.organizerId === c.id);
     const cPlaces = places.filter((p) => p.organizerId === c.id);

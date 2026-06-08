@@ -13,6 +13,7 @@
   //  fill honest defaults (0 counts, blank organiser) and compute `isLive` from
   //  the event window. Coordinates carry through as lat/lng for the real map.
   const FALLBACK_COVER = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=500&fit=crop';
+  const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=200&h=200&fit=crop';
   const fmtTime = (d) => d ? d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : '';
   function adaptEvent(r) {
     const dt = r.date ? new Date(r.date) : null;
@@ -26,7 +27,10 @@
       date: validDt ? validDt.toISOString().slice(0, 10) : '',
       time: fmtTime(validDt), endTime: fmtTime(validEnd),
       location: r.location || '', address: r.location || '',
-      organizerName: '', organizerId: r.created_by || null,
+      // organizerId = created_by (UUID). organizerName falls back to the
+      // community_contributor text so community-posted events still show a name
+      // even when the creator isn't an approved Contributor in the directory.
+      organizerName: r.community_contributor || '', organizerId: r.created_by || null,
       isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
       isBusy: false, connectCount: 0, considerCount: 0, volunteeringEnabled: false,
       coverPhoto: r.image_url || FALLBACK_COVER,
@@ -34,6 +38,37 @@
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [], upcomingDates: [],
+    };
+  }
+
+  // API contributor row (public /api/v1/contributors → a profiles row) → app
+  // contributor shape. The public directory is sparse, so anything it doesn't
+  // expose (follower counts, involvement tier, niche) gets honest, crash-safe
+  // defaults — never fabricated numbers (VISION: honour the small honestly).
+  function adaptContributor(r) {
+    const socials = {};
+    if (r.instagram_handle) socials.instagram = r.instagram_handle;
+    if (r.facebook_url) socials.facebook = r.facebook_url;
+    if (r.tiktok_handle) socials.tiktok = r.tiktok_handle;
+    if (r.youtube_url) socials.youtube = r.youtube_url;
+    return {
+      id: r.id,
+      name: r.full_name || 'Contributor',
+      role: 'contributor',
+      kind: r.contributor_kind || 'organization',
+      slug: r.contributor_slug || null,
+      profilePhoto: r.logo_url || r.avatar_url || FALLBACK_AVATAR,
+      coverPhoto: FALLBACK_COVER,
+      bio: r.bio || '',
+      website: r.website_url || '',
+      location: r.physical_address || '',
+      followerCount: 0,
+      involvementLevel: 'Shepherd',
+      dominantNiche: '',
+      socials,
+      collaborators: [],
+      members: [],
+      verified: true,
     };
   }
 
@@ -366,7 +401,29 @@
         })();
       }
 
-      // 2) Active map bubbles (anon RPC) — attach to whatever events are loaded.
+      // 2) Real Contributors — merge into the directory so real events/places
+      //    resolve their organiser identity (name + logo) instead of a blank or,
+      //    worse, the wrong (first-mock) organiser. Merge (not replace) so mock
+      //    places still in the tree keep resolving their mock organisers during
+      //    the mock→real migration; on id collision the real row wins.
+      if (base) {
+        (async () => {
+          try {
+            const res = await fetch(base + '/api/v1/contributors?limit=100');
+            if (!res.ok) return;
+            const json = await res.json();
+            const adapted = ((json && json.data) || []).map(adaptContributor);
+            if (!active || !adapted.length) return;
+            setContributors((prev) => {
+              const byId = new Map(prev.map((c) => [c.id, c]));
+              adapted.forEach((c) => byId.set(c.id, c));
+              return [...byId.values()];
+            });
+          } catch (e) { /* directory is optional — org falls back to its name */ }
+        })();
+      }
+
+      // 3) Active map bubbles (anon RPC) — attach to whatever events are loaded.
       (async () => {
         try {
           const sb = window.CC_SUPABASE;
