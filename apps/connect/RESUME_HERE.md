@@ -265,10 +265,25 @@ auth-client.js or any app/*.jsx** so the preview/deployed clients load fresh cod
 ## 2g. Phase 2b COMPLETE — real places + marker clustering + polish ✅ (2026-06-09)
 
 The whole map phase (Phase 2) is now done: the last mock map layer is gone, dense areas cluster,
-and the polish items are shipped. **Commit on branch `phase2b-map-anchor-organiser-identity`
-(pushed to origin as a feature branch; NOT merged to main — main merge needs founder action).**
+and the polish items are shipped. **MERGED TO MAIN + pushed (origin/main @ `0552f62`, founder-
+authorized 2026-06-09).** The feature branch `phase2b-map-anchor-organiser-identity` fast-forwarded
+main by 5 commits (the two earlier Phase 2b parts that were never on main + real-places + cache-bust).
 Working log: `.claude/sessions/phase2b-real-places.md`. Backend gated; `src/frontend/` excluded
 from tsc/eslint/vitest as always.
+
+### Map verified working locally this session (re: the founder-reported "404 / couldn't see anything")
+- Booted frontend (:3001) + API (:3000) in preview. **No 404 reproducible locally** — landing/auth
+  page renders; API `/api/v1/{events,places,contributors}` all 200; MapTiler custom style 200.
+- Entered as demo Citizen → map renders **140 markers** (100 events + 40 places): 8 pins + 41 clusters
+  at z11, collapsing to 6 clusters at national zoom — clustering works. 0 console errors, 0 failed reqs.
+- **Root cause of the blank/404-look = STALE BROWSER CACHE** (the documented no-cache-headers gotcha):
+  a cached `map.jsx?v=…` served old code → 0 markers, until the `?v=` token was bumped. Fixed by
+  bumping to **`?v=20260609b`** (commit `0552f62`). Lesson reinforced: ALWAYS bump `?v=` on frontend
+  edits AND hard-refresh when verifying. (`styleLoaded:false` in headless preview is just the WebGL
+  basemap not painting without a GPU — DOM markers render fine; a real browser shows the basemap.)
+- **A deployed 404 (if seen on a hosted URL) is topology, not a code bug:** the app is the static
+  frontend (→ `https://www.citizenscentral.co.za`); the Vercel project is **API-only** and 404s at its
+  root by design. For e2e, open the static frontend URL (or localhost:3001), not the API origin.
 
 ### Real places (increment #1) — drop the mock bbox projection
 - **NEW [src/app/api/v1/places/route.ts](src/app/api/v1/places/route.ts)** — public, read-only places
