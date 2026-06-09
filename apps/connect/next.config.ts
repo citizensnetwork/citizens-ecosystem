@@ -4,6 +4,13 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// CDN domains required by the static HTML frontend (loaded via <script> / <link> tags).
+// These are only needed when the frontend is served from the same Next.js project
+// (i.e. after scripts/build-frontend.js copies it into public/).
+const FRONTEND_SCRIPT_CDN = "https://unpkg.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net";
+const FRONTEND_STYLE_CDN  = "https://unpkg.com https://fonts.googleapis.com";
+const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
   poweredByHeader: false,
@@ -20,6 +27,13 @@ const nextConfig: NextConfig = {
     // Node.js 24 breaks webpack's WasmHash in worker threads
     webpackBuildWorker: false,
   },
+  // Redirect the bare root to the static HTML frontend (copied into public/ at build time).
+  async redirects() {
+    return [
+      { source: "/", destination: "/index.html", permanent: false },
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -37,10 +51,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // 'unsafe-eval' is required by Next.js React Refresh in development
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com",
+              // 'unsafe-eval' is required by Next.js React Refresh in development.
+              // CDN domains are needed for the static HTML frontend (React/Babel/MapLibre via unpkg).
+              `script-src 'self' 'unsafe-inline' ${FRONTEND_SCRIPT_CDN}${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+              `style-src 'self' 'unsafe-inline' ${FRONTEND_STYLE_CDN}`,
+              `img-src 'self' data: blob: ${FRONTEND_IMG_CDN} https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com`,
               "font-src 'self' https://fonts.gstatic.com",
               "media-src 'self' blob: https://xyiajtrvhlxaeplsiajj.supabase.co",
               "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com https://tile.openstreetmap.org https://basemaps.cartocdn.com",

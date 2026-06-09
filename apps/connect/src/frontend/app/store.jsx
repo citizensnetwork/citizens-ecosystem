@@ -71,7 +71,9 @@
     if (r.youtube_url) socials.youtube = r.youtube_url;
     return {
       id: r.id,
-      name: r.full_name || 'Contributor',
+      name: r.full_name || (r.contributor_slug
+        ? r.contributor_slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+        : 'Unnamed Ministry'),
       role: 'contributor',
       kind: r.contributor_kind || 'organization',
       slug: r.contributor_slug || null,
@@ -220,7 +222,37 @@
       setMyApplication(app);
       setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
       toast('Application submitted — an admin will review it shortly.', 'gold');
-    }, [toast]);
+      go('home');
+      // Write to the database for real signed-in users (no-op in demo mode).
+      if (realUser) {
+        (async () => {
+          try {
+            const res = await authedFetch('/api/contributor/apply', {
+              method: 'POST',
+              body: JSON.stringify({
+                display_name: form.orgName,
+                contributor_kind: form.category,
+                bio: form.bio,
+                motivation_text: form.reason,
+                physical_address: form.location,
+                website_url: form.website || null,
+                instagram_handle: (form.socials && form.socials.instagram) || null,
+                facebook_url: (form.socials && form.socials.facebook) || null,
+                tiktok_handle: (form.socials && form.socials.tiktok) || null,
+                youtube_url: (form.socials && form.socials.youtube) || null,
+              }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              console.warn('[apply] API error', res.status, body);
+            }
+          } catch (e) {
+            console.warn('[apply] network error', e);
+            // Local state is already set — don't alarm the user over a background write failure.
+          }
+        })();
+      }
+    }, [realUser, toast, go]);
 
     const reviewApplication = useCallback((id, status, note) => {
       setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status, reviewNote: note || a.reviewNote, reviewedAt: today() } : a)));
@@ -657,6 +689,7 @@
       assistMode, assistLoginAs, exitAssist,
       myApplication, myContributor,
       connected, considering, followedOrgs, followedPlaces,
+      realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       unreadNotifs, unreadMsgs, toasts, toast,
       createKind, openCreate, closeCreate,
@@ -676,4 +709,5 @@
 
   window.AppProvider = AppProvider;
   window.useApp = useApp;
+  window.authedFetch = authedFetch;
 })();

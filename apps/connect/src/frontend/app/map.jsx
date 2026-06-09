@@ -11,6 +11,11 @@
 //  item has them; legacy mock items (only mapX/mapY) are projected into a
 //  greater-Pretoria bounding box so they still place sensibly during the
 //  mock→real data migration.
+//
+//  Date-based zoom layering: items are sorted by event-date proximity
+//  (closest future first, then recent past last) and split into 5 equal
+//  groups assigned minZoom 9–13. At zoom ≥ 13 all items are visible.
+//  Live events, active broadcasts, and the selected pin are always visible.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useRef, useEffect } = React;
@@ -136,33 +141,37 @@
     return wrap;
   }
 
-  // ── Cluster badge (grid deconfliction at low zoom) ──────────────────
-  //  Dense areas (e.g. Gauteng at national zoom) overlap heavily, so below
-  //  CLUSTER_MAX_ZOOM we bucket nearby pins into one gold count badge. Live
-  //  events, active broadcasts and the selected pin are NEVER folded in — we
-  //  don't bury what's happening now (VISION: make the unseen seen).
-  const CLUSTER_CELL = 56;       // px grid for bucketing nearby pins
-  const CLUSTER_MAX_ZOOM = 12;   // at/above this zoom, every pin shows individually
+  // ── Date-based zoom layering ────────────────────────────────────────
+  //  Items sorted by event-date proximity: future events closest to now
+  //  come first; past events ordered most-recent first; undated items last.
+  //  Divided into 5 equal groups → minZoom 9 (widest) through 13 (closest).
+  //  At zoom ≥ 13 everything is visible. Live/broadcast/selected bypass the
+  //  filter entirely (VISION: make the unseen seen — don't bury what's live).
+  const LAYER_MIN = 9;
+  const LAYER_MAX = 13;
+  const LAYER_COUNT = LAYER_MAX - LAYER_MIN + 1;  // 5 groups
 
-  function buildCluster(count, onClick) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'cursor:pointer;line-height:0;';
-    const inner = document.createElement('div');
-    inner.style.cssText = 'position:relative;line-height:0;';
-    wrap.appendChild(inner);
-    const d = count >= 100 ? 46 : count >= 25 ? 42 : 38;
-    const ring = document.createElement('span');
-    ring.style.cssText = 'position:absolute;left:50%;top:50%;width:' + (d + 10) + 'px;height:' + (d + 10) +
-      'px;margin:-' + ((d + 10) / 2) + 'px 0 0 -' + ((d + 10) / 2) + 'px;border-radius:50%;background:rgba(201,168,76,.18);';
-    const badge = document.createElement('div');
-    badge.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
-      'px;border-radius:50%;border:2.5px solid #fff;background:linear-gradient(135deg,#E4C765,#C9A84C 60%,#A8842F);' +
-      'color:#fff;font-weight:800;font-size:' + (count >= 1000 ? 12 : 13) + 'px;box-shadow:0 4px 12px rgba(0,0,0,.28);';
-    badge.textContent = count >= 1000 ? (Math.round(count / 100) / 10) + 'k' : String(count);
-    inner.appendChild(ring);
-    inner.appendChild(badge);
-    wrap.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
-    return wrap;
+  function assignLayerZooms(items) {
+    if (!items.length) return new Map();
+    const now = Date.now();
+    const sorted = [...items].sort((a, b) => {
+      const da = a.m.date ? new Date(a.m.date).getTime() : null;
+      const db = b.m.date ? new Date(b.m.date).getTime() : null;
+      if (da === null && db === null) return 0;
+      if (da === null) return 1;   // undated items sink to the back
+      if (db === null) return -1;
+      const futureA = da >= now;
+      const futureB = db >= now;
+      if (futureA !== futureB) return futureA ? -1 : 1;  // future before past
+      return futureA ? da - db : db - da;  // future: sooner first; past: more-recent first
+    });
+    const groupSize = Math.max(1, Math.ceil(sorted.length / LAYER_COUNT));
+    const result = new Map();
+    sorted.forEach((it, i) => {
+      const group = Math.min(Math.floor(i / groupSize), LAYER_COUNT - 1);
+      result.set(it.m.id, LAYER_MIN + group);
+    });
+    return result;
   }
 
   // ── The map component ──────────────────────────────────────────────
@@ -171,9 +180,9 @@
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
-    const clusterObjs = useRef(new Map());   // cellKey → maplibre Marker (cluster badge)
+    const layerZoomMap = useRef(new Map());  // id → minZoom (9–13) assigned by date proximity
     const userMovedRef = useRef(false);      // stop auto-framing once the user takes control
-    const renderRef = useRef(() => {});      // latest render fn, so moveend can re-cluster
+    const renderRef = useRef(() => {});      // latest render fn, so moveend can re-layer
     const onSelectRef = useRef(onSelect);
     onSelectRef.current = onSelect;
     const onDismissBubbleRef = useRef(onDismissBubble);
@@ -200,49 +209,56 @@
       const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
       map.on('dragstart', onUserMove);
       map.on('zoomstart', onUserMove);
-      // Re-cluster after any pan/zoom settles — clustering is computed in screen
-      // space, so cell membership shifts as the viewport moves.
+      // Re-render after any pan/zoom settles — date layering is zoom-dependent,
+      // so visibility changes as the user zooms in or out.
       map.on('moveend', () => renderRef.current());
       mapRef.current = map;
+
+      // ── Default framing: user location FIRST, national data as fallback ──
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (mapRef.current !== map || userMovedRef.current) return;
+            userMovedRef.current = true;
+            map.flyTo({
+              center: [pos.coords.longitude, pos.coords.latitude],
+              zoom: 12,
+              duration: 0,
+            });
+          },
+          () => { /* denied / unavailable → keep the national fallback */ },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
+        );
+      }
+
       return () => { map.remove(); mapRef.current = null; };
     }, []);
 
-    // (re)render pins + clusters whenever inputs change
+    // (re)render pins whenever inputs change
     useEffect(() => {
       const map = mapRef.current;
       if (!map || !window.maplibregl) return;
 
+      // Resolve coords once and compute date-layer assignments whenever markers change.
+      const items = [];
+      markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
+      layerZoomMap.current = assignLayerZooms(items);
+
       const renderMarkers = () => {
         const mp = mapRef.current;
         if (!mp || !window.maplibregl) return;
-        const clustering = mp.getZoom() < CLUSTER_MAX_ZOOM;
+        const currentZoom = mp.getZoom();
 
-        // Resolve coords once; skip anything that can't be placed.
-        const items = [];
-        markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
-
-        // Decide which items render as individual pins vs fold into clusters.
+        // Filter: always-visible items (live, broadcast, selected) plus items
+        // whose date-group minZoom is at or below the current zoom level.
         const pinItems = [];
-        const clusters = [];   // { key, items:[{m,coords}] }
-        if (clustering) {
-          const cells = new Map();
-          items.forEach((it) => {
-            const m = it.m;
-            // Never bury a live event, an active broadcast, or the selected pin.
-            const always = selectedId === m.id || m.isLive || (m.broadcast && m.broadcast.message);
-            if (always) { pinItems.push(it); return; }
-            const p = mp.project(it.coords);
-            const key = Math.floor(p.x / CLUSTER_CELL) + ':' + Math.floor(p.y / CLUSTER_CELL);
-            if (!cells.has(key)) cells.set(key, []);
-            cells.get(key).push(it);
-          });
-          cells.forEach((arr, key) => {
-            if (arr.length === 1) pinItems.push(arr[0]);
-            else clusters.push({ key, items: arr });
-          });
-        } else {
-          items.forEach((it) => pinItems.push(it));
-        }
+        items.forEach((it) => {
+          const m = it.m;
+          const always = selectedId === m.id || m.isLive || (m.broadcast && m.broadcast.message);
+          if (always || currentZoom >= (layerZoomMap.current.get(m.id) || LAYER_MIN)) {
+            pinItems.push(it);
+          }
+        });
 
         // ── individual pins ──
         const seenPins = new Set();
@@ -275,44 +291,12 @@
         markerObjs.current.forEach((mk, id) => {
           if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
         });
-
-        // ── cluster badges ──
-        const seenClusters = new Set();
-        clusters.forEach(({ key, items: members }) => {
-          seenClusters.add(key);
-          // Average the member coords for a stable badge anchor.
-          let sx = 0, sy = 0;
-          members.forEach((it) => { sx += it.coords[0]; sy += it.coords[1]; });
-          const center = [sx / members.length, sy / members.length];
-          const onClick = () => {
-            userMovedRef.current = true;
-            const b = new window.maplibregl.LngLatBounds(members[0].coords, members[0].coords);
-            members.forEach((it) => b.extend(it.coords));
-            mp.fitBounds(b, { padding: 80, maxZoom: CLUSTER_MAX_ZOOM + 2, duration: 400 });
-          };
-          const el = buildCluster(members.length, onClick);
-          const existing = clusterObjs.current.get(key);
-          if (existing) {
-            existing.getElement().replaceWith(el);
-            existing._element = el;
-            existing.setLngLat(center);
-          } else {
-            const mk = new window.maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(center).addTo(mp);
-            clusterObjs.current.set(key, mk);
-          }
-        });
-        clusterObjs.current.forEach((mk, key) => {
-          if (!seenClusters.has(key)) { mk.remove(); clusterObjs.current.delete(key); }
-        });
       };
 
       renderRef.current = renderMarkers;
       renderMarkers();
 
-      // Auto-frame all markers until the user takes manual control. This
-      // re-fits when the live feed replaces the seed data, so we always open
-      // on the real spread instead of latching onto whatever loaded first.
-      // (fitBounds fires moveend → renderRef re-clusters at the framed zoom.)
+      // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
       if (!userMovedRef.current) {
         const coordsList = markers.map(coordsFor).filter(Boolean);
         if (coordsList.length) {

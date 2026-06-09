@@ -69,10 +69,50 @@
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   function AdminPage() {
-    const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go } = window.useApp();
+    const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser } = window.useApp();
     const [tab, setTab] = useState('applications');
     const [status, setStatus] = useState('all');
     const [search, setSearch] = useState('');
+    const [apiApps, setApiApps] = useState(null);
+
+    // Fetch real contributor applications from the database when an admin is signed in.
+    React.useEffect(() => {
+      if (!isAdmin || !realUser) return;
+      let active = true;
+      (async () => {
+        try {
+          const res = await window.authedFetch('/api/admin/contributor-applications');
+          if (!res.ok || !active) return;
+          const json = await res.json();
+          if (active) setApiApps(json.data || []);
+        } catch (e) { /* fail open — demo data stays visible */ }
+      })();
+      return () => { active = false; };
+    }, [isAdmin, realUser]);
+
+    // Merge reviewed state back into apiApps so the card refreshes immediately.
+    const handleReview = async (id, reviewStatus, note) => {
+      // Optimistic update for real-app state
+      if (apiApps !== null) {
+        setApiApps((prev) => prev.map((a) => a.id === id
+          ? { ...a, status: reviewStatus, reviewNote: note, reviewedAt: new Date().toISOString() }
+          : a));
+      }
+      // Update demo / local store state (covers demo mode + myApplication)
+      reviewApplication(id, reviewStatus, note);
+      // Sync to the review API for real UUID applications
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!UUID_RE.test(id) || !realUser) return;
+      try {
+        const res = await window.authedFetch('/api/admin/contributors/review', {
+          method: 'POST',
+          body: JSON.stringify({ application_id: id, action: reviewStatus === 'approved' ? 'approve' : 'reject', reason: note || '' }),
+        });
+        if (!res.ok) console.warn('[admin review] API error', res.status);
+      } catch (e) { console.warn('[admin review] network error', e); }
+    };
+
+    const displayApps = apiApps !== null ? apiApps : applications;
 
     if (!isAdmin) {
       return h('div', { className: 'flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center' },
@@ -82,8 +122,8 @@
         h(Button, { variant: 'primary', onClick: () => go('home') }, 'Back to Map'));
     }
 
-    const pending = applications.filter((a) => a.status === 'pending').length;
-    const filtered = applications.filter((a) => status === 'all' || a.status === status).filter((a) => !search || a.name.toLowerCase().includes(search.toLowerCase()));
+    const pending = displayApps.filter((a) => a.status === 'pending').length;
+    const filtered = displayApps.filter((a) => status === 'all' || a.status === status).filter((a) => !search || a.name.toLowerCase().includes(search.toLowerCase()));
 
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'admin' },
       h(PageHeader, null,
@@ -94,7 +134,7 @@
             h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, 'Platform management & oversight')),
           pending > 0 && h('span', { className: 'ml-auto px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] text-[#D97706]' }, pending + ' pending')),
         h('div', { className: 'grid grid-cols-4 gap-2 mb-4' },
-          [['Total Apps', applications.length, '#5D6D7E'], ['Pending', pending, '#D97706'], ['Approved', applications.filter((a) => a.status === 'approved').length, '#16A34A'], ['Rejected', applications.filter((a) => a.status === 'rejected').length, '#DC2626']]
+          [['Total Apps', displayApps.length, '#5D6D7E'], ['Pending', pending, '#D97706'], ['Approved', displayApps.filter((a) => a.status === 'approved').length, '#16A34A'], ['Rejected', displayApps.filter((a) => a.status === 'rejected').length, '#DC2626']]
             .map(([l, v, c]) => h('div', { key: l, className: 'bg-card rounded-xl p-2.5 border border-border text-center' },
               h('p', { className: 'text-base font-bold', style: { color: c } }, v),
               h('p', { className: 'text-[9px] text-muted-foreground' }, l)))),
@@ -109,7 +149,7 @@
             ['all', 'pending', 'approved', 'rejected'].map((s) => h('button', { key: s, onClick: () => setStatus(s), className: cx('px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap capitalize transition-all', status === s ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground') }, s))),
           filtered.length === 0
             ? h(Empty, { icon: 'FileText', title: 'No applications match your filter' })
-            : filtered.map((a) => h(AppCard, { key: a.id, app: a, onReview: reviewApplication }))),
+            : filtered.map((a) => h(AppCard, { key: a.id, app: a, onReview: handleReview }))),
 
         tab === 'overview' && h(window.AdminOverview, { setTab }),
 

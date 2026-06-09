@@ -242,7 +242,9 @@
       case 'onboarding': return React.createElement(window.OnboardingPage);
       case 'event': return React.createElement(window.EventProfilePage, { id: nav.params.id });
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
-      case 'profile': return React.createElement(window.ContributorProfilePage, { id: nav.params.id });
+      case 'profile': return nav.params.id
+        ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
+        : React.createElement(window.CitizenProfilePage);
       default: return React.createElement(window.HomePage);
     }
   }

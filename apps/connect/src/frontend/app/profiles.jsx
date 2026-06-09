@@ -131,6 +131,45 @@
           h(Gallery, { imgs: pl.gallery }))));
   }
 
+  // ── Citizen (own profile) ──
+  function CitizenProfilePage() {
+    const app = window.useApp();
+    const { user, events, connected, considering, go } = app;
+    const connectedEvents = events.filter((e) => connected.has(e.id)).slice(0, 6);
+    const consideringEvents = events.filter((e) => considering.has(e.id)).slice(0, 4);
+    return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
+      h(Scroll, null,
+        h('div', { className: 'relative h-44 sm:h-52' },
+          h('img', { src: user.coverPhoto, className: 'w-full h-full object-cover' }),
+          h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' }),
+          h(BackBar, { onBack: () => go('home'), floating: true })),
+        h('div', { className: 'px-4 max-w-2xl mx-auto -mt-12 relative space-y-4' },
+          h(Avatar, { src: user.profilePhoto, size: 84, rounded: 'xl', ring: '#F7F4EE' }),
+          h('div', null,
+            h('h1', { className: 'text-xl text-foreground font-display' }, user.name),
+            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, 'Citizen')),
+          user.bio && h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, user.bio),
+          connectedEvents.length > 0 && h('div', null,
+            h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Attending (' + connectedEvents.length + ')'),
+            h('div', { className: 'grid grid-cols-2 gap-2' }, connectedEvents.map((e) =>
+              h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'rounded-2xl overflow-hidden border border-border bg-card text-left' },
+                h('div', { className: 'relative h-20' },
+                  h('img', { src: e.coverPhoto, className: 'w-full h-full object-cover' }),
+                  e.isLive && h('span', { className: 'absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full' }, 'LIVE')),
+                h('div', { className: 'p-2' },
+                  h('p', { className: 'text-xs font-bold text-foreground truncate' }, e.title),
+                  h('p', { className: 'text-[10px] text-muted-foreground' }, e.date ? new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')))))),
+          consideringEvents.length > 0 && h('div', null,
+            h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Considering (' + consideringEvents.length + ')'),
+            h('div', { className: 'space-y-2' }, consideringEvents.map((e) =>
+              h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'w-full flex items-center gap-3 p-2.5 bg-card rounded-2xl border border-border text-left' },
+                h(Avatar, { src: e.coverPhoto, size: 40, rounded: 'xl' }),
+                h('div', { className: 'flex-1 min-w-0' },
+                  h('p', { className: 'text-sm font-bold text-foreground truncate' }, e.title),
+                  h('p', { className: 'text-xs text-muted-foreground' }, e.date ? new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
+                h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground' }))))))));
+  }
+
   // ── Contributor ──
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
@@ -200,4 +239,5 @@
   window.EventProfilePage = EventProfilePage;
   window.PlaceProfilePage = PlaceProfilePage;
   window.ContributorProfilePage = ContributorProfilePage;
+  window.CitizenProfilePage = CitizenProfilePage;
 })();

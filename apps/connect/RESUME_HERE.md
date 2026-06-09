@@ -314,7 +314,12 @@ from tsc/eslint/vitest as always.
 ### Polish (increment #3)
 - **AM/PM time** (store.jsx `fmtTime` → `en-US` `hour12`). **Dropped the "Route" legend row** + ALL
   dead route code (`routes` const + prop, `isMobile`/`route` marker fields, the ROUTE cover badge) —
-  real events have no routes. Default framing = frame-to-data (honest national spread) kept.
+  real events have no routes. **Default framing = USER LOCATION FIRST, national data as fallback**
+  (2026-06-09 founder decision): on load the map tries `navigator.geolocation` → centres on the
+  citizen's own area at city zoom (individual pins, local belonging); on denial / no support / timeout
+  it falls back to the national fit-to-data. Both a real gesture and a geo success set `userMovedRef`,
+  so the view is never yanked once settled. (Headless preview has geolocation disabled → it always
+  exercises the national fallback; the geo path needs a real browser + permission grant to verify.)
 - **Preview-panel organiser row made crash-safe** (home.jsx `PreviewPanel`): real directory contributor
   → tappable to its profile (+ verified tick); only-a-name (community-posted, no directory match) →
   non-tappable name row; no organiser → row omitted. Mirrors the §2e profile-page fix — real events/
@@ -340,6 +345,61 @@ from tsc/eslint/vitest as always.
 - **Manual (founder, can't be scripted — live Google OAuth):** hard-refresh localhost → real places at
   real coords; zoom out → gold clusters over Gauteng, click one to zoom/split; live & selected pins
   never hide; sign in → Follow a real place → reload (persists). Then **merge the branch to main**.
+
+---
+
+## 2h. Post-Phase-2 Multi-Issue Fixes ✅ (2026-06-09)
+
+Six bugs fixed in one batch. Working log: `.claude/sessions/bugfix-all-issues.md`.
+`src/frontend/` excluded from tsc/eslint/vitest; **tsc 0** re-confirmed after new API route.
+
+### A. Vercel 404 at www.citizenscentral.co.za — FIXED
+- **Root cause:** Next.js project is API-only (no root `page.tsx`); `public/` had no HTML frontend.
+- **Fix:**
+  - **[scripts/build-frontend.js](scripts/build-frontend.js)** (NEW) — pre-build script copies `src/frontend/*` → `public/` and generates `public/config.js` from env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_MAPTILER_KEY`, `NEXT_PUBLIC_MAPTILER_STYLE`, `NEXT_PUBLIC_API_BASE_URL`). `config.js` skipped in the copy (generated fresh).
+  - **[package.json](package.json)** — `"build"` now: `node scripts/build-frontend.js && next build`.
+  - **[next.config.ts](next.config.ts)** — `async redirects()` adds `{ source: '/', destination: '/index.html', permanent: false }`. CSP expanded: `script-src` ← `unpkg.com cdn.tailwindcss.com cdn.jsdelivr.net`; `style-src` ← `unpkg.com fonts.googleapis.com`; `img-src` ← `images.unsplash.com`.
+  - **[.gitignore](.gitignore)** — generated `public/index.html`, `public/auth-client.js`, `public/config*.js`, `public/app/` are now gitignored (build artifacts, not committed).
+  - **Vercel env vars needed:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_MAPTILER_KEY`, `NEXT_PUBLIC_MAPTILER_STYLE`. Set `NEXT_PUBLIC_API_BASE_URL=''` (empty → same-origin). CORS `ALLOWED_FRONTEND_ORIGIN` can stay pointing at localhost for dev; same-origin production requests bypass CORS anyway.
+
+### B. Map clustering removed → date-based zoom layering — FIXED
+- **Root cause:** Grid clustering (CLUSTER_CELL/CLUSTER_MAX_ZOOM) was slow and obscured density.
+- **Fix** ([map.jsx](src/frontend/app/map.jsx)):
+  - Removed: `CLUSTER_CELL`, `CLUSTER_MAX_ZOOM`, `buildCluster()`, `clusterObjs` ref, all cluster logic.
+  - Added: `assignLayerZooms(items)` — sorts items by date proximity (future-closest first, then recent past; undated last), divides into 5 groups, assigns `minZoom` 9–13. `LAYER_MIN=9`, `LAYER_MAX=13`, `LAYER_COUNT=5`.
+  - `renderMarkers()` now filters: shows an item if `currentZoom >= item.minZoom` OR the item is always-visible (live / active broadcast / selected). `moveend` still re-renders (zoom-dependent layering). Layer zoom map recomputed when `markers` prop changes.
+
+### C. Citizen profile → "Contributor doesn't exist" — FIXED
+- **Root cause:** `go('profile')` passed no `id`; `ContributorProfilePage(id=undefined)` → not found.
+- **Fix:** Added `CitizenProfilePage` to [profiles.jsx](src/frontend/app/profiles.jsx) — shows the signed-in user's photo, name, bio, attending events, and considering events. Updated [shell.jsx](src/frontend/app/shell.jsx) `case 'profile'` router: `nav.params.id` present → `ContributorProfilePage`; absent → `CitizenProfilePage`.
+
+### D. Apply form → route to map on completion — FIXED
+- **Root cause:** `submitApplication` in [store.jsx](src/frontend/app/store.jsx) didn't call `go()`.
+- **Fix:** Added `go('home')` after the toast. Also wired a background API call to `POST /api/contributor/apply` for real signed-in users (no-op in demo mode, fires-and-forgets on failure). `realUser` added to the `useCallback` deps.
+- Shell sidebar already showed "Application under review" when `myApplication.status === 'pending'` — no change needed there.
+
+### E. Message title shows "Contributor" — FIXED
+- **Root cause:** `adaptContributor` in [store.jsx](src/frontend/app/store.jsx) fell back to the literal string `'Contributor'` when `full_name` is `null`; this string was then stored as the conversation's `participantName`.
+- **Fix:** Fallback is now `contributor_slug` converted to Title Case (e.g. `grace-city-church` → `Grace City Church`), or `'Unnamed Ministry'` if slug is also null.
+
+### F. Admin contributor applications not wired — FIXED
+- **Root cause:** `applications` in the store was local-only mock state; no DB fetch wired.
+- **Fix:**
+  - **NEW [src/app/api/admin/contributor-applications/route.ts](src/app/api/admin/contributor-applications/route.ts)** — `GET /api/admin/contributor-applications`. Admin-only (`requireAdmin` guard). Returns all applications (all statuses, newest first) shaped for `AppCard`: `{ id, name, photo, bio, category, website, location, reason, socials, status, submittedAt }`.
+  - **[admin.jsx](src/frontend/app/admin.jsx)** — local `apiApps` state; `React.useEffect` fetches from the new endpoint when `isAdmin && realUser`. Falls back to demo `applications` when API is unavailable. `handleReview` updates `apiApps` optimistically + calls `reviewApplication` (store) + POSTs to `/api/admin/contributors/review` for real UUID apps.
+  - **[store.jsx](src/frontend/app/store.jsx)** — `realUser` exposed in the context value; `window.authedFetch` exposed globally so admin.jsx can reach it.
+
+### cache-bust
+- `?v=` token bumped: `20260609c` → **`20260609d`** (index.html, all 20 script refs).
+
+### Gates
+- **tsc 0** · no lint warnings in changed TS files · frontend excluded from tsc/vitest. New API route follows exact same pattern as existing admin routes (`requireAdmin`, `createClient`, `NextResponse.json`). Vibe-security: read-only route, admin-guarded, no secrets, no new writes. **No DB changes → next migration # still 131.**
+
+### Deferred / manual verification needed
+- Vercel: add `NEXT_PUBLIC_*` env vars, redeploy, confirm `www.citizenscentral.co.za` serves the app.
+- Local: hard-refresh, sign in as citizen → "View Profile" → should show citizen profile page.
+- Local: sign in as citizen → apply flow → submit → should land on map, sidebar should show "under review".
+- Local: sign in as admin → Admin Panel → applications tab → should show real DB applications (not just demo data when real user is signed in).
 
 ---
 
