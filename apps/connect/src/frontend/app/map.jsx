@@ -12,10 +12,10 @@
 //  greater-Pretoria bounding box so they still place sensibly during the
 //  mock→real data migration.
 //
-//  Date-based zoom layering: items are sorted by event-date proximity
-//  (closest future first, then recent past last) and split into 5 equal
-//  groups assigned minZoom 9–13. At zoom ≥ 13 all items are visible.
-//  Live events, active broadcasts, and the selected pin are always visible.
+//  Visibility: EVERY item with coordinates is shown — no clustering and no
+//  zoom-based layering (both were tried and both ended up hiding events).
+//  MapLibre repositions DOM markers itself as the user zooms/pans, so the
+//  marker set only re-renders when the data / filter / selection changes.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useRef, useEffect } = React;
@@ -45,24 +45,23 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
-  // ── DOM pin builder (mirrors the prototype's teardrop / dot / glass) ──
-  function buildPin(m, cat, opts) {
+  // ── Pin content builder ─────────────────────────────────────────────
+  //  Returns the INNER node (a position:relative wrapper holding the pulse
+  //  ring, the pin shape, the broadcast bubble and the selected label).
+  //
+  //  The OUTER element handed to MapLibre is built (and kept) by the render
+  //  loop and is NEVER replaced — MapLibre adds its `maplibregl-marker` class
+  //  (which carries `position:absolute`) once at construction and anchors the
+  //  pin to its lng/lat with a transform. Replacing that element on every
+  //  re-render dropped the class → the pin fell to `position:static` and
+  //  drifted on zoom/pan. So on reuse we swap only this inner content.
+  function buildPinInner(m, cat, opts) {
     const selected = opts.selected, pinStyle = opts.pinStyle;
     const isIdea = m.type === 'idea';
     const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
 
-    // Outer element handed to MapLibre. It must NOT set `position` — MapLibre's
-    // `.maplibregl-marker { position:absolute }` rule anchors the pin to its
-    // lng/lat via a transform. An inline `position:relative` here would override
-    // that rule and the pin would drift on zoom/pan instead of staying glued.
-    // All decoration is positioned relative to `inner` instead.
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'cursor:pointer;line-height:0;';
-    if (opts.dim) wrap.style.opacity = '0.3';
-
     const inner = document.createElement('div');
     inner.style.cssText = 'position:relative;line-height:0;';
-    wrap.appendChild(inner);
 
     // live / busy pulse ring (behind the pin)
     if (m.isLive || m.isBusy) {
@@ -97,18 +96,22 @@
     }
     inner.appendChild(pin);
 
-    // broadcast bubble (above the pin)
+    // broadcast bubble (above the pin). Capped width with a clean one-line
+    // ellipsis: the text child needs `min-width:0` for the ellipsis to engage
+    // inside the flex row, and the bubble itself sizes to its content up to the
+    // cap, so short updates stay small instead of stretching into a long bar.
     if (m.broadcast && m.broadcast.message) {
       const b = document.createElement('div');
       b.className = 'cc-pin-bubble';
       b.style.cssText = 'position:absolute;left:50%;bottom:100%;margin-bottom:10px;' +
-        'transform:translateX(-50%);max-width:170px;display:flex;align-items:center;gap:4px;' +
+        'transform:translateX(-50%);max-width:188px;width:max-content;display:flex;align-items:center;gap:5px;' +
         'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:14px 14px 14px 4px;' +
-        'padding:4px 8px;box-shadow:0 6px 16px rgba(0,0,0,.16);white-space:nowrap;overflow:hidden;';
+        'padding:5px 9px;box-shadow:0 6px 16px rgba(0,0,0,.16);';
       const dot = document.createElement('span');
       dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#C9A84C;flex:0 0 auto;';
       const txt = document.createElement('span');
-      txt.style.cssText = 'font-size:9px;font-weight:600;color:#0A0908;overflow:hidden;text-overflow:ellipsis;';
+      txt.style.cssText = 'flex:0 1 auto;min-width:0;font-size:10px;line-height:1.3;font-weight:600;color:#0A0908;' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
       txt.textContent = m.broadcast.message;
       b.appendChild(dot); b.appendChild(txt);
       // Dismiss × — only for real (dismissible) bubbles with a handler wired.
@@ -132,46 +135,14 @@
     if (selected && m.title) {
       const l = document.createElement('div');
       l.style.cssText = 'position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;' +
-        'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
-        'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.18);';
+        'max-width:200px;background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
+        'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+        'box-shadow:0 3px 10px rgba(0,0,0,.18);';
       l.textContent = m.title;
       inner.appendChild(l);
     }
 
-    return wrap;
-  }
-
-  // ── Date-based zoom layering ────────────────────────────────────────
-  //  Items sorted by event-date proximity: future events closest to now
-  //  come first; past events ordered most-recent first; undated items last.
-  //  Divided into 5 equal groups → minZoom 9 (widest) through 13 (closest).
-  //  At zoom ≥ 13 everything is visible. Live/broadcast/selected bypass the
-  //  filter entirely (VISION: make the unseen seen — don't bury what's live).
-  const LAYER_MIN = 9;
-  const LAYER_MAX = 13;
-  const LAYER_COUNT = LAYER_MAX - LAYER_MIN + 1;  // 5 groups
-
-  function assignLayerZooms(items) {
-    if (!items.length) return new Map();
-    const now = Date.now();
-    const sorted = [...items].sort((a, b) => {
-      const da = a.m.date ? new Date(a.m.date).getTime() : null;
-      const db = b.m.date ? new Date(b.m.date).getTime() : null;
-      if (da === null && db === null) return 0;
-      if (da === null) return 1;   // undated items sink to the back
-      if (db === null) return -1;
-      const futureA = da >= now;
-      const futureB = db >= now;
-      if (futureA !== futureB) return futureA ? -1 : 1;  // future before past
-      return futureA ? da - db : db - da;  // future: sooner first; past: more-recent first
-    });
-    const groupSize = Math.max(1, Math.ceil(sorted.length / LAYER_COUNT));
-    const result = new Map();
-    sorted.forEach((it, i) => {
-      const group = Math.min(Math.floor(i / groupSize), LAYER_COUNT - 1);
-      result.set(it.m.id, LAYER_MIN + group);
-    });
-    return result;
+    return inner;
   }
 
   // ── The map component ──────────────────────────────────────────────
@@ -180,9 +151,7 @@
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
-    const layerZoomMap = useRef(new Map());  // id → minZoom (9–13) assigned by date proximity
     const userMovedRef = useRef(false);      // stop auto-framing once the user takes control
-    const renderRef = useRef(() => {});      // latest render fn, so moveend can re-layer
     const onSelectRef = useRef(onSelect);
     onSelectRef.current = onSelect;
     const onDismissBubbleRef = useRef(onDismissBubble);
@@ -209,9 +178,6 @@
       const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
       map.on('dragstart', onUserMove);
       map.on('zoomstart', onUserMove);
-      // Re-render after any pan/zoom settles — date layering is zoom-dependent,
-      // so visibility changes as the user zooms in or out.
-      map.on('moveend', () => renderRef.current());
       mapRef.current = map;
 
       // ── Default framing: user location FIRST, national data as fallback ──
@@ -231,79 +197,70 @@
         );
       }
 
-      return () => { map.remove(); mapRef.current = null; };
+      return () => {
+        markerObjs.current.forEach((mk) => mk.remove());
+        markerObjs.current.clear();
+        map.remove();
+        mapRef.current = null;
+      };
     }, []);
 
-    // (re)render pins whenever inputs change
+    // (re)render pins whenever inputs change. Visibility is no longer
+    // zoom-dependent, so this only needs to run on data/filter/selection/style
+    // changes — MapLibre keeps each marker glued to its coordinate on zoom/pan.
     useEffect(() => {
-      const map = mapRef.current;
-      if (!map || !window.maplibregl) return;
+      const mp = mapRef.current;
+      if (!mp || !window.maplibregl) return;
 
-      // Resolve coords once and compute date-layer assignments whenever markers change.
+      // Resolve coordinates once.
       const items = [];
       markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
-      layerZoomMap.current = assignLayerZooms(items);
 
-      const renderMarkers = () => {
-        const mp = mapRef.current;
-        if (!mp || !window.maplibregl) return;
-        const currentZoom = mp.getZoom();
-
-        // Filter: always-visible items (live, broadcast, selected) plus items
-        // whose date-group minZoom is at or below the current zoom level.
-        const pinItems = [];
-        items.forEach((it) => {
-          const m = it.m;
-          const always = selectedId === m.id || m.isLive || (m.broadcast && m.broadcast.message);
-          if (always || currentZoom >= (layerZoomMap.current.get(m.id) || LAYER_MIN)) {
-            pinItems.push(it);
-          }
-        });
-
-        // ── individual pins ──
-        const seenPins = new Set();
-        pinItems.forEach(({ m, coords }) => {
-          seenPins.add(m.id);
-          const cat = window.DATA.getCategory(m.category);
-          const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
-          const selected = selectedId === m.id;
-          const el = buildPin(m, cat, { selected, dim, pinStyle, onDismissBubble: onDismissBubbleRef.current });
-          el.addEventListener('click', (e) => {
+      // ── individual pins — show them all ──
+      const seenPins = new Set();
+      items.forEach(({ m, coords }) => {
+        seenPins.add(m.id);
+        const cat = window.DATA.getCategory(m.category);
+        const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
+        const selected = selectedId === m.id;
+        const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
+        const inner = buildPinInner(m, cat, { selected, pinStyle, onDismissBubble: onDismissBubbleRef.current });
+        const existing = markerObjs.current.get(m.id);
+        // Reuse the marker (and its MapLibre-owned outer element) whenever the
+        // anchor is unchanged — swap ONLY the inner content so the
+        // `maplibregl-marker` class + absolute positioning survive. The anchor
+        // is fixed at construction, so a pinStyle switch (teardrop↔center)
+        // forces a rebuild or the pin would render off its coordinate.
+        if (existing && existing._ccAnchor === anchor) {
+          const wrap = existing.getElement();
+          wrap.style.opacity = dim ? '0.3' : '';
+          wrap.replaceChildren(inner);
+          existing.setLngLat(coords);
+        } else {
+          if (existing) existing.remove();
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'cursor:pointer;line-height:0;';
+          if (dim) wrap.style.opacity = '0.3';
+          wrap.appendChild(inner);
+          wrap.addEventListener('click', (e) => {
             e.stopPropagation();
             onSelectRef.current && onSelectRef.current(m.id, m.type);
           });
-          const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
-          const existing = markerObjs.current.get(m.id);
-          // Reuse the marker only while its anchor is unchanged; the anchor is
-          // fixed at construction, so a pinStyle switch (teardrop↔center) must
-          // rebuild the marker or it would render off its coordinate.
-          if (existing && existing._ccAnchor === anchor) {
-            existing.getElement().replaceWith(el);
-            existing._element = el;                 // keep ref in sync
-            existing.setLngLat(coords);
-          } else {
-            if (existing) existing.remove();
-            const mk = new window.maplibregl.Marker({ element: el, anchor }).setLngLat(coords).addTo(mp);
-            mk._ccAnchor = anchor;
-            markerObjs.current.set(m.id, mk);
-          }
-        });
-        markerObjs.current.forEach((mk, id) => {
-          if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
-        });
-      };
-
-      renderRef.current = renderMarkers;
-      renderMarkers();
+          const mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
+          mk._ccAnchor = anchor;
+          markerObjs.current.set(m.id, mk);
+        }
+      });
+      // drop markers whose item is gone
+      markerObjs.current.forEach((mk, id) => {
+        if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
+      });
 
       // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
-      if (!userMovedRef.current) {
-        const coordsList = markers.map(coordsFor).filter(Boolean);
-        if (coordsList.length) {
-          const b = new window.maplibregl.LngLatBounds(coordsList[0], coordsList[0]);
-          coordsList.forEach((c) => b.extend(c));
-          map.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
-        }
+      if (!userMovedRef.current && items.length) {
+        const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
+        items.forEach(({ coords }) => b.extend(coords));
+        mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
       }
     }, [markers, filterCategory, selectedId, pinStyle]);
 

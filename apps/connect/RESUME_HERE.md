@@ -348,6 +348,55 @@ from tsc/eslint/vitest as always.
 
 ---
 
+## 2i. Map regression fixes — markers not showing + floating pins + broadcast bubbles ✅ (2026-06-09)
+
+Three founder-reported map bugs, all traced to the marker render loop in
+[map.jsx](src/frontend/app/map.jsx) and the §2h date-layering. Verified end-to-end in preview
+(mock + real data, incl. a zoom anchor test). Working log: `.claude/sessions/map-markers-broadcast-fix.md`.
+Frontend-only (`src/frontend/` excluded from tsc/eslint/vitest); **tsc 0** re-confirmed (backend untouched).
+**Commit pending push (held for founder auth, per repo convention).**
+
+### Root causes
+- **Marker reuse broke positioning + wiped pins.** The reuse path did
+  `existing.getElement().replaceWith(el); existing._element = el;`. The fresh `el` did NOT carry
+  MapLibre's `maplibregl-marker` class (added once at construction → `position:absolute`), so the
+  pin fell to `position:static` + a transform → **floated** on zoom/pan. Verified live:
+  `.maplibregl-marker` count was 0 and no pin wraps were attached to the canvas container.
+- **Date-based zoom-gate hid events.** §2h's `assignLayerZooms` only showed an item when
+  `currentZoom >= its minZoom (9–13)`. At national fit-zoom (<9) **every** non-live/non-broadcast
+  marker was hidden → "not all events showing". (Confirmed: real data = 140 markers, all hidden at
+  national zoom until fixed.) A render where the filter emptied also tripped the remove-pass → all pins gone.
+- **Broadcast bubble CSS.** `white-space:nowrap` on the row + a flex text child with default
+  `min-width:auto` meant `text-overflow:ellipsis` never engaged → long messages clipped/stretched
+  ("very long"); the floating made them look detached/contentless.
+
+### Fix ([map.jsx](src/frontend/app/map.jsx))
+1. **Removed date-layering entirely** (`assignLayerZooms`, `LAYER_*`, `layerZoomMap`) + the zoom-gate
+   filter + the `moveend` re-render + `renderRef`. **All items with coords now render**; MapLibre
+   repositions DOM markers itself on zoom/pan, so the set only re-renders on data/filter/selection/style change.
+   (Both clustering — §2g/§2h — and layering are now gone; we show everything. VISION: make the unseen seen.)
+2. **Split `buildPin` → `buildPinInner`** (returns only the inner decoration node). The OUTER element
+   MapLibre owns is created once and **never replaced**; on reuse we swap only its children
+   (`wrap.replaceChildren(inner)`) + update opacity + `setLngLat`, so the `maplibregl-marker` class +
+   absolute positioning survive → **pins stay anchored**. (Anchor still rebuilds on a teardrop↔center pinStyle flip.)
+3. **Broadcast bubble**: `max-width:188px` + `width:max-content`; text child gets `min-width:0` +
+   one-line ellipsis → short updates stay small, long ones truncate cleanly. Selected label also capped + ellipsised.
+4. **Clear `markerObjs` on map cleanup** (insurance against stale marker objects).
+
+### Verification (preview)
+- Mock data: 10/10 markers, all `position:absolute`; 3 bubbles show content, cap at 188px, ellipsis-truncate.
+- Zoom in/out: transforms change (glued to coords), all markers stay absolute + keep the class, count stable — **no floating**.
+- Real data (localhost:3000): **140/140 markers render + anchored**, 0 console errors.
+- index.html cache-bust bumped `?v=20260609d` → **`?v=20260609e`** (20 refs).
+
+### Note for the next session
+- §2h's date-layering is GONE. If marker density ever needs managing again, do it WITHOUT hiding
+  events by zoom (that was the regression) — e.g. collision-aware label hiding, or a non-destructive overlay.
+- `config.js` API_BASE_URL is local-only (gitignored); it was momentarily pointed at a dead port to
+  force the mock-data path during bubble verification, then restored to `http://localhost:3000`.
+
+---
+
 ## 2h. Post-Phase-2 Multi-Issue Fixes ✅ (2026-06-09)
 
 Six bugs fixed in one batch. Working log: `.claude/sessions/bugfix-all-issues.md`.
