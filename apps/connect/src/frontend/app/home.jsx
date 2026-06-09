@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useState, useRef } = React;
-  const { cx, Avatar, Button, CategoryBadge } = window.UI;
+  const { cx, Avatar, SmartImage, Button, CategoryBadge } = window.UI;
   const Icon = window.Icon;
 
   // ── Preview panel (on pin click) ──
@@ -56,7 +56,7 @@
     return Wrapper(onClose, React.createElement(React.Fragment, null,
       // ── cover ──
       React.createElement('div', { className: 'relative h-40 shrink-0' },
-        React.createElement('img', { src: item.coverPhoto, className: 'w-full h-full object-cover' }),
+        React.createElement(SmartImage, { src: item.coverPhoto, cat, label: isEvent ? 'Event' : 'Place', alt: item.title || item.name, className: 'w-full h-full' }),
         React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-black/25' }),
         // category badge (top-left)
         cat && React.createElement('span', { className: 'absolute top-3 left-3 inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full text-[10px] font-bold text-white shadow-lg', style: { background: hex } },
@@ -202,7 +202,7 @@
             React.createElement(Icon, { name: 'SlidersHorizontal', size: 16, className: filter ? 'text-gold' : 'text-foreground/60' })),
           React.createElement('div', { className: 'relative shrink-0' },
             React.createElement('button', { onClick: () => setShowProfile((s) => !s), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
-              React.createElement('img', { src: user.profilePhoto, className: 'w-full h-full object-cover' }),
+              React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl' }),
               role !== 'citizen' && React.createElement('span', { className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center' }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-white' }))),
             showProfile && React.createElement(window.ProfilePanel, { onClose: () => setShowProfile(false), anchor: 'top' }))),
 

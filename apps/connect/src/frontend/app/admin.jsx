@@ -26,7 +26,7 @@
     return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
       h('div', { className: 'p-4' },
         h('div', { className: 'flex items-start gap-3' },
-          h(Avatar, { src: app.photo, size: 48, rounded: 'xl' }),
+          h(Avatar, { src: app.photo, name: app.name, size: 48, rounded: 'xl' }),
           h('div', { className: 'flex-1 min-w-0' },
             h('div', { className: 'flex items-center gap-2 flex-wrap' },
               h('p', { className: 'text-sm font-bold text-foreground' }, app.name),

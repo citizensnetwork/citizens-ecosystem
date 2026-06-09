@@ -114,7 +114,7 @@
       !isEvent && h(Field, { label: 'Opening hours' }, h(Input, { value: f.openHours, onChange: (e) => up('openHours', e.target.value), placeholder: 'Mon–Fri 9AM–9PM' })));
 
     const Media = h(F, null,
-      h(Field, { label: 'Cover photo', required: true }, h(MediaPicker, { value: f.coverPhoto, onChange: (v) => up('coverPhoto', v) })),
+      h(Field, { label: 'Cover photo', required: true }, h(MediaPicker, { value: f.coverPhoto, onChange: (v) => up('coverPhoto', v), scope: isEvent ? 'event-cover' : 'place-cover' })),
       h(Field, { label: 'Gallery', hint: 'Add photos & videos citizens will see on your profile.' },
         h('div', { className: 'grid grid-cols-4 gap-1.5 mb-2' },
           f.gallery.map((g, i) => h('div', { key: i, className: 'relative aspect-square rounded-lg overflow-hidden group' },

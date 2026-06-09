@@ -26,12 +26,56 @@
     return fetch(base + path, Object.assign({}, opts, { headers }));
   }
 
+  // Upload a real image file → Supabase Storage, returning its public URL. Two
+  // server paths by scope:
+  //   • 'avatar'                      → POST /api/avatar (multipart); ALSO persists
+  //                                     profiles.avatar_url for the signed-in user.
+  //   • 'event-cover' | 'place-cover' → POST /api/media/upload mints a signed upload
+  //                                     URL, then bytes go straight to Storage (one hop).
+  // Requires a real signed-in user (Bearer). In demo / unconfigured mode there is no
+  // token, so we throw a friendly error and the caller keeps the stock/URL options.
+  async function uploadImage(file, opts) {
+    opts = opts || {};
+    const scope = opts.scope || 'event-cover';
+    if (!window.CC_AUTH) throw new Error('Sign in with Google to upload your own photo.');
+    const token = await window.CC_AUTH.getAccessToken();
+    if (!token) throw new Error('Sign in with Google to upload your own photo.');
+    const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+    const readErr = async (res, fallback) => {
+      const body = await res.json().catch(() => ({}));
+      return new Error((body && body.error) || fallback);
+    };
+
+    if (scope === 'avatar') {
+      const fd = new FormData();
+      fd.append('file', file);
+      // NB: do NOT set Content-Type — the browser adds the multipart boundary itself.
+      const res = await fetch(base + '/api/avatar', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd,
+      });
+      if (!res.ok) throw await readErr(res, 'Could not upload your photo. Please try again.');
+      return (await res.json()).avatar_url;
+    }
+
+    // Cover scopes: mint a signed upload URL, then push the bytes to Storage directly.
+    const signRes = await authedFetch('/api/media/upload', {
+      method: 'POST',
+      body: JSON.stringify({ scope, filename: file.name, contentType: file.type, size: file.size }),
+    });
+    if (!signRes.ok) throw await readErr(signRes, 'Could not start the upload. Please try again.');
+    const { bucket, path, token: uploadToken, publicUrl } = await signRes.json();
+    const { error } = await window.CC_AUTH.supabase.storage.from(bucket).uploadToSignedUrl(path, uploadToken, file);
+    if (error) throw new Error('Upload failed. Please try again.');
+    return publicUrl;
+  }
+
   // ── Live data adapter: /api/v1/events row → app event shape ──────────
   //  The public API is sparse (no organiser name / connect counts yet), so we
   //  fill honest defaults (0 counts, blank organiser) and compute `isLive` from
   //  the event window. Coordinates carry through as lat/lng for the real map.
-  const FALLBACK_COVER = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=500&fit=crop';
-  const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=200&h=200&fit=crop';
+  // Real rows with no image get an EMPTY photo (not a stock stand-in): the UI's
+  // SmartImage/Avatar then render an honest, category-tinted placeholder rather
+  // than a generic stranger's photo masquerading as a real venue/person.
   const fmtTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
   function adaptEvent(r) {
     const dt = r.date ? new Date(r.date) : null;
@@ -51,7 +95,7 @@
       organizerName: r.community_contributor || '', organizerId: r.created_by || null,
       isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
       isBusy: false, connectCount: 0, considerCount: 0, volunteeringEnabled: false,
-      coverPhoto: r.image_url || FALLBACK_COVER,
+      coverPhoto: r.image_url || '',
       gallery: [], broadcast: null, website: r.website_url || '',
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
@@ -77,8 +121,8 @@
       role: 'contributor',
       kind: r.contributor_kind || 'organization',
       slug: r.contributor_slug || null,
-      profilePhoto: r.logo_url || r.avatar_url || FALLBACK_AVATAR,
-      coverPhoto: FALLBACK_COVER,
+      profilePhoto: r.logo_url || r.avatar_url || '',
+      coverPhoto: '',
       bio: r.bio || '',
       website: r.website_url || '',
       location: r.physical_address || '',
@@ -105,7 +149,7 @@
       description: r.description || '',
       address: r.address || '',
       organizerName: '', organizerId: r.created_by || null,
-      coverPhoto: r.image_url || FALLBACK_COVER,
+      coverPhoto: r.image_url || '',
       gallery: [],
       openHours: '',
       website: r.website || '', phone: r.phone || '',
@@ -208,7 +252,9 @@
       ? { ...baseUser,
           id: realUser.id || baseUser.id,
           name: realUser.name || baseUser.name,
-          profilePhoto: realUser.avatarUrl || baseUser.profilePhoto }
+          // Empty (not the demo stock face) when the real user has no avatar →
+          // Avatar renders their initials. Demo mode keeps baseUser's stock photo.
+          profilePhoto: realUser.avatarUrl || '' }
       : baseUser;
 
     // ── actions ─────────────────────────────────────────────────────
@@ -677,6 +723,13 @@
     const unreadNotifs = notifications.filter((n) => !n.read).length;
     const unreadMsgs = conversations.reduce((a, c) => a + c.unread, 0);
 
+    // Reflect a freshly-uploaded avatar immediately (header + profile). The
+    // /api/avatar route already persisted it to profiles.avatar_url, so this is
+    // just the optimistic in-session overlay for citizen/admin. No-op in demo mode.
+    const updateAvatar = useCallback((url) => {
+      setRealUser((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
+    }, []);
+
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
     const value = {
@@ -692,7 +745,7 @@
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       unreadNotifs, unreadMsgs, toasts, toast,
-      createKind, openCreate, closeCreate,
+      createKind, openCreate, closeCreate, updateAvatar,
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
@@ -710,4 +763,5 @@
   window.AppProvider = AppProvider;
   window.useApp = useApp;
   window.authedFetch = authedFetch;
+  window.uploadImage = uploadImage;
 })();

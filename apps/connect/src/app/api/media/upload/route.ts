@@ -29,7 +29,7 @@
  * Returns: { bucket, path, token, publicUrl, kind: "image" | "video" }
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -58,11 +58,8 @@ const SCOPE_CONFIG: Record<
 };
 
 export async function POST(request: Request) {
-  // 1. Auth
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 1. Auth — Bearer (cross-origin static/Capacitor frontend) OR cookie (same-origin).
+  const { user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

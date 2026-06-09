@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useState, useEffect, useRef } = React;
-  const { cx, Avatar, Toasts } = window.UI;
+  const { cx, Avatar, SmartImage, Toasts } = window.UI;
   const Icon = window.Icon;
 
   const BASE_TABS = [
@@ -44,10 +44,10 @@
     },
       React.createElement('div', { className: 'relative' },
         React.createElement('div', { className: 'h-20 overflow-hidden' },
-          React.createElement('img', { src: user.coverPhoto, className: 'w-full h-full object-cover' }),
+          React.createElement(SmartImage, { src: user.coverPhoto, alt: '', className: 'w-full h-full' }),
           React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/55 to-transparent' })),
         React.createElement('div', { className: 'absolute bottom-0 left-4 translate-y-1/2' },
-          React.createElement(Avatar, { src: user.profilePhoto, size: 48, rounded: 'xl', ring: '#F7F4EE' }))),
+          React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl', ring: '#F7F4EE' }))),
       React.createElement('div', { className: 'pt-8 pb-4 px-4' },
         React.createElement('p', { className: 'text-sm font-bold text-foreground' }, user.name),
         React.createElement('div', { className: 'flex items-center gap-1.5 mt-0.5' },
@@ -109,7 +109,7 @@
           className: cx('flex items-center w-full rounded-xl transition-colors hover:bg-accent/50 p-2', collapsed ? 'justify-center' : 'gap-3'),
         },
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement(Avatar, { src: user.profilePhoto, size: 36, ring: 'rgba(201,168,76,0.4)' }),
+            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(201,168,76,0.4)' }),
             role !== 'citizen' && React.createElement('span', {
               className: 'absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
               style: { background: rb.color },
@@ -200,7 +200,7 @@
             className: cx('flex flex-col items-center justify-center gap-0.5 transition-colors'),
           },
             React.createElement('div', { className: 'relative' },
-              React.createElement(Avatar, { src: user.profilePhoto, size: 24, ring: showProfile ? '#C9A84C' : 'rgba(201,168,76,0.3)' }),
+              React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 24, ring: showProfile ? '#C9A84C' : 'rgba(201,168,76,0.3)' }),
               role !== 'citizen' && React.createElement('span', { className: 'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-gold border border-white flex items-center justify-center' },
                 React.createElement(Icon, { name: 'Crown', size: 6, className: 'text-white' }))),
             React.createElement('span', { className: cx('text-[9px] font-semibold', showProfile ? 'text-gold-dark' : 'text-foreground/45') }, 'You')),

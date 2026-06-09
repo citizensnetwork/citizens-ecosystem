@@ -6,7 +6,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState } = React;
-  const { cx, Avatar, Button, Segmented, Empty } = window.UI;
+  const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
   const Icon = window.Icon;
 
   // deterministic pseudo-random for synthetic series
@@ -90,7 +90,7 @@
     const [open, setOpen] = useState(true);
     return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
       h('button', { onClick: () => setOpen((o) => !o), className: 'w-full flex items-center gap-3 p-3 text-left' },
-        h('div', { className: 'w-12 h-12 rounded-xl overflow-hidden shrink-0' }, h('img', { src: ev.coverPhoto, className: 'w-full h-full object-cover' })),
+        h('div', { className: 'w-12 h-12 rounded-xl overflow-hidden shrink-0' }, h(SmartImage, { src: ev.coverPhoto, cat, alt: ev.title, className: 'w-full h-full' })),
         h('div', { className: 'flex-1 min-w-0' },
           h('p', { className: 'text-sm font-bold text-foreground truncate' }, ev.title),
           h('div', { className: 'flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground' },
@@ -261,7 +261,7 @@
             h('input', { value: q, onChange: (e) => setQ(e.target.value), placeholder: 'Search contributors…', className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground' }))),
         h('div', { className: 'divide-y divide-border/60 max-h-72 overflow-y-auto' },
           filtered.map((c) => h('div', { key: c.id, className: 'flex items-center gap-3 px-4 py-2.5' },
-            h(Avatar, { src: c.profilePhoto, size: 36, rounded: 'xl' }),
+            h(Avatar, { src: c.profilePhoto, name: c.name, size: 36, rounded: 'xl' }),
             h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate flex items-center gap-1' }, c.name, h(Icon, { name: 'BadgeCheck', size: 12, className: 'text-gold' })), h('p', { className: 'text-[11px] text-muted-foreground truncate' }, c.dominantNiche + ' · ' + c.followerCount.toLocaleString() + ' followers')),
             h(Button, { variant: 'soft', size: 'sm', icon: 'LogIn', onClick: () => assistLoginAs(c.id) }, 'Log in as')))))); 
   }

@@ -32,6 +32,48 @@ with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-
 
 ---
 
+## 2j. Photos — real upload + honest display ✅ (2026-06-09)
+
+Founder: "allow photos to show… wire those up — photos aren't showing for mock data either" → **All of the above.**
+Working log: `.claude/sessions/photos-upload-and-display.md`. **tsc 0 · next lint 0 · vitest 628/628.**
+No DB/migration change → **next migration # still 131.** Cache-bust `?v=20260609e → 20260610a`.
+
+### Root cause
+Rendering/CSP were fine (mock Unsplash loads; prod CSP allows unsplash + supabase storage; storage public, real img = 200).
+The real problems: **live DB has almost no photos** (2/191 events, 0/40 places, 1/21 profiles) so everything fell
+back to ONE generic stock image; and there was **no real upload** (MediaPicker was a stock-image stand-in).
+
+### Backend (2 routes, Bearer-enabled — pattern = §2f)
+- **[src/app/api/avatar/route.ts](src/app/api/avatar/route.ts)** + **[src/app/api/media/upload/route.ts](src/app/api/media/upload/route.ts)**
+  now use `getRouteAuth(request)` (Bearer-or-cookie) so the cross-origin static frontend can upload. avatar persists
+  `profiles.avatar_url`; media/upload mints a signed upload URL (server-built, user-scoped path). Rate-limited, MIME/size validated.
+
+### Frontend
+- **[store.jsx](src/frontend/app/store.jsx)** — `window.uploadImage(file,{scope})`: `avatar`→multipart `/api/avatar`
+  (NB no forced Content-Type); `event-cover`/`place-cover`→`/api/media/upload` then `CC_AUTH.supabase.storage.uploadToSignedUrl`.
+  New `updateAvatar(url)` action (in-session overlay). Adapters now emit `coverPhoto:''`/`profilePhoto:''` (no stock
+  FALLBACK; consts removed); real-user overlay profilePhoto `''` when no avatar → initials.
+- **[ui.jsx](src/frontend/app/ui.jsx)** — `MediaPicker` gains **"Upload from device"** (file input accept=image/*) + spinner +
+  error, plus a `scope` prop. `Avatar` graceful fallback (empty/onError → initials-on-gold via `name`, else User icon).
+  New **`SmartImage`** (empty/onError → category-tinted placeholder w/ icon+label, never a fake stock photo).
+- All cover `<img>` → `SmartImage`; avatars given `name` across home/shell/profiles/dashboard/insights/admin/messages.
+  MediaPicker scopes wired: Settings photo=`avatar` (persists) + cover=`event-cover`; create event/place-cover; apply cover+logo=`event-cover`.
+
+### Verified (preview + live API :3000, real data) — 0 console errors
+Real event w/ no image → category placeholder tile (aria-label=title), 0 broken. Real contributor w/ no logo → "CR"
+initials avatar + placeholders, 0 broken. "Upload from device" + file input present; `window.uploadImage` live.
+
+### NOT auto-verifiable (founder — needs real Google OAuth)
+Sign in → Settings → Photo → Upload from device → avatar uploads/persists/header updates/survives reload. Same for a Create-Event cover.
+
+### Deferred (NOT silently built — flag when wanted)
+- **Create→DB persistence** for events/places is still session-local mock, so an uploaded cover lives in Storage but the
+  listing vanishes on reload until that lands (Phase 3). **Gallery upload** (needs persisted entityId UUID) +
+  **dedicated contributor logo/cover persistence** (currently apply/onboarding logos upload to the event-images bucket and
+  aren't saved to a contributor row) belong to that same phase.
+
+---
+
 ## 2. What just shipped — Phase 0: HTML frontend wiring kickoff ✅ (2026-06-07)
 
 Two commits on `main` (local — **push to origin still pending founder approval**):

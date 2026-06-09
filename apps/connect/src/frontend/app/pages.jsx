@@ -86,7 +86,7 @@
   // ── Settings ──
   function SettingsPage() {
     const app = window.useApp();
-    const { user, role, go, toast, isCitizen, signOut } = app;
+    const { user, role, go, toast, isCitizen, signOut, updateAvatar } = app;
     const [name, setName] = useState(user.name);
     const [bio, setBio] = useState(user.bio);
     const [profilePhoto, setProfilePhoto] = useState(user.profilePhoto);
@@ -101,13 +101,16 @@
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8 px-4 sm:px-5 py-4' },
         h('div', { className: 'max-w-2xl mx-auto space-y-4' },
           h(Section, { title: 'Profile', sub: 'How you appear across Citizens Connect' },
-            h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: coverPhoto, onChange: setCoverPhoto, aspect: '16/6', label: 'cover' })),
+            h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: coverPhoto, onChange: setCoverPhoto, aspect: '16/6', label: 'cover', scope: 'event-cover' })),
             h('div', { className: 'flex gap-4 items-end' },
-              h('div', { className: 'w-24' }, h(Field, { label: 'Photo' }, h(MediaPicker, { value: profilePhoto, onChange: setProfilePhoto, aspect: '1/1', label: 'photo' }))),
+              // 'avatar' scope uploads the file AND persists profiles.avatar_url.
+              h('div', { className: 'w-24' }, h(Field, { label: 'Photo' }, h(MediaPicker, { value: profilePhoto, onChange: setProfilePhoto, aspect: '1/1', label: 'photo', scope: 'avatar' }))),
               h('div', { className: 'flex-1 space-y-3' },
                 h(Field, { label: 'Display name' }, h(Input, { value: name, onChange: (e) => setName(e.target.value) })))),
             h(Field, { label: 'Bio' }, h(Textarea, { value: bio, rows: 3, onChange: (e) => setBio(e.target.value) })),
-            h(Button, { variant: 'gold', size: 'sm', icon: 'Check', onClick: () => toast('Profile saved', 'green') }, 'Save Profile')),
+            // An uploaded photo is already persisted by /api/avatar; reflect it across
+            // the app (header, profile) immediately via updateAvatar.
+            h(Button, { variant: 'gold', size: 'sm', icon: 'Check', onClick: () => { if (profilePhoto) updateAvatar(profilePhoto); toast('Profile saved', 'green'); } }, 'Save Profile')),
 
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },
             h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },

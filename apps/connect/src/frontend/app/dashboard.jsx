@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState } = React;
-  const { cx, Avatar, Button, Segmented, Empty } = window.UI;
+  const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
   const Icon = window.Icon;
 
   const WEEK = [
@@ -35,7 +35,7 @@
     const cat = window.DATA.getEventCategory(ev.category);
     return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
       h('div', { className: 'relative h-28' },
-        h('img', { src: ev.coverPhoto, className: 'w-full h-full object-cover' }),
+        h(SmartImage, { src: ev.coverPhoto, cat, label: 'Event', alt: ev.title, className: 'w-full h-full' }),
         h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/65 to-transparent' }),
         ev.isLive && h('div', { className: 'absolute top-2 left-2 flex items-center gap-1 bg-red-500 px-2 py-0.5 rounded-full' },
           h('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }), h('span', { className: 'text-[9px] font-bold text-white' }, 'LIVE')),
@@ -103,7 +103,7 @@
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
         h('div', { className: 'flex items-center justify-between' },
           h('div', { className: 'flex items-center gap-3' },
-            h(Avatar, { src: activeContributor.profilePhoto, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)' }),
+            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)' }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name))),
@@ -154,7 +154,7 @@
             myPlaces.length > 0 && h(F, null,
               h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Your Places'),
               myPlaces.map((p) => h('div', { key: p.id, className: 'flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
-                h(Avatar, { src: p.coverPhoto, size: 56, rounded: 'xl' }),
+                h(Avatar, { src: p.coverPhoto, name: p.name, size: 56, rounded: 'xl' }),
                 h('div', { className: 'flex-1 min-w-0' },
                   h('p', { className: 'text-sm font-bold text-foreground truncate' }, p.name),
                   h('p', { className: 'text-xs text-muted-foreground truncate flex items-center gap-1' }, h(Icon, { name: 'MapPin', size: 10 }), p.address),
@@ -164,7 +164,7 @@
           tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
             h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1' }, 'Recent Conversations'),
             conversations.slice(0, 3).map((c) => h('button', { key: c.id, onClick: () => go('messages', { convId: c.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all text-left' },
-              h('div', { className: 'relative' }, h(Avatar, { src: c.participantPhoto, size: 40, rounded: 'xl' }), c.unread > 0 && h('span', { className: 'absolute -top-1 -right-1 w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, c.unread)),
+              h('div', { className: 'relative' }, h(Avatar, { src: c.participantPhoto, name: c.participantName, size: 40, rounded: 'xl' }), c.unread > 0 && h('span', { className: 'absolute -top-1 -right-1 w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, c.unread)),
               h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, c.participantName), h('p', { className: 'text-xs text-muted-foreground truncate' }, c.lastMessage)),
               h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, c.lastTime))),
             h(Button, { variant: 'outline', className: 'w-full', onClick: () => go('messages') }, 'View All Messages')),

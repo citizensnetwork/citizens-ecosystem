@@ -155,8 +155,8 @@
       {
         title: 'Brand your profile', subtitle: 'Your logo & cover are the first thing citizens see.',
         node: h(F, null,
-          h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: f.coverPhoto, onChange: (v) => up('coverPhoto', v), aspect: '16/6', label: 'cover' })),
-          h(Field, { label: 'Logo / profile photo' }, h('div', { className: 'w-28' }, h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo' }))),
+          h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: f.coverPhoto, onChange: (v) => up('coverPhoto', v), aspect: '16/6', label: 'cover', scope: 'event-cover' })),
+          h(Field, { label: 'Logo / profile photo' }, h('div', { className: 'w-28' }, h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
           h(Field, { label: 'Organisation name', required: true }, h(Input, { value: f.name, onChange: (e) => up('name', e.target.value) }))),
       },
       {

@@ -11,7 +11,7 @@
  * Returns: { avatar_url: string }
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -20,11 +20,8 @@ import { validateImageFile, safeImageExtension } from "@/lib/validation";
 const MAX_AVATAR_BYTES = 15 * 1024 * 1024; // 15 MB (matches validateImageFile cap)
 
 export async function POST(request: Request) {
-  // 1. Auth
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 1. Auth — Bearer (cross-origin static/Capacitor frontend) OR cookie (same-origin).
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

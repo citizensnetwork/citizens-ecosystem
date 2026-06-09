@@ -2,18 +2,57 @@
 //  Citizens Connect — shared UI primitives  (window.UI)
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const Icon = window.Icon;
   const cx = (...a) => a.filter(Boolean).join(' ');
 
-  // ── Avatar ──
-  function Avatar({ src, alt, size = 40, rounded = 'full', ring, className, style }) {
+  // First-letters of up to two words → honest initials placeholder.
+  const initials = (s) => !s ? '' : String(s).trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+
+  // ── Avatar (graceful fallback) ──
+  // A missing or broken src never shows a broken-image glyph: it degrades to the
+  // person/org's initials on gold, or a neutral User icon when we have no name —
+  // honest, never a fake stock face (VISION: don't misrepresent identity).
+  function Avatar({ src, alt, name, size = 40, rounded = 'full', ring, className, style }) {
+    const [failed, setFailed] = useState(false);
+    useEffect(() => setFailed(false), [src]);
     const r = rounded === 'full' ? '9999px' : rounded === 'xl' ? '14px' : '10px';
-    return React.createElement('img', {
-      src, alt: alt || '',
-      className: cx('object-cover shrink-0', className),
-      style: { width: size, height: size, borderRadius: r, boxShadow: ring ? `0 0 0 2px ${ring}` : undefined, ...style },
-    });
+    const box = { width: size, height: size, borderRadius: r, boxShadow: ring ? `0 0 0 2px ${ring}` : undefined, ...style };
+    if (src && !failed) {
+      return React.createElement('img', {
+        src, alt: alt || name || '', loading: 'lazy', onError: () => setFailed(true),
+        className: cx('object-cover shrink-0', className), style: box,
+      });
+    }
+    const ini = initials(name || alt);
+    return React.createElement('div', {
+      'aria-label': alt || name || 'avatar',
+      className: cx('shrink-0 flex items-center justify-center gold-gradient text-white font-bold select-none', className),
+      style: Object.assign({}, box, { fontSize: Math.max(9, Math.round(size * 0.4)) }),
+    }, ini || React.createElement(Icon, { name: 'User', size: Math.round(size * 0.5) }));
+  }
+
+  // ── SmartImage (graceful cover/photo) ──
+  // Drop-in for cover <img>. Empty or broken src → an honest, category-tinted
+  // placeholder (its colour + icon), never a generic stock photo standing in for
+  // a real place/event. `cat` is an optional DATA category {hex,icon,name}.
+  function SmartImage({ src, alt, className, cat, label, style }) {
+    const [failed, setFailed] = useState(false);
+    useEffect(() => setFailed(false), [src]);
+    if (src && !failed) {
+      return React.createElement('img', {
+        src, alt: alt || '', loading: 'lazy', onError: () => setFailed(true),
+        className: cx('object-cover', className), style,
+      });
+    }
+    const hex = cat && cat.hex ? cat.hex : '#C9A84C';
+    return React.createElement('div', {
+      'aria-label': alt || (cat ? cat.name : 'image'),
+      className: cx('flex flex-col items-center justify-center gap-1 select-none', className),
+      style: Object.assign({ background: `linear-gradient(135deg, ${hex}22, ${hex}0f 55%, ${hex}26)` }, style),
+    },
+      React.createElement(Icon, { name: cat && cat.icon ? cat.icon : 'Image', size: 26, style: { color: hex, opacity: 0.7 } }),
+      label && React.createElement('span', { className: 'text-[10px] font-bold uppercase tracking-wider', style: { color: hex, opacity: 0.85 } }, label));
   }
 
   // ── Button ──
@@ -133,29 +172,63 @@
     'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&h=500&fit=crop',
     'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&h=500&fit=crop',
   ];
-  function MediaPicker({ value, onChange, aspect = '16/9', label = 'cover photo' }) {
+  //  `scope` routes the device upload to the right backend path / Storage bucket:
+  //  'avatar' (also persists profiles.avatar_url) · 'event-cover' · 'place-cover'.
+  function MediaPicker({ value, onChange, aspect = '16/9', label = 'cover photo', scope = 'event-cover' }) {
     const [open, setOpen] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [err, setErr] = useState('');
+    const fileRef = useRef(null);
+
+    const onFile = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = ''; // allow re-picking the same file
+      if (!file) return;
+      setErr('');
+      setUploading(true);
+      try {
+        const url = await window.uploadImage(file, { scope });
+        onChange(url);
+        setOpen(false);
+      } catch (ex) {
+        setErr((ex && ex.message) || 'Upload failed. Please try again.');
+      } finally {
+        setUploading(false);
+      }
+    };
+
     return React.createElement('div', { className: 'space-y-2' },
       React.createElement('button', {
-        type: 'button', onClick: () => setOpen((o) => !o),
+        type: 'button', onClick: () => setOpen((o) => !o), disabled: uploading,
         className: 'relative w-full rounded-2xl overflow-hidden border border-border bg-white/60 group',
         style: { aspectRatio: aspect },
       },
         value
-          ? React.createElement('img', { src: value, className: 'w-full h-full object-cover' })
+          ? React.createElement('img', { src: value, alt: '', className: 'w-full h-full object-cover' })
           : React.createElement('div', { className: 'w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground' },
               React.createElement('div', { className: 'w-11 h-11 rounded-2xl bg-accent flex items-center justify-center' },
                 React.createElement(Icon, { name: 'ImagePlus', size: 18, className: 'text-gold-dark' })),
               React.createElement('span', { className: 'text-xs font-semibold' }, 'Add ' + label)),
-        React.createElement('span', { className: 'absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/55 text-white text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity' },
+        uploading && React.createElement('span', { className: 'absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-sm' },
+          React.createElement('span', { className: 'w-6 h-6 rounded-full border-2 border-white border-t-transparent spin' })),
+        !uploading && React.createElement('span', { className: 'absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/55 text-white text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity' },
           React.createElement(Icon, { name: 'Pencil', size: 10 }), value ? 'Change' : 'Browse')),
-      open && React.createElement('div', { className: 'p-2.5 rounded-2xl bg-white/70 border border-border space-y-2 fade-in' },
-        React.createElement('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1' }, 'Choose an image'),
+
+      React.createElement('input', { ref: fileRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: onFile }),
+
+      open && React.createElement('div', { className: 'p-2.5 rounded-2xl bg-white/70 border border-border space-y-2.5 fade-in' },
+        React.createElement('button', {
+          type: 'button', onClick: () => fileRef.current && fileRef.current.click(), disabled: uploading,
+          className: 'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl gold-gradient text-white text-xs font-bold shadow-sm disabled:opacity-60',
+        }, React.createElement(Icon, { name: 'Upload', size: 13 }), uploading ? 'Uploading…' : 'Upload from device'),
+        err && React.createElement('p', { className: 'text-[11px] text-destructive font-semibold px-1 flex items-center gap-1' },
+          React.createElement(Icon, { name: 'AlertCircle', size: 11 }), err),
+        React.createElement('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1' }, 'Or choose a stock image'),
         React.createElement('div', { className: 'grid grid-cols-4 gap-1.5' },
           STOCK.map((s) => React.createElement('button', {
             key: s, type: 'button', onClick: () => { onChange(s); setOpen(false); },
             className: cx('rounded-lg overflow-hidden aspect-square border-2 transition-all', value === s ? 'border-gold' : 'border-transparent hover:border-gold/40'),
-          }, React.createElement('img', { src: s, className: 'w-full h-full object-cover' })))),
+          }, React.createElement('img', { src: s, alt: '', className: 'w-full h-full object-cover' })))),
         React.createElement('div', { className: 'flex gap-2 items-center pt-1' },
           React.createElement('input', {
             placeholder: 'or paste an image URL…',
@@ -196,5 +269,5 @@
         }))));
   }
 
-  window.UI = { cx, Avatar, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK };
+  window.UI = { cx, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
 })();
