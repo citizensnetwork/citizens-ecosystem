@@ -313,6 +313,10 @@ Priority order:
 10. Settings → `PATCH /api/account`
 
 ### Phase 4 — Advanced features
+> ⚠️ **Read [PHASE_4_5_ADDENDUM.md](./PHASE_4_5_ADDENDUM.md) § A before starting this phase** —
+> adds the data-access policy, shared rate-limit store, ecosystem data-plane decisions,
+> and the deferred schema/product decisions (idea→event date, location_snapshot source,
+> event↔place FK, schema.sql drift).
 1. Funder report PDF generation (`/api/contributor/[handle]/funder-report`)
 2. City reach map (RSVP location snapshot aggregation)
 3. Impact Ideas auto-transition + event creation on threshold hit
@@ -321,6 +325,10 @@ Priority order:
 6. Convince mechanic
 
 ### Phase 5 — Capacitor mobile build
+> ⚠️ **Read [PHASE_4_5_ADDENDUM.md](./PHASE_4_5_ADDENDUM.md) § B before starting this phase** —
+> the commands below are NOT the whole phase. Missing prerequisites documented there:
+> frontend build step (kill Babel-standalone), OAuth deep links, multi-origin CORS for
+> `capacitor://localhost`, push wiring (F1/F2), native geolocation, store compliance.
 Once Phase 3 is complete:
 ```bash
 npm run build          # builds HTML frontend into out/
