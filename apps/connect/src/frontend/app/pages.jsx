@@ -17,49 +17,100 @@
 
   // ── Kingdom Projects ──
   function IdeaCard({ idea }) {
-    const { toast } = window.useApp();
+    const { toggleIdeaVote } = window.useApp();
     const cat = window.DATA.getCategory(idea.category);
-    const [voted, setVoted] = useState(false);
-    const votes = idea.votes + (voted ? 1 : 0);
-    const pct = Math.min(100, Math.round((votes / idea.threshold) * 100));
+    const voted = !!idea.votedByMe;
+    const pct = Math.min(100, Math.round((idea.votes / idea.threshold) * 100));
     const confirmed = idea.status === 'confirmed';
+    const inProcess = idea.status === 'inProcess';
     return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
       h('div', { className: 'p-4' },
         h('div', { className: 'flex items-center justify-between mb-2' },
           h('div', { className: 'flex items-center gap-2' },
-            h(Avatar, { src: idea.authorPhoto, size: 24, rounded: 'full' }),
+            h(Avatar, { src: idea.authorPhoto, name: idea.authorName, size: 24, rounded: 'full' }),
             h('span', { className: 'text-xs text-muted-foreground' }, idea.authorName)),
-          cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.short)),
+          h('div', { className: 'flex items-center gap-1.5' },
+            idea.tierLabel && h('span', { className: 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground' }, idea.tierLabel),
+            cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.short))),
         h('h3', { className: 'text-base text-foreground leading-tight mb-1' }, idea.title),
         h('p', { className: 'text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-3' }, idea.description),
         confirmed
-          ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#DCFCE7] text-[#15803d]' }, h(Icon, { name: 'CheckCircle2', size: 15 }), h('span', { className: 'text-xs font-bold' }, 'Confirmed Kingdom Project · ' + idea.collaborators + ' collaborators'))
-          : h(F, null,
-              h('div', { className: 'flex items-center justify-between mb-1' },
-                h('span', { className: 'text-xs font-bold text-foreground' }, votes.toLocaleString() + ' votes'),
-                h('span', { className: 'text-[10px] text-muted-foreground' }, pct + '% to goal')),
-              h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-3' }, h('div', { className: 'h-full gold-gradient rounded-full transition-all', style: { width: pct + '%' } })),
-              h('div', { className: 'flex gap-2' },
-                h(Button, { variant: voted ? 'success' : 'gold', size: 'sm', className: 'flex-1', icon: voted ? 'Check' : 'ThumbsUp', onClick: () => setVoted((v) => !v) }, voted ? 'Voted to collaborate' : 'Collaborate'),
-                h(Button, { variant: 'outline', size: 'sm', icon: 'X', onClick: () => toast('Idea dismissed') }, 'Dismiss')))));
+          ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#DCFCE7] text-[#15803d]' }, h(Icon, { name: 'CheckCircle2', size: 15 }),
+              h('span', { className: 'text-xs font-bold' }, 'Confirmed Kingdom Project' + (typeof idea.collaborators === 'number' ? ' · ' + idea.collaborators + ' collaborators' : '')))
+          : inProcess
+            ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#FEF3C7] text-[#92400E]' }, h(Icon, { name: 'Hammer', size: 15 }),
+                h('span', { className: 'text-xs font-bold' }, 'In Process — goal reached with ' + idea.votes.toLocaleString() + ' votes'))
+            : h(F, null,
+                h('div', { className: 'flex items-center justify-between mb-1' },
+                  h('span', { className: 'text-xs font-bold text-foreground' }, idea.votes.toLocaleString() + ' of ' + idea.threshold.toLocaleString() + ' votes'),
+                  h('span', { className: 'text-[10px] text-muted-foreground' }, pct + '% to goal')),
+                h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-3' }, h('div', { className: 'h-full gold-gradient rounded-full transition-all', style: { width: pct + '%' } })),
+                h(Button, { variant: voted ? 'success' : 'gold', size: 'sm', className: 'w-full', icon: voted ? 'Check' : 'ThumbsUp', onClick: () => toggleIdeaVote(idea.id) }, voted ? 'Voted to collaborate — tap to undo' : 'Collaborate'))));
+  }
+
+  // Tier ranges mirror the server's validation (spec §4.2): the submitter picks
+  // an exact goal within the tier's range; the top two tiers are fixed.
+  const IDEA_TIERS = [
+    { id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20 },
+    { id: 'community', label: 'Community', min: 20, max: 100 },
+    { id: 'town', label: 'Town', min: 100, max: 1000 },
+    { id: 'funders_challenge', label: 'Funders Challenge', min: 5000, max: 5000, fixed: true },
+    { id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true },
+  ];
+  function IdeaComposer({ onClose }) {
+    const { submitIdea } = window.useApp();
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [category, setCategory] = useState('');
+    const [tierId, setTierId] = useState('community');
+    const [threshold, setThreshold] = useState(50);
+    const [busy, setBusy] = useState(false);
+    const tier = IDEA_TIERS.find((t) => t.id === tierId);
+    const goal = tier.fixed ? tier.min : Math.min(tier.max, Math.max(tier.min, threshold));
+    const valid = title.trim().length >= 3 && description.trim().length >= 10;
+    const pickTier = (t) => { setTierId(t.id); setThreshold(t.fixed ? t.min : Math.min(t.max, Math.max(t.min, threshold))); };
+    const submit = () => {
+      if (!valid || busy) return;
+      setBusy(true);
+      submitIdea({ title: title.trim(), description: description.trim(), category, tier: tierId, tierLabel: tier.label, voteThreshold: goal },
+        (ok) => { setBusy(false); if (ok) onClose(); });
+    };
+    return h('div', { className: 'bg-card rounded-2xl border border-gold/40 p-4 space-y-4' },
+      h('div', { className: 'flex items-center justify-between' },
+        h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-2' }, h(Icon, { name: 'Lightbulb', size: 15, className: 'text-gold-dark' }), 'Post an Impact Idea'),
+        h('button', { onClick: onClose, className: 'w-7 h-7 rounded-lg hover:bg-accent/60 flex items-center justify-center text-muted-foreground' }, h(Icon, { name: 'X', size: 15 }))),
+      h(Field, { label: 'Title' }, h(Input, { value: title, onChange: (e) => setTitle(e.target.value), placeholder: 'What should we build together?' })),
+      h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
+      h(Field, { label: 'Category' },
+        h('div', { className: 'flex flex-wrap gap-1.5' }, window.DATA.EVENT_CATEGORIES.map((c) =>
+          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(201,168,76,0.25)', color: '#7A7060' } }, c.short)))),
+      h(Field, { label: 'Project tier' },
+        h('div', { className: 'flex flex-wrap gap-1.5' }, IDEA_TIERS.map((t) =>
+          h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-white border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),
+      h(Field, { label: 'Vote goal — ' + goal.toLocaleString() + ' votes' + (tier.fixed ? ' (fixed for this tier)' : '') },
+        tier.fixed
+          ? h('p', { className: 'text-xs text-muted-foreground' }, tier.label + ' projects always require ' + tier.min.toLocaleString() + ' votes and are reviewed by an admin once reached.')
+          : h('input', { type: 'range', min: tier.min, max: tier.max, value: goal, onChange: (e) => setThreshold(Number(e.target.value)), className: 'w-full accent-[#C9A84C]' })),
+      h(Button, { variant: 'gold', className: 'w-full', icon: 'Send', disabled: !valid || busy, onClick: submit }, busy ? 'Posting…' : 'Post Idea'));
   }
 
   function CommunityPage() {
-    const { toast } = window.useApp();
+    const { ideas } = window.useApp();
     const [tab, setTab] = useState('voting');
-    const ideas = window.DATA.impactIdeas;
+    const [composing, setComposing] = useState(false);
     const map = { voting: 'voting', process: 'inProcess', confirmed: 'confirmed' };
     const list = ideas.filter((i) => i.status === map[tab]);
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'community' },
       h(Header, { icon: 'Lightbulb', title: 'Kingdom Projects', sub: 'Community ideas, voting & collaboration',
-        right: h(Button, { variant: 'gold', size: 'sm', icon: 'Plus', onClick: () => toast('Impact Idea composer — coming soon', 'gold') }, 'Post Idea') }),
+        right: h(Button, { variant: 'gold', size: 'sm', icon: 'Plus', onClick: () => setComposing((c) => !c) }, 'Post Idea') }),
       h('div', { className: 'px-4 sm:px-5 py-3 border-b border-border' }, h(Segmented, { options: [{ value: 'voting', label: 'Voting Now' }, { value: 'process', label: 'In Process' }, { value: 'confirmed', label: 'Confirmed' }], value: tab, onChange: setTab })),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8 px-4 sm:px-5 py-4' },
         h('div', { className: 'max-w-2xl mx-auto space-y-4 fade-in' },
+          composing && h(IdeaComposer, { onClose: () => setComposing(false) }),
           tab === 'voting' && h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark mb-1' },
             h(Icon, { name: 'Info', size: 15, className: 'shrink-0 mt-0.5' }),
             h('p', { className: 'text-xs leading-relaxed' }, 'Ideas that reach their vote goal become collaborative Kingdom Projects. Voting polls also appear on the Discover map.')),
-          list.length === 0 ? h(Empty, { icon: 'Lightbulb', title: 'Nothing here yet' }) : list.map((i) => h(IdeaCard, { key: i.id, idea: i })))));
+          list.length === 0 ? h(Empty, { icon: 'Lightbulb', title: 'Nothing here yet', sub: tab === 'voting' ? 'Be the first — post an Impact Idea for your community.' : undefined }) : list.map((i) => h(IdeaCard, { key: i.id, idea: i })))));
   }
 
   // ── Notifications ──

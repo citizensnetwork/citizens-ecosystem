@@ -94,10 +94,9 @@ describe("POST /api/suggestions", () => {
       data: { user: null },
       error: null,
     });
-    mockClient._chain.single.mockResolvedValueOnce({
-      data: { id: SUGGESTION_ID },
-      error: null,
-    });
+    // Anonymous inserts must NOT request the row back (RETURNING runs under the
+    // own-rows SELECT policy and would reject the whole insert), so no
+    // single() result is queued here.
     const res = await POST(
       makeReq("POST", {
         title: "Anon idea",
@@ -106,8 +105,70 @@ describe("POST /api/suggestions", () => {
       }),
     );
     expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.id).toBeNull();
     const insertArgs = mockClient._chain.insert.mock.calls[0]?.[0];
     expect(insertArgs.user_id).toBeNull();
+  });
+
+  it("requires sign-in for idea submissions (tier present)", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: null,
+    });
+    const res = await POST(
+      makeReq("POST", {
+        title: "Anon idea",
+        body: "An anonymous idea that should be rejected politely.",
+        page_url: "http://localhost/community",
+        tier: "community",
+        vote_threshold: 50,
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("enforces per-tier vote thresholds and stores tier metadata", async () => {
+    // Out-of-range threshold for the community tier → 400.
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    const bad = await POST(
+      makeReq("POST", {
+        title: "Garden idea",
+        body: "A community garden idea with a bad vote goal.",
+        page_url: "http://localhost/community",
+        tier: "community",
+        vote_threshold: 5,
+      }),
+    );
+    expect(bad.status).toBe(400);
+
+    // Fixed tier ignores the requested threshold and uses the fixed value.
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: SUGGESTION_ID },
+      error: null,
+    });
+    const ok = await POST(
+      makeReq("POST", {
+        title: "Provincial vision idea",
+        body: "A large idea that uses the fixed provincial threshold.",
+        page_url: "http://localhost/community",
+        tier: "provincial_vision",
+        category: "outreach-missions",
+      }),
+    );
+    expect(ok.status).toBe(201);
+    const insertArgs = mockClient._chain.insert.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(insertArgs.tier).toBe("provincial_vision");
+    expect(insertArgs.vote_threshold).toBe(10000);
+    expect(insertArgs.tier_label).toBe("Provincial Vision");
+    expect(insertArgs.category).toBe("outreach-missions");
   });
 
   it("returns 429 after 10 submissions in 24h", async () => {

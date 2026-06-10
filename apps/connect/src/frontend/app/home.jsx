@@ -9,11 +9,11 @@
   // ── Preview panel (on pin click) ──
   function PreviewPanel({ id, type, onClose }) {
     const app = window.useApp();
-    const { events, places, impactIdeas, connected, considering, followedPlaces, toggleConnect, toggleConsider, togglePlaceFollow, go, startConversationWith, contributors, toast } = app;
+    const { events, places, ideas, connected, considering, followedPlaces, toggleConnect, toggleConsider, togglePlaceFollow, toggleIdeaVote, go, startConversationWith, contributors, toast } = app;
     let item, cat, isEvent = type === 'event', isIdea = type === 'idea';
     if (isEvent) item = events.find((e) => e.id === id);
     else if (type === 'place') item = places.find((p) => p.id === id);
-    else item = (window.DATA.impactIdeas).find((i) => i.id === id);
+    else item = ideas.find((i) => i.id === id);
     if (!item) return null;
     cat = window.DATA.getCategory(item.category);
 
@@ -32,7 +32,7 @@
           React.createElement('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-3' },
             React.createElement('div', { className: 'h-full gold-gradient rounded-full', style: { width: pct + '%' } })),
           React.createElement('div', { className: 'flex gap-2' },
-            React.createElement(Button, { variant: 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toast('You voted to collaborate! 🙌', 'gold') }, 'Collaborate'),
+            React.createElement(Button, { variant: item.votedByMe ? 'success' : 'gold', className: 'flex-1', icon: item.votedByMe ? 'Check' : 'Heart', onClick: () => toggleIdeaVote(item.id) }, item.votedByMe ? 'Voted — tap to undo' : 'Collaborate'),
             React.createElement(Button, { variant: 'outline', icon: 'X', onClick: onClose }, 'Dismiss'))));
     }
 
@@ -163,7 +163,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, user, role, dismissBubble } = app;
+    const { events, places, ideas, user, role, dismissBubble } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -179,7 +179,7 @@
     const markers = [
       ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
       ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
-      ...(showIdeas ? window.DATA.impactIdeas.filter((i) => i.status === 'voting').map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
+      ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
 

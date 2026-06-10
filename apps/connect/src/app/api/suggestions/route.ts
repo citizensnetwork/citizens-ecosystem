@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const SUGGESTION_TITLE_MAX = 200;
 const SUGGESTION_BODY_MAX = 2000;
 const PAGE_URL_MAX = 500;
 const SUGGESTIONS_PER_DAY = 10;
+
+// Kingdom-Projects idea tiers (spec §4.2). Submitter picks the exact threshold
+// within the tier's range; the two top tiers are fixed and non-negotiable.
+const IDEA_TIERS: Record<string, { label: string; min: number; max: number; fixed?: number }> = {
+  small_volunteer: { label: "Small Volunteer Project", min: 1, max: 20 },
+  community: { label: "Community Project", min: 20, max: 100 },
+  town: { label: "Town Project", min: 100, max: 1000 },
+  funders_challenge: { label: "Funders Challenge", min: 5000, max: 5000, fixed: 5000 },
+  provincial_vision: { label: "Provincial Vision", min: 10000, max: 10000, fixed: 10000 },
+};
+const CATEGORY_SLUG_RE = /^[a-z0-9-]{1,50}$/;
 
 /** Sanitize: strip all control chars, allow printable Unicode only. */
 function sanitizeText(raw: string): string {
@@ -14,13 +25,12 @@ function sanitizeText(raw: string): string {
     .trim();
 }
 
-/** POST /api/suggestions — submit a platform suggestion. Rate-limited 10/day/user. */
+/** POST /api/suggestions — submit a platform suggestion or a community idea.
+ *  Rate-limited 10/day/user. Idea submissions (tier present) additionally carry
+ *  category/threshold/location and require an authenticated author (the
+ *  submitter becomes the prospective project lead — spec §4.4). */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   // Apply rate limit keyed by user ID (authenticated) or IP (anonymous)
   const rateLimitKey = user
@@ -77,32 +87,85 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid page URL" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("suggestions")
-    .insert({
-      user_id: user?.id ?? null,
-      title,
-      body: suggestion,
-      page_url: pageUrl,
-    })
-    .select("id")
-    .single();
+  const row: Record<string, unknown> = {
+    user_id: user?.id ?? null,
+    title,
+    body: suggestion,
+    page_url: pageUrl,
+  };
 
+  // ── Optional Kingdom-Projects idea fields ──────────────────────────────
+  if (raw.tier !== undefined) {
+    if (!user) {
+      return NextResponse.json({ error: "Sign in to submit an Impact Idea" }, { status: 401 });
+    }
+    const tierKey = typeof raw.tier === "string" ? raw.tier : "";
+    const tier = IDEA_TIERS[tierKey];
+    if (!tier) {
+      return NextResponse.json({ error: "Invalid idea tier" }, { status: 400 });
+    }
+    const requested = typeof raw.vote_threshold === "number" ? raw.vote_threshold : NaN;
+    const threshold = tier.fixed ?? requested;
+    if (!Number.isInteger(threshold) || threshold < tier.min || threshold > tier.max) {
+      return NextResponse.json(
+        { error: `Vote goal for ${tier.label} must be between ${tier.min} and ${tier.max}` },
+        { status: 400 },
+      );
+    }
+    row.tier = tierKey;
+    row.tier_label = tier.label;
+    row.vote_threshold = threshold;
+
+    if (raw.category !== undefined) {
+      const category = typeof raw.category === "string" ? raw.category : "";
+      if (!CATEGORY_SLUG_RE.test(category)) {
+        return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+      }
+      row.category = category;
+    }
+
+    const hasLat = raw.latitude !== undefined && raw.latitude !== null;
+    const hasLng = raw.longitude !== undefined && raw.longitude !== null;
+    if (hasLat !== hasLng) {
+      return NextResponse.json({ error: "Provide both latitude and longitude, or neither" }, { status: 400 });
+    }
+    if (hasLat && hasLng) {
+      const lat = typeof raw.latitude === "number" ? raw.latitude : NaN;
+      const lng = typeof raw.longitude === "number" ? raw.longitude : NaN;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
+      }
+      row.latitude = lat;
+      row.longitude = lng;
+    }
+  }
+
+  // RETURNING runs under the SELECT policy (own rows only), so an anonymous
+  // insert must not ask for the row back — RLS would reject the whole insert.
+  if (user) {
+    const { data, error } = await supabase
+      .from("suggestions")
+      .insert(row)
+      .select("id")
+      .single();
+    if (error) {
+      console.error("[API suggestions POST]", error);
+      return NextResponse.json({ error: "Failed to submit suggestion" }, { status: 500 });
+    }
+    return NextResponse.json({ id: data.id }, { status: 201 });
+  }
+
+  const { error } = await supabase.from("suggestions").insert(row);
   if (error) {
     console.error("[API suggestions POST]", error);
     return NextResponse.json({ error: "Failed to submit suggestion" }, { status: 500 });
   }
-
-  return NextResponse.json({ id: data.id }, { status: 201 });
+  return NextResponse.json({ id: null }, { status: 201 });
 }
 
 /** GET /api/suggestions — admin-only: list all suggestions with filters. */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: profile } = await supabase

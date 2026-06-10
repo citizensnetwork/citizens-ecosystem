@@ -244,6 +244,37 @@
     };
   }
 
+  // ── Impact Idea adapter (get_community_ideas RPC row → app idea shape) ──
+  //  Legacy ideas from the old Next.js page encoded category as a "[cat:slug]"
+  //  body prefix; prefer the real category column, fall back to parsing it.
+  const IDEA_STATUS_MAP = { voting: 'voting', in_process: 'inProcess', confirmed: 'confirmed' };
+  function adaptIdea(r) {
+    let description = r.body || '';
+    let category = r.category || '';
+    const m = description.match(/^\[cat:([a-z0-9-]+)\]\s*/i);
+    if (m) { if (!category) category = m[1]; description = description.slice(m[0].length); }
+    return {
+      id: r.id,
+      title: r.title || 'Untitled idea',
+      description,
+      category,
+      votes: Number(r.vote_count) || 0,
+      threshold: r.vote_threshold || 1,
+      status: IDEA_STATUS_MAP[r.idea_status] || 'voting',
+      tier: r.tier || 'community',
+      tierLabel: r.tier_label || '',
+      votedByMe: !!r.voted_by_me,
+      authorName: r.author_name || 'A Citizen',
+      authorPhoto: r.author_avatar || '',
+      projectLeadId: r.project_lead_id || null,
+      associatedEventId: r.associated_event_id || null,
+      collaborators: null, // honest: real collaborator counts arrive with Phase-4 projects
+      createdAt: r.created_at || '',
+      lat: typeof r.latitude === 'number' ? r.latitude : null,
+      lng: typeof r.longitude === 'number' ? r.longitude : null,
+    };
+  }
+
   // ── session persistence (login survives refresh) ──
   const SESSION_KEY = 'cc_session_v1';
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch (e) { return null; } };
@@ -280,6 +311,7 @@
     const [notifications, setNotifications] = useState(() => DATA.notifications.map((n) => ({ ...n })));
     const [volunteerApps, setVolunteerApps] = useState(() => DATA.volunteerApplications.map((v) => ({ ...v })));
     const [reports, setReports] = useState(() => DATA.reports.map((r) => ({ ...r })));
+    const [ideas, setIdeas] = useState(() => DATA.impactIdeas.map((i) => ({ ...i, votedByMe: false })));
 
     // contributor onboarding state
     const [myApplication, setMyApplication] = useState(null); // {id,status,...}
@@ -637,6 +669,88 @@
       })();
     }, [events, realUser, toast]);
 
+    // ── Kingdom Projects / Impact Ideas ───────────────────────────────
+    //  Read path: anon-callable get_community_ideas RPC (controlled fields).
+    //  Replace the demo seeds whenever the RPC answers (even with []) so a
+    //  reachable backend always shows the REAL board, never mock ideas.
+    const fetchIdeas = useCallback(async () => {
+      const sb = window.CC_SUPABASE;
+      if (!sb) return;
+      try {
+        const { data, error } = await sb.rpc('get_community_ideas');
+        if (!error && Array.isArray(data)) setIdeas(data.map(adaptIdea));
+      } catch (e) { /* fail open — keep current list */ }
+    }, []);
+
+    // Toggle a vote ("Collaborate") on an idea. Real ideas require a real
+    // signed-in session (the RPC is authenticated-only); demo/mock ideas
+    // toggle locally so the prototype experience still works offline.
+    const toggleIdeaVote = useCallback((ideaId) => {
+      const idea = ideas.find((i) => i.id === ideaId);
+      if (!idea) return;
+      if (!isRealId(ideaId)) {
+        setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: !i.votedByMe, votes: i.votes + (i.votedByMe ? -1 : 1) } : i)));
+        return;
+      }
+      if (!realUser) { toast('Sign in with Google to vote on ideas.', 'gold'); return; }
+      const was = idea.votedByMe;
+      setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: !was, votes: i.votes + (was ? -1 : 1) } : i)));
+      (async () => {
+        try {
+          const { data, error } = await window.CC_SUPABASE.rpc('vote_on_idea', { p_idea_id: ideaId });
+          if (error) throw error;
+          // Reconcile with the authoritative count from the RPC.
+          setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: !!data.voted, votes: data.vote_count } : i)));
+          if (data.action === 'added' && data.threshold_reached) {
+            toast('This idea has reached its vote goal! 🎉', 'green');
+          }
+        } catch (e) {
+          setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: was, votes: i.votes + (was ? 1 : -1) } : i)));
+          toast('Could not save your vote — please try again.', 'red');
+        }
+      })();
+    }, [ideas, realUser, toast]);
+
+    // Submit a new Impact Idea. Real users write through (then re-sync the
+    // board); demo users get a local-only idea so the flow stays explorable.
+    const submitIdea = useCallback((form, done) => {
+      if (!realUser) {
+        const local = {
+          id: uid('idea'), title: form.title, description: form.description, category: form.category || '',
+          votes: 0, threshold: form.voteThreshold || 50, status: 'voting', tier: form.tier || 'community',
+          tierLabel: form.tierLabel || '', votedByMe: false, authorName: user.name, authorPhoto: user.profilePhoto,
+          collaborators: null, createdAt: today(), lat: null, lng: null,
+        };
+        setIdeas((prev) => [local, ...prev]);
+        toast('Idea posted to the board (demo) — sign in to make it real.', 'gold');
+        if (done) done(true);
+        return;
+      }
+      (async () => {
+        try {
+          const res = await authedFetch('/api/suggestions', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: form.title,
+              body: form.description,
+              page_url: window.location.origin + '/community',
+              tier: form.tier,
+              vote_threshold: form.voteThreshold,
+              category: form.category || undefined,
+            }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) { toast(json.error || 'Could not post your idea.', 'red'); if (done) done(false); return; }
+          toast('Idea posted to the board! 💡', 'green');
+          fetchIdeas();
+          if (done) done(true);
+        } catch (e) {
+          toast('Could not post your idea — please try again.', 'red');
+          if (done) done(false);
+        }
+      })();
+    }, [realUser, user, toast, fetchIdeas]);
+
     const markNotifsRead = useCallback(() => {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       if (!realUser) return;
@@ -788,6 +902,10 @@
       return () => { active = false; };
     }, [realUser]);
 
+    // ── Real Impact Ideas (Phase 3) ───────────────────────────────────
+    //  Re-runs after sign-in so voted_by_me reflects the real user.
+    useEffect(() => { fetchIdeas(); }, [fetchIdeas, realUser]);
+
     // ── Real notifications + conversations (Phase 3) ─────────────────
     //  For a real signed-in user these REPLACE the demo seeds even when empty:
     //  showing another (mock) person's inbox to a real user would be dishonest.
@@ -928,6 +1046,7 @@
       role, setRole, nav, go,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,
+      ideas, toggleIdeaVote, submitIdea,
       citizens: DATA.citizens,
       volunteerApps, reviewVolunteer, reports, resolveReport,
       assistMode, assistLoginAs, exitAssist,
