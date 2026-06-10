@@ -4,7 +4,7 @@
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { useState, useRef } = React;
+  const { useState } = React;
   const { cx, Field, Input, Textarea, Button, Toggle, MediaPicker, Stepper, Overlay } = window.UI;
   const Icon = window.Icon;
 
@@ -34,48 +34,26 @@
         h('input', { value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value), placeholder: s.key, className: 'flex-1 text-sm bg-transparent outline-none' }))));
   }
 
-  // ── mini map for placement / route ──
-  function MiniMap({ mode, point, route, hex, onPoint, onRoute }) {
-    const ref = useRef(null);
-    const pos = (e) => {
-      const r = ref.current.getBoundingClientRect();
-      return { x: Math.max(2, Math.min(98, Math.round((e.clientX - r.left) / r.width * 100))), y: Math.max(2, Math.min(98, Math.round((e.clientY - r.top) / r.height * 100))) };
-    };
-    const click = (e) => { const p = pos(e); mode === 'route' ? onRoute([...(route || []), p]) : onPoint(p); };
-    const d = (route || []).map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`).join(' ');
-    return h('div', { ref, onClick: click, className: 'relative w-full rounded-2xl overflow-hidden border border-border cursor-crosshair', style: { aspectRatio: '16/9', background: 'var(--map-bg)' } },
-      h(window.MapBackdrop),
-      mode === 'route' && route && route.length > 1 && h('svg', { className: 'absolute inset-0 w-full h-full pointer-events-none', viewBox: '0 0 100 100', preserveAspectRatio: 'none' },
-        h('path', { d, fill: 'none', stroke: '#fff', strokeWidth: 5, vectorEffect: 'non-scaling-stroke', strokeLinecap: 'round', opacity: 0.7 }),
-        h('path', { d, fill: 'none', stroke: hex, strokeWidth: 3, vectorEffect: 'non-scaling-stroke', strokeLinecap: 'round', className: 'dash-flow' })),
-      mode === 'route'
-        ? (route || []).map((p, i) => h('div', { key: i, className: 'absolute -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow', style: { left: p.x + '%', top: p.y + '%', width: 16, height: 16, background: i === 0 ? '#16A34A' : i === route.length - 1 ? hex : '#fff', color: i === 0 || i === route.length - 1 ? '#fff' : hex, border: `2px solid ${hex}` } }, i === 0 ? 'S' : i === route.length - 1 ? h(Icon, { name: 'Flag', size: 9 }) : i))
-        : point && h('div', { className: 'absolute -translate-x-1/2 -translate-y-full', style: { left: point.x + '%', top: point.y + '%' } },
-            h('span', { className: 'flex items-center justify-center shadow-lg', style: { width: 26, height: 26, background: hex, border: '2px solid #fff', borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)' } }, h('span', { style: { transform: 'rotate(45deg)', display: 'flex' } }, h(Icon, { name: 'MapPin', size: 12, className: 'text-white' })))),
-      h('div', { className: 'absolute top-2 left-2 glass-strong rounded-lg px-2 py-1 text-[10px] font-semibold text-foreground/70 pointer-events-none' }, mode === 'route' ? 'Tap to drop start → waypoints → finish' : 'Tap to place your pin'));
-  }
-
   function CreateFlow({ kind }) {
     const app = window.useApp();
     const { closeCreate, createEvent, createPlace, creationStyle, activeContributor } = app;
     const isEvent = kind === 'event';
     const [step, setStep] = useState(0);
     const [f, setF] = useState(isEvent
-      ? { title: '', category: '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, isMobile: false, route: [], mapX: 48, mapY: 50, upcomingDates: [], launchBroadcast: '' }
-      : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, mapX: 52, mapY: 46 });
+      ? { title: '', category: '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, upcomingDates: [], launchBroadcast: '' }
+      : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
     const [recur, setRecur] = useState('');
-    const cat = window.DATA.getCategory(f.category);
-    const hex = cat ? cat.hex : '#C9A84C';
+    const [publishing, setPublishing] = useState(false);
 
+    // Publish is async for real users (geocode + DB write). The sheet only
+    // closes on success so a failed publish keeps the form intact.
     const submit = () => {
-      if (isEvent) {
-        const pos = f.isMobile && f.route.length ? f.route[0] : { x: f.mapX, y: f.mapY };
-        createEvent({ ...f, mapX: pos.x, mapY: pos.y, route: f.isMobile ? f.route : null });
-      } else createPlace(f);
-      closeCreate();
-      app.go('home');
+      if (publishing) return;
+      setPublishing(true);
+      const done = (ok) => { setPublishing(false); if (ok) { closeCreate(); app.go('home'); } };
+      if (isEvent) createEvent(f, done); else createPlace(f, done);
     };
 
     // ── field sections ──
@@ -90,19 +68,11 @@
         h(Field, { label: 'Date', required: true }, h('input', { type: 'date', value: f.date, onChange: (e) => up('date', e.target.value), className: window.UI.inputCls })),
         h(Field, { label: 'Start' }, h('input', { type: 'time', value: f.time, onChange: (e) => up('time', e.target.value), className: window.UI.inputCls })),
         h(Field, { label: 'End' }, h('input', { type: 'time', value: f.endTime, onChange: (e) => up('endTime', e.target.value), className: window.UI.inputCls }))),
-      h(Field, { label: isEvent ? 'Venue name' : 'Address', required: true }, h(Input, { value: isEvent ? f.location : f.address, onChange: (e) => up(isEvent ? 'location' : 'address', e.target.value), placeholder: isEvent ? 'Where is it held?' : 'Street, area' })),
-      isEvent && h(Field, { label: 'Address' }, h(Input, { value: f.address, onChange: (e) => up('address', e.target.value), placeholder: 'Street, area' })),
-      isEvent && h(Field, { label: 'Mobile event' },
-        h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
-          h(Toggle, { checked: f.isMobile, onChange: (v) => up('isMobile', v), label: 'Start → finish route', desc: 'For walks, runs & processions — track shows on the map in your category colour.' }))),
-      f.isMobile
-        ? h(Field, { label: 'Draw the route' },
-            h(MiniMap, { mode: 'route', route: f.route, hex, onRoute: (r) => up('route', r) }),
-            h('div', { className: 'flex items-center gap-2 mt-2' },
-              h('span', { className: 'text-[11px] text-muted-foreground flex-1' }, f.route.length + ' point' + (f.route.length === 1 ? '' : 's') + (f.route.length >= 2 ? ' · ' + f.route.length + ' stops' : '')),
-              h(Button, { variant: 'ghost', size: 'sm', icon: 'Undo2', onClick: () => up('route', f.route.slice(0, -1)) }, 'Undo'),
-              h(Button, { variant: 'ghost', size: 'sm', icon: 'Trash2', onClick: () => up('route', []) }, 'Clear')))
-        : h(Field, { label: 'Place on map', required: true }, h(MiniMap, { mode: 'point', point: { x: f.mapX, y: f.mapY }, hex, onPoint: (p) => { up('mapX', p.x); up('mapY', p.y); } })),
+      h(Field, { label: isEvent ? 'Venue name' : 'Address', required: true }, h(Input, { value: isEvent ? f.location : f.address, onChange: (e) => up(isEvent ? 'location' : 'address', e.target.value), placeholder: isEvent ? 'Where is it held?' : 'Street, suburb, city' })),
+      isEvent && h(Field, { label: 'Address', hint: 'Include suburb & city — this places your pin on the map.' }, h(Input, { value: f.address, onChange: (e) => up('address', e.target.value), placeholder: 'Street, suburb, city' })),
+      h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
+        h(Icon, { name: 'MapPin', size: 15, className: 'shrink-0 mt-0.5' }),
+        h('p', { className: 'text-xs leading-relaxed' }, 'Your map pin is placed automatically from the address above.')),
       isEvent && h(Field, { label: 'Recurring / upcoming dates', hint: 'Optional — add future dates this repeats.' },
         h('div', { className: 'flex gap-2 mb-2' },
           h('input', { type: 'date', value: recur, onChange: (e) => setRecur(e.target.value), className: window.UI.inputCls }),
@@ -156,7 +126,7 @@
             h('div', { className: 'space-y-4' }, cur.node)),
           h('div', { className: 'shrink-0 border-t border-border px-5 py-3 flex gap-3' },
             step > 0 && h(Button, { variant: 'outline', className: 'flex-1', onClick: () => setStep(step - 1) }, 'Back'),
-            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: last && !canSubmit, icon: last ? 'Rocket' : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? 'Publish' : 'Continue'))));
+            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: (last && !canSubmit) || publishing, icon: last ? 'Rocket' : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? (publishing ? 'Publishing…' : 'Publish') : 'Continue'))));
     }
 
     // MODAL / SIDE layout (single scroll, sectioned)
@@ -171,7 +141,7 @@
             h('div', { className: 'space-y-4' }, s.node)))),
         h('div', { className: 'shrink-0 border-t border-border px-5 py-3 flex gap-3' },
           h(Button, { variant: 'outline', onClick: closeCreate }, 'Cancel'),
-          h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSubmit, icon: 'Rocket', onClick: submit }, 'Publish to map'))));
+          h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSubmit || publishing, icon: 'Rocket', onClick: submit }, publishing ? 'Publishing…' : 'Publish to map'))));
   }
 
   function GalleryAdd({ onAdd }) {

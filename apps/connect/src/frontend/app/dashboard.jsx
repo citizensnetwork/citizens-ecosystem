@@ -15,14 +15,50 @@
     { day: 'Sun', connects: 52, views: 145 },
   ];
 
-  function BarChart() {
-    const max = Math.max(...WEEK.map((d) => d.views));
+  // Build the last-7-days series from the real analytics API response
+  // ({ rsvps: [{date,value}], views: [{date,value}] }) — days with no row are 0.
+  function buildWeek(series) {
+    const byDay = {}; const keys = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      byDay[key] = { day: d.toLocaleDateString('en-GB', { weekday: 'short' }), connects: 0, views: 0 };
+      keys.push(key);
+    }
+    ((series && series.rsvps) || []).forEach((r) => { if (byDay[r.date]) byDay[r.date].connects += r.value; });
+    ((series && series.views) || []).forEach((r) => { if (byDay[r.date]) byDay[r.date].views += r.value; });
+    return keys.map((k) => byDay[k]);
+  }
+
+  const timeAgo = (iso) => {
+    if (!iso) return '';
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' hour' + (Math.floor(s / 3600) === 1 ? '' : 's') + ' ago';
+    return Math.floor(s / 86400) + ' day' + (Math.floor(s / 86400) === 1 ? '' : 's') + ' ago';
+  };
+
+  function BarChart({ week }) {
+    const data = week || WEEK;
+    const max = Math.max(1, ...data.map((d) => Math.max(d.views, d.connects)));
     return h('div', { className: 'flex items-end justify-between gap-2 h-36 pt-2' },
-      WEEK.map((d) => h('div', { key: d.day, className: 'flex-1 flex flex-col items-center gap-1.5 h-full justify-end' },
+      data.map((d, i) => h('div', { key: i, className: 'flex-1 flex flex-col items-center gap-1.5 h-full justify-end' },
         h('div', { className: 'w-full flex items-end justify-center gap-0.5 flex-1' },
           h('div', { className: 'w-1/2 rounded-t-md bg-gold transition-all', style: { height: (d.connects / max * 100) + '%' }, title: d.connects + ' connects' }),
           h('div', { className: 'w-1/2 rounded-t-md bg-gold-light transition-all', style: { height: (d.views / max * 100) + '%' }, title: d.views + ' views' })),
         h('span', { className: 'text-[9px] text-muted-foreground font-medium' }, d.day))));
+  }
+
+  // Real activity_log row → display row. Falls back to a readable generic
+  // label for unrecognised actions; never invents data.
+  const ACTIVITY_ICON = { event: ['Calendar', '#C9A84C'], place: ['MapPin', '#2563EB'], broadcast: ['Radio', '#C9A84C'], volunteer: ['HandHeart', '#16A34A'], team: ['Users', '#7C3AED'] };
+  function activityRow(a) {
+    const kind = (a.entity_type || '').toLowerCase();
+    const [ic, c] = ACTIVITY_ICON[kind] || ['Activity', '#C9A84C'];
+    const who = a.actor && a.actor.full_name ? a.actor.full_name + ' — ' : '';
+    const label = String(a.action || 'activity').replace(/[._-]/g, ' ');
+    return { icon: ic, color: c, text: who + label + (a.entity_type ? ' (' + a.entity_type + ')' : ''), time: timeAgo(a.created_at) };
   }
 
   function StatCard({ label, value, color }) {
@@ -90,7 +126,7 @@
 
   function DashboardPage() {
     const app = window.useApp();
-    const { activeContributor, activeContributorId, events, places, conversations, openCreate, go } = app;
+    const { activeContributor, activeContributorId, events, places, conversations, contributorDash, realUser, openCreate, go } = app;
     const [tab, setTab] = useState('overview');
     const [tool, setTool] = useState(null); // null | 'volunteer' | 'analytics'
     const [bcTarget, setBcTarget] = useState('');
@@ -98,6 +134,11 @@
     const myPlaces = places.filter((p) => p.organizerId === activeContributorId);
     const totalConnects = myEvents.reduce((a, e) => a + e.connectCount, 0);
     const totalConsider = myEvents.reduce((a, e) => a + e.considerCount, 0);
+    // Real-mode signals (null/undefined in demo → the mock placeholders show).
+    const dash = contributorDash;
+    const realWeek = dash && dash.week ? buildWeek(dash.week) : null;
+    const realActivity = dash ? (dash.recentActivity || []).map(activityRow) : null;
+    const followerCount = dash && dash.stats ? dash.stats.total_followers : activeContributor.followerCount;
 
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'dashboard' },
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
@@ -125,24 +166,31 @@
             h('div', { className: 'bg-card rounded-2xl p-4 border border-border' },
               h('div', { className: 'flex items-center justify-between mb-1' },
                 h('p', { className: 'text-sm font-bold text-foreground' }, "This Week's Activity"),
-                h('span', { className: 'text-xs text-gold-dark font-semibold flex items-center gap-1' }, h(Icon, { name: 'TrendingUp', size: 12 }), '+24%')),
+                // The growth badge is demo flavour only — no fabricated % on real data.
+                !dash && h('span', { className: 'text-xs text-gold-dark font-semibold flex items-center gap-1' }, h(Icon, { name: 'TrendingUp', size: 12 }), '+24%')),
               h('div', { className: 'flex items-center gap-4 mb-2 text-[10px] text-muted-foreground' },
                 h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded bg-gold' }), 'Connects'),
                 h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded bg-gold-light' }), 'Views')),
-              h(BarChart)),
+              h(BarChart, { week: realWeek })),
             h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
               h('div', { className: 'px-4 py-3 border-b border-border' }, h('p', { className: 'text-sm font-bold text-foreground' }, 'Recent Activity')),
-              [['Users', '12 new citizens connected to Sunday Glory Service', '30 min ago', '#C9A84C'],
-               ['MessageCircle', 'New message from Lydia Mensah', '1 hour ago', '#2563EB'],
-               ['Eye', 'Kingdom Creative Arts Workshop viewed 48 times today', '2 hours ago', '#7C3AED'],
-               ['CheckCircle2', 'Volunteer application received for Feed the City', '3 hours ago', '#16A34A']]
-                .map(([ic, t, time, c], i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
-                  h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: c + '20', color: c } }, h(Icon, { name: ic, size: 13 })),
-                  h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug' }, t), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, time))))),
+              realActivity
+                ? (realActivity.length === 0
+                    ? h('p', { className: 'px-4 py-6 text-xs text-muted-foreground text-center' }, 'No activity yet — it shows here as citizens connect with your work.')
+                    : realActivity.map((r, i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
+                        h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: r.color + '20', color: r.color } }, h(Icon, { name: r.icon, size: 13 })),
+                        h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug capitalize' }, r.text), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, r.time)))))
+                : [['Users', '12 new citizens connected to Sunday Glory Service', '30 min ago', '#C9A84C'],
+                   ['MessageCircle', 'New message from Lydia Mensah', '1 hour ago', '#2563EB'],
+                   ['Eye', 'Kingdom Creative Arts Workshop viewed 48 times today', '2 hours ago', '#7C3AED'],
+                   ['CheckCircle2', 'Volunteer application received for Feed the City', '3 hours ago', '#16A34A']]
+                    .map(([ic, t, time, c], i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
+                      h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: c + '20', color: c } }, h(Icon, { name: ic, size: 13 })),
+                      h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug' }, t), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, time))))),
             h('button', { onClick: () => go('profile', { id: activeContributorId }), className: 'w-full flex items-center gap-3 p-4 bg-gradient-to-r from-[#F2E8CC] to-[#E8D48B]/30 rounded-2xl border border-gold/30 hover:border-gold/60 transition-all' },
               h('div', { className: 'flex-1 text-left' },
                 h('p', { className: 'text-sm font-bold text-gold-dark' }, 'View Public Profile'),
-                h('p', { className: 'text-xs text-gold-dark/70' }, activeContributor.followerCount.toLocaleString() + ' followers · ' + activeContributor.dominantNiche)),
+                h('p', { className: 'text-xs text-gold-dark/70' }, (followerCount || 0).toLocaleString() + ' followers' + (activeContributor.dominantNiche ? ' · ' + activeContributor.dominantNiche : ''))),
               h(Icon, { name: 'ChevronRight', size: 16, className: 'text-gold' }))),
 
           tab === 'events' && h('div', { className: 'space-y-4 fade-in' },

@@ -8,6 +8,7 @@
 // steady state.
 
 import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { CONTRIBUTOR_ROLES } from "@/types/db";
 
 export type DashboardAccessResult =
@@ -15,13 +16,22 @@ export type DashboardAccessResult =
   | { hasAccess: false };
 
 export async function checkDashboardAccess(
-  handle: string
+  handle: string,
+  request?: Request
 ): Promise<DashboardAccessResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // When the route hands us its Request we honour Bearer tokens too (the
+  // cross-origin static frontend has no cookie); without it, behaviour is the
+  // original cookie-only path so untouched callers are unaffected.
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let user: { id: string } | null;
+  if (request) {
+    const auth = await getRouteAuth(request);
+    supabase = auth.supabase;
+    user = auth.user;
+  } else {
+    supabase = await createClient();
+    user = (await supabase.auth.getUser()).data.user;
+  }
   if (!user) return { hasAccess: false };
 
   // Resolve handle → contributor profile

@@ -137,8 +137,10 @@
     const [f, setF] = useState({
       name: ma.name || '', category: ma.category || 'church-services', bio: ma.bio || '',
       location: ma.location || '', website: ma.website || '', contactEmail: '',
-      profilePhoto: 'https://images.unsplash.com/photo-1473177104440-ffee2f376098?w=200&h=200&fit=crop',
-      coverPhoto: 'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=900&h=400&fit=crop',
+      // No stock stand-ins: empty → MediaPicker offers upload, and the profile
+      // falls back to honest initials/category tiles until real art is added.
+      profilePhoto: '',
+      coverPhoto: '',
       members: [], socials: ma.socials || {},
     });
     const [member, setMember] = useState('');

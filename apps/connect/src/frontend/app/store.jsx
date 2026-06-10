@@ -69,6 +69,39 @@
     return publicUrl;
   }
 
+  // Forward-geocode a free-text address via MapTiler (key already in env for
+  // the basemap). South-Africa-biased. Returns {lat,lng} or null — callers
+  // decide whether coordinates are required (places) or optional (events).
+  async function geocodeAddress(q) {
+    try {
+      const key = window.__CC_ENV && window.__CC_ENV.MAPTILER_KEY;
+      if (!key || !q || !q.trim()) return null;
+      const res = await fetch('https://api.maptiler.com/geocoding/' + encodeURIComponent(q.trim()) + '.json?key=' + key + '&limit=1&country=za');
+      if (!res.ok) return null;
+      const json = await res.json();
+      const f = json && json.features && json.features[0];
+      if (!f || !Array.isArray(f.center)) return null;
+      return { lng: f.center[0], lat: f.center[1] };
+    } catch (e) { return null; }
+  }
+
+  // Lazy slug → category_id map (places.category_id is a uuid FK; the create
+  // form works in slugs). Cached after the first lookup; fails open to null
+  // so an unknown slug lands in custom_category instead.
+  let _categoryIdBySlug = null;
+  async function getCategoryId(slug) {
+    if (!slug) return null;
+    if (!_categoryIdBySlug) {
+      try {
+        const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+        const res = await fetch(base + '/api/v1/categories');
+        const json = await res.json();
+        _categoryIdBySlug = new Map(((json && json.data) || []).map((c) => [c.slug, c.id]));
+      } catch (e) { _categoryIdBySlug = new Map(); }
+    }
+    return _categoryIdBySlug.get(slug) || null;
+  }
+
   // ── Live data adapter: /api/v1/events row → app event shape ──────────
   //  The public API is sparse (no organiser name / connect counts yet), so we
   //  fill honest defaults (0 counts, blank organiser) and compute `isLive` from
@@ -107,12 +140,14 @@
       date: validDt ? validDt.toISOString().slice(0, 10) : '',
       time: fmtTime(validDt), endTime: fmtTime(validEnd),
       location: r.location || '', address: r.location || '',
-      // organizerId = created_by (UUID). organizerName falls back to the
-      // community_contributor text so community-posted events still show a name
-      // even when the creator isn't an approved Contributor in the directory.
-      organizerName: r.community_contributor || '', organizerId: r.created_by || null,
+      // organizerId = created_by (UUID). community_contributor is a BOOLEAN on
+      // the live schema (community-posted flag) — only use it as a name if some
+      // upstream shape ever sends a string; never render `true` as a name.
+      organizerName: typeof r.community_contributor === 'string' ? r.community_contributor : '',
+      organizerId: r.created_by || null,
       isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
-      isBusy: false, connectCount: 0, considerCount: 0, volunteeringEnabled: false,
+      isBusy: false, connectCount: 0, considerCount: 0,
+      volunteeringEnabled: !!r.volunteer_openings,
       coverPhoto: r.image_url || '',
       gallery: [], broadcast: null, website: r.website_url || '',
       lat: typeof r.latitude === 'number' ? r.latitude : null,
@@ -318,6 +353,7 @@
     const [myContributor, setMyContributor] = useState(null); // contributor obj once onboarded
     const [assistMode, setAssistMode] = useState(false); // admin assisting as a contributor
     const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
+    const [contributorDash, setContributorDash] = useState(null); // real dashboard stats/activity/week (null in demo)
 
     // citizen RSVP state (mock seeds for demo mode; replaced by the user's real
     // rows once a real Supabase session loads — see the seeding effect below).
@@ -342,9 +378,17 @@
     const openCreate = useCallback((kind) => setCreateKind(kind), []);
     const closeCreate = useCallback(() => setCreateKind(null), []);
 
-    // active org the contributor manages (their new org, else demo Grace City)
-    const activeContributorId = myContributor ? myContributor.id : 'c1';
-    const activeContributor = contributors.find((c) => c.id === activeContributorId);
+    // active org the contributor manages: their real org (signed-in
+    // contributor), an assist-mode/freshly-onboarded org, else demo Grace City.
+    // Crash-safe: always resolves to SOME contributor object.
+    const activeContributorId = myContributor
+      ? myContributor.id
+      : (realUser && role === 'contributor' ? realUser.id : 'c1');
+    const activeContributor =
+      (myContributor && myContributor.id === activeContributorId ? myContributor : null)
+      || contributors.find((c) => c.id === activeContributorId)
+      || contributors[0]
+      || { id: 'c1', name: 'My Ministry', profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '' };
 
     const baseUser =
       role === 'admin' ? ADMIN_BASE
@@ -427,63 +471,227 @@
       toast(status === 'resolved' ? 'Report resolved.' : status === 'removed' ? 'Content removed.' : 'Report dismissed.', status === 'dismissed' ? 'gold' : 'green');
     }, [toast]);
 
-    const completeOnboarding = useCallback((form) => {
-      const c = {
-        id: uid('c'), name: form.name || (myApplication && myApplication.name) || 'My Ministry',
-        bio: form.bio, profilePhoto: form.profilePhoto, coverPhoto: form.coverPhoto,
+    // Broadcast: optimistic local bubble; for a real contributor on a real
+    // entity it writes through to the broadcasts API (which fans out
+    // notifications + creates the 24h map bubble via DB trigger).
+    const sendBroadcast = useCallback((kind, id, message) => {
+      const setColl = kind === 'event' ? setEvents : setPlaces;
+      setColl((prev) => prev.map((x) => (x.id === id ? { ...x, broadcast: { message, minsAgo: 0 } } : x)));
+      const slug = myContributor && myContributor.slug;
+      if (realUser && isRealId(id) && slug) {
+        (async () => {
+          try {
+            const res = await authedFetch('/api/contributor/' + slug + '/broadcasts', {
+              method: 'POST',
+              body: JSON.stringify({ entity_type: kind, entity_id: id, body: message }),
+            });
+            if (!res.ok) throw new Error('broadcast ' + res.status);
+            toast('Broadcast sent — bubble live on the map for 24h.', 'gold');
+          } catch (e) {
+            setColl((prev) => prev.map((x) => (x.id === id ? { ...x, broadcast: null } : x)));
+            toast('Broadcast failed — please try again.', 'red');
+          }
+        })();
+        return;
+      }
+      // Demo: keep the prototype's local notification for flavour.
+      setNotifications((prev) => [{ id: uid('n'), type: 'broadcast', title: activeContributor.name + ' sent a broadcast', body: message, time: 'just now', read: false, photo: activeContributor.profilePhoto }, ...prev]);
+      toast('Broadcast sent — bubble live on the map for 24h.', 'gold');
+    }, [activeContributor, myContributor, realUser, toast]);
+
+    // Create event: demo mode stays local; a real signed-in user writes the
+    // row through the supabase client (RLS: created_by = auth.uid()). The pin
+    // location comes from geocoding the address — no coordinates is still a
+    // valid event (it lists, but can't sit on the map yet).
+    const createEvent = useCallback((form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) {
+        const ev = {
+          id: uid('e'), title: form.title, category: form.category, description: form.description,
+          date: form.date, time: form.time, endTime: form.endTime, location: form.location, address: form.address,
+          organizerName: activeContributor.name, organizerId: activeContributorId,
+          isLive: false, isBusy: false, connectCount: 0, considerCount: 0,
+          volunteeringEnabled: !!form.volunteeringEnabled,
+          coverPhoto: form.coverPhoto || '',
+          gallery: form.gallery || [], broadcast: null, website: form.website || activeContributor.website,
+          socials: form.socials || {}, upcomingDates: form.upcomingDates || [], tags: form.tags || [],
+          mapX: form.mapX || 48, mapY: form.mapY || 50,
+        };
+        setEvents((prev) => [ev, ...prev]);
+        if (form.launchBroadcast) {
+          ev.broadcast = { message: form.launchBroadcast, minsAgo: 0 };
+          setNotifications((prev) => [{ id: uid('n'), type: 'broadcast', title: activeContributor.name + ' sent a broadcast', body: form.launchBroadcast, time: 'just now', read: false, photo: activeContributor.profilePhoto }, ...prev]);
+        }
+        toast('Event created — now live on the map!', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          const start = form.date ? new Date(form.date + 'T' + (form.time || '09:00')) : null;
+          if (!start || isNaN(start.getTime())) { toast('Please pick a date and start time.', 'red'); finish(false); return; }
+          const end = form.endTime ? new Date(form.date + 'T' + form.endTime) : null;
+          const geo = await geocodeAddress(form.address || form.location);
+          const socials = form.socials || {};
+          const row = {
+            title: form.title,
+            description: form.description || '',
+            category: form.category || 'church-services',
+            date: start.toISOString(),
+            end_time: end && !isNaN(end.getTime()) ? end.toISOString() : null,
+            location: [form.location, form.address].filter(Boolean).join(', '),
+            created_by: realUser.id,
+            image_url: form.coverPhoto || null,
+            volunteer_openings: !!form.volunteeringEnabled,
+            latitude: geo ? geo.lat : null,
+            longitude: geo ? geo.lng : null,
+            instagram_url: socials.instagram || null,
+            facebook_url: socials.facebook || null,
+            youtube_url: socials.youtube || null,
+          };
+          const { data, error } = await window.CC_SUPABASE.from('events').insert(row).select('*').single();
+          if (error) throw error;
+          setEvents((prev) => [adaptEvent(data), ...prev]);
+          toast(geo ? 'Event published — now live on the map!' : 'Event published! We couldn’t place that address on the map — refine it later.', 'green');
+          if (form.launchBroadcast && role === 'contributor') sendBroadcast('event', data.id, form.launchBroadcast);
+          finish(true);
+        } catch (e) {
+          console.warn('[createEvent]', e);
+          toast('Could not publish the event — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [activeContributor, activeContributorId, realUser, role, sendBroadcast, toast]);
+
+    // Create place: places.latitude/longitude are NOT NULL, so a real place
+    // needs a geocodable address — we refuse (with guidance) rather than
+    // fabricate coordinates.
+    const createPlace = useCallback((form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) {
+        const pl = {
+          id: uid('p'), name: form.name, category: form.category, description: form.description,
+          address: form.address, organizerName: activeContributor.name, organizerId: activeContributorId,
+          coverPhoto: form.coverPhoto || '',
+          gallery: form.gallery || [], openHours: form.openHours || '', website: form.website || activeContributor.website,
+          volunteeringEnabled: !!form.volunteeringEnabled, followerCount: 0,
+          mapX: form.mapX || 52, mapY: form.mapY || 46, associatedEventIds: [], socials: form.socials || {},
+        };
+        setPlaces((prev) => [pl, ...prev]);
+        toast('Place added to the map!', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          const geo = await geocodeAddress(form.address);
+          if (!geo) { toast('We couldn’t find that address — add a suburb and city, then try again.', 'red'); finish(false); return; }
+          const categoryId = await getCategoryId(form.category);
+          const row = {
+            name: form.name,
+            description: form.description || '',
+            address: form.address,
+            category_id: categoryId,
+            custom_category: categoryId ? null : (form.category || null),
+            image_url: form.coverPhoto || null,
+            latitude: geo.lat,
+            longitude: geo.lng,
+            created_by: realUser.id,
+            volunteer_openings: !!form.volunteeringEnabled,
+          };
+          const { data, error } = await window.CC_SUPABASE.from('places').insert(row).select('*').single();
+          if (error) throw error;
+          // The insert returns a raw row (no category embed); resolve the slug locally.
+          setPlaces((prev) => [{ ...adaptPlace(data), category: form.category || '' }, ...prev]);
+          toast('Place published — now live on the map!', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[createPlace]', e);
+          toast('Could not publish the place — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [activeContributor, activeContributorId, realUser, toast]);
+
+    // Onboarding: for a real (admin-approved) contributor this persists the
+    // profile via /api/contributor/setup (+ the contributor-profile route for
+    // logo/address/socials), then flips the in-app surface to their dashboard.
+    const completeOnboarding = useCallback((form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      const localOrg = {
+        id: realUser ? realUser.id : uid('c'),
+        name: form.name || (myApplication && myApplication.name) || 'My Ministry',
+        role: 'contributor', kind: 'organization', slug: null,
+        bio: form.bio, profilePhoto: form.profilePhoto || '', coverPhoto: form.coverPhoto || '',
         category: form.category, website: form.website, contactEmail: form.contactEmail || '',
         location: form.location || '', members: form.members || [], followerCount: 0,
         dominantNiche: DATA.getEventCategory(form.category) ? DATA.getEventCategory(form.category).name : 'Community',
-        involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true,
+        involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
-      setContributors((prev) => [...prev, c]);
-      setMyContributor(c);
-      setRole('contributor');
-      toast('Welcome aboard! Your contributor profile is live.', 'green');
-      go('dashboard');
-    }, [myApplication, toast, go]);
-
-    const createEvent = useCallback((form) => {
-      const ev = {
-        id: uid('e'), title: form.title, category: form.category, description: form.description,
-        date: form.date, time: form.time, endTime: form.endTime, location: form.location, address: form.address,
-        organizerName: activeContributor.name, organizerId: activeContributorId,
-        isLive: false, isBusy: false, connectCount: 0, considerCount: 0,
-        volunteeringEnabled: !!form.volunteeringEnabled,
-        coverPhoto: form.coverPhoto || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=500&fit=crop',
-        gallery: form.gallery || [], broadcast: null, website: form.website || activeContributor.website,
-        socials: form.socials || {}, isMobile: !!form.isMobile, route: form.route || null,
-        mapX: form.mapX || 48, mapY: form.mapY || 50, upcomingDates: form.upcomingDates || [], tags: form.tags || [],
-      };
-      setEvents((prev) => [ev, ...prev]);
-      if (form.launchBroadcast) {
-        ev.broadcast = { message: form.launchBroadcast, minsAgo: 0 };
-        setNotifications((prev) => [{ id: uid('n'), type: 'broadcast', title: activeContributor.name + ' sent a broadcast', body: form.launchBroadcast, time: 'just now', read: false, photo: activeContributor.profilePhoto }, ...prev]);
+      if (!realUser) {
+        setContributors((prev) => [...prev, localOrg]);
+        setMyContributor(localOrg);
+        setRole('contributor');
+        toast('Welcome aboard! Your contributor profile is live.', 'green');
+        go('dashboard');
+        finish(true);
+        return;
       }
-      toast('Event created — now live on the map!', 'green');
-      return ev;
-    }, [activeContributor, activeContributorId, toast]);
-
-    const createPlace = useCallback((form) => {
-      const pl = {
-        id: uid('p'), name: form.name, category: form.category, description: form.description,
-        address: form.address, organizerName: activeContributor.name, organizerId: activeContributorId,
-        coverPhoto: form.coverPhoto || 'https://images.unsplash.com/photo-1481253127861-534498168948?w=800&h=500&fit=crop',
-        gallery: form.gallery || [], openHours: form.openHours || '', website: form.website || activeContributor.website,
-        volunteeringEnabled: !!form.volunteeringEnabled, followerCount: 0,
-        mapX: form.mapX || 52, mapY: form.mapY || 46, associatedEventIds: [], socials: form.socials || {},
-      };
-      setPlaces((prev) => [pl, ...prev]);
-      toast('Place added to the map!', 'green');
-      return pl;
-    }, [activeContributor, activeContributorId, toast]);
-
-    const sendBroadcast = useCallback((kind, id, message) => {
-      if (kind === 'event') setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, broadcast: { message, minsAgo: 0 } } : e)));
-      else setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, broadcast: { message, minsAgo: 0 } } : p)));
-      setNotifications((prev) => [{ id: uid('n'), type: 'broadcast', title: activeContributor.name + ' sent a broadcast', body: message, time: 'just now', read: false, photo: activeContributor.profilePhoto }, ...prev]);
-      toast('Broadcast sent — bubble live on the map for 24h.', 'gold');
-    }, [activeContributor, toast]);
+      (async () => {
+        try {
+          const asUrl = (v) => (v && v.trim() ? (/^https?:\/\//i.test(v.trim()) ? v.trim() : 'https://' + v.trim()) : null);
+          const setupRes = await authedFetch('/api/contributor/setup', {
+            method: 'POST',
+            body: JSON.stringify({
+              display_name: form.name || 'My Ministry',
+              contact_email: form.contactEmail || null,
+              website_url: asUrl(form.website),
+              bio: form.bio || null,
+            }),
+          });
+          if (!setupRes.ok) {
+            const body = await setupRes.json().catch(() => ({}));
+            toast(body.error || 'Could not complete setup — please try again.', 'red');
+            finish(false);
+            return;
+          }
+          // Best-effort extras — profile route is additive and allowlisted.
+          const socials = form.socials || {};
+          await authedFetch('/api/contributor/profile', {
+            method: 'POST',
+            body: JSON.stringify({
+              bio: form.bio || undefined,
+              website_url: asUrl(form.website) || undefined,
+              physical_address: form.location || undefined,
+              logo_url: form.profilePhoto && /^https:\/\//i.test(form.profilePhoto) ? form.profilePhoto : undefined,
+              instagram_handle: socials.instagram || undefined,
+              tiktok_handle: socials.tiktok || undefined,
+            }),
+          }).catch(() => {});
+          // Refresh identity from the DB (slug included) so the dashboard is real.
+          const { data: prof } = await window.CC_SUPABASE
+            .from('profiles')
+            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, instagram_handle, facebook_url, tiktok_handle, youtube_url')
+            .eq('id', realUser.id)
+            .maybeSingle();
+          const org = prof ? { ...adaptContributor(prof), isMine: true } : localOrg;
+          setContributors((prev) => {
+            const byId = new Map(prev.map((c) => [c.id, c]));
+            byId.set(org.id, org);
+            return [...byId.values()];
+          });
+          setMyContributor(org);
+          setRole('contributor');
+          toast('Welcome aboard! Your contributor profile is live.', 'green');
+          go('dashboard');
+          finish(true);
+        } catch (e) {
+          console.warn('[onboarding]', e);
+          toast('Could not complete setup — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [myApplication, realUser, toast, go]);
 
     // Send: optimistic append, then write through for real conversations. The
     // temp id is swapped for the DB id on success so realtime dedup works.
@@ -902,6 +1110,76 @@
       return () => { active = false; };
     }, [realUser]);
 
+    // ── Real contributor identity (Phase 3) ──────────────────────────
+    //  A signed-in contributor manages THEIR org, not the demo's Grace City:
+    //  hydrate myContributor from their own profiles row (slug included, which
+    //  the dashboard/broadcast APIs key on). Assist mode is left untouched.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !realUser || role !== 'contributor' || assistMode) return;
+      let active = true;
+      (async () => {
+        try {
+          const { data } = await sb
+            .from('profiles')
+            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, instagram_handle, facebook_url, tiktok_handle, youtube_url')
+            .eq('id', realUser.id)
+            .maybeSingle();
+          if (!active || !data) return;
+          const org = { ...adaptContributor(data), isMine: true };
+          setMyContributor((prev) => (prev && prev.id === org.id ? { ...prev, ...org } : org));
+          setContributors((prev) => {
+            const byId = new Map(prev.map((c) => [c.id, c]));
+            byId.set(org.id, { ...(byId.get(org.id) || {}), ...org });
+            return [...byId.values()];
+          });
+        } catch (e) { /* identity hydration is best-effort */ }
+      })();
+      return () => { active = false; };
+    }, [realUser, role, assistMode]);
+
+    // ── Real contributor dashboard data (Phase 3) ─────────────────────
+    //  1. /api/manage/events → real per-event connect/consider/view counts.
+    //  2. /api/contributor/<slug>/dashboard + analytics → stats, activity, week.
+    useEffect(() => {
+      if (!realUser || role !== 'contributor') { setContributorDash(null); return; }
+      let active = true;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/manage/events');
+          if (!res.ok) return;
+          const json = await res.json();
+          const byId = new Map(((json && json.events) || []).map((e) => [e.id, e]));
+          if (!active || !byId.size) return;
+          setEvents((prev) => prev.map((e) => (byId.has(e.id)
+            ? { ...e, connectCount: byId.get(e.id).attendee_count || 0, considerCount: byId.get(e.id).consider_count || 0, viewCount: byId.get(e.id).view_count || 0 }
+            : e)));
+        } catch (e) { /* counts stay at honest 0 */ }
+      })();
+      const slug = myContributor && myContributor.slug;
+      if (slug) {
+        (async () => {
+          try {
+            const [dashRes, weekRes] = await Promise.all([
+              authedFetch('/api/contributor/' + slug + '/dashboard?period=30'),
+              authedFetch('/api/contributor/' + slug + '/analytics?period=7'),
+            ]);
+            const dash = dashRes.ok ? await dashRes.json() : null;
+            const week = weekRes.ok ? await weekRes.json() : null;
+            if (!active || (!dash && !week)) return;
+            setContributorDash({
+              stats: dash ? dash.stats : null,
+              recentActivity: dash ? dash.recent_activity : [],
+              topEvent: dash ? dash.top_event : null,
+              week: week ? week.series : null,
+              weekTotals: week ? week.totals : null,
+            });
+          } catch (e) { /* dashboard shows honest demo placeholders */ }
+        })();
+      }
+      return () => { active = false; };
+    }, [realUser, role, myContributor]);
+
     // ── Real Impact Ideas (Phase 3) ───────────────────────────────────
     //  Re-runs after sign-in so voted_by_me reflects the real user.
     useEffect(() => { fetchIdeas(); }, [fetchIdeas, realUser]);
@@ -1050,7 +1328,7 @@
       citizens: DATA.citizens,
       volunteerApps, reviewVolunteer, reports, resolveReport,
       assistMode, assistLoginAs, exitAssist,
-      myApplication, myContributor,
+      myApplication, myContributor, contributorDash,
       connected, considering, followedOrgs, followedPlaces,
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',

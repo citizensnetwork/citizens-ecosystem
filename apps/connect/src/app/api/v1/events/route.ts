@@ -145,6 +145,7 @@ export async function GET(request: Request) {
         "created_by",
         "created_at",
         "community_contributor",
+        "volunteer_openings",
       ].join(","),
       // `count: 'exact'` dropped on the public listing to stop scanning
       // the full filtered set on every poll. Consumers use page advance
