@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -8,11 +8,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /** GET — fetch current user's notifications (newest first, max 50) */
-export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: NextRequest) {
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,10 +37,7 @@ export async function GET() {
 
 /** PATCH — mark notification(s) as read */
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -103,10 +97,7 @@ export async function PATCH(request: NextRequest) {
 
 /** DELETE — delete a single notification */
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

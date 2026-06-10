@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -11,8 +11,7 @@ type RouteParams = { params: Promise<{ id: string }> };
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { id: conversationId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -143,10 +142,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  * Soft-remove this user from the conversation (they stop seeing it).
  * The conversation remains for the other participant.
  */
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { id: conversationId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

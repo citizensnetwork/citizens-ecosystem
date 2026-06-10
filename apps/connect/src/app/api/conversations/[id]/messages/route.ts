@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -8,11 +8,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 /** GET — fetch messages in a conversation (paginated) */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id: conversationId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -86,11 +82,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 /** POST — send a message */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id: conversationId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

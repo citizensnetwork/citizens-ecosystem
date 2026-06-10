@@ -112,7 +112,7 @@
     const mine = volunteerApps.filter((v) => myEvents.some((e) => e.id === v.eventId));
     const pendingTotal = mine.filter((v) => v.status === 'pending').length;
     const approvedTotal = mine.filter((v) => v.status === 'approved').length;
-    const onMessage = (v) => startConversationWith(v.name, v.photo, false);
+    const onMessage = (v) => startConversationWith(v.name, v.photo, false, v.userId);
 
     if (evs.length === 0) return h('div', { className: 'fade-in' }, h(Empty, { icon: 'HandHeart', title: 'No volunteer roles yet', sub: 'Enable volunteering on an event to start receiving applications to serve.' }));
 

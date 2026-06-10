@@ -33,7 +33,7 @@ describe("GET /api/conversations", () => {
       error: null,
     });
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/conversations"));
     expect(response.status).toBe(401);
   });
 
@@ -44,7 +44,7 @@ describe("GET /api/conversations", () => {
     });
     mockClient._chain._result = { data: [], error: null, count: 0 };
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/conversations"));
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json.conversations).toEqual([]);
@@ -59,7 +59,7 @@ describe("GET /api/conversations", () => {
     });
     mockClient._chain._result = { data: null, error: { message: "DB error" }, count: 0 };
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/conversations"));
     expect(response.status).toBe(500);
 
     mockClient._chain._result = { data: null, error: null, count: 0 };

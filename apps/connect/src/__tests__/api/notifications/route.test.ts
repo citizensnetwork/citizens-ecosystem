@@ -39,7 +39,7 @@ describe("GET /api/notifications", () => {
       error: null,
     });
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/notifications"));
     expect(response.status).toBe(401);
   });
 
@@ -54,7 +54,7 @@ describe("GET /api/notifications", () => {
       count: 1,
     };
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/notifications"));
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json.notifications).toHaveLength(1);
@@ -71,7 +71,7 @@ describe("GET /api/notifications", () => {
     });
     mockClient._chain._result = { data: [], error: null, count: 0 };
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/notifications"));
     expect(response.status).toBe(200);
     expect((await response.json()).notifications).toEqual([]);
 
@@ -85,7 +85,7 @@ describe("GET /api/notifications", () => {
     });
     mockClient._chain._result = { data: null, error: { message: "DB error" }, count: 0 };
 
-    const response = await GET();
+    const response = await GET(new NextRequest("http://localhost:3000/api/notifications"));
     expect(response.status).toBe(500);
 
     mockClient._chain._result = { data: null, error: null, count: 0 };

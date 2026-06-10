@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -6,13 +6,9 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 type RouteParams = { params: Promise<{ id: string }> };
 
 /** PATCH — mark conversation as read (update last_read_at) */
-export async function PATCH(_request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { id: conversationId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -23,7 +23,8 @@
           h('p', { className: 'text-[11px] text-muted-foreground' }, conv.isOrg ? 'Contributor' : 'Citizen')),
         h('button', { className: 'w-8 h-8 rounded-lg hover:bg-accent/60 flex items-center justify-center text-muted-foreground' }, h(Icon, { name: 'MoreVertical', size: 16 }))),
       h('div', { ref: endRef, className: 'flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2' },
-        conv.messages.length === 0 && h('p', { className: 'text-center text-xs text-muted-foreground py-8' }, 'Say hello 👋'),
+        conv.messages.length === 0 && h('p', { className: 'text-center text-xs text-muted-foreground py-8' },
+          conv.messagesLoaded === false ? 'Loading conversation…' : 'Say hello 👋'),
         conv.messages.map((m, i) => {
           const mine = m.from === 'me';
           const showDate = i === 0 || conv.messages[i - 1].date !== m.date;

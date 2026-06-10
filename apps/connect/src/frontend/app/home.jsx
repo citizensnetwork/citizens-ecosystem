@@ -125,7 +125,7 @@
           React.createElement('button', { onClick: () => go(type, { id }), className: 'flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-opacity hover:opacity-90', style: { background: soft, color: softInk } }, 'View Full Profile'),
           circle('Globe', () => toast('Opening ' + (item.website || 'website'), 'gold'), 'w'),
           circle('Share2', () => toast('Share link copied', 'gold'), 's'),
-          circle('MessageCircle', () => startConversationWith(item.organizerName, org.profilePhoto, true), 'm')))));
+          circle('MessageCircle', () => startConversationWith(item.organizerName, org.profilePhoto, true, org.id || item.organizerId), 'm')))));
 
     function Wrapper(close, children) {
       return React.createElement('div', { className: 'fixed z-[120] left-0 right-0 bottom-16 md:bottom-4 md:left-[280px] md:right-auto md:w-[370px]' },

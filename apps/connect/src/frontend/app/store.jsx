@@ -77,6 +77,24 @@
   // SmartImage/Avatar then render an honest, category-tinted placeholder rather
   // than a generic stranger's photo masquerading as a real venue/person.
   const fmtTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+  // Compact relative timestamp for list rows ("now", "5m", "3h", "2d", "4 Mar").
+  const timeAgo = (iso) => {
+    if (!iso) return '';
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'now';
+    if (s < 3600) return Math.floor(s / 60) + 'm';
+    if (s < 86400) return Math.floor(s / 3600) + 'h';
+    if (s < 604800) return Math.floor(s / 86400) + 'd';
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
+  const fmtDateLabel = (iso) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const sameDay = (a, b) => a.toDateString() === b.toDateString();
+    if (sameDay(d, new Date())) return 'Today';
+    if (sameDay(d, new Date(Date.now() - 86400000))) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
   function adaptEvent(r) {
     const dt = r.date ? new Date(r.date) : null;
     const endDt = r.end_time ? new Date(r.end_time) : null;
@@ -162,6 +180,67 @@
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [],
+    };
+  }
+
+  // ── Notification + conversation adapters (API rows → app shapes) ─────
+  //  DB notification types collapse onto the design's display buckets so the
+  //  Notifications screen can keep its small icon map.
+  const NOTIF_TYPE_MAP = {
+    broadcast_sent: 'broadcast',
+    dm_received: 'message', dm_response: 'message', new_message: 'message',
+    friend_convince: 'convince',
+    friend_attending: 'friend', new_follower: 'friend',
+    suggestion_response: 'idea',
+    event_reminder: 'event', new_event_match: 'event', event_update: 'event',
+    event_cancelled: 'event', review_prompt: 'event',
+    volunteer_application: 'volunteer', volunteer_application_response: 'volunteer',
+    team_invite: 'team', team_invite_response: 'team', team_owner_transfer: 'team',
+    contributor_approved: 'admin', contributor_rejected: 'admin',
+    admin_elevation_request: 'admin', spam_flag: 'admin', broadcast_flood: 'admin',
+  };
+  function adaptNotification(r) {
+    const d = (r && typeof r.data === 'object' && r.data) || {};
+    const url = typeof d.url === 'string' ? d.url : '';
+    const evMatch = url.match(/\/events\/([0-9a-f-]{36})/i);
+    const msgMatch = url.match(/\/messages\/([0-9a-f-]{36})/i);
+    return {
+      id: r.id,
+      type: NOTIF_TYPE_MAP[r.type] || 'bell',
+      title: r.title || 'Notification',
+      body: r.body || '',
+      time: timeAgo(r.created_at),
+      read: !!r.read,
+      photo: d.photo || d.avatar_url || '',
+      // Deep-link targets for the in-app router (event profile / message thread).
+      eventId: d.event_id || (evMatch ? evMatch[1] : null),
+      convId: d.conversation_id || (msgMatch ? msgMatch[1] : null),
+    };
+  }
+
+  function adaptConversation(r) {
+    const other = r.other_user || {};
+    return {
+      id: r.id,
+      isOrg: !!other.is_contributor,
+      participantId: other.id || null,
+      participantName: other.full_name || 'Citizen',
+      participantPhoto: other.avatar_url || '',
+      lastMessage: r.last_message ? r.last_message.body : 'Start the conversation…',
+      lastTime: timeAgo(r.last_message ? r.last_message.created_at : r.updated_at),
+      unread: r.unread_count || 0,
+      status: r.status || 'active',
+      messages: [],
+      messagesLoaded: false, // thread loads on open
+    };
+  }
+  function adaptMessage(m, myId) {
+    return {
+      id: m.id,
+      from: m.sender_id === myId ? 'me' : 'them',
+      text: m.body,
+      time: fmtTime(new Date(m.created_at)),
+      date: fmtDateLabel(m.created_at),
     };
   }
 
@@ -374,22 +453,75 @@
       toast('Broadcast sent — bubble live on the map for 24h.', 'gold');
     }, [activeContributor, toast]);
 
+    // Send: optimistic append, then write through for real conversations. The
+    // temp id is swapped for the DB id on success so realtime dedup works.
     const sendMessage = useCallback((convId, text) => {
       const stamp = new Date().toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' });
-      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, { id: uid('m'), from: 'me', text, time: stamp, date: 'Today' }], lastMessage: text, lastTime: stamp, unread: 0 } : c)));
-    }, []);
+      const tempId = uid('m');
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, { id: tempId, from: 'me', text, time: stamp, date: 'Today' }], lastMessage: text, lastTime: 'now', unread: 0 } : c)));
+      if (!realUser || !isRealId(convId)) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/conversations/' + convId + '/messages', { method: 'POST', body: JSON.stringify({ body: text }) });
+          if (!res.ok) throw new Error('send failed');
+          const json = await res.json().catch(() => ({}));
+          if (json.message && json.message.id) {
+            setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: c.messages.map((m) => (m.id === tempId ? { ...m, id: json.message.id } : m)) } : c)));
+          }
+        } catch (e) {
+          setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== tempId) } : c)));
+          toast('Message not sent — please try again.', 'red');
+        }
+      })();
+    }, [realUser, toast]);
 
+    // Open: zero the unread badge, mark read server-side, and (re)load the
+    // thread. Mock conversations keep their local messages untouched.
     const openConversation = useCallback((convId) => {
       setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, unread: 0 } : c)));
-    }, []);
+      if (!realUser || !isRealId(convId)) return;
+      authedFetch('/api/conversations/' + convId + '/read', { method: 'PATCH' }).catch(() => {});
+      (async () => {
+        try {
+          const res = await authedFetch('/api/conversations/' + convId + '/messages?limit=100');
+          if (!res.ok) return;
+          const json = await res.json();
+          const msgs = (json.messages || []).map((m) => adaptMessage(m, realUser.id));
+          setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: msgs, messagesLoaded: true } : c)));
+        } catch (e) { /* keep whatever is shown — thread load is best-effort */ }
+      })();
+    }, [realUser]);
 
-    const startConversationWith = useCallback((name, photo, isOrg) => {
+    // Start (or resume) a DM. For a real signed-in user with a real recipient
+    // profile UUID this creates/fetches the conversation server-side (block +
+    // permission rules enforced by the API); otherwise it stays a local mock.
+    const startConversationWith = useCallback((name, photo, isOrg, recipientId) => {
+      if (realUser && recipientId && isRealId(recipientId)) {
+        if (recipientId === realUser.id) { toast('That’s your own profile — no need to message yourself.', 'gold'); return; }
+        const existing = conversations.find((c) => c.participantId === recipientId);
+        if (existing) { go('messages', { convId: existing.id }); return; }
+        (async () => {
+          try {
+            const res = await authedFetch('/api/conversations', { method: 'POST', body: JSON.stringify({ recipient_id: recipientId }) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) { toast(json.error || 'Could not start the conversation.', 'red'); return; }
+            const convId = json.conversation_id;
+            setConversations((prev) => (prev.some((c) => c.id === convId) ? prev : [{
+              id: convId, isOrg: !!isOrg, participantId: recipientId, participantName: name,
+              participantPhoto: photo || '', lastMessage: 'Start the conversation…', lastTime: 'now',
+              unread: 0, status: 'active', messages: [], messagesLoaded: false,
+            }, ...prev]));
+            go('messages', { convId });
+          } catch (e) { toast('Could not start the conversation.', 'red'); }
+        })();
+        return;
+      }
       const existing = conversations.find((c) => c.participantName === name);
       if (existing) { go('messages', { convId: existing.id }); return; }
       const id = uid('conv');
       setConversations((prev) => [{ id, isOrg: !!isOrg, participantName: name, participantPhoto: photo, lastMessage: 'Start the conversation…', lastTime: 'now', unread: 0, messages: [] }, ...prev]);
       go('messages', { convId: id });
-    }, [conversations, go]);
+    }, [conversations, realUser, go, toast]);
 
     // Connect (attending) and Consider (considering) are two states of ONE rsvps
     // row, so they're mutually exclusive. Each toggle updates the UI optimistically,
@@ -505,7 +637,18 @@
       })();
     }, [events, realUser, toast]);
 
-    const markNotifsRead = useCallback(() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))), []);
+    const markNotifsRead = useCallback(() => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      if (!realUser) return;
+      authedFetch('/api/notifications', { method: 'PATCH', body: JSON.stringify({ all: true }) }).catch(() => {});
+    }, [realUser]);
+
+    // Mark ONE notification read (row tap), then deep-link via the caller.
+    const readNotification = useCallback((id) => {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      if (!realUser || !isRealId(id)) return;
+      authedFetch('/api/notifications', { method: 'PATCH', body: JSON.stringify({ id }) }).catch(() => {});
+    }, [realUser]);
 
     const assistLoginAs = useCallback((cid) => {
       const c = contributors.find((x) => x.id === cid);
@@ -645,6 +788,54 @@
       return () => { active = false; };
     }, [realUser]);
 
+    // ── Real notifications + conversations (Phase 3) ─────────────────
+    //  For a real signed-in user these REPLACE the demo seeds even when empty:
+    //  showing another (mock) person's inbox to a real user would be dishonest.
+    useEffect(() => {
+      if (!realUser) return;
+      let active = true;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/notifications');
+          if (!res.ok) return;
+          const json = await res.json();
+          if (active && Array.isArray(json.notifications)) setNotifications(json.notifications.map(adaptNotification));
+        } catch (e) { /* fail open — keep current list */ }
+      })();
+      (async () => {
+        try {
+          const res = await authedFetch('/api/conversations');
+          if (!res.ok) return;
+          const json = await res.json();
+          if (active && Array.isArray(json.conversations)) setConversations(json.conversations.map(adaptConversation));
+        } catch (e) { /* fail open */ }
+      })();
+      return () => { active = false; };
+    }, [realUser]);
+
+    // ── Realtime: incoming messages for the OPEN thread ───────────────
+    //  Own sends are appended optimistically (and deduped by id swap), so only
+    //  the other side's inserts are appended here. If realtime isn't enabled on
+    //  the messages table this simply never fires — the thread still loads on open.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      const convId = nav.page === 'messages' ? nav.params.convId : null;
+      if (!sb || !realUser || !convId || !isRealId(convId)) return;
+      const me = realUser.id;
+      const ch = sb.channel('cc-msgs-' + convId)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + convId }, (payload) => {
+          const m = payload && payload.new;
+          if (!m || m.sender_id === me) return;
+          setConversations((prev) => prev.map((c) => {
+            if (c.id !== convId || c.messages.some((x) => x.id === m.id)) return c;
+            return { ...c, messages: [...c.messages, adaptMessage(m, me)], lastMessage: m.body, lastTime: 'now' };
+          }));
+          authedFetch('/api/conversations/' + convId + '/read', { method: 'PATCH' }).catch(() => {});
+        })
+        .subscribe();
+      return () => { try { sb.removeChannel(ch); } catch (e) { /* already gone */ } };
+    }, [nav, realUser]);
+
     // ── Live events + map bubbles (Phase 2) ──────────────────────────
     //  Replace the demo events with the real public feed when reachable, then
     //  attach any active broadcast bubbles (anon RPC). Fails open: on any error
@@ -749,7 +940,7 @@
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
-      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead,
+      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
     };
     return React.createElement(AppCtx.Provider, { value }, children);
   }

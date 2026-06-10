@@ -87,7 +87,7 @@
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Upcoming dates'),
             h('div', { className: 'flex flex-wrap gap-2' }, ev.upcomingDates.map((d, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' }, new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))))),
           h('div', { className: 'grid grid-cols-3 gap-2' },
-            h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true) }, 'Message'),
+            h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || ev.organizerId) }, 'Message'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => toast('Opening ' + ev.website) }, 'Website'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') }, 'Share')))));
   }
@@ -115,7 +115,7 @@
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
           h('div', { className: 'flex gap-2' },
             h(Button, { variant: isFollowingPlace ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => togglePlaceFollow(id, pl.name) }, isFollowingPlace ? 'Following' : 'Follow'),
-            h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true) }, 'Message'),
+            h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') })),
           h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
@@ -201,7 +201,7 @@
               h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, c.followerCount.toLocaleString() + ' followers'))),
           h('div', { className: 'flex gap-2 mb-4' },
             h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
-            h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true) }, 'Message'),
+            h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true, c.id) }, 'Message'),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Profile link copied', 'gold') })),
           h('div', { className: 'space-y-4' },
             h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, c.bio),

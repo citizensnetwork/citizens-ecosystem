@@ -63,16 +63,28 @@
   }
 
   // ── Notifications ──
-  const NOTIF_ICON = { broadcast: ['Radio', '#C9A84C'], friend: ['UserPlus', '#3498DB'], convince: ['Sparkles', '#9B59B6'], message: ['MessageCircle', '#2563EB'], idea: ['Lightbulb', '#16A34A'] };
+  const NOTIF_ICON = {
+    broadcast: ['Radio', '#C9A84C'], friend: ['UserPlus', '#3498DB'], convince: ['Sparkles', '#9B59B6'],
+    message: ['MessageCircle', '#2563EB'], idea: ['Lightbulb', '#16A34A'], event: ['Calendar', '#E67E22'],
+    volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#C9A84C'],
+  };
   function NotificationsPage() {
-    const { notifications, markNotifsRead, go } = window.useApp();
+    const { notifications, markNotifsRead, readNotification, go } = window.useApp();
+    const open = (n) => {
+      readNotification(n.id);
+      if (n.eventId) go('event', { id: n.eventId });
+      else if (n.convId) go('messages', { convId: n.convId });
+    };
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'notifications' },
       h(Header, { icon: 'Bell', title: 'Notifications', right: h(Button, { variant: 'ghost', size: 'sm', onClick: markNotifsRead }, 'Mark all read') }),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         h('div', { className: 'max-w-2xl mx-auto' },
+          notifications.length === 0 && h(Empty, { icon: 'Bell', title: 'No notifications yet', sub: 'Broadcasts, messages and event updates land here.' }),
           notifications.map((n) => {
             const [ic, c] = NOTIF_ICON[n.type] || ['Bell', '#C9A84C'];
-            return h('div', { key: n.id, className: cx('flex items-start gap-3 px-4 sm:px-5 py-3.5 border-b border-border/50 transition-colors', !n.read && 'bg-accent/30') },
+            const linked = !!(n.eventId || n.convId);
+            return h('div', { key: n.id, onClick: () => open(n), role: linked ? 'button' : undefined,
+              className: cx('flex items-start gap-3 px-4 sm:px-5 py-3.5 border-b border-border/50 transition-colors', !n.read && 'bg-accent/30', linked && 'cursor-pointer hover:bg-accent/40') },
               n.photo ? h('div', { className: 'relative shrink-0' }, h(Avatar, { src: n.photo, size: 42, rounded: 'xl' }), h('span', { className: 'absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background flex items-center justify-center', style: { background: c } }, h(Icon, { name: ic, size: 9, className: 'text-white' })))
                 : h('div', { className: 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0', style: { background: c + '20', color: c } }, h(Icon, { name: ic, size: 17 })),
               h('div', { className: 'flex-1 min-w-0' },
