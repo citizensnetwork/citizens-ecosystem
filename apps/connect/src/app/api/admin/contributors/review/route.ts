@@ -16,7 +16,7 @@
  * check).
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -56,7 +56,7 @@ function getClientIp(req: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
 
   let payload: {
     application_id?: string;

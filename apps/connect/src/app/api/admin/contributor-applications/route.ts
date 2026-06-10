@@ -8,7 +8,7 @@
  *   { id, name, photo, bio, category, website, location, reason, socials, status, submittedAt }
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/adminGuard";
 
@@ -20,8 +20,8 @@ type ProfileJoin =
   | { email?: string | null; full_name?: string | null; avatar_url?: string | null }[]
   | null;
 
-export async function GET(_request: NextRequest) {
-  const supabase = await createClient();
+export async function GET(request: NextRequest) {
+  const { supabase } = await getRouteAuth(request);
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 

@@ -73,34 +73,13 @@
     const [tab, setTab] = useState('applications');
     const [status, setStatus] = useState('all');
     const [search, setSearch] = useState('');
-    const [apiApps, setApiApps] = useState(null);
 
-    // Fetch real contributor applications from the database when an admin is signed in.
-    React.useEffect(() => {
-      if (!isAdmin || !realUser) return;
-      let active = true;
-      (async () => {
-        try {
-          const res = await window.authedFetch('/api/admin/contributor-applications');
-          if (!res.ok || !active) return;
-          const json = await res.json();
-          if (active) setApiApps(json.data || []);
-        } catch (e) { /* fail open — demo data stays visible */ }
-      })();
-      return () => { active = false; };
-    }, [isAdmin, realUser]);
-
-    // Merge reviewed state back into apiApps so the card refreshes immediately.
+    // Applications are fetched into the store for real admins (replacing the
+    // demo seeds), so the same list powers this tab AND the overview counts.
     const handleReview = async (id, reviewStatus, note) => {
-      // Optimistic update for real-app state
-      if (apiApps !== null) {
-        setApiApps((prev) => prev.map((a) => a.id === id
-          ? { ...a, status: reviewStatus, reviewNote: note, reviewedAt: new Date().toISOString() }
-          : a));
-      }
-      // Update demo / local store state (covers demo mode + myApplication)
+      // Optimistic local update (covers demo mode + the store list).
       reviewApplication(id, reviewStatus, note);
-      // Sync to the review API for real UUID applications
+      // Sync to the review API for real UUID applications.
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!UUID_RE.test(id) || !realUser) return;
       try {
@@ -112,7 +91,7 @@
       } catch (e) { console.warn('[admin review] network error', e); }
     };
 
-    const displayApps = apiApps !== null ? apiApps : applications;
+    const displayApps = applications;
 
     if (!isAdmin) {
       return h('div', { className: 'flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center' },

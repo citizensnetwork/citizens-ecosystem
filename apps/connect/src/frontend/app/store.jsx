@@ -153,6 +153,29 @@
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [], upcomingDates: [],
+      createdAt: r.created_at || '',
+    };
+  }
+
+  // Admin moderation queue row (GET /api/admin/reports) → app report shape.
+  // Severity is a TRIAGE HINT derived from the reason (the DB stores none) —
+  // it orders the queue, it is not a stored judgement.
+  const SEVERITY_BY_REASON = { harassment: 'high', hate: 'high', violence: 'high', threat: 'high', abuse: 'high', spam: 'medium', misleading: 'medium', impersonation: 'medium' };
+  function adaptReport(r) {
+    return {
+      id: r.id,
+      targetType: r.target_type,
+      targetName: r.target_name || 'A ' + r.target_type,
+      reason: r.reason || 'other',
+      severity: SEVERITY_BY_REASON[r.reason] || 'low',
+      detail: r.body || '',
+      reporter: r.reporter_name || 'A citizen',
+      reporterPhoto: r.reporter_avatar || '',
+      date: r.created_at,
+      // DB vocab: open | actioned | dismissed. UI vocab keeps resolved/removed
+      // as presentation of 'actioned' (the notes carry the distinction).
+      status: r.status === 'actioned' ? 'resolved' : r.status,
+      resolution: r.resolution_notes || '',
     };
   }
 
@@ -354,6 +377,8 @@
     const [assistMode, setAssistMode] = useState(false); // admin assisting as a contributor
     const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
     const [contributorDash, setContributorDash] = useState(null); // real dashboard stats/activity/week (null in demo)
+    const [adminStats, setAdminStats] = useState(null); // {totalUsers} for the real admin overview
+    const [myProfileMeta, setMyProfileMeta] = useState(null); // {bio, discoverable, notificationPrefs} — own profiles row
 
     // citizen RSVP state (mock seeds for demo mode; replaced by the user's real
     // rows once a real Supabase session loads — see the seeding effect below).
@@ -409,7 +434,10 @@
           name: realUser.name || baseUser.name,
           // Empty (not the demo stock face) when the real user has no avatar →
           // Avatar renders their initials. Demo mode keeps baseUser's stock photo.
-          profilePhoto: realUser.avatarUrl || '' }
+          profilePhoto: realUser.avatarUrl || '',
+          // Real bio (may be empty — honest), never the demo persona's bio.
+          bio: myProfileMeta ? (myProfileMeta.bio || '') : '',
+          coverPhoto: '' }
       : baseUser;
 
     // ── actions ─────────────────────────────────────────────────────
@@ -466,10 +494,26 @@
       toast(status === 'approved' ? 'Volunteer approved — they’ll be notified.' : 'Volunteer application declined.', status === 'approved' ? 'green' : 'gold');
     }, [toast]);
 
+    // Resolve a moderation report. UI statuses resolved/removed both persist
+    // as 'actioned' (the notes carry the distinction); dismissed maps 1:1.
     const resolveReport = useCallback((id, status, resolution) => {
+      const prevRow = reports.find((r) => r.id === id);
       setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status, resolution: resolution || r.resolution, reviewedAt: today() } : r)));
       toast(status === 'resolved' ? 'Report resolved.' : status === 'removed' ? 'Content removed.' : 'Report dismissed.', status === 'dismissed' ? 'gold' : 'green');
-    }, [toast]);
+      if (!realUser || !isRealId(id)) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/admin/reports/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: status === 'dismissed' ? 'dismissed' : 'actioned', resolution_notes: resolution || null }),
+          });
+          if (!res.ok) throw new Error('report patch ' + res.status);
+        } catch (e) {
+          if (prevRow) setReports((prev) => prev.map((r) => (r.id === id ? prevRow : r)));
+          toast('Could not update the report — please try again.', 'red');
+        }
+      })();
+    }, [reports, realUser, toast]);
 
     // Broadcast: optimistic local bubble; for a real contributor on a real
     // entity it writes through to the broadcasts API (which fans out
@@ -1110,6 +1154,57 @@
       return () => { active = false; };
     }, [realUser]);
 
+    // ── Own profile meta (bio / discoverable / notification prefs) ────
+    //  Kept OUTSIDE realUser so updating it never re-triggers the
+    //  realUser-keyed fetch effects.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !realUser) { setMyProfileMeta(null); return; }
+      let active = true;
+      (async () => {
+        try {
+          const { data } = await sb
+            .from('profiles')
+            .select('bio, discoverable, notification_prefs')
+            .eq('id', realUser.id)
+            .maybeSingle();
+          if (active && data) setMyProfileMeta({ bio: data.bio || '', discoverable: data.discoverable !== false, notificationPrefs: data.notification_prefs || {} });
+        } catch (e) { /* meta is best-effort */ }
+      })();
+      return () => { active = false; };
+    }, [realUser]);
+
+    // ── Real admin data (Phase 3): applications, reports, platform stats ──
+    useEffect(() => {
+      if (!realUser || role !== 'admin') { setAdminStats(null); return; }
+      let active = true;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/admin/contributor-applications');
+          if (!res.ok) return;
+          const json = await res.json();
+          if (active && Array.isArray(json.data)) setApplications(json.data);
+        } catch (e) { /* fail open — demo list stays */ }
+      })();
+      (async () => {
+        try {
+          const res = await authedFetch('/api/admin/reports');
+          if (!res.ok) return;
+          const json = await res.json();
+          if (active && Array.isArray(json.reports)) setReports(json.reports.map(adaptReport));
+        } catch (e) { /* fail open */ }
+      })();
+      (async () => {
+        try {
+          const res = await authedFetch('/api/admin/users?page=1');
+          if (!res.ok) return;
+          const json = await res.json();
+          if (active && json.meta) setAdminStats({ totalUsers: json.meta.total || 0 });
+        } catch (e) { /* overview falls back to demo counts */ }
+      })();
+      return () => { active = false; };
+    }, [realUser, role]);
+
     // ── Real contributor identity (Phase 3) ──────────────────────────
     //  A signed-in contributor manages THEIR org, not the demo's Grace City:
     //  hydrate myContributor from their own profiles row (slug included, which
@@ -1317,6 +1412,58 @@
       setRealUser((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
     }, []);
 
+    // ── Settings write paths ──────────────────────────────────────────
+    //  Own-row profiles updates go straight through the RLS client (the
+    //  addendum's pattern for simple user-scoped writes).
+    const saveProfile = useCallback((fields, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) { toast('Profile saved', 'green'); finish(true); return; }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE
+            .from('profiles')
+            .update({ full_name: fields.name, bio: fields.bio })
+            .eq('id', realUser.id);
+          if (error) throw error;
+          setRealUser((prev) => (prev ? { ...prev, name: fields.name } : prev));
+          setMyProfileMeta((prev) => ({ ...(prev || {}), bio: fields.bio }));
+          toast('Profile saved', 'green');
+          finish(true);
+        } catch (e) { toast('Could not save your profile — please try again.', 'red'); finish(false); }
+      })();
+    }, [realUser, toast]);
+
+    const setDiscoverable = useCallback((value) => {
+      setMyProfileMeta((prev) => ({ ...(prev || {}), discoverable: value }));
+      if (!realUser || !window.CC_SUPABASE) return;
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.from('profiles').update({ discoverable: value }).eq('id', realUser.id);
+          if (error) throw error;
+        } catch (e) {
+          setMyProfileMeta((prev) => ({ ...(prev || {}), discoverable: !value }));
+          toast('Could not update your privacy setting.', 'red');
+        }
+      })();
+    }, [realUser, toast]);
+
+    const saveNotificationPref = useCallback((key, value) => {
+      setMyProfileMeta((prev) => prev ? { ...prev, notificationPrefs: { ...(prev.notificationPrefs || {}), [key]: value } } : prev);
+      if (!realUser) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/notifications/preferences', {
+            method: 'PATCH',
+            body: JSON.stringify({ notification_prefs: { [key]: value } }),
+          });
+          if (!res.ok) throw new Error('prefs ' + res.status);
+        } catch (e) {
+          setMyProfileMeta((prev) => prev ? { ...prev, notificationPrefs: { ...(prev.notificationPrefs || {}), [key]: !value } } : prev);
+          toast('Could not save that preference.', 'red');
+        }
+      })();
+    }, [realUser, toast]);
+
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
     const value = {
@@ -1334,6 +1481,7 @@
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       unreadNotifs, unreadMsgs, toasts, toast,
       createKind, openCreate, closeCreate, updateAvatar,
+      adminStats, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref,
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,

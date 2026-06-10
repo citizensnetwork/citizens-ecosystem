@@ -147,15 +147,35 @@
   }
 
   // ── Settings ──
+  // Real notification preference keys (profiles.notification_prefs — the API
+  // allowlist); demo mode toggles the same keys locally.
+  const NOTIF_PREFS = [
+    ['event_reminders', 'Event reminders', 'Upcoming events you connected to'],
+    ['contributor_updates', 'Broadcasts & updates', 'Updates from places, events & orgs you follow'],
+    ['friends_activity', 'Friends', 'Friend requests & friend activity'],
+    ['announcements', 'Announcements', 'Important platform announcements'],
+    ['weekly_digest', 'Weekly digest', 'A weekly summary of Kingdom activity'],
+  ];
   function SettingsPage() {
     const app = window.useApp();
-    const { user, role, go, toast, isCitizen, signOut, updateAvatar } = app;
+    const { user, role, go, toast, isCitizen, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
+    const { useEffect } = React;
     const [name, setName] = useState(user.name);
     const [bio, setBio] = useState(user.bio);
     const [profilePhoto, setProfilePhoto] = useState(user.profilePhoto);
     const [coverPhoto, setCoverPhoto] = useState(user.coverPhoto);
-    const [isPublic, setIsPublic] = useState(true);
-    const [notif, setNotif] = useState({ events: true, messages: true, broadcasts: true, friends: true });
+    const [saving, setSaving] = useState(false);
+    const [localNotif, setLocalNotif] = useState({});
+    // Re-seed once the real profile meta arrives (bio lives there).
+    useEffect(() => { setName(user.name); setBio(user.bio || ''); }, [user.name, user.bio]);
+    const isPublic = myProfileMeta ? myProfileMeta.discoverable !== false : true;
+    const notifOn = (k) => (myProfileMeta && myProfileMeta.notificationPrefs
+      ? myProfileMeta.notificationPrefs[k] !== false
+      : localNotif[k] !== false);
+    const toggleNotif = (k, v) => {
+      if (realUser) saveNotificationPref(k, v);
+      else setLocalNotif((s) => ({ ...s, [k]: v }));
+    };
     const Section = ({ title, sub, children }) => h('div', { className: 'bg-card rounded-2xl border border-border p-4 sm:p-5 space-y-4' },
       h('div', null, h('p', { className: 'text-sm font-bold text-foreground' }, title), sub && h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, sub)), children);
 
@@ -172,17 +192,22 @@
                 h(Field, { label: 'Display name' }, h(Input, { value: name, onChange: (e) => setName(e.target.value) })))),
             h(Field, { label: 'Bio' }, h(Textarea, { value: bio, rows: 3, onChange: (e) => setBio(e.target.value) })),
             // An uploaded photo is already persisted by /api/avatar; reflect it across
-            // the app (header, profile) immediately via updateAvatar.
-            h(Button, { variant: 'gold', size: 'sm', icon: 'Check', onClick: () => { if (profilePhoto) updateAvatar(profilePhoto); toast('Profile saved', 'green'); } }, 'Save Profile')),
+            // the app (header, profile) immediately via updateAvatar. Name + bio
+            // persist to the profiles row for real users.
+            h(Button, { variant: 'gold', size: 'sm', icon: 'Check', disabled: saving, onClick: () => {
+              if (profilePhoto) updateAvatar(profilePhoto);
+              setSaving(true);
+              saveProfile({ name: name.trim() || user.name, bio: bio || '' }, () => setSaving(false));
+            } }, saving ? 'Saving…' : 'Save Profile')),
 
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },
             h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
-              h(Toggle, { checked: isPublic, onChange: setIsPublic, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' }))),
+              h(Toggle, { checked: isPublic, onChange: setDiscoverable, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' }))),
 
           h(Section, { title: 'Notifications', sub: 'Choose what you hear about' },
             h('div', { className: 'space-y-3' },
-              [['events', 'Event reminders', 'Upcoming events you connected to'], ['messages', 'Messages', 'Direct messages from citizens & contributors'], ['broadcasts', 'Broadcasts', 'Updates from places & events you follow'], ['friends', 'Friends', 'Friend requests & friend activity']]
-                .map(([k, l, d]) => h('div', { key: k, className: 'p-3 rounded-xl bg-white/60 border border-border' }, h(Toggle, { checked: notif[k], onChange: (v) => setNotif((s) => ({ ...s, [k]: v })), label: l, desc: d }))))),
+              NOTIF_PREFS.map(([k, l, d]) => h('div', { key: k, className: 'p-3 rounded-xl bg-white/60 border border-border' },
+                h(Toggle, { checked: notifOn(k), onChange: (v) => toggleNotif(k, v), label: l, desc: d }))))),
 
           isCitizen && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/40 border border-gold/30' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, 'Weekly contribution')),
@@ -191,7 +216,7 @@
 
           h(Section, { title: 'Account' },
             h('div', { className: 'flex items-center justify-between' },
-              h('div', null, h('p', { className: 'text-sm text-foreground capitalize' }, role + ' account'), h('p', { className: 'text-xs text-muted-foreground' }, 'lydia.mensah@email.com')),
+              h('div', null, h('p', { className: 'text-sm text-foreground capitalize' }, role + ' account'), h('p', { className: 'text-xs text-muted-foreground' }, realUser ? (realUser.email || '') : 'demo session')),
               h(Button, { variant: 'danger', size: 'sm', icon: 'LogOut', onClick: signOut }, 'Sign Out'))))));
   }
 

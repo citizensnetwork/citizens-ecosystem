@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateSourceMutes } from "@/lib/notifications/sourceMutes";
@@ -22,10 +22,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

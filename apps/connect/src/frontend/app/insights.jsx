@@ -195,24 +195,53 @@
   }
 
   // ════════════════════════ ADMIN OVERVIEW ═══════════════════════════
+  const agoShort = (iso) => {
+    if (!iso) return '';
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 3600) return Math.max(1, Math.floor(s / 60)) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' hour' + (Math.floor(s / 3600) === 1 ? '' : 's') + ' ago';
+    return Math.floor(s / 86400) + ' day' + (Math.floor(s / 86400) === 1 ? '' : 's') + ' ago';
+  };
+
   function AdminOverview({ setTab }) {
     const app = window.useApp();
-    const { events, places, citizens, contributors, applications, reports, assistLoginAs } = app;
+    const { events, places, citizens, contributors, applications, reports, assistLoginAs, adminStats } = app;
     const liveNow = events.filter((e) => e.isLive).length;
     const pendingApps = applications.filter((a) => a.status === 'pending').length;
     const openReports = reports.filter((r) => r.status === 'open').length;
     const [q, setQ] = useState('');
+    const real = !!adminStats; // signed-in admin with live platform data
 
     // category distribution across all events
     const catCounts = {};
     events.forEach((e) => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; });
     const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#C9A84C' }; });
 
-    // growth (6 weeks)
-    const ev6 = [3, 4, 6, 8, 10, events.length].map((n, i) => Math.max(1, n - (5 - i)));
-    const us6 = WEEKS.slice(0, 6).map((_, i) => 40 + Math.round(seed(i + 3) * 30) + i * 14);
+    // growth (6 weeks): real mode = actual events-created-per-week from
+    // created_at; demo keeps the synthetic two-series chart.
+    let growthSeries, growthGroups;
+    if (real) {
+      const weeks = [0, 0, 0, 0, 0, 0];
+      events.forEach((e) => {
+        if (!e.createdAt) return;
+        const age = Math.floor((Date.now() - new Date(e.createdAt).getTime()) / (7 * 86400000));
+        if (age >= 0 && age < 6) weeks[5 - age] += 1;
+      });
+      growthGroups = ['-5w', '-4w', '-3w', '-2w', '-1w', 'now'];
+      growthSeries = [{ name: 'New events', color: '#C9A84C', data: weeks }];
+    } else {
+      const ev6 = [3, 4, 6, 8, 10, events.length].map((n, i) => Math.max(1, n - (5 - i)));
+      const us6 = WEEKS.slice(0, 6).map((_, i) => 40 + Math.round(seed(i + 3) * 30) + i * 14);
+      growthGroups = WEEKS.slice(0, 6);
+      growthSeries = [{ name: 'Events', color: '#C9A84C', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }];
+    }
 
-    const activity = [
+    // activity feed: real mode = latest created events (honest, derivable
+    // from live data); demo keeps the illustrative feed.
+    const activity = real
+      ? events.filter((e) => e.createdAt).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
+          .map((e) => { const org = contributors.find((c) => c.id === e.organizerId); return ['CalendarPlus', '#C9A84C', (org ? org.name : e.organizerName || 'A community member') + ' created “' + e.title + '”', agoShort(e.createdAt)]; })
+      : [
       ['CalendarPlus', '#C9A84C', 'Grace City Church created “Members\u2019 Covenant Gathering”', '12 min ago'],
       ['UserPlus', '#2563EB', '8 new citizens joined the platform', '40 min ago'],
       ['Radio', '#8B6914', 'Lighthouse Community Centre sent a broadcast', '1 hour ago'],
@@ -224,7 +253,8 @@
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
       h('div', { className: 'grid grid-cols-2 sm:grid-cols-5 gap-2' },
         KpiCard('Events', events.length, '#C9A84C'), KpiCard('Places', places.length, '#2563EB'),
-        KpiCard('Citizens', citizens.length, '#16A34A'), KpiCard('Contributors', contributors.length, '#9B59B6'),
+        KpiCard(real ? 'Members' : 'Citizens', real ? adminStats.totalUsers : citizens.length, '#16A34A'),
+        KpiCard('Contributors', contributors.length, '#9B59B6'),
         KpiCard('Live now', liveNow, '#DC2626', liveNow ? { up: false, text: 'on the map' } : null)),
 
       (pendingApps > 0 || openReports > 0) && h('div', { className: 'grid sm:grid-cols-2 gap-2' },
@@ -240,9 +270,8 @@
       h('div', { className: 'grid sm:grid-cols-2 gap-4' },
         h(SectionCard, { title: 'Platform growth', right: h('span', { className: 'text-[11px] text-muted-foreground' }, '6 weeks') },
           h('div', { className: 'flex items-center gap-4 mb-2 text-[10px] text-muted-foreground' },
-            h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded bg-gold' }), 'New events'),
-            h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded', style: { background: '#2563EB' } }), 'New citizens')),
-          h(Bars, { groups: WEEKS.slice(0, 6), series: [{ name: 'Events', color: '#C9A84C', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }] })),
+            growthSeries.map((s) => h('span', { key: s.name, className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded', style: { background: s.color } }), s.name))),
+          h(Bars, { groups: growthGroups, series: growthSeries })),
         h(SectionCard, { title: 'Events by category' }, h(StackBar, { parts: catParts }))),
 
       h(SectionCard, { title: 'Recent platform activity' },

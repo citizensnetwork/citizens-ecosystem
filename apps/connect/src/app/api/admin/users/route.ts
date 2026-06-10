@@ -14,7 +14,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -33,7 +33,7 @@ const ALLOWED_CONTRIB_KINDS = ["ministry", "organization", "business"] as const;
 const PAGE_SIZE = 20;
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
