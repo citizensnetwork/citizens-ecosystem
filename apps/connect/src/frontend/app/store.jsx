@@ -333,6 +333,24 @@
     };
   }
 
+  // Volunteer application row (GET /api/contributor/<slug>/volunteers) → app shape.
+  function adaptVolunteer(r) {
+    const prof = Array.isArray(r.applicant) ? r.applicant[0] : r.applicant;
+    return {
+      id: r.id,
+      eventId: r.entity_type === 'event' ? r.entity_id : null,
+      placeId: r.entity_type === 'place' ? r.entity_id : null,
+      name: (prof && prof.full_name) || 'A Citizen',
+      photo: (prof && prof.avatar_url) || '',
+      role: 'Volunteer',
+      message: r.message || '',
+      skills: [],
+      status: r.status,
+      userId: r.applicant_id,
+      createdAt: r.created_at,
+    };
+  }
+
   // ── session persistence (login survives refresh) ──
   const SESSION_KEY = 'cc_session_v1';
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch (e) { return null; } };
@@ -378,6 +396,7 @@
     const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
     const [contributorDash, setContributorDash] = useState(null); // real dashboard stats/activity/week (null in demo)
     const [adminStats, setAdminStats] = useState(null); // {totalUsers} for the real admin overview
+    const [cityReach, setCityReach] = useState(null); // [{area, count}] from rsvps.location_snapshot (real contributors)
     const [myProfileMeta, setMyProfileMeta] = useState(null); // {bio, discoverable, notificationPrefs} — own profiles row
 
     // citizen RSVP state (mock seeds for demo mode; replaced by the user's real
@@ -489,10 +508,46 @@
       toast(status === 'approved' ? 'Application approved — contributor access granted.' : 'Application rejected.', status === 'approved' ? 'green' : 'red');
     }, [toast]);
 
+    // Review a volunteer application; writes through to the volunteers API
+    // (which notifies the applicant) for real contributors, with rollback.
     const reviewVolunteer = useCallback((id, status) => {
+      const prevRow = volunteerApps.find((v) => v.id === id);
       setVolunteerApps((prev) => prev.map((v) => (v.id === id ? { ...v, status, reviewedAt: today() } : v)));
       toast(status === 'approved' ? 'Volunteer approved — they’ll be notified.' : 'Volunteer application declined.', status === 'approved' ? 'green' : 'gold');
-    }, [toast]);
+      const slug = myContributor && myContributor.slug;
+      if (!realUser || !isRealId(id) || !slug) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/contributor/' + slug + '/volunteers', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'update_status', application_id: id, status }),
+          });
+          if (!res.ok) throw new Error('volunteer review ' + res.status);
+        } catch (e) {
+          if (prevRow) setVolunteerApps((prev) => prev.map((v) => (v.id === id ? prevRow : v)));
+          toast('Could not save the review — please try again.', 'red');
+        }
+      })();
+    }, [volunteerApps, myContributor, realUser, toast]);
+
+    // Citizen applies to serve at an event/place. The handle segment is only
+    // used by the API for the notification deep-link; the contributor is
+    // resolved from the entity itself.
+    const applyToVolunteer = useCallback((entityType, entityId, orgSlug) => {
+      if (!realUser || !isRealId(entityId)) { toast('Volunteer application sent! 🙌', 'green'); return; }
+      (async () => {
+        try {
+          const res = await authedFetch('/api/contributor/' + (orgSlug || 'apply') + '/volunteers', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'apply', entity_type: entityType, entity_id: entityId }),
+          });
+          if (res.status === 409) { toast('You have already applied to serve here.', 'gold'); return; }
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) { toast(json.error || 'Could not send your application.', 'red'); return; }
+          toast('Volunteer application sent! 🙌', 'green');
+        } catch (e) { toast('Could not send your application.', 'red'); }
+      })();
+    }, [realUser, toast]);
 
     // Resolve a moderation report. UI statuses resolved/removed both persist
     // as 'actioned' (the notes carry the distinction); dismissed maps 1:1.
@@ -1003,6 +1058,49 @@
       })();
     }, [realUser, user, toast, fetchIdeas]);
 
+    // Lead schedules the kickoff (founder decision: NO placeholder dates —
+    // the event is born only when the lead picks a real date). The RPC creates
+    // the event at the idea's location, auto-RSVPs every voter and notifies them.
+    const scheduleKingdomProject = useCallback((ideaId, dateIso, endIso, location, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !isRealId(ideaId) || !window.CC_SUPABASE) {
+        toast('Sign in with Google to schedule this project.', 'gold');
+        finish(false);
+        return;
+      }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.rpc('schedule_kingdom_project', {
+            p_idea_id: ideaId, p_date: dateIso, p_end: endIso || null, p_location: location || null,
+          });
+          if (error) throw error;
+          toast('Kickoff scheduled — all voters are connected automatically! 🗓', 'green');
+          fetchIdeas();
+          finish(true);
+        } catch (e) {
+          toast((e && e.message) || 'Could not schedule — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast, fetchIdeas]);
+
+    // Admin confirms an In Process project (suggestions_update_admin RLS).
+    const confirmIdea = useCallback((ideaId) => {
+      if (!realUser || !isRealId(ideaId) || !window.CC_SUPABASE) {
+        setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, status: 'confirmed' } : i)));
+        toast('Project confirmed. 🎉', 'green');
+        return;
+      }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.from('suggestions').update({ idea_status: 'confirmed' }).eq('id', ideaId);
+          if (error) throw error;
+          toast('Project confirmed. 🎉', 'green');
+          fetchIdeas();
+        } catch (e) { toast('Could not confirm — please try again.', 'red'); }
+      })();
+    }, [realUser, toast, fetchIdeas]);
+
     const markNotifsRead = useCallback(() => {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       if (!realUser) return;
@@ -1251,8 +1349,33 @@
             : e)));
         } catch (e) { /* counts stay at honest 0 */ }
       })();
+      // City reach: province snapshots of everyone connected to my events
+      // (rsvps.location_snapshot, populated by safe_rsvp since migration 132).
+      (async () => {
+        try {
+          const sb = window.CC_SUPABASE;
+          if (!sb) return;
+          const { data } = await sb
+            .from('rsvps')
+            .select('location_snapshot, events!inner(created_by)')
+            .eq('events.created_by', realUser.id)
+            .not('location_snapshot', 'is', null);
+          if (!active || !Array.isArray(data)) return;
+          const counts = {};
+          data.forEach((r) => { counts[r.location_snapshot] = (counts[r.location_snapshot] || 0) + 1; });
+          setCityReach(Object.entries(counts).map(([area, count]) => ({ area, count })).sort((a, b) => b.count - a.count));
+        } catch (e) { /* reach card shows honest empty */ }
+      })();
       const slug = myContributor && myContributor.slug;
       if (slug) {
+        (async () => {
+          try {
+            const res = await authedFetch('/api/contributor/' + slug + '/volunteers');
+            if (!res.ok) return;
+            const json = await res.json();
+            if (active && Array.isArray(json.volunteers)) setVolunteerApps(json.volunteers.map(adaptVolunteer));
+          } catch (e) { /* manager shows demo seeds */ }
+        })();
         (async () => {
           try {
             const [dashRes, weekRes] = await Promise.all([
@@ -1471,9 +1594,9 @@
       role, setRole, nav, go,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,
-      ideas, toggleIdeaVote, submitIdea,
+      ideas, toggleIdeaVote, submitIdea, scheduleKingdomProject, confirmIdea,
       citizens: DATA.citizens,
-      volunteerApps, reviewVolunteer, reports, resolveReport,
+      volunteerApps, reviewVolunteer, applyToVolunteer, cityReach, reports, resolveReport,
       assistMode, assistLoginAs, exitAssist,
       myApplication, myContributor, contributorDash,
       connected, considering, followedOrgs, followedPlaces,

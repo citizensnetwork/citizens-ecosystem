@@ -130,13 +130,33 @@
   const WEEKS = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8'];
   function AnalyticsPanel() {
     const app = window.useApp();
-    const { activeContributor, activeContributorId, events, places } = app;
+    const { activeContributor, activeContributorId, events, places, contributorDash, cityReach, myContributor, toast } = app;
+    const real = !!contributorDash; // signed-in contributor with live analytics
+    const stats = real ? contributorDash.stats : null;
     const myEvents = events.filter((e) => e.organizerId === activeContributorId);
     const totalConnects = myEvents.reduce((a, e) => a + e.connectCount, 0);
     const totalConsiders = myEvents.reduce((a, e) => a + e.considerCount, 0);
-    const followers = activeContributor.followerCount || 0;
+    const followers = real && stats ? stats.total_followers : (activeContributor.followerCount || 0);
     const reach = Math.round(totalConnects * 6.4 + totalConsiders * 4.2 + followers * 1.1);
     const [metric, setMetric] = useState('views');
+    const [generating, setGenerating] = useState(false);
+
+    // Funder report: fetch the PDF with the Bearer token, then download it.
+    const downloadFunderReport = async () => {
+      const slug = myContributor && myContributor.slug;
+      if (!slug || generating) return;
+      setGenerating(true);
+      try {
+        const res = await window.authedFetch('/api/contributor/' + slug + '/funder-report');
+        if (!res.ok) throw new Error('report ' + res.status);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = slug + '-funder-report.pdf'; a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) { toast('Could not generate the report — please try again.', 'red'); }
+      setGenerating(false);
+    };
 
     // synthetic weekly series scaled to the contributor's size
     const base = Math.max(8, Math.round(reach / 70));
@@ -157,13 +177,35 @@
     const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#C9A84C' }; });
 
     return h('div', { className: 'space-y-4 fade-in' },
-      h('div', { className: 'grid grid-cols-2 sm:grid-cols-4 gap-2' },
-        KpiCard('Total reach', reach.toLocaleString(), '#C9A84C', { up: true, text: '24% this week' }),
-        KpiCard('Connects', totalConnects.toLocaleString(), '#16A34A', { up: true, text: '12%' }),
-        KpiCard('Considers', totalConsiders.toLocaleString(), '#7C3AED', null),
-        KpiCard('Followers', followers.toLocaleString(), '#2563EB', { up: true, text: fgDelta.toLocaleString() })),
+      real
+        ? h('div', { className: 'grid grid-cols-2 sm:grid-cols-4 gap-2' },
+            KpiCard('Followers', (stats ? stats.total_followers : 0).toLocaleString(), '#2563EB'),
+            KpiCard('Connects (30d)', (stats ? stats.rsvps_in_period : 0).toLocaleString(), '#16A34A'),
+            KpiCard('Upcoming events', (stats ? stats.upcoming_events : 0).toLocaleString(), '#C9A84C'),
+            KpiCard('Active places', (stats ? stats.active_places : 0).toLocaleString(), '#7C3AED'))
+        : h('div', { className: 'grid grid-cols-2 sm:grid-cols-4 gap-2' },
+            KpiCard('Total reach', reach.toLocaleString(), '#C9A84C', { up: true, text: '24% this week' }),
+            KpiCard('Connects', totalConnects.toLocaleString(), '#16A34A', { up: true, text: '12%' }),
+            KpiCard('Considers', totalConsiders.toLocaleString(), '#7C3AED', null),
+            KpiCard('Followers', followers.toLocaleString(), '#2563EB', { up: true, text: fgDelta.toLocaleString() })),
 
-      h(SectionCard, { title: 'Engagement over time',
+      // Real mode: city reach (province snapshots of connected citizens) +
+      // funder-facing PDF export.
+      real && h(SectionCard, { title: 'City reach', right: h('span', { className: 'text-[11px] text-muted-foreground' }, 'where your people connect from') },
+        (!cityReach || cityReach.length === 0)
+          ? h('p', { className: 'text-xs text-muted-foreground py-2' }, 'No reach data yet — it builds as citizens connect to your events.')
+          : h('div', { className: 'space-y-2' }, (() => {
+              const max = Math.max(...cityReach.map((r) => r.count), 1);
+              return cityReach.slice(0, 8).map((r) => h('div', { key: r.area, className: 'flex items-center gap-3' },
+                h('span', { className: 'text-xs font-semibold text-foreground w-28 truncate shrink-0' }, r.area),
+                h('div', { className: 'flex-1 h-2 rounded-full bg-muted overflow-hidden' },
+                  h('div', { className: 'h-full gold-gradient rounded-full', style: { width: (r.count / max * 100) + '%' } })),
+                h('span', { className: 'text-xs font-bold text-foreground w-8 text-right shrink-0' }, r.count)));
+            })())),
+      real && h(Button, { variant: 'outline', className: 'w-full', icon: 'FileDown', disabled: generating, onClick: downloadFunderReport },
+        generating ? 'Generating report…' : 'Generate funder report (PDF)'),
+
+      !real && h(SectionCard, { title: 'Engagement over time',
         right: h('div', { className: 'flex gap-1' }, Object.keys(metaMap).map((k) => h('button', { key: k, onClick: () => setMetric(k), className: cx('px-2 py-1 rounded-lg text-[10px] font-bold transition-all', metric === k ? 'text-white' : 'text-muted-foreground bg-muted'), style: metric === k ? { background: metaMap[k].c } : undefined }, metaMap[k].label))) },
         h('div', { className: 'flex items-end justify-between mb-1' },
           h('p', { className: 'text-2xl font-bold text-foreground' }, seriesData[metric].reduce((a, b) => a + b, 0).toLocaleString()),
@@ -185,7 +227,7 @@
             }))),
 
       h('div', { className: 'grid sm:grid-cols-2 gap-4' },
-        h(SectionCard, { title: 'Follower growth' },
+        !real && h(SectionCard, { title: 'Follower growth' },
           h('div', { className: 'flex items-end gap-2 mb-1' },
             h('p', { className: 'text-2xl font-bold text-foreground' }, followers.toLocaleString()),
             h('p', { className: 'text-[11px] font-semibold text-[#16A34A] pb-1' }, '▲ ' + fgDelta.toLocaleString() + ' / 6mo')),

@@ -2,7 +2,7 @@
 // POST /api/contributor/[handle]/volunteers  – apply or change status
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
@@ -21,13 +21,10 @@ export async function GET(
   { params }: { params: Promise<{ handle: string }> }
 ) {
   const { handle } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, req);
   if (!access.hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const url = new URL(req.url);
@@ -64,10 +61,7 @@ export async function POST(
   { params }: { params: Promise<{ handle: string }> }
 ) {
   const { handle } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rl = checkRateLimit(user.id, RATE_LIMITS.mutation);
@@ -147,7 +141,7 @@ export async function POST(
 
   if (action === "update_status") {
     // Contributor updates application status
-    const access = await checkDashboardAccess(handle);
+    const access = await checkDashboardAccess(handle, req);
     if (!access.hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { application_id, status: newStatus } = body as Record<string, unknown>;

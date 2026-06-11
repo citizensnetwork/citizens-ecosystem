@@ -16,13 +16,39 @@
   }
 
   // ── Kingdom Projects ──
+  // Lead-only kickoff scheduler (founder decision: the event exists only once
+  // the lead picks a real date — voters are then auto-connected).
+  function ScheduleKickoff({ idea }) {
+    const { scheduleKingdomProject } = window.useApp();
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('10:00');
+    const [location, setLocation] = useState('');
+    const [busy, setBusy] = useState(false);
+    const valid = date && time;
+    const submit = () => {
+      if (!valid || busy) return;
+      const start = new Date(date + 'T' + time);
+      if (isNaN(start.getTime()) || start < new Date()) return;
+      setBusy(true);
+      scheduleKingdomProject(idea.id, start.toISOString(), null, location.trim() || null, () => setBusy(false));
+    };
+    return h('div', { className: 'mt-2 p-3 rounded-xl bg-white/70 border border-gold/30 space-y-2' },
+      h('p', { className: 'text-xs font-bold text-gold-dark flex items-center gap-1.5' }, h(Icon, { name: 'CalendarPlus', size: 13 }), 'You lead this project — schedule the kickoff'),
+      h('div', { className: 'grid grid-cols-2 gap-2' },
+        h('input', { type: 'date', value: date, onChange: (e) => setDate(e.target.value), className: window.UI.inputCls }),
+        h('input', { type: 'time', value: time, onChange: (e) => setTime(e.target.value), className: window.UI.inputCls })),
+      h(Input, { value: location, onChange: (e) => setLocation(e.target.value), placeholder: 'Kickoff location (optional)' }),
+      h(Button, { variant: 'gold', size: 'sm', className: 'w-full', icon: 'Rocket', disabled: !valid || busy, onClick: submit }, busy ? 'Scheduling…' : 'Schedule & connect voters'));
+  }
+
   function IdeaCard({ idea }) {
-    const { toggleIdeaVote } = window.useApp();
+    const { toggleIdeaVote, confirmIdea, realUser, isAdmin, go } = window.useApp();
     const cat = window.DATA.getCategory(idea.category);
     const voted = !!idea.votedByMe;
     const pct = Math.min(100, Math.round((idea.votes / idea.threshold) * 100));
     const confirmed = idea.status === 'confirmed';
     const inProcess = idea.status === 'inProcess';
+    const isLead = !!(realUser && idea.projectLeadId === realUser.id);
     return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
       h('div', { className: 'p-4' },
         h('div', { className: 'flex items-center justify-between mb-2' },
@@ -38,8 +64,13 @@
           ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#DCFCE7] text-[#15803d]' }, h(Icon, { name: 'CheckCircle2', size: 15 }),
               h('span', { className: 'text-xs font-bold' }, 'Confirmed Kingdom Project' + (typeof idea.collaborators === 'number' ? ' · ' + idea.collaborators + ' collaborators' : '')))
           : inProcess
-            ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#FEF3C7] text-[#92400E]' }, h(Icon, { name: 'Hammer', size: 15 }),
-                h('span', { className: 'text-xs font-bold' }, 'In Process — goal reached with ' + idea.votes.toLocaleString() + ' votes'))
+            ? h(F, null,
+                h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#FEF3C7] text-[#92400E]' }, h(Icon, { name: 'Hammer', size: 15 }),
+                  h('span', { className: 'text-xs font-bold' }, 'In Process — goal reached with ' + idea.votes.toLocaleString() + ' votes')),
+                idea.associatedEventId
+                  ? h(Button, { variant: 'soft', size: 'sm', className: 'w-full mt-2', icon: 'Calendar', onClick: () => go('event', { id: idea.associatedEventId }) }, 'View the kickoff event')
+                  : (isLead && h(ScheduleKickoff, { idea })),
+                isAdmin && h(Button, { variant: 'success', size: 'sm', className: 'w-full mt-2', icon: 'CheckCircle2', onClick: () => confirmIdea(idea.id) }, 'Mark as Confirmed Kingdom Project'))
             : h(F, null,
                 h('div', { className: 'flex items-center justify-between mb-1' },
                   h('span', { className: 'text-xs font-bold text-foreground' }, idea.votes.toLocaleString() + ' of ' + idea.threshold.toLocaleString() + ' votes'),

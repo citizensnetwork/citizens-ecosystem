@@ -4,10 +4,66 @@
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
+  const { useState, useEffect } = React;
   const { cx, Avatar, SmartImage, Button, Empty } = window.UI;
   const catOf = (x) => window.DATA.getCategory(x && x.category);
   const Icon = window.Icon;
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // ── Anonymous broadcast reactions (🙏❤️🎉🙌🔥) ──
+  //  Counts are aggregate-only (no identity stored — migration 128). Reads the
+  //  event's latest broadcast (public) + its reaction counts; taps write
+  //  through the rate-limited react API for signed-in users.
+  const REACT_EMOJI = ['🙏', '❤️', '🎉', '🙌', '🔥'];
+  function BroadcastReactions({ eventId }) {
+    const { realUser, toast } = window.useApp();
+    const [bc, setBc] = useState(null);
+    const [counts, setCounts] = useState({});
+    const [tapped, setTapped] = useState({});
+    useEffect(() => {
+      let active = true;
+      (async () => {
+        try {
+          const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+          const res = await fetch(base + '/api/contributor/x/broadcasts?entity_type=event&entity_id=' + eventId);
+          if (!res.ok) return;
+          const json = await res.json();
+          const b = (json.broadcasts || [])[0];
+          if (!active || !b) return;
+          setBc(b);
+          const sb = window.CC_SUPABASE;
+          if (sb) {
+            const { data } = await sb.from('broadcast_reactions').select('emoji, count').eq('broadcast_id', b.id);
+            if (active && Array.isArray(data)) setCounts(Object.fromEntries(data.map((r) => [r.emoji, r.count])));
+          }
+        } catch (e) { /* reactions are optional */ }
+      })();
+      return () => { active = false; };
+    }, [eventId]);
+    if (!bc) return null;
+    const react = (emoji) => {
+      if (!realUser) { toast('Sign in with Google to react.', 'gold'); return; }
+      if (tapped[emoji]) return; // one optimistic tap per emoji per visit
+      setTapped((t) => ({ ...t, [emoji]: true }));
+      setCounts((c) => ({ ...c, [emoji]: (c[emoji] || 0) + 1 }));
+      (async () => {
+        try {
+          const res = await window.authedFetch('/api/broadcasts/' + bc.id + '/react', { method: 'POST', body: JSON.stringify({ emoji }) });
+          if (!res.ok) throw new Error('react');
+        } catch (e) {
+          setCounts((c) => ({ ...c, [emoji]: Math.max(0, (c[emoji] || 1) - 1) }));
+          setTapped((t) => ({ ...t, [emoji]: false }));
+        }
+      })();
+    };
+    return h('div', { className: 'mx-4 mt-2 flex items-center gap-1.5 flex-wrap' },
+      REACT_EMOJI.map((e) => h('button', {
+        key: e, onClick: () => react(e),
+        className: cx('flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold transition-all',
+          tapped[e] ? 'border-gold/60 bg-accent/70 text-gold-dark' : 'border-border bg-card hover:border-gold/40 text-foreground'),
+      }, e, (counts[e] || 0) > 0 && h('span', null, counts[e]))));
+  }
 
   function Scroll({ children }) {
     return h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-10 bg-background' }, children);
@@ -55,6 +111,7 @@
         ev.broadcast && h('div', { className: 'mx-4 mt-4 p-3 rounded-2xl glass-strong border border-gold/30 flex items-start gap-2.5' },
           h('div', { className: 'w-8 h-8 rounded-xl gold-gradient flex items-center justify-center shrink-0' }, h(Icon, { name: 'Radio', size: 14, className: 'text-white' })),
           h('div', null, h('p', { className: 'text-[10px] font-bold uppercase tracking-wide text-gold-dark' }, 'Latest broadcast'), h('p', { className: 'text-sm text-foreground' }, ev.broadcast.message))),
+        UUID_RE.test(id) && h(BroadcastReactions, { eventId: id }),
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
           // Organiser row: clickable when the org is a real directory profile;
           // a non-clickable identity row when we only have a name; omitted entirely
@@ -81,7 +138,7 @@
           ev.volunteeringEnabled && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/40 border border-[#16A34A]/20' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'HandHeart', size: 16, className: 'text-[#16A34A]' }), h('p', { className: 'text-sm font-bold text-[#15803d]' }, 'Volunteers needed')),
             h('p', { className: 'text-xs text-[#15803d]/80 mb-3' }, 'This event is looking for people to serve. Put your hand up!'),
-            h(Button, { variant: 'success', size: 'sm', icon: 'HandHeart', onClick: () => toast('Volunteer application sent! 🙌', 'green') }, 'Apply to Volunteer')),
+            h(Button, { variant: 'success', size: 'sm', icon: 'HandHeart', onClick: () => app.applyToVolunteer('event', id, org && org.slug) }, 'Apply to Volunteer')),
           h(Gallery, { imgs: ev.gallery }),
           ev.upcomingDates && ev.upcomingDates.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Upcoming dates'),
@@ -122,7 +179,7 @@
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
             h(InfoRow, { icon: 'Clock', label: 'Opening hours', value: pl.openHours || 'Not specified' })),
           h('div', null, h('p', { className: 'text-sm font-bold text-foreground mb-1.5' }, 'About'), h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, pl.description)),
-          pl.volunteeringEnabled && h(Button, { variant: 'success', className: 'w-full', icon: 'HandHeart', onClick: () => toast('Volunteer application sent! 🙌', 'green') }, 'Apply to Volunteer Here'),
+          pl.volunteeringEnabled && h(Button, { variant: 'success', className: 'w-full', icon: 'HandHeart', onClick: () => app.applyToVolunteer('place', id, org && org.slug) }, 'Apply to Volunteer Here'),
           assoc.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events here'),
             h('div', { className: 'space-y-2' }, assoc.map((e) => h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'w-full flex items-center gap-3 p-2.5 bg-card rounded-2xl border border-border hover:border-gold/40 text-left' },
