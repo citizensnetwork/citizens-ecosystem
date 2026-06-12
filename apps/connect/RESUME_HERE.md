@@ -32,6 +32,60 @@ with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-
 
 ---
 
+## 2k. PHASES 3 + 4 + 5-GROUNDWORK COMPLETE ✅ (2026-06-10 → 2026-06-12, one continuous session)
+
+**The HTML-frontend rollout from docs/HTML_FRONTEND_WIRING_SPEC.md is done.** Six gated,
+pushed commits on origin/main; migrations **131 + 132 applied live → next migration # = 133**.
+Working log: `.claude/sessions/phase3-5-full-rollout.md` (full per-batch detail).
+Final gates: **tsc 0 · vitest 634/634 · lint FULLY clean · advisors 0 ERROR** (114 WARN / 3 INFO =
+baseline + 3 accepted secdef RPCs). Cache-bust token now **`?v=20260610f`**.
+
+### Founder decisions applied (locked this session)
+1. **Pushes pre-authorized** per milestone (six commits pushed).
+2. **Idea→event = "lead schedules it"**: goal hit ⇒ in_process + voters notified instantly;
+   the EVENT only exists when the lead picks a real future date. No placeholder dates.
+3. **Phase 5 scope = build/sync + docs** (no Firebase F1 / no Apple F2 yet).
+
+### The commits
+- `ed9a132` Messages + Notifications wired (Bearer-enabled routes; realtime open-thread channel;
+  deep-linking notification rows).
+- `9bed0de` Kingdom Projects voting (migration 131: get_community_ideas RPC + idea columns;
+  tier composer w/ per-tier vote-goal slider; vote toggle via vote_on_idea; fixed pre-existing
+  anon-suggestion RLS 500).
+- `6460d84` Contributor surface (real identity/slug; dashboard stats/activity/7-day chart;
+  createEvent/createPlace → RLS inserts with MapTiler geocoding — places REQUIRE geocode;
+  onboarding persists via setup+profile routes; broadcasts real w/ rollback; FIXED create-flow
+  crash from deleted MapBackdrop; mobile-route feature retired).
+- `2f1290d` Admin + Settings (NEW GET /api/admin/reports w/ target-name resolution; admin
+  effect feeds applications/reports/member-count; resolveReport write-through; Settings: real
+  notification_prefs keys, discoverable, name/bio persist; real bio everywhere — never the
+  demo persona's).
+- `cfd464b` Phase 4 (migration 132: safe_rsvp province snapshot; vote_on_idea auto-transition +
+  admin crossing alerts; schedule_kingdom_project — voter auto-RSVP + notify; NEW funder-report
+  PDF route (pdf-lib); volunteers wired end-to-end; broadcast reactions 🙏❤️🎉🙌🔥 on event
+  profiles; city-reach bars + funder download in AnalyticsPanel; convince API Bearer-enabled —
+  its UI awaits the friends-surface rehome, addendum A5).
+- `4df3057` Phase 5 groundwork (capacitor webDir=mobile-dist BUNDLED — server.url wrapper gone;
+  `npm run build:mobile`/`cap:sync` verified Android+iOS; multi-origin CORS moved to
+  middleware.ts — capacitor://localhost etc., OPTIONS 204, +4 tests;
+  **docs/MOBILE_LAUNCH_RUNBOOK.md** = the full launch path).
+- (also `3ccebd0` docs: founder's PHASE_4_5_ADDENDUM + spec pointers.)
+
+### NOT auto-verifiable — founder manual pass (needs real Google OAuth)
+Sign in and run: real DMs (list/send/realtime) · notifications list + deep-links · submit idea →
+vote → threshold → in_process → (as lead) schedule kickoff → event + auto-RSVP'd voters ·
+create event/place (geocoded pin) · contributor dashboard real stats · volunteer apply/review ·
+broadcast + reactions · admin panel (applications/reports/overview) · settings save · funder PDF.
+
+### Remaining roadmap (in order — see docs/MOBILE_LAUNCH_RUNBOOK.md)
+1. **Vite precompile of the frontend (B0)** — first task of the next session; kills Babel-standalone
+   AND the `?v=` ritual. 2. Shared rate-limit store (A2 — needs infra choice; pre-launch MUST).
+3. F1 Firebase/FCM + F2 Apple/APNs + OAuth deep links. 4. Store compliance + strip demo mode (A5).
+5. Deferred product decisions: event↔place FK; friends surface (convince UI + BurgerMenu debt);
+   gallery/contributor-media persistence (§2j); schema.sql drift reconcile (§2g).
+
+---
+
 ## 2j. Photos — real upload + honest display ✅ (2026-06-09)
 
 Founder: "allow photos to show… wire those up — photos aren't showing for mock data either" → **All of the above.**
