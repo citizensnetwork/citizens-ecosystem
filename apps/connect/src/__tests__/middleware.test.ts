@@ -21,21 +21,31 @@ vi.mock("@supabase/ssr", () => ({
   })),
 }));
 
-// Mock NextResponse
-const mockNextResponse = {
+// Mock NextResponse — constructible (the middleware builds `new NextResponse`
+// for OPTIONS preflights) with static next/redirect, and real Headers so the
+// CORS assertions read actual header state.
+const mockNextResponse: { cookies: { set: ReturnType<typeof vi.fn>; getAll: ReturnType<typeof vi.fn> }; headers: Headers } = {
   cookies: { set: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+  headers: new Headers(),
 };
 const mockRedirectResponse = { redirected: true, cookies: { set: vi.fn() } };
 
-vi.mock("next/server", () => ({
-  NextResponse: {
-    next: vi.fn(() => mockNextResponse),
-    redirect: vi.fn(() => mockRedirectResponse),
-  },
-}));
+vi.mock("next/server", () => {
+  function NextResponse(this: { status: number; headers: Headers }, _body: unknown, init?: { status?: number }) {
+    this.status = init?.status ?? 200;
+    this.headers = new Headers();
+  }
+  (NextResponse as unknown as { next: unknown }).next = vi.fn(() => mockNextResponse);
+  (NextResponse as unknown as { redirect: unknown }).redirect = vi.fn(() => mockRedirectResponse);
+  return { NextResponse };
+});
 
-function makeRequest(pathname = "/events") {
+function makeRequest(pathname = "/events", opts: { method?: string; origin?: string } = {}) {
+  const headers = new Headers();
+  if (opts.origin) headers.set("origin", opts.origin);
   return {
+    method: opts.method ?? "GET",
+    headers,
     cookies: {
       getAll: vi.fn().mockReturnValue([]),
       set: vi.fn(),
@@ -50,6 +60,7 @@ function makeRequest(pathname = "/events") {
 describe("middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNextResponse.headers = new Headers();
   });
 
   it("calls getUser to refresh the session", async () => {
@@ -69,6 +80,43 @@ describe("middleware", () => {
     const response = await middleware(makeRequest("/api/rsvp") as never);
     // Early pass-through: no cookie session work is done for API routes.
     expect(response).toBe(mockNextResponse);
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
+  it("echoes an allow-listed origin on /api responses (CORS)", async () => {
+    const { middleware } = await import("@/middleware");
+    const response = (await middleware(
+      makeRequest("/api/rsvp", { origin: "http://localhost:3001" }) as never,
+    )) as unknown as { headers: Headers };
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3001");
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    expect(response.headers.get("Vary")).toBe("Origin");
+  });
+
+  it("echoes the Capacitor shell origins on /api responses (CORS)", async () => {
+    const { middleware } = await import("@/middleware");
+    const response = (await middleware(
+      makeRequest("/api/v1/events", { origin: "capacitor://localhost" }) as never,
+    )) as unknown as { headers: Headers };
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("capacitor://localhost");
+  });
+
+  it("sets NO CORS headers for an unknown origin", async () => {
+    const { middleware } = await import("@/middleware");
+    const response = (await middleware(
+      makeRequest("/api/rsvp", { origin: "https://evil.example.com" }) as never,
+    )) as unknown as { headers: Headers };
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
+  it("answers /api OPTIONS preflights with 204 + CORS headers", async () => {
+    const { middleware } = await import("@/middleware");
+    const response = (await middleware(
+      makeRequest("/api/rsvp", { method: "OPTIONS", origin: "http://localhost" }) as never,
+    )) as unknown as { status: number; headers: Headers };
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toContain("PATCH");
     expect(mockGetUser).not.toHaveBeenCalled();
   });
 

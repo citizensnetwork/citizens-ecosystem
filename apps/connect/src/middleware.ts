@@ -14,6 +14,40 @@ const BIO_SETUP_ALLOW = [
 ];
 
 /**
+ * CORS for `/api/*` lives HERE (not next.config.ts static headers) because the
+ * allow-list has several members and static headers can only echo one value:
+ *   • ALLOWED_FRONTEND_ORIGIN  — the deployed static frontend (www domain)
+ *   • capacitor://localhost    — the iOS Capacitor shell
+ *   • http(s)://localhost      — the Android Capacitor shell
+ *   • http://localhost:3001    — local static-frontend dev server
+ * Requests with no Origin (same-origin, curl, server-to-server) get no CORS
+ * headers — they don't need them. (Addendum §B2.)
+ */
+const CORS_STATIC_ORIGINS = [
+  "capacitor://localhost",
+  "http://localhost",
+  "https://localhost",
+  "http://localhost:3001",
+];
+
+function corsOriginFor(request: NextRequest): string | null {
+  const origin = request.headers.get("origin");
+  if (!origin) return null;
+  const allowed = [process.env.ALLOWED_FRONTEND_ORIGIN, ...CORS_STATIC_ORIGINS].filter(Boolean);
+  return allowed.includes(origin) ? origin : null;
+}
+
+function withCors(res: NextResponse, origin: string | null): NextResponse {
+  if (!origin) return res;
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.headers.set("Access-Control-Allow-Credentials", "true");
+  res.headers.set("Vary", "Origin");
+  return res;
+}
+
+/**
  * Build a redirect response that carries every cookie currently set on
  * `supabaseResponse`. Required because `supabase.auth.signOut()` sets
  * `Set-Cookie: sb-*=; Max-Age=0` on `supabaseResponse` via our
@@ -37,7 +71,11 @@ export async function middleware(request: NextRequest) {
   // every public read and (b) risk redirecting an API request to a (now-deleted)
   // page route. Skip it entirely and let the route handlers gate access.
   if (pathname.startsWith("/api")) {
-    return NextResponse.next({ request });
+    const origin = corsOriginFor(request);
+    if (request.method === "OPTIONS") {
+      return withCors(new NextResponse(null, { status: 204 }), origin);
+    }
+    return withCors(NextResponse.next({ request }), origin);
   }
 
   let supabaseResponse = NextResponse.next({ request });
