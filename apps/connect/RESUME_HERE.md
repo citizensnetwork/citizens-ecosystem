@@ -32,6 +32,119 @@ with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-
 
 ---
 
+## 2M. Empty-map + fake-"Lydia"-login fixes + Vision snapshots table ✅ (2026-06-15)
+
+Two founder-reported LIVE launch blockers fixed, plus the last shared-DB Vision data point.
+Commits **`af6261d`** (bug fixes) + **`b3bd47d`** (migration 134) on origin/main.
+Migration **134 applied live → next migration # = 135**. Cache-bust now **`?v=20260615b`**.
+Working log: `.claude/sessions/fix-empty-map-and-lydia-login.md`.
+Gates: **tsc 0** (backend untouched) · preview boot verified (app renders, 0 syntax errors,
+starts on sign-in screen) · same-origin `/api/v1/events` returns the 191 real events ·
+advisors **0 ERROR** (migration 134 adds no new findings).
+
+### Bug 1 — no data on the map (ROOT CAUSE + fix)
+`store.jsx` live-data effect wrapped every fetch in `if (base)`. The standard production
+topology sets `API_BASE_URL=''` (same-origin), so `base` was falsy → events/places/contributors
+were **never fetched**; once §2L emptied `data.jsx`, the map went blank.
+**Fix:** removed the `if (base)` guards — `fetch('/api/v1/events')` is a valid same-origin
+request (proven: same-origin API returns the 191 events at real coords). Works for both
+topologies (same-origin `base=''` and cross-origin `base=<url>`).
+
+### Bug 2 — Google login routed everyone to fictitious "Lydia Mensah" (ROOT CAUSE + fix)
+When the deployed `config.js` lacks real Supabase values (or keeps the `REPLACE_WITH`
+placeholder), `auth-client.js` sets `CC_AUTH=null` and `signIn()` **silently demo-logged-in**
+as the hardcoded `CITIZEN_BASE = "Lydia Mensah"`. **Fixes (store.jsx + dashboard.jsx):**
+- `signIn()` with no `CC_AUTH` now **fails honestly** (error toast) — never fakes a session.
+- `CITIZEN_BASE`/`ADMIN_BASE` neutralised (no persona, no stranger Unsplash photos).
+- Dead `signInDemo` removed; `submitApplication` refs repointed to `realUser`.
+- `dashboard.jsx`: demo "Lydia" activity rows + fabricated "+24%" / fake weekly numbers
+  replaced with honest empty/zeroed states.
+
+### ⚠️ FOUNDER ACTION REQUIRED to actually log real users in
+The code now fails honestly instead of faking Lydia — but real Google login still needs the
+**Vercel env vars** set on the deployment that serves the app, then a redeploy:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_MAPTILER_KEY`,
+`NEXT_PUBLIC_MAPTILER_STYLE`, and `NEXT_PUBLIC_API_BASE_URL=''` (same-origin) — matches memory
+`supabase-placeholder-fallback-masks-missing-env`. Without them: map still loads (public REST,
+same-origin) but Google sign-in shows "Sign-in is temporarily unavailable."
+
+### Vision data points — status (Citizens_Vision_Backend_Architecture.md)
+**Migration 133 already implemented EVERY Connect/Database-layer data point** (verified live:
+`event_impressions`+RPC, `impression_count`/`cancellation_count`, cancellation trigger,
+`broadcast_messages.audience_size_at_post`, `profiles.timezone`, `vision.category_space_map`,
+`vision.reach_per_event`, `vision.engagement_per_event`).
+**Migration 134 (this session)** adds the one missing shared-DB item:
+**`vision.vision_period_snapshots`** — per-org (optional per-Space) period table feeding Growth
+(#4) + Retention (#5). Stores reach/engagement numerators as COUNTS (display #8), distinct-person
+reach, and `active_events` denominator. RLS-on, `vps_own_read` (own-org/admin reads), writes only
+via `service_role` (Vision backend; bypasses RLS) — invisible to anon/authenticated.
+**OUT OF SCOPE for Connect (Vision app layer):** the daily snapshot job (resolved in
+`profiles.timezone`), growth/retention math, Org/Space aggregation, Priority-weighting, Pulse —
+architecture-doc open questions #1–#3. Connect never writes the snapshot table.
+
+### Accepted debt (not silently built)
+- `store.jsx` still has `if (!realUser)` local-demo branches in createEvent/createPlace/submitIdea
+  etc. They're unreachable in production now (no fake auth) but kept as harmless graceful
+  degradation; strip with the B0 Vite precompile pass if wanted.
+- `vision.spaces` table still owed (category_space_map.space_id + snapshot.space_id need a referent).
+
+---
+
+## 2L. Vision Backend + Demo Removal + Impression Tracking ✅ (2026-06-15)
+
+Commit **`9a94885`** on origin/main. Migration **133 applied live → next migration # = 134**.
+Working log: `.claude/sessions/launch-prep-vision-backend.md`.
+Gates: **tsc 0 · vitest 634/634 · lint clean**. Cache-bust token now **`?v=20260615a`**.
+
+### What shipped
+
+**Migration 133 — Vision Backend Groundwork:**
+- `event_impressions` table (PK user_id, event_id) + RLS + `record_event_impression(uuid, uuid)` SECDEF RPC (dedup + atomic counter)
+- `events.impression_count integer default 0` + `events.cancellation_count integer default 0`
+- `trg_cancellation_count` → fires on `rsvp_cancellations` INSERT (Connect deletes rsvp rows rather than status→'cancelled')
+- `broadcast_messages.audience_size_at_post integer` + BEFORE INSERT trigger counts `follows.followee_id = contributor_id`
+- `profiles.timezone text default 'Africa/Johannesburg'` (Vision's org timezone; "organisations" = contributor profiles in Connect)
+- `vision` Postgres schema created
+- `vision.category_space_map` table (org_id → profiles, category_id → categories, space_id uuid; prerequisite for Vision Spaces)
+- `vision.reach_per_event` view: MAX(impression_count, attending+considering+cancellations)
+- `vision.engagement_per_event` view: 6-component weighted score 35/20/15/10/10/10 (attending/considering/org_followers/reviews/broadcasts/event_updates)
+
+**Frontend launch prep:**
+- `auth.jsx`: Removed SHOW_DEMO block + demo role picker (Citizen/Contributor/Admin shortcut buttons) — only real Google OAuth remains
+- `data.jsx`: Cleared all fictional entity arrays (Grace City Church, Lydia Mensah, etc.) — only category/tier reference constants remain; real data comes from Supabase
+- `store.jsx`: Removed `signInDemo` from context; added `trackImpression(eventId)` (fire-and-forget RPC)
+- `home.jsx`: Calls `trackImpression` on map marker select (event type)
+- `profiles.jsx`: Calls `trackImpression` on EventProfilePage mount
+
+### Key architectural facts (durable, for Vision)
+- `broadcasts` in Vision docs = `broadcast_messages` in Connect DB
+- `organisations` in Vision docs = `profiles` where `contributor_status='approved'` in Connect DB
+- DB counts: 191 events, 40 places, 10 contributors, 21 profiles, 27 categories
+- Vision schema lives in the same Supabase project as Connect (`xyiajtrvhlxaeplsiajj`)
+- Citizens-Vision Supabase project (`ijdmcudcrncmaprmzgfk`) is INACTIVE — Vision reads from Connect DB
+
+### What the app shows without demo mode
+- **Map**: 191 real events + 40 real places at real national coords ✅
+- **Contributors**: 10 approved ✅
+- **Messages / Notifications**: empty states (0 real msgs; normal for a fresh launch)
+- **Kingdom Projects**: live ideas board from Supabase; `suggestions` has 1 row
+
+### Remaining roadmap (in order)
+1. **B0: Vite precompile** — kills Babel-standalone + `?v=` ritual (first task next session)
+2. **A2: Rate-limit store** — Redis/Upstash (infra decision; pre-launch MUST)
+3. **F1/F2: Firebase FCM + Apple APNs** — mobile push notifications
+4. **Friends surface** — convince UI still needs a permanent home (BurgerMenu debt)
+5. **Vision application layer** — Vision app connecting to `vision` schema views (separate project)
+6. **vision.spaces table** — category_space_map.space_id needs a referent once Vision Spaces are designed
+7. **Store compliance** — app store submission checklist
+
+### NOT auto-verifiable (founder — needs real Google OAuth)
+Sign in → confirm no demo role picker appears → map shows 191 events → click marker → event preview
+→ open full event profile → check Supabase that `event_impressions` row was inserted.
+Also: sign in as contributor, send a broadcast → check `broadcast_messages.audience_size_at_post` is set.
+
+---
+
 ## 2k. PHASES 3 + 4 + 5-GROUNDWORK COMPLETE ✅ (2026-06-10 → 2026-06-12, one continuous session)
 
 **The HTML-frontend rollout from docs/HTML_FRONTEND_WIRING_SPEC.md is done.** Six gated,
