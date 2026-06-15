@@ -3,7 +3,6 @@
 //  · Founding scripture (Eph. 2:19–22) → CITIZENS wordmark
 //  · "Connecting [carousel]" slogan
 //  · Continue with Google + Citizen / Contributor choice
-//  · Removable demo-account block (see SHOW_DEMO below)
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -11,10 +10,6 @@
   const { useState, useEffect } = React;
   const { cx } = window.UI;
   const Icon = window.Icon;
-
-  // Flip to false (or delete the demo block lower down) to ship without
-  // the reviewer role-preview shortcuts.
-  const SHOW_DEMO = true;
 
   // ── "Connecting ___" rotating slogan (2s) ──
   const PHRASES = [
@@ -104,15 +99,13 @@
 
   // ── Main screen ──
   function AuthScreen() {
-    const { signIn, signInDemo } = window.useApp();
+    const { signIn } = window.useApp();
     const [intent, setIntent] = useState('citizen');
     const [loading, setLoading] = useState(false);
 
     const onGoogle = () => {
       if (loading) return;
       setLoading(true);
-      // Real Google OAuth redirect (auth-client.js → store.signIn). In demo
-      // mode signIn resolves locally and this screen unmounts. No fake delay.
       signIn(intent);
     };
 
@@ -132,12 +125,12 @@
           // scripture eyebrow
           h('p', { className: 'font-display italic text-[13px] sm:text-sm text-foreground/65 text-center leading-relaxed max-w-sm px-2' },
             h('sup', { className: 'gold-text font-bold not-italic text-[10px] mr-0.5' }, '19'),
-            '\u201CNow, therefore, you are no longer strangers and foreigners, but fellow \u2014\u201D'),
+            '“Now, therefore, you are no longer strangers and foreigners, but fellow —”'),
 
           // CITIZENS wordmark (completes the verse)
           h('h1', { className: 'font-display gold-text font-semibold leading-none text-center my-3', style: { fontSize: 'clamp(48px, 13vw, 88px)', letterSpacing: '0.1em' } }, 'CITIZENS'),
 
-          h('p', { className: 'text-[11px] font-bold tracking-[0.3em] uppercase text-gold-dark/70 mb-7' }, 'Eph. 2:19\u201322'),
+          h('p', { className: 'text-[11px] font-bold tracking-[0.3em] uppercase text-gold-dark/70 mb-7' }, 'Eph. 2:19–22'),
 
           // slogan carousel
           h('div', { className: 'mb-9' }, h(SloganCarousel)),
@@ -148,7 +141,7 @@
             h('p', { className: 'text-center text-xs text-muted-foreground mb-4' }, 'Sign in or create your account with Google.'),
 
             // role choice
-            h('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-0.5' }, 'I\u2019m joining as'),
+            h('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-0.5' }, 'I’m joining as'),
             h('div', { className: 'grid grid-cols-1 gap-2 mb-4' },
               h(RoleOption, {
                 active: intent === 'citizen', onClick: () => setIntent('citizen'),
@@ -158,7 +151,7 @@
               h(RoleOption, {
                 active: intent === 'contributor', onClick: () => setIntent('contributor'),
                 icon: 'Crown', title: 'A Contributor',
-                desc: 'Lead a ministry or organisation. We\u2019ll guide you through a quick application after sign-in.',
+                desc: 'Lead a ministry or organisation. We’ll guide you through a quick application after sign-in.',
               })),
 
             // Google button
@@ -169,36 +162,12 @@
               loading
                 ? h('span', { className: 'w-[18px] h-[18px] rounded-full border-2 border-gold border-t-transparent spin' })
                 : h(GoogleMark),
-              h('span', null, loading ? 'Connecting\u2026' : 'Continue with Google')),
+              h('span', null, loading ? 'Connecting…' : 'Continue with Google')),
 
             intent === 'contributor' && h('div', { className: 'flex items-start gap-2 mt-3 p-2.5 rounded-xl bg-accent/60 text-gold-dark fade-in' },
               h(Icon, { name: 'Info', size: 13, className: 'shrink-0 mt-0.5' }),
-              h('p', { className: 'text-[11px] leading-relaxed' }, 'You\u2019ll sign in first, then set up your contributor application for an admin to review.')),
+              h('p', { className: 'text-[11px] leading-relaxed' }, 'You’ll sign in first, then set up your contributor application for an admin to review.')))
 
-            null),
-
-          // ─────────────────────────────────────────────────────────────
-          //  DEMO ROLE PREVIEW — review shortcut. Delete this whole block
-          //  (and signInDemo in store.jsx) to ship the live login only.
-          // ─────────────────────────────────────────────────────────────
-          SHOW_DEMO && h('div', { className: 'w-full mt-5 rounded-2xl border border-dashed border-gold/35 bg-white/35 p-3.5' },
-            h('div', { className: 'flex items-center gap-2 mb-2.5' },
-              h(Icon, { name: 'FlaskConical', size: 12, className: 'text-gold-dark' }),
-              h('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-gold-dark/80' }, 'Demo \u2014 preview a role'),
-              h('span', { className: 'text-[9px] text-muted-foreground ml-auto' }, 'removed before launch')),
-            h('div', { className: 'grid grid-cols-3 gap-2' },
-              [
-                { r: 'citizen', label: 'Citizen', icon: 'User', c: '#3498DB' },
-                { r: 'contributor', label: 'Contributor', icon: 'Crown', c: '#C9A84C' },
-                { r: 'admin', label: 'Admin', icon: 'Shield', c: '#8E44AD' },
-              ].map((d) => h('button', {
-                key: d.r, onClick: () => signInDemo(d.r),
-                className: 'flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-white/70 border border-border hover:border-gold/50 hover:bg-white transition-all',
-              },
-                h('span', { className: 'w-7 h-7 rounded-lg flex items-center justify-center', style: { background: d.c + '1c', color: d.c } },
-                  h(Icon, { name: d.icon, size: 14 })),
-                h('span', { className: 'text-[11px] font-bold text-foreground' }, d.label)))))
-          // ─────────────────────────── end demo block ───────────────────────────
         )));
   }
 

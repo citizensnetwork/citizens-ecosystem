@@ -976,6 +976,17 @@
       })();
     }, [events, realUser, toast]);
 
+    // ── Vision: deduplicated event impression tracking ────────────────
+    //  Calls record_event_impression() RPC (SECURITY DEFINER) which inserts
+    //  into event_impressions (deduped by PK) and increments impression_count
+    //  only on the first view. Fire-and-forget — no UI effect.
+    const trackImpression = useCallback((eventId) => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !realUser || !isRealId(eventId)) return;
+      sb.rpc('record_event_impression', { p_user_id: realUser.id, p_event_id: eventId })
+        .then(({ error }) => { if (error) console.warn('[trackImpression]', error.message); });
+    }, [realUser]);
+
     // ── Kingdom Projects / Impact Ideas ───────────────────────────────
     //  Read path: anon-callable get_community_ideas RPC (controlled fields).
     //  Replace the demo seeds whenever the RPC answers (even with []) so a
@@ -1590,7 +1601,7 @@
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
     const value = {
-      authed, signIn, signInDemo, signOut,
+      authed, signIn, signOut,
       role, setRole, nav, go,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,
@@ -1609,6 +1620,7 @@
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
       toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
+      trackImpression,
     };
     return React.createElement(AppCtx.Provider, { value }, children);
   }

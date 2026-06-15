@@ -85,8 +85,9 @@
   // ── Event ──
   function EventProfilePage({ id }) {
     const app = window.useApp();
-    const { events, contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, toast } = app;
+    const { events, contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, toast, trackImpression } = app;
     const ev = events.find((e) => e.id === id);
+    useEffect(() => { trackImpression(id); }, [id]); // deduplicated server-side
     if (!ev) return h(Empty, { icon: 'CalendarX', title: 'Event not found' });
     const cat = window.DATA.getCategory(ev.category);
     // Organiser may not be an approved Contributor in the directory (real events

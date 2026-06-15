@@ -163,7 +163,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, ideas, user, role, dismissBubble } = app;
+    const { events, places, ideas, user, role, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -185,7 +185,7 @@
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
-        React.createElement(window.StylizedMap, { markers, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); }, onDismissBubble: dismissBubble })),
+        React.createElement(window.StylizedMap, { markers, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); if (t === 'event') trackImpression(id); }, onDismissBubble: dismissBubble })),
 
       // broadcast bubbles + selected label — sibling overlay (paints over the map's heavy subtree)
       React.createElement(window.MapFloatersLayer, { markers, filterCategory: filter, selectedId: selected }),
