@@ -355,18 +355,18 @@
   const SESSION_KEY = 'cc_session_v1';
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch (e) { return null; } };
 
-  // user identities per role
+  // Neutral identity scaffolds per role. The signed-in person's REAL identity
+  // (name/photo/bio from their profiles row) is overlaid onto these — see the
+  // `user` derivation below. They are never a fabricated persona: with no real
+  // session the app stays on the sign-in screen, so these only show as a brief,
+  // honest placeholder (initials/empty) while the real session resolves.
   const CITIZEN_BASE = {
-    id: 'u1', name: 'Lydia Mensah', role: 'citizen',
-    profilePhoto: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop',
-    coverPhoto: 'https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=900&h=400&fit=crop',
-    bio: 'Worshipper, intercessor, and community builder. Passionate about seeing the Kingdom manifest in every neighbourhood.',
+    id: 'me', name: '', role: 'citizen',
+    profilePhoto: '', coverPhoto: '', bio: '',
   };
   const ADMIN_BASE = {
-    id: 'admin-1', name: 'Citizens Connect Admin', role: 'admin',
-    profilePhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop',
-    coverPhoto: 'https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=900&h=400&fit=crop',
-    bio: 'Platform administrator. Serving the Citizens Connect community.',
+    id: 'admin', name: '', role: 'admin',
+    profilePhoto: '', coverPhoto: '', bio: '',
   };
 
   function AppProvider({ children }) {
@@ -462,10 +462,10 @@
     // ── actions ─────────────────────────────────────────────────────
     const submitApplication = useCallback((form) => {
       const app = {
-        id: 'app-mine', name: form.orgName, photo: CITIZEN_BASE.profilePhoto,
+        id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
         bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
         submittedAt: today(), reason: form.reason, location: form.location,
-        website: form.website, socials: form.socials || {}, applicantName: CITIZEN_BASE.name, isMine: true,
+        website: form.website, socials: form.socials || {}, applicantName: (realUser && realUser.name) || '', isMine: true,
       };
       setMyApplication(app);
       setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
@@ -1159,30 +1159,12 @@
         });
         return;
       }
-      // Fallback (no Supabase configured): local demo session only.
-      setAuthed(true);
-      setRole('citizen');
-      setMyContributor(null);
-      setAssistMode(false);
-      if (intent === 'contributor') {
-        setNav({ page: 'apply', params: {} });
-        toast('Signed in \u2014 let\u2019s set up your contributor application.', 'gold');
-      } else {
-        setNav({ page: 'home', params: {} });
-        toast('Welcome to Citizens Connect!', 'gold');
-      }
+      // No Supabase configured \u2192 we CANNOT authenticate a real person. Never
+      // fake a session (that previously dropped users into a fictitious persona).
+      // Fail honestly so a misconfigured deploy is obvious and fixable.
+      console.error('[signIn] CC_AUTH unavailable \u2014 Supabase env not configured (config.js).');
+      toast('Sign-in is temporarily unavailable. Please try again shortly.', 'red');
     }, [toast]);
-
-    // DEMO ONLY \u2014 jump straight into a role for review. Safe to delete
-    // along with the demo block in app/auth.jsx; nothing else depends on it.
-    const signInDemo = useCallback((r) => {
-      setAuthed(true);
-      setRole(r);
-      setMyContributor(null);
-      setMyApplication(null);
-      setAssistMode(false);
-      setNav({ page: r === 'admin' ? 'admin' : r === 'contributor' ? 'dashboard' : 'home', params: {} });
-    }, []);
 
     const signOut = useCallback(() => {
       if (window.CC_AUTH) { window.CC_AUTH.signOut().catch(() => {}); }
@@ -1466,58 +1448,53 @@
     //  attach any active broadcast bubbles (anon RPC). Fails open: on any error
     //  we keep the demo data so the app still runs offline / without the API.
     useEffect(() => {
+      // API base is an OPTIONAL prefix: '' means same-origin (the standard
+      // Vercel topology where this static app and the API ship together). We
+      // ALWAYS fetch — `fetch('/api/v1/events')` is a valid same-origin request.
+      // (Guarding on a truthy base previously skipped every fetch in production,
+      // leaving the map blank once the mock arrays were removed.)
       const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
       let active = true;
 
       // 1) Real events — set as soon as they arrive (do NOT wait on bubbles).
-      if (base) {
-        (async () => {
-          try {
-            const res = await fetch(base + '/api/v1/events?limit=100');
-            if (!res.ok) return;
-            const json = await res.json();
-            const adapted = ((json && json.data) || []).map(adaptEvent);
-            if (active && adapted.length) setEvents(adapted);
-          } catch (e) { console.warn('[events] live fetch failed — keeping demo data', e); }
-        })();
-      }
+      (async () => {
+        try {
+          const res = await fetch(base + '/api/v1/events?limit=100');
+          if (!res.ok) return;
+          const json = await res.json();
+          const adapted = ((json && json.data) || []).map(adaptEvent);
+          if (active && adapted.length) setEvents(adapted);
+        } catch (e) { console.warn('[events] live fetch failed', e); }
+      })();
 
-      // 1b) Real places — replace the demo (bbox-projected) places with real DB
-      //     places at real coordinates. Same fail-open contract as events: only
-      //     swap when real rows arrive, otherwise keep the demo data offline.
-      if (base) {
-        (async () => {
-          try {
-            const res = await fetch(base + '/api/v1/places?limit=100');
-            if (!res.ok) return;
-            const json = await res.json();
-            const adapted = ((json && json.data) || []).map(adaptPlace);
-            if (active && adapted.length) setPlaces(adapted);
-          } catch (e) { console.warn('[places] live fetch failed — keeping demo data', e); }
-        })();
-      }
+      // 1b) Real places at real coordinates (NOT NULL lat/lng → anchor directly).
+      (async () => {
+        try {
+          const res = await fetch(base + '/api/v1/places?limit=100');
+          if (!res.ok) return;
+          const json = await res.json();
+          const adapted = ((json && json.data) || []).map(adaptPlace);
+          if (active && adapted.length) setPlaces(adapted);
+        } catch (e) { console.warn('[places] live fetch failed', e); }
+      })();
 
       // 2) Real Contributors — merge into the directory so real events/places
-      //    resolve their organiser identity (name + logo) instead of a blank or,
-      //    worse, the wrong (first-mock) organiser. Merge (not replace) so mock
-      //    places still in the tree keep resolving their mock organisers during
-      //    the mock→real migration; on id collision the real row wins.
-      if (base) {
-        (async () => {
-          try {
-            const res = await fetch(base + '/api/v1/contributors?limit=100');
-            if (!res.ok) return;
-            const json = await res.json();
-            const adapted = ((json && json.data) || []).map(adaptContributor);
-            if (!active || !adapted.length) return;
-            setContributors((prev) => {
-              const byId = new Map(prev.map((c) => [c.id, c]));
-              adapted.forEach((c) => byId.set(c.id, c));
-              return [...byId.values()];
-            });
-          } catch (e) { /* directory is optional — org falls back to its name */ }
-        })();
-      }
+      //    resolve their organiser identity (name + logo). On id collision the
+      //    real row wins; merge (not replace) is harmless now that seeds are empty.
+      (async () => {
+        try {
+          const res = await fetch(base + '/api/v1/contributors?limit=100');
+          if (!res.ok) return;
+          const json = await res.json();
+          const adapted = ((json && json.data) || []).map(adaptContributor);
+          if (!active || !adapted.length) return;
+          setContributors((prev) => {
+            const byId = new Map(prev.map((c) => [c.id, c]));
+            adapted.forEach((c) => byId.set(c.id, c));
+            return [...byId.values()];
+          });
+        } catch (e) { /* directory is optional — org falls back to its name */ }
+      })();
 
       // 3) Active map bubbles (anon RPC) — attach to whatever events are loaded.
       (async () => {

@@ -8,13 +8,6 @@
   const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
   const Icon = window.Icon;
 
-  const WEEK = [
-    { day: 'Mon', connects: 12, views: 45 }, { day: 'Tue', connects: 8, views: 32 },
-    { day: 'Wed', connects: 25, views: 87 }, { day: 'Thu', connects: 18, views: 63 },
-    { day: 'Fri', connects: 41, views: 120 }, { day: 'Sat', connects: 35, views: 98 },
-    { day: 'Sun', connects: 52, views: 145 },
-  ];
-
   // Build the last-7-days series from the real analytics API response
   // ({ rsvps: [{date,value}], views: [{date,value}] }) — days with no row are 0.
   function buildWeek(series) {
@@ -40,7 +33,9 @@
   };
 
   function BarChart({ week }) {
-    const data = week || WEEK;
+    // No real series yet → an honest zeroed week (correct day labels, no bars),
+    // never fabricated traffic.
+    const data = week || buildWeek(null);
     const max = Math.max(1, ...data.map((d) => Math.max(d.views, d.connects)));
     return h('div', { className: 'flex items-end justify-between gap-2 h-36 pt-2' },
       data.map((d, i) => h('div', { key: i, className: 'flex-1 flex flex-col items-center gap-1.5 h-full justify-end' },
@@ -165,28 +160,18 @@
           tab === 'overview' && h('div', { className: 'space-y-4 fade-in' },
             h('div', { className: 'bg-card rounded-2xl p-4 border border-border' },
               h('div', { className: 'flex items-center justify-between mb-1' },
-                h('p', { className: 'text-sm font-bold text-foreground' }, "This Week's Activity"),
-                // The growth badge is demo flavour only — no fabricated % on real data.
-                !dash && h('span', { className: 'text-xs text-gold-dark font-semibold flex items-center gap-1' }, h(Icon, { name: 'TrendingUp', size: 12 }), '+24%')),
+                h('p', { className: 'text-sm font-bold text-foreground' }, "This Week's Activity")),
               h('div', { className: 'flex items-center gap-4 mb-2 text-[10px] text-muted-foreground' },
                 h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded bg-gold' }), 'Connects'),
                 h('span', { className: 'flex items-center gap-1' }, h('span', { className: 'w-2.5 h-2.5 rounded bg-gold-light' }), 'Views')),
               h(BarChart, { week: realWeek })),
             h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
               h('div', { className: 'px-4 py-3 border-b border-border' }, h('p', { className: 'text-sm font-bold text-foreground' }, 'Recent Activity')),
-              realActivity
-                ? (realActivity.length === 0
-                    ? h('p', { className: 'px-4 py-6 text-xs text-muted-foreground text-center' }, 'No activity yet — it shows here as citizens connect with your work.')
-                    : realActivity.map((r, i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
-                        h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: r.color + '20', color: r.color } }, h(Icon, { name: r.icon, size: 13 })),
-                        h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug capitalize' }, r.text), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, r.time)))))
-                : [['Users', '12 new citizens connected to Sunday Glory Service', '30 min ago', '#C9A84C'],
-                   ['MessageCircle', 'New message from Lydia Mensah', '1 hour ago', '#2563EB'],
-                   ['Eye', 'Kingdom Creative Arts Workshop viewed 48 times today', '2 hours ago', '#7C3AED'],
-                   ['CheckCircle2', 'Volunteer application received for Feed the City', '3 hours ago', '#16A34A']]
-                    .map(([ic, t, time, c], i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
-                      h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: c + '20', color: c } }, h(Icon, { name: ic, size: 13 })),
-                      h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug' }, t), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, time))))),
+              (realActivity && realActivity.length)
+                ? realActivity.map((r, i) => h('div', { key: i, className: 'flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-b-0' },
+                    h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: r.color + '20', color: r.color } }, h(Icon, { name: r.icon, size: 13 })),
+                    h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug capitalize' }, r.text), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, r.time))))
+                : h('p', { className: 'px-4 py-6 text-xs text-muted-foreground text-center' }, 'No activity yet — it shows here as citizens connect with your work.')),
             h('button', { onClick: () => go('profile', { id: activeContributorId }), className: 'w-full flex items-center gap-3 p-4 bg-gradient-to-r from-[#F2E8CC] to-[#E8D48B]/30 rounded-2xl border border-gold/30 hover:border-gold/60 transition-all' },
               h('div', { className: 'flex-1 text-left' },
                 h('p', { className: 'text-sm font-bold text-gold-dark' }, 'View Public Profile'),
