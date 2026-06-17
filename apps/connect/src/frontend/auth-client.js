@@ -32,7 +32,12 @@
     if (intent === "contributor") {
       try { localStorage.setItem(PENDING, "contributor"); } catch (e) {}
     }
-    var redirectTo = (env.FRONTEND_ORIGIN || window.location.origin) + window.location.pathname;
+    var origin = env.FRONTEND_ORIGIN || window.location.origin;
+    // A bare hostname (e.g. "www.citizenscentral.co.za") has no scheme, so
+    // Supabase treats it as a relative path on its own domain and the OAuth
+    // redirect lands on supabase.co/<hostname>?code=…  which 404s.
+    if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
+    var redirectTo = origin + window.location.pathname;
     var res = await client.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: redirectTo, queryParams: { access_type: "offline", prompt: "consent" } },

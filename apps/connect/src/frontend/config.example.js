@@ -19,6 +19,7 @@ window.__CC_ENV = {
   // Optional: force the OAuth redirect origin. Leave blank to use the origin
   // the app is served from (recommended).
   //   Production frontend origin: https://www.citizenscentral.co.za
+  //   MUST include the https:// scheme — a bare hostname breaks the OAuth redirect.
   FRONTEND_ORIGIN: "",
 
   // MapTiler Cloud — powers the real map basemap (MapLibre GL). The key is a
@@ -35,3 +36,4 @@ window.__CC_ENV = {
 //    API_BASE_URL:    "https://citizens-connect.vercel.app"
 //    FRONTEND_ORIGIN: "https://www.citizenscentral.co.za"
 //  and the API project sets Vercel env ALLOWED_FRONTEND_ORIGIN to the frontend origin.
+//  FRONTEND_ORIGIN MUST include https:// (bare hostname breaks OAuth redirect — see auth-client.js).
