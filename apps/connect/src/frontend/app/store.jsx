@@ -831,6 +831,29 @@
       })();
     }, [realUser]);
 
+    const acceptRequest = useCallback((convId) => {
+      if (!realUser || !isRealId(convId)) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/conversations/' + convId, { method: 'PATCH', body: JSON.stringify({ action: 'accept' }) });
+          if (!res.ok) { toast('Could not accept request.', 'red'); return; }
+          setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, status: 'active' } : c)));
+        } catch (e) { toast('Could not accept request.', 'red'); }
+      })();
+    }, [realUser, toast]);
+
+    const rejectRequest = useCallback((convId) => {
+      if (!realUser || !isRealId(convId)) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/conversations/' + convId, { method: 'PATCH', body: JSON.stringify({ action: 'reject' }) });
+          if (!res.ok) { toast('Could not decline request.', 'red'); return; }
+          setConversations((prev) => prev.filter((c) => c.id !== convId));
+          go('messages');
+        } catch (e) { toast('Could not decline request.', 'red'); }
+      })();
+    }, [realUser, toast, go]);
+
     // Start (or resume) a DM. For a real signed-in user with a real recipient
     // profile UUID this creates/fetches the conversation server-side (block +
     // permission rules enforced by the API); otherwise it stays a local mock.
@@ -1596,6 +1619,7 @@
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
+      acceptRequest, rejectRequest,
       toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
       trackImpression,
     };

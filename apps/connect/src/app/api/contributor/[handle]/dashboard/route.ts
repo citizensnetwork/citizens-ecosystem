@@ -81,11 +81,11 @@ export async function GET(
       .eq("events.created_by", contributorId)
       .gte("created_at", sinceIso),
 
-    // Unread DM conversations
+    // DM conversations this contributor is part of
     supabase
-      .from("conversations")
-      .select("id", { count: "exact", head: true })
-      .eq("participant_id", contributorId),
+      .from("conversation_participants")
+      .select("conversation_id", { count: "exact", head: true })
+      .eq("user_id", contributorId),
 
     // Active team members
     supabase

@@ -34,6 +34,9 @@ type AllowedKey = (typeof ALLOWED_KEYS)[number];
 
 const MAX_GALLERY_URLS = 6;
 const MAX_URL_LENGTH = 2_000;
+const MAX_BIO = 2_000;
+const MAX_HANDLE = 80;
+const MAX_ADDRESS = 500;
 
 function normalisePublicUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -152,6 +155,13 @@ export async function POST(request: Request) {
       { error: "physical_longitude must be a number" },
       { status: 400 },
     );
+  }
+
+  // String length guards for free-text fields.
+  for (const [key, max] of [["bio", MAX_BIO], ["physical_address", MAX_ADDRESS], ["instagram_handle", MAX_HANDLE], ["tiktok_handle", MAX_HANDLE]] as const) {
+    if (update[key] != null && typeof update[key] === "string" && (update[key] as string).length > max) {
+      return NextResponse.json({ error: `${key} exceeds maximum length of ${max}` }, { status: 400 });
+    }
   }
 
   const { error } = await supabase

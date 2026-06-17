@@ -19,13 +19,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   // Verify user is a participant
-  const { data: participant } = await supabase
+  const { data: participant, error: partErr } = await supabase
     .from("conversation_participants")
     .select("conversation_id")
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id)
     .maybeSingle();
 
+  if (partErr) {
+    console.error("[API messages GET] participant check", partErr);
+    return NextResponse.json({ error: "Failed to verify access" }, { status: 500 });
+  }
   if (!participant) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });
   }
@@ -109,13 +113,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Verify user is a participant
-  const { data: participant } = await supabase
+  const { data: participant, error: partErr } = await supabase
     .from("conversation_participants")
     .select("conversation_id")
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id)
     .maybeSingle();
 
+  if (partErr) {
+    console.error("[API messages POST] participant check", partErr);
+    return NextResponse.json({ error: "Failed to verify access" }, { status: 500 });
+  }
   if (!participant) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });
   }

@@ -35,13 +35,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   // Verify the user is a participant
-  const { data: participation } = await supabase
+  const { data: participation, error: partErr } = await supabase
     .from("conversation_participants")
     .select("conversation_id, muted_at")
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id)
     .maybeSingle();
 
+  if (partErr) {
+    console.error("[conversations PATCH] participant check", partErr);
+    return NextResponse.json({ error: "Failed to verify access" }, { status: 500 });
+  }
   if (!participation) {
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   }

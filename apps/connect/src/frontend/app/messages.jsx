@@ -9,19 +9,33 @@
   const Icon = window.Icon;
 
   function Thread({ conv, onBack }) {
-    const { sendMessage } = window.useApp();
+    const { sendMessage, acceptRequest, rejectRequest } = window.useApp();
     const [text, setText] = useState('');
     const endRef = useRef(null);
     useEffect(() => { if (endRef.current) endRef.current.scrollTop = endRef.current.scrollHeight; }, [conv.messages.length, conv.id]);
-    const send = () => { if (text.trim()) { sendMessage(conv.id, text.trim()); setText(''); } };
+
+    const isPending = conv.status === 'pending';
+    // Recipient = pending conv where no messages are from "me" (initiator sent the first message).
+    // We only determine this after messages load to avoid a flash.
+    const iAmRecipient = isPending && conv.messagesLoaded && !conv.messages.some((m) => m.from === 'me');
+
+    const send = () => { if (text.trim() && !iAmRecipient) { sendMessage(conv.id, text.trim()); setText(''); } };
     return h('div', { className: 'flex-1 flex flex-col min-h-0 bg-background' },
       h('div', { className: 'px-3 sm:px-4 py-3 border-b border-border glass-strong flex items-center gap-3 shrink-0' },
         h('button', { onClick: onBack, className: 'md:hidden w-8 h-8 rounded-lg hover:bg-accent/60 flex items-center justify-center' }, h(Icon, { name: 'ArrowLeft', size: 17 })),
         h(Avatar, { src: conv.participantPhoto, name: conv.participantName, size: 38, rounded: 'xl' }),
         h('div', { className: 'flex-1 min-w-0' },
           h('div', { className: 'flex items-center gap-1.5' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, conv.participantName), conv.isOrg && h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })),
-          h('p', { className: 'text-[11px] text-muted-foreground' }, conv.isOrg ? 'Contributor' : 'Citizen')),
+          h('p', { className: 'text-[11px] text-muted-foreground' }, isPending ? 'Message request' : (conv.isOrg ? 'Contributor' : 'Citizen'))),
         h('button', { className: 'w-8 h-8 rounded-lg hover:bg-accent/60 flex items-center justify-center text-muted-foreground' }, h(Icon, { name: 'MoreVertical', size: 16 }))),
+      isPending && h('div', { className: 'mx-3 sm:mx-4 mt-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 shrink-0' },
+        iAmRecipient
+          ? h('div', null,
+              h('p', { className: 'font-semibold mb-2' }, conv.participantName + ' sent you a message request.'),
+              h('div', { className: 'flex gap-2' },
+                h('button', { onClick: () => acceptRequest(conv.id), className: 'flex-1 py-1.5 rounded-lg bg-gold text-white text-xs font-semibold' }, 'Accept'),
+                h('button', { onClick: () => rejectRequest(conv.id), className: 'flex-1 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 text-xs font-semibold' }, 'Decline')))
+          : h('p', null, 'Awaiting ' + conv.participantName + '\u2019s response to your message request.')),
       h('div', { ref: endRef, className: 'flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2' },
         conv.messages.length === 0 && h('p', { className: 'text-center text-xs text-muted-foreground py-8' },
           conv.messagesLoaded === false ? 'Loading conversation…' : 'Say hello 👋'),
@@ -37,8 +51,8 @@
         })),
       h('div', { className: 'px-3 sm:px-4 py-3 border-t border-border glass-strong shrink-0 flex items-center gap-2' },
         h('button', { className: 'w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0' }, h(Icon, { name: 'Plus', size: 18 })),
-        h('input', { value: text, onChange: (e) => setText(e.target.value), onKeyDown: (e) => e.key === 'Enter' && send(), placeholder: 'Write a message…', className: 'flex-1 px-4 py-2.5 bg-white/70 border border-border rounded-full text-sm outline-none focus:border-gold/60' }),
-        h('button', { onClick: send, disabled: !text.trim(), className: 'w-10 h-10 rounded-full gold-gradient text-white flex items-center justify-center shrink-0 disabled:opacity-40' }, h(Icon, { name: 'Send', size: 16 }))));
+        h('input', { value: text, onChange: (e) => setText(e.target.value), onKeyDown: (e) => e.key === 'Enter' && send(), disabled: iAmRecipient, placeholder: iAmRecipient ? 'Accept the request to reply…' : 'Write a message…', className: cx('flex-1 px-4 py-2.5 bg-white/70 border border-border rounded-full text-sm outline-none focus:border-gold/60', iAmRecipient && 'opacity-50 cursor-not-allowed') }),
+        h('button', { onClick: send, disabled: !text.trim() || iAmRecipient, className: 'w-10 h-10 rounded-full gold-gradient text-white flex items-center justify-center shrink-0 disabled:opacity-40' }, h(Icon, { name: 'Send', size: 16 }))));
   }
 
   function MessagesPage() {
@@ -60,7 +74,8 @@
           h('div', { className: 'flex-1 min-w-0' },
             h('div', { className: 'flex items-center justify-between gap-2' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, c.participantName), h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, c.lastTime)),
             h('div', { className: 'flex items-center justify-between gap-2 mt-0.5' }, h('p', { className: cx('text-xs truncate', c.unread ? 'text-foreground font-medium' : 'text-muted-foreground') }, c.lastMessage),
-              c.unread > 0 && h('span', { className: 'w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center shrink-0' }, c.unread)))))));
+              c.unread > 0 && h('span', { className: 'w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center shrink-0' }, c.unread),
+              c.status === 'pending' && h('span', { className: 'text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0' }, 'Request')))))));
 
     return h('div', { className: 'flex-1 flex min-h-0', 'data-screen': 'messages' },
       List,
