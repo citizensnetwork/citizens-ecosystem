@@ -71,6 +71,38 @@ sync tables. (Step 0 frontend swap remains in flight — this doc work did not d
 
 ---
 
+## 2O. Messaging Polish + Search-Path Fix ✅ (2026-06-17)
+
+Commit **`0187a11`** on origin/main. **Migration 136 applied live** → next migration # = **137**.
+Working log: `.claude/sessions/messaging-realtime-and-polish.md`.
+Gates: **tsc 0** · 0 new security findings.
+
+### What shipped
+
+**Realtime (inbox-level) — `store.jsx`:**
+- `messages` table was already in the `supabase_realtime` publication and the thread-level subscription was already wired (open conversation updates)
+- Added `cc-inbox` channel subscription: any message INSERT for the user's conversations updates the inbox last-message preview + unread badge without a manual refresh. Uses a `navRef` so the single subscription survives navigation changes without re-subscribing.
+
+**Search — `messages.jsx`:**
+- `searchQuery` state filters the conversations list by participant name or last-message body
+- Empty-state message when no conversations match the query
+
+**Mute / Unmute — `store.jsx` + `messages.jsx`:**
+- `adaptConversation` now includes the `muted: boolean` field from the API
+- `muteConversation(convId)` / `unmuteConversation(convId)` — optimistic update + PATCH `/api/conversations/[id]`, rollback on failure
+- Thread header MoreVertical button opens a dropdown with mute toggle; muted conversations show a `BellOff` icon in the inbox list
+
+**Block — `store.jsx` + `messages.jsx`:**
+- `blockUser(blockedId, convId)` — confirm dialog → POST `/api/blocks` → removes conversation + navigates back
+- Block option in the same Thread header dropdown
+
+**Migration 136 (`fix_function_search_paths`) — applied live:**
+- Added `SET search_path = public` to all 12 user-owned `public`-schema functions that were missing it: `cleanup_stale_locations`, `count_friends`, `find_conversation`, `generate_contributor_slug`, `handle_new_user`, `is_admin`, `is_approved_contributor`, `is_organiser`, `protect_role_column`, `sync_event_category_id`, `trending_events`, `update_conversation_timestamp`
+- 0 user-owned functions missing search_path now (confirmed via `pg_proc` query)
+- Remaining advisor WARN entries are from extension/system functions (not modifiable by us)
+
+---
+
 ## 2N. Messaging System Audit & Fix ✅ (2026-06-17)
 
 Commit **`1ca9d8e`** on origin/main. **Migration 135 applied live** → next migration # = **136**.
@@ -98,14 +130,7 @@ Gates: **tsc 0** · security advisors **0 new findings** (3 INFO + 118 WARN = pr
 - `store.jsx`: `acceptRequest()` and `rejectRequest()` actions added to context
 
 ### Security audit result — no critical/high issues
-All security patterns are solid: service_role server-only, CORS allowlist, JWT validated server-side via `getUser()`, mass assignment protected, strong headers. The MapTiler key was found in `.env.example` but that file is gitignored — never committed.
-
-### Still ahead for messaging
-1. **No Realtime** — messages require manual refresh; Supabase Realtime channels not yet wired
-2. **Search input** in messages list sidebar is decorative (not wired)
-3. **Mute/unmute UI** — PATCH action exists, no button in UI
-4. **Block management UI** — `/api/blocks` exists, no frontend
-5. **118 `function_search_path_mutable` warnings** — pre-existing; needs `SET search_path = public` on every DB function before public launch
+All security patterns are solid: service_role server-only, CORS allowlist, JWT validated server-side via `getUser()`, mass assignment protected, strong headers.
 
 ---
 
