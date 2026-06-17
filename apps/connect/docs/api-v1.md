@@ -1,8 +1,14 @@
 # Citizens Connect — Public API v1
 
 Read-only public directory endpoints that power the Citizens ecosystem
-(Citizens Central and other channels). All responses return a
-consistent envelope:
+(Citizens Central and other channels).
+
+> **This API is the cross-app contract.** Sibling Citizens apps (Vision, Wear, …) consume
+> Connect's commons data through these endpoints — **never** Connect's raw tables. See
+> [`docs/SHARED_DB_CONTRACT.md`](./SHARED_DB_CONTRACT.md) Rule 2 for why, and the stability
+> policy at the bottom of this file for what counts as a breaking change.
+
+All responses return a consistent envelope:
 
 ```json
 { "data": ... , "meta": { ... } }
@@ -120,6 +126,32 @@ a future `/api/v1/contributors/{slug}/events?before=…` endpoint.
 
 ---
 
+## GET /api/v1/contributors/{slug}/stats
+
+Public counts for a single approved contributor, derived only from
+public data. Never exposes demographics, `event_views`, or private
+events. Backed by the `get_contributor_public_stats` RPC, which returns
+`null` for non-approved contributors.
+
+```json
+{
+  "data": {
+    "total_events": 12,
+    "upcoming_events": 4,
+    "total_rsvps": 318,
+    "followers": 128
+  },
+  "meta": { "generated_at": "2026-…" }
+}
+```
+
+`400` when the slug is missing, `404` when it does not resolve to an
+approved contributor. A per-slug secondary rate cap applies (anonymous
+tier) so a rotating-IP client cannot single out one contributor.
+Cached `s-maxage=60, stale-while-revalidate=120`.
+
+---
+
 ## GET /api/v1/events
 
 Paginated feed of published public events.
@@ -193,6 +225,57 @@ Full public view of a single event with aggregated stats.
 ```
 
 404 when the event does not exist, is private, or is not published.
+
+---
+
+## GET /api/v1/places
+
+Public, read-only directory of places (venues, churches, creative
+spaces…). Places have no draft/private lifecycle like events — the
+`places` RLS policy permits public SELECT, so every place is
+intentionally public here.
+
+### Query parameters
+
+| Param        | Type    | Default | Notes                                       |
+| ------------ | ------- | ------- | ------------------------------------------- |
+| `created_by` | uuid    | —       | Owning contributor (`places.created_by`)    |
+| `q`          | string  | —       | Case-insensitive match on name / description |
+| `limit`      | integer | 50      | 1..100                                      |
+| `offset`     | integer | 0       | 0..10000                                    |
+
+Each row flattens its category into `category` (slug) +
+`category_emoji` / `category_color`, so a map can colour pins without a
+second round-trip. `category` is `null` for places using a free-text
+`custom_category`.
+
+```json
+{
+  "data": [
+    {
+      "id": "…uuid…",
+      "name": "Rooted House",
+      "description": "…",
+      "address": "Pretoria CBD",
+      "custom_category": null,
+      "image_url": "https://…",
+      "phone": "…",
+      "website": "https://…",
+      "latitude": -25.7479,
+      "longitude": 28.2293,
+      "created_by": "…uuid…",
+      "verified": true,
+      "volunteer_openings": 2,
+      "category": "creative",
+      "category_emoji": "🎨",
+      "category_color": "#c8a24f"
+    }
+  ],
+  "meta": { "count": 40, "limit": 50, "offset": 0 }
+}
+```
+
+Cached `s-maxage=60, stale-while-revalidate=120`.
 
 ---
 

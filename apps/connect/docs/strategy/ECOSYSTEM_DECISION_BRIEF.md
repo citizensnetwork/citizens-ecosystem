@@ -9,6 +9,9 @@
 > Where any of those disagree with this brief, **this brief wins.** They remain for history; banners added to the top of each.
 >
 > **Companion:** [`docs/strategy/CAPACITOR_REACT_AUDIT.md`](./CAPACITOR_REACT_AUDIT.md) — the dependency audit that was owed; it underpins §5.
+>
+> **Output of step 1 (2026-06-17):** [`docs/SHARED_DB_CONTRACT.md`](../SHARED_DB_CONTRACT.md) — the
+> normative, LOCKED contract that implements §3 below. It is the artifact Vision + Wear build against.
 
 ---
 
@@ -104,7 +107,7 @@ MASTER_DIRECTION Part 10 planned: …Batch 6 (profile schema + `content_labels` 
 | Order | Work | Source / status |
 |---|---|---|
 | **0 (in flight)** | Finish Connect's frontend swap + launch blockers | RESUME_HERE §2M; do **not** start repo surgery during this |
-| **1** | **Lock the shared-DB contract** — schema boundaries (`public`/`vision`/future `wear`), confirm `/api/v1` as the cross-app contract, one `auth.users`, `app_id` attribution. Land Unified Profile columns + `content_labels` + auto-label trigger. | D1 · MASTER_DIRECTION Part 7 + Batch 6 · addendum §A3 |
+| **1 ✅ LOCKED (2026-06-17)** | **Shared-DB contract locked** in [`docs/SHARED_DB_CONTRACT.md`](../SHARED_DB_CONTRACT.md). Verified live (project `xyiajtrvhlxaeplsiajj`, head mig 134): schema boundaries (`public`+`vision`; `wear` future), one `auth.users`, RLS-only-wall, `/api/v1` confirmed + `docs/api-v1.md` brought current (added `places`, `contributors/{slug}/stats`). Unified Profile cols + `content_labels` + auto-label trigger were **already landed in Batch 6** (mig 072–077). `app_id` column **deferred per §3** until the 2nd app writes analytics (rule R4 locked now; no sibling writes yet). | D1 · MASTER_DIRECTION Part 7 + Batch 6 · addendum §A3 |
 | **2** | **Finish Vision** against `vision.*`; migrate Vision-owned data from the paused eu-west project into the shared eu-central project; drop obsolete `cc_*_mirror` sync tables. | D1/D2 · §3 |
 | **3** | **Point Wear at the shared Supabase project** (it already has `db` + `connect-client`). | D1 · §5 |
 | **4** | **Extract pure-TS shared packages**; align Wear's `@citizens-wear/*` → `@citizens/*`. | D5 · §5 |

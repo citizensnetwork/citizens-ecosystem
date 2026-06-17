@@ -32,6 +32,45 @@ with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-
 
 ---
 
+## 3A. Ecosystem Step 1 — shared-DB contract LOCKED ✅ (2026-06-17)
+
+First item of the reconciled ecosystem work plan
+([docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) §6, order 1).
+The thing **Vision + Wear both depend on**. Working log: `.claude/sessions/step1-shared-db-contract-lock.md`.
+**Docs-only — no DB/migration change → next migration # still 135.** Security advisors: **0 ERROR**
+(119 WARN / 3 INFO = baseline; the 3 `rls_enabled_no_policy` WARNs are the intended service_role-only
+pattern). Committed on branch `step1-shared-db-contract-lock` — **push to main pending founder auth.**
+
+### Root finding — most of the brief's "Land …" items were already shipped
+Verified live (project `xyiajtrvhlxaeplsiajj`, head mig 134): the Unified Profile columns,
+`content_labels` + auto-label trigger + lifecycle + RLS, and the `vision.*` schema all **already
+exist** (Batch 6 mig 072–077 + Vision groundwork 133–134). So Step 1's real remaining work was the
+**contract lock itself**, not new migrations.
+
+### What shipped
+- **NEW [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md)** — the normative, LOCKED contract
+  (the keystone artifact). Rules: schema boundaries (`public`/commons, `vision.*`, future `wear.*`);
+  one `auth.users`; **RLS is the only isolation wall**; **`/api/v1` is the cross-app contract, not
+  raw tables**; `app_id` attribution **rule R4** locked now / **column deferred** until the 2nd app
+  writes analytics; Unified Profile + `content_labels` as the two sanctioned cross-app bridges;
+  migration discipline; exit ramp. §9 carries the live verification snapshot.
+- **[docs/api-v1.md](docs/api-v1.md) brought current** — was stale; added the live `GET /api/v1/places`
+  and `GET /api/v1/contributors/{slug}/stats` endpoints + a contract-pointer banner.
+- **[docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md)** — Step 1
+  row marked ✅ LOCKED; contract doc registered as the step's output.
+
+### Decision recorded (no prod migration)
+The brief's own guard-rail (§3) defers the `app_id` *column* to "once the 2nd app writes." Connect is
+the only analytics writer today (Vision reads only; Wear has no prod data). So the **rule** is locked
+in the contract (R4); the **column** lands with the first sibling writer — YAGNI + brief-aligned.
+
+### Next in the plan (Step 2)
+Finish **Vision** against `vision.*`; migrate Vision-owned config from the paused eu-west project
+(`ijdmcudcrncmaprmzgfk`, INACTIVE) into the shared eu-central project; drop obsolete `cc_*_mirror`
+sync tables. (Step 0 frontend swap remains in flight — this doc work did not disturb it.)
+
+---
+
 ## 2M. Empty-map + fake-"Lydia"-login fixes + Vision snapshots table ✅ (2026-06-15)
 
 Two founder-reported LIVE launch blockers fixed, plus the last shared-DB Vision data point.
