@@ -71,6 +71,44 @@ sync tables. (Step 0 frontend swap remains in flight — this doc work did not d
 
 ---
 
+## 2N. Messaging System Audit & Fix ✅ (2026-06-17)
+
+Commit **`1ca9d8e`** on origin/main. **Migration 135 applied live** → next migration # = **136**.
+Working log: `.claude/sessions/messaging-audit-and-fix.md`.
+Gates: **tsc 0** · security advisors **0 new findings** (3 INFO + 118 WARN = pre-existing baseline).
+
+### Root cause
+`conversation_participants` SELECT RLS policy had a self-referential `EXISTS` subquery → PostgreSQL recursive RLS → HTTP 500 on every participant lookup. Message sends returned false 403 (swallowed error), optimistic UI immediately rolled back.
+
+### What shipped
+
+**Migration 135 (`fix_messaging_recursive_rls`) — applied live:**
+- `is_conversation_participant(conv_id, uid)` SECURITY DEFINER STABLE function breaks the recursion
+- Rewrote 4 RLS policies (conversation_participants SELECT, conversations SELECT+INSERT, messages SELECT) to call the helper
+- Dropped stale 2-arg `find_or_create_conversation` overload
+
+**API fixes:**
+- `conversations/[id]/messages` (GET+POST) — properly surface 500 vs 403 on participant DB errors
+- `conversations/[id]` (PATCH) — same fix
+- `contributor/[handle]/dashboard` — fix wrong column (`conversations.participant_id` → `conversation_participants.user_id`)
+- `contributor/profile` — add length caps for bio/handle/address (security hardening)
+
+**Frontend:**
+- `messages.jsx` Thread: amber pending banner → Accept/Decline buttons (recipient), "awaiting response" note (initiator), reply input disabled until accepted. List: amber "Request" badge on pending conversations.
+- `store.jsx`: `acceptRequest()` and `rejectRequest()` actions added to context
+
+### Security audit result — no critical/high issues
+All security patterns are solid: service_role server-only, CORS allowlist, JWT validated server-side via `getUser()`, mass assignment protected, strong headers. The MapTiler key was found in `.env.example` but that file is gitignored — never committed.
+
+### Still ahead for messaging
+1. **No Realtime** — messages require manual refresh; Supabase Realtime channels not yet wired
+2. **Search input** in messages list sidebar is decorative (not wired)
+3. **Mute/unmute UI** — PATCH action exists, no button in UI
+4. **Block management UI** — `/api/blocks` exists, no frontend
+5. **118 `function_search_path_mutable` warnings** — pre-existing; needs `SET search_path = public` on every DB function before public launch
+
+---
+
 ## 2M. Empty-map + fake-"Lydia"-login fixes + Vision snapshots table ✅ (2026-06-15)
 
 Two founder-reported LIVE launch blockers fixed, plus the last shared-DB Vision data point.
