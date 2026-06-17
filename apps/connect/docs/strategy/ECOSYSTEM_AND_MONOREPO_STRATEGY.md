@@ -1,5 +1,12 @@
 # Citizens Ecosystem — Strategy & Monorepo Decision Brief
 
+> ⚠️ **SUPERSEDED (2026-06-16) by [`ECOSYSTEM_DECISION_BRIEF.md`](ECOSYSTEM_DECISION_BRIEF.md).**
+> This was the *questions* doc for the strategy session. Those questions are now answered (decisions
+> locked: single shared Supabase project + schema-per-app; Vision = back-office only; Wear is the
+> monorepo seed; pure-TS sharing first). Its §5 leaned toward autonomous-DBs+sync — that direction
+> was **not** taken. **Still useful as background:** the monorepo trade-off table (§3) and the
+> data-architecture option write-ups (§5). Read the decision brief for what we're actually doing.
+
 > **Status:** DRAFT for a dedicated strategy/"grilling" session.
 > **Created:** 2026-05-29 (end of the migrations + hardening session).
 > **Source of truth for intent:** the 2026-05-29 conversation supersedes the older

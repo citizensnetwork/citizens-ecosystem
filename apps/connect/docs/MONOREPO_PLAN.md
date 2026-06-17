@@ -1,5 +1,12 @@
 # Monorepo Migration Plan — Citizens Ecosystem
 
+> ⚠️ **SUPERSEDED (2026-06-16) by [`docs/strategy/ECOSYSTEM_DECISION_BRIEF.md`](strategy/ECOSYSTEM_DECISION_BRIEF.md).**
+> Two assumptions here are overtaken by reality: (1) "Wear starts fresh inside the monorepo" —
+> Wear is **already** a standalone Turborepo and is now the monorepo *seed*; (2) the single-shared-
+> Supabase-project layout is confirmed, but the migration is a *consolidation of 3 existing repos*,
+> not "lift Connect + start Wear." **Still valid:** the `git filter-repo` mechanics, the risks/
+> mitigations (§4), and the cutover checklist (§5). Read the brief first.
+
 > **Status:** Planning. No code has moved. This document defines the target state and the cutover steps.
 > Triggered by: MASTER_DIRECTION Part 7 — "Monorepo Migration (before building Wear)".
 
