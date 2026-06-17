@@ -14,7 +14,9 @@
  *   NEXT_PUBLIC_API_BASE_URL     (optional, defaults to '' = same origin)
  */
 'use strict';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
@@ -47,7 +49,11 @@ function copyDir(src, dest) {
     if (name === 'config.js') continue; // generated below from env vars
     const s = path.join(src, name);
     const d = path.join(dest, name);
-    fs.statSync(s).isDirectory() ? copyDir(s, d) : fs.copyFileSync(s, d);
+    if (fs.statSync(s).isDirectory()) {
+      copyDir(s, d);
+    } else {
+      fs.copyFileSync(s, d);
+    }
   }
 }
 
