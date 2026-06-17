@@ -288,6 +288,7 @@
       lastTime: timeAgo(r.last_message ? r.last_message.created_at : r.updated_at),
       unread: r.unread_count || 0,
       status: r.status || 'active',
+      muted: !!r.muted,
       messages: [],
       messagesLoaded: false, // thread loads on open
     };
@@ -853,6 +854,39 @@
         } catch (e) { toast('Could not decline request.', 'red'); }
       })();
     }, [realUser, toast, go]);
+
+    const muteConversation = useCallback((convId) => {
+      if (!realUser || !isRealId(convId)) return;
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, muted: true } : c)));
+      authedFetch('/api/conversations/' + convId, { method: 'PATCH', body: JSON.stringify({ action: 'mute' }) })
+        .catch(() => {
+          setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, muted: false } : c)));
+          toast('Could not mute conversation.', 'red');
+        });
+    }, [realUser, toast]);
+
+    const unmuteConversation = useCallback((convId) => {
+      if (!realUser || !isRealId(convId)) return;
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, muted: false } : c)));
+      authedFetch('/api/conversations/' + convId, { method: 'PATCH', body: JSON.stringify({ action: 'unmute' }) })
+        .catch(() => {
+          setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, muted: true } : c)));
+          toast('Could not unmute conversation.', 'red');
+        });
+    }, [realUser, toast]);
+
+    const blockUser = useCallback((blockedId, convId) => {
+      if (!realUser || !isRealId(blockedId)) return;
+      (async () => {
+        try {
+          const res = await authedFetch('/api/blocks', { method: 'POST', body: JSON.stringify({ blocked_id: blockedId }) });
+          if (!res.ok) { const j = await res.json().catch(() => ({})); toast(j.error || 'Could not block user.', 'red'); return; }
+          if (convId) setConversations((prev) => prev.filter((c) => c.id !== convId));
+          go('messages');
+          toast('User blocked.', 'green');
+        } catch (e) { toast('Could not block user.', 'red'); }
+      })();
+    }, [realUser, go, toast]);
 
     // Start (or resume) a DM. For a real signed-in user with a real recipient
     // profile UUID this creates/fetches the conversation server-side (block +
@@ -1466,6 +1500,36 @@
       return () => { try { sb.removeChannel(ch); } catch (e) { /* already gone */ } };
     }, [nav, realUser]);
 
+    // ── Realtime: inbox badge + preview for non-open conversations ────
+    //  Subscribes to all message inserts visible to the user (RLS-filtered).
+    //  Own inserts are skipped; for messages in other conversations the unread
+    //  badge increments and the preview line updates without a page refresh.
+    //  Uses a navRef so the subscription outlives navigation changes.
+    const navRef = React.useRef(nav);
+    React.useEffect(() => { navRef.current = nav; }, [nav]);
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !realUser) return;
+      const me = realUser.id;
+      const ch = sb.channel('cc-inbox')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+          const m = payload && payload.new;
+          if (!m || m.sender_id === me) return;
+          const convId = m.conversation_id;
+          const currentNav = navRef.current;
+          const isOpen = currentNav.page === 'messages' && currentNav.params && currentNav.params.convId === convId;
+          setConversations((prev) => {
+            if (!prev.some((c) => c.id === convId)) return prev;
+            return prev.map((c) => {
+              if (c.id !== convId) return c;
+              return { ...c, lastMessage: m.body, lastTime: 'now', unread: isOpen ? c.unread : (c.unread || 0) + 1 };
+            });
+          });
+        })
+        .subscribe();
+      return () => { try { sb.removeChannel(ch); } catch (e) { /* already gone */ } };
+    }, [realUser]);
+
     // ── Live events + map bubbles (Phase 2) ──────────────────────────
     //  Replace the demo events with the real public feed when reachable, then
     //  attach any active broadcast bubbles (anon RPC). Fails open: on any error
@@ -1619,7 +1683,7 @@
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
-      acceptRequest, rejectRequest,
+      acceptRequest, rejectRequest, muteConversation, unmuteConversation, blockUser,
       toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
       trackImpression,
     };
