@@ -120,6 +120,55 @@ RLS / 5 MVs / 6 views / 96 policies / 28 fns / 20 triggers / 0 leftover mirrors.
 
 ---
 
+## 3C. SECURITY DEFINER EXECUTE-grant hardening ✅ APPLIED (2026-06-18)
+
+Pre-existing Connect tech-debt (surfaced by the security advisors during the Vision consolidation in
+§3B, but **NOT caused by it**). **Migration 140 applied live → next migration # = 141.**
+Working log: `.claude/sessions/secdef-execute-grant-hardening.md`. Gates: **tsc 0** (no app code changed) ·
+advisors **still 0 ERROR**.
+
+### The finding
+`public` had 45 `anon_security_definer_function_executable` + 59 `authenticated_security_definer_function_executable`
+advisor WARNs — SECURITY DEFINER functions whose EXECUTE was granted to low-priv roles (mostly the default
+PUBLIC grant left in at CREATE time). A SECURITY DEFINER fn runs as its owner and bypasses RLS, so each
+over-grant is an escalation surface.
+
+### Method (tooling note)
+Supabase MCP tools were **not loaded** at the start of the Claude Code session (only `.vscode/mcp.json`, a VS Code
+config). Used the **Management API directly** with that token: `GET /advisors/security`, `POST /database/query`,
+`POST /database/migrations`. (curl needs a browser User-Agent or Cloudflare 403s; no jq → Python, force UTF-8.)
+Classified every fn against live `pg_proc` (bodies/ACLs/grants) + `pg_policies` (which roles each predicate
+serves) + `src/` callers — not guesswork.
+
+### Migration 140 (`140_revoke_overgranted_secdef_execute.sql`) — tighten only, never loosen
+- **15 trigger fns + `cleanup_stale_locations`** → `revoke ... from public, anon, authenticated; grant service_role`
+  (triggers fire as table owner — never need a role grant; cleanup has no app caller, not even a cron job).
+- **19 privileged/authed RPCs** (admin approvals, api-key admin, dashboard analytics, safe_rsvp/toggle_consider,
+  find_or_create_conversation, is_organiser/is_approved_contributor/is_blocked/get_mutual_followers) →
+  `revoke from public, anon; grant authenticated` (internal `auth.uid()`/`is_admin()` guard protects; admins are
+  `authenticated`). Must revoke `public` too, else anon keeps access via the PUBLIC grant.
+- **10 intentionally LEFT anon-executable** (documented in the migration footer): get_active_map_bubbles,
+  get_community_ideas, get_contributor_public_stats, get_public_contributor_analytics, get_public_team,
+  get_search_autocomplete, trending_events, `is_admin`/`is_conversation_participant` (load-bearing for roles=public
+  RLS policies), `resolve_api_key` (resolved server-side via the **anon** client for API-key auth). Their WARNs
+  remain by design.
+
+### Verified live (post-apply)
+Advisors: **0 ERROR**; `anon_security_definer` **45 → 10**, `authenticated_security_definer` **59 → 43**
+(total WARN 106 → 55). Grant spot-check: safe_rsvp a=✗/u=✓, handle_new_user a=✗/u=✗, cleanup_stale_locations
+a=✗/u=✗, is_organiser a=✗/u=✓; kept fns is_admin/get_active_map_bubbles/resolve_api_key a=✓/u=✓. Recorded as
+`20260618174052 / 140_revoke_overgranted_secdef_execute`. No app code touched → no legitimate RPC path changed.
+
+### Owed / reported (NOT fixed here — out of scope of grant-hardening)
+1. **Secret leak**: a Supabase Management PAT (`.vscode/mcp.json`) and an anon JWT (cron jobid 7) are committed
+   in-repo. **Rotate the PAT and move both to env** — highest-priority follow-up.
+2. **Caller-trust IDOR surface**: `is_blocked`, `find_or_create_conversation`, `safe_rsvp`, `toggle_consider`,
+   `get_mutual_followers` accept caller-passed user ids with no internal `auth.uid()` self-check (the app passes
+   the authed id, but the fns don't enforce it). Add an internal guard in a later migration.
+3. `cleanup_stale_locations` is defined but scheduled by **no** cron job — live-location cleanup isn't running.
+
+---
+
 ## 2O. Messaging Polish + Search-Path Fix ✅ (2026-06-17)
 
 Commit **`0187a11`** on origin/main. **Migration 136 applied live** → next migration # = **137**.
