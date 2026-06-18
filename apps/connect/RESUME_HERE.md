@@ -71,6 +71,55 @@ sync tables. (Step 0 frontend swap remains in flight — this doc work did not d
 
 ---
 
+## 3B. Ecosystem Step 2 — Vision DB consolidation APPLIED ✅ (2026-06-18)
+
+Second item of the ecosystem plan ([brief](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) §6 order 2).
+Working log: `.claude/sessions/step2-vision-consolidation-EXEC.md` (+ `...-scope.md`).
+**Founder decisions:** seed-only data ⇒ **0 rows migrated, no eu-west restore**; full consolidation now;
+migrations consolidate into `citizens-connect` lineage, `citizens-vision` goes app-only.
+
+### What shipped (migrations 137–139, applied DIRECTLY to prod `xyiajtrvhlxaeplsiajj`)
+Branching needs Supabase Pro (org is Free) → founder approved direct apply; `apply_migration` is atomic.
+Pre-apply git tag: **`vision-pre-consolidation`** @ 721c5dd.
+- **137_vision_schema_port.sql** — ports Citizens Vision's 21 standalone `public.*` migrations into the
+  shared project's **`vision.*`** as one consolidated end-state: **22 owned tables** (incl. the 3 the scope
+  had under-counted: `export_logs`, `scheduled_reports`, `activity_daily_aggregates`), 2 enums, 5 MVs,
+  ~28 functions, full RLS, triggers, advisory seed, **non-fatal** platform-admin bootstrap. Heavily
+  schema-qualified; per-function hardened `search_path`; trigram opclass via `extensions.gin_trgm_ops`;
+  cron bodies qualified `vision.*`. **No `cc_*_mirror`/sync** (obsoleted). **Broken dev seed NOT ported.**
+- **138_vision_cc_claims.sql** — claim→promote re-model: `vision.cc_event_claims` (keyed by `cc_event_id`,
+  cols `cv_org_id/cv_project_id/cv_activity_id`) + `vision.cc_place_claims`. **No cross-schema FK** (value
+  refs to `public.events`/`places`) — preserves the exit-ramp. org-scoped RLS.
+- **139_vision_ratings_views.sql** — the `avg_rating` owed item (scope §8) resolved as **route (b)**:
+  Connect-published `vision.ratings_per_event` + `vision.ratings_per_place` (service_role-only, mirrors the
+  existing `reach_/engagement_per_event` pattern). No `/api/v1` change ⇒ `api-v1.md` untouched.
+
+### Security model refinement (contract updated)
+Vision's **operational** tables = `authenticated` + RLS (org admins/members, per-org); **MVs = service_role-only**
+(bypass RLS → read via SECURITY DEFINER reader fns); **Connect-published aggregates = service_role-only**.
+Contract §1 + §9 re-stamped to head 139. The `vision` schema is **not** PostgREST-exposed yet (app-repoint toggle).
+
+### Verification
+Security advisors **0 ERROR** (R7.3 met). 106 WARN + 3 INFO — **all 104 SECURITY-DEFINER WARNs are pre-existing
+`public.*` Connect fns; the vision port added 0 new findings.** Structural QA: 26 vision base tables / 0 without
+RLS / 5 MVs / 6 views / 96 policies / 28 fns / 20 triggers / 0 leftover mirrors. Founder = vision platform_admin;
+2 `vision_*` cron jobs live.
+
+### Next (Step 2 app half — separate session, in the `citizens-vision` repo)
+1. Repoint Supabase client → shared project `xyiajtrvhlxaeplsiajj` + `db.schema='vision'` (one shared `auth.users`).
+2. **Expose `vision` schema** in the project's PostgREST settings (Dashboard → API → Exposed schemas) so the
+   app reaches `vision.*` as `authenticated`.
+3. Swap `/api/connect/*` to read Connect via **`/api/v1`** + `vision.*` views; delete `sync-from-connect` edge fn,
+   its cron, `SyncStatusPanel` + sync UI; wire the claim flow to `cc_event_claims`/`cc_place_claims`.
+4. Archive `citizens-vision/supabase/migrations/` (history only; no longer applied).
+5. **Identity reconciliation owed:** `vision.organisations.id` (Vision's own org entity) vs
+   `public.profiles.id` (the Connect-contributor identity that the pre-existing `vision.category_space_map`/
+   `vision_period_snapshots` key `org_id` to). No table collision today; unify during the app repoint.
+6. Then ecosystem Step 3 — point **Wear** at the shared project; the Vision + Wear **HTML front-ends are ready
+   to plug in** once their data planes are wired.
+
+---
+
 ## 2O. Messaging Polish + Search-Path Fix ✅ (2026-06-17)
 
 Commit **`0187a11`** on origin/main. **Migration 136 applied live** → next migration # = **137**.

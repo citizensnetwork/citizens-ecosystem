@@ -33,7 +33,7 @@ split cheap. (See memory `global-databases-means-ecosystem-shared`.)
 | Schema | Owner | Contains | Who may write |
 |---|---|---|---|
 | `public` | **Connect (commons)** | The shared Kingdom data every app surfaces: `profiles`, `contributors` (approved profiles), `events`, `places`, `categories`, social graph, plus Connect's own app tables. | Connect (via RLS + service_role). Other apps **read via `/api/v1`**, never write here. |
-| `vision` | **Vision (back-office)** | Analytics aggregates + snapshots: `vision.category_space_map`, `vision.vision_period_snapshots`, views `vision.reach_per_event`, `vision.engagement_per_event`. | **`service_role` only** (Vision backend bypasses RLS). Invisible to anon/authenticated. |
+| `vision` | **Vision (back-office)** | **Two classes** (mig 133–134, 137–139): (a) **Connect-published aggregates** — `category_space_map`, `vision_period_snapshots`, views `reach_per_event`, `engagement_per_event`, `ratings_per_event`, `ratings_per_place`; (b) **Vision's own operational schema** — 24 tables (orgs, departments, activities, goals, projects, advisories, boundaries, partnerships, claims, …) + 5 MVs + ~28 fns. | (a) **`service_role` only** (Connect→Vision publishing; invisible to anon/auth). (b) **`authenticated` + RLS** (Vision org admins/members under per-org RLS) + `service_role` for backend jobs. **MVs are `service_role`-only** (they bypass RLS; users read via SECURITY DEFINER reader fns). Schema is **not** PostgREST-exposed until the Vision app repoint. |
 | `wear` *(future)* | **Wear** | Wear-owned tables once Wear points at this project. **Does not exist yet** — create it as a schema, not a new project, when Wear lands (brief D3/§5). | `service_role` + Wear RLS, by analogy to `vision`. |
 
 **Rules:**
@@ -175,7 +175,7 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (2026-06-17, project `xyiajtrvhlxaeplsiajj`, head = mig 134)
+## 9. Verification snapshot (updated 2026-06-18, project `xyiajtrvhlxaeplsiajj`, head = mig 139)
 
 Confirmed live:
 - **Schemas:** `public`, `vision` present. `wear` absent (future, correct).
@@ -183,8 +183,12 @@ Confirmed live:
   `learn_enrolled_listings`, `connect_home_province`, `notification_radius_km`, `timezone` — all present.
 - **content_labels:** table present; triggers `trg_apply_event_content_labels` +
   `trg_cleanup_content_labels_event` present; RLS on.
-- **vision.\*:** tables `category_space_map`, `vision_period_snapshots`; views `reach_per_event`,
-  `engagement_per_event`.
+- **vision.\* (post-consolidation, mig 137–139):** **26 base tables** (all RLS-enabled, 0 without),
+  **5 materialized views** (`service_role`-only), **6 views** (`reach_/engagement_/ratings_per_event`,
+  `ratings_per_place` + the snapshot helpers), **96 RLS policies**, **28 functions**, **20 triggers**.
+  No `cc_*_mirror`/sync tables (obsoleted). Founder bootstrapped as `vision` platform_admin; 2 `vision_*`
+  cron refresh jobs registered. **Security advisors: 0 ERROR** (all SECURITY-DEFINER WARNs are pre-existing
+  `public.*` Connect functions; the `vision` port added zero new findings).
 - **`app_id` attribution:** **not yet present** on any analytics table — correct per R4.2
   (no sibling writes analytics yet).
 - **`/api/v1` routes on disk:** contributors, contributors/[slug], contributors/[slug]/stats,
