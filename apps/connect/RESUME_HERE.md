@@ -180,7 +180,7 @@ next migration # still 141.** Investigation corrected the assumed threat model:
 
 | Item | Assumed (§3C / founder note) | **Verified actual** | Action |
 |---|---|---|---|
-| Supabase Mgmt **PAT** (`.vscode/mcp.json`) | "committed in-repo" | **Never committed** — gitignored (`.gitignore:96`), absent from full git history & every tracked file. Local plaintext only. Grants full project control. | De-hardcoded to `${env:SUPABASE_ACCESS_TOKEN}`. **⏳ Rotation = pending founder action** (dashboard → Account → Access Tokens: revoke `sbp_7ee8cf…`, generate new, set as `SUPABASE_ACCESS_TOKEN` system env var so VS Code inherits it). |
+| Supabase Mgmt **PAT** (`.vscode/mcp.json`) | "committed in-repo" | **Never committed** — gitignored (`.gitignore:96`), absent from full git history & every tracked file. Local plaintext only. Grants full project control. | De-hardcoded to `${env:SUPABASE_ACCESS_TOKEN}`. **⏳ Rotation = pending founder action** (dashboard → Account → Access Tokens: revoke the old `sbp_…` token, generate new, set as `SUPABASE_ACCESS_TOKEN` system env var so VS Code inherits it). |
 | **anon JWT** (cron jobid 7, mig 125 line 44) | "leak — move to env" | Committed, but decodes to `role:anon` = the **publishable** key (already in every frontend bundle). Public-by-design under RLS-first. "env" path was already tried & **denied** (mig 125 comment: GUC `ALTER DATABASE` blocked for mgmt role). | **Left as-is** (founder-approved). Not a secret. Vault would be churn for zero gain. **Do not re-flag in future audits.** |
 | service_role key | — | **None committed** anywhere (verified). | — |
 | `.claude/sessions/*.json` advisor dumps | — | Gitignored, local-only, contain no PAT/service_role. | — |
