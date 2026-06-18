@@ -160,12 +160,33 @@ a=✗/u=✗, is_organiser a=✗/u=✓; kept fns is_admin/get_active_map_bubbles/
 `20260618174052 / 140_revoke_overgranted_secdef_execute`. No app code touched → no legitimate RPC path changed.
 
 ### Owed / reported (NOT fixed here — out of scope of grant-hardening)
-1. **Secret leak**: a Supabase Management PAT (`.vscode/mcp.json`) and an anon JWT (cron jobid 7) are committed
-   in-repo. **Rotate the PAT and move both to env** — highest-priority follow-up.
+1. ~~**Secret leak**: a Supabase Management PAT + anon JWT committed in-repo.~~ **✅ TRIAGED + HARDENED (2026-06-18,
+   commit after 140).** Threat model corrected after investigation — see **§3D** below. TL;DR: the PAT was
+   **never committed** (`.vscode/mcp.json` is gitignored — `.gitignore:96`, absent from all history); de-hardcoded
+   to `${env:SUPABASE_ACCESS_TOKEN}`. **⏳ One user action remains: rotate the PAT in the Supabase dashboard**
+   (account-level token — only the founder can do it). The "anon JWT" (cron jobid 7 / mig 125) decodes to
+   `role:anon` = the **publishable** key → intentionally retained (public-by-design, RLS-first). **Do not re-flag.**
 2. **Caller-trust IDOR surface**: `is_blocked`, `find_or_create_conversation`, `safe_rsvp`, `toggle_consider`,
    `get_mutual_followers` accept caller-passed user ids with no internal `auth.uid()` self-check (the app passes
    the authed id, but the fns don't enforce it). Add an internal guard in a later migration.
 3. `cleanup_stale_locations` is defined but scheduled by **no** cron job — live-location cleanup isn't running.
+
+---
+
+## 3D. Secret-leak triage + PAT hardening ✅ (2026-06-18)
+
+Acted on §3C follow-up #1. Working log: `.claude/sessions/secret-leak-hardening.md`. **No migration, no app code →
+next migration # still 141.** Investigation corrected the assumed threat model:
+
+| Item | Assumed (§3C / founder note) | **Verified actual** | Action |
+|---|---|---|---|
+| Supabase Mgmt **PAT** (`.vscode/mcp.json`) | "committed in-repo" | **Never committed** — gitignored (`.gitignore:96`), absent from full git history & every tracked file. Local plaintext only. Grants full project control. | De-hardcoded to `${env:SUPABASE_ACCESS_TOKEN}`. **⏳ Rotation = pending founder action** (dashboard → Account → Access Tokens: revoke `sbp_7ee8cf…`, generate new, set as `SUPABASE_ACCESS_TOKEN` system env var so VS Code inherits it). |
+| **anon JWT** (cron jobid 7, mig 125 line 44) | "leak — move to env" | Committed, but decodes to `role:anon` = the **publishable** key (already in every frontend bundle). Public-by-design under RLS-first. "env" path was already tried & **denied** (mig 125 comment: GUC `ALTER DATABASE` blocked for mgmt role). | **Left as-is** (founder-approved). Not a secret. Vault would be churn for zero gain. **Do not re-flag in future audits.** |
+| service_role key | — | **None committed** anywhere (verified). | — |
+| `.claude/sessions/*.json` advisor dumps | — | Gitignored, local-only, contain no PAT/service_role. | — |
+
+**Net:** the only genuinely sensitive secret (PAT) was *not* publicly exposed via the repo; it is now out of the
+config file and awaiting the founder's rotation. Anon-key "leak" was a false positive (publishable by design).
 
 ---
 
