@@ -166,10 +166,12 @@ a=✗/u=✗, is_organiser a=✗/u=✓; kept fns is_admin/get_active_map_bubbles/
    to `${env:SUPABASE_ACCESS_TOKEN}`. **⏳ One user action remains: rotate the PAT in the Supabase dashboard**
    (account-level token — only the founder can do it). The "anon JWT" (cron jobid 7 / mig 125) decodes to
    `role:anon` = the **publishable** key → intentionally retained (public-by-design, RLS-first). **Do not re-flag.**
-2. **Caller-trust IDOR surface**: `is_blocked`, `find_or_create_conversation`, `safe_rsvp`, `toggle_consider`,
-   `get_mutual_followers` accept caller-passed user ids with no internal `auth.uid()` self-check (the app passes
-   the authed id, but the fns don't enforce it). Add an internal guard in a later migration.
-3. `cleanup_stale_locations` is defined but scheduled by **no** cron job — live-location cleanup isn't running.
+2. ~~**Caller-trust IDOR surface**: `is_blocked`, `find_or_create_conversation`, `safe_rsvp`, `toggle_consider`,
+   `get_mutual_followers` accept caller-passed user ids with no internal `auth.uid()` self-check.~~ **✅ FIXED in
+   §3E (migration 141).** Investigation found `safe_rsvp`/`toggle_consider` ALREADY enforced it; the other three
+   now do too. **Do not re-flag.**
+3. ~~`cleanup_stale_locations` is defined but scheduled by **no** cron job — live-location cleanup isn't running.~~
+   **✅ FIXED in §3E (migration 141)** — cron jobid 10 `live-location-cleanup`, every 15 min.
 
 ---
 
@@ -187,6 +189,51 @@ next migration # still 141.** Investigation corrected the assumed threat model:
 
 **Net:** the only genuinely sensitive secret (PAT) was *not* publicly exposed via the repo; it is now out of the
 config file and awaiting the founder's rotation. Anon-key "leak" was a false positive (publishable by design).
+
+---
+
+## 3E. IDOR self-check guards + live-location cleanup cron ✅ APPLIED (2026-06-18)
+
+Closed the last two §3C follow-ups (#2 IDOR + #3 unscheduled cleanup). **Migration 141 applied live →
+next migration # = 142.** Working log: `.claude/sessions/idor-guards-and-location-cron.md`.
+Gates: **advisors 0 ERROR** (55 WARN / 3 INFO = byte-for-byte the §3C post-140 baseline — 0 new findings) ·
+no `src/` (TypeScript) touched → tsc/vitest unchanged from `be6784d`.
+
+### A. Caller-trust IDOR guards — migration 141 part A
+Three `public` SECURITY DEFINER RPCs accepted caller-passed user ids without enforcing the caller IS that
+user (a SECURITY DEFINER fn runs as owner + bypasses RLS, so a forged id = act/read as someone else).
+Added the proven `safe_rsvp` guard to each:
+```
+if auth.uid() is null or (auth.uid() <> A and auth.uid() <> B) then
+  raise exception 'unauthorized' using errcode = '42501';
+end if;
+```
+- `is_blocked(uuid,uuid)` — converted sql→plpgsql + guard.
+- `find_or_create_conversation(uuid,uuid,text)` — guard added (guard fires BEFORE the INSERT → no junk rows).
+- `get_mutual_followers(uuid,uuid,integer)` — converted sql→plpgsql + guard.
+- **`safe_rsvp` / `toggle_consider` were ALREADY guarded** (live `pg_proc` confirmed; mig 086/028) — the §3C
+  note over-listed them. **Left untouched.**
+
+**Key gotcha (recorded):** the `auth.uid() is null` arm is mandatory — a NULL uid makes `NULL <> A` evaluate
+to NULL, so `if NULL` would SKIP the raise (silent bypass). Verified: with no JWT, all three now raise 42501.
+
+**Why it's safe for live callers:** `is_blocked` + `find_or_create_conversation` are only called from
+`src/app/api/conversations/route.ts`, which passes the authed `user.id` through `getRouteAuth` = a
+**user-scoped** client (anon key + Bearer/cookie → `auth.uid()` resolves inside the SECDEF body, exactly how
+`safe_rsvp` already works in prod). `get_mutual_followers` has no live caller yet (friends surface pending).
+Grants unchanged (CREATE OR REPLACE preserves ACL): `authenticated` + `service_role`, **no anon/public**.
+
+### B. Live-location cleanup cron — migration 141 part B
+`cleanup_stale_locations()` (defined mig 019) was scheduled by **no** cron → post-event live-location rows
+(the most privacy-sensitive data the platform holds) were never purged. Registered **cron jobid 10
+`live-location-cleanup`, `*/15 * * * *`** (the fn keeps a 30-min post-event grace, so stale rows are gone
+≤45 min after an event ends; the delete is tiny + indexed → negligible cost). Runs as `postgres` (cron owner)
+so the mig-140 service_role-only grant on the fn doesn't block it — same as job #1's `recompute_map_prominence`.
+
+### Residual (noted, out of scope of the self-check item)
+`find_or_create_conversation` still trusts the caller-passed `p_status` (the route computes the
+contributor→citizen pending/active gate and passes it). That's a status-policy concern, not the `auth.uid()`
+self-check that §3C asked for — left as the route's responsibility. Flag if we want the RPC to enforce it too.
 
 ---
 
