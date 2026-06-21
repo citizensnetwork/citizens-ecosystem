@@ -105,18 +105,7 @@ Security advisors **0 ERROR** (R7.3 met). 106 WARN + 3 INFO — **all 104 SECURI
 RLS / 5 MVs / 6 views / 96 policies / 28 fns / 20 triggers / 0 leftover mirrors. Founder = vision platform_admin;
 2 `vision_*` cron jobs live.
 
-### Next (Step 2 app half — separate session, in the `citizens-vision` repo)
-1. Repoint Supabase client → shared project `xyiajtrvhlxaeplsiajj` + `db.schema='vision'` (one shared `auth.users`).
-2. **Expose `vision` schema** in the project's PostgREST settings (Dashboard → API → Exposed schemas) so the
-   app reaches `vision.*` as `authenticated`.
-3. Swap `/api/connect/*` to read Connect via **`/api/v1`** + `vision.*` views; delete `sync-from-connect` edge fn,
-   its cron, `SyncStatusPanel` + sync UI; wire the claim flow to `cc_event_claims`/`cc_place_claims`.
-4. Archive `citizens-vision/supabase/migrations/` (history only; no longer applied).
-5. **Identity reconciliation owed:** `vision.organisations.id` (Vision's own org entity) vs
-   `public.profiles.id` (the Connect-contributor identity that the pre-existing `vision.category_space_map`/
-   `vision_period_snapshots` key `org_id` to). No table collision today; unify during the app repoint.
-6. Then ecosystem Step 3 — point **Wear** at the shared project; the Vision + Wear **HTML front-ends are ready
-   to plug in** once their data planes are wired.
+### Next (Step 2 app half) — ✅ DONE (2026-06-21), shipped to `main`. Full detail in **§3F** below.
 
 ---
 
@@ -234,6 +223,62 @@ so the mig-140 service_role-only grant on the fn doesn't block it — same as jo
 `find_or_create_conversation` still trusts the caller-passed `p_status` (the route computes the
 contributor→citizen pending/active gate and passes it). That's a status-policy concern, not the `auth.uid()`
 self-check that §3C asked for — left as the route's responsibility. Flag if we want the RPC to enforce it too.
+
+---
+
+## 3F. Ecosystem Step 2 **app-half** SHIPPED ✅ + Step 3 (Wear) NEXT (2026-06-21)
+
+Finishes [ECOSYSTEM_DECISION_BRIEF](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) §6 order 2 (app half)
+and sets up order 3 (Wear). Working log: `.claude/sessions/ecosystem-step2-vision-app-half.md`.
+
+### Shipped to `main` (both repos pushed)
+- **citizens-vision** `main` @ **e39aa88** — Vision app cut onto shared `vision.*` + live `/api/v1`.
+- **citizens-connect** `main` @ **b8eea2e** — **migration 142** `vision.organisations.connect_contributor_id`
+  (applied to prod `xyiajtrvhlxaeplsiajj`; advisors **0 ERROR** / 72 WARN / 3 INFO). **Next migration # = 143.**
+- Gates green: **tsc 0 · vitest 849 pass / 90 files · eslint clean**.
+
+### The model now (citizens-vision)
+- Supabase clients → `db: { schema: 'vision' }` (cast back to bare `SupabaseClient` so the whole app's
+  schema-agnostic helpers keep compiling; queries are untyped `any` either way).
+- **Sync subsystem DELETED**: `sync-from-connect` edge fn, `/api/connect/sync`, `SyncStatusPanel`,
+  `cc_*_mirror` reads. Old `citizens-vision/supabase/migrations/` archived (README marker; the real
+  lineage lives here in citizens-connect).
+- Connect data read live via **`/api/v1`** (`src/lib/connect/api.ts` + `feed.ts`), scoped to the org's
+  linked contributor (`/api/v1/events?created_by={id}`).
+- Claims: `vision.cc_event_claims` (PK `cc_event_id`, **exclusive** — one org per event) /
+  `vision.cc_place_claims` (PK `cc_place_id`). Promote builds `vision.activities` from `/api/v1/events/{id}`.
+- **Identity link RESOLVED (founder decision A):** org ↔ Connect via
+  `vision.organisations.connect_contributor_id` (= `public.profiles.id` = the auth uid). Set via
+  `POST /api/connect/link` (slug→id), **ownership-verified** (`profile.id === auth.uid`) so an org can't
+  hijack another contributor's events/attribution.
+
+### ⛔ DEPLOY GATES — founder must do these before Vision is functional
+(Vision prod was already down — its old project is paused — so this push regresses nothing.)
+1. citizens-vision Vercel env → `NEXT_PUBLIC_SUPABASE_URL` = shared **`xyiajtrvhlxaeplsiajj`** + its
+   **anon/publishable** key.
+2. Supabase Dashboard → API → **Exposed schemas → add `vision`** (else PostgREST won't serve `vision.*`).
+3. Set **`CONNECT_API_BASE_URL`** (prod Connect origin) + optional `CONNECT_API_KEY` (`cck_live_…`).
+Then org admins link their Connect account on the Vision `/[orgSlug]/connect` page.
+
+### Optional doc polish (low priority)
+`citizens-vision/docs/API.md` + `docs/ADMIN_GUIDE.md` still describe the old sync — light edit when convenient.
+
+### ▶ STEP 3 — point **Wear** at the shared project (NOT started; do next)
+Repo: `C:\Users\SJ\Documents\Citizen Network\citizens-wear` (a Turborepo — the monorepo seed).
+- **CAUTION:** it sits on branch **`chore/phase-2-se-poly-hardening`** — likely in-process work.
+  Confirm its branch/working-tree state and coordinate **before editing** so you don't clobber it;
+  branch off a clean base.
+- It already has `packages/db` (contract/realtime/memory/hashtags) + `packages/connect-client`
+  (http/mock/webhook/factory) — a real abstraction, **not** a one-env repoint. Scope first: read how
+  `packages/db` builds its Supabase client (Wear has **no `wear.*` schema yet** → it reads Connect commons
+  via `connect-client` over `/api/v1`, not raw tables) and how `connect-client` resolves its base URL.
+- Shared-DB facts a cold session needs: project **`xyiajtrvhlxaeplsiajj`** (eu-central), one `auth.users`;
+  `public.*` = Connect commons, `vision.*` = Vision, `wear.*` = future (none yet). Cross-app reads =
+  **`/api/v1`** ([docs/api-v1.md](docs/api-v1.md)), never raw tables ([docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) R2).
+  Wear has **no prod data** → trivial repoint, zero data migration.
+- After Step 3: **Step 4** = extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`);
+  **Step 5** = the actual monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in),
+  gated behind the Connect frontend swap (Step 0) stabilising.
 
 ---
 
