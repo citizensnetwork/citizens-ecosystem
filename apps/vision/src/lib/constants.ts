@@ -121,22 +121,6 @@ export const PROJECT_STATUS_TRANSITIONS: Record<string, string[]> = {
   archived: [],
 };
 
-// Phase 7: Citizens Connect Integration
-
-export const CC_SYNC_TYPES = [
-  "events",
-  "places",
-  "profiles",
-  "full",
-] as const;
-
-export const CC_SYNC_TYPE_LABELS: Record<string, string> = {
-  events: "Events",
-  places: "Places",
-  profiles: "Profiles",
-  full: "Full Sync",
-};
-
 // Phase 8: Advisory Engine
 
 export const ADVISORY_SEVERITIES = ["info", "warning", "critical"] as const;

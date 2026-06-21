@@ -404,6 +404,17 @@ The timeline and map are linked:
 
 ## 7. Citizens Connect Integration
 
+> ⚠️ **SUPERSEDED (2026-06 ecosystem consolidation).** §7.1–§7.2 below describe the
+> original **separate-project pull-sync** model (`sync-from-connect` Edge Function →
+> `cc_*_mirror` tables). That model has been removed. Vision now runs **inside the shared
+> Citizens Supabase project** under the `vision` schema (one `auth.users`), and reads
+> Connect's commons data **live over Connect's public API (`/api/v1`)** — never via mirror
+> tables. Org↔Connect-event/place attribution lives in `vision.cc_event_claims` /
+> `vision.cc_place_claims`, keyed by the org's linked contributor
+> (`vision.organisations.connect_contributor_id`, set via `POST /api/connect/link`).
+> See `citizens-connect/docs/strategy/ECOSYSTEM_DECISION_BRIEF.md` and `docs/SHARED_DB_CONTRACT.md`.
+> The sections below are kept for historical context only.
+
 ### 7.1 Integration Architecture
 
 ```

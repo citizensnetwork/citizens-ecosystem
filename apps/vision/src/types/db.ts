@@ -194,8 +194,10 @@ export interface ProjectActivityWithActivity extends ProjectActivity {
 
 // Phase 7: Citizens Connect Integration
 
-export type CCSyncType = "events" | "places" | "profiles" | "full";
-
+/**
+ * A Citizens Connect event as surfaced in Vision: live fields from Connect's
+ * /api/v1 merged with this org's claim status (vision.cc_event_claims).
+ */
 export interface CCEvent {
   cc_event_id: string;
   title: string;
@@ -206,16 +208,18 @@ export interface CCEvent {
   latitude: number | null;
   longitude: number | null;
   category: string | null;
-  status: string | null;
   created_by: string | null;
   rsvp_count: number;
   avg_rating: number | null;
-  synced_at: string;
   cv_org_id: string | null;
   cv_project_id: string | null;
   cv_activity_id: string | null;
 }
 
+/**
+ * A Citizens Connect place as surfaced in Vision: live fields from Connect's
+ * /api/v1 merged with this org's claim status (vision.cc_place_claims).
+ */
 export interface CCPlace {
   cc_place_id: string;
   name: string;
@@ -226,25 +230,6 @@ export interface CCPlace {
   verified: boolean;
   avg_rating: number | null;
   cv_org_id: string | null;
-  synced_at: string;
-}
-
-export interface CCProfile {
-  cc_user_id: string;
-  email: string | null;
-  full_name: string | null;
-  avatar_url: string | null;
-  synced_at: string;
-}
-
-export interface CCSyncLog {
-  id: string;
-  sync_type: CCSyncType;
-  started_at: string;
-  completed_at: string | null;
-  records_synced: number;
-  errors: unknown[];
-  org_id: string | null;
 }
 
 // Phase 8: Advisory Engine

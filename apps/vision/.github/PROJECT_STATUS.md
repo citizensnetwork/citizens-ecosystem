@@ -1,6 +1,17 @@
 # Citizens Vision — Project Status
 
-## Current Phase: Phase 21b Complete — Cache-Tag Wiring Expansion
+## Current Phase: Ecosystem Consolidation (Step 2, app half) — in progress
+
+Vision now runs inside the **shared Citizens Supabase project** (`vision` schema, one
+`auth.users`). The old separate-project pull-sync (`sync-from-connect` → `cc_*_mirror`)
+is **removed**: Connect data is read live over **`/api/v1`**, and org↔Connect attribution
+lives in `vision.cc_event_claims` / `vision.cc_place_claims`, scoped by
+`vision.organisations.connect_contributor_id` (linked via `POST /api/connect/link`).
+Phase 7 / 17 (Connect sync) are superseded. See `ARCHITECTURE.md` §7 banner and
+`citizens-connect/docs/strategy/ECOSYSTEM_DECISION_BRIEF.md`.
+
+**Deploy prerequisites:** point env at the shared project, expose `vision` in PostgREST,
+set `CONNECT_API_BASE_URL`.
 
 ## Phase Tracker
 

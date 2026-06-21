@@ -4,8 +4,14 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ConnectEventList } from "@/components/connect/ConnectEventList";
 import { ConnectPlaceList } from "@/components/connect/ConnectPlaceList";
+import { LinkConnectAccount } from "@/components/connect/LinkConnectAccount";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
+import {
+  getOrgConnectContributorId,
+  listOrgConnectEvents,
+  listOrgConnectPlaces,
+} from "@/lib/connect/feed";
 
 interface ConnectPageProps {
   params: Promise<{ orgSlug: string }>;
@@ -33,50 +39,51 @@ export default async function ConnectPage({
 
   if (!org) redirect("/");
 
+  const connectContributorId = await getOrgConnectContributorId(supabase, org.id);
+
+  const header = (
+    <h1 className="text-2xl font-semibold text-text-primary">
+      Citizens Connect
+    </h1>
+  );
+
+  // Not linked yet — the org must connect its Citizens Connect contributor first.
+  if (!connectContributorId) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <LinkConnectAccount orgId={org.id} />
+      </div>
+    );
+  }
+
   const tab = filters.tab ?? "events";
   const page = Math.max(1, parseInt(filters.page ?? "1", 10));
-  const from = (page - 1) * ITEMS_PER_PAGE;
 
-  let events: unknown[] = [];
+  let events: Awaited<ReturnType<typeof listOrgConnectEvents>>["events"] = [];
   let eventsTotal = 0;
-  let places: unknown[] = [];
+  let places: Awaited<ReturnType<typeof listOrgConnectPlaces>>["places"] = [];
   let placesTotal = 0;
 
   if (tab === "events") {
-    const { data, count } = await supabase
-      .from("cc_events_mirror")
-      .select("*", { count: "exact" })
-      .or(`cv_org_id.is.null,cv_org_id.eq.${org.id}`)
-      .order("date", { ascending: false, nullsFirst: false })
-      .range(from, from + ITEMS_PER_PAGE - 1);
-
-    events = data ?? [];
-    eventsTotal = count ?? 0;
+    ({ events, total: eventsTotal } = await listOrgConnectEvents(supabase, {
+      orgId: org.id,
+      connectContributorId,
+      page,
+      perPage: ITEMS_PER_PAGE,
+    }));
   } else {
-    const { data, count } = await supabase
-      .from("cc_places_mirror")
-      .select("*", { count: "exact" })
-      .or(`cv_org_id.is.null,cv_org_id.eq.${org.id}`)
-      .order("synced_at", { ascending: false })
-      .range(from, from + ITEMS_PER_PAGE - 1);
-
-    places = data ?? [];
-    placesTotal = count ?? 0;
+    ({ places, total: placesTotal } = await listOrgConnectPlaces(supabase, {
+      orgId: org.id,
+      connectContributorId,
+      page,
+      perPage: ITEMS_PER_PAGE,
+    }));
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-text-primary">
-          Citizens Connect
-        </h1>
-        <Link
-          href={`/${orgSlug}/connect/sync`}
-          className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-alt"
-        >
-          Sync Status
-        </Link>
-      </div>
+      {header}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
@@ -105,7 +112,7 @@ export default async function ConnectPage({
       <Suspense fallback={<LoadingSkeleton className="h-48 w-full" />}>
         {tab === "events" ? (
           <ConnectEventList
-            initialEvents={events as Parameters<typeof ConnectEventList>[0]["initialEvents"]}
+            initialEvents={events}
             orgId={org.id}
             orgSlug={orgSlug}
             total={eventsTotal}
@@ -114,7 +121,7 @@ export default async function ConnectPage({
           />
         ) : (
           <ConnectPlaceList
-            initialPlaces={places as Parameters<typeof ConnectPlaceList>[0]["initialPlaces"]}
+            initialPlaces={places}
             orgId={org.id}
             orgSlug={orgSlug}
             total={placesTotal}

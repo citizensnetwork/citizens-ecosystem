@@ -34,9 +34,18 @@ export function ConnectEventList({
         body: JSON.stringify({ org_id: orgId, action: "claim" }),
       });
       if (res.ok) {
-        const updated = await res.json();
+        const claim = await res.json();
         setEvents((prev) =>
-          prev.map((e) => (e.cc_event_id === eventId ? updated : e))
+          prev.map((e) =>
+            e.cc_event_id === eventId
+              ? {
+                  ...e,
+                  cv_org_id: claim.cv_org_id ?? orgId,
+                  cv_project_id: claim.cv_project_id ?? e.cv_project_id,
+                  cv_activity_id: claim.cv_activity_id ?? e.cv_activity_id,
+                }
+              : e
+          )
         );
       }
     },
@@ -68,7 +77,7 @@ export function ConnectEventList({
     return (
       <EmptyState
         title="No Connect events"
-        description="Events from Citizens Connect will appear here once synced."
+        description="Events you publish on Citizens Connect appear here, ready to claim."
       />
     );
   }

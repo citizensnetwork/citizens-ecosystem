@@ -2,7 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
+import {
+  getOrgConnectContributorId,
+  listOrgConnectEvents,
+} from "@/lib/connect/feed";
+import { ConnectApiError } from "@/lib/connect/api";
 
+/**
+ * GET /api/connect/events — the org's Citizens Connect events with claim status.
+ *
+ * Reads live from Connect's /api/v1 (scoped to the org's linked contributor) and
+ * overlays this org's claims from vision.cc_event_claims. `claimed=true|false`
+ * filters the returned page by whether this org has claimed each event.
+ */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -16,8 +28,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const orgId = searchParams.get("org_id");
   const claimed = searchParams.get("claimed");
-  const category = searchParams.get("category");
-  const page = parseInt(searchParams.get("page") ?? "1", 10);
+  const category = searchParams.get("category") ?? undefined;
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
 
   if (!orgId || !isValidUUID(orgId)) {
     return NextResponse.json(
@@ -38,41 +50,38 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
-  // Build query: unclaimed OR claimed by this org
-  let query = supabase
-    .from("cc_events_mirror")
-    .select("*", { count: "exact" });
+  const connectContributorId = await getOrgConnectContributorId(supabase, orgId);
 
-  if (claimed === "true") {
-    query = query.eq("cv_org_id", orgId);
-  } else if (claimed === "false") {
-    query = query.is("cv_org_id", null);
-  } else {
-    // Default: show unclaimed + org-claimed
-    query = query.or(`cv_org_id.is.null,cv_org_id.eq.${orgId}`);
-  }
+  try {
+    const { events, total, linked } = await listOrgConnectEvents(supabase, {
+      orgId,
+      connectContributorId,
+      category,
+      page,
+      perPage: ITEMS_PER_PAGE,
+    });
 
-  if (category) {
-    query = query.eq("category", category);
-  }
+    let filtered = events;
+    if (claimed === "true") filtered = events.filter((e) => e.cv_org_id);
+    else if (claimed === "false") filtered = events.filter((e) => !e.cv_org_id);
 
-  query = query
-    .order("date", { ascending: false, nullsFirst: false })
-    .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
-
-  const { data: events, count, error } = await query;
-
-  if (error) {
+    return NextResponse.json({
+      events: filtered,
+      total,
+      page,
+      per_page: ITEMS_PER_PAGE,
+      linked,
+    });
+  } catch (error) {
+    if (error instanceof ConnectApiError) {
+      return NextResponse.json(
+        { error: "Citizens Connect API is unavailable" },
+        { status: 502 }
+      );
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    events: events ?? [],
-    total: count ?? 0,
-    page,
-    per_page: ITEMS_PER_PAGE,
-  });
 }

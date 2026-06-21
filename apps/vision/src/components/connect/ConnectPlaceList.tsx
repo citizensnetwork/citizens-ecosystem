@@ -33,9 +33,13 @@ export function ConnectPlaceList({
         body: JSON.stringify({ org_id: orgId, action: "claim" }),
       });
       if (res.ok) {
-        const updated = await res.json();
+        const claim = await res.json();
         setPlaces((prev) =>
-          prev.map((p) => (p.cc_place_id === placeId ? updated : p))
+          prev.map((p) =>
+            p.cc_place_id === placeId
+              ? { ...p, cv_org_id: claim.cv_org_id ?? orgId }
+              : p
+          )
         );
       }
     },
@@ -46,7 +50,7 @@ export function ConnectPlaceList({
     return (
       <EmptyState
         title="No Connect places"
-        description="Places from Citizens Connect will appear here once synced."
+        description="Places you own on Citizens Connect appear here, ready to claim."
       />
     );
   }

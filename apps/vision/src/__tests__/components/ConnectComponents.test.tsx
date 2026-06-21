@@ -10,7 +10,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// Mock next/navigation (SyncStatusPanel uses useRouter for refresh after sync)
+// Mock next/navigation (client list components may call useRouter).
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
@@ -25,11 +25,9 @@ const baseEvent: CCEvent = {
   latitude: 51.5,
   longitude: -0.1,
   category: "environment",
-  status: "active",
   created_by: "user-1",
   rsvp_count: 25,
   avg_rating: 4.5,
-  synced_at: "2025-03-14T00:00:00Z",
   cv_org_id: null,
   cv_project_id: null,
   cv_activity_id: null,
@@ -77,7 +75,8 @@ describe("ConnectEventCard", () => {
   });
 
   it("displays location and RSVP count", () => {
-    render(<ConnectEventCard event={baseEvent} orgSlug="test-org" />);
+    const withRsvps = { ...baseEvent, rsvp_count: 25 };
+    render(<ConnectEventCard event={withRsvps} orgSlug="test-org" />);
     expect(screen.getByText("Central Park")).toBeInTheDocument();
     expect(screen.getByText("25 RSVPs")).toBeInTheDocument();
   });
@@ -108,7 +107,6 @@ const basePlaces: CCPlace[] = [
     verified: true,
     avg_rating: 4.2,
     cv_org_id: null,
-    synced_at: "2025-03-14T00:00:00Z",
   },
 ];
 
@@ -137,45 +135,5 @@ describe("ConnectPlaceList", () => {
   it("shows Associate with Org button for unclaimed places", () => {
     render(<ConnectPlaceList initialPlaces={basePlaces} orgId="org-1" orgSlug="test-org" total={1} page={1} perPage={20} />);
     expect(screen.getByText("Associate with Org")).toBeInTheDocument();
-  });
-});
-
-// -- SyncStatusPanel --
-import { SyncStatusPanel } from "@/components/connect/SyncStatusPanel";
-
-describe("SyncStatusPanel", () => {
-  it("renders stats summary", () => {
-    render(
-      <SyncStatusPanel
-        logs={[]}
-        stats={{ claimed_events: 5, claimed_places: 3, last_sync: null }}
-      />
-    );
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("Never")).toBeInTheDocument();
-  });
-
-  it("shows sync logs", () => {
-    const logs = [
-      { id: "log1", sync_type: "events" as const, started_at: "2025-03-15T10:00:00Z", completed_at: "2025-03-15T10:00:30Z", records_synced: 42, errors: [], org_id: "org1" },
-    ];
-    render(
-      <SyncStatusPanel
-        logs={logs}
-        stats={{ claimed_events: 5, claimed_places: 3, last_sync: logs[0] }}
-      />
-    );
-    expect(screen.getByText("42 records")).toBeInTheDocument();
-  });
-
-  it("shows no sync logs message", () => {
-    render(
-      <SyncStatusPanel
-        logs={[]}
-        stats={{ claimed_events: 0, claimed_places: 0, last_sync: null }}
-      />
-    );
-    expect(screen.getByText("No sync logs yet.")).toBeInTheDocument();
   });
 });
