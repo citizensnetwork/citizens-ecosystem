@@ -27,7 +27,7 @@
     const ini = initials(name || alt);
     return React.createElement('div', {
       'aria-label': alt || name || 'avatar',
-      className: cx('shrink-0 flex items-center justify-center gold-gradient text-black font-bold select-none', className),
+      className: cx('shrink-0 flex items-center justify-center gold-gradient text-white font-bold select-none', className),
       style: Object.assign({}, box, { fontSize: Math.max(9, Math.round(size * 0.4)) }),
     }, ini || React.createElement(Icon, { name: 'User', size: Math.round(size * 0.5) }));
   }
@@ -45,7 +45,7 @@
         className: cx('object-cover', className), style,
       });
     }
-    const hex = cat && cat.hex ? cat.hex : '#F0C024';
+    const hex = cat && cat.hex ? cat.hex : '#C9A84C';
     return React.createElement('div', {
       'aria-label': alt || (cat ? cat.name : 'image'),
       className: cx('flex flex-col items-center justify-center gap-1 select-none', className),
@@ -57,14 +57,14 @@
 
   // ── Button ──
   function Button({ variant = 'primary', size = 'md', icon, iconRight, children, className, ...rest }) {
-    const base = 'inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 focus:ring-offset-background';
+    const base = 'inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none';
     const sizes = { sm: 'text-xs px-3 py-2', md: 'text-sm px-4 py-2.5', lg: 'text-sm px-5 py-3.5' };
     const variants = {
       primary: 'bg-foreground text-background hover:bg-foreground/90 shadow-sm',
-      gold: 'gold-gradient text-black shadow-[0_8px_22px_rgba(240,192,36,0.28)] hover:brightness-105',
+      gold: 'gold-gradient text-white shadow-[0_4px_14px_rgba(201,168,76,0.4)] hover:brightness-105',
       soft: 'bg-accent text-gold-dark hover:bg-gold-light/60',
       ghost: 'text-foreground/70 hover:bg-accent/60 hover:text-foreground',
-      outline: 'border border-border bg-white text-foreground hover:bg-accent/40',
+      outline: 'border border-border text-foreground hover:bg-accent/40',
       danger: 'bg-[#FEE2E2] text-[#DC2626] hover:bg-red-100',
       success: 'bg-[#DCFCE7] text-[#16A34A] hover:bg-green-100',
     };
@@ -83,18 +83,18 @@
       hint && React.createElement('p', { className: 'text-[11px] text-muted-foreground' }, hint));
   }
 
-  const inputCls = 'w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-gold/60 focus:ring-2 focus:ring-gold/25 transition-all';
+  const inputCls = 'w-full px-3.5 py-2.5 bg-white/70 border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-gold/60 focus:bg-white transition-all';
   function Input(props) { return React.createElement('input', { className: cx(inputCls, props.className), ...props, ref: undefined }); }
   function Textarea(props) { return React.createElement('textarea', { ...props, className: cx(inputCls, 'resize-none leading-relaxed', props.className) }); }
 
   // ── Toggle switch ──
   function Toggle({ checked, onChange, label, desc }) {
     return React.createElement('button', {
-      type: 'button', onClick: () => onChange(!checked), role: 'switch', 'aria-checked': checked,
+      type: 'button', onClick: () => onChange(!checked),
       className: 'flex items-center gap-3 w-full text-left',
     },
       React.createElement('span', {
-        className: cx('relative w-11 h-6 rounded-full transition-colors shrink-0', checked ? 'bg-gold' : 'bg-[#DCD9D2]'),
+        className: cx('relative w-11 h-6 rounded-full transition-colors shrink-0', checked ? 'bg-gold' : 'bg-[#D4C5A0]'),
       }, React.createElement('span', {
         className: 'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
         style: { transform: checked ? 'translateX(20px)' : 'none' },
@@ -106,7 +106,7 @@
 
   // ── Segmented control ──
   function Segmented({ options, value, onChange, size = 'md' }) {
-    return React.createElement('div', { className: 'flex gap-0 bg-muted rounded-xl p-1 overflow-x-auto scrollbar-none border border-border' },
+    return React.createElement('div', { className: 'flex gap-0 bg-muted rounded-xl p-1 overflow-x-auto scrollbar-none' },
       options.map((o) => {
         const val = typeof o === 'string' ? o : o.value;
         const label = typeof o === 'string' ? o : o.label;
@@ -115,7 +115,7 @@
           key: val, onClick: () => onChange(val),
           className: cx('flex-1 rounded-lg font-semibold whitespace-nowrap transition-all capitalize',
             size === 'sm' ? 'py-1.5 px-2.5 text-[11px]' : 'py-2 px-3 text-xs',
-            active ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'),
+            active ? 'bg-white shadow text-foreground' : 'text-muted-foreground hover:text-foreground'),
         }, label);
       }));
   }
@@ -127,7 +127,7 @@
       onClick,
       className: 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shrink-0',
       style: active
-        ? { background: cat.hex, color: '#fff', boxShadow: `0 3px 12px ${cat.hex}44` }
+        ? { background: cat.hex, color: '#fff', boxShadow: `0 3px 12px ${cat.hex}55` }
         : { background: 'rgba(255,255,255,0.8)', color: cat.hex, border: `1px solid ${cat.hex}40` },
     }, showIcon && React.createElement(Icon, { name: cat.icon, size: 11, strokeWidth: 2.5 }), cat.short || cat.name);
   }
@@ -151,7 +151,7 @@
     },
       React.createElement('div', { className: 'absolute inset-0 bg-black/40 backdrop-blur-sm fade-in', onClick: onClose }),
       React.createElement('div', {
-        className: cx('bg-white border border-border shadow-2xl flex flex-col overflow-hidden relative', panelPos),
+        className: cx('glass-strong border border-white/60 shadow-2xl flex flex-col overflow-hidden relative', panelPos),
         style: !isSheet && !isSide ? { maxWidth } : undefined,
       },
         title && React.createElement('div', { className: 'flex items-center justify-between px-5 py-4 border-b border-border shrink-0' },
@@ -206,7 +206,7 @@
         value
           ? React.createElement('img', { src: value, alt: '', className: 'w-full h-full object-cover' })
           : React.createElement('div', { className: 'w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground' },
-              React.createElement('div', { className: 'w-11 h-11 rounded-2xl bg-accent flex items-center justify-center border border-border' },
+              React.createElement('div', { className: 'w-11 h-11 rounded-2xl bg-accent flex items-center justify-center' },
                 React.createElement(Icon, { name: 'ImagePlus', size: 18, className: 'text-gold-dark' })),
               React.createElement('span', { className: 'text-xs font-semibold' }, 'Add ' + label)),
         uploading && React.createElement('span', { className: 'absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-sm' },
@@ -216,10 +216,10 @@
 
       React.createElement('input', { ref: fileRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: onFile }),
 
-      open && React.createElement('div', { className: 'p-2.5 rounded-2xl bg-white border border-border shadow-sm space-y-2.5 fade-in' },
+      open && React.createElement('div', { className: 'p-2.5 rounded-2xl bg-white/70 border border-border space-y-2.5 fade-in' },
         React.createElement('button', {
           type: 'button', onClick: () => fileRef.current && fileRef.current.click(), disabled: uploading,
-          className: 'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl gold-gradient text-black text-xs font-bold shadow-sm disabled:opacity-60',
+          className: 'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl gold-gradient text-white text-xs font-bold shadow-sm disabled:opacity-60',
         }, React.createElement(Icon, { name: 'Upload', size: 13 }), uploading ? 'Uploading…' : 'Upload from device'),
         err && React.createElement('p', { className: 'text-[11px] text-destructive font-semibold px-1 flex items-center gap-1' },
           React.createElement(Icon, { name: 'AlertCircle', size: 11 }), err),
