@@ -517,6 +517,8 @@ to mirror, consumers to repoint, coverage strategy, mirror-handle derivation).
      starting §3.4's consumer step.
 2. **Step 3a (recommended, per brief §6a)** — import the Wear HTML frontend (reuse Connect's
    `scripts/build-frontend.js` + Capacitor + cross-origin Bearer auth); make Wear Next.js API-only.
+   Design asset (provided 2026-07-01): `C:\Users\SJ\Documents\Citizen Network\Citizens Wear app design-handoff.zip`.
+   Import only AFTER step 1's data plane + `/api/*` exist.
 3. **Step 4** — extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`). No prod risk.
 4. **Step 5** — the monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in).
    Gated behind Step 3/4, not behind Step 0 code anymore.

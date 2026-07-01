@@ -123,6 +123,10 @@ MASTER_DIRECTION Part 10 planned: …Batch 6 (profile schema + `content_labels` 
 **Ask:** import a standalone HTML/React frontend for Wear, as Connect has (`src/frontend/`), instead
 of Wear's current full Next.js App-Router **RSC** app (server components + server actions).
 
+**Asset (provided 2026-07-01):** `C:\Users\SJ\Documents\Citizen Network\Citizens Wear app design-handoff.zip`
+(≈8.6 MB — the Wear sibling of the "Citizens Connect Map.zip" that seeded Connect's frontend). Do **not**
+import it until steps 1–2 below are done.
+
 **The key insight — sequence it *into* step 3, don't bolt it on after.** The remaining step-3 unit
 (scope §3.4) currently repoints ~16 **RSC server-component** consumers onto the new `SupabaseWearStore`.
 If Wear then pivots to a static HTML frontend that talks to **HTTP APIs**, those RSC pages are thrown
