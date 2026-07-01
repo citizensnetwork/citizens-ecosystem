@@ -18,6 +18,8 @@ export type { ConnectFactoryOptions } from './factory';
 export {
   FIXTURE_VALID_TOKEN,
   fixtureBrands,
+  fixtureCategories,
+  fixtureContributors,
   fixtureProducts,
   fixtureSession,
   fixtureUsers,

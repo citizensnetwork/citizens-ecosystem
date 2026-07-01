@@ -4,6 +4,8 @@ import {
   FIXTURE_VALID_TOKEN,
   MockConnectClient,
   fixtureBrands,
+  fixtureCategories,
+  fixtureContributors,
   fixtureProducts,
   fixtureUsers,
 } from '../src/index';
@@ -112,6 +114,73 @@ describe('ProductCatalog', () => {
   });
 });
 
+describe('ContributorDirectory', () => {
+  it('lists contributors ordered by name', async () => {
+    const client = makeClient();
+    const page = await client.contributors.list();
+    expect(page.items.map((c) => c.slug)).toEqual([
+      'bread-of-life-ministries',
+      'kingdom-threads',
+      'united-hands',
+    ]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('filters by kind and by query (name or bio, case-insensitive)', async () => {
+    const client = makeClient();
+    expect((await client.contributors.list({ kind: 'business' })).items.map((c) => c.id)).toEqual([
+      'ctr_002',
+    ]);
+    expect((await client.contributors.list({ query: 'VOLUNTEERING' })).items.map((c) => c.id)).toEqual(
+      ['ctr_003'],
+    );
+    expect(
+      (await client.contributors.list({ kind: 'ministry', query: 'apparel' })).items,
+    ).toHaveLength(0);
+  });
+
+  it('paginates with offset-style cursors', async () => {
+    const client = makeClient();
+    const first = await client.contributors.list({ limit: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).toBe('2');
+    const rest = await client.contributors.list({ limit: 2, cursor: first.nextCursor! });
+    expect(rest.items.map((c) => c.id)).toEqual(['ctr_003']);
+    expect(rest.nextCursor).toBeNull();
+  });
+
+  it('resolves a contributor profile by slug (case-insensitive) with counts', async () => {
+    const client = makeClient();
+    const profile = await client.contributors.getBySlug('KINGDOM-THREADS');
+    expect(profile?.contributor.name).toBe('Kingdom Threads');
+    expect(profile?.followerCount).toBe(0);
+    expect(await client.contributors.getBySlug('missing')).toBeNull();
+  });
+});
+
+describe('CategoryDirectory', () => {
+  it('lists all categories in sort order', async () => {
+    const client = makeClient();
+    const categories = await client.categories.list();
+    expect(categories.map((c) => c.slug)).toEqual(['church-service', 'youth', 'coffee-spots']);
+  });
+
+  it('filters by appliesTo, including "both" rows for events/places', async () => {
+    const client = makeClient();
+    expect((await client.categories.list({ appliesTo: 'events' })).map((c) => c.slug)).toEqual([
+      'church-service',
+      'youth',
+    ]);
+    expect((await client.categories.list({ appliesTo: 'places' })).map((c) => c.slug)).toEqual([
+      'church-service',
+      'coffee-spots',
+    ]);
+    expect((await client.categories.list({ appliesTo: 'both' })).map((c) => c.slug)).toEqual([
+      'church-service',
+    ]);
+  });
+});
+
 describe('EventBus', () => {
   it('delivers published events to subscribers', async () => {
     const client = makeClient();
@@ -165,5 +234,10 @@ describe('fixtures', () => {
     expect(fixtureUsers).toHaveLength(2);
     expect(fixtureBrands).toHaveLength(2);
     expect(fixtureProducts).toHaveLength(3);
+  });
+
+  it('exposes stable contributor and category fixtures', () => {
+    expect(fixtureContributors).toHaveLength(3);
+    expect(fixtureCategories).toHaveLength(3);
   });
 });

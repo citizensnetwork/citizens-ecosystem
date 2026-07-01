@@ -1,8 +1,11 @@
 import type {
   AuthProvider,
   BrandDirectory,
+  CategoryDirectory,
   ConnectBrand,
+  ConnectCategory,
   ConnectClient,
+  ConnectContributor,
   ConnectEvent,
   ConnectEventHandler,
   ConnectId,
@@ -10,6 +13,7 @@ import type {
   ConnectSession,
   ConnectStatus,
   ConnectUser,
+  ContributorDirectory,
   EventBus,
   Page,
   PageParams,
@@ -20,6 +24,8 @@ import { ConnectError } from '../contract';
 import {
   FIXTURE_VALID_TOKEN,
   fixtureBrands,
+  fixtureCategories,
+  fixtureContributors,
   fixtureProducts,
   fixtureSession,
   fixtureUsers,
@@ -54,6 +60,8 @@ export interface MockConnectClientOptions {
   readonly users?: readonly ConnectUser[];
   readonly brands?: readonly ConnectBrand[];
   readonly products?: readonly ConnectProduct[];
+  readonly contributors?: readonly ConnectContributor[];
+  readonly categories?: readonly ConnectCategory[];
   readonly validToken?: string;
   readonly session?: ConnectSession;
   /** Override `Date.now` (useful for deterministic tests). */
@@ -65,11 +73,15 @@ export class MockConnectClient implements ConnectClient {
   public readonly users: UserDirectory;
   public readonly brands: BrandDirectory;
   public readonly products: ProductCatalog;
+  public readonly contributors: ContributorDirectory;
+  public readonly categories: CategoryDirectory;
   public readonly events: EventBus;
 
   private readonly _users: ConnectUser[];
   private readonly _brands: ConnectBrand[];
   private readonly _products: ConnectProduct[];
+  private readonly _contributors: ConnectContributor[];
+  private readonly _categories: ConnectCategory[];
   private readonly _validToken: string;
   private readonly _session: ConnectSession;
   private readonly _now: () => Date;
@@ -79,6 +91,8 @@ export class MockConnectClient implements ConnectClient {
     this._users = [...(options.users ?? fixtureUsers)];
     this._brands = [...(options.brands ?? fixtureBrands)];
     this._products = [...(options.products ?? fixtureProducts)];
+    this._contributors = [...(options.contributors ?? fixtureContributors)];
+    this._categories = [...(options.categories ?? fixtureCategories)];
     this._validToken = options.validToken ?? FIXTURE_VALID_TOKEN;
     this._session = options.session ?? fixtureSession;
     this._now = options.now ?? (() => new Date());
@@ -145,6 +159,51 @@ export class MockConnectClient implements ConnectClient {
             )
           : this._products;
         return paginate(matches, params);
+      },
+    };
+
+    this.contributors = {
+      // Mirrors the live endpoint's semantics: kind filter is exact, `query`
+      // is a case-insensitive substring match on name/bio, results are
+      // ordered by name ascending.
+      list: async (params) => {
+        const q = (params?.query ?? '').trim().toLowerCase();
+        let matches = this._contributors.filter((c) => {
+          if (params?.kind && c.kind !== params.kind) return false;
+          if (!q) return true;
+          return (
+            c.name.toLowerCase().includes(q) || (c.bio ?? '').toLowerCase().includes(q)
+          );
+        });
+        matches = matches.slice().sort((a, b) => a.name.localeCompare(b.name));
+        return paginate(matches, params);
+      },
+      getBySlug: async (slug) => {
+        const contributor =
+          this._contributors.find((c) => c.slug.toLowerCase() === slug.toLowerCase()) ?? null;
+        if (!contributor) return null;
+        // The mock has no event/place/follow graph behind contributors, so
+        // counts are deterministically zero (the live client maps Connect's
+        // real `counts` block).
+        return { contributor, followerCount: 0, eventCount: 0, placeCount: 0 };
+      },
+    };
+
+    this.categories = {
+      list: async (params) => {
+        const applies = params?.appliesTo;
+        const include =
+          applies === 'events'
+            ? ['events', 'both']
+            : applies === 'places'
+              ? ['places', 'both']
+              : applies === 'both'
+                ? ['both']
+                : null;
+        const matches = include
+          ? this._categories.filter((c) => include.includes(c.appliesTo))
+          : this._categories;
+        return matches.slice().sort((a, b) => a.sortOrder - b.sortOrder);
       },
     };
 

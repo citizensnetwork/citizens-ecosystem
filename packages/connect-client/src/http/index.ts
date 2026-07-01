@@ -1,13 +1,20 @@
 import type {
   AuthProvider,
   BrandDirectory,
+  CategoryAppliesTo,
+  CategoryDirectory,
   ConnectBrand,
+  ConnectCategory,
   ConnectClient,
+  ConnectContributor,
+  ConnectContributorKind,
+  ConnectContributorProfile,
   ConnectEventHandler,
   ConnectProduct,
   ConnectSession,
   ConnectStatus,
   ConnectUser,
+  ContributorDirectory,
   EventBus,
   Page,
   ProductCatalog,
@@ -51,11 +58,97 @@ interface RequestOptions {
   readonly query?: Record<string, string | number | undefined>;
 }
 
+/* ------------------------------------------------------------------ *
+ * Wire shapes for Connect's REAL `/api/v1` surface (snake_case). The
+ * legacy `/v1/*` endpoints above pre-date Connect's actual API and are
+ * retired with the RSC frontend (ADR-0002 amendment, Step 3 D).
+ * ------------------------------------------------------------------ */
+
+interface WireContributor {
+  readonly id: string;
+  readonly full_name: string;
+  readonly contributor_kind: string | null;
+  readonly contributor_slug: string;
+  readonly bio: string | null;
+  readonly avatar_url: string | null;
+  readonly logo_url: string | null;
+  readonly website_url: string | null;
+  readonly instagram_handle: string | null;
+  readonly facebook_url: string | null;
+  readonly tiktok_handle: string | null;
+  readonly youtube_url: string | null;
+  readonly physical_address: string | null;
+  readonly physical_latitude: number | null;
+  readonly physical_longitude: number | null;
+  readonly created_at: string;
+}
+
+interface WireCategory {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+  readonly emoji: string;
+  readonly color: string;
+  readonly applies_to: CategoryAppliesTo;
+  readonly sort_order: number;
+  readonly event_count: number;
+}
+
+function mapContributorKind(kind: string | null): ConnectContributorKind | null {
+  return kind === 'ministry' || kind === 'organization' || kind === 'business' ? kind : null;
+}
+
+function mapContributor(wire: WireContributor): ConnectContributor {
+  return {
+    id: wire.id,
+    slug: wire.contributor_slug,
+    name: wire.full_name,
+    kind: mapContributorKind(wire.contributor_kind),
+    bio: wire.bio ?? null,
+    avatarUrl: wire.avatar_url ?? null,
+    logoUrl: wire.logo_url ?? null,
+    websiteUrl: wire.website_url ?? null,
+    instagramHandle: wire.instagram_handle ?? null,
+    facebookUrl: wire.facebook_url ?? null,
+    tiktokHandle: wire.tiktok_handle ?? null,
+    youtubeUrl: wire.youtube_url ?? null,
+    physicalAddress: wire.physical_address ?? null,
+    physicalLatitude: wire.physical_latitude ?? null,
+    physicalLongitude: wire.physical_longitude ?? null,
+    createdAt: wire.created_at,
+  };
+}
+
+function mapCategory(wire: WireCategory): ConnectCategory {
+  return {
+    id: wire.id,
+    name: wire.name,
+    slug: wire.slug,
+    emoji: wire.emoji,
+    color: wire.color,
+    appliesTo: wire.applies_to,
+    sortOrder: wire.sort_order,
+    eventCount: wire.event_count ?? 0,
+  };
+}
+
+/** Parse a `Page` cursor as the wire offset (mock convention: stringified index). */
+function cursorToOffset(cursor: string | undefined): number {
+  if (!cursor) return 0;
+  const offset = Number.parseInt(cursor, 10);
+  if (Number.isNaN(offset) || offset < 0) {
+    throw new ConnectError('invalid_cursor', `Invalid cursor: ${cursor}`);
+  }
+  return offset;
+}
+
 export class HttpConnectClient implements ConnectClient {
   public readonly auth: AuthProvider;
   public readonly users: UserDirectory;
   public readonly brands: BrandDirectory;
   public readonly products: ProductCatalog;
+  public readonly contributors: ContributorDirectory;
+  public readonly categories: CategoryDirectory;
   public readonly events: EventBus;
 
   private readonly _baseUrl: string;
@@ -130,6 +223,53 @@ export class HttpConnectClient implements ConnectClient {
         }),
     };
 
+    this.contributors = {
+      list: async (params) => {
+        const offset = cursorToOffset(params?.cursor);
+        const res = await this._request<{
+          data: WireContributor[];
+          meta: { count: number; limit: number; offset: number };
+        }>('/api/v1/contributors', {
+          query: {
+            kind: params?.kind,
+            q: params?.query?.trim() || undefined,
+            limit: params?.limit,
+            offset: offset || undefined,
+          },
+        });
+        const items = (res.data ?? []).map(mapContributor);
+        const nextIndex = offset + items.length;
+        return {
+          items,
+          nextCursor: nextIndex < (res.meta?.count ?? 0) ? String(nextIndex) : null,
+        } satisfies Page<ConnectContributor>;
+      },
+      getBySlug: async (slug) => {
+        const res = await this._requestNullable<{
+          data: {
+            profile: WireContributor;
+            counts: { followers: number; events_total: number; places_total: number };
+          };
+        }>(`/api/v1/contributors/${encodeURIComponent(slug.toLowerCase())}`);
+        if (!res?.data?.profile) return null;
+        return {
+          contributor: mapContributor(res.data.profile),
+          followerCount: res.data.counts?.followers ?? 0,
+          eventCount: res.data.counts?.events_total ?? 0,
+          placeCount: res.data.counts?.places_total ?? 0,
+        } satisfies ConnectContributorProfile;
+      },
+    };
+
+    this.categories = {
+      list: async (params) => {
+        const res = await this._request<{ data: WireCategory[] }>('/api/v1/categories', {
+          query: { applies_to: params?.appliesTo },
+        });
+        return (res.data ?? []).map(mapCategory);
+      },
+    };
+
     this.events = {
       subscribe: (handler) => {
         this._handlers.add(handler);
@@ -191,8 +331,11 @@ export class HttpConnectClient implements ConnectClient {
     if (opts.body !== undefined) {
       headers['content-type'] = 'application/json';
     }
+    // Connect's /api/v1 gate resolves `X-API-Key` (or `Authorization:
+    // Bearer`); the old `x-connect-api-key` name never matched the real
+    // surface (ADR-0002 amendment).
     if (this._apiKey) {
-      headers['x-connect-api-key'] = this._apiKey;
+      headers['x-api-key'] = this._apiKey;
     }
     if (opts.token) {
       headers['authorization'] = `Bearer ${opts.token}`;
