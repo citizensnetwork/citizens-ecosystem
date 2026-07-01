@@ -109,6 +109,14 @@ Ordered, each independently shippable behind Wear's existing launch gate:
 this repo's lineage and documented in `api-v1.md`. Everything else is Wear-side or operational;
 Q4's contributor link reuses the existing `/api/v1/contributors/{slug}`.
 
+> ✅ **DONE (2026-07-01)** — `GET /api/v1/profiles/{id}` shipped:
+> [`src/app/api/v1/profiles/[id]/route.ts`](../../src/app/api/v1/profiles/[id]/route.ts)
+> (returns only `id, full_name, avatar_url`; UUID-validated → 400; 404 when unresolved;
+> `gateV1` rate-limited; RLS row-read is `using(true)` so column safety is enforced by the
+> explicit select). Tests in `src/__tests__/api/v1/endpoints.test.ts`; documented in
+> [`api-v1.md`](../api-v1.md). **The only Connect-side dependency for the Wear build is now
+> in place** — the remaining Step-3 items (§3.1–3.5) are all Wear-repo / operational.
+
 ---
 
 ## 4. SHARED_DB_CONTRACT implications

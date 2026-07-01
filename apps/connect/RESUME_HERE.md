@@ -302,7 +302,11 @@ gates + OAuth allow-list; Q4 `wear.brands` Wear-owned + OPTIONAL ownership-verif
 2. replace mock-token session (`apps/web/src/lib/session.ts`) with Supabase Auth;
 3. **apply** the drafted `wear.*` DDL — move [docs/wear/143_wear_schema.sql](docs/wear/143_wear_schema.sql)
    → `supabase/migrations/143_wear_schema.sql` (renumber if Connect shipped a later migration first) + `apply_migration`;
-4. add the one Connect endpoint `GET /api/v1/profiles/{id}` (+ document in `docs/api-v1.md`, R2.3);
+4. ~~add the one Connect endpoint `GET /api/v1/profiles/{id}`~~ ✅ **DONE (2026-07-01, this repo)** —
+   [`src/app/api/v1/profiles/[id]/route.ts`](src/app/api/v1/profiles/[id]/route.ts): display-safe
+   `id/full_name/avatar_url` only, UUID→400, 404 when unresolved, `gateV1`-limited; tests in
+   `src/__tests__/api/v1/endpoints.test.ts`; documented in `docs/api-v1.md`. **The sole Connect-side
+   Step-3 dependency is now met** — items 1–3 & 5 below are Wear-repo / operational.
 5. reconcile `connect-client`; wire `packages/db` off `MemoryWearStore`; keep coverage gates green.
 
 - After Step 3: **Step 4** = extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`);

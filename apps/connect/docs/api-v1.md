@@ -311,6 +311,39 @@ Cached for 5 minutes at the edge (`s-maxage=300`).
 
 ---
 
+## GET /api/v1/profiles/{id}
+
+Minimal, **display-safe** public identity for a single user by id. Exists
+so a sibling app (e.g. Citizens Wear) can render the display identity of a
+Connect user it hasn't seen sign in yet — the rare backfill case its own
+user mirror can't hydrate from the user's session. Keeps that read inside
+the `/api/v1` contract instead of a raw `public.profiles` table read (see
+[`SHARED_DB_CONTRACT.md`](./SHARED_DB_CONTRACT.md) Rule 2 and
+[`strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](./strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) §5 Q1).
+
+Returns **only** `id`, `full_name`, `avatar_url`. Email, address,
+contributor internals and every other column are intentionally never
+exposed here. For an approved contributor's richer public profile, use
+`/api/v1/contributors/{slug}` instead.
+
+```json
+{
+  "data": {
+    "id": "…uuid…",
+    "full_name": "Thabo Mokoena",
+    "avatar_url": "https://…"
+  },
+  "meta": {}
+}
+```
+
+`400` when the id is not a valid UUID, `404` when it does not resolve to a
+profile. `generated_at` is returned as the `X-Generated-At` response
+header (body stays byte-stable for CDN caching). A per-id secondary rate
+cap applies (anonymous tier). Cached `s-maxage=60, stale-while-revalidate=120`.
+
+---
+
 ## GET /api/v1/analytics/community
 
 Platform-wide aggregated analytics (no PII). Individual contributor
@@ -343,3 +376,6 @@ Cached for 5 minutes at the edge.
 - Removal or type changes bump the path prefix (`/api/v2/...`).
 - `role`, `contributor_kind`, `contributor_slug`, `id` are guaranteed
   to be present on every contributor payload.
+- `id`, `full_name`, `avatar_url` are guaranteed to be present on every
+  `/api/v1/profiles/{id}` payload; that endpoint will never widen beyond
+  display-safe fields without a `/api/v2` bump.

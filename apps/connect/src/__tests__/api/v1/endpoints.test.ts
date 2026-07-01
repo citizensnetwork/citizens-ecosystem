@@ -25,6 +25,7 @@ const eventDetailMod = await import("@/app/api/v1/events/[id]/route");
 const categoriesMod = await import("@/app/api/v1/categories/route");
 const analyticsMod = await import("@/app/api/v1/analytics/community/route");
 const placesMod = await import("@/app/api/v1/places/route");
+const profilesMod = await import("@/app/api/v1/profiles/[id]/route");
 
 describe("/api/v1/events", () => {
   beforeEach(() => {
@@ -169,6 +170,67 @@ describe("/api/v1/places", () => {
     expect(j.data[0].category_emoji).toBe("🙏");
     expect(j.data[0].category_color).toBe("#abc");
     expect(j.data[0]).not.toHaveProperty("categories");
+  });
+});
+
+describe("/api/v1/profiles/[id]", () => {
+  const VALID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (mockClient._chain as unknown as Record<string, unknown>).maybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: null });
+  });
+
+  it("returns 400 on invalid UUID", async () => {
+    const res = await profilesMod.GET(
+      new Request("http://localhost/api/v1/profiles/not-a-uuid"),
+      { params: Promise.resolve({ id: "not-a-uuid" }) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when profile not found", async () => {
+    (mockClient._chain as unknown as Record<string, unknown>).maybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: null });
+    const res = await profilesMod.GET(
+      new Request(`http://localhost/api/v1/profiles/${VALID}`),
+      { params: Promise.resolve({ id: VALID }) },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 200 with only display-safe fields (no PII widening)", async () => {
+    (mockClient._chain as unknown as Record<string, unknown>).maybeSingle = vi
+      .fn()
+      .mockResolvedValue({
+        data: {
+          id: VALID,
+          full_name: "Thabo Mokoena",
+          avatar_url: "https://example.com/a.jpg",
+        },
+        error: null,
+      });
+
+    const res = await profilesMod.GET(
+      new Request(`http://localhost/api/v1/profiles/${VALID}`),
+      { params: Promise.resolve({ id: VALID }) },
+    );
+
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(j).toHaveProperty("data");
+    expect(j).toHaveProperty("meta");
+    expect(j.data.id).toBe(VALID);
+    expect(j.data.full_name).toBe("Thabo Mokoena");
+    // The query must request ONLY display-safe columns — this guards
+    // against a future edit widening the select into PII.
+    expect(mockClient._chain.select).toHaveBeenCalledWith(
+      "id,full_name,avatar_url",
+    );
+    expect(res.headers.get("X-Generated-At")).toBeTruthy();
   });
 });
 
