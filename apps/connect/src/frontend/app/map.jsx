@@ -58,7 +58,7 @@
   function buildPinInner(m, cat, opts) {
     const selected = opts.selected, pinStyle = opts.pinStyle;
     const isIdea = m.type === 'idea';
-    const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
+    const fill = isIdea ? '#F0C024' : (cat ? cat.hex : '#F0C024');
 
     const inner = document.createElement('div');
     inner.style.cssText = 'position:relative;line-height:0;';
@@ -79,17 +79,17 @@
       const d = selected ? 22 : 16;
       pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
         'px;border:2.5px solid #fff;border-radius:50%;background:' + fill +
-        ';box-shadow:0 3px 8px rgba(0,0,0,.28);transition:all .15s;';
+        ';box-shadow:0 3px 10px rgba(14,14,14,.22);transition:all .15s cubic-bezier(.2,0,0,1);';
     } else if (pinStyle === 'glass') {
       const d = selected ? 40 : 32;
       pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
-        'px;border:1.5px solid rgba(255,255,255,.7);border-radius:16px;background:' + fill +
-        'E6;box-shadow:0 4px 10px rgba(0,0,0,.22);transition:all .15s;';
+        'px;border:1.5px solid rgba(255,255,255,.78);border-radius:14px;background:' + fill +
+        'E6;box-shadow:0 8px 18px rgba(14,14,14,.18);transition:all .15s cubic-bezier(.2,0,0,1);';
     } else { // teardrop
       const d = selected ? 38 : 30;
       pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
         'px;border:2.5px solid #fff;background:' + fill +
-        ';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 10px rgba(0,0,0,.24);transition:all .15s;';
+        ';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 8px 18px rgba(14,14,14,.20);transition:all .15s cubic-bezier(.2,0,0,1);';
       const dot = document.createElement('span');
       dot.style.cssText = 'position:absolute;left:50%;top:42%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.9);';
       pin.appendChild(dot);
@@ -105,12 +105,12 @@
       b.className = 'cc-pin-bubble';
       b.style.cssText = 'position:absolute;left:50%;bottom:100%;margin-bottom:10px;' +
         'transform:translateX(-50%);max-width:188px;width:max-content;display:flex;align-items:center;gap:5px;' +
-        'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:14px 14px 14px 4px;' +
-        'padding:5px 9px;box-shadow:0 6px 16px rgba(0,0,0,.16);';
+        'background:#fff;border:1px solid #DCD9D2;border-radius:14px 14px 14px 4px;' +
+        'padding:5px 9px;box-shadow:0 8px 20px rgba(14,14,14,.12);';
       const dot = document.createElement('span');
-      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#C9A84C;flex:0 0 auto;';
+      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#F0C024;flex:0 0 auto;';
       const txt = document.createElement('span');
-      txt.style.cssText = 'flex:0 1 auto;min-width:0;font-size:10px;line-height:1.3;font-weight:600;color:#0A0908;' +
+      txt.style.cssText = 'flex:0 1 auto;min-width:0;font-size:10px;line-height:1.3;font-weight:600;color:#000000;' +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
       txt.textContent = m.broadcast.message;
       b.appendChild(dot); b.appendChild(txt);
@@ -120,7 +120,7 @@
         x.textContent = '×';
         x.setAttribute('aria-label', 'Dismiss update');
         x.style.cssText = 'flex:0 0 auto;margin-left:2px;width:15px;height:15px;line-height:13px;' +
-          'border:none;border-radius:50%;background:rgba(0,0,0,.06);color:#0A0908;font-size:13px;' +
+          'border:none;border-radius:50%;background:rgba(0,0,0,.06);color:#000000;font-size:13px;' +
           'cursor:pointer;padding:0;';
         x.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -135,9 +135,9 @@
     if (selected && m.title) {
       const l = document.createElement('div');
       l.style.cssText = 'position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;' +
-        'max-width:200px;background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
-        'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
-        'box-shadow:0 3px 10px rgba(0,0,0,.18);';
+        'max-width:200px;background:#fff;border:1px solid #DCD9D2;border-radius:999px;padding:3px 9px;' +
+        'font-size:10px;font-weight:700;color:#000000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+        'box-shadow:0 6px 16px rgba(14,14,14,.14);';
       l.textContent = m.title;
       inner.appendChild(l);
     }

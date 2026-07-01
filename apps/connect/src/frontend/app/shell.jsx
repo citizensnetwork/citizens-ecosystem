@@ -15,7 +15,7 @@
 
   function roleBadge(role, level) {
     if (role === 'admin') return { label: 'Admin', color: '#8E44AD', icon: 'Shield' };
-    if (role === 'contributor') return { label: level || 'Contributor', color: '#C9A84C', icon: 'Crown' };
+    if (role === 'contributor') return { label: level || 'Contributor', color: '#F0C024', icon: 'Crown' };
     return null;
   }
 
@@ -40,14 +40,14 @@
     links.push({ p: 'settings', label: 'Settings', icon: 'Settings' });
 
     return React.createElement('div', {
-      ref, className: cx('absolute z-[150] w-72 glass-strong rounded-2xl shadow-2xl border border-white/60 overflow-hidden fade-in', pos),
+      ref, className: cx('absolute z-[150] w-72 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden fade-in', pos),
     },
       React.createElement('div', { className: 'relative' },
         React.createElement('div', { className: 'h-20 overflow-hidden' },
           React.createElement(SmartImage, { src: user.coverPhoto, alt: '', className: 'w-full h-full' }),
           React.createElement('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/55 to-transparent' })),
         React.createElement('div', { className: 'absolute bottom-0 left-4 translate-y-1/2' },
-          React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl', ring: '#F7F4EE' }))),
+          React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl', ring: '#FFFFFF' }))),
       React.createElement('div', { className: 'pt-8 pb-4 px-4' },
         React.createElement('p', { className: 'text-sm font-bold text-foreground' }, user.name),
         React.createElement('div', { className: 'flex items-center gap-1.5 mt-0.5' },
@@ -89,27 +89,27 @@
     const rb = roleBadge(role, user.involvementLevel);
 
     return React.createElement('aside', {
-      className: cx('hidden md:flex flex-col glass border-r border-white/40 z-40 shrink-0 transition-all duration-300 relative', collapsed ? 'w-[74px]' : 'w-64'),
+      className: cx('hidden md:flex flex-col bg-white border-r border-border z-40 shrink-0 transition-all duration-300 relative shadow-sm', collapsed ? 'w-[74px]' : 'w-64'),
     },
       // logo
       React.createElement('button', {
         onClick: () => go('home'),
-        className: cx('px-4 py-5 border-b border-white/30 flex items-center', collapsed ? 'justify-center' : 'gap-3'),
+        className: cx('px-4 py-5 border-b border-border flex items-center', collapsed ? 'justify-center' : 'gap-3'),
       },
         React.createElement('div', { className: 'w-9 h-9 rounded-xl gold-gradient flex items-center justify-center shadow-lg shrink-0' },
-          React.createElement(Icon, { name: 'Crown', size: 16, className: 'text-white', strokeWidth: 2.5 })),
+          React.createElement(Icon, { name: 'Crown', size: 16, className: 'text-black', strokeWidth: 2.5 })),
         !collapsed && React.createElement('div', { className: 'text-left overflow-hidden' },
-          React.createElement('p', { className: 'text-sm font-bold text-foreground tracking-tight leading-none font-display' }, 'Citizens'),
+          React.createElement('p', { className: 'text-sm font-extrabold text-foreground tracking-[0.18em] uppercase leading-none' }, 'Citizens'),
           React.createElement('p', { className: 'text-[10px] text-gold font-bold tracking-[0.22em] uppercase mt-0.5' }, 'Connect'))),
 
       // user mini profile
-      React.createElement('div', { className: cx('border-b border-white/20 relative', collapsed ? 'px-2 py-3' : 'px-3 py-3') },
+      React.createElement('div', { className: cx('border-b border-border relative', collapsed ? 'px-2 py-3' : 'px-3 py-3') },
         React.createElement('button', {
           onClick: () => setShowProfile((s) => !s),
           className: cx('flex items-center w-full rounded-xl transition-colors hover:bg-accent/50 p-2', collapsed ? 'justify-center' : 'gap-3'),
         },
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(201,168,76,0.4)' }),
+            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(240,192,36,0.4)' }),
             role !== 'citizen' && React.createElement('span', {
               className: 'absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
               style: { background: rb.color },
@@ -132,14 +132,14 @@
             a && !collapsed && React.createElement('span', { className: 'absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gold rounded-r-full' }),
             React.createElement('div', { className: 'relative shrink-0' },
               React.createElement(Icon, { name: t.icon, size: 17, strokeWidth: a ? 2.4 : 1.8 }),
-              b > 0 && collapsed && React.createElement('span', { className: 'absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
+              b > 0 && collapsed && React.createElement('span', { className: 'absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-gold text-black text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
             !collapsed && React.createElement(React.Fragment, null,
               React.createElement('span', { className: 'flex-1 text-left' }, t.label),
               b > 0 && React.createElement('span', { className: 'min-w-[20px] h-5 px-1 bg-gold text-black text-[10px] font-bold rounded-full flex items-center justify-center' }, b)));
         })),
 
       // contributor CTA / application status
-      !collapsed && role === 'citizen' && React.createElement('div', { className: 'px-3 pb-3 border-t border-white/20 pt-3' },
+      !collapsed && role === 'citizen' && React.createElement('div', { className: 'px-3 pb-3 border-t border-border pt-3' },
         myApplication && myApplication.status === 'pending'
           ? React.createElement('div', { className: 'rounded-xl p-3.5 bg-accent/70 border border-gold/20' },
               React.createElement('div', { className: 'flex items-center gap-2 mb-1' },
@@ -153,13 +153,13 @@
                 React.createElement('p', { className: 'text-[11px] font-bold text-[#15803d]' }, "You're approved!")),
               React.createElement('p', { className: 'text-[9px] text-[#15803d]/80 mb-2' }, 'Set up your contributor profile to go live.'),
               React.createElement('span', { className: 'text-[10px] font-bold text-[#16A34A] flex items-center gap-1' }, 'Complete setup', React.createElement(Icon, { name: 'ArrowRight', size: 11 })))
-          : React.createElement('button', { onClick: () => go('apply'), className: 'w-full text-left rounded-xl p-3.5 bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/50 hover:from-[#F2E8CC] hover:to-[#E8D48B]/70 transition-all' },
-              React.createElement('p', { className: 'text-[11px] font-bold text-gold-dark mb-0.5 font-display' }, 'Become a Contributor'),
+          : React.createElement('button', { onClick: () => go('apply'), className: 'w-full text-left rounded-xl p-3.5 bg-gradient-to-br from-[#FEF8E2] to-[#F9E08A]/50 hover:from-[#FEF8E2] hover:to-[#F9E08A]/70 transition-all' },
+              React.createElement('p', { className: 'text-[11px] font-extrabold text-gold-dark mb-0.5' }, 'Become a Contributor'),
               React.createElement('p', { className: 'text-[9px] text-gold-dark/75 mb-2.5' }, 'Create events, places & lead your community.'),
-              React.createElement('span', { className: 'w-full flex items-center justify-center text-[10px] font-bold gold-gradient text-white rounded-lg py-1.5' }, 'Apply Now'))),
+              React.createElement('span', { className: 'w-full flex items-center justify-center text-[10px] font-bold gold-gradient text-black rounded-lg py-1.5' }, 'Apply Now'))),
 
       // collapse
-      React.createElement('div', { className: cx('border-t border-white/20', collapsed ? 'p-2' : 'px-3 py-3') },
+      React.createElement('div', { className: cx('border-t border-border', collapsed ? 'p-2' : 'px-3 py-3') },
         React.createElement('button', {
           onClick: () => setCollapsed((c) => !c),
           className: 'w-full flex items-center justify-center gap-2 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all text-xs font-medium',
@@ -181,7 +181,7 @@
     ];
     const badge = (p) => (p === 'notifications' ? unreadNotifs : p === 'messages' ? unreadMsgs : 0);
     const active = (p) => nav.page === p;
-    return React.createElement('nav', { className: 'md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/50 px-2 pb-[env(safe-area-inset-bottom)]' },
+    return React.createElement('nav', { className: 'md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/70 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(14,14,14,0.10)]' },
       React.createElement('div', { className: 'flex items-stretch justify-around h-16' },
         tabs.map((t) => {
           const a = active(t.page), b = badge(t.page);
@@ -191,7 +191,7 @@
           },
             React.createElement('div', { className: 'relative' },
               React.createElement(Icon, { name: t.icon, size: 21, strokeWidth: a ? 2.4 : 1.9 }),
-              b > 0 && React.createElement('span', { className: 'absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-0.5 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
+              b > 0 && React.createElement('span', { className: 'absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-0.5 bg-gold text-black text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
             React.createElement('span', { className: 'text-[9px] font-semibold' }, t.label));
         }),
         React.createElement('div', { className: 'relative flex-1 flex items-center justify-center' },
@@ -200,7 +200,7 @@
             className: cx('flex flex-col items-center justify-center gap-0.5 transition-colors'),
           },
             React.createElement('div', { className: 'relative' },
-              React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 24, ring: showProfile ? '#C9A84C' : 'rgba(201,168,76,0.3)' }),
+              React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 24, ring: showProfile ? '#F0C024' : 'rgba(240,192,36,0.3)' }),
               role !== 'citizen' && React.createElement('span', { className: 'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-gold border border-white flex items-center justify-center' },
                 React.createElement(Icon, { name: 'Crown', size: 6, className: 'text-white' }))),
             React.createElement('span', { className: cx('text-[9px] font-semibold', showProfile ? 'text-gold-dark' : 'text-foreground/45') }, 'You')),
@@ -215,13 +215,13 @@
     if (!isContributor || ['messages', 'settings'].includes(nav.page)) return null;
     return React.createElement('div', { className: 'fixed right-4 bottom-20 md:bottom-6 z-40 flex flex-col items-end gap-2' },
       open && React.createElement(React.Fragment, null,
-        React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
+        React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl bg-white shadow-xl border border-border scale-in' },
           React.createElement(Icon, { name: 'MapPin', size: 15, className: 'text-[#3498DB]' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Add Place')),
-        React.createElement('button', { onClick: () => { openCreate('event'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
+        React.createElement('button', { onClick: () => { openCreate('event'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl bg-white shadow-xl border border-border scale-in' },
           React.createElement(Icon, { name: 'CalendarPlus', size: 15, className: 'text-gold-dark' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Create Event'))),
       React.createElement('button', {
         onClick: () => setOpen((o) => !o),
-        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(201,168,76,0.5)] flex items-center justify-center transition-transform active:scale-95',
+        className: 'w-14 h-14 rounded-2xl gold-gradient text-black shadow-[0_8px_24px_rgba(240,192,36,0.38)] flex items-center justify-center transition-transform active:scale-95',
         style: { transform: open ? 'rotate(45deg)' : 'none' },
       }, React.createElement(Icon, { name: 'Plus', size: 24, strokeWidth: 2.5 })));
   }

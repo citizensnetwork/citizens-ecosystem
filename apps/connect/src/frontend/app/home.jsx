@@ -38,9 +38,8 @@
 
     const isConnected = connected.has(id), isConsidered = considering.has(id), isFollowingPlace = followedPlaces.has(id);
     // ── category-adaptive palette ──
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F0C024';
     const mix = (a, p, b) => `color-mix(in srgb, ${a} ${p}%, ${b})`;
-    const grad = `linear-gradient(135deg, ${mix(hex, 68, '#ffffff')}, ${hex} 52%, ${mix(hex, 72, '#000000')})`;
     const hexInk = mix(hex, 72, '#1a1206');   // readable icon / text accent
     const soft = mix(hex, 13, 'transparent'); // tinted fill
     const softInk = mix(hex, 70, '#000000');  // text on soft fill
@@ -113,11 +112,11 @@
         // primary actions
         isEvent
           ? React.createElement('div', { className: 'grid grid-cols-2 gap-2' },
-              React.createElement('button', { onClick: () => toggleConnect(id), className: 'flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold text-white transition-transform active:scale-[0.98]', style: { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` } },
+              React.createElement('button', { onClick: () => toggleConnect(id), className: 'flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold text-black gold-gradient transition-transform active:scale-[0.98]', style: { boxShadow: 'var(--shadow-gold)' } },
                 React.createElement(Icon, { name: isConnected ? 'Check' : 'CalendarCheck', size: 15, strokeWidth: 2.6 }), isConnected ? 'Connected' : 'Connect'),
               React.createElement('button', { onClick: () => toggleConsider(id), className: 'flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-colors', style: isConsidered ? { background: soft, color: softInk } : { border: `1px solid ${mix(hex, 30, 'transparent')}`, color: hexInk } },
                 React.createElement(Icon, { name: 'Bookmark', size: 15, strokeWidth: 2.4, fill: isConsidered ? 'currentColor' : 'none' }), 'Consider'))
-          : React.createElement('button', { onClick: () => togglePlaceFollow(id, item.name), className: 'w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-transform active:scale-[0.98]' + (isFollowingPlace ? '' : ' text-white'), style: isFollowingPlace ? { background: soft, color: softInk } : { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` } },
+          : React.createElement('button', { onClick: () => togglePlaceFollow(id, item.name), className: 'w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-[13px] font-bold transition-transform active:scale-[0.98]' + (isFollowingPlace ? '' : ' text-black gold-gradient'), style: isFollowingPlace ? { background: soft, color: softInk } : { boxShadow: 'var(--shadow-gold)' } },
               React.createElement(Icon, { name: 'Heart', size: 15, strokeWidth: 2.4, fill: isFollowingPlace ? 'currentColor' : 'none' }), isFollowingPlace ? 'Following' : 'Follow'),
 
         // view profile + circle actions
@@ -128,8 +127,8 @@
           circle('MessageCircle', () => startConversationWith(item.organizerName, org.profilePhoto, true, org.id || item.organizerId), 'm')))));
 
     function Wrapper(close, children) {
-      return React.createElement('div', { className: 'fixed z-[120] left-0 right-0 bottom-16 md:bottom-4 md:left-[280px] md:right-auto md:w-[370px]' },
-        React.createElement('div', { className: 'bg-white border border-gold/20 shadow-2xl rounded-t-3xl md:rounded-3xl overflow-hidden md:max-h-none max-h-[78vh] flex flex-col' }, children));
+      return React.createElement('div', { className: 'fixed z-[120] left-0 right-0 bottom-16 md:left-auto md:right-4 md:top-4 md:bottom-auto md:w-[390px]' },
+        React.createElement('div', { className: 'bg-white border border-border shadow-2xl rounded-t-[22px] md:rounded-[22px] overflow-hidden md:max-h-[calc(100vh-2rem)] max-h-[78vh] flex flex-col' }, children));
     }
   }
   const Row = ({ icon, text }) => React.createElement('div', { className: 'flex items-center gap-2 text-xs text-foreground/80' },
@@ -141,14 +140,14 @@
   function CategoryPanel({ selected, onSelect, onClose }) {
     const eventBtn = (c) => React.createElement('button', {
       key: c.id, onClick: () => { onSelect(selected === c.id ? null : c.id); onClose(); },
-      className: cx('flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left', selected === c.id ? 'border-transparent text-white' : 'border-border bg-white/60 hover:bg-white'),
+      className: cx('flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left', selected === c.id ? 'border-transparent text-white' : 'border-border bg-white hover:bg-accent/40'),
       style: selected === c.id ? { background: c.hex } : { color: c.hex },
     },
       React.createElement('span', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0', style: selected === c.id ? { background: 'rgba(255,255,255,0.25)' } : { background: c.hex + '1c' } },
         React.createElement(Icon, { name: c.icon, size: 14 })),
       React.createElement('span', { className: cx('text-xs font-semibold truncate', selected === c.id ? 'text-white' : 'text-foreground') }, c.name));
     const placeItem = (c) => React.createElement('div', {
-      key: c.id, className: 'flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border bg-white/60', style: { color: c.hex },
+      key: c.id, className: 'flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border bg-white', style: { color: c.hex },
     },
       React.createElement('span', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0', style: { background: c.hex + '1c' } }, React.createElement(Icon, { name: c.icon, size: 14 })),
       React.createElement('span', { className: 'text-xs font-semibold text-foreground truncate' }, c.name));
@@ -193,36 +192,36 @@
       // top overlay
       React.createElement('div', { className: 'absolute top-0 left-0 right-0 z-30 p-3 flex flex-col gap-3 pointer-events-none', style: { paddingTop: 'max(0.75rem, env(safe-area-inset-top))' } },
         React.createElement('div', { className: 'flex gap-2 items-center pointer-events-auto' },
-          React.createElement('div', { className: cx('flex-1 glass rounded-2xl shadow-xl border transition-all', focus ? 'border-gold/50' : 'border-white/60') },
+          React.createElement('div', { className: cx('flex-1 glass rounded-2xl shadow-xl border transition-all', focus ? 'border-gold/50 ring-2 ring-gold/20' : 'border-white/70') },
             React.createElement('div', { className: 'flex items-center gap-2 px-4 py-3' },
               React.createElement(Icon, { name: 'Search', size: 15, className: 'text-gold shrink-0' }),
               React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), onFocus: () => setFocus(true), onBlur: () => setFocus(false), placeholder: 'Search events, places, people…', className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground' }),
               query && React.createElement('button', { onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 14, className: 'text-muted-foreground' })))),
-          React.createElement('button', { onClick: () => setShowCats(true), className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/60') },
+          React.createElement('button', { onClick: () => setShowCats(true), 'aria-label': 'Browse categories', className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/70') },
             React.createElement(Icon, { name: 'SlidersHorizontal', size: 16, className: filter ? 'text-gold' : 'text-foreground/60' })),
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement('button', { onClick: () => setShowProfile((s) => !s), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
+            React.createElement('button', { onClick: () => setShowProfile((s) => !s), 'aria-label': 'Open your profile menu', className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/70 overflow-hidden relative' },
               React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl' }),
-              role !== 'citizen' && React.createElement('span', { className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center' }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-white' }))),
+              role !== 'citizen' && React.createElement('span', { className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center' }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-black' }))),
             showProfile && React.createElement(window.ProfilePanel, { onClose: () => setShowProfile(false), anchor: 'top' }))),
 
         // pills
         React.createElement('div', { className: 'flex items-center gap-1.5 pointer-events-auto', style: { transform: 'translateZ(0)' } },
-          React.createElement('button', { onClick: () => scroll('l'), className: 'glass w-7 h-7 rounded-full border border-white/60 flex items-center justify-center shadow-md shrink-0' }, React.createElement(Icon, { name: 'ChevronLeft', size: 13, className: 'text-foreground/60' })),
+          React.createElement('button', { onClick: () => scroll('l'), 'aria-label': 'Scroll categories left', className: 'glass w-7 h-7 rounded-full border border-white/70 flex items-center justify-center shadow-md shrink-0' }, React.createElement(Icon, { name: 'ChevronLeft', size: 13, className: 'text-foreground/60' })),
           React.createElement('div', { ref: pillsRef, className: 'flex-1 flex items-center gap-1.5 overflow-x-auto scrollbar-none' },
-            React.createElement('button', { onClick: () => setFilter(null), className: cx('px-3.5 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm shrink-0 transition-all', !filter ? 'bg-foreground text-background' : 'glass text-foreground/60 border border-white/60') }, 'All'),
+            React.createElement('button', { onClick: () => setFilter(null), className: cx('px-3.5 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm shrink-0 transition-all', !filter ? 'bg-foreground text-background' : 'glass text-foreground/60 border border-white/70') }, 'All'),
             window.DATA.EVENT_CATEGORIES.map((c) => React.createElement(CategoryBadge, { key: c.id, cat: c, active: filter === c.id, onClick: () => setFilter(filter === c.id ? null : c.id) })),
-            React.createElement('button', { onClick: () => setShowIdeas((s) => !s), className: cx('flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm shrink-0 transition-all', showIdeas ? 'bg-gold text-white' : 'glass text-gold border border-gold/40') },
+            React.createElement('button', { onClick: () => setShowIdeas((s) => !s), className: cx('flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm shrink-0 transition-all', showIdeas ? 'bg-gold text-black' : 'glass text-gold border border-gold/40') },
               React.createElement(Icon, { name: 'Lightbulb', size: 11, strokeWidth: 2.5 }), 'Ideas')),
-          React.createElement('button', { onClick: () => scroll('r'), className: 'glass w-7 h-7 rounded-full border border-white/60 flex items-center justify-center shadow-md shrink-0' }, React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'text-foreground/60' })))),
+          React.createElement('button', { onClick: () => scroll('r'), 'aria-label': 'Scroll categories right', className: 'glass w-7 h-7 rounded-full border border-white/70 flex items-center justify-center shadow-md shrink-0' }, React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'text-foreground/60' })))),
 
       // legend
       React.createElement('div', { className: 'absolute bottom-20 md:bottom-5 left-3 z-20' },
-        React.createElement('div', { className: 'glass rounded-xl p-2.5 border border-white/60 shadow-lg space-y-1.5' },
+        React.createElement('div', { className: 'glass rounded-xl p-2.5 border border-white/70 shadow-lg space-y-1.5' },
           React.createElement('p', { className: 'text-[8px] font-bold text-muted-foreground uppercase tracking-widest' }, 'Map Key'),
           React.createElement(LegendRow, { color: '#ef4444', label: 'Live', pulse: true }),
           React.createElement(LegendRow, { label: 'Place', square: true }),
-          React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }))),
+          React.createElement(LegendRow, { color: '#F0C024', label: 'Idea', square: true }))),
 
       selected && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }),
       showCats && React.createElement(CategoryPanel, { selected: filter, onSelect: setFilter, onClose: () => setShowCats(false) }));

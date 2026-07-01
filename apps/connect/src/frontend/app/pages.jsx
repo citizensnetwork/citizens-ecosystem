@@ -114,14 +114,14 @@
       h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
       h(Field, { label: 'Category' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, window.DATA.EVENT_CATEGORIES.map((c) =>
-          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(201,168,76,0.25)', color: '#7A7060' } }, c.short)))),
+          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(240,192,36,0.25)', color: '#7A7060' } }, c.short)))),
       h(Field, { label: 'Project tier' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, IDEA_TIERS.map((t) =>
-          h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-white border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),
+          h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-black border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),
       h(Field, { label: 'Vote goal — ' + goal.toLocaleString() + ' votes' + (tier.fixed ? ' (fixed for this tier)' : '') },
         tier.fixed
           ? h('p', { className: 'text-xs text-muted-foreground' }, tier.label + ' projects always require ' + tier.min.toLocaleString() + ' votes and are reviewed by an admin once reached.')
-          : h('input', { type: 'range', min: tier.min, max: tier.max, value: goal, onChange: (e) => setThreshold(Number(e.target.value)), className: 'w-full accent-[#C9A84C]' })),
+          : h('input', { type: 'range', min: tier.min, max: tier.max, value: goal, onChange: (e) => setThreshold(Number(e.target.value)), className: 'w-full accent-[#F0C024]' })),
       h(Button, { variant: 'gold', className: 'w-full', icon: 'Send', disabled: !valid || busy, onClick: submit }, busy ? 'Posting…' : 'Post Idea'));
   }
 
@@ -146,9 +146,9 @@
 
   // ── Notifications ──
   const NOTIF_ICON = {
-    broadcast: ['Radio', '#C9A84C'], friend: ['UserPlus', '#3498DB'], convince: ['Sparkles', '#9B59B6'],
+    broadcast: ['Radio', '#F0C024'], friend: ['UserPlus', '#3498DB'], convince: ['Sparkles', '#9B59B6'],
     message: ['MessageCircle', '#2563EB'], idea: ['Lightbulb', '#16A34A'], event: ['Calendar', '#E67E22'],
-    volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#C9A84C'],
+    volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#F0C024'],
   };
   function NotificationsPage() {
     const { notifications, markNotifsRead, readNotification, go } = window.useApp();
@@ -163,7 +163,7 @@
         h('div', { className: 'max-w-2xl mx-auto' },
           notifications.length === 0 && h(Empty, { icon: 'Bell', title: 'No notifications yet', sub: 'Broadcasts, messages and event updates land here.' }),
           notifications.map((n) => {
-            const [ic, c] = NOTIF_ICON[n.type] || ['Bell', '#C9A84C'];
+            const [ic, c] = NOTIF_ICON[n.type] || ['Bell', '#F0C024'];
             const linked = !!(n.eventId || n.convId);
             return h('div', { key: n.id, onClick: () => open(n), role: linked ? 'button' : undefined,
               className: cx('flex items-start gap-3 px-4 sm:px-5 py-3.5 border-b border-border/50 transition-colors', !n.read && 'bg-accent/30', linked && 'cursor-pointer hover:bg-accent/40') },
@@ -240,7 +240,7 @@
               NOTIF_PREFS.map(([k, l, d]) => h('div', { key: k, className: 'p-3 rounded-xl bg-white/60 border border-border' },
                 h(Toggle, { checked: notifOn(k), onChange: (v) => toggleNotif(k, v), label: l, desc: d }))))),
 
-          isCitizen && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/40 border border-gold/30' },
+          isCitizen && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#FEF8E2] to-[#F9E08A]/40 border border-gold/30' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, 'Weekly contribution')),
             h('p', { className: 'text-xs text-gold-dark/80 mb-3' }, 'Citizens can post one community-organised event each week. Want to do more? Apply to become a Contributor.'),
             h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, 'Apply to become a Contributor')),

@@ -63,7 +63,7 @@
           ? h('div', null,
               h('p', { className: 'font-semibold mb-2' }, conv.participantName + ' sent you a message request.'),
               h('div', { className: 'flex gap-2' },
-                h('button', { onClick: () => acceptRequest(conv.id), className: 'flex-1 py-1.5 rounded-lg bg-gold text-white text-xs font-semibold' }, 'Accept'),
+                h('button', { onClick: () => acceptRequest(conv.id), className: 'flex-1 py-1.5 rounded-lg bg-gold text-black text-xs font-semibold' }, 'Accept'),
                 h('button', { onClick: () => rejectRequest(conv.id), className: 'flex-1 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 text-xs font-semibold' }, 'Decline')))
           : h('p', null, 'Awaiting ' + conv.participantName + '\u2019s response to your message request.')),
       h('div', { ref: endRef, className: 'flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2' },
@@ -75,14 +75,14 @@
           return h(F, { key: m.id },
             showDate && h('div', { className: 'flex justify-center my-2' }, h('span', { className: 'text-[10px] font-semibold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full' }, m.date)),
             h('div', { className: cx('flex', mine ? 'justify-end' : 'justify-start') },
-              h('div', { className: cx('max-w-[78%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed', mine ? 'gold-gradient text-white rounded-br-sm' : 'bg-card border border-border text-foreground rounded-bl-sm') },
+              h('div', { className: cx('max-w-[78%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed', mine ? 'gold-gradient text-black rounded-br-sm' : 'bg-card border border-border text-foreground rounded-bl-sm') },
                 m.text,
                 h('span', { className: cx('block text-[9px] mt-0.5', mine ? 'text-white/70' : 'text-muted-foreground') }, m.time))));
         })),
       h('div', { className: 'px-3 sm:px-4 py-3 border-t border-border glass-strong shrink-0 flex items-center gap-2' },
         h('button', { className: 'w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0' }, h(Icon, { name: 'Plus', size: 18 })),
         h('input', { value: text, onChange: (e) => setText(e.target.value), onKeyDown: (e) => e.key === 'Enter' && send(), disabled: iAmRecipient, placeholder: iAmRecipient ? 'Accept the request to reply…' : 'Write a message…', className: cx('flex-1 px-4 py-2.5 bg-white/70 border border-border rounded-full text-sm outline-none focus:border-gold/60', iAmRecipient && 'opacity-50 cursor-not-allowed') }),
-        h('button', { onClick: send, disabled: !text.trim() || iAmRecipient, className: 'w-10 h-10 rounded-full gold-gradient text-white flex items-center justify-center shrink-0 disabled:opacity-40' }, h(Icon, { name: 'Send', size: 16 }))));
+        h('button', { onClick: send, disabled: !text.trim() || iAmRecipient, className: 'w-10 h-10 rounded-full gold-gradient text-black flex items-center justify-center shrink-0 disabled:opacity-40' }, h(Icon, { name: 'Send', size: 16 }))));
   }
 
   function MessagesPage() {
@@ -114,7 +114,7 @@
                 c.muted && h(Icon, { name: 'BellOff', size: 10, className: 'text-muted-foreground' }),
                 h('span', { className: 'text-[10px] text-muted-foreground' }, c.lastTime))),
             h('div', { className: 'flex items-center justify-between gap-2 mt-0.5' }, h('p', { className: cx('text-xs truncate', c.unread ? 'text-foreground font-medium' : 'text-muted-foreground') }, c.lastMessage),
-              c.unread > 0 && h('span', { className: 'w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center shrink-0' }, c.unread),
+              c.unread > 0 && h('span', { className: 'w-4 h-4 bg-gold text-black text-[8px] font-bold rounded-full flex items-center justify-center shrink-0' }, c.unread),
               c.status === 'pending' && h('span', { className: 'text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0' }, 'Request')))))));
 
     return h('div', { className: 'flex-1 flex min-h-0', 'data-screen': 'messages' },

@@ -47,10 +47,10 @@
 
   // Real activity_log row → display row. Falls back to a readable generic
   // label for unrecognised actions; never invents data.
-  const ACTIVITY_ICON = { event: ['Calendar', '#C9A84C'], place: ['MapPin', '#2563EB'], broadcast: ['Radio', '#C9A84C'], volunteer: ['HandHeart', '#16A34A'], team: ['Users', '#7C3AED'] };
+  const ACTIVITY_ICON = { event: ['Calendar', '#F0C024'], place: ['MapPin', '#2563EB'], broadcast: ['Radio', '#F0C024'], volunteer: ['HandHeart', '#16A34A'], team: ['Users', '#7C3AED'] };
   function activityRow(a) {
     const kind = (a.entity_type || '').toLowerCase();
-    const [ic, c] = ACTIVITY_ICON[kind] || ['Activity', '#C9A84C'];
+    const [ic, c] = ACTIVITY_ICON[kind] || ['Activity', '#F0C024'];
     const who = a.actor && a.actor.full_name ? a.actor.full_name + ' — ' : '';
     const label = String(a.action || 'activity').replace(/[._-]/g, ' ');
     return { icon: ic, color: c, text: who + label + (a.entity_type ? ' (' + a.entity_type + ')' : ''), time: timeAgo(a.created_at) };
@@ -139,7 +139,7 @@
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
         h('div', { className: 'flex items-center justify-between' },
           h('div', { className: 'flex items-center gap-3' },
-            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)' }),
+            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(240,192,36,0.4)' }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name))),
@@ -149,7 +149,7 @@
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         h('div', { className: 'px-4 sm:px-5 py-4 grid grid-cols-4 gap-2' },
-          h(StatCard, { label: 'Connected', value: totalConnects, color: '#C9A84C' }),
+          h(StatCard, { label: 'Connected', value: totalConnects, color: '#F0C024' }),
           h(StatCard, { label: 'Considering', value: totalConsider, color: '#7C3AED' }),
           h(StatCard, { label: 'Events', value: myEvents.length, color: '#16A34A' }),
           h(StatCard, { label: 'Places', value: myPlaces.length, color: '#2563EB' })),
@@ -172,7 +172,7 @@
                     h('div', { className: 'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5', style: { background: r.color + '20', color: r.color } }, h(Icon, { name: r.icon, size: 13 })),
                     h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-xs text-foreground leading-snug capitalize' }, r.text), h('p', { className: 'text-[10px] text-muted-foreground mt-0.5' }, r.time))))
                 : h('p', { className: 'px-4 py-6 text-xs text-muted-foreground text-center' }, 'No activity yet — it shows here as citizens connect with your work.')),
-            h('button', { onClick: () => go('profile', { id: activeContributorId }), className: 'w-full flex items-center gap-3 p-4 bg-gradient-to-r from-[#F2E8CC] to-[#E8D48B]/30 rounded-2xl border border-gold/30 hover:border-gold/60 transition-all' },
+            h('button', { onClick: () => go('profile', { id: activeContributorId }), className: 'w-full flex items-center gap-3 p-4 bg-gradient-to-r from-[#FEF8E2] to-[#F9E08A]/30 rounded-2xl border border-gold/30 hover:border-gold/60 transition-all' },
               h('div', { className: 'flex-1 text-left' },
                 h('p', { className: 'text-sm font-bold text-gold-dark' }, 'View Public Profile'),
                 h('p', { className: 'text-xs text-gold-dark/70' }, (followerCount || 0).toLocaleString() + ' followers' + (activeContributor.dominantNiche ? ' · ' + activeContributor.dominantNiche : ''))),
@@ -197,7 +197,7 @@
           tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
             h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1' }, 'Recent Conversations'),
             conversations.slice(0, 3).map((c) => h('button', { key: c.id, onClick: () => go('messages', { convId: c.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all text-left' },
-              h('div', { className: 'relative' }, h(Avatar, { src: c.participantPhoto, name: c.participantName, size: 40, rounded: 'xl' }), c.unread > 0 && h('span', { className: 'absolute -top-1 -right-1 w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, c.unread)),
+              h('div', { className: 'relative' }, h(Avatar, { src: c.participantPhoto, name: c.participantName, size: 40, rounded: 'xl' }), c.unread > 0 && h('span', { className: 'absolute -top-1 -right-1 w-4 h-4 bg-gold text-black text-[8px] font-bold rounded-full flex items-center justify-center' }, c.unread)),
               h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, c.participantName), h('p', { className: 'text-xs text-muted-foreground truncate' }, c.lastMessage)),
               h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, c.lastTime))),
             h(Button, { variant: 'outline', className: 'w-full', onClick: () => go('messages') }, 'View All Messages')),
@@ -215,7 +215,7 @@
                 tool === 'volunteer' ? h(window.VolunteerManager, null) : h(window.AnalyticsPanel, null))
             : h('div', { className: 'space-y-4 fade-in' },
                 h(BroadcastTool, { myEvents, myPlaces, preselect: bcTarget }),
-                [['Create Event', 'CalendarPlus', '#C9A84C', 'Post a new event on the map', () => openCreate('event')],
+                [['Create Event', 'CalendarPlus', '#F0C024', 'Post a new event on the map', () => openCreate('event')],
                  ['Add Place', 'MapPin', '#2563EB', 'Register a venue or community space', () => openCreate('place')],
                  ['Volunteer Manager', 'HandHeart', '#16A34A', 'Review volunteer applications', () => setTool('volunteer')],
                  ['Analytics', 'TrendingUp', '#7C3AED', 'Detailed insights and reach data', () => setTool('analytics')]]

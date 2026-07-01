@@ -110,6 +110,9 @@ vitest.log
 # .github/ and .github/prompts/ — see .github/agents/connect-auditor.agent.md
 .audit/
 
+# Temporary Codex session offloads and extracted design references.
+.Codex/sessions/
+
 .vitest-p2.log
 .vitest*.log
 

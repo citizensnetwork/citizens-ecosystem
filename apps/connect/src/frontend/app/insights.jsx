@@ -13,7 +13,7 @@
   const seed = (n) => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
 
   // ── tiny charts ─────────────────────────────────────────────────────
-  function Trend({ data, color = '#C9A84C', height = 120, gid }) {
+  function Trend({ data, color = '#F0C024', height = 120, gid }) {
     const max = Math.max(...data, 1);
     const id = 'tg' + (gid || Math.round(seed(data[0] + data.length) * 1e6));
     const pts = data.map((v, i) => [data.length === 1 ? 0 : (i / (data.length - 1)) * 100, 96 - (v / max) * 88]);
@@ -106,7 +106,7 @@
   function VolunteerManager() {
     const app = window.useApp();
     const { activeContributor, activeContributorId, events, volunteerApps, reviewVolunteer, startConversationWith } = app;
-    const hex = '#C9A84C';
+    const hex = '#F0C024';
     const myEvents = events.filter((e) => e.organizerId === activeContributorId);
     const evs = myEvents.filter((e) => e.volunteeringEnabled || volunteerApps.some((v) => v.eventId === e.id));
     const mine = volunteerApps.filter((v) => myEvents.some((e) => e.id === v.eventId));
@@ -162,7 +162,7 @@
     const base = Math.max(8, Math.round(reach / 70));
     const mk = (mult, jitter) => WEEKS.map((_, i) => Math.round(base * mult * (0.55 + i * 0.07) * (0.8 + seed(i + jitter) * 0.5)));
     const seriesData = { views: mk(2.4, 1), connects: mk(0.6, 7), considers: mk(0.4, 13) };
-    const metaMap = { views: { c: '#C9A84C', label: 'Profile views' }, connects: { c: '#16A34A', label: 'Connects' }, considers: { c: '#7C3AED', label: 'Considers' } };
+    const metaMap = { views: { c: '#F0C024', label: 'Profile views' }, connects: { c: '#16A34A', label: 'Connects' }, considers: { c: '#7C3AED', label: 'Considers' } };
 
     const top = myEvents.slice().sort((a, b) => b.connectCount - a.connectCount).slice(0, 5);
     const topMax = Math.max(...top.map((e) => e.connectCount), 1);
@@ -174,17 +174,17 @@
     // audience by category
     const catCounts = {};
     myEvents.forEach((e) => { catCounts[e.category] = (catCounts[e.category] || 0) + e.connectCount; });
-    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#C9A84C' }; });
+    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#F0C024' }; });
 
     return h('div', { className: 'space-y-4 fade-in' },
       real
         ? h('div', { className: 'grid grid-cols-2 sm:grid-cols-4 gap-2' },
             KpiCard('Followers', (stats ? stats.total_followers : 0).toLocaleString(), '#2563EB'),
             KpiCard('Connects (30d)', (stats ? stats.rsvps_in_period : 0).toLocaleString(), '#16A34A'),
-            KpiCard('Upcoming events', (stats ? stats.upcoming_events : 0).toLocaleString(), '#C9A84C'),
+            KpiCard('Upcoming events', (stats ? stats.upcoming_events : 0).toLocaleString(), '#F0C024'),
             KpiCard('Active places', (stats ? stats.active_places : 0).toLocaleString(), '#7C3AED'))
         : h('div', { className: 'grid grid-cols-2 sm:grid-cols-4 gap-2' },
-            KpiCard('Total reach', reach.toLocaleString(), '#C9A84C', { up: true, text: '24% this week' }),
+            KpiCard('Total reach', reach.toLocaleString(), '#F0C024', { up: true, text: '24% this week' }),
             KpiCard('Connects', totalConnects.toLocaleString(), '#16A34A', { up: true, text: '12%' }),
             KpiCard('Considers', totalConsiders.toLocaleString(), '#7C3AED', null),
             KpiCard('Followers', followers.toLocaleString(), '#2563EB', { up: true, text: fgDelta.toLocaleString() })),
@@ -223,7 +223,7 @@
                   h('div', { className: 'flex items-center justify-between gap-2 mb-1' },
                     h('p', { className: 'text-xs font-semibold text-foreground truncate' }, e.title),
                     h('span', { className: 'text-xs font-bold text-foreground shrink-0' }, e.connectCount.toLocaleString())),
-                  h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden' }, h('div', { className: 'h-full rounded-full', style: { width: (e.connectCount / topMax * 100) + '%', background: c ? c.hex : '#C9A84C' } }))));
+                  h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden' }, h('div', { className: 'h-full rounded-full', style: { width: (e.connectCount / topMax * 100) + '%', background: c ? c.hex : '#F0C024' } }))));
             }))),
 
       h('div', { className: 'grid sm:grid-cols-2 gap-4' },
@@ -257,7 +257,7 @@
     // category distribution across all events
     const catCounts = {};
     events.forEach((e) => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; });
-    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#C9A84C' }; });
+    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#F0C024' }; });
 
     // growth (6 weeks): real mode = actual events-created-per-week from
     // created_at; demo keeps the synthetic two-series chart.
@@ -270,23 +270,23 @@
         if (age >= 0 && age < 6) weeks[5 - age] += 1;
       });
       growthGroups = ['-5w', '-4w', '-3w', '-2w', '-1w', 'now'];
-      growthSeries = [{ name: 'New events', color: '#C9A84C', data: weeks }];
+      growthSeries = [{ name: 'New events', color: '#F0C024', data: weeks }];
     } else {
       const ev6 = [3, 4, 6, 8, 10, events.length].map((n, i) => Math.max(1, n - (5 - i)));
       const us6 = WEEKS.slice(0, 6).map((_, i) => 40 + Math.round(seed(i + 3) * 30) + i * 14);
       growthGroups = WEEKS.slice(0, 6);
-      growthSeries = [{ name: 'Events', color: '#C9A84C', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }];
+      growthSeries = [{ name: 'Events', color: '#F0C024', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }];
     }
 
     // activity feed: real mode = latest created events (honest, derivable
     // from live data); demo keeps the illustrative feed.
     const activity = real
       ? events.filter((e) => e.createdAt).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
-          .map((e) => { const org = contributors.find((c) => c.id === e.organizerId); return ['CalendarPlus', '#C9A84C', (org ? org.name : e.organizerName || 'A community member') + ' created “' + e.title + '”', agoShort(e.createdAt)]; })
+          .map((e) => { const org = contributors.find((c) => c.id === e.organizerId); return ['CalendarPlus', '#F0C024', (org ? org.name : e.organizerName || 'A community member') + ' created “' + e.title + '”', agoShort(e.createdAt)]; })
       : [
-      ['CalendarPlus', '#C9A84C', 'Grace City Church created “Members\u2019 Covenant Gathering”', '12 min ago'],
+      ['CalendarPlus', '#F0C024', 'Grace City Church created “Members\u2019 Covenant Gathering”', '12 min ago'],
       ['UserPlus', '#2563EB', '8 new citizens joined the platform', '40 min ago'],
-      ['Radio', '#8B6914', 'Lighthouse Community Centre sent a broadcast', '1 hour ago'],
+      ['Radio', '#B07F08', 'Lighthouse Community Centre sent a broadcast', '1 hour ago'],
       ['Flag', '#DC2626', 'A new content report was filed', '2 hours ago'],
       ['Crown', '#16A34A', 'Cornerstone Sports League was approved as a contributor', '5 hours ago'],
     ];
@@ -294,7 +294,7 @@
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
       h('div', { className: 'grid grid-cols-2 sm:grid-cols-5 gap-2' },
-        KpiCard('Events', events.length, '#C9A84C'), KpiCard('Places', places.length, '#2563EB'),
+        KpiCard('Events', events.length, '#F0C024'), KpiCard('Places', places.length, '#2563EB'),
         KpiCard(real ? 'Members' : 'Citizens', real ? adminStats.totalUsers : citizens.length, '#16A34A'),
         KpiCard('Contributors', contributors.length, '#9B59B6'),
         KpiCard('Live now', liveNow, '#DC2626', liveNow ? { up: false, text: 'on the map' } : null)),
@@ -340,7 +340,7 @@
   // ════════════════════════ ADMIN REPORTS ════════════════════════════
   const RSEV = { high: { c: '#DC2626', l: 'High' }, medium: { c: '#D97706', l: 'Medium' }, low: { c: '#5D6D7E', l: 'Low' } };
   const RICON = { event: 'Calendar', place: 'MapPin', user: 'User', message: 'MessageCircle', broadcast: 'Radio' };
-  const RSTATUS = { open: { c: '#D97706', bg: '#FEF3C7', l: 'Open' }, resolved: { c: '#16A34A', bg: '#DCFCE7', l: 'Resolved' }, removed: { c: '#DC2626', bg: '#FEE2E2', l: 'Removed' }, dismissed: { c: '#5D6D7E', bg: '#EDE8DC', l: 'Dismissed' } };
+  const RSTATUS = { open: { c: '#D97706', bg: '#FEF3C7', l: 'Open' }, resolved: { c: '#16A34A', bg: '#DCFCE7', l: 'Resolved' }, removed: { c: '#DC2626', bg: '#FEE2E2', l: 'Removed' }, dismissed: { c: '#5D6D7E', bg: '#F2F0EB', l: 'Dismissed' } };
 
   function ReportCard({ r, onResolve }) {
     const sev = RSEV[r.severity] || RSEV.low;

@@ -553,6 +553,26 @@ Full plan + the verified `/api/v1` shapes are in the gitignored Wear session log
 
 ---
 
+## 3K. Connect Map design-system reskin SHIPPED ✅ (2026-07-01)
+
+Presentation-only reskin of the standalone HTML/React frontend in `src/frontend/`; the Next.js
+application remains the API/static host. No API, auth, database, RLS, or migration behavior changed.
+
+- Reworked the shared visual foundation around Manrope, bright Kingdom Gold (`#F0C024`), warm ground,
+  white paper surfaces, black ink, hairline borders, restrained shadows, and glass reserved for
+  floating map chrome.
+- Reskinned the landing/sign-in flow, desktop shell, mobile navigation, dashboard surfaces, map
+  controls, filters, category sheet, legend, MapLibre markers/broadcast bubbles, previews, and profile
+  detail surfaces. Desktop map selections now use the established right-panel content pattern.
+- Preserved category colors for discovery signals while removing the former antique-gold/cream and
+  mixed-serif treatment. Added accessible labels/focus treatment to touched icon and toggle controls.
+- Quality gates: standalone frontend build ✅; TypeScript ✅; Vitest **637/637** (71 files) ✅;
+  ESLint ✅; `git diff --check` ✅; focused secret scan ✅. Architect/security review: **SHIP**;
+  no changed data or trust boundary, and no new OWASP finding.
+- Rendered Browser QA remains a manual-preview item: the in-app Browser runtime failed during bootstrap
+  with `codex/sandbox-state-meta: missing field sandboxPolicy`, before navigation. No Playwright fallback
+  was used because fallback had not been pre-authorised.
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Step 3 §3.4 data plane is DONE (§3J): `SupabaseWearStore` + `WearStore.users/brands` + mig 144 +
