@@ -555,8 +555,6 @@ Full plan + the verified `/api/v1` shapes are in the gitignored Wear session log
 
 ## 3K. Connect Map design-system reskin SHIPPED ✅ (2026-07-01)
 
-Implementation commit: **`10ec40f`**.
-
 Presentation-only reskin of the standalone HTML/React frontend in `src/frontend/`; the Next.js
 application remains the API/static host. No API, auth, database, RLS, or migration behavior changed.
 
