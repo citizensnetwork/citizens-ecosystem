@@ -54,7 +54,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`slug-change:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`slug-change:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

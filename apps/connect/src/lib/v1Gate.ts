@@ -15,7 +15,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { checkRateLimitAsync } from "@/lib/rate-limit-async";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   resolveApiKey,
   type ApiKeyContext,
@@ -75,7 +75,7 @@ export async function gateV1(
     ? `${opts.bucket}:key:${key.id}`
     : `${opts.bucket}:ip:${getClientIp(req)}`;
 
-  const primary = await checkRateLimitAsync(primaryId, {
+  const primary = await checkRateLimit(primaryId, {
     limit: primaryLimit,
     windowMs: 60_000,
   });
@@ -92,7 +92,7 @@ export async function gateV1(
     const normalised = opts.resourceId.toLowerCase();
     const resId = `${opts.bucket}:res:${normalised}`;
     const resLimit = opts.resourceLimitPerMinute ?? 120;
-    const secondary = await checkRateLimitAsync(resId, {
+    const secondary = await checkRateLimit(resId, {
       limit: resLimit,
       windowMs: 60_000,
     });

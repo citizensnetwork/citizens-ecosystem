@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   // Rate-limit: prefer the authenticated user id, fall back to IP for anon.
   const rlKey = user ? `shares:user:${user.id}` : `shares:ip:${getClientIp(request)}`;
-  const rl = checkRateLimit(rlKey, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(rlKey, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

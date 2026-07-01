@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`suggestions-export:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`suggestions-export:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

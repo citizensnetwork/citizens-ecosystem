@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
   // Light read cap — defence-in-depth for admin session compromise
   // (Architect audit L3).
-  const rl = checkRateLimit(`admin-users-get:${guard.user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`admin-users-get:${guard.user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const rl = checkRateLimit(`admin-users-patch:${guard.user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`admin-users-patch:${guard.user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

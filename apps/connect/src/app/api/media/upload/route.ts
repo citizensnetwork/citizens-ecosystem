@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   // 2. Rate-limit (per user) — caps how many uploads a user can initiate.
-  const rl = checkRateLimit(`media-upload:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`media-upload:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

@@ -191,7 +191,7 @@
       React.createElement(window.MapFloatersLayer, { markers, filterCategory: filter, selectedId: selected }),
 
       // top overlay
-      React.createElement('div', { className: 'absolute top-0 left-0 right-0 z-30 p-3 flex flex-col gap-3 pointer-events-none' },
+      React.createElement('div', { className: 'absolute top-0 left-0 right-0 z-30 p-3 flex flex-col gap-3 pointer-events-none', style: { paddingTop: 'max(0.75rem, env(safe-area-inset-top))' } },
         React.createElement('div', { className: 'flex gap-2 items-center pointer-events-auto' },
           React.createElement('div', { className: cx('flex-1 glass rounded-2xl shadow-xl border transition-all', focus ? 'border-gold/50' : 'border-white/60') },
             React.createElement('div', { className: 'flex items-center gap-2 px-4 py-3' },

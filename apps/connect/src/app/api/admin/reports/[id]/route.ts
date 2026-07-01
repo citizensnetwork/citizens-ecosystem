@@ -35,7 +35,7 @@ export async function PATCH(
 
   // Defence-in-depth for admin session compromise (parity with the rest
   // of the admin write surfaces).
-  const rl = checkRateLimit(
+  const rl = await checkRateLimit(
     `admin-reports-patch:${guard.user.id}`,
     RATE_LIMITS.mutation,
   );

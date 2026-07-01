@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`notif-prefs:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`notif-prefs:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

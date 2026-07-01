@@ -14,7 +14,7 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`account-delete:${user.id}`, { limit: 3, windowMs: 3_600_000 });
+  const rl = await checkRateLimit(`account-delete:${user.id}`, { limit: 3, windowMs: 3_600_000 });
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

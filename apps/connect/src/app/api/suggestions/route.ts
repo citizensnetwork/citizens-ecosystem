@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     ? `suggestions:user:${user.id}`
     : `suggestions:ip:${request.headers.get("x-forwarded-for") ?? "unknown"}`;
 
-  const rl = checkRateLimit(rateLimitKey, {
+  const rl = await checkRateLimit(rateLimitKey, {
     limit: SUGGESTIONS_PER_DAY,
     windowMs: 24 * 60 * 60 * 1000,
   });
@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`suggestions:read:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`suggestions:read:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

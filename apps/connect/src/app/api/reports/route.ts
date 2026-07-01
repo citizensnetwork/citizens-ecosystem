@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`reports:${user.id}`, REPORT_RATE);
+  const rl = await checkRateLimit(`reports:${user.id}`, REPORT_RATE);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many reports. Please try again later." },

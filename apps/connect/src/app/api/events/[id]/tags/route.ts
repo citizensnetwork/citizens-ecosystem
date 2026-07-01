@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`event-tags:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`event-tags:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -155,7 +155,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid tag id" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`event-tags:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`event-tags:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

@@ -62,7 +62,7 @@ export async function POST(
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rl = checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -140,7 +140,7 @@ export async function PATCH(
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rl = checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

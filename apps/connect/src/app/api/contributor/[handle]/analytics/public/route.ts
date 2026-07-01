@@ -38,7 +38,7 @@ export async function GET(
     data: { user },
   } = await supabase.auth.getUser();
   const rlKey = `analytics-public:${user?.id ?? handle}`;
-  const rl = checkRateLimit(rlKey, RATE_LIMITS.read);
+  const rl = await checkRateLimit(rlKey, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

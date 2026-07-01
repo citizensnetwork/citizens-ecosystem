@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid tag id" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`admin-tags:${guard.user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`admin-tags:${guard.user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

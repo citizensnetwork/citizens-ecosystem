@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const rl = checkRateLimit(`admin-reports-get:${guard.user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`admin-reports-get:${guard.user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

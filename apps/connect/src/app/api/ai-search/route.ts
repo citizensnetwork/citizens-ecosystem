@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
   // Rate-limit by IP first (cheapest key; applies to anonymous callers).
   const ip = getClientIp(request);
-  const ipRl = checkRateLimit(`ai-search:ip:${ip}`, AI_SEARCH_LIMIT);
+  const ipRl = await checkRateLimit(`ai-search:ip:${ip}`, AI_SEARCH_LIMIT);
   if (!ipRl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   // Second layer of rate-limiting keyed on user id when available — defeats
   // attackers who rotate IPs but share a single stolen session cookie.
   if (user) {
-    const userRl = checkRateLimit(`ai-search:user:${user.id}`, AI_SEARCH_LIMIT);
+    const userRl = await checkRateLimit(`ai-search:user:${user.id}`, AI_SEARCH_LIMIT);
     if (!userRl.success) {
       return NextResponse.json(
         { error: "Too many requests" },

@@ -96,7 +96,7 @@ export async function POST(
   const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rl = checkRateLimit(`broadcasts:send:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`broadcasts:send:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

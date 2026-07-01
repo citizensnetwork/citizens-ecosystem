@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit: location updates are frequent, allow 60/min
-    const rl = checkRateLimit(`loc:${user.id}`, { limit: 60, windowMs: 60_000 });
+    const rl = await checkRateLimit(`loc:${user.id}`, { limit: 60, windowMs: 60_000 });
     if (!rl.success) {
       return NextResponse.json({ error: "Too many requests" }, {
         status: 429,
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Rate limit GET to prevent tracking abuse
-    const rl = checkRateLimit(`loc-get:${user.id}`, RATE_LIMITS.mutation);
+    const rl = await checkRateLimit(`loc-get:${user.id}`, RATE_LIMITS.mutation);
     if (!rl.success) {
       return NextResponse.json({ error: "Too many requests" }, {
         status: 429,

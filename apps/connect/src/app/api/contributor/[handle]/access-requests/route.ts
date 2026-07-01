@@ -41,7 +41,7 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`access-requests:read:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`access-requests:read:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -94,7 +94,7 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden — admins only" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`access-requests:submit:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`access-requests:submit:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -202,7 +202,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`access-requests:update:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`access-requests:update:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

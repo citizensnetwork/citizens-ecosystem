@@ -122,7 +122,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(
+  const rl = await checkRateLimit(
     `admin-categories-patch:${guard.user.id}`,
     RATE_LIMITS.mutation,
   );
@@ -197,7 +197,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(
+  const rl = await checkRateLimit(
     `admin-categories-delete:${guard.user.id}`,
     RATE_LIMITS.mutation,
   );

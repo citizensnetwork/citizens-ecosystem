@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`conv-list:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`conv-list:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`conv:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`conv:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

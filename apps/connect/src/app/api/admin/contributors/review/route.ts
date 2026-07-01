@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!ip) {
       return NextResponse.json({ error: "client_identity_required" }, { status: 400 });
     }
-    const rl = checkRateLimit(`admin-review-deeplink:${ip}`, RATE_LIMITS.heavy);
+    const rl = await checkRateLimit(`admin-review-deeplink:${ip}`, RATE_LIMITS.heavy);
     if (!rl.success) {
       return NextResponse.json(
         { error: "Too many requests" },
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   } else {
     const guard = await requireAdmin(supabase);
     if (!guard.ok) return guard.deny;
-    const rl = checkRateLimit(`admin-review-inapp:${guard.user.id}`, RATE_LIMITS.mutation);
+    const rl = await checkRateLimit(`admin-review-inapp:${guard.user.id}`, RATE_LIMITS.mutation);
     if (!rl.success) {
       return NextResponse.json(
         { error: "Too many requests" },

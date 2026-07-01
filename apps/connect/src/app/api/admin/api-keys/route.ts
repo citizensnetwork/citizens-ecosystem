@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   // Light read cap — defence-in-depth for admin session compromise.
   // Listing keys is a read; mutation tier was needlessly tight (Tier-B
   // audit follow-up — `read` matches the rest of admin list endpoints).
-  const rl = checkRateLimit(`admin-keys-list:${guard.user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`admin-keys-list:${guard.user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const rl = checkRateLimit(`admin-keys-mint:${guard.user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`admin-keys-mint:${guard.user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -200,7 +200,7 @@ export async function DELETE(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const rl = checkRateLimit(
+  const rl = await checkRateLimit(
     `admin-keys-revoke:${guard.user.id}`,
     RATE_LIMITS.mutation,
   );

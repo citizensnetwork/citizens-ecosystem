@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   if (limit > 20) limit = 20;
 
   const ip = getClientIp(request);
-  const ipRl = checkRateLimit(`autocomplete:ip:${ip}`, AUTOCOMPLETE_LIMIT);
+  const ipRl = await checkRateLimit(`autocomplete:ip:${ip}`, AUTOCOMPLETE_LIMIT);
   if (!ipRl.success) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    const userRl = checkRateLimit(`autocomplete:user:${user.id}`, AUTOCOMPLETE_LIMIT);
+    const userRl = await checkRateLimit(`autocomplete:user:${user.id}`, AUTOCOMPLETE_LIMIT);
     if (!userRl.success) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }

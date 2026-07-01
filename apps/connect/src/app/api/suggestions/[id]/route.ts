@@ -31,7 +31,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`suggestions:update:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`suggestions:update:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

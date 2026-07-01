@@ -81,7 +81,7 @@ export async function POST(
     return NextResponse.json({ error: "Place not owned by this contributor" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`services:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`services:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

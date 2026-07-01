@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   // Rate-limit per user — block abusive re-submits even if the unique
   // index would already stop duplicates (the index only fires after
   // the row reaches Postgres; rate-limit short-circuits earlier).
-  const rl = checkRateLimit(`contrib-apply:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`contrib-apply:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many attempts" },

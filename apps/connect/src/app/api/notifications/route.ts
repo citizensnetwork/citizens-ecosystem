@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`notifications-get:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`notifications-get:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`notifications-patch:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`notifications-patch:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`notifications-delete:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`notifications-delete:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

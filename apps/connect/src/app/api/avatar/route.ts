@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   // 2. Rate-limit
-  const rl = checkRateLimit(`avatar:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`avatar:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

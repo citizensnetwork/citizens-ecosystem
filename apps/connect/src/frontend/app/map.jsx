@@ -181,19 +181,27 @@
       mapRef.current = map;
 
       // ── Default framing: user location FIRST, national data as fallback ──
-      if (navigator.geolocation) {
+      // Native shell (Capacitor): route through @capacitor/geolocation so the
+      // proper native permission prompt fires (raw navigator.geolocation is
+      // unreliable in a WKWebView/Android WebView without it — runbook Step 4).
+      // Web: unchanged browser Geolocation API. Either way this only fires once
+      // the map itself has mounted (first map view), never at app boot.
+      const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+      const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
+      const onLocated = (coords) => {
+        if (mapRef.current !== map || userMovedRef.current) return;
+        userMovedRef.current = true;
+        map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
+      };
+      if (isNativeMap && window.CapGeolocation) {
+        window.CapGeolocation.getCurrentPosition(positionOpts)
+          .then((pos) => onLocated(pos.coords))
+          .catch(() => { /* denied / unavailable → keep the national fallback */ });
+      } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (mapRef.current !== map || userMovedRef.current) return;
-            userMovedRef.current = true;
-            map.flyTo({
-              center: [pos.coords.longitude, pos.coords.latitude],
-              zoom: 12,
-              duration: 0,
-            });
-          },
+          (pos) => onLocated(pos.coords),
           () => { /* denied / unavailable → keep the national fallback */ },
-          { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
+          positionOpts,
         );
       }
 

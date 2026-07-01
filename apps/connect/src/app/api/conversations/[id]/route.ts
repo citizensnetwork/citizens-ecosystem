@@ -19,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid conversation ID" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`conv-action:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`conv-action:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   let body: { action: string };
@@ -156,7 +156,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid conversation ID" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`conv-action:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`conv-action:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   const { error } = await supabase

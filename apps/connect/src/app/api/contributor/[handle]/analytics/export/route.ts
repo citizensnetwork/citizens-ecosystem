@@ -54,7 +54,7 @@ export async function GET(
   }
 
   // Export is heavier than a list fetch — use the heavy bucket.
-  const rl = checkRateLimit(`analytics-export:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`analytics-export:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

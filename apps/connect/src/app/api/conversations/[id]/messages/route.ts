@@ -128,7 +128,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not a participant" }, { status: 403 });
   }
 
-  const rl = checkRateLimit(`msg:${user.id}`, RATE_LIMITS.message);
+  const rl = await checkRateLimit(`msg:${user.id}`, RATE_LIMITS.message);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many messages" }, { status: 429 });
   }

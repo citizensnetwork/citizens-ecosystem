@@ -25,25 +25,75 @@
   window.CC_SUPABASE = client;
 
   var PENDING = "cc_pending_intent";
+  var NATIVE_REDIRECT = "citizensconnect://auth-callback";
 
-  // Sign in / sign up with Google (OAuth — same call for both). With OAuth
-  // this navigates away to Google and returns to the app origin.
+  function isNativeShell() {
+    return !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+  }
+
+  // Sign in / sign up with Google (OAuth — same call for both).
+  // Web: normal in-page redirect to Google, back to the app origin.
+  // Native (Capacitor): the webview's own origin (capacitor://localhost /
+  // https://localhost) isn't a redirectable https URL from Google's side, so
+  // we open the OAuth URL in the SYSTEM browser (@capacitor/browser) and
+  // register a custom-scheme redirect; the app catches the return via
+  // `appUrlOpen` (listenForNativeAuthCallback, below) and exchanges the code
+  // for a session (runbook Step 3 / addendum §B1).
   async function signInWithGoogle(intent) {
     if (intent === "contributor") {
       try { localStorage.setItem(PENDING, "contributor"); } catch (e) {}
     }
-    var origin = env.FRONTEND_ORIGIN || window.location.origin;
-    // A bare hostname (e.g. "www.citizenscentral.co.za") has no scheme, so
-    // Supabase treats it as a relative path on its own domain and the OAuth
-    // redirect lands on supabase.co/<hostname>?code=…  which 404s.
-    if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
-    var redirectTo = origin + window.location.pathname;
+    var native = isNativeShell();
+    var redirectTo;
+    if (native) {
+      redirectTo = NATIVE_REDIRECT;
+    } else {
+      var origin = env.FRONTEND_ORIGIN || window.location.origin;
+      // A bare hostname (e.g. "www.citizenscentral.co.za") has no scheme, so
+      // Supabase treats it as a relative path on its own domain and the OAuth
+      // redirect lands on supabase.co/<hostname>?code=…  which 404s.
+      if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
+      redirectTo = origin + window.location.pathname;
+    }
     var res = await client.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: redirectTo, queryParams: { access_type: "offline", prompt: "consent" } },
+      options: {
+        redirectTo: redirectTo,
+        queryParams: { access_type: "offline", prompt: "consent" },
+        skipBrowserRedirect: native,
+      },
     });
     if (res.error) throw res.error;
+    if (native && res.data && res.data.url && window.CapBrowser) {
+      await window.CapBrowser.open({ url: res.data.url });
+    }
   }
+
+  // Catches the `citizensconnect://auth-callback?code=…` deep link the
+  // system browser hands back after Google sign-in, closes the browser tab,
+  // and exchanges the PKCE code for a session. onAuthStateChange (already
+  // wired via onAuthChange below) then fires SIGNED_IN exactly as it does
+  // on web — no extra plumbing needed on the store.jsx side.
+  function listenForNativeAuthCallback() {
+    if (!isNativeShell() || !window.CapApp) return;
+    window.CapApp.addListener("appUrlOpen", async function (data) {
+      var url = data && data.url;
+      if (!url || url.indexOf(NATIVE_REDIRECT) !== 0) return;
+      try {
+        if (window.CapBrowser && window.CapBrowser.close) {
+          try { await window.CapBrowser.close(); } catch (e) {}
+        }
+        var match = url.match(/[?&]code=([^&]+)/);
+        var code = match ? decodeURIComponent(match[1]) : null;
+        if (!code) return;
+        var res = await client.auth.exchangeCodeForSession(code);
+        if (res.error) console.error("[CC_AUTH] native OAuth exchange failed", res.error);
+      } catch (e) {
+        console.error("[CC_AUTH] native OAuth callback failed", e);
+      }
+    });
+  }
+  listenForNativeAuthCallback();
 
   // Resolve the current session + role after (re)load. Returns null if signed out.
   async function loadSession() {

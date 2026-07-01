@@ -27,7 +27,7 @@ export async function GET(
   const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rl = checkRateLimit(`dashboard:stats:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`dashboard:stats:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

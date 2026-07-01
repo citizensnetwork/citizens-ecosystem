@@ -16,6 +16,20 @@
 
 ---
 
+## 🔴 OPERATIONAL STATUS — read this before anything else (2026-07-01)
+
+**Supabase billing lapses this month.** Founder confirms Google OAuth has been verified working
+in prod (Vercel env vars are correctly set — the §2M "founder action required" note below is
+resolved). But **Supabase project `xyiajtrvhlxaeplsiajj` will pause (DB + Auth) once billing
+lapses, until the invoice is paid** — at that point the map goes empty and Google sign-in breaks
+again, exactly like the §2M symptoms, but the ROOT CAUSE will be billing, not env vars or code.
+**Any session diagnosing "no data on the map" or "sign-in unavailable" from here forward: check
+Supabase project status / billing FIRST** before re-investigating env vars or re-reading §2M's
+history — don't burn a session re-diagnosing an already-solved problem. No code action available
+on our side; only the founder settling the Supabase invoice un-pauses it.
+
+---
+
 ## ⚠️ STRATEGIC PIVOT (2026-06-07) — read before trusting older sections
 
 The **in-place Figma reskin of the Next.js components (Phases 1–5 below) is ABANDONED.**
@@ -311,6 +325,126 @@ gates + OAuth allow-list; Q4 `wear.brands` Wear-owned + OPTIONAL ownership-verif
 
 ---
 
+## 3G. Step 0 launch-hardening — B0/A2/Step3/Step4/Step6 SHIPPED ✅ (2026-07-01)
+
+Closes the code-only items from `docs/MOBILE_LAUNCH_RUNBOOK.md`'s remaining tail (founder
+approved building "as far as you effectively can"; F1/F2/store-compliance/release-process
+deliberately left for later — need Firebase/Apple accounts + legal/asset decisions, not code).
+Infra choice for A2 = **Upstash Redis free tier**. Working log:
+`.claude/sessions/step0-launch-hardening.md`. No DB migration. Gates: **tsc 0 · eslint 0 ·
+vitest 634/634** (all green both before and after — the async rate-limit refactor changed 67
+route files but every call site was already inside an `async` handler, confirmed by a clean
+`tsc --noEmit`).
+
+### B0 — Vite/esbuild precompile of the frontend (addendum §B0)
+The 19 `app/*.jsx` screens were shipping as raw Babel-standalone, JIT-compiled in the browser on
+every load — the actual "not shippable to mid-range phones" problem, plus the `?v=` cache-bust
+ritual. **[scripts/build-frontend.js](scripts/build-frontend.js)** now precompiles them:
+- Each screen is still its own IIFE that only talks via `window.*` (no import/export was ever
+  used) — esbuild strips JSX per file (`React.createElement` classic pragma, matching the old
+  Babel config) and concatenates the results in load order, so the cross-file `window.X` wiring
+  is untouched. The whole concatenation is minified as one pass → one content-hashed
+  `app/bundle.<hash>.js`. `auth-client.js` gets the same hash-and-minify treatment.
+- **React/ReactDOM/supabase-js/maplibre-gl/lucide stay on CDN UMD `<script>` tags** (deliberate
+  scope cut, documented in the runbook — true full-vendor bundling for offline-first boot is a
+  fast-follow, not required to fix the actual JIT-compile perf problem or kill `?v=`).
+- `index.html` is rewritten at build time: drops the Babel-standalone CDN script + all 19
+  `type="text/babel"` tags, inserts the compiled bundle + a new Capacitor bridge script (below).
+  `viewport-fit=cover` added to the **source** `src/frontend/index.html` meta tag directly (so
+  local dev at `:3001` gets it too, not just built output).
+- Old hashed outputs are deleted before each build (`cleanHashedOutputs()`) so stale bundles
+  don't accumulate in `public/`/`mobile-dist/`.
+- Local dev (`python -m http.server 3001 --directory src/frontend`, raw Babel-standalone) is
+  **unaffected** — only the shipped `public/`/`mobile-dist/` builds changed. New launch config
+  `frontend-built` (`.claude/launch.json`, port 3002, serves `public/`) added to preview the
+  actual compiled output. Verified in-browser: renders, 0 console errors, click → `useState`
+  re-render confirmed working (screenshot before/after "A Contributor" toggle).
+- `eslint.config.mjs` + `.gitignore` updated — `public/**`/`mobile-dist/**` are generated
+  output (same category as `android/**`/`ios/**`), never linted; new hashed filenames
+  (`auth-client.*.js`, `capacitor-bridge.*.js`) added to `.gitignore` (only the old fixed
+  `auth-client.js` name was covered before). Incidentally also gitignored `public/supabase-auth.js`
+  (a plain copy of the Phase-1 reference file — was untracked/uncovered before, harmless gap).
+
+### A2 — Upstash Redis rate limiter (addendum §A2, "must land before store launch")
+Found **prior, undocumented work**: `src/lib/rate-limit-async.ts` + `src/lib/v1Gate.ts` already
+had an Upstash-backed limiter (raw `fetch` to the Upstash REST API, no SDK — fixed-window
+INCR+EXPIRE), but scoped ONLY to the public `/api/v1/*` surface (ecosystem Phase C work, commit
+`11e4660`, never logged in this file). Everything else (~90 authenticated routes) still called
+the single-instance in-memory `checkRateLimit` from `src/lib/rate-limit.ts` — the actual gap the
+runbook flagged.
+- **Merged the two**: `checkRateLimit` in `src/lib/rate-limit.ts` is now itself the Upstash-or-
+  fallback async function (same algorithm as the old `rate-limit-async.ts`, which is now
+  deleted). Same exported name/shape everywhere — no call site needed an import change, only
+  `await`. `v1Gate.ts` now imports `checkRateLimit` from `./rate-limit` directly.
+- Activates when **both** `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set;
+  otherwise (dev, tests, or an Upstash outage) transparently falls back to the original
+  in-memory sliding-window limiter — same behaviour as before for anyone without the env vars.
+  Documented in `.env.example`.
+- Mechanically added `await` to **96 call sites across 67 `route.ts` files** (scripted, not
+  hand-edited — every site matched the uniform `const x = checkRateLimit(...)` shape). `tsc
+  --noEmit` came back clean, confirming every one was already inside an `async` handler.
+  Existing `vi.mock` test doubles (`api-keys.test.ts`, `categories.test.ts`, `admin/reports/
+  route.test.ts`, `admin/users.test.ts`) needed **no changes** — `await` on a plain mocked
+  object just resolves to that object.
+- **Founder action (only if Upstash is wanted live):** create a free-tier DB at
+  console.upstash.com → REST API section → set `UPSTASH_REDIS_REST_URL` +
+  `UPSTASH_REDIS_REST_TOKEN` in Vercel. Without them the app runs exactly as it did before this
+  session (in-memory, single-instance) — nothing breaks either way.
+
+### Step 3 — OAuth-on-device deep link (addendum §B1) + Step 4 — native geolocation (addendum §B4)
+Built together since both needed the same new Capacitor plugin bridge. **Discovered the native
+platform config (Android `AndroidManifest.xml` intent-filter, iOS `Info.plist`
+`CFBundleURLTypes`/`CFBundleURLSchemes`, both location usage strings) was ALREADY wired for
+`citizensconnect://` and location permissions** — likely from the initial Capacitor scaffold,
+never logged here. Only the JS-side plugin wiring was missing.
+- **New [src/frontend/capacitor-bridge.js](src/frontend/capacitor-bridge.js)** — the one frontend
+  file that's real ESM (imports `@capacitor/core` + the newly-added `@capacitor/app` +
+  `@capacitor/browser`, plus the already-installed `@capacitor/geolocation`). It's the only file
+  needing a true `bundle:true` esbuild pass (not just a JSX strip); exposes `window.CapCore` /
+  `CapApp` / `CapBrowser` / `CapGeolocation`. Loaded in both web and mobile builds (Capacitor's
+  web-shim implementations no-op harmlessly outside the native shell; verified `isNativePlatform()
+  === false` in a plain browser via `preview_eval`).
+- **`auth-client.js`**: `signInWithGoogle` now branches on `isNativeShell()`. Native →
+  `skipBrowserRedirect: true` + `redirectTo: "citizensconnect://auth-callback"` +
+  `CapBrowser.open()` (system browser, since the webview's own origin isn't a redirectable https
+  URL for Google). New `listenForNativeAuthCallback()` catches the `appUrlOpen` deep link, closes
+  the browser tab, extracts `?code=`, calls `client.auth.exchangeCodeForSession(code)` — the
+  existing `onAuthChange` subscription in `store.jsx` picks up the resulting `SIGNED_IN` event
+  with **no changes needed there**. Web path (non-native) is byte-for-byte unchanged.
+- **`map.jsx`**: the existing "user location first, national fallback" init effect now checks
+  `isNativeMap` and calls `CapGeolocation.getCurrentPosition()` instead of raw
+  `navigator.geolocation` when running natively (raw browser geolocation is unreliable in a
+  WKWebView/Android WebView without the plugin — no proper native permission prompt). Still only
+  fires when the map screen mounts (first map view), never at app boot — matches the runbook's
+  explicit requirement.
+- **NOT auto-verifiable** (needs a real device/simulator build): the actual
+  `cap:sync` → Android Studio/Xcode → sign-in-via-system-browser-and-return round trip. Code
+  paths were verified for correctness and the non-native fallback was verified in-browser; the
+  native round trip needs `npm run cap:sync` + a device, which this session's tools can't drive.
+
+### Step 6 (partial) — viewport-fit=cover + safe-area insets (addendum §B5)
+- `viewport-fit=cover` added to `src/frontend/index.html`'s meta tag (source-level, covers dev
+  + both builds).
+- Bottom nav (`shell.jsx` `BottomNav`) already had `pb-[env(safe-area-inset-bottom)]` from an
+  earlier, undocumented pass. Added the missing counterpart: the map screen's floating top
+  overlay (search bar/filter/avatar, `home.jsx`, `position:absolute; top:0`) now gets
+  `paddingTop: max(0.75rem, env(safe-area-inset-top))` so it clears a notch/status-bar cutout.
+  Other screens don't need explicit top insets — `capacitor.config.ts`'s existing
+  `ios: { contentInset: "automatic" }` already insets normal (non-fixed) scrolling content below
+  the safe area; only viewport-edge-pinned elements bypass that and need manual handling.
+- Rest of Step 6 (public privacy/terms URLs, data-safety forms, icons/screenshots/feature
+  graphic, age rating, store-nav surfacing of the already-built account-deletion/report/block
+  APIs) is legal/content work, **left for later per founder instruction**.
+
+### What's still open (founder accounts/decisions — not code, deliberately deferred)
+1. **F1** Android push — needs a Firebase project.
+2. **F2** iOS push + build — needs Apple Developer Program enrollment + a macOS/Xcode machine.
+3. **Step 6 rest** — store compliance content/legal/assets.
+4. **Step 7** — release process/cadence.
+5. **Supabase billing** — see the operational-status banner at the top of this file.
+
+---
+
 ## 2O. Messaging Polish + Search-Path Fix ✅ (2026-06-17)
 
 Commit **`0187a11`** on origin/main. **Migration 136 applied live** → next migration # = **137**.
@@ -402,13 +536,18 @@ as the hardcoded `CITIZEN_BASE = "Lydia Mensah"`. **Fixes (store.jsx + dashboard
 - `dashboard.jsx`: demo "Lydia" activity rows + fabricated "+24%" / fake weekly numbers
   replaced with honest empty/zeroed states.
 
-### ⚠️ FOUNDER ACTION REQUIRED to actually log real users in
-The code now fails honestly instead of faking Lydia — but real Google login still needs the
+### ~~⚠️ FOUNDER ACTION REQUIRED to actually log real users in~~ ✅ DONE (confirmed 2026-07-01)
+~~The code now fails honestly instead of faking Lydia — but real Google login still needs the
 **Vercel env vars** set on the deployment that serves the app, then a redeploy:
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_MAPTILER_KEY`,
 `NEXT_PUBLIC_MAPTILER_STYLE`, and `NEXT_PUBLIC_API_BASE_URL=''` (same-origin) — matches memory
 `supabase-placeholder-fallback-masks-missing-env`. Without them: map still loads (public REST,
-same-origin) but Google sign-in shows "Sign-in is temporarily unavailable."
+same-origin) but Google sign-in shows "Sign-in is temporarily unavailable."~~
+**Founder confirms (2026-07-01): the Vercel env vars are set and Google sign-in has been verified
+working in prod.** See the new operational-status warning near the top of this file — **Supabase
+billing lapses this month; project services (DB + Auth, incl. this working Google login) will pause
+until the invoice is paid.** Not a code issue — no action needed here beyond the founder settling
+the bill before that happens.
 
 ### Vision data points — status (Citizens_Vision_Backend_Architecture.md)
 **Migration 133 already implemented EVERY Connect/Database-layer data point** (verified live:

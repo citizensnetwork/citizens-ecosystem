@@ -75,7 +75,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 
-  const rl = checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -173,7 +173,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 
-  const rl = checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -271,7 +271,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 
-  const rl = checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`cover-photo:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

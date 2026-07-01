@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const rl = checkRateLimit(
+  const rl = await checkRateLimit(
     `admin-contrib-delete:${guard.user.id}`,
     RATE_LIMITS.mutation,
   );

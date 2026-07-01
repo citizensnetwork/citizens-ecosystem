@@ -93,7 +93,7 @@ function clientId(request: NextRequest): string {
 
 export async function GET(request: NextRequest) {
   const ip = clientId(request);
-  const rl = checkRateLimit(`org-search:${ip}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`org-search:${ip}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

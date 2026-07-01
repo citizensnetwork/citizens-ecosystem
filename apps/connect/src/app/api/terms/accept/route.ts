@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`terms-accept:${user.id}`, RATE_LIMITS.auth);
+  const rl = await checkRateLimit(`terms-accept:${user.id}`, RATE_LIMITS.auth);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

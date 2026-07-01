@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid conversation ID" }, { status: 400 });
   }
 
-  const rl = checkRateLimit(`conv-read:${user.id}`, RATE_LIMITS.read);
+  const rl = await checkRateLimit(`conv-read:${user.id}`, RATE_LIMITS.read);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

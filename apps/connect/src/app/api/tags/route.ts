@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`tags:${user.id}`, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(`tags:${user.id}`, RATE_LIMITS.mutation);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests" },

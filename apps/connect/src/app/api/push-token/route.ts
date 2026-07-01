@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = checkRateLimit(`push:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`push:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest) {
   // Share the `push:${user.id}` bucket with POST: register/unregister storms
   // are the same abuse pattern (token churn) and legitimate clients only
   // call this once on logout.
-  const rl = checkRateLimit(`push:${user.id}`, RATE_LIMITS.heavy);
+  const rl = await checkRateLimit(`push:${user.id}`, RATE_LIMITS.heavy);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

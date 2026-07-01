@@ -64,7 +64,7 @@ export async function POST(
   const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rl = checkRateLimit(user.id, RATE_LIMITS.mutation);
+  const rl = await checkRateLimit(user.id, RATE_LIMITS.mutation);
   if (!rl.success) return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
 
   let body: unknown;
