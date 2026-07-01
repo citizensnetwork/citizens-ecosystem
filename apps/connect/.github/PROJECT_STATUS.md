@@ -7,7 +7,7 @@
 
 | Batch | Scope | Status | Notes |
 |-------|-------|--------|-------|
-| connect-map-design-system-reskin | Align the standalone HTML/React Connect Map and landing flow with the Citizens Design System | **Shipped** | `src/frontend/` only; Manrope, bright gold/paper/ink tokens, reskinned shell/navigation/map controls/markers/previews/detail surfaces. Next remains API/static host. Build, tsc, ESLint, diff check, security scan, and 637 tests pass. In-app Browser bootstrap failed before navigation, so rendered visual QA remains manual. |
+| connect-map-design-system-reskin | Align the standalone HTML/React Connect Map and landing flow with the Citizens Design System | **Shipped** `10ec40f` | `src/frontend/` only; Manrope, bright gold/paper/ink tokens, reskinned shell/navigation/map controls/markers/previews/detail surfaces. Next remains API/static host. Build, tsc, ESLint, diff check, security scan, and 637 tests pass. In-app Browser bootstrap failed before navigation, so rendered visual QA remains manual. |
 
 ## MASTER_DIRECTION Execution (current)
 
