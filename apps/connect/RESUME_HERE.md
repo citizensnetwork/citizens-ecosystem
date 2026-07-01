@@ -434,6 +434,71 @@ never logged here. Only the JS-side plugin wiring was missing.
 
 ---
 
+## 3H. Step 3 Connect dependency SHIPPED — `GET /api/v1/profiles/{id}` ✅ (2026-07-01)
+
+Delivered the **single Connect-side dependency** the Wear (Step 3) build needs, and re-verified
+Step 0 is code-complete + stable. Commit **`e2f579a`** on `main` (pushed `85ac146..e2f579a`).
+Working log: `.claude/sessions/step3-connect-profiles-endpoint.md`.
+**No DB change → next migration # still 143.** Gates: **tsc 0 · eslint 0 · vitest 637/637** (+3).
+
+### What shipped
+- **NEW [`src/app/api/v1/profiles/[id]/route.ts`](src/app/api/v1/profiles/[id]/route.ts)** —
+  `GET /api/v1/profiles/{id}` returning **display-safe fields only** (`id, full_name, avatar_url`)
+  for a user by id. Lets a sibling app (Wear) render a Connect user's display identity through the
+  `/api/v1` contract instead of a raw `public.profiles` read (SHARED_DB_CONTRACT R2), covering the
+  rare "user who hasn't opened Wear yet" backfill case (STEP3 scope §5 Q1).
+  - UUID-validated → **400**; **404** when unresolved; `gateV1` rate-limited (anon IP cap + 120/min
+    per-id secondary cap); byte-stable body + `X-Generated-At` header (mirrors `events/{id}`).
+  - **Security:** `profiles` RLS is `using(true)` (policy "Profiles are viewable by everyone",
+    migrations 063/065) → server anon client can row-read any profile; **column safety is enforced
+    by the explicit `select("id,full_name,avatar_url")`**. A test asserts the select can't silently
+    widen into PII. Returns only already-public display identity → no new exposure surface.
+- Tests: `src/__tests__/api/v1/endpoints.test.ts` (+3: 400 / 404 / 200-display-safe-with-select-guard).
+- Docs: new section + stability guarantee in [`docs/api-v1.md`](docs/api-v1.md); STEP3 scope doc
+  §3 + §3F item 4 above both marked DONE.
+
+### Step 0 status re-verified this session
+Old Next.js frontend is **fully deleted** — `src/app` is API-only (no `src/components`/`src/hooks`/
+`layout.tsx`/`globals.css`/`page.tsx`). `node scripts/build-frontend.js` = 0. So Step 0's remaining
+tail is **all non-code** (F1/F2/Step 6 rest/Step 7 above); nothing code-level is outstanding there.
+⇒ Step 5 (monorepo lift) is no longer gated by Step 0 code — it's gated only by the founder's
+non-code launch items + the Step 3/4 sequencing.
+
+---
+
+## ▶▶ NEXT STEPS (start here in a fresh chat)
+
+**The Connect repo has no outstanding code work on the current plan.** The next unit is a
+**different repo** and involves a **production schema migration**, so it needs an explicit founder go-ahead.
+
+1. **Step 3 — Wear app build (in the `citizens-wear` repo, NOT this one).** Branch off Wear `main`.
+   Full spec: [`docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) §3.
+   Connect-side dependency (`/api/v1/profiles/{id}`) is **DONE** — everything below is Wear-repo / operational:
+   1. add `@supabase/supabase-js` + `ssr` (env = shared project `xyiajtrvhlxaeplsiajj`, NOT a new Wear project);
+   2. replace mock-token session (`apps/web/src/lib/session.ts`) with Supabase Auth;
+   3. **apply the drafted `wear.*` DDL to prod** — move
+      [`docs/wear/143_wear_schema.sql`](docs/wear/143_wear_schema.sql) → the Wear/Connect migration
+      lineage as `143_wear_schema.sql` (renumber if Connect ships a migration first) + `apply_migration`.
+      ⚠ **This is a prod DB write — confirm before applying.**
+   4. reconcile `connect-client` to Connect's real `/api/v1` (drop brands/products/users/OIDC);
+   5. wire `packages/db` off `MemoryWearStore` onto supabase-js (`db:{schema:'wear'}`, RLS-enforced);
+      keep Wear coverage gates green.
+   - **Deploy gates (founder, from scope §5 Q3):** Wear Vercel env → shared URL + anon key; Supabase
+     Dashboard → API → **Exposed schemas → add `wear`**; set `CONNECT_API_BASE_URL` (+ optional
+     `CONNECT_API_KEY`); add Wear's prod origin to Supabase Auth Redirect URLs allow-list.
+2. **Step 4** — extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`). No prod risk.
+3. **Step 5** — the monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in).
+   Gated behind Step 3/4, not behind Step 0 code anymore.
+4. **Founder-only, non-code (any time):** Vision deploy gates (§3F ⛔), Wear deploy gates (above),
+   F1 Firebase / F2 Apple push, Step 6 store compliance, Step 7 release. Supabase Mgmt **PAT
+   rotation** still owed (§3D).
+
+> Optional Connect-side polish if a session wants a low-risk in-repo task: the accepted demo debt
+> in `src/frontend/app/store.jsx` (`if (!realUser)` graceful-degradation branches, §2M) — harmless,
+> unreachable in prod, strip only if desired. Not required for launch.
+
+---
+
 ## 2O. Messaging Polish + Search-Path Fix ✅ (2026-06-17)
 
 Commit **`0187a11`** on origin/main. **Migration 136 applied live** → next migration # = **137**.
