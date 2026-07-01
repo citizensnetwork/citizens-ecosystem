@@ -16,20 +16,6 @@
 
 ---
 
-## 🔴 OPERATIONAL STATUS — read this before anything else (2026-07-01)
-
-**Supabase billing lapses this month.** Founder confirms Google OAuth has been verified working
-in prod (Vercel env vars are correctly set — the §2M "founder action required" note below is
-resolved). But **Supabase project `xyiajtrvhlxaeplsiajj` will pause (DB + Auth) once billing
-lapses, until the invoice is paid** — at that point the map goes empty and Google sign-in breaks
-again, exactly like the §2M symptoms, but the ROOT CAUSE will be billing, not env vars or code.
-**Any session diagnosing "no data on the map" or "sign-in unavailable" from here forward: check
-Supabase project status / billing FIRST** before re-investigating env vars or re-reading §2M's
-history — don't burn a session re-diagnosing an already-solved problem. No code action available
-on our side; only the founder settling the Supabase invoice un-pauses it.
-
----
-
 ## ⚠️ STRATEGIC PIVOT (2026-06-07) — read before trusting older sections
 
 The **in-place Figma reskin of the Next.js components (Phases 1–5 below) is ABANDONED.**
@@ -441,7 +427,6 @@ never logged here. Only the JS-side plugin wiring was missing.
 2. **F2** iOS push + build — needs Apple Developer Program enrollment + a macOS/Xcode machine.
 3. **Step 6 rest** — store compliance content/legal/assets.
 4. **Step 7** — release process/cadence.
-5. **Supabase billing** — see the operational-status banner at the top of this file.
 
 ---
 
@@ -544,10 +529,10 @@ as the hardcoded `CITIZEN_BASE = "Lydia Mensah"`. **Fixes (store.jsx + dashboard
 `supabase-placeholder-fallback-masks-missing-env`. Without them: map still loads (public REST,
 same-origin) but Google sign-in shows "Sign-in is temporarily unavailable."~~
 **Founder confirms (2026-07-01): the Vercel env vars are set and Google sign-in has been verified
-working in prod.** See the new operational-status warning near the top of this file — **Supabase
-billing lapses this month; project services (DB + Auth, incl. this working Google login) will pause
-until the invoice is paid.** Not a code issue — no action needed here beyond the founder settling
-the bill before that happens.
+working in prod.** A billing-lapse warning was raised and briefly noted here, but founder confirmed
+(2026-07-01) there is no billing issue on the free tier, and both Supabase projects were independently
+verified `ACTIVE_HEALTHY` via the Management API in the same session. Google OAuth is confirmed valid
+through 2026-07-15. No blocker here.
 
 ### Vision data points — status (Citizens_Vision_Backend_Architecture.md)
 **Migration 133 already implemented EVERY Connect/Database-layer data point** (verified live:
