@@ -1,6 +1,9 @@
 # Step 3 — Citizens Wear Integration Scope (Wear ↔ shared backend)
 
-> **Status: SCOPED & DIRECTION LOCKED (2026-06-21). Build NOT started.**
+> **Status: BUILD IN PROGRESS (2026-07-01).** Increments 1–3 done & shipped (schema→prod on Connect
+> `main`; Supabase added + mock session replaced by shared Supabase Auth on `citizens-wear` `main`).
+> **Remaining = the one coupled unit §3.4** (Supabase store port + `connect-client` reconciliation +
+> repoint ~16 consumers) + docs (§3.5) + founder deploy gates (§3.6).
 > Implements [`ECOSYSTEM_DECISION_BRIEF.md`](./ECOSYSTEM_DECISION_BRIEF.md) §6 order **3**
 > ("Point Wear at the shared Supabase project"). Governed by
 > [`../SHARED_DB_CONTRACT.md`](../SHARED_DB_CONTRACT.md) and [`../api-v1.md`](../api-v1.md).
@@ -86,13 +89,18 @@ Citizen in Wear, "making the unseen seen" across channels.
 
 Ordered, each independently shippable behind Wear's existing launch gate:
 
-1. **Add Supabase to Wear** — `@supabase/supabase-js` (+ `@supabase/ssr`); env points at the
-   **shared** project (`NEXT_PUBLIC_SUPABASE_URL`/anon key = `xyiajtrvhlxaeplsiajj`), **not** a new
-   Wear project. Update `LOCAL-SETUP.md` §2/§3 + `.env.local` blueprint to match D1.
-2. **Replace the mock session with Supabase Auth** — rewrite `apps/web/src/lib/session.ts`
-   (`getSession`/`writeSessionCookie`) onto `@supabase/ssr`; Google OAuth callback; `getCurrentUser`
-   resolves the Supabase user + shared `public.profiles`. Retire `MOCK_SIGN_IN_TOKEN` and the
-   `connect-client.auth` path. Keep `MockConnectClient` for tests only.
+1. ✅ **DONE (2026-07-01) — Supabase added to Wear** (`citizens-wear` `main`, commit `361e438`).
+   `@supabase/supabase-js@^2.102.1` + `@supabase/ssr@^0.10.0` (ecosystem-pinned) on `apps/web`; env
+   points at the **shared** project. New `apps/web/src/lib/supabase/{env,server,client,middleware}.ts`
+   (request-scoped server client → RLS via the user JWT; browser client; session-refresh middleware
+   that no-ops without env). *Still TODO (doc, Inc 5): rewrite `LOCAL-SETUP.md` §2/§3 + `.env.local`
+   blueprint to the shared-project model.*
+2. ✅ **DONE (2026-07-01) — mock session replaced by shared Supabase Auth** (commit `361e438`).
+   `session.ts` `getSession`/`getCurrentUser` resolve the Supabase user (validated via `getUser()`),
+   mapped to the existing `ConnectUser` shape so all ~20 consumers compile unchanged; added `signOut()`.
+   `/sign-in` → Google OAuth server action; new `/auth/callback` code-exchange (open-redirect-safe
+   `next`). Removed `MOCK_SIGN_IN_TOKEN` + the `/api/auth/callback/connect` OIDC route. `MockConnectClient`
+   retained. Gates: tsc 7/7 · eslint clean · vitest 18/18 · `next build` OK (middleware 90 kB).
 3. ✅ **DONE (2026-07-01) — `wear.*` schema APPLIED to prod.** Now
    [`supabase/migrations/143_wear_schema.sql`](../../supabase/migrations/143_wear_schema.sql)
    (22 tables, 42 policies, 10 enums, 3 fns). Three corrections vs the draft before applying: dropped
@@ -101,9 +109,41 @@ Ordered, each independently shippable behind Wear's existing launch gate:
    must not read the reverse row). **Verified: 0 tables without RLS; advisors 0 ERROR, 0 new findings.**
    Reads use `supabase-js` `db:{schema:'wear'}` (§5). Still TODO: wire `packages/db` off
    `MemoryWearStore` onto the real client (Wear-repo work).
-4. **Reconcile `connect-client`** — drop/repoint the brands/products/users/OIDC surface; keep only
-   real Connect reads Wear needs (contributors/categories over `/api/v1`). Update `ADR-0002` lineage.
-5. **Tests/gates** — keep coverage gates green; contract tests updated to the reconciled surface.
+4. **⏳ REMAINING — wire the Supabase store + reconcile `connect-client` (ONE coupled unit).**
+   Verified 2026-07-01: the app resolves users via `getConnectClient().users.getByHandle/getById`,
+   brands via `brands.getBySlug/listForOwner/…`, products via `products.*` across **~16 files**
+   (`actions.ts` + feed/profile/post/search/explore/messages/stories/brand/compose/settings pages).
+   So dropping the users/brands/products surface from `connect-client` **cannot** be separated from
+   porting the store — it is one refactor. Precise steps:
+   - **Extend the `WearStore` contract** (`packages/db/src/contract.ts`) with the two repos `wear.*`
+     now owns: `users` (mirror directory — `getById`/`getByHandle`/`search`/`upsertFromSession`) and
+     `brands` (`getById`/`getBySlug`/`listForOwner`/`listAll`/`search` + owner-verified `create`/`update`
+     with the optional `connect_contributor_id` link, Q4). Implement both in `MemoryWearStore` (keeps
+     memory mode + the contract tests green; seed fixtures move here from `connect-client`).
+   - **Implement `SupabaseWearStore`** (all 13 existing repos + the 2 new) against `wear.*` with an
+     **injected request-scoped `SupabaseClient`** (`db:{schema:'wear'}`; cast to bare `SupabaseClient`
+     like Vision). Mirror `MemoryWearStore` semantics (cursor pagination, feed ranking, 24h story
+     expiry, DM request states, soft-delete, block symmetry via the `wear.is_blocked_either` SECDEF,
+     membership via `wear.is_conversation_member`). Put it in `apps/web/src/lib/` (web coverage is an
+     allowlist → auto-excluded) **or** `packages/db` with a documented `coverage.exclude` (I/O adapter,
+     not unit-testable without Postgres — validate by contract-conformance + `next build` + prod RLS smoke).
+   - **`getWearStore()`** env-selects: Supabase client present → `SupabaseWearStore`; else
+     `MemoryWearStore` (dev/test). Store must be **request-scoped** for the Supabase path (RLS needs the
+     user JWT) — build per-request from the `@supabase/ssr` server client, not a process singleton.
+   - **Repoint the ~16 consumers** off `connect-client.users/brands/products` onto `getWearStore().users/brands`.
+     Drop product validation in `createPost`/compose (no `wear.products` table yet → `tagged_product_ids`
+     stays opaque passthrough).
+   - **Reconcile `connect-client`**: remove `users`/`brands`/`products`/`auth`(OIDC) from the contract +
+     mock + http + factory + fixtures; **add** `contributors` + `categories` directories over the real
+     `/api/v1` (`/contributors`, `/contributors/{slug}`, `/categories`); update the 3 test files +
+     `ADR-0002` lineage. Keep `MockConnectClient` for tests. `webhook/*` + `events` bus stay.
+   - **Mirror hydration:** on first Wear sign-in, upsert `wear.users` from the session (derive a unique
+     `handle` — Connect `/api/v1/profiles/{id}` returns only id/full_name/avatar_url, **no handle**).
+5. **Tests/gates** — keep coverage gates green (`web` allowlist store.ts/connect.ts/validators.ts@90;
+   `db`+`connect-client` src/**@70); update contract tests to the reconciled surface; `next build` green.
+6. **Deploy gates (founder, §5 Q3):** expose `wear` in PostgREST Exposed schemas; Wear Vercel env
+   (shared URL + anon key, `CONNECT_API_BASE_URL`, optional `CONNECT_API_KEY`); add Wear's prod origin
+   to Supabase Auth Redirect URLs; Google OAuth allow-list.
 
 **Connect-side work this implies:** exactly **one small additive endpoint** —
 `GET /api/v1/profiles/{id}` (display-safe fields only), per the §5 Q1 recommendation — authored in

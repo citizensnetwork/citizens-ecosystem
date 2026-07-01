@@ -466,26 +466,48 @@ non-code launch items + the Step 3/4 sequencing.
 
 ---
 
+## 3I. Wear Phase 3 — foundation shipped (schema→prod + Supabase Auth) ✅ (2026-07-01)
+
+Executed Step 3 **foundation-first, sequenced** (founder chose this delivery + contract-conformance
+validation). Working log: `.claude/sessions/wear-phase3-shared-supabase.md` (gitignored).
+
+- **Increment 1 — `wear.*` schema APPLIED to prod** (Connect `main`, commit `a38cc24`; pushed).
+  **Migration 143** `supabase/migrations/143_wear_schema.sql` → shared project `xyiajtrvhlxaeplsiajj`.
+  Activates the 3rd schema boundary (`public`/`vision`/**`wear`**). **22 tables (0 without RLS), 42
+  policies, 10 enums, 3 fns.** **Advisors 0 ERROR, 0 new findings** (72 WARN/3 INFO = mig-142 baseline).
+  Fixed 3 bugs vs the `docs/wear` draft before applying: dropped `wear.users.email` (PII under
+  public-read RLS); reordered the DM block (a `language sql` fn body is validated at CREATE →
+  `is_conversation_member` cannot precede its table); added `wear.is_blocked_either` SECDEF (a block's
+  target must not read the reverse row). SHARED_DB_CONTRACT §1/§9 stamped to head 143. **Next # = 144.**
+- **Increment 2 — mock session replaced by shared Supabase Auth** (`citizens-wear` `main`, commit
+  `361e438`; pushed). `@supabase/supabase-js@^2.102.1`+`@supabase/ssr@^0.10.0`; new
+  `apps/web/src/lib/supabase/{env,server,client,middleware}.ts` (request-scoped server client → RLS via
+  user JWT; session-refresh middleware); `session.ts` onto Supabase Auth (mapped to the existing
+  `ConnectUser` shape so ~20 consumers compile unchanged); `/sign-in` → Google OAuth; `/auth/callback`
+  code-exchange; removed the OIDC callback + `MOCK_SIGN_IN_TOKEN`. **Gates: tsc 7/7 · eslint clean ·
+  vitest 18/18 · `next build` OK.** One Kingdom identity now spans Connect → Vision → Wear.
+
+**Why it stopped here (honest checkpoint):** the remaining unit (§3.4) is **one tightly-coupled
+refactor** — the app resolves users/brands/products via `connect-client` across **~16 files**, so
+reconciling `connect-client` is inseparable from porting the ~700-line store onto `wear.*` and
+extending the `WearStore` contract with `users`+`brands` repos. It **cannot be integration-tested in
+this environment (no local Postgres)**, so a blind big-bang rewrite would breach the "validated,
+tested changes" bar. Precise execution spec is in **STEP3 scope §3.4** (repos to add, store semantics
+to mirror, consumers to repoint, coverage strategy, mirror-handle derivation).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-**The Connect repo has no outstanding code work on the current plan.** The next unit is a
-**different repo** and involves a **production schema migration**, so it needs an explicit founder go-ahead.
-
-1. **Step 3 — Wear app build (in the `citizens-wear` repo, NOT this one).** Branch off Wear `main`.
-   Full spec: [`docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) §3.
-   Connect-side dependency (`/api/v1/profiles/{id}`) is **DONE** — everything below is Wear-repo / operational:
-   1. add `@supabase/supabase-js` + `ssr` (env = shared project `xyiajtrvhlxaeplsiajj`, NOT a new Wear project);
-   2. replace mock-token session (`apps/web/src/lib/session.ts`) with Supabase Auth;
-   3. **apply the drafted `wear.*` DDL to prod** — move
-      [`docs/wear/143_wear_schema.sql`](docs/wear/143_wear_schema.sql) → the Wear/Connect migration
-      lineage as `143_wear_schema.sql` (renumber if Connect ships a migration first) + `apply_migration`.
-      ⚠ **This is a prod DB write — confirm before applying.**
-   4. reconcile `connect-client` to Connect's real `/api/v1` (drop brands/products/users/OIDC);
-   5. wire `packages/db` off `MemoryWearStore` onto supabase-js (`db:{schema:'wear'}`, RLS-enforced);
-      keep Wear coverage gates green.
-   - **Deploy gates (founder, from scope §5 Q3):** Wear Vercel env → shared URL + anon key; Supabase
-     Dashboard → API → **Exposed schemas → add `wear`**; set `CONNECT_API_BASE_URL` (+ optional
-     `CONNECT_API_KEY`); add Wear's prod origin to Supabase Auth Redirect URLs allow-list.
+1. **Step 3 REMAINING — the coupled store/connect-client unit (in `citizens-wear`, branch off `main`).**
+   Full, execution-ready spec: [`docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) §3.4.
+   In short: extend `WearStore` with `users`+`brands` repos (impl in Memory + a new `SupabaseWearStore`
+   with an injected request-scoped client, `db:{schema:'wear'}`); env-select in `getWearStore()`;
+   repoint the ~16 `connect-client.users/brands/products` consumers onto the store; reconcile
+   `connect-client` to `contributors`+`categories` over `/api/v1` (drop users/brands/products/OIDC,
+   update its 3 test files + ADR-0002); hydrate the `wear.users` mirror on first sign-in (derive a
+   unique handle — Connect returns none). Then §3.5 docs (`LOCAL-SETUP.md`/`.env` blueprint) + §3.6
+   founder deploy gates. Validate: tsc · eslint · vitest · `next build` · prod RLS smoke.
 2. **Step 4** — extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`). No prod risk.
 3. **Step 5** — the monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in).
    Gated behind Step 3/4, not behind Step 0 code anymore.
