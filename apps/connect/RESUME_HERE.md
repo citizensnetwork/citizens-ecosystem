@@ -553,6 +553,13 @@ Full plan + the verified `/api/v1` shapes are in the gitignored Wear session log
 
 ---
 
+## 3K. Connect Map design-system reskin WITHDRAWN (2026-07-01)
+
+The founder determined the attempted visual treatment did not match expectations. Commits
+`b14d595` and `10ec40f` were reverted with history-preserving revert commits `3bf7aad` and
+`6ec4976`. The standalone HTML/React frontend in `src/frontend/` is restored to its pre-reskin
+state; Next.js remains the API/static host. No API, auth, database, RLS, or migration behavior changed.
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Step 3 §3.4 data plane is DONE (§3J): `SupabaseWearStore` + `WearStore.users/brands` + mig 144 +

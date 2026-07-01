@@ -3,6 +3,12 @@
 > Living document. Update after completing each phase or major milestone.
 > Full batch history and per-batch validation logs live in `git log`.
 
+## Connect Map Reskin (2026-07-01)
+
+| Batch | Scope | Status | Notes |
+|-------|-------|--------|-------|
+| connect-map-design-system-reskin | Attempted standalone HTML/React Connect Map visual alignment | **Withdrawn** | Implementation `10ec40f` and handoff `b14d595` were reverted by `6ec4976` and `3bf7aad` at founder request. The prior frontend visual state is restored. |
+
 ## MASTER_DIRECTION Execution (current)
 
 The single source of truth is [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md).
