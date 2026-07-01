@@ -175,16 +175,23 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-01, project `xyiajtrvhlxaeplsiajj`, head = mig 143)
+## 9. Verification snapshot (updated 2026-07-01, project `xyiajtrvhlxaeplsiajj`, head = mig 144)
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
-- **`wear.*` (mig 143):** **22 base tables** (all RLS-enabled, **0 without RLS**), **42 RLS policies**,
-  **3 functions** (`set_updated_at`, and two SECURITY DEFINER helpers `is_conversation_member` +
-  `is_blocked_either`, both `search_path=''`, EXECUTE revoked from public → `authenticated`+`service_role`),
-  **10 enums**. `wear.users` mirror carries **no email column** (display-safe, public-SELECT).
-  **Security advisors: 0 ERROR** and **0 new findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged;
-  all pre-existing `public.*`). **PostgREST-exposed** (`wear` added to Exposed schemas, 2026-07-01).
+- **`wear.*` (mig 143 + 144):** **22 base tables** (all RLS-enabled, **0 without RLS**), **42 RLS policies**,
+  **7 functions** — `set_updated_at`; the two READ-path SECURITY DEFINER helpers `is_conversation_member`
+  + `is_blocked_either`; and the four **mig-144 write-path** helpers (`create_direct_conversation`,
+  `create_group_conversation` — SECDEF RPCs, EXECUTE `authenticated`+`service_role` only, internal
+  `auth.uid()` actor-guard; `bump_conversation_updated_at`, `unfollow_on_block` — SECDEF trigger fns,
+  `postgres`-only, fired by `trg_bump_conversation_updated_at` on `messages` insert and
+  `trg_unfollow_on_block` on `blocks` insert) — all `search_path=''`. **10 enums**. `wear.users` mirror
+  carries **no email column** (display-safe, public-SELECT). **Security advisors: 0 ERROR** and **0 new
+  findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged; all pre-existing `public.*`).
+  **PostgREST-exposed** (`wear` added to Exposed schemas, 2026-07-01). Mig 144 rationale: 143's RLS
+  cannot express DM/group creation (inserting the *other* member's row), the `conversations.updated_at`
+  bump, or block→symmetric-unfollow — the `SupabaseWearStore` port delegates those to these helpers,
+  mirroring Connect's `find_or_create_conversation` SECDEF precedent.
 - **Unified Profile cols:** `wear_style_preferences`, `wear_wardrobe_visibility`,
   `learn_enrolled_listings`, `connect_home_province`, `notification_radius_km`, `timezone` — all present.
 - **content_labels:** table present; triggers `trg_apply_event_content_labels` +
