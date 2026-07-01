@@ -263,19 +263,48 @@ Then org admins link their Connect account on the Vision `/[orgSlug]/connect` pa
 ### Optional doc polish (low priority)
 `citizens-vision/docs/API.md` + `docs/ADMIN_GUIDE.md` still describe the old sync — light edit when convenient.
 
-### ▶ STEP 3 — point **Wear** at the shared project (NOT started; do next)
-Repo: `C:\Users\SJ\Documents\Citizen Network\citizens-wear` (a Turborepo — the monorepo seed).
-- **CAUTION:** it sits on branch **`chore/phase-2-se-poly-hardening`** — likely in-process work.
-  Confirm its branch/working-tree state and coordinate **before editing** so you don't clobber it;
-  branch off a clean base.
-- It already has `packages/db` (contract/realtime/memory/hashtags) + `packages/connect-client`
-  (http/mock/webhook/factory) — a real abstraction, **not** a one-env repoint. Scope first: read how
-  `packages/db` builds its Supabase client (Wear has **no `wear.*` schema yet** → it reads Connect commons
-  via `connect-client` over `/api/v1`, not raw tables) and how `connect-client` resolves its base URL.
-- Shared-DB facts a cold session needs: project **`xyiajtrvhlxaeplsiajj`** (eu-central), one `auth.users`;
-  `public.*` = Connect commons, `vision.*` = Vision, `wear.*` = future (none yet). Cross-app reads =
-  **`/api/v1`** ([docs/api-v1.md](docs/api-v1.md)), never raw tables ([docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) R2).
-  Wear has **no prod data** → trivial repoint, zero data migration.
+### ▶ STEP 3 — point **Wear** at the shared project → **SCOPED · DIRECTION RATIFIED · `wear.*` DDL DRAFTED (2026-07-01); app build NOT started**
+Full scope: **[docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md)**.
+Drafted `wear.*` DDL (NOT applied): **[docs/wear/143_wear_schema.sql](docs/wear/143_wear_schema.sql)**.
+Working log: `.claude/sessions/step3-wear-shared-project-scope.md`. No Connect/Wear *functional* code changed.
+
+**The resume's Step-3 premise was WRONG — corrected by scoping `citizens-wear` on disk:**
+- `packages/db` has **no** Supabase client — it's an **in-memory** store + an *unwired* Prisma schema.
+  `grep -ri supabase` across the whole Wear repo = **0 hits**; **no `@supabase/*` dependency** at all.
+- `connect-client`'s `HttpConnectClient` targets a Connect API that **does not exist**:
+  `{base}/v1/auth/verify · /v1/users · /v1/brands · /v1/products · /v1/health`. Connect's REAL surface is
+  `/api/v1/{events, places, contributors, categories, analytics}` — **disjoint** (diff prefix + diff domain;
+  no brands/products/OIDC). Wear's `ADR-0002` built the contract before Connect's shape stabilised and drifted.
+- ⇒ "point Wear at the shared project" = **Wear's entire (unstarted) Phase 3**, gated on a direction decision —
+  NOT a one-env repoint. (Still zero data migration — Wear has no prod data; the cost is *build*.)
+
+**Founder decision (2026-06-21) — Direction A:** Wear authenticates against the **shared Supabase project**
+(`xyiajtrvhlxaeplsiajj`, one `auth.users`, Google OAuth — same as Vision); Wear owns its commerce/social data
+in a new **`wear.*`** schema (activates the 3rd schema boundary); `connect-client` is reconciled to Connect's
+real `/api/v1` (drop users/brands/products/OIDC). Recorded as **Wear `ADR-0007`** →
+[citizens-wear PR #22](https://github.com/citizensnetwork/citizens-wear/pull/22) (**MERGED to `main`** 2026-07-01).
+**Data-access: stay on Supabase (`supabase-js`), NOT Prisma** — RLS is the only isolation wall (R3) and
+`supabase-js` enforces it with the user JWT; Prisma bypasses RLS + can't co-own the SQL migration lineage.
+`schema.prisma` kept as a design reference only.
+
+**Wear `main` reconciliation (done):** `main` was a strict ancestor of canonical `chore/phase-2-se-poly-hardening`
+(7 behind, 0 diverged). Merged existing **PR #8** (clean ff, merge `9e8833b`) → `main` now carries Phases 2.5–6 +
+social-commerce foundation. **`main` is the correct base for the Step 3 build branch.** Canonical branch +
+`chore/phase-4-local-rewrite` (cherry-pick reserve) left untouched.
+
+**Q1–Q4 RATIFIED (2026-07-01)** — scope doc §5: Q1 `wear.users` mirror hydrated from session + a tiny additive
+`GET /api/v1/profiles/{id}`; Q2 `supabase-js db.schema='wear'` (RLS, like Vision); Q3 mirror Vision's deploy
+gates + OAuth allow-list; Q4 `wear.brands` Wear-owned + OPTIONAL ownership-verified `connect_contributor_id`.
+**Net new Connect-side work = one additive endpoint** (`/api/v1/profiles/{id}`).
+
+**The app build remaining (a future session, branch off Wear `main`)** — see scope doc §3:
+1. add `@supabase/supabase-js`+`ssr` (env = shared project, NOT a new Wear project);
+2. replace mock-token session (`apps/web/src/lib/session.ts`) with Supabase Auth;
+3. **apply** the drafted `wear.*` DDL — move [docs/wear/143_wear_schema.sql](docs/wear/143_wear_schema.sql)
+   → `supabase/migrations/143_wear_schema.sql` (renumber if Connect shipped a later migration first) + `apply_migration`;
+4. add the one Connect endpoint `GET /api/v1/profiles/{id}` (+ document in `docs/api-v1.md`, R2.3);
+5. reconcile `connect-client`; wire `packages/db` off `MemoryWearStore`; keep coverage gates green.
+
 - After Step 3: **Step 4** = extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`);
   **Step 5** = the actual monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in),
   gated behind the Connect frontend swap (Step 0) stabilising.
