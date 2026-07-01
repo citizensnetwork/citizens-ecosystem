@@ -93,13 +93,14 @@ Ordered, each independently shippable behind Wear's existing launch gate:
    (`getSession`/`writeSessionCookie`) onto `@supabase/ssr`; Google OAuth callback; `getCurrentUser`
    resolves the Supabase user + shared `public.profiles`. Retire `MOCK_SIGN_IN_TOKEN` and the
    `connect-client.auth` path. Keep `MockConnectClient` for tests only.
-3. **Land the `wear.*` schema** — the DDL is **already drafted**:
-   [`../wear/143_wear_schema.sql`](../wear/143_wear_schema.sql) (tables, enums, RLS, grants, the
-   `wear.users` mirror, the optional `brands.connect_contributor_id`, and a recursion-safe
-   `is_conversation_member` helper). Move it to `supabase/migrations/143_wear_schema.sql` (renumber if
-   Connect shipped a later migration meanwhile) and apply via `apply_migration`. Reads use
-   `supabase-js` `db:{schema:'wear'}` (settled — see the data-access decision in §5). Wire
-   `packages/db` off `MemoryWearStore` onto the real client.
+3. ✅ **DONE (2026-07-01) — `wear.*` schema APPLIED to prod.** Now
+   [`supabase/migrations/143_wear_schema.sql`](../../supabase/migrations/143_wear_schema.sql)
+   (22 tables, 42 policies, 10 enums, 3 fns). Three corrections vs the draft before applying: dropped
+   `wear.users.email` (PII under public-read RLS); reordered the DM block (sql-fn body validated at
+   CREATE → helper cannot precede its table); added `wear.is_blocked_either` SECDEF (a block's target
+   must not read the reverse row). **Verified: 0 tables without RLS; advisors 0 ERROR, 0 new findings.**
+   Reads use `supabase-js` `db:{schema:'wear'}` (§5). Still TODO: wire `packages/db` off
+   `MemoryWearStore` onto the real client (Wear-repo work).
 4. **Reconcile `connect-client`** — drop/repoint the brands/products/users/OIDC surface; keep only
    real Connect reads Wear needs (contributors/categories over `/api/v1`). Update `ADR-0002` lineage.
 5. **Tests/gates** — keep coverage gates green; contract tests updated to the reconciled surface.

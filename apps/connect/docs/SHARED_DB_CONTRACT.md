@@ -34,7 +34,7 @@ split cheap. (See memory `global-databases-means-ecosystem-shared`.)
 |---|---|---|---|
 | `public` | **Connect (commons)** | The shared Kingdom data every app surfaces: `profiles`, `contributors` (approved profiles), `events`, `places`, `categories`, social graph, plus Connect's own app tables. | Connect (via RLS + service_role). Other apps **read via `/api/v1`**, never write here. |
 | `vision` | **Vision (back-office)** | **Two classes** (mig 133–134, 137–139): (a) **Connect-published aggregates** — `category_space_map`, `vision_period_snapshots`, views `reach_per_event`, `engagement_per_event`, `ratings_per_event`, `ratings_per_place`; (b) **Vision's own operational schema** — 24 tables (orgs, departments, activities, goals, projects, advisories, boundaries, partnerships, claims, …) + 5 MVs + ~28 fns. | (a) **`service_role` only** (Connect→Vision publishing; invisible to anon/auth). (b) **`authenticated` + RLS** (Vision org admins/members under per-org RLS) + `service_role` for backend jobs. **MVs are `service_role`-only** (they bypass RLS; users read via SECURITY DEFINER reader fns). Schema is **not** PostgREST-exposed until the Vision app repoint. |
-| `wear` *(DDL drafted, not yet applied)* | **Wear** | Wear-owned social/commerce tables (users-mirror, profiles, brands, follows, posts, stories, DMs, moderation). **DDL drafted** in [`docs/wear/143_wear_schema.sql`](wear/143_wear_schema.sql) per Step 3 Direction A ([`strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](strategy/STEP3_WEAR_INTEGRATION_SCOPE.md)); **not applied live yet** (§9 still shows `wear` absent — correct). Optional Connect link = `brands.connect_contributor_id` (value-ref to `public.profiles.id`, **no cross-schema FK**, ownership-verified — mirrors `vision.organisations.connect_contributor_id`). Reads via `supabase-js` under RLS, not Prisma. | `authenticated` + Wear RLS (per-user), `service_role` for backend; by analogy to `vision`. |
+| `wear` *(APPLIED — mig 143, 2026-07-01)* | **Wear** | Wear-owned social/commerce tables (display-safe users-mirror, profiles, brands, follows, posts, stories, DMs, moderation) — **22 tables, all RLS-enabled**. Applied as [`supabase/migrations/143_wear_schema.sql`](../supabase/migrations/143_wear_schema.sql) per Step 3 Direction A ([`strategy/STEP3_WEAR_INTEGRATION_SCOPE.md`](strategy/STEP3_WEAR_INTEGRATION_SCOPE.md)). The `wear.users` mirror is **display-safe only (no email/PII)** since it is public-SELECT. Optional Connect link = `brands.connect_contributor_id` (value-ref to `public.profiles.id`, **no cross-schema FK**, ownership-verified — mirrors `vision.organisations.connect_contributor_id`). Reads via `supabase-js` `db:{schema:'wear'}` under RLS, not Prisma. **Not PostgREST-exposed until the Wear app repoint** (deploy gate). | `authenticated` + Wear RLS (per-user), `service_role` for backend; by analogy to `vision`. |
 
 **Rules:**
 - **R1.1** A new ecosystem app gets a **new Postgres schema**, not a new Supabase project, until
@@ -175,10 +175,16 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-06-18, project `xyiajtrvhlxaeplsiajj`, head = mig 139)
+## 9. Verification snapshot (updated 2026-07-01, project `xyiajtrvhlxaeplsiajj`, head = mig 143)
 
 Confirmed live:
-- **Schemas:** `public`, `vision` present. `wear` absent (future, correct).
+- **Schemas:** `public`, `vision`, **`wear`** present.
+- **`wear.*` (mig 143):** **22 base tables** (all RLS-enabled, **0 without RLS**), **42 RLS policies**,
+  **3 functions** (`set_updated_at`, and two SECURITY DEFINER helpers `is_conversation_member` +
+  `is_blocked_either`, both `search_path=''`, EXECUTE revoked from public → `authenticated`+`service_role`),
+  **10 enums**. `wear.users` mirror carries **no email column** (display-safe, public-SELECT).
+  **Security advisors: 0 ERROR** and **0 new findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged;
+  all pre-existing `public.*`). **Not PostgREST-exposed yet** (deploy gate).
 - **Unified Profile cols:** `wear_style_preferences`, `wear_wardrobe_visibility`,
   `learn_enrolled_listings`, `connect_home_province`, `notification_radius_km`, `timezone` — all present.
 - **content_labels:** table present; triggers `trg_apply_event_content_labels` +
