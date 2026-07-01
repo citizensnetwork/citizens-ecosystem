@@ -141,9 +141,9 @@ Ordered, each independently shippable behind Wear's existing launch gate:
      `handle` — Connect `/api/v1/profiles/{id}` returns only id/full_name/avatar_url, **no handle**).
 5. **Tests/gates** — keep coverage gates green (`web` allowlist store.ts/connect.ts/validators.ts@90;
    `db`+`connect-client` src/**@70); update contract tests to the reconciled surface; `next build` green.
-6. **Deploy gates (founder, §5 Q3):** expose `wear` in PostgREST Exposed schemas; Wear Vercel env
-   (shared URL + anon key, `CONNECT_API_BASE_URL`, optional `CONNECT_API_KEY`); add Wear's prod origin
-   to Supabase Auth Redirect URLs; Google OAuth allow-list.
+6. **Deploy gates (founder, §5 Q3):** ✅ **`wear` added to PostgREST Exposed schemas (2026-07-01).**
+   Still owed: Wear Vercel env (shared URL + anon key, `CONNECT_API_BASE_URL`, optional `CONNECT_API_KEY`);
+   add Wear's prod origin to Supabase Auth Redirect URLs; Google OAuth allow-list.
 
 **Connect-side work this implies:** exactly **one small additive endpoint** —
 `GET /api/v1/profiles/{id}` (display-safe fields only), per the §5 Q1 recommendation — authored in

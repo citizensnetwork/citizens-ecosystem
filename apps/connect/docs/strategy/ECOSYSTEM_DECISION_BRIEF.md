@@ -109,11 +109,55 @@ MASTER_DIRECTION Part 10 planned: …Batch 6 (profile schema + `content_labels` 
 | **0 (in flight)** | Finish Connect's frontend swap + launch blockers | RESUME_HERE §2M; do **not** start repo surgery during this |
 | **1 ✅ LOCKED (2026-06-17)** | **Shared-DB contract locked** in [`docs/SHARED_DB_CONTRACT.md`](../SHARED_DB_CONTRACT.md). Verified live (project `xyiajtrvhlxaeplsiajj`, head mig 134): schema boundaries (`public`+`vision`; `wear` future), one `auth.users`, RLS-only-wall, `/api/v1` confirmed + `docs/api-v1.md` brought current (added `places`, `contributors/{slug}/stats`). Unified Profile cols + `content_labels` + auto-label trigger were **already landed in Batch 6** (mig 072–077). `app_id` column **deferred per §3** until the 2nd app writes analytics (rule R4 locked now; no sibling writes yet). | D1 · MASTER_DIRECTION Part 7 + Batch 6 · addendum §A3 |
 | **2 — DB half ✅ (2026-06-18)** | **Vision data-plane consolidated into `vision.*`** on the shared project (migrations **137–139**): 22 owned tables + 2 enums + 5 MVs + 28 fns + RLS/triggers ported; claim→promote re-modelled as `vision.cc_event_claims`/`cc_place_claims` (no cross-schema FK); `avg_rating` resolved as Connect-published `vision.ratings_per_event`/`ratings_per_place` views (route b). `cc_*_mirror`/sync **not ported** (obsoleted by `/api/v1` + `vision.*`). Seed-only ⇒ **0 rows migrated**, no eu-west restore. Advisors **0 ERROR**. **Remaining (app half):** repoint the `citizens-vision` app → shared project + `db.schema='vision'`, expose `vision` in PostgREST, swap `/api/connect/*`→`/api/v1`+`vision.*`, delete `sync-from-connect`, wire the claim UI to the new claim tables. | D1/D2 · §3 |
-| **3** | **Point Wear at the shared Supabase project** (it already has `db` + `connect-client`). | D1 · §5 |
+| **3 — in progress (2026-07-01)** | **Point Wear at the shared project.** NOT a trivial repoint (see [`STEP3_WEAR_INTEGRATION_SCOPE.md`](STEP3_WEAR_INTEGRATION_SCOPE.md)). **Done:** `wear.*` schema→prod (mig 143, 22 tables/0-without-RLS/advisors 0 ERROR); Supabase Auth cutover (Google OAuth, one `auth.users`); `wear` PostgREST-exposed. **Remaining:** the coupled `SupabaseWearStore` port + `connect-client` reconcile + repoint ~16 consumers (scope §3.4). | D1 · §5 · STEP3 |
+| **3a — RECOMMENDED (see §6a)** | **Import a standalone HTML frontend for Wear** (mirror Connect's `src/frontend/` + esbuild precompile + Capacitor), making Wear's Next.js **API-only**. Fold into step 3 so the store is consumed via `/api/*` **once**, not wired as RSC then discarded. | founder request 2026-07-01 · §6a |
 | **4** | **Extract pure-TS shared packages**; align Wear's `@citizens-wear/*` → `@citizens/*`. | D5 · §5 |
 | **5** | **Monorepo consolidation** — grow `citizens-wear` → `citizens`, lift Connect + Vision via `git filter-repo`, hoist `supabase/`, Vercel per-app filters. *(After step 0 stabilises.)* | D3 · §4 |
 | **6** | **Shared React UI** (Connect HTML + Wear) — only if/when it pays for itself; Vision stays separate-rendering. | D5 · audit |
 | **parallel** | PayFast billing (Batch 8) can run independently. | MASTER_DIRECTION Batch 8 |
+
+---
+
+## 6a. Wear HTML frontend — recommendation (2026-07-01)
+
+**Ask:** import a standalone HTML/React frontend for Wear, as Connect has (`src/frontend/`), instead
+of Wear's current full Next.js App-Router **RSC** app (server components + server actions).
+
+**The key insight — sequence it *into* step 3, don't bolt it on after.** The remaining step-3 unit
+(scope §3.4) currently repoints ~16 **RSC server-component** consumers onto the new `SupabaseWearStore`.
+If Wear then pivots to a static HTML frontend that talks to **HTTP APIs**, those RSC pages are thrown
+away — the UI wiring is done twice. So the frontend model must be chosen **before** executing §3.4's
+consumer-repoint. The **data-plane** parts of §3.4 (the `SupabaseWearStore`, the `WearStore` contract
+extension, the `connect-client` reconciliation) are frontend-agnostic and proceed regardless.
+
+**Recommended sequence:**
+1. **Data plane first (frontend-agnostic):** `SupabaseWearStore` + `WearStore` `users`/`brands` repos +
+   `connect-client` → `contributors`/`categories` over `/api/v1` (scope §3.4). No UI wiring yet.
+2. **Expose Wear's operations as `apps/web/src/app/api/*` route handlers** — the contract the HTML app
+   consumes (mirrors Connect's `/api/v1`). Build this consumption surface **once**; a thin interim RSC
+   page and the future HTML app both call it. Confirm the **cross-origin Bearer-token auth** pattern
+   Connect learned the hard way (static frontend + `localStorage` session ⇒ authenticated mutations
+   need an `Authorization: Bearer` header because cookie middleware sees nothing cross-origin —
+   Connect memory `static-frontend-cross-origin-auth`).
+3. **Import the HTML/React design** into Wear, reusing Connect's proven Phase-0 machinery **verbatim**:
+   `scripts/build-frontend.js` (esbuild JSX precompile, kills CDN+Babel JIT), the Capacitor bridge
+   (native Google-OAuth deep link + geolocation), safe-area insets, `?v=` cache-bust removal. Wire each
+   screen to the `/api/*` surface; make Next.js **API-only** (delete/retire the RSC page tree).
+4. **Ship mobile via Capacitor** (reuse Connect's config) if Wear targets phones.
+
+**Most effective way — reuse, don't reinvent.** Connect already solved every hard part of this exact
+pivot (Step 0, RESUME §3G): esbuild precompile, native OAuth, cross-origin Bearer auth, safe-area,
+Upstash rate-limiting on `/api/*`. Building Wear's frontend on the **same toolchain** (a) avoids
+re-learning those lessons, (b) makes the **step-5 monorepo merge trivial** (both apps share one static-
+frontend build pipeline — a natural **step-4 `@citizens/*` package**: `@citizens/frontend-build`), and
+(c) lets the two static frontends share design tokens/components later (**step 6**, "shared React UI",
+which is *this* — Connect HTML + Wear — now with a concrete first mover).
+
+**Decision flag (founder):** this **discards most of Wear's Next.js RSC UI** (its Phase 1–6 server
+components) — the same trade Connect made and does not regret. The data plane (store/auth/`/api/*`) is
+valuable under *either* model, so it proceeds now; the **RSC→HTML swap itself is the reversible-later
+call**. Recommend confirming the RSC-discard before step 3, but exposing `/api/*` immediately since it
+serves both models. If the HTML design isn't ready yet, do steps 1–2 now and 3–4 when the design lands.
 
 ---
 
@@ -124,7 +168,7 @@ MASTER_DIRECTION Part 10 planned: …Batch 6 (profile schema + `content_labels` 
 | `docs/MONOREPO_PLAN.md` | **Superseded by this brief** | Mechanics of `git filter-repo` lift, risks/mitigations, cutover checklist — still valid for step 5. |
 | `docs/strategy/ECOSYSTEM_AND_MONOREPO_STRATEGY.md` | **Superseded** (was a questions doc) | The trade-off table (§3) and the data-architecture options (§5) remain good background. Its open questions are now answered here. |
 | `.github/MASTER_DIRECTION.md` Part 7 | **Amended** by this brief | "monorepo before Wear" is reversed; Unified Profile + `content_labels` + batch order otherwise stand. |
-| `monorepo-prep/` | Still the seed README set for `packages/*` | Folds into step 4/5. |
+| `monorepo-prep/` | **Deleted (2026-07-01)** | Placeholder READMEs for the superseded *Connect-seeded* monorepo; reality is Wear-is-the-seed. `@citizens/*` package shape is defined at step 4 against Wear's `@citizens-wear/*`. |
 
 ---
 
