@@ -183,19 +183,29 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-01, project `xyiajtrvhlxaeplsiajj`, head = mig 144)
+## 9. Verification snapshot (updated 2026-07-02, project `xyiajtrvhlxaeplsiajj`, head = mig 146)
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
-- **`wear.*` (mig 143 + 144):** **22 base tables** (all RLS-enabled, **0 without RLS**), **42 RLS policies**,
-  **7 functions** — `set_updated_at`; the two READ-path SECURITY DEFINER helpers `is_conversation_member`
-  + `is_blocked_either`; and the four **mig-144 write-path** helpers (`create_direct_conversation`,
-  `create_group_conversation` — SECDEF RPCs, EXECUTE `authenticated`+`service_role` only, internal
-  `auth.uid()` actor-guard; `bump_conversation_updated_at`, `unfollow_on_block` — SECDEF trigger fns,
-  `postgres`-only, fired by `trg_bump_conversation_updated_at` on `messages` insert and
-  `trg_unfollow_on_block` on `blocks` insert) — all `search_path=''`. **10 enums**. `wear.users` mirror
+- **`wear.*` (mig 143 + 144 + 145 + 146):** **23 base tables** (all RLS-enabled, **0 without RLS**),
+  **48 RLS policies**, **9 functions** — `set_updated_at`; the two READ-path SECURITY DEFINER helpers
+  `is_conversation_member` + `is_blocked_either`; the four **mig-144 write-path** helpers
+  (`create_direct_conversation`, `create_group_conversation` — SECDEF RPCs, EXECUTE
+  `authenticated`+`service_role` only, internal `auth.uid()` actor-guard; `bump_conversation_updated_at`,
+  `unfollow_on_block` — SECDEF trigger fns, `postgres`-only, fired by `trg_bump_conversation_updated_at`
+  on `messages` insert and `trg_unfollow_on_block` on `blocks` insert); and the two **mig-145 capability
+  helpers** `is_moderator()`/`is_admin()` (SECDEF, EXECUTE `authenticated`+`service_role`) — all
+  `search_path=''`. **12 enums** (mig 145 adds `platform_role`, `report_status`).
+  **Mig-145 admin/moderation tier** (R6.3 assigned-authority): `wear.user_roles` (service_role-managed;
+  self-SELECT only; **no write policy AND no write grant for `authenticated` — mig 146 grants are
+  deliberately narrower than 143's blanket pattern**: `authenticated` SELECT-only, `anon` nothing),
+  `reports` triage lifecycle (`status/handled_by/handled_at`), moderator SELECT/UPDATE on `reports`,
+  moderator DELETE on `posts`/`comments`/`stories` — **DMs excluded** (privacy). Smoke-verified
+  2026-07-02 (rolled-back transactions against prod): plain user sees 0 reports/0 roles + role
+  self-insert denied; moderator sees the queue, triages, `is_admin()` stays false. `wear.users` mirror
   carries **no email column** (display-safe, public-SELECT). **Security advisors: 0 ERROR** and **0 new
-  findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged; all pre-existing `public.*`).
+  findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged; all pre-existing `public.*`;
+  note the linter does not currently surface `wear.*` SECDEF fns at all).
   **PostgREST-exposed** (`wear` added to Exposed schemas, 2026-07-01). Mig 144 rationale: 143's RLS
   cannot express DM/group creation (inserting the *other* member's row), the `conversations.updated_at`
   bump, or block→symmetric-unfollow — the `SupabaseWearStore` port delegates those to these helpers,

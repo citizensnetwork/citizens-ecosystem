@@ -21,7 +21,7 @@ own *Admin*, and no level is ever inherited across apps.**
 ```
                     ┌────────────────────────────────────────────────┐
  Level 2 — ADMIN    │ Connect admin ✅ · Vision platform_admin ✅ ·   │  per-app stewardship
-                    │ Wear moderator/admin ⛔ GAP (→ §5 proposal)     │
+                    │ Wear moderator/admin ✅ (mig 145+146, §5)       │
                     ├────────────────────────────────────────────────┤
  Level 1 — CREATING │ Connect: Contributor (approved lifecycle)      │  per-app, app-granted
         TIER        │ Wear:    Creator (default) / Brand (owner)     │
@@ -109,7 +109,7 @@ They are deliberately **not** unified into one table — the *contract* is the s
 |---|---|---|
 | Connect | `public.profiles.role='admin'`, gate `is_admin()`, self-escalation blocked by `protect_role_column` (mig 038); admin RPCs are SECDEF + `authenticated`-granted with internal `is_admin()` checks. | Approvals, moderation/reports, dashboards for the commons. |
 | Vision | `vision.user_org_roles.role='platform_admin'` (Citizens Network staff; sees all orgs). Founder bootstrapped (mig 137). | All Vision orgs (back-office). |
-| **Wear** | **⛔ NONE.** `wear.reports` is reporter-INSERT + `service_role`-read only — there is **no admin/moderator role, no triage lifecycle, no takedown policy**. Moderation currently requires raw `service_role` access (dashboard/MCP), which is unauditable and founder-only. | — |
+| **Wear** | ✅ **LIVE (mig 145+146, 2026-07-02).** `wear.user_roles` (`moderator`/`admin`, service_role-managed, self-SELECT only), gates `wear.is_moderator()`/`wear.is_admin()` (SECDEF), reports triage lifecycle, moderator takedown on posts/comments/stories (DMs excluded). Role grants issued by founder via MCP/SQL until an admin UI exists. | Reports queue + public-content takedown. |
 
 **Rules**
 - **P2.1** Admin is **per-app**. There is deliberately no ecosystem-wide super-role: a person
@@ -123,13 +123,16 @@ They are deliberately **not** unified into one table — the *contract* is the s
 
 ---
 
-## 5. The Wear gap — proposed **migration 145** (⛔ NOT APPLIED — founder confirmation required)
+## 5. The Wear gap — **migration 145 ✅ APPLIED (2026-07-02, founder-confirmed)**
 
-**Gap:** Wear ships reports intake (mig 143) but no one except `service_role` can read or act on
-them; there is no moderator/admin concept in `wear.*`. Reports triage — and any takedown of
-posts/comments/stories — has no auditable, role-gated path.
+**Was:** Wear shipped reports intake (mig 143) but no one except `service_role` could read or act
+on them; there was no moderator/admin concept in `wear.*`.
 
-**Proposal** (draft SQL: [`docs/wear/145_wear_admin_moderation.sql`](./wear/145_wear_admin_moderation.sql)):
+**Shipped** (now [`supabase/migrations/145_wear_admin_moderation.sql`](../supabase/migrations/145_wear_admin_moderation.sql)
++ [`146_wear_user_roles_grants.sql`](../supabase/migrations/146_wear_user_roles_grants.sql) — the
+145 smoke test found `wear.user_roles` had NO table-level grants (mig 143 grants are explicit
+per-table, not default privileges); 146 adds `authenticated` SELECT-only + `service_role` full,
+deliberately narrower than 143's blanket pattern — no anon, no authenticated writes):
 1. **`wear.user_roles`** (`user_id`, `role wear.platform_role ∈ {moderator, admin}`,
    `granted_by`, `created_at`) — **service_role-managed** (no INSERT/UPDATE/DELETE policy at
    all → P2.2 satisfied structurally; self-SELECT only). Mirrors Vision's assigned-authority
@@ -147,8 +150,12 @@ posts/comments/stories — has no auditable, role-gated path.
 5. Follow-up (app-side, after apply): Wear `/api/admin/*` routes gated on `wear.is_moderator()`
    + a minimal triage screen; grants issued by founder via MCP/SQL until an admin UI exists.
 
-**Apply protocol when confirmed** (SHARED_DB_CONTRACT R7): pre-apply git tag → `apply_migration`
-to `xyiajtrvhlxaeplsiajj` → `get_advisors` = 0 ERROR / 0 new findings → stamp contract §9.
+**Applied per protocol** (SHARED_DB_CONTRACT R7): pre-apply tag `connect-pre-mig145` →
+`apply_migration` (145, then 146 grants fix) → advisors **0 ERROR / 0 new findings** (72 WARN /
+3 INFO = mig-144 baseline byte-for-byte) → smoke-verified via rolled-back prod transactions
+(plain user: 0 reports / 0 roles visible, self-escalation INSERT denied; moderator: queue
+visible, triage UPDATE works, `is_admin()` correctly false) → contract §9 re-stamped (head 146).
+**Remaining app-side follow-up:** item 5 above (Wear `/api/admin/*` + triage screen).
 
 ---
 

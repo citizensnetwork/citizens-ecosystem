@@ -1,15 +1,13 @@
 -- ============================================================================
--- 145_wear_admin_moderation.sql  — ⛔ DRAFT, NOT APPLIED
+-- 145_wear_admin_moderation.sql  — APPLIED 2026-07-02 (founder-confirmed)
 --
 -- Closes the Wear admin/moderation gap (ECOSYSTEM_PROFILE_LEVELS.md §5;
 -- decision brief §6 row 4b). Adds the assigned-authority moderator/admin
 -- tier, a reports triage lifecycle, and moderator takedown policies.
 --
--- ⛔ Founder confirmation REQUIRED before applying. Apply protocol
--- (SHARED_DB_CONTRACT R7): pre-apply git tag → move this file to
--- supabase/migrations/145_wear_admin_moderation.sql (renumber if Connect
--- shipped a later migration first) → apply_migration on xyiajtrvhlxaeplsiajj
--- → get_advisors(security) = 0 ERROR / 0 new findings → stamp contract §9.
+-- Applied per SHARED_DB_CONTRACT R7: pre-apply tag `connect-pre-mig145` →
+-- apply_migration on xyiajtrvhlxaeplsiajj → get_advisors(security)
+-- 0 ERROR / 0 unexpected findings → contract §9 re-stamped.
 --
 -- Design notes (why this shape — ECOSYSTEM_PROFILE_LEVELS.md P2.1–P2.3):
 --  * SEPARATE service_role-managed table, not a role column on wear.users:
