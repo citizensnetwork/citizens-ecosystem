@@ -13,6 +13,17 @@ const eslintConfig = defineConfig([
     "build/**",
     "coverage/**",
     "next-env.d.ts",
+    // src/frontend/** is the standalone HTML/React frontend (browser React via
+    // CDN UMD globals, window.*-wired IIFEs, no module imports) — not part of
+    // the Next.js API build; the API's TypeScript/React rules don't apply.
+    // public/ is scripts/build-frontend.js's generated copy of that frontend
+    // (gitignored build output). vendor/** is the vendored
+    // @citizens/frontend-build package (canonical source + lint live in
+    // citizens-wear — see vendor/README.md). .claude/** is session scratch.
+    "src/frontend/**",
+    "public/**",
+    "vendor/**",
+    ".claude/**",
   ]),
 ]);
 

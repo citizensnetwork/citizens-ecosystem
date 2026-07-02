@@ -51,3 +51,17 @@ test_run*.txt
 # Supabase CLI local state
 supabase/.temp/
 supabase/.branches/
+
+# HTML frontend per-environment runtime config (config.example.js is committed)
+/src/frontend/config.js
+
+# Generated frontend build artifacts (scripts/build-frontend.js copies
+# src/frontend/* into public/ at build time; hashed bundles + config.js).
+# The source of truth lives in src/frontend/ — public/ is ephemeral output.
+/public/index.html
+/public/auth-client.js
+/public/auth-client.*.js
+/public/capacitor-bridge.*.js
+/public/config.js
+/public/config.example.js
+/public/app/

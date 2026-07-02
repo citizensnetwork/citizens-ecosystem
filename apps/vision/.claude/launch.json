@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-built",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3003", "--directory", "public"],
+      "port": 3003
+    },
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3004", "--directory", "src/frontend"],
+      "port": 3004
+    }
+  ]
+}
