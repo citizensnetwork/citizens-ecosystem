@@ -40,3 +40,11 @@ Old version/
 # Claude Code local session/offload notes (never committed)
 .claude/
 
+
+# Static HTML frontend — generated build outputs + local runtime config.
+# public/ and mobile-dist/ are produced from apps/web/src/frontend by
+# apps/web/scripts/build-frontend.js on every build; config.js carries
+# per-machine values (copy from config.example.js).
+apps/web/public/
+apps/web/mobile-dist/
+apps/web/src/frontend/config.js

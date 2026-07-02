@@ -27,6 +27,6 @@ export const GET = handler(async (req, ctx, params) => {
     counts,
     brands: brands.map(toBrandDto),
     viewerFollows,
-    posts: await hydrateFeed(ctx.store, postsPage),
+    posts: await hydrateFeed(ctx.store, postsPage, { viewerId: ctx.userId }),
   });
 });

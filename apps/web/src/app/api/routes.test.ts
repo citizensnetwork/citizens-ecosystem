@@ -144,6 +144,37 @@ describe('posts + feed', () => {
     expect(data.mode).toBe('chronological');
     expect(Array.isArray(data.items)).toBe(true);
   });
+
+  it('feed items carry engagement counts and viewer flags', async () => {
+    asUser('usr_001');
+    await postsPOST(req('/api/posts', jsonBody({ body: 'Count me' })), route());
+    const res = await feedGET(req('/api/feed?mode=chronological'), route());
+    const item = (await res.json()).items[0];
+    expect(item).toMatchObject({
+      likeCount: expect.any(Number),
+      commentCount: expect.any(Number),
+      viewerLiked: expect.any(Boolean),
+      viewerSaved: expect.any(Boolean),
+    });
+  });
+
+  it('accepts https media urls and drops unsafe ones', async () => {
+    asUser('usr_001');
+    const res = await postsPOST(
+      req(
+        '/api/posts',
+        jsonBody({
+          body: 'With media',
+          mediaUrls: ['https://images.example/tee.jpg', 'javascript:alert(1)'],
+        }),
+      ),
+      route(),
+    );
+    expect(res.status).toBe(201);
+    const post = await res.json();
+    expect(post.media).toHaveLength(1);
+    expect(post.media[0].url).toBe('https://images.example/tee.jpg');
+  });
 });
 
 describe('POST /api/me/hydrate (mirror hydration)', () => {

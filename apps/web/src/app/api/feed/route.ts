@@ -17,5 +17,5 @@ export const GET = handler(async (req, ctx) => {
     mode === 'chronological'
       ? await ctx.store.posts.feedChronological(userId, params)
       : await ctx.store.posts.feedForYou(userId, params);
-  return json({ mode, ...(await hydrateFeed(ctx.store, page)) });
+  return json({ mode, ...(await hydrateFeed(ctx.store, page, { viewerId: userId })) });
 });

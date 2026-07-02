@@ -16,7 +16,7 @@ export const GET = handler(async (req, ctx, params) => {
   return json({
     brand: toBrandDto(brand),
     owner: owner ? toUserDto(owner) : null,
-    posts: await hydrateFeed(ctx.store, posts),
+    posts: await hydrateFeed(ctx.store, posts, { viewerId: ctx.userId }),
   });
 });
 
