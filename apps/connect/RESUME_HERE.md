@@ -651,34 +651,97 @@ Closing notes from the Step-3 completion session (no code/DB change → **next C
 
 ---
 
+## 3N. Ecosystem Step 4 SHIPPED · 4b docs SHIPPED · 4c SCOPED ✅ (2026-07-02)
+
+Executed brief §6 rows **4 / 4b / 4c-prep** in order, each increment gated + pushed.
+Working log: `.claude/sessions/step4-frontend-build-extraction.md` (gitignored).
+**No DB change → next Connect migration # still 145 — now RESERVED for the Wear admin draft
+(Vision DDL starts at 146; renumber if the founder declines 145).**
+
+### Step 4 — `@citizens/frontend-build` extracted (both repos pushed)
+- **Canonical package: `citizens-wear/packages/frontend-build`** (Wear `main` 4a4d22f → **5863447**).
+  Dependency-free CJS; **the host injects its own esbuild** (Connect 0.28.x / Wear 0.25.x) — that is
+  what keeps each app's output byte-identical; config-driven (appFileOrder, envGlobalName,
+  configVars `env → local → default` with `mobileEnv` forced-absolute, extraSpecialFiles,
+  mobileRequiredKeys). 19 vitest tests, 100% line / 95% branch coverage; typed via hand-written
+  `index.d.ts`.
+- **Wear consumer:** thin `apps/web/scripts/build-frontend.js` + `workspace:*` dep.
+  **Outputs BYTE-IDENTICAL** (SHA-256 tree compare, web + mobile).
+- **Connect consumer** (`main` 218cbca → **075c422**): vendored at `vendor/citizens-frontend-build`
+  via a `file:` dep (Vercel can't reach a sibling repo); refresh with `npm run sync:frontend-build`;
+  drift-guard test `src/__tests__/frontend-build-vendor.test.ts` (EOL-normalized byte compare when
+  the sibling checkout exists + esbuild-injection smoke; `@vitest-environment node` — esbuild
+  refuses jsdom). Vendored package.json is **reduced to publish fields** (npm resolves `file:` deps
+  like workspace links → the canonical `workspace:*` devDeps would EUNSUPPORTEDPROTOCOL).
+  **Outputs BYTE-IDENTICAL** (bundle `f9a5ddcbaa` / auth `84c0a64de1` / bridge `e19e3e2c55`
+  unchanged). Gates: **tsc 0 · eslint 0 · vitest 640/640 (+3)**.
+- Incidental fix: Connect eslint ignores += `vendor/**` and `.claude/**` (bare `eslint .` hit 20
+  pre-existing errors in the gitignored reskin-reference uploads; prior sessions used
+  `next lint --dir src`).
+- **Other pure-TS extractions assessed → deliberately DEFERRED** (recorded in brief row 4):
+  `@citizens/utils`(rate-limit) extracts **together with** the Wear rate-limiting fast-follow (its
+  first real 2nd consumer); `contracts`/`connect-client` re-evaluate at 4c; `db` types stay per-app
+  (siblings consume via `/api/v1`, R2).
+
+### Step 4b — ecosystem profile-levels contract (docs `6250f2e`; migration ⛔ awaiting founder)
+- **NEW [`docs/ECOSYSTEM_PROFILE_LEVELS.md`](docs/ECOSYSTEM_PROFILE_LEVELS.md)** — normative:
+  **Citizen** (base; display-safe per-app mirrors) → **creating tier** (Connect Contributor
+  approval lifecycle [migs 033/036/038] · Wear Creator/Brand [`wear.brands.owner_user_id`] ·
+  Vision authority-assigned `vision.user_org_roles` RBAC [spec §0.4]) → **per-app Admin**.
+  P-rules: baseline participation never level-gated; **no cross-app inheritance** (ownership-
+  verified links only); **no ecosystem super-role**; self-escalation blocked at the DB layer.
+  SHARED_DB_CONTRACT gains **R6.3/R6.4**.
+- **Wear admin/moderation GAP** → draft **[`docs/wear/145_wear_admin_moderation.sql`](docs/wear/145_wear_admin_moderation.sql)**:
+  `wear.user_roles` (service_role-managed, self-SELECT only — structural no-self-escalation) +
+  `wear.is_moderator()`/`is_admin()` SECDEF helpers + `reports` triage lifecycle
+  (`open→reviewed→actioned|dismissed`, handled_by/at) + moderator takedown policies on
+  posts/comments/stories (**DMs excluded** — privacy). **⛔ NOT APPLIED — founder must confirm**;
+  then: pre-apply tag → `apply_migration` → advisors 0 ERROR/0 new → contract §9 re-stamp.
+
+### Step 4c — Vision reconcile SCOPED (`37dcefb`; execution gated on founder Q1–Q3)
+- **NEW [`docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md`](docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md)** —
+  Wear's §6a sequence adapted: wiring-spec units (DDL from 146) → audit Vision's **45 existing
+  `/api/*` handlers** + Bearer `route-context` + **day-one rate limiting** (don't repeat Wear
+  debt #1) → HTML swap as `@citizens/frontend-build`'s 3rd consumer (Connect vendoring pattern,
+  `__CV_ENV`, desktop-first, no Capacitor) → Vision Next.js API-only.
+- **KEY FINDING (read-only zip inspection, nothing imported):** `App Planning Docs/Vision/
+  Citizens Vision.zip` is a **353 KB Claude-design canvas/reference** (`Citizens Vision.dc.html`
+  + support.js + 5 screenshots + already-known PDFs/MDs) — **NOT an importable app-source
+  handoff** like Wear's 8.6 MB zip. Founder must choose: fuller design export vs
+  build-from-canvas (scope §5 Q1).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Ecosystem Step 3 is COMPLETE (§3L).** All three apps share one auth + one Postgres; Wear and
-> Connect both run the static-HTML-frontend model with API-only Next.js. The roadmap below is the
-> ratified order ([brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md)) — each step feeds the next.
+> **Steps 3 (§3L) and 4 (§3N) are COMPLETE; 4b docs shipped; 4c scoped.** All three apps share
+> one auth + one Postgres; Connect + Wear run the static-HTML model on the shared
+> `@citizens/frontend-build` pipeline. The roadmap below is the ratified order
+> ([brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md)) — **the next moves are founder
+> answers, then 4c execution.**
 
-1. **Step 4 — extract `@citizens/*` packages.** First mover `@citizens/frontend-build`
-   (Connect `scripts/build-frontend.js` ≈ Wear `apps/web/scripts/build-frontend.js`; Vision in
-   step 4c becomes the third consumer — hoist BEFORE building a third copy). No prod risk.
-2. **Step 4b — ecosystem profile-levels contract (founder request).** One capability model:
-   **Citizen** (base identity, one `auth.users`) → **creating tier** per app (Connect =
-   Contributor ✅ exists · Wear = Creator/Brand ✅ exists · Vision = authority-assigned org levels
-   ✅ exists as `vision.user_org_roles` RBAC, spec §0.4) → **Admin** (Connect ✅ · Vision
-   platform_admin ✅ · **Wear ❌ GAP — no admin/moderation role**). Deliverable: SHARED_DB_CONTRACT
-   amendment + gap migrations (Wear admin; reports triage needs it). Docs-first; design before 4c
-   (Vision API gates consume it) and before the monorepo.
-3. **Step 4c — Vision reconcile + HTML frontend (founder request).** Repeat Wear's §6a-proven
-   sequence: (1) backend wiring per [`docs/VISION_BACKEND_WIRING_SPEC.md`](docs/VISION_BACKEND_WIRING_SPEC.md)
-   (identity bridge ✅ mig 142); (2) expose Vision ops as `/api/*`; (3) HTML frontend swap via
-   `@citizens/frontend-build`, Vision Next.js → API-only. **Founder input needed: confirm
-   `App Planning Docs/Vision/Citizens Vision.zip` is the design handoff** (+ UI Diagram PDF /
-   colour PNG as reference).
-4. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
-   hoist `supabase/`). After 4–4c stabilise, so the lift stays mechanical.
-5. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate limiting
-   (port Connect's Upstash pattern — §3L debt #1); media upload pipeline; notifications backend;
-   full desktop layouts (design zip = reference); Wear Capacitor shell scaffold (JS side done).
-6. **Founder-only, non-code (any time):**
+1. **Founder decisions now blocking (answer these first):**
+   - **4b:** confirm (or decline) the Wear admin/moderation migration —
+     [`docs/wear/145_wear_admin_moderation.sql`](docs/wear/145_wear_admin_moderation.sql) (§3N).
+     On confirm, any session applies it per protocol (pre-apply tag → `apply_migration` →
+     advisors 0 ERROR → SHARED_DB_CONTRACT §9 re-stamp + PROFILE_LEVELS §4/§5 update).
+   - **4c Q1:** Vision design asset — the zip is a canvas, not a handoff (§3N): fuller
+     design export (Wear-style) **or** build-from-canvas + UI Diagram PDF?
+   - **4c Q3:** reconfirm discarding Vision's RSC UI at execution kickoff.
+2. **Step 4c — Vision reconcile + HTML frontend (execution).** Follow
+   [`docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md`](docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md)
+   §3 units 1→4 (wiring-spec units, DDL from **146**; `/api/*` audit + Bearer route-context +
+   day-one rate limiting; HTML swap via vendored `@citizens/frontend-build`; Next.js API-only).
+   Unit 1 can start before the design asset lands (Q1 only gates unit 3).
+3. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
+   hoist `supabase/`; vendored frontend-build copies flip to `workspace:*` and are deleted).
+   After 4c stabilises, so the lift stays mechanical.
+4. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate limiting —
+   **extract `@citizens/utils`(rate-limit) in the same change** (the Step-4 deferred-extraction
+   decision, brief row 4); media upload pipeline; notifications backend; full desktop layouts
+   (design zip = reference); Wear Capacitor shell scaffold (JS side done). Plus Wear
+   `/api/admin/*` + triage screen once mig 145 lands.
+5. **Founder-only, non-code (any time):**
    - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
      + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
      (`https://citizens-connect.vercel.app`), optional CONNECT_API_KEY; Supabase Auth Redirect
