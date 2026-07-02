@@ -151,6 +151,14 @@ Cross-app tagging substrate. Connect itself does not read these; siblings consum
   identity in Connect, Vision (if ever surfaced to them), Wear, etc.
 - **R6.2** Vision is **back-office only** (contributors + organisations, e.g. Wear's clothing
   brands) — **not** citizens (brief D2). Per-eco-app Vision UIs are deferred.
+- **R6.3** *(added 2026-07-02, Step 4b)* **Capability tiers on that one identity are governed by
+  [`ECOSYSTEM_PROFILE_LEVELS.md`](./ECOSYSTEM_PROFILE_LEVELS.md)** (Citizen → per-app creating
+  tier → per-app Admin). Its P-rules are part of this contract; the two files change together
+  (§10). Non-negotiables restated: levels are granted **per app** and **never inherited across
+  apps** (P1.2); admin is per-app with **no ecosystem super-role** (P2.1); self-escalation must
+  be blocked **at the DB layer** (P2.2).
+- **R6.4** *(added 2026-07-02)* Per-app identity **mirrors** of `auth.users` (e.g. `wear.users`)
+  MUST be display-safe when public-SELECT — no email/PII (P0.3; the mig-143 no-email precedent).
 
 ---
 
