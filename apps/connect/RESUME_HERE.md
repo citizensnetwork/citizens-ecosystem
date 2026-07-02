@@ -619,28 +619,76 @@ unchanged from §3J: 0 ERROR / 72 WARN / 3 INFO).
 
 ---
 
+## 3M. Session wrap 2026-07-02 — deploy-gate values · Supabase-Preview diagnosis · founder roadmap folded in
+
+Closing notes from the Step-3 completion session (no code/DB change → **next Connect mig # still 145**):
+
+1. **Deploy-gate values delivered to the founder** (Wear + Vision Vercel env, Supabase Auth
+   redirect URLs — the §3L / LOCAL-SETUP lists). Anon/publishable key retrievable any time via
+   MCP `get_publishable_keys` (project `xyiajtrvhlxaeplsiajj`) — publishable by design, do not
+   re-flag (§3D). Founder still to action.
+2. **"Supabase Preview: Remote migration versions not found in local migrations directory" —
+   DIAGNOSED, harmless, ⏳ awaiting founder answer.** Root cause: remote
+   `supabase_migrations.schema_migrations` holds 140 **timestamp**-versioned rows (how MCP
+   `apply_migration` records; verified head = `20260701175436 / 144_wear_write_helpers` — prod is
+   complete and healthy), while local files are **human-numbered** (`001_…`–`144_…`). Any CLI-style
+   checker (Supabase GitHub app "Supabase Preview" check / Supabase↔Vercel integration / local
+   `supabase db push`) will therefore always fail — it's a workflow mismatch, NOT a broken or
+   missing migration. **Fix = turn off whichever integration runs the check** (we deliberately
+   apply via MCP with tags+advisors). Founder to confirm which surface showed it. Do NOT rename
+   the 146 files or `migration repair` 140 rows to appease it; if Supabase-managed CI migrations
+   are ever wanted, decide at Step 5 when `supabase/` is hoisted.
+3. **Founder draft docs COMMITTED** (were untracked/at-risk):
+   [`docs/VISION_BACKEND_WIRING_SPEC.md`](docs/VISION_BACKEND_WIRING_SPEC.md) (1075-line Vision
+   wiring reference — §0.3 identity bridge annotated ✅ resolved by mig 142; §0.4 = Vision's RBAC
+   hierarchy) and [`CATEGORIES.md`](CATEGORIES.md) (canonical category colours/icons). Deeper
+   planning corpus lives OUTSIDE the repos at `C:\Users\SJ\Documents\Citizen Network\App Planning
+   Docs\{Vision,Wear,Connect}\` — Vision's folder incl. `Back-End Wiring Series/`, Product
+   Blueprint PDF, `Citizens_Vision_Backend_Architecture.md`, and **`Citizens Vision.zip`** (likely
+   the Vision design handoff, sibling of the Connect/Wear zips — confirm before import).
+4. **Founder prospects integrated into the plan** (brief §6 rows 4b/4c added, row 6 amended):
+   Vision HTML frontend + ecosystem profile levels — see NEXT STEPS below for the ratified order.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Ecosystem Step 3 is COMPLETE (§3L).** Wear runs the full shared-project model end-to-end:
-> shared auth → `wear.*` → `/api/*` → standalone HTML frontend, with `connect-client` reconciled
-> to Connect's real `/api/v1`. Next code step = Step 4.
+> **Ecosystem Step 3 is COMPLETE (§3L).** All three apps share one auth + one Postgres; Wear and
+> Connect both run the static-HTML-frontend model with API-only Next.js. The roadmap below is the
+> ratified order ([brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md)) — each step feeds the next.
 
-1. **Step 4 — extract pure-TS `@citizens/*` packages** (align Wear's `@citizens-wear/*`). First
-   mover per §6a: `@citizens/frontend-build` (Connect `scripts/build-frontend.js` + Wear
-   `apps/web/scripts/build-frontend.js` are now near-identical ports — hoist once). No prod risk.
-2. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
-   hoist `supabase/`). Gated behind Step 4 only.
-3. **Wear launch-hardening fast-follows (code, any session):** `/api/*` rate limiting (port
-   Connect's Upstash pattern — §3L debt #1); media upload pipeline (R2/Supabase storage);
-   notifications backend; full desktop layouts; Wear Capacitor shell scaffold (`cap init` + the
-   store-build flow — JS side already done).
-4. **Founder-only, non-code (any time):**
-   - **Wear deploy gates ⛔:** Vercel env `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-     (shared project `xyiajtrvhlxaeplsiajj`), `CONNECT_MODE=live` + `CONNECT_API_BASE_URL`
-     (+ optional `CONNECT_API_KEY`); Supabase Auth → Redirect URLs → add Wear's prod origin.
-     (The `wear` PostgREST Exposed-schemas gate is ✅ done.)
-   - Vision deploy gates (§3F ⛔) · F1 Firebase / F2 Apple push · Step 6 store compliance ·
-     Step 7 release · Supabase Mgmt **PAT rotation** still owed (§3D).
+1. **Step 4 — extract `@citizens/*` packages.** First mover `@citizens/frontend-build`
+   (Connect `scripts/build-frontend.js` ≈ Wear `apps/web/scripts/build-frontend.js`; Vision in
+   step 4c becomes the third consumer — hoist BEFORE building a third copy). No prod risk.
+2. **Step 4b — ecosystem profile-levels contract (founder request).** One capability model:
+   **Citizen** (base identity, one `auth.users`) → **creating tier** per app (Connect =
+   Contributor ✅ exists · Wear = Creator/Brand ✅ exists · Vision = authority-assigned org levels
+   ✅ exists as `vision.user_org_roles` RBAC, spec §0.4) → **Admin** (Connect ✅ · Vision
+   platform_admin ✅ · **Wear ❌ GAP — no admin/moderation role**). Deliverable: SHARED_DB_CONTRACT
+   amendment + gap migrations (Wear admin; reports triage needs it). Docs-first; design before 4c
+   (Vision API gates consume it) and before the monorepo.
+3. **Step 4c — Vision reconcile + HTML frontend (founder request).** Repeat Wear's §6a-proven
+   sequence: (1) backend wiring per [`docs/VISION_BACKEND_WIRING_SPEC.md`](docs/VISION_BACKEND_WIRING_SPEC.md)
+   (identity bridge ✅ mig 142); (2) expose Vision ops as `/api/*`; (3) HTML frontend swap via
+   `@citizens/frontend-build`, Vision Next.js → API-only. **Founder input needed: confirm
+   `App Planning Docs/Vision/Citizens Vision.zip` is the design handoff** (+ UI Diagram PDF /
+   colour PNG as reference).
+4. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
+   hoist `supabase/`). After 4–4c stabilise, so the lift stays mechanical.
+5. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate limiting
+   (port Connect's Upstash pattern — §3L debt #1); media upload pipeline; notifications backend;
+   full desktop layouts (design zip = reference); Wear Capacitor shell scaffold (JS side done).
+6. **Founder-only, non-code (any time):**
+   - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
+     + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
+     (`https://citizens-connect.vercel.app`), optional CONNECT_API_KEY; Supabase Auth Redirect
+     URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
+   - **Vision deploy gates ⛔** (§3F): same env pattern + Exposed schemas → add `vision` + its
+     redirect URL.
+   - Answer the **Supabase-Preview** question (§3M #2: which surface showed the error) so the
+     integration can be switched off.
+   - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release · **PAT rotation**
+     still owed (§3D).
 
 > Optional Connect-side polish if a session wants a low-risk in-repo task: the accepted demo debt
 > in `src/frontend/app/store.jsx` (`if (!realUser)` graceful-degradation branches, §2M) — harmless,
