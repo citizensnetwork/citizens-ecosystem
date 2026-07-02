@@ -86,10 +86,15 @@ analytics}` — a map-discovery commons with **no** users/brands/products/OIDC (
      `X-API-Key` (the old `x-connect-api-key` header never matched Connect's key resolver).
    - Base URL env: `CONNECT_API_BASE_URL` (ecosystem-standard, same as Vision;
      `CONNECT_BASE_URL` accepted as legacy fallback).
-4. **The legacy `auth`/`users`/`brands`/`products` surface is retired with the RSC frontend**
-   (Step 3 D-removal + E): it targets endpoints that have never existed, and its consumers (the
-   RSC pages) are replaced by the standalone HTML frontend talking to Wear's own `/api/*`. Until
-   that lands, the legacy surface remains so the RSC pages keep compiling against the mock.
+4. **The legacy `auth`/`users`/`brands`/`products` surface is retired — DONE (2026-07-02).**
+   It targeted endpoints that never existed, and its consumers (the RSC pages) were replaced by
+   the standalone HTML frontend talking to Wear's own `/api/*` (Step 3 D-removal + E). The
+   `EventBus`/webhook module went with it: Connect emits no webhooks, and the event types it
+   carried (`user/brand/product.updated`) were all removed domains. `/api/connect/webhook` and
+   the delivery log were deleted; `/api/connect/status` remains on `healthCheck`.
+5. **`healthCheck` is reconciled**: Connect exposes no `/health` endpoint, so the live probe is
+   a cheap real call — `GET /api/v1/categories?applies_to=both` (hard-capped, edge-cached);
+   any 2xx counts as healthy.
 
 Contract tests continue to run against the interface; the mock mirrors the live endpoints'
 semantics (name-ascending ordering, kind/q filters, `applies_to` widening to `both`).

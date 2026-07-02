@@ -1,12 +1,14 @@
 /**
  * Citizens Wear data model — TypeScript contract.
  *
- * These interfaces mirror `prisma/schema.prisma` one-for-one. They are the
- * types the application should program against; the concrete implementation
- * is `MemoryWearStore` today and a Prisma-backed store tomorrow (Phase 3).
+ * These are the types the application programs against; the concrete
+ * implementations are `MemoryWearStore` (dev/tests, the semantic spec) and
+ * `SupabaseWearStore` (prod, `wear.*` on the shared Citizens project).
  *
- * Wear owns: `Profile`, `Follow`, `UserSettings`.
- * Connect owns: `User`, `Brand` (mirrored here for local reads).
+ * Wear owns ALL of this data (ADR-0007 / ADR-0002 amendment): `wear.users` is
+ * a display-safe mirror of the shared Supabase Auth identity, and brands/
+ * posts/social graph are Wear-native. Connect provides only the public
+ * ecosystem commons (contributors, categories) via `connect-client`.
  */
 import type { ConnectId, IsoDateTime } from '@citizens-wear/connect-client';
 

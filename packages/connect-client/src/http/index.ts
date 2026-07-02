@@ -1,49 +1,32 @@
 import type {
-  AuthProvider,
-  BrandDirectory,
   CategoryAppliesTo,
   CategoryDirectory,
-  ConnectBrand,
   ConnectCategory,
   ConnectClient,
   ConnectContributor,
   ConnectContributorKind,
   ConnectContributorProfile,
-  ConnectEventHandler,
-  ConnectProduct,
-  ConnectSession,
   ConnectStatus,
-  ConnectUser,
   ContributorDirectory,
-  EventBus,
   Page,
-  ProductCatalog,
-  UserDirectory,
 } from '../contract';
 import { ConnectError } from '../contract';
 
 /**
- * HTTP/OIDC-style implementation of the Citizens Connect contract.
- *
- * Phase 3 introduces this client so Wear can consume the real Citizens
- * Connect service when it comes online. Until a live Connect deployment
- * exists, callers should continue to use `MockConnectClient`; the factory
- * in `createConnectClient` selects between the two based on env.
+ * HTTP implementation of the Citizens Connect contract against Connect's
+ * REAL `/api/v1` surface (ADR-0002 amendment).
  *
  * Design:
- *   - Calls target `{baseUrl}/v1/...` and authenticate with a service
- *     API key if provided. User session tokens are passed through to
- *     endpoints that verify them (never parsed here).
+ *   - Calls target `{baseUrl}/api/v1/...` — public, IP-rate-limited
+ *     endpoints (`gateV1`). An optional service API key is sent as
+ *     `X-API-Key` for the higher rate tier.
  *   - All non-2xx responses become `ConnectError` with the upstream status.
- *   - The `EventBus` is local: webhook deliveries are dispatched by the
- *     Wear webhook receiver (`apps/web/src/app/api/connect/webhook`) into
- *     `events.publish`, which fans out to in-process subscribers.
  */
 
 export interface HttpConnectClientOptions {
   /** Base URL of the live Connect service, e.g. `https://connect.example`. */
   readonly baseUrl: string;
-  /** Service-to-service API key (optional; omitted in dev/staging). */
+  /** Service API key (`cck_live_…`, optional; raises the rate tier). */
   readonly apiKey?: string;
   /** Override `fetch` (tests and edge runtimes). */
   readonly fetch?: typeof fetch;
@@ -53,15 +36,12 @@ export interface HttpConnectClientOptions {
 
 interface RequestOptions {
   readonly method?: 'GET' | 'POST';
-  readonly token?: string;
   readonly body?: unknown;
   readonly query?: Record<string, string | number | undefined>;
 }
 
 /* ------------------------------------------------------------------ *
- * Wire shapes for Connect's REAL `/api/v1` surface (snake_case). The
- * legacy `/v1/*` endpoints above pre-date Connect's actual API and are
- * retired with the RSC frontend (ADR-0002 amendment, Step 3 D).
+ * Wire shapes for Connect's `/api/v1` surface (snake_case).
  * ------------------------------------------------------------------ */
 
 interface WireContributor {
@@ -143,19 +123,13 @@ function cursorToOffset(cursor: string | undefined): number {
 }
 
 export class HttpConnectClient implements ConnectClient {
-  public readonly auth: AuthProvider;
-  public readonly users: UserDirectory;
-  public readonly brands: BrandDirectory;
-  public readonly products: ProductCatalog;
   public readonly contributors: ContributorDirectory;
   public readonly categories: CategoryDirectory;
-  public readonly events: EventBus;
 
   private readonly _baseUrl: string;
   private readonly _apiKey: string | undefined;
   private readonly _fetch: typeof fetch;
   private readonly _now: () => Date;
-  private readonly _handlers = new Set<ConnectEventHandler>();
 
   public constructor(options: HttpConnectClientOptions) {
     if (!options.baseUrl) {
@@ -165,63 +139,6 @@ export class HttpConnectClient implements ConnectClient {
     this._apiKey = options.apiKey;
     this._fetch = options.fetch ?? fetch;
     this._now = options.now ?? (() => new Date());
-
-    this.auth = {
-      verifyToken: async (token) => {
-        return this._request<ConnectSession>('/v1/auth/verify', { method: 'POST', token });
-      },
-      getCurrentUser: async (session) => {
-        return this._requestNullable<ConnectUser>('/v1/auth/me', {
-          method: 'POST',
-          body: { userId: session.userId },
-        });
-      },
-    };
-
-    this.users = {
-      getById: async (id) =>
-        this._requestNullable<ConnectUser>(`/v1/users/${encodeURIComponent(id)}`),
-      getByHandle: async (handle) =>
-        this._requestNullable<ConnectUser>(
-          `/v1/users/by-handle/${encodeURIComponent(handle.toLowerCase())}`,
-        ),
-      search: async (query, params) =>
-        this._request<Page<ConnectUser>>('/v1/users/search', {
-          query: { q: query, cursor: params?.cursor, limit: params?.limit },
-        }),
-    };
-
-    this.brands = {
-      getById: async (id) =>
-        this._requestNullable<ConnectBrand>(`/v1/brands/${encodeURIComponent(id)}`),
-      getBySlug: async (slug) =>
-        this._requestNullable<ConnectBrand>(
-          `/v1/brands/by-slug/${encodeURIComponent(slug.toLowerCase())}`,
-        ),
-      listAll: async (params) =>
-        this._request<Page<ConnectBrand>>('/v1/brands', {
-          query: { cursor: params?.cursor, limit: params?.limit },
-        }),
-      listForOwner: async (userId) =>
-        this._request<readonly ConnectBrand[]>(`/v1/users/${encodeURIComponent(userId)}/brands`),
-      search: async (query, params) =>
-        this._request<Page<ConnectBrand>>('/v1/brands/search', {
-          query: { q: query, cursor: params?.cursor, limit: params?.limit },
-        }),
-    };
-
-    this.products = {
-      getById: async (id) =>
-        this._requestNullable<ConnectProduct>(`/v1/products/${encodeURIComponent(id)}`),
-      listForBrand: async (brandId, params) =>
-        this._request<Page<ConnectProduct>>(`/v1/brands/${encodeURIComponent(brandId)}/products`, {
-          query: { cursor: params?.cursor, limit: params?.limit },
-        }),
-      search: async (query, params) =>
-        this._request<Page<ConnectProduct>>('/v1/products/search', {
-          query: { q: query, cursor: params?.cursor, limit: params?.limit },
-        }),
-    };
 
     this.contributors = {
       list: async (params) => {
@@ -269,31 +186,19 @@ export class HttpConnectClient implements ConnectClient {
         return (res.data ?? []).map(mapCategory);
       },
     };
-
-    this.events = {
-      subscribe: (handler) => {
-        this._handlers.add(handler);
-        return () => {
-          this._handlers.delete(handler);
-        };
-      },
-      publish: async (event) => {
-        for (const handler of this._handlers) {
-          await handler(event);
-        }
-      },
-    };
   }
 
+  /**
+   * Connect exposes no dedicated health endpoint, so the probe is a cheap,
+   * cacheable real call: `GET /api/v1/categories` (hard-capped ≤30 rows,
+   * `s-maxage=300`). Any 2xx means the commons surface is serving.
+   */
   public async healthCheck(): Promise<ConnectStatus> {
     try {
-      const res = await this._request<{ ok?: boolean; message?: string }>('/v1/health');
-      return {
-        ok: res?.ok !== false,
-        mode: 'live',
-        checkedAt: this._now().toISOString(),
-        message: res?.message,
-      };
+      await this._request<{ data: unknown[] }>('/api/v1/categories', {
+        query: { applies_to: 'both' },
+      });
+      return { ok: true, mode: 'live', checkedAt: this._now().toISOString() };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -332,13 +237,10 @@ export class HttpConnectClient implements ConnectClient {
       headers['content-type'] = 'application/json';
     }
     // Connect's /api/v1 gate resolves `X-API-Key` (or `Authorization:
-    // Bearer`); the old `x-connect-api-key` name never matched the real
-    // surface (ADR-0002 amendment).
+    // Bearer`); the retired client's `x-connect-api-key` name never matched
+    // the real surface (ADR-0002 amendment).
     if (this._apiKey) {
       headers['x-api-key'] = this._apiKey;
-    }
-    if (opts.token) {
-      headers['authorization'] = `Bearer ${opts.token}`;
     }
 
     let response: Response;
@@ -357,8 +259,9 @@ export class HttpConnectClient implements ConnectClient {
       let code = 'http_error';
       let message = `Connect responded with ${response.status}`;
       try {
-        const body = (await response.json()) as { code?: string; message?: string };
+        const body = (await response.json()) as { code?: string; error?: string; message?: string };
         if (body?.code) code = body.code;
+        else if (body?.error) code = body.error;
         if (body?.message) message = body.message;
       } catch {
         // ignore body parse errors; status is enough.

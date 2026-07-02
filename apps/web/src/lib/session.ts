@@ -1,5 +1,4 @@
 import type { User } from '@supabase/supabase-js';
-import type { ConnectSession, ConnectUser } from '@citizens-wear/connect-client';
 import { createServerSupabaseClient } from './supabase/server';
 
 /**
@@ -7,18 +6,36 @@ import { createServerSupabaseClient } from './supabase/server';
  *
  * Identity is the shared `auth.users` row (Google OAuth), the same one Connect
  * and Vision use — one Kingdom identity across every channel. This replaces the
- * Phase-2 `cw_session` mock-token cookie verified via `connect-client.auth`.
+ * Phase-2 `cw_session` mock-token cookie verified via `connect-client.auth`
+ * (that OIDC surface was retired in the Step 3 reconciliation — ADR-0002
+ * amendment; the session types below are Wear-owned).
  *
  * Server code should only ever call `getSession()` / `getCurrentUser()` from
  * this module. Both resolve the Supabase user (validated against the auth
- * server via `getUser()`), mapped to the `ConnectUser` shape the rest of the
- * app already programs against. An unauthenticated caller — including one where
+ * server via `getUser()`). An unauthenticated caller — including one where
  * Supabase env is unset — resolves to `null`; callers handle that explicitly.
  */
 
+/** Display identity of the signed-in citizen (session-derived, not persisted). */
+export interface WearSessionUser {
+  readonly id: string;
+  readonly handle: string;
+  readonly displayName: string;
+  readonly email: string | null;
+  readonly avatarUrl: string | null;
+  readonly createdAt: string;
+}
+
+export interface WearSessionInfo {
+  readonly userId: string;
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly scopes: readonly string[];
+}
+
 export interface WearSession {
-  readonly session: ConnectSession;
-  readonly user: ConnectUser;
+  readonly session: WearSessionInfo;
+  readonly user: WearSessionUser;
 }
 
 const HANDLE_SANITISE = /[^a-z0-9_]/g;
@@ -64,7 +81,7 @@ export function identityFromAuthUser(user: User): {
   return { handle: deriveHandle(user), displayName, avatarUrl };
 }
 
-function toConnectUser(user: User): ConnectUser {
+function toSessionUser(user: User): WearSessionUser {
   const identity = identityFromAuthUser(user);
   return {
     id: user.id,
@@ -90,7 +107,7 @@ export async function getSession(): Promise<WearSession | null> {
       data: { session },
     } = await supabase.auth.getSession();
     const nowIso = new Date().toISOString();
-    const connectSession: ConnectSession = {
+    const sessionInfo: WearSessionInfo = {
       userId: user.id,
       issuedAt: user.last_sign_in_at ?? user.created_at ?? nowIso,
       expiresAt: session?.expires_at
@@ -99,7 +116,7 @@ export async function getSession(): Promise<WearSession | null> {
       scopes: ['authenticated'],
     };
 
-    return { session: connectSession, user: toConnectUser(user) };
+    return { session: sessionInfo, user: toSessionUser(user) };
   } catch {
     // Missing env or a transient auth error → treat as anonymous so public
     // pages still render.
@@ -108,7 +125,7 @@ export async function getSession(): Promise<WearSession | null> {
 }
 
 /** Convenience accessor for the current user, or `null`. */
-export async function getCurrentUser(): Promise<ConnectUser | null> {
+export async function getCurrentUser(): Promise<WearSessionUser | null> {
   return (await getSession())?.user ?? null;
 }
 

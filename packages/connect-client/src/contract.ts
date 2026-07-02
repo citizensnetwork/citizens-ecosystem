@@ -1,17 +1,20 @@
 /**
- * Citizens Connect integration contract.
+ * Citizens Connect integration contract — RECONCILED (ADR-0002 amendment,
+ * 2026-07-02).
  *
- * Citizens Wear consumes Citizens Connect as an upstream identity and catalog
- * service. This file defines the *contract* — the set of capabilities Wear
- * expects from Connect — as TypeScript interfaces. A mock implementation lives
- * under `./mock` and is used for development, tests, and for running Wear
- * standalone until the real Connect HTTP/OIDC client lands in Phase 3.
+ * Citizens Wear consumes Citizens Connect as the ecosystem's public commons:
+ * the Kingdom contributor directory and categories, served by Connect's real
+ * `GET /api/v1/*` surface. Identity comes from the shared Supabase project
+ * (one `auth.users`, ADR-0007) and users/brands/products are Wear-owned
+ * (`wear.*`, `@citizens-wear/db`) — the Phase-1 assumption that Connect was
+ * an identity + clothing-catalog service (users/brands/products/OIDC) never
+ * matched Connect's real shape and that surface was retired together with
+ * the RSC frontend (Step 3 D-removal + E).
  *
  * Design notes:
- *   - All identifiers are opaque strings (Connect-owned). Wear never invents
- *     a user/brand/product id; it mirrors Connect's.
+ *   - All identifiers are opaque strings (Connect-owned).
  *   - All methods are async and may throw `ConnectError`.
- *   - Results are read-only snapshots; mutation happens in Connect, not Wear.
+ *   - Results are read-only snapshots; Wear never mutates Connect data.
  */
 
 /** Opaque identifier issued by Citizens Connect. */
@@ -19,40 +22,14 @@ export type ConnectId = string;
 
 export type IsoDateTime = string;
 
-/** A Kingdom citizen (human user). */
-export interface ConnectUser {
-  readonly id: ConnectId;
-  readonly handle: string;
-  readonly displayName: string;
-  readonly email: string | null;
-  readonly avatarUrl: string | null;
-  readonly createdAt: IsoDateTime;
+export interface Page<T> {
+  readonly items: readonly T[];
+  readonly nextCursor: string | null;
 }
 
-/** A Christian clothing brand (organization account). */
-export interface ConnectBrand {
-  readonly id: ConnectId;
-  readonly slug: string;
-  readonly name: string;
-  readonly tagline: string | null;
-  readonly websiteUrl: string | null;
-  readonly logoUrl: string | null;
-  readonly verified: boolean;
-  readonly ownerUserId: ConnectId;
-}
-
-export type ProductStockState = 'in_stock' | 'low' | 'sold_out' | 'preorder';
-
-export interface ConnectProduct {
-  readonly id: ConnectId;
-  readonly brandId: ConnectId;
-  readonly title: string;
-  readonly description: string;
-  readonly priceCents: number;
-  readonly currency: string;
-  readonly imageUrls: readonly string[];
-  readonly stockState: ProductStockState;
-  readonly updatedAt: IsoDateTime;
+export interface PageParams {
+  readonly cursor?: string;
+  readonly limit?: number;
 }
 
 /**
@@ -112,54 +89,6 @@ export interface ConnectCategory {
   readonly eventCount: number;
 }
 
-/** A verified session issued by Connect. */
-export interface ConnectSession {
-  readonly userId: ConnectId;
-  readonly issuedAt: IsoDateTime;
-  readonly expiresAt: IsoDateTime;
-  readonly scopes: readonly string[];
-}
-
-export interface Page<T> {
-  readonly items: readonly T[];
-  readonly nextCursor: string | null;
-}
-
-export interface PageParams {
-  readonly cursor?: string;
-  readonly limit?: number;
-}
-
-/** Authentication against Citizens Connect. */
-export interface AuthProvider {
-  /** Verify a Connect-issued token and return the associated session. */
-  verifyToken(token: string): Promise<ConnectSession>;
-
-  /** Resolve the current user for a session. Returns `null` if revoked. */
-  getCurrentUser(session: ConnectSession): Promise<ConnectUser | null>;
-}
-
-/** Read-through directory of Kingdom citizens. */
-export interface UserDirectory {
-  getById(id: ConnectId): Promise<ConnectUser | null>;
-  getByHandle(handle: string): Promise<ConnectUser | null>;
-  search(query: string, params?: PageParams): Promise<Page<ConnectUser>>;
-}
-
-/** Read-through directory of Christian clothing brands. */
-export interface BrandDirectory {
-  getById(id: ConnectId): Promise<ConnectBrand | null>;
-  getBySlug(slug: string): Promise<ConnectBrand | null>;
-  listAll(params?: PageParams): Promise<Page<ConnectBrand>>;
-  listForOwner(userId: ConnectId): Promise<readonly ConnectBrand[]>;
-  /**
-   * Phase 5 — discovery surface. Matches against `name`, `slug`, and
-   * `tagline`. The query is case-insensitive and trimmed; an empty query
-   * returns the same shape as `listAll`.
-   */
-  search(query: string, params?: PageParams): Promise<Page<ConnectBrand>>;
-}
-
 /**
  * Directory of Kingdom Contributors over Connect's REAL `/api/v1` surface.
  *
@@ -192,52 +121,12 @@ export interface CategoryDirectory {
   list(params?: CategoryListParams): Promise<readonly ConnectCategory[]>;
 }
 
-/** Read-through catalog of brand products (stock, pricing, imagery). */
-export interface ProductCatalog {
-  getById(id: ConnectId): Promise<ConnectProduct | null>;
-  listForBrand(brandId: ConnectId, params?: PageParams): Promise<Page<ConnectProduct>>;
-  /**
-   * Phase 5 — discovery surface. Matches against `title` and `description`.
-   * `sold_out` products are still returned so they remain discoverable
-   * (callers may choose to dim them in the UI).
-   */
-  search(query: string, params?: PageParams): Promise<Page<ConnectProduct>>;
-}
-
-/** Domain events Connect may emit into Wear (Phase 3 wires this to webhooks). */
-export type ConnectEvent =
-  | { readonly type: 'user.updated'; readonly user: ConnectUser }
-  | { readonly type: 'brand.updated'; readonly brand: ConnectBrand }
-  | { readonly type: 'product.updated'; readonly product: ConnectProduct }
-  | {
-      readonly type: 'product.stock_changed';
-      readonly productId: ConnectId;
-      readonly stockState: ProductStockState;
-    };
-
-export type ConnectEventHandler = (event: ConnectEvent) => void | Promise<void>;
-
-/** A minimal pub/sub surface for Connect -> Wear domain events. */
-export interface EventBus {
-  subscribe(handler: ConnectEventHandler): () => void;
-  /**
-   * Publish an event. In production this is invoked by the webhook receiver;
-   * in tests/mock it can be invoked directly to simulate upstream changes.
-   */
-  publish(event: ConnectEvent): Promise<void>;
-}
-
-/** The full capability surface Wear expects from Connect. */
+/** The capability surface Wear consumes from Connect. */
 export interface ConnectClient {
-  readonly auth: AuthProvider;
-  readonly users: UserDirectory;
-  readonly brands: BrandDirectory;
-  readonly products: ProductCatalog;
   /** Connect's REAL `/api/v1` commons (contributors directory). */
   readonly contributors: ContributorDirectory;
   /** Connect's REAL `/api/v1` commons (categories). */
   readonly categories: CategoryDirectory;
-  readonly events: EventBus;
   /** Lightweight probe used by `/api/connect/status`. */
   healthCheck(): Promise<ConnectStatus>;
 }
