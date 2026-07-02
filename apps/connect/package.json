@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "build:mobile": "node scripts/build-frontend.js --mobile",
+    "sync:frontend-build": "node scripts/sync-frontend-build.js",
     "cap:sync": "npm run build:mobile && npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
@@ -58,6 +59,7 @@
     "tw-animate-css": "1.2.0"
   },
   "devDependencies": {
+    "@citizens/frontend-build": "file:vendor/citizens-frontend-build",
     "@eslint/compat": "^2.0.4",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
