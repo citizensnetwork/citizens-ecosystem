@@ -52,21 +52,11 @@ export async function proxy(request: NextRequest) {
   );
 
   // Refresh session — do not remove
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Redirect unauthenticated users away from protected routes
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/auth") ||
-    request.nextUrl.pathname === "/";
-  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
-
-  if (!user && !isAuthRoute && !isApiRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
-  }
+  // Refresh session — do not remove. (Cookie callers only; the RSC page
+  // tree is gone — Step 4c unit 4 — so there is no login redirect anymore.
+  // The static HTML frontend authenticates via Bearer tokens, and auth
+  // gating happens per-route in the handlers, not here.)
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }
