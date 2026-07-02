@@ -544,12 +544,9 @@ authed as that user. Serializers hydrate post authors/brands via the store's own
 `connect-client` round-trip — the Inc-A payoff). +14 handler tests. Fixed the vitest `@` alias on
 Windows (`fileURLToPath`).
 
-### ⚠️ Remaining Step-3 work = **D + E (coupled)** — see NEXT STEPS
-`connect-client` still carries the legacy users/brands/products/OIDC surface, consumed by the ~16 RSC
-pages + `actions.ts`. §6a forbids repointing those then discarding them, so **removing** that surface
-is coupled with the **HTML-frontend swap** (delete the RSC tree, make Next API-only). The *additive*
-half of D (add `contributors`+`categories` over the real `/api/v1`) is safe to ship independently.
-Full plan + the verified `/api/v1` shapes are in the gitignored Wear session log.
+### ~~⚠️ Remaining Step-3 work = D + E (coupled)~~ → ✅ **DONE — see §3L (2026-07-02)**
+The `connect-client` reconcile (D) and the HTML-frontend swap (E) shipped as sequenced in §6a
+(D-additive → E → D-removal); Step 3 is complete end-to-end.
 
 ---
 
@@ -560,36 +557,90 @@ The founder determined the attempted visual treatment did not match expectations
 `6ec4976`. The standalone HTML/React frontend in `src/frontend/` is restored to its pre-reskin
 state; Next.js remains the API/static host. No API, auth, database, RLS, or migration behavior changed.
 
+## 3L. Ecosystem Step 3 **COMPLETE** — Wear D + E + F shipped ✅ (2026-07-02)
+
+Finished [ECOSYSTEM_DECISION_BRIEF](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) §6 orders **3 + 3a**
+(rows now ✅). Working log: `citizens-wear/.claude/sessions/step3-wear-D-E-F-completion.md`
+(gitignored). **No Connect DB/code change → next Connect migration # still 145.** Connect-side
+edits this session = docs only (this file + the two strategy docs).
+
+### Shipped to `citizens-wear` `main` (31f9143 → **4a4d22f**, all pushed)
+- **`66ed31b` D-additive** — `connect-client` gains `ContributorDirectory` (list/getBySlug →
+  profile+counts) + `CategoryDirectory` (list) over Connect's REAL
+  `/api/v1/{contributors,contributors/[slug],categories}`: snake→camel mapping, offset pagination
+  surfaced through the uniform `Page` cursor (= stringified offset), API-key header FIXED
+  `x-connect-api-key`→`X-API-Key` (old name never matched Connect's resolver), env
+  `CONNECT_API_BASE_URL` (ecosystem-standard; `CONNECT_BASE_URL` legacy fallback). ADR-0002 amended.
+- **`c21a3ae` E-prep (API)** — `POST /api/me/hydrate` (mirror hydration from the **server-validated**
+  session identity — never the request body; `RouteContext.identity` + `identityFromAuthUser` shared
+  with session.ts); `GET /api/me/saves` (boards); `GET /api/hashtags/trending`;
+  `GET /api/ecosystem/contributors` (proxies the D-additive surface — Discover's "From the wider
+  Kingdom" rail; 502 on upstream failure); `GET /api/me` +owned brands / `PATCH /api/me`
+  (bio/visibility/displayNameOverride); `users/[handle]` +posts grid.
+- **`1e55a2b` E (the swap)** — standalone HTML frontend `apps/web/src/frontend/` (index.html,
+  `auth-client.js` = CW_AUTH port of Connect's incl. `citizenswear://auth-callback` native deep link,
+  capacitor-bridge (core/app/browser), 15 app/*.jsx modules, crown asset) built by
+  `apps/web/scripts/build-frontend.js` (verbatim port of Connect's esbuild pipeline → hashed bundle,
+  no Babel JIT, env-generated config.js; `--mobile` → mobile-dist/). Screens wired to `/api/*` with
+  **Bearer-token auth**: home (stories tray + feed cards w/ optimistic like/save + engagement counts),
+  discover (users/brands search, trending tags, Kingdom contributors rail), create (post/story/brand),
+  inbox (conversations + thread + new DM), post detail (comments), brand, profile (posts grid + saved
+  boards), settings (PATCH /api/me + sign-out), shell (bottom nav + ≥1024px sidebar). Serializer now
+  attaches likeCount/commentCount/viewerLiked/viewerSaved; `POST /api/posts` accepts safeUrl-validated
+  `mediaUrls` (≤4). **RSC tree DELETED** (all pages incl. /sign-in + /auth/callback, components/, RSC
+  libs, Tailwind/Radix toolchain) → **Next.js is API-only** (`/` → `/index.html` redirect; 23 routes).
+  **Verified in-browser** (built bundle + stubbed API): auth screen, home feed, optimistic like
+  342→343 w/ server confirm, hydrate fires on sign-in, discover/post-detail/profile/create/inbox all
+  render; 0 console errors.
+- **`0350509` D-removal** — `connect-client` = contributors + categories + healthCheck ONLY.
+  AuthProvider/UserDirectory/BrandDirectory/ProductCatalog/EventBus + webhook module DELETED
+  (+ `/api/connect/webhook` + webhook-log — Connect emits no webhooks). Live `healthCheck` reconciled
+  → probes `GET /api/v1/categories?applies_to=both` (Connect has no /health). session.ts decoupled
+  onto Wear-owned `WearSessionUser`/`WearSessionInfo`.
+- **`4a4d22f` F (docs)** — `rollout-plan.md`: dup "Phase 3" heading fixed, OIDC/webhook Phase 3
+  marked superseded, new **Phase 3R** records reality; framing bullet updated (identity = shared
+  auth; Connect = commons only). `LOCAL-SETUP.md` (untracked local file) §2/§3 rewritten to the
+  shared-project model + deploy gates + two-server dev flow.
+
+### Gates (final, all green)
+tsc/lint/test = **13 turbo tasks** · vitest **connect-client 20 / db 69 / web 49** · coverage
+cc **98.6%** / web **99.1%** (funcs 100%) · `next build` OK. Prod DB untouched (advisors baseline
+unchanged from §3J: 0 ERROR / 72 WARN / 3 INFO).
+
+### Known debt (reported, deliberate)
+1. **Wear `/api/*` has NO rate limiting** (pre-existing from Inc C). Port Connect's Upstash
+   fixed-window pattern (`src/lib/rate-limit.ts`) before store/public launch — same env vars.
+2. Media = URL-only (no upload pipeline yet); notifications tab = placeholder (no backend);
+   desktop uses the mobile-composed column in a sidebar shell (full desktop layouts = fast-follow);
+   Wear Capacitor native shell (capacitor.config + android/ios) not scaffolded yet — the JS side
+   (bridge + deep-link auth) is ready.
+3. Wear CSP still deferred (Phase 9 note in rollout-plan) — CDN scripts (react/babel-dev/supabase)
+   load without one; react/react-dom/babel pins carry SRI hashes.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Step 3 §3.4 data plane is DONE (§3J): `SupabaseWearStore` + `WearStore.users/brands` + mig 144 +
-> the `/api/*` contract, all on `main`.** What's left is the `connect-client` reconcile (D) and the
-> HTML-frontend swap (E), which are **coupled** (§6a: don't repoint the RSC pages then discard them).
-> Source of truth for the exact plan: `citizens-wear/.claude/sessions/step3-wear-store-and-frontend.md`.
+> **Ecosystem Step 3 is COMPLETE (§3L).** Wear runs the full shared-project model end-to-end:
+> shared auth → `wear.*` → `/api/*` → standalone HTML frontend, with `connect-client` reconciled
+> to Connect's real `/api/v1`. Next code step = Step 4.
 
-1. **D-additive (safe, ship-alone) — `connect-client` contributors + categories (in `citizens-wear`).**
-   Add `ConnectContributor`+`ContributorDirectory` (list/getBySlug) and `ConnectCategory`+
-   `CategoryDirectory` (list) over Connect's REAL `/api/v1/{contributors,contributors/[slug],
-   categories}` (offset pagination; map `full_name→name`, `contributor_slug→slug`, `logo_url→logoUrl`).
-   Implement in `contract`+`mock`+`http`+`fixtures`; keep users/brands/products for now (RSC still uses
-   them); update the 3 connect-client test files + `ADR-0002`; keep `src/**@70` coverage green.
-2. **D-removal + E (one coupled unit) — HTML frontend swap.** Import the design asset
-   (`C:\Users\SJ\Documents\Citizen Network\Citizens Wear app design-handoff.zip` — a Claude-design
-   `.dc.html` handoff, NOT ready-run React) reusing Connect's `scripts/build-frontend.js` (esbuild JSX
-   precompile) + Capacitor bridge + safe-area insets. Wire each screen to `/api/*` (Bearer auth).
-   **Delete the RSC page tree** (`apps/web/src/app/{feed,explore,search,compose,messages,stories,b,u,p,
-   h,settings,page.tsx}` + `actions.ts`), make Next **API-only**, THEN drop users/brands/products/
-   OIDC-auth from `connect-client`. **Mirror hydration:** on first sign-in call
-   `store.users.upsertFromSession({id,handle,displayName,avatarUrl})` (from the Supabase session) —
-   wire in `/auth/callback` or a `POST /api/me/hydrate` the HTML app calls post-login.
-3. **Step 3.5 docs** — rewrite Wear `LOCAL-SETUP.md` §2/§3 + `.env.local` blueprint to the shared-
-   project model; fix `citizens-wear/docs/rollout-plan.md`'s stale "Phase 3 landed" label.
-4. **Step 4** — extract pure-TS `@citizens/*` packages (align Wear's `@citizens-wear/*`). No prod risk.
-5. **Step 5** — the monorepo lift (grow Wear → `citizens`, `git filter-repo` Connect + Vision in).
-   Gated behind Step 3/4, not behind Step 0 code anymore.
-6. **Founder-only, non-code (any time):** Vision deploy gates (§3F ⛔), remaining Wear deploy gates
-   (Vercel env + Auth Redirect URLs; the Exposed-schemas gate is ✅ done), F1 Firebase / F2 Apple push,
-   Step 6 store compliance, Step 7 release. Supabase Mgmt **PAT rotation** still owed (§3D).
+1. **Step 4 — extract pure-TS `@citizens/*` packages** (align Wear's `@citizens-wear/*`). First
+   mover per §6a: `@citizens/frontend-build` (Connect `scripts/build-frontend.js` + Wear
+   `apps/web/scripts/build-frontend.js` are now near-identical ports — hoist once). No prod risk.
+2. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
+   hoist `supabase/`). Gated behind Step 4 only.
+3. **Wear launch-hardening fast-follows (code, any session):** `/api/*` rate limiting (port
+   Connect's Upstash pattern — §3L debt #1); media upload pipeline (R2/Supabase storage);
+   notifications backend; full desktop layouts; Wear Capacitor shell scaffold (`cap init` + the
+   store-build flow — JS side already done).
+4. **Founder-only, non-code (any time):**
+   - **Wear deploy gates ⛔:** Vercel env `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     (shared project `xyiajtrvhlxaeplsiajj`), `CONNECT_MODE=live` + `CONNECT_API_BASE_URL`
+     (+ optional `CONNECT_API_KEY`); Supabase Auth → Redirect URLs → add Wear's prod origin.
+     (The `wear` PostgREST Exposed-schemas gate is ✅ done.)
+   - Vision deploy gates (§3F ⛔) · F1 Firebase / F2 Apple push · Step 6 store compliance ·
+     Step 7 release · Supabase Mgmt **PAT rotation** still owed (§3D).
 
 > Optional Connect-side polish if a session wants a low-risk in-repo task: the accepted demo debt
 > in `src/frontend/app/store.jsx` (`if (!realUser)` graceful-degradation branches, §2M) — harmless,
@@ -613,4 +664,4 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
 - [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **144**, `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
-- [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**§3.4 = the active unit**).
+- [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

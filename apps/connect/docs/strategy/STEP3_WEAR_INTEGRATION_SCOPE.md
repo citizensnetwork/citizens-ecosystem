@@ -1,9 +1,13 @@
 # Step 3 — Citizens Wear Integration Scope (Wear ↔ shared backend)
 
-> **Status: BUILD IN PROGRESS (2026-07-01).** Increments 1–3 done & shipped (schema→prod on Connect
-> `main`; Supabase added + mock session replaced by shared Supabase Auth on `citizens-wear` `main`).
-> **Remaining = the one coupled unit §3.4** (Supabase store port + `connect-client` reconciliation +
-> repoint ~16 consumers) + docs (§3.5) + founder deploy gates (§3.6).
+> **Status: ✅ COMPLETE (2026-07-02).** All increments shipped to `citizens-wear` `main` (@ `4a4d22f`):
+> data plane (§3.4 → `SupabaseWearStore` + `WearStore` users/brands + Connect mig 144 + the `/api/*`
+> contract), `connect-client` reconciled to the real `/api/v1` (contributors + categories ADDED;
+> users/brands/products/OIDC + webhook module REMOVED — ADR-0002 amendment), the standalone HTML
+> frontend replaced the RSC tree (Next.js API-only; §6a route taken — the RSC pages were never
+> repointed), and §3.5 docs (`rollout-plan.md` Phase 3R + `LOCAL-SETUP.md` shared-project model).
+> **Remaining = founder deploy gates only (§3.6):** Wear Vercel env + Supabase Auth redirect URL.
+> Full session record: citizens-connect `RESUME_HERE.md` §3L.
 > Implements [`ECOSYSTEM_DECISION_BRIEF.md`](./ECOSYSTEM_DECISION_BRIEF.md) §6 order **3**
 > ("Point Wear at the shared Supabase project"). Governed by
 > [`../SHARED_DB_CONTRACT.md`](../SHARED_DB_CONTRACT.md) and [`../api-v1.md`](../api-v1.md).
