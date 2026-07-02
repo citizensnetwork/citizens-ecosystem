@@ -712,42 +712,99 @@ Working log: `.claude/sessions/step4-frontend-build-extraction.md` (gitignored).
 
 ---
 
+## 3O. Step 4b APPLIED + Step 4c EXECUTED — Vision on the static-HTML model ✅ (2026-07-02)
+
+Founder answered everything in one go: mig 145 confirmed, Q1 answered by a **new design
+handoff** (`Citizens Vision Design.zip`, 3.1 MB, 2026-07-02 — `_ds/` design-system token
+export + **`VISION_BUILD_PLAN.md`** + canvas + brand assets; extracted read-only to
+`App Planning Docs/Vision/design-handoff-20260702/`, **do not re-import**), Q3 delegated →
+decided **discard** (all three apps now converge on the static-frontend model), plus one
+addition: **Vision needs a login page** (built). Working log:
+`.claude/sessions/step4b-mig145-and-4c-vision-execution.md` (gitignored).
+
+### 4b — migrations 145 + 146 APPLIED to prod (Connect `main` 4b44473, tag `connect-pre-mig145`)
+- **145_wear_admin_moderation**: `wear.user_roles` (service_role-managed, self-SELECT only),
+  `wear.is_moderator()`/`is_admin()` SECDEF gates, reports triage lifecycle
+  (`open→reviewed→actioned|dismissed` + handled_by/at), moderator takedown on
+  posts/comments/stories (**DMs excluded**).
+- **146_wear_user_roles_grants**: the 145 post-apply smoke found `wear.user_roles` had **no
+  table-level grants at all** (mig-143 grants are explicit per-table, not default privileges) —
+  `authenticated` SELECT-only + `service_role` full; deliberately narrower than 143's blanket
+  pattern (no anon, no authenticated writes → self-escalation blocked at grant AND policy layer).
+- Verified: advisors **0 ERROR / 0 new** (72 WARN / 3 INFO = mig-144 baseline byte-for-byte;
+  note: the linter does not surface `wear.*` SECDEF fns at all — pre-existing behaviour);
+  live counts 23 tables / 48 policies / 9 fns / 12 enums / 0 without RLS; rolled-back prod
+  smokes: plain user denied everywhere; moderator queue-read + triage-UPDATE work;
+  `is_admin()` false for a moderator. Contract §9 → **head 146**; PROFILE_LEVELS §1/§4/§5 ✅;
+  brief row 4b ✅. **Next migration # = 147** (Vision DDL starts here).
+
+### 4c — executed in 3 gated increments (citizens-vision `e39aa88` → **3602a86**, all pushed)
+- **`2da69ba` unit 2** — day-one rate limiting: Connect's `rate-limit.ts` ported verbatim
+  (byte-compatible for the `@citizens/utils` extraction later) + `api-gate.ts` blanket per-IP
+  gate for ALL `/api/*` in `proxy.ts` (GET/HEAD 240/min, writes 60/min, split buckets,
+  429+Retry-After). **Bearer auth in ONE place**: `lib/supabase/server.ts` — Bearer present →
+  per-request supabase-js client (token as global header → RLS as user, `db.schema='vision'`) +
+  no-arg `auth.getUser()` bound to the token ⇒ **all 45 handlers gained cross-origin auth with
+  zero route edits.** +3 test files.
+- **`61e7030` unit 3** — standalone HTML frontend: Vision = `@citizens/frontend-build`'s **3rd
+  consumer** (Connect vendoring pattern: `vendor/` + `file:` dep + `sync:frontend-build` +
+  drift test; esbuild ^0.28.1 injected; `__CV_ENV`; stub `capacitor-bridge.js` — desktop
+  back-office, **no Capacitor/mobile build**). `src/frontend/`: DS tokens (Kingdom Gold ramp,
+  Manrope, **Light + Noir**), `auth-client.js` CV_AUTH (Google OAuth PKCE vs the shared
+  project, localStorage session, `getAccessToken()` → Bearer; demo fallback), 8 screens:
+  **login** (founder ask), shell (build-plan §3 **nested nav**: Home · Spaces▾Directory▾5 ·
+  Insights▾Analytics▾6-metrics · Goals▾3 · Settings; <1000px icon-collapse), home (health
+  ring + Kingdom Pulse + observation feed), analytics (Reach/Growth/Retention/**Funnel**/
+  Engagement/**Broadcast**), coverage, advisories (dismissable), reports, editable
+  Objectives/Projects/Vision-Statements, settings (7 panels incl. nav-visibility toggles).
+  **THE NARRATIVE ENGINE** (build plan §4 ⭐): `fill(template,data)` + catalog — every insight
+  is `{template,data}` slots, **the `data` keys ARE the future backend calc contract**; the
+  **five-layer law** (Conclusions→Contributions→Evidence→Charts→Raw) is the card pattern.
+  Verified in-browser (0 console errors; Connect `.claude/launch.json` gained
+  `vision-frontend-built` :3005 serving the sibling `public/`).
+- **`3602a86` unit 4** — RSC tree DELETED (149 files: pages, components, stores, 27 UI tests,
+  tailwind/recharts/zustand/maplibre deps; `@types/geojson` added — it rode in via maplibre).
+  Next.js **API-only** (45 handlers + `/api/auth/signout` kept), `/` → `/index.html`,
+  proxy login-redirect dropped, **CSP retuned** for the static model (unpkg/jsdelivr/
+  Google-Fonts/MapTiler; Vision = the only Citizens app shipping a CSP).
+- Gates (final): **tsc 0 · eslint 0 · vitest 664/664 (67 files) · next build OK**.
+
+### What Step 4c leaves open (Vision fast-follows, any session)
+1. **Demo→live wiring**: connect the 45 `/api/*` handlers into the screens (`authFetch` is
+   ready; the narrative-engine `data` objects define exactly which calc outputs each surface
+   needs — see VISION_BUILD_PLAN §3 surface→spec table).
+2. **Timeline Map** live MapLibre implementation (placeholder ships; needs MAPTILER key + live
+   activity data).
+3. Wiring-spec DDL beyond what migs 137–139 already landed (numbers from **147**).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3 (§3L) and 4 (§3N) are COMPLETE; 4b docs shipped; 4c scoped.** All three apps share
-> one auth + one Postgres; Connect + Wear run the static-HTML model on the shared
-> `@citizens/frontend-build` pipeline. The roadmap below is the ratified order
-> ([brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md)) — **the next moves are founder
-> answers, then 4c execution.**
+> **Steps 3, 4, 4b and 4c are ALL COMPLETE (§3L/§3N/§3O).** All three apps share one auth +
+> one Postgres + the static-HTML frontend model on one `@citizens/frontend-build` pipeline.
+> **No monorepo yet** — that is Step 5, now unblocked. Roadmap order = the ratified
+> [brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md).
 
-1. **Founder decisions now blocking (answer these first):**
-   - **4b:** confirm (or decline) the Wear admin/moderation migration —
-     [`docs/wear/145_wear_admin_moderation.sql`](docs/wear/145_wear_admin_moderation.sql) (§3N).
-     On confirm, any session applies it per protocol (pre-apply tag → `apply_migration` →
-     advisors 0 ERROR → SHARED_DB_CONTRACT §9 re-stamp + PROFILE_LEVELS §4/§5 update).
-   - **4c Q1:** Vision design asset — the zip is a canvas, not a handoff (§3N): fuller
-     design export (Wear-style) **or** build-from-canvas + UI Diagram PDF?
-   - **4c Q3:** reconfirm discarding Vision's RSC UI at execution kickoff.
-2. **Step 4c — Vision reconcile + HTML frontend (execution).** Follow
-   [`docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md`](docs/strategy/STEP4C_VISION_RECONCILE_SCOPE.md)
-   §3 units 1→4 (wiring-spec units, DDL from **146**; `/api/*` audit + Bearer route-context +
-   day-one rate limiting; HTML swap via vendored `@citizens/frontend-build`; Next.js API-only).
-   Unit 1 can start before the design asset lands (Q1 only gates unit 3).
-3. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision in,
-   hoist `supabase/`; vendored frontend-build copies flip to `workspace:*` and are deleted).
-   After 4c stabilises, so the lift stays mechanical.
-4. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate limiting —
-   **extract `@citizens/utils`(rate-limit) in the same change** (the Step-4 deferred-extraction
-   decision, brief row 4); media upload pipeline; notifications backend; full desktop layouts
-   (design zip = reference); Wear Capacitor shell scaffold (JS side done). Plus Wear
-   `/api/admin/*` + triage screen once mig 145 lands.
-5. **Founder-only, non-code (any time):**
+1. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision
+   in, hoist `supabase/`; the two vendored frontend-build copies flip to `workspace:*` and are
+   deleted). All code prerequisites are met; give 4c a short stabilisation window if desired.
+2. **Vision fast-follows (code, any session):** demo→live wiring of the 45 handlers into the
+   HTML screens (§3O list); Timeline Map; Vision DDL from **147**.
+3. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate
+   limiting — **extract `@citizens/utils`(rate-limit) in the same change** (brief row 4;
+   Vision's copy was kept byte-compatible on purpose); Wear `/api/admin/*` + triage screen
+   (**mig 145 is live** — the DB side is ready); media upload pipeline; notifications backend;
+   full desktop layouts; Capacitor shell scaffold.
+4. **Founder-only, non-code (any time):**
    - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
      + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
      (`https://citizens-connect.vercel.app`), optional CONNECT_API_KEY; Supabase Auth Redirect
      URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
-   - **Vision deploy gates ⛔** (§3F): same env pattern + Exposed schemas → add `vision` + its
-     redirect URL.
+   - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
+     NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
+   - First **Wear moderator/admin grants**: `insert into wear.user_roles (user_id, role) …` as
+     service_role (founder via MCP/SQL — §3O 4b).
    - Answer the **Supabase-Preview** question (§3M #2: which surface showed the error) so the
      integration can be switched off.
    - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release · **PAT rotation**
@@ -773,6 +830,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **144**, `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **146**, `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

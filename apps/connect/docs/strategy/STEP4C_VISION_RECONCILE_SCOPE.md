@@ -1,9 +1,13 @@
-# Step 4c — Vision reconcile + HTML frontend: SCOPE (prep only)
+# Step 4c — Vision reconcile + HTML frontend: SCOPE
 
-> **Status: SCOPING — no execution.** Created 2026-07-02 (ecosystem
-> [brief §6 row 4c](./ECOSYSTEM_DECISION_BRIEF.md)). Repeats Wear's proven §6a
-> sequence for `citizens-vision` (main @ `e39aa88`). Execution starts only after
-> the founder answers §5.
+> **Status: ✅ EXECUTED 2026-07-02** (citizens-vision `e39aa88` → `3602a86`; brief
+> row 4c stamped). Founder answers: Q1 = the `Citizens Vision Design.zip` handoff
+> (2026-07-02, `_ds` tokens + VISION_BUILD_PLAN.md — build-from-plan); Q2 = mig 145
+> applied (146 became the Wear grants fix → **Vision DDL numbers from 147**);
+> Q3 = RSC discard reconfirmed (delegated + executed). Units 2→4 shipped as three
+> gated increments; the §3 sequence below is retained as the record. Remaining
+> Vision work = demo→live wiring of the 45 handlers into the frontend screens
+> (the narrative-engine `data` objects are the contract) + deploy gates (§1).
 >
 > Companions: [`docs/VISION_BACKEND_WIRING_SPEC.md`](../VISION_BACKEND_WIRING_SPEC.md)
 > (the unit-of-work reference for the backend half),
