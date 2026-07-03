@@ -13,11 +13,10 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
-    "sync:frontend-build": "node scripts/sync-frontend-build.js",
     "build:frontend": "node scripts/build-frontend.js"
   },
   "dependencies": {
-    "@citizens/frontend-build": "file:vendor/citizens-frontend-build",
+    "@citizens/frontend-build": "workspace:*",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.102.1",
     "next": "16.2.3",
