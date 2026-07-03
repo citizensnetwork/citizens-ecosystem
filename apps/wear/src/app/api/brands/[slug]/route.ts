@@ -27,7 +27,9 @@ export const PATCH = handler(async (req, ctx, params) => {
   if (!brand) throw new ApiError(404, 'brand_not_found', `Unknown brand ${params.slug}.`);
   const body = await readJsonBody(req);
   const has = (key: string): boolean =>
-    !!body && typeof body === 'object' && typeof (body as Record<string, unknown>)[key] === 'string';
+    !!body &&
+    typeof body === 'object' &&
+    typeof (body as Record<string, unknown>)[key] === 'string';
   const patch: UpdateBrandInput = {
     ...(has('name') ? { name: bodyString(body, 'name') } : {}),
     ...(has('tagline') ? { tagline: bodyString(body, 'tagline') || null } : {}),

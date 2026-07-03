@@ -4,7 +4,8 @@ import type { PageParams } from '@citizens/db';
 export function readPageParams(url: URL): PageParams {
   const cursor = url.searchParams.get('cursor') ?? undefined;
   const limitRaw = url.searchParams.get('limit');
-  const limit = limitRaw !== null && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
+  const limit =
+    limitRaw !== null && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
   return { ...(cursor ? { cursor } : {}), ...(limit ? { limit } : {}) };
 }
 

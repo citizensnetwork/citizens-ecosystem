@@ -27,7 +27,11 @@
       throw err;
     }
     let data = {};
-    try { data = await res.json(); } catch (e) { /* empty body */ }
+    try {
+      data = await res.json();
+    } catch (e) {
+      /* empty body */
+    }
     if (!res.ok) {
       const err = new Error(data.message || 'Request failed (' + res.status + ')');
       err.code = data.error || 'http_error';

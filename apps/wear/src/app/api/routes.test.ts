@@ -99,7 +99,10 @@ describe('brands', () => {
 
   it('returns a brand with owner and posts', async () => {
     anonymous();
-    const res = await brandGET(req('/api/brands/salt-and-light'), route({ slug: 'salt-and-light' }));
+    const res = await brandGET(
+      req('/api/brands/salt-and-light'),
+      route({ slug: 'salt-and-light' }),
+    );
     const data = await res.json();
     expect(data.brand.slug).toBe('salt-and-light');
     expect(data.owner.handle).toBe('hannah');
@@ -207,7 +210,10 @@ describe('PATCH /api/me', () => {
   it('updates bio and visibility', async () => {
     asUser('usr_001');
     const res = await mePATCH(
-      req('/api/me', { ...jsonBody({ bio: 'For His glory.', visibility: 'private' }), method: 'PATCH' }),
+      req('/api/me', {
+        ...jsonBody({ bio: 'For His glory.', visibility: 'private' }),
+        method: 'PATCH',
+      }),
       route(),
     );
     expect(res.status).toBe(200);

@@ -34,9 +34,9 @@ describe('ContributorDirectory', () => {
     expect((await client.contributors.list({ kind: 'business' })).items.map((c) => c.id)).toEqual([
       'ctr_002',
     ]);
-    expect((await client.contributors.list({ query: 'VOLUNTEERING' })).items.map((c) => c.id)).toEqual(
-      ['ctr_003'],
-    );
+    expect(
+      (await client.contributors.list({ query: 'VOLUNTEERING' })).items.map((c) => c.id),
+    ).toEqual(['ctr_003']);
     expect(
       (await client.contributors.list({ kind: 'ministry', query: 'apparel' })).items,
     ).toHaveLength(0);
@@ -105,7 +105,9 @@ describe('healthCheck', () => {
 describe('custom fixtures', () => {
   it('accepts caller-supplied contributors and categories', async () => {
     const client = new MockConnectClient({
-      contributors: [{ ...fixtureContributors[0]!, id: 'ctr_x', name: 'Zion Works', slug: 'zion-works' }],
+      contributors: [
+        { ...fixtureContributors[0]!, id: 'ctr_x', name: 'Zion Works', slug: 'zion-works' },
+      ],
       categories: [fixtureCategories[1]!],
     });
     expect((await client.contributors.list()).items.map((c) => c.id)).toEqual(['ctr_x']);

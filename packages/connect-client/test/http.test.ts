@@ -65,11 +65,17 @@ describe('HttpConnectClient', () => {
           // Connect's key resolver reads X-API-Key (the retired client sent a
           // header Connect never recognised — ADR-0002 amendment).
           expect((init.headers as Record<string, string>)['x-api-key']).toBe('cck_live_key');
-          return jsonResponse(200, { data: [wireContributor], meta: { count: 3, limit: 1, offset: 0 } });
+          return jsonResponse(200, {
+            data: [wireContributor],
+            meta: { count: 3, limit: 1, offset: 0 },
+          });
         },
         (url) => {
           expect(new URL(url).searchParams.get('offset')).toBe('1');
-          return jsonResponse(200, { data: [wireContributor], meta: { count: 3, limit: 1, offset: 1 } });
+          return jsonResponse(200, {
+            data: [wireContributor],
+            meta: { count: 3, limit: 1, offset: 1 },
+          });
         },
       ]),
     });
@@ -101,7 +107,13 @@ describe('HttpConnectClient', () => {
           expect(url).toBe('https://connect.example/api/v1/contributors/kingdom-threads');
           return jsonResponse(200, {
             data: {
-              profile: { ...wireContributor, id: 'uuid-2', full_name: 'Kingdom Threads', contributor_kind: 'business', contributor_slug: 'kingdom-threads' },
+              profile: {
+                ...wireContributor,
+                id: 'uuid-2',
+                full_name: 'Kingdom Threads',
+                contributor_kind: 'business',
+                contributor_slug: 'kingdom-threads',
+              },
               upcoming_events: [],
               past_events: [],
               places: [],

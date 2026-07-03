@@ -20,7 +20,8 @@ export const GET = handler(async (req, ctx) => {
   );
 
   const otherIds = new Set<string>();
-  for (const s of summaries) for (const m of s.members) if (m.userId !== userId) otherIds.add(m.userId);
+  for (const s of summaries)
+    for (const m of s.members) if (m.userId !== userId) otherIds.add(m.userId);
   const users = new Map<string, WearUser>();
   await Promise.all(
     [...otherIds].map(async (id) => {

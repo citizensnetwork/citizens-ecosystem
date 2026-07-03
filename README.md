@@ -8,11 +8,11 @@
 
 ## The apps
 
-| App | Path | What it is | Runtime |
-|---|---|---|---|
-| **Connect** | [`apps/connect`](apps/connect) | Map-first Christian community discovery — events, places, contributors. | Next.js (API-only) + standalone HTML frontend + Capacitor (iOS/Android) |
-| **Vision** | [`apps/vision`](apps/vision) | Impact intelligence back-office for organisations — reach, engagement, goals. | Next.js (API-only) + standalone HTML frontend (desktop) |
-| **Wear** | [`apps/wear`](apps/wear) | Kingdom fashion social platform — brands, posts, stories, DMs. | Next.js (API-only) + standalone HTML frontend |
+| App         | Path                           | What it is                                                                    | Runtime                                                                 |
+| ----------- | ------------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Connect** | [`apps/connect`](apps/connect) | Map-first Christian community discovery — events, places, contributors.       | Next.js (API-only) + standalone HTML frontend + Capacitor (iOS/Android) |
+| **Vision**  | [`apps/vision`](apps/vision)   | Impact intelligence back-office for organisations — reach, engagement, goals. | Next.js (API-only) + standalone HTML frontend (desktop)                 |
+| **Wear**    | [`apps/wear`](apps/wear)       | Kingdom fashion social platform — brands, posts, stories, DMs.                | Next.js (API-only) + standalone HTML frontend                           |
 
 All three share **one Supabase project** (one `auth.users`, per-app Postgres schemas
 `public` / `vision` / `wear`) governed by

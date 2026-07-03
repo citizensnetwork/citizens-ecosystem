@@ -18,18 +18,37 @@
         src: user.avatarUrl,
         alt: name,
         referrerPolicy: 'no-referrer',
-        style: { width: size, height: size, borderRadius: '50%', objectFit: 'cover', flex: 'none', display: 'block' },
+        style: {
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          flex: 'none',
+          display: 'block',
+        },
       });
     }
-    const initials = name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    const initials = name
+      .split(' ')
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
     return h(
       'div',
       {
         style: {
-          width: size, height: size, borderRadius: '50%',
+          width: size,
+          height: size,
+          borderRadius: '50%',
           background: 'linear-gradient(135deg,#3a3a3a,#1a1a1a)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: GOLD, fontWeight: 700, fontSize: size * 0.34, flex: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: GOLD,
+          fontWeight: 700,
+          fontSize: size * 0.34,
+          flex: 'none',
         },
       },
       initials,
@@ -42,15 +61,28 @@
       return h('img', {
         src: brand.logoUrl,
         alt: brand.name,
-        style: { width: size, height: size, borderRadius: '50%', objectFit: 'cover', flex: 'none', display: 'block' },
+        style: {
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          flex: 'none',
+          display: 'block',
+        },
       });
     }
     return h(
       'div',
       {
         style: {
-          width: size, height: size, borderRadius: '50%', background: '#0e0e0e',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none',
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          background: '#0e0e0e',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 'none',
         },
       },
       h(Crown, { size: size * 0.52 }),
@@ -61,12 +93,23 @@
     return h(
       'button',
       {
-        onClick, disabled,
+        onClick,
+        disabled,
         style: {
-          width: '100%', background: disabled ? '#f0d789' : GOLD, color: '#fff', border: 'none',
-          borderRadius: 14, padding: '14px', fontSize: 14, fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          boxShadow: '0 6px 18px -6px rgba(242,186,27,0.7)', ...style,
+          width: '100%',
+          background: disabled ? '#f0d789' : GOLD,
+          color: '#fff',
+          border: 'none',
+          borderRadius: 14,
+          padding: '14px',
+          fontSize: 14,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          boxShadow: '0 6px 18px -6px rgba(242,186,27,0.7)',
+          ...style,
         },
       },
       icon || null,
@@ -84,8 +127,10 @@
           border: '1px solid ' + (following ? '#e6e3dc' : GOLD),
           background: following ? '#fff' : GOLD,
           color: following ? '#9a9892' : '#fff',
-          fontSize: small ? 11.5 : 12.5, fontWeight: 700,
-          padding: small ? '6px 14px' : '7px 18px', borderRadius: small ? 9 : 10,
+          fontSize: small ? 11.5 : 12.5,
+          fontWeight: 700,
+          padding: small ? '6px 14px' : '7px 18px',
+          borderRadius: small ? 9 : 10,
         },
       },
       following ? 'Following' : 'Follow',
@@ -93,12 +138,17 @@
   }
 
   function Spinner({ size = 26 }) {
-    return h('div', { style: { display: 'flex', justifyContent: 'center', padding: 28 } },
+    return h(
+      'div',
+      { style: { display: 'flex', justifyContent: 'center', padding: 28 } },
       h('div', {
         className: 'spin',
         style: {
-          width: size, height: size, border: '2.5px solid #f0eee9',
-          borderTopColor: GOLD, borderRadius: '50%',
+          width: size,
+          height: size,
+          border: '2.5px solid #f0eee9',
+          borderTopColor: GOLD,
+          borderRadius: '50%',
         },
       }),
     );
@@ -107,28 +157,85 @@
   function EmptyState({ icon, title, note }) {
     return h(
       'div',
-      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '44px 30px', textAlign: 'center' } },
-      h('div', {
+      {
         style: {
-          width: 54, height: 54, borderRadius: 16, background: '#faf8f3',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #f0eee7',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
+          padding: '44px 30px',
+          textAlign: 'center',
         },
-      }, Icon(icon || 'search', { size: 24, color: MUTED })),
+      },
+      h(
+        'div',
+        {
+          style: {
+            width: 54,
+            height: 54,
+            borderRadius: 16,
+            background: '#faf8f3',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid #f0eee7',
+          },
+        },
+        Icon(icon || 'search', { size: 24, color: MUTED }),
+      ),
       h('div', { style: { fontSize: 14.5, fontWeight: 800, color: INK } }, title),
-      note ? h('div', { style: { fontSize: 12.5, color: MUTED, fontWeight: 500, lineHeight: 1.5, maxWidth: 260 } }, note) : null,
+      note
+        ? h(
+            'div',
+            {
+              style: {
+                fontSize: 12.5,
+                color: MUTED,
+                fontWeight: 500,
+                lineHeight: 1.5,
+                maxWidth: 260,
+              },
+            },
+            note,
+          )
+        : null,
     );
   }
 
   function ErrorNote({ message, onRetry }) {
     return h(
       'div',
-      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '36px 30px', textAlign: 'center' } },
-      h('div', { style: { fontSize: 13.5, color: '#8f4a2b', fontWeight: 600, lineHeight: 1.5 } }, message || 'Something went wrong.'),
+      {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+          padding: '36px 30px',
+          textAlign: 'center',
+        },
+      },
+      h(
+        'div',
+        { style: { fontSize: 13.5, color: '#8f4a2b', fontWeight: 600, lineHeight: 1.5 } },
+        message || 'Something went wrong.',
+      ),
       onRetry
-        ? h('button', {
-            onClick: onRetry,
-            style: { border: '1px solid #e6e3dc', background: '#fff', borderRadius: 11, padding: '9px 22px', fontSize: 12.5, fontWeight: 700 },
-          }, 'Try again')
+        ? h(
+            'button',
+            {
+              onClick: onRetry,
+              style: {
+                border: '1px solid #e6e3dc',
+                background: '#fff',
+                borderRadius: 11,
+                padding: '9px 22px',
+                fontSize: 12.5,
+                fontWeight: 700,
+              },
+            },
+            'Try again',
+          )
         : null,
     );
   }
@@ -156,26 +263,66 @@
       'div',
       {
         style: {
-          position: 'sticky', top: 0, zIndex: 30, background: '#fbfaf8',
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          background: '#fbfaf8',
           padding: 'calc(14px + var(--safe-top)) 18px 12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
         },
       },
       onBack
-        ? h('button', {
-            onClick: onBack,
-            style: { border: 'none', background: '#f2f0ea', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-          }, Icon('back', { size: 20 }))
+        ? h(
+            'button',
+            {
+              onClick: onBack,
+              style: {
+                border: 'none',
+                background: '#f2f0ea',
+                borderRadius: '50%',
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+            },
+            Icon('back', { size: 20 }),
+          )
         : h('div', { style: { width: 36 } }),
-      h('div', { style: { fontSize: 16, fontWeight: 800, letterSpacing: '-0.2px', textAlign: 'center', flex: 1 } }, title),
+      h(
+        'div',
+        {
+          style: {
+            fontSize: 16,
+            fontWeight: 800,
+            letterSpacing: '-0.2px',
+            textAlign: 'center',
+            flex: 1,
+          },
+        },
+        title,
+      ),
       right || h('div', { style: { width: 36 } }),
     );
   }
 
   window.CWUI = {
-    GOLD, INK, MUTED,
-    Avatar, BrandLogo, GoldButton, FollowButton,
-    Spinner, EmptyState, ErrorNote, ScreenHeader,
-    timeAgo, fmtCount,
+    GOLD,
+    INK,
+    MUTED,
+    Avatar,
+    BrandLogo,
+    GoldButton,
+    FollowButton,
+    Spinner,
+    EmptyState,
+    ErrorNote,
+    ScreenHeader,
+    timeAgo,
+    fmtCount,
   };
 })();

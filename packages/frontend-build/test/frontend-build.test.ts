@@ -53,7 +53,10 @@ function writeFixture(rootDir: string): void {
     'const bridge = { native: false };\nwindow.FIXTURE_CAP = bridge;\n',
   );
   fs.writeFileSync(path.join(src, 'styles.css'), 'body { color: rebeccapurple; }\n');
-  fs.writeFileSync(path.join(src, 'assets', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
+  fs.writeFileSync(
+    path.join(src, 'assets', 'logo.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg"/>\n',
+  );
   fs.writeFileSync(path.join(src, 'config.example.js'), 'window.__T_ENV = { EXAMPLE: true };\n');
 }
 
@@ -69,7 +72,10 @@ const CONFIG_VARS: ConfigVar[] = [
   { key: 'STYLE', env: 'NEXT_PUBLIC_STYLE', defaultValue: 'streets-v2' },
 ];
 
-function makeOptions(rootDir: string, overrides: Partial<BuildFrontendOptions> = {}): BuildFrontendOptions {
+function makeOptions(
+  rootDir: string,
+  overrides: Partial<BuildFrontendOptions> = {},
+): BuildFrontendOptions {
   return {
     esbuild,
     rootDir,
@@ -99,7 +105,9 @@ afterEach(() => {
 
 describe('buildFrontend (end-to-end, web)', () => {
   it('produces hashed outputs, rewrites index.html, and copies static files', () => {
-    const result = buildFrontend(makeOptions(rootDir, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://sb.example' } }));
+    const result = buildFrontend(
+      makeOptions(rootDir, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://sb.example' } }),
+    );
 
     expect(result.dest).toBe(path.join(rootDir, 'public'));
     expect(result.bundleFile).toMatch(/^bundle\.[0-9a-f]{10}\.js$/);
@@ -124,7 +132,9 @@ describe('buildFrontend (end-to-end, web)', () => {
     // Exactly one bundle tag; bridge precedes auth-client (window.Cap* must exist first).
     expect(html.match(new RegExp(`app/${result.bundleFile}`, 'g'))).toHaveLength(1);
     expect(html.indexOf(result.capacitorBridgeFile)).toBeGreaterThan(-1);
-    expect(html.indexOf(result.capacitorBridgeFile)).toBeLessThan(html.indexOf(result.authClientFile));
+    expect(html.indexOf(result.capacitorBridgeFile)).toBeLessThan(
+      html.indexOf(result.authClientFile),
+    );
     // Untouched scripts survive.
     expect(html).toContain('https://cdn.example.com/react.js');
 
@@ -195,7 +205,10 @@ describe('buildFrontend (mobile)', () => {
 
   it('prefers MOBILE_API_BASE_URL env over the mobile default', () => {
     const result = buildFrontend(
-      makeOptions(rootDir, { mobile: true, env: { MOBILE_API_BASE_URL: 'https://staging.example.org' } }),
+      makeOptions(rootDir, {
+        mobile: true,
+        env: { MOBILE_API_BASE_URL: 'https://staging.example.org' },
+      }),
     );
     expect(result.config.API_BASE_URL).toBe('https://staging.example.org');
   });
@@ -203,7 +216,9 @@ describe('buildFrontend (mobile)', () => {
   it('warns when required mobile values are missing (no local config.js)', () => {
     const warn = vi.fn();
     buildFrontend(makeOptions(rootDir, { mobile: true, warn }));
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('mobile config is missing Supabase values'));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('mobile config is missing Supabase values'),
+    );
   });
 });
 
@@ -215,9 +230,9 @@ describe('option validation', () => {
     ['invalid envGlobalName', { envGlobalName: 'window.__X__; alert(1)' }, /envGlobalName/],
     ['empty configVars', { configVars: [] }, /configVars/],
   ] as const)('rejects %s', (_label, override, message) => {
-    expect(() => buildFrontend({ ...makeOptions(rootDir), ...(override as object) } as BuildFrontendOptions)).toThrow(
-      message,
-    );
+    expect(() =>
+      buildFrontend({ ...makeOptions(rootDir), ...(override as object) } as BuildFrontendOptions),
+    ).toThrow(message);
   });
 
   it('rejects a missing options object', () => {
@@ -251,7 +266,12 @@ describe('pure helpers', () => {
       API_BASE_URL: 'https://app.example.org',
       STYLE: 'streets-v2',
     });
-    expect(Object.keys(cfg)).toEqual(['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'API_BASE_URL', 'STYLE']);
+    expect(Object.keys(cfg)).toEqual([
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+      'API_BASE_URL',
+      'STYLE',
+    ]);
   });
 
   it('resolveConfigValues: web build uses env/local/default for mobileEnv vars too', () => {

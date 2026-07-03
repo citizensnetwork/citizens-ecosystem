@@ -39,7 +39,8 @@ export const POST = handler(async (req, ctx) => {
     mediaKindRaw === 'video' || mediaKindRaw === 'text' ? mediaKindRaw : 'image';
   const mediaUrl = safeUrl(bodyString(body, 'mediaUrl'));
   const caption = bodyString(body, 'caption').slice(0, MAX_STORY_CAPTION);
-  const audience: StoryAudience = bodyString(body, 'audience') === 'followers' ? 'followers' : 'public';
+  const audience: StoryAudience =
+    bodyString(body, 'audience') === 'followers' ? 'followers' : 'public';
 
   if (mediaKind === 'text' && !caption) {
     throw new ApiError(422, 'empty_story', 'Text stories must have a caption.');

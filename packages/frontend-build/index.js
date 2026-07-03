@@ -231,7 +231,11 @@ function assertOptions(options) {
     throw new TypeError('[frontend-build] options object is required');
   }
   const { esbuild, rootDir, appFileOrder, envGlobalName, configVars } = options;
-  if (!esbuild || typeof esbuild.transformSync !== 'function' || typeof esbuild.buildSync !== 'function') {
+  if (
+    !esbuild ||
+    typeof esbuild.transformSync !== 'function' ||
+    typeof esbuild.buildSync !== 'function'
+  ) {
     throw new TypeError(
       '[frontend-build] options.esbuild is required — pass the host app\'s own esbuild instance (require("esbuild")) so output stays byte-identical to the host toolchain',
     );
@@ -240,10 +244,14 @@ function assertOptions(options) {
     throw new TypeError('[frontend-build] options.rootDir (absolute app root) is required');
   }
   if (!Array.isArray(appFileOrder) || appFileOrder.length === 0) {
-    throw new TypeError('[frontend-build] options.appFileOrder must be a non-empty array of app/*.jsx filenames in load order');
+    throw new TypeError(
+      '[frontend-build] options.appFileOrder must be a non-empty array of app/*.jsx filenames in load order',
+    );
   }
   if (typeof envGlobalName !== 'string' || !IDENTIFIER_RE.test(envGlobalName)) {
-    throw new TypeError('[frontend-build] options.envGlobalName must be a valid JS identifier (e.g. "__CC_ENV")');
+    throw new TypeError(
+      '[frontend-build] options.envGlobalName must be a valid JS identifier (e.g. "__CC_ENV")',
+    );
   }
   if (!Array.isArray(configVars) || configVars.length === 0) {
     throw new TypeError('[frontend-build] options.configVars must be a non-empty array');

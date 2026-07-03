@@ -51,8 +51,7 @@ body {
   }
 
   .cw-hero-glow {
-    background:
-      radial-gradient(
+    background: radial-gradient(
         ellipse 70% 50% at 85% 10%,
         rgba(201, 162, 74, 0.18) 0%,
         rgba(201, 162, 74, 0) 60%

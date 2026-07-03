@@ -35,16 +35,26 @@
   function renderScreen({ screen, params }) {
     const S = window.CWScreens;
     switch (screen) {
-      case 'home': return h(S.Home, {});
-      case 'discover': return h(S.Discover, {});
-      case 'create': return h(S.Create, {});
-      case 'inbox': return h(S.Inbox, {});
-      case 'profile': return h(S.Profile, {});
-      case 'user': return h(S.Profile, { params });
-      case 'brand': return h(S.Brand, { params });
-      case 'post': return h(S.Post, { params });
-      case 'settings': return h(S.Settings, {});
-      default: return h(S.Home, {});
+      case 'home':
+        return h(S.Home, {});
+      case 'discover':
+        return h(S.Discover, {});
+      case 'create':
+        return h(S.Create, {});
+      case 'inbox':
+        return h(S.Inbox, {});
+      case 'profile':
+        return h(S.Profile, {});
+      case 'user':
+        return h(S.Profile, { params });
+      case 'brand':
+        return h(S.Brand, { params });
+      case 'post':
+        return h(S.Post, { params });
+      case 'settings':
+        return h(S.Settings, {});
+      default:
+        return h(S.Home, {});
     }
   }
 
@@ -55,11 +65,17 @@
       'div',
       {
         style: {
-          position: 'absolute', bottom: 0, left: 0, right: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           height: 'calc(84px + var(--safe-bottom))',
-          background: '#fbfaf8', borderTop: '1px solid #f0eee9',
-          display: 'flex', alignItems: 'flex-start',
-          padding: '11px 8px calc(0px + var(--safe-bottom))', zIndex: 45,
+          background: '#fbfaf8',
+          borderTop: '1px solid #f0eee9',
+          display: 'flex',
+          alignItems: 'flex-start',
+          padding: '11px 8px calc(0px + var(--safe-bottom))',
+          zIndex: 45,
         },
       },
       TABS.map((t) => {
@@ -67,9 +83,26 @@
         const col = active ? GOLD : '#9a9892';
         return h(
           'button',
-          { key: t.k, onClick: () => setTab(t.k), style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, border: 'none', background: 'none', padding: '4px 0' } },
+          {
+            key: t.k,
+            onClick: () => setTab(t.k),
+            style: {
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              border: 'none',
+              background: 'none',
+              padding: '4px 0',
+            },
+          },
           Icon(t.icon, { size: 24, color: col, sw: active ? 2.1 : 1.8 }),
-          h('span', { style: { fontSize: 9.5, fontWeight: 700, letterSpacing: '0.2px', color: col } }, t.label),
+          h(
+            'span',
+            { style: { fontSize: 9.5, fontWeight: 700, letterSpacing: '0.2px', color: col } },
+            t.label,
+          ),
         );
       }),
     );
@@ -79,32 +112,75 @@
     const { nav, setTab, openSettings } = useStore();
     const overlayTop = nav.stack.length ? nav.stack[nav.stack.length - 1].screen : null;
     const item = (t, onClick, activeOverride) => {
-      const active = activeOverride !== undefined ? activeOverride : !nav.stack.length && nav.tab === t.k;
+      const active =
+        activeOverride !== undefined ? activeOverride : !nav.stack.length && nav.tab === t.k;
       return h(
         'button',
         {
           key: t.k,
           onClick,
           style: {
-            display: 'flex', alignItems: 'center', gap: 13, border: 'none',
-            background: active ? '#faf6ec' : 'transparent', borderRadius: 11,
-            padding: '10px 12px', width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 13,
+            border: 'none',
+            background: active ? '#faf6ec' : 'transparent',
+            borderRadius: 11,
+            padding: '10px 12px',
+            width: '100%',
           },
         },
         Icon(t.icon, { size: 20, color: active ? GOLD : '#6a6a6a' }),
-        h('span', { style: { fontSize: 13.5, fontWeight: active ? 700 : 600, color: active ? GOLD : '#555' } }, t.label),
+        h(
+          'span',
+          {
+            style: {
+              fontSize: 13.5,
+              fontWeight: active ? 700 : 600,
+              color: active ? GOLD : '#555',
+            },
+          },
+          t.label,
+        ),
       );
     };
     return h(
       'div',
-      { style: { width: 236, flex: 'none', borderRight: '1px solid #f0eee9', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 3, background: '#fff' } },
-      h('button', { onClick: () => setTab('home'), style: { display: 'flex', alignItems: 'center', gap: 9, border: 'none', background: 'none', padding: '6px 10px 24px' } },
+      {
+        style: {
+          width: 236,
+          flex: 'none',
+          borderRight: '1px solid #f0eee9',
+          padding: '24px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+          background: '#fff',
+        },
+      },
+      h(
+        'button',
+        {
+          onClick: () => setTab('home'),
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            border: 'none',
+            background: 'none',
+            padding: '6px 10px 24px',
+          },
+        },
         h(Crown, { size: 22 }),
         h('span', { style: { fontSize: 14, letterSpacing: '0.3em', fontWeight: 700 } }, 'CITIZENS'),
       ),
       TABS.map((t) => item(t, () => setTab(t.k))),
       h('div', { style: { height: 1, background: '#f0eee9', margin: '11px 10px' } }),
-      item({ k: 'settings', label: 'Settings', icon: 'sliders' }, openSettings, overlayTop === 'settings'),
+      item(
+        { k: 'settings', label: 'Settings', icon: 'sliders' },
+        openSettings,
+        overlayTop === 'settings',
+      ),
     );
   }
 
@@ -119,17 +195,47 @@
       // fast-follow — this keeps one source of truth per screen).
       return h(
         'div',
-        { style: { height: '100%', display: 'flex', background: '#e9e7e1', justifyContent: 'center', padding: '26px 16px' } },
-        h('div', {
+        {
           style: {
-            width: '100%', maxWidth: 1180, height: '100%', display: 'flex',
-            background: '#fff', borderRadius: 18, overflow: 'hidden',
-            boxShadow: '0 30px 70px -30px rgba(0,0,0,0.35)', border: '1px solid #ececec',
+            height: '100%',
+            display: 'flex',
+            background: '#e9e7e1',
+            justifyContent: 'center',
+            padding: '26px 16px',
           },
         },
+        h(
+          'div',
+          {
+            style: {
+              width: '100%',
+              maxWidth: 1180,
+              height: '100%',
+              display: 'flex',
+              background: '#fff',
+              borderRadius: 18,
+              overflow: 'hidden',
+              boxShadow: '0 30px 70px -30px rgba(0,0,0,0.35)',
+              border: '1px solid #ececec',
+            },
+          },
           h(Sidebar, {}),
-          h('div', { style: { flex: 1, minWidth: 0, position: 'relative', background: '#fcfbf9' } },
-            h('div', { key: current.screen + JSON.stringify(current.params), style: { height: '100%', maxWidth: 640, margin: '0 auto', background: '#fff', borderLeft: '1px solid #f0eee9', borderRight: '1px solid #f0eee9' } },
+          h(
+            'div',
+            { style: { flex: 1, minWidth: 0, position: 'relative', background: '#fcfbf9' } },
+            h(
+              'div',
+              {
+                key: current.screen + JSON.stringify(current.params),
+                style: {
+                  height: '100%',
+                  maxWidth: 640,
+                  margin: '0 auto',
+                  background: '#fff',
+                  borderLeft: '1px solid #f0eee9',
+                  borderRight: '1px solid #f0eee9',
+                },
+              },
               renderScreen(current),
             ),
           ),
@@ -140,7 +246,14 @@
     return h(
       'div',
       { style: { height: '100%', position: 'relative', background: '#fff', overflow: 'hidden' } },
-      h('div', { key: current.screen + JSON.stringify(current.params), style: { position: 'absolute', inset: 0 } }, renderScreen(current)),
+      h(
+        'div',
+        {
+          key: current.screen + JSON.stringify(current.params),
+          style: { position: 'absolute', inset: 0 },
+        },
+        renderScreen(current),
+      ),
       h(BottomNav, {}),
     );
   }

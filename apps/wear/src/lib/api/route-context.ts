@@ -49,9 +49,11 @@ function bearerToken(req: Request): string | null {
   return match ? match[1]!.trim() : null;
 }
 
-function identityFromWearSession(session: {
-  user: { handle: string; displayName: string; avatarUrl: string | null };
-} | null): SessionIdentity | null {
+function identityFromWearSession(
+  session: {
+    user: { handle: string; displayName: string; avatarUrl: string | null };
+  } | null,
+): SessionIdentity | null {
   if (!session) return null;
   return {
     handle: session.user.handle,

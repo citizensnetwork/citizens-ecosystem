@@ -35,10 +35,21 @@ buildFrontend({
   // <script type="text/babel"> tags loaded them (later files reference
   // `window.X` set by earlier ones).
   appFileOrder: [
-    'icons.jsx', 'api.jsx', 'store.jsx', 'ui.jsx', 'auth.jsx',
-    'home.jsx', 'discover.jsx', 'create.jsx', 'inbox.jsx',
-    'post.jsx', 'brand.jsx', 'profile.jsx', 'settings.jsx',
-    'shell.jsx', 'app.jsx',
+    'icons.jsx',
+    'api.jsx',
+    'store.jsx',
+    'ui.jsx',
+    'auth.jsx',
+    'home.jsx',
+    'discover.jsx',
+    'create.jsx',
+    'inbox.jsx',
+    'post.jsx',
+    'brand.jsx',
+    'profile.jsx',
+    'settings.jsx',
+    'shell.jsx',
+    'app.jsx',
   ],
 
   extraSpecialFiles: ['config.example.js'],

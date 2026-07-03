@@ -15,22 +15,36 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   var env = window.__CW_ENV || {};
-  if (!window.supabase || !window.supabase.createClient || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY ||
-      env.SUPABASE_ANON_KEY.indexOf("REPLACE_WITH") === 0) {
-    console.warn("[CW_AUTH] Supabase not configured — copy config.example.js → config.js.");
+  if (
+    !window.supabase ||
+    !window.supabase.createClient ||
+    !env.SUPABASE_URL ||
+    !env.SUPABASE_ANON_KEY ||
+    env.SUPABASE_ANON_KEY.indexOf('REPLACE_WITH') === 0
+  ) {
+    console.warn('[CW_AUTH] Supabase not configured — copy config.example.js → config.js.');
     window.CW_AUTH = null;
     return;
   }
 
   var client = window.supabase.createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
   });
   window.CW_SUPABASE = client;
 
-  var NATIVE_REDIRECT = "citizenswear://auth-callback";
+  var NATIVE_REDIRECT = 'citizenswear://auth-callback';
 
   function isNativeShell() {
-    return !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+    return !!(
+      window.CapCore &&
+      window.CapCore.isNativePlatform &&
+      window.CapCore.isNativePlatform()
+    );
   }
 
   // Sign in / sign up with Google (OAuth — same call for both).
@@ -48,14 +62,16 @@
       var origin = env.FRONTEND_ORIGIN || window.location.origin;
       // A bare hostname has no scheme; Supabase would treat it as a relative
       // path on its own domain and the redirect would 404 (Connect lesson).
-      if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
+      if (origin && !/^https?:\/\//i.test(origin)) {
+        origin = 'https://' + origin;
+      }
       redirectTo = origin + window.location.pathname;
     }
     var res = await client.auth.signInWithOAuth({
-      provider: "google",
+      provider: 'google',
       options: {
         redirectTo: redirectTo,
-        queryParams: { access_type: "offline", prompt: "consent" },
+        queryParams: { access_type: 'offline', prompt: 'consent' },
         skipBrowserRedirect: native,
       },
     });
@@ -71,20 +87,22 @@
   // SIGNED_IN exactly as on web — no extra plumbing in store.jsx.
   function listenForNativeAuthCallback() {
     if (!isNativeShell() || !window.CapApp) return;
-    window.CapApp.addListener("appUrlOpen", async function (data) {
+    window.CapApp.addListener('appUrlOpen', async function (data) {
       var url = data && data.url;
       if (!url || url.indexOf(NATIVE_REDIRECT) !== 0) return;
       try {
         if (window.CapBrowser && window.CapBrowser.close) {
-          try { await window.CapBrowser.close(); } catch (e) {}
+          try {
+            await window.CapBrowser.close();
+          } catch (e) {}
         }
         var match = url.match(/[?&]code=([^&]+)/);
         var code = match ? decodeURIComponent(match[1]) : null;
         if (!code) return;
         var res = await client.auth.exchangeCodeForSession(code);
-        if (res.error) console.error("[CW_AUTH] native OAuth exchange failed", res.error);
+        if (res.error) console.error('[CW_AUTH] native OAuth exchange failed', res.error);
       } catch (e) {
-        console.error("[CW_AUTH] native OAuth callback failed", e);
+        console.error('[CW_AUTH] native OAuth callback failed', e);
       }
     });
   }
@@ -99,8 +117,8 @@
     var meta = session.user.user_metadata || {};
     return {
       user: session.user,
-      name: meta.full_name || meta.name || "",
-      avatarUrl: meta.avatar_url || meta.picture || "",
+      name: meta.full_name || meta.name || '',
+      avatarUrl: meta.avatar_url || meta.picture || '',
     };
   }
 
@@ -118,12 +136,16 @@
   }
 
   async function signOut() {
-    try { await client.auth.signOut(); } catch (e) {}
+    try {
+      await client.auth.signOut();
+    } catch (e) {}
   }
 
   // Subscribe to auth changes (mounted once at the app root).
   function onAuthChange(cb) {
-    return client.auth.onAuthStateChange(function (event, session) { cb(event, session); });
+    return client.auth.onAuthStateChange(function (event, session) {
+      cb(event, session);
+    });
   }
 
   window.CW_AUTH = {

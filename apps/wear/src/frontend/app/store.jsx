@@ -73,7 +73,11 @@
         }
       });
       return () => {
-        try { sub.data.subscription.unsubscribe(); } catch (e) { /* noop */ }
+        try {
+          sub.data.subscription.unsubscribe();
+        } catch (e) {
+          /* noop */
+        }
       };
     }, [completeSignIn]);
 
@@ -93,15 +97,23 @@
     // ── navigation ──
     const setTab = useCallback((tab) => setNav({ tab, stack: [] }), []);
     const push = useCallback(
-      (screen, params) => setNav((n) => ({ ...n, stack: [...n.stack, { screen, params: params || {} }] })),
+      (screen, params) =>
+        setNav((n) => ({ ...n, stack: [...n.stack, { screen, params: params || {} }] })),
       [],
     );
     const pop = useCallback(() => setNav((n) => ({ ...n, stack: n.stack.slice(0, -1) })), []);
 
     const value = {
-      authStatus, me, authError,
-      signIn, signOut, refreshMe,
-      nav, setTab, push, pop,
+      authStatus,
+      me,
+      authError,
+      signIn,
+      signOut,
+      refreshMe,
+      nav,
+      setTab,
+      push,
+      pop,
       openPost: (id) => push('post', { id }),
       openBrand: (slug) => push('brand', { slug }),
       openUser: (handle) => push('user', { handle }),

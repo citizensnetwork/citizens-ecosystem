@@ -110,9 +110,7 @@ export async function getSession(): Promise<WearSession | null> {
     const sessionInfo: WearSessionInfo = {
       userId: user.id,
       issuedAt: user.last_sign_in_at ?? user.created_at ?? nowIso,
-      expiresAt: session?.expires_at
-        ? new Date(session.expires_at * 1000).toISOString()
-        : nowIso,
+      expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : nowIso,
       scopes: ['authenticated'],
     };
 

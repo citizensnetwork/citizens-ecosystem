@@ -12,7 +12,7 @@
 //  Local dev: the static server runs on :3001 and the API on :3000.
 // ════════════════════════════════════════════════════════════════════
 window.__CW_ENV = {
-  SUPABASE_URL: "https://xyiajtrvhlxaeplsiajj.supabase.co",
-  SUPABASE_ANON_KEY: "REPLACE_WITH_ANON_KEY",
-  API_BASE_URL: "http://localhost:3000",
+  SUPABASE_URL: 'https://xyiajtrvhlxaeplsiajj.supabase.co',
+  SUPABASE_ANON_KEY: 'REPLACE_WITH_ANON_KEY',
+  API_BASE_URL: 'http://localhost:3000',
 };

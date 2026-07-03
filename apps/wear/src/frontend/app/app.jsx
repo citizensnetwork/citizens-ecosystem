@@ -10,7 +10,17 @@
     if (authStatus === 'loading') {
       return h(
         'div',
-        { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, background: '#fbfaf8' } },
+        {
+          style: {
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 18,
+            background: '#fbfaf8',
+          },
+        },
         h(Crown, { size: 56 }),
         h(Spinner, { size: 22 }),
       );

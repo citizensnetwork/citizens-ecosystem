@@ -65,11 +65,11 @@ buildFrontend({
 
 ## Consumers & distribution (pre-monorepo)
 
-| App | Wrapper | How it gets the package |
-|---|---|---|
-| **Wear** | `apps/wear/scripts/build-frontend.js` | `workspace:*` (this repo) |
-| **Connect** | `scripts/build-frontend.js` | **Vendored copy** at `vendor/citizens-frontend-build` (`file:` dep) — separate repo + Vercel builds can't reach this workspace. Sync with `npm run sync:frontend-build`; a vitest drift-test compares the copy against this canonical source whenever the sibling checkout exists. |
-| **Vision** (Step 4c) | planned `scripts/build-frontend.js` | same vendoring pattern as Connect until the Step-5 monorepo |
+| App                  | Wrapper                               | How it gets the package                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wear**             | `apps/wear/scripts/build-frontend.js` | `workspace:*` (this repo)                                                                                                                                                                                                                                                          |
+| **Connect**          | `scripts/build-frontend.js`           | **Vendored copy** at `vendor/citizens-frontend-build` (`file:` dep) — separate repo + Vercel builds can't reach this workspace. Sync with `npm run sync:frontend-build`; a vitest drift-test compares the copy against this canonical source whenever the sibling checkout exists. |
+| **Vision** (Step 4c) | planned `scripts/build-frontend.js`   | same vendoring pattern as Connect until the Step-5 monorepo                                                                                                                                                                                                                        |
 
 **This directory is the canonical source.** Edit here, run the tests, then
 re-sync vendored copies. At Step 5 (monorepo lift) the vendored copies are

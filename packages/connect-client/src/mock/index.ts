@@ -65,9 +65,7 @@ export class MockConnectClient implements ConnectClient {
         let matches = this._contributors.filter((c) => {
           if (params?.kind && c.kind !== params.kind) return false;
           if (!q) return true;
-          return (
-            c.name.toLowerCase().includes(q) || (c.bio ?? '').toLowerCase().includes(q)
-          );
+          return c.name.toLowerCase().includes(q) || (c.bio ?? '').toLowerCase().includes(q);
         });
         matches = matches.slice().sort((a, b) => a.name.localeCompare(b.name));
         return paginate(matches, params);

@@ -131,7 +131,10 @@ export class SupabaseWearStore implements WearStore {
       search: async (query, params) => {
         const q = query.trim();
         let builder = this.db.from('users').select(USER_COLS).order('handle', { ascending: true });
-        if (q) builder = builder.or(`handle.ilike.%${escapeLike(q)}%,display_name.ilike.%${escapeLike(q)}%`);
+        if (q)
+          builder = builder.or(
+            `handle.ilike.%${escapeLike(q)}%,display_name.ilike.%${escapeLike(q)}%`,
+          );
         return this._pageFrom(builder, params, mapUser);
       },
       upsertFromSession: async (input: UpsertUserInput) => {
@@ -149,7 +152,10 @@ export class SupabaseWearStore implements WearStore {
           return mapUser(updated);
         }
         // First sign-in: insert with a unique handle, retrying on collision.
-        const base = (input.handle.trim().toLowerCase() || `user_${input.id.slice(0, 8)}`).slice(0, 32);
+        const base = (input.handle.trim().toLowerCase() || `user_${input.id.slice(0, 8)}`).slice(
+          0,
+          32,
+        );
         for (let attempt = 0; attempt < 25; attempt += 1) {
           const handle = attempt === 0 ? base : `${base}-${attempt + 1}`;
           const { data, error } = await this.db
@@ -166,7 +172,9 @@ export class SupabaseWearStore implements WearStore {
           if (error && error.code === '23505' && /handle/i.test(error.message)) continue; // handle taken
           if (error && error.code === '23505') {
             // id collided → a row already exists (race); read it back.
-            const row = await this._single(this.db.from('users').select(USER_COLS).eq('id', input.id));
+            const row = await this._single(
+              this.db.from('users').select(USER_COLS).eq('id', input.id),
+            );
             return mapUser(row);
           }
           if (error) throw wrap(error);
@@ -335,10 +343,16 @@ export class SupabaseWearStore implements WearStore {
       },
       counts: async (userId): Promise<FollowCounts> => {
         const followers = await this._count(
-          this.db.from('follows').select('*', { count: 'exact', head: true }).eq('target_id', userId),
+          this.db
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('target_id', userId),
         );
         const following = await this._count(
-          this.db.from('follows').select('*', { count: 'exact', head: true }).eq('actor_id', userId),
+          this.db
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('actor_id', userId),
         );
         return { followers, following };
       },
@@ -400,7 +414,8 @@ export class SupabaseWearStore implements WearStore {
     };
     return {
       create: async (input: CreatePostInput) => {
-        if (!input.body.trim()) throw new WearStoreError('empty_post', 'Post body must not be empty.');
+        if (!input.body.trim())
+          throw new WearStoreError('empty_post', 'Post body must not be empty.');
         const post = await this._single(
           this.db
             .from('posts')
@@ -577,15 +592,14 @@ export class SupabaseWearStore implements WearStore {
           .select('post_id,user_id,created_at')
           .single();
         if (error) {
-          if (error.code === '23503') throw new WearStoreError('post_not_found', `Unknown post ${postId}.`);
+          if (error.code === '23503')
+            throw new WearStoreError('post_not_found', `Unknown post ${postId}.`);
           throw wrap(error);
         }
         return mapLike(data as LikeRow);
       },
       unlikePost: async (postId, userId) => {
-        await this._run(
-          this.db.from('likes').delete().eq('post_id', postId).eq('user_id', userId),
-        );
+        await this._run(this.db.from('likes').delete().eq('post_id', postId).eq('user_id', userId));
       },
       isPostLiked: async (postId, userId) => {
         const row = await this._maybeSingle(
@@ -647,7 +661,8 @@ export class SupabaseWearStore implements WearStore {
   private _comments(): CommentRepo {
     return {
       create: async ({ postId, authorId, body, parentCommentId }) => {
-        if (!body.trim()) throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
+        if (!body.trim())
+          throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
         const { data, error } = await this.db
           .from('comments')
           .insert({
@@ -689,7 +704,10 @@ export class SupabaseWearStore implements WearStore {
       },
       commentsForPostCount: async (postId) =>
         this._count(
-          this.db.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', postId),
+          this.db
+            .from('comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', postId),
         ),
     };
   }
@@ -717,7 +735,10 @@ export class SupabaseWearStore implements WearStore {
       const posts = await this._many(
         this.db.from('saved_posts').select('post_id').eq('collection_id', row.id),
       );
-      return mapSaveCollection(row, posts.map((p) => p.post_id));
+      return mapSaveCollection(
+        row,
+        posts.map((p) => p.post_id),
+      );
     };
     return {
       getOrCreateDefault: async (ownerId) => snapshot(await defaultCollection(ownerId)),
@@ -746,7 +767,8 @@ export class SupabaseWearStore implements WearStore {
             { onConflict: 'collection_id,post_id', ignoreDuplicates: true },
           );
         if (error) {
-          if (error.code === '23503') throw new WearStoreError('post_not_found', `Unknown post ${postId}.`);
+          if (error.code === '23503')
+            throw new WearStoreError('post_not_found', `Unknown post ${postId}.`);
           throw wrap(error);
         }
         return snapshot(collection);
@@ -828,7 +850,9 @@ export class SupabaseWearStore implements WearStore {
         return mapStory(row);
       },
       getById: async (id) => {
-        const row = await this._maybeSingle(this.db.from('stories').select(STORY_COLS).eq('id', id));
+        const row = await this._maybeSingle(
+          this.db.from('stories').select(STORY_COLS).eq('id', id),
+        );
         return row ? mapStory(row) : null;
       },
       listByAuthor: async (authorId) => {
@@ -856,7 +880,8 @@ export class SupabaseWearStore implements WearStore {
         );
         const visible: Story[] = [];
         for (const r of rows) {
-          if (r.author_id !== viewerId && (await this._isBlockedEither(viewerId, r.author_id))) continue;
+          if (r.author_id !== viewerId && (await this._isBlockedEither(viewerId, r.author_id)))
+            continue;
           visible.push(mapStory(r));
         }
         return visible;
@@ -984,7 +1009,10 @@ export class SupabaseWearStore implements WearStore {
           .eq('highlight_id', id)
           .order('order_index', { ascending: true }),
       );
-      return mapHighlight(row, items.map((i) => i.story_id));
+      return mapHighlight(
+        row,
+        items.map((i) => i.story_id),
+      );
     };
     const requireOwned = async (id: string, ownerId: ConnectId): Promise<StoryHighlight> => {
       const h = await load(id);
@@ -997,7 +1025,8 @@ export class SupabaseWearStore implements WearStore {
     return {
       create: async ({ ownerId, name, coverUrl }) => {
         const trimmed = name.trim();
-        if (!trimmed) throw new WearStoreError('empty_highlight', 'Highlight name must not be empty.');
+        if (!trimmed)
+          throw new WearStoreError('empty_highlight', 'Highlight name must not be empty.');
         const row = await this._single(
           this.db
             .from('story_highlights')
@@ -1029,7 +1058,10 @@ export class SupabaseWearStore implements WearStore {
         );
         if (!story) throw new WearStoreError('story_not_found', `Unknown story ${storyId}.`);
         if (story.author_id !== ownerId) {
-          throw new WearStoreError('forbidden', 'Highlights may only contain the owner’s own stories.');
+          throw new WearStoreError(
+            'forbidden',
+            'Highlights may only contain the owner’s own stories.',
+          );
         }
         if (highlight.storyIds.includes(storyId)) return highlight;
         await this._run(
@@ -1093,7 +1125,8 @@ export class SupabaseWearStore implements WearStore {
     };
     return {
       getOrCreateDirect: async (actorId, otherId) => {
-        if (actorId === otherId) throw new WearStoreError('self_dm', 'Cannot start a DM with yourself.');
+        if (actorId === otherId)
+          throw new WearStoreError('self_dm', 'Cannot start a DM with yourself.');
         const conv = await this._rpcRow('create_direct_conversation', { p_other: otherId });
         return mapConversation(conv as ConversationRow);
       },
@@ -1254,7 +1287,11 @@ export class SupabaseWearStore implements WearStore {
         const row = await this._single(
           this.db
             .from('messages')
-            .insert({ conversation_id: conversationId, author_id: authorId, body: trimmed.slice(0, 4000) })
+            .insert({
+              conversation_id: conversationId,
+              author_id: authorId,
+              body: trimmed.slice(0, 4000),
+            })
             .select(MESSAGE_COLS),
         );
         return mapMessage(row);
@@ -1306,7 +1343,8 @@ export class SupabaseWearStore implements WearStore {
   private _blocks(): BlockRepo {
     return {
       block: async (actorId, targetId) => {
-        if (actorId === targetId) throw new WearStoreError('self_block', 'A user cannot block themselves.');
+        if (actorId === targetId)
+          throw new WearStoreError('self_block', 'A user cannot block themselves.');
         const existing = await this._maybeSingle(
           this.db
             .from('blocks')
@@ -1424,26 +1462,30 @@ export class SupabaseWearStore implements WearStore {
     }
     return posts.map((p) => ({
       post: mapPost(p),
-      media: (byPost.get(p.id) ?? [])
-        .sort((a, b) => a.order_index - b.order_index)
-        .map(mapMedia),
+      media: (byPost.get(p.id) ?? []).sort((a, b) => a.order_index - b.order_index).map(mapMedia),
     }));
   }
 
   // ── PostgREST plumbing ────────────────────────────────────────────────────
-  private async _maybeSingle<T>(builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>): Promise<T | null> {
+  private async _maybeSingle<T>(
+    builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
+  ): Promise<T | null> {
     const { data, error } = await builder;
     if (error) throw wrap(error);
     return data && data.length ? data[0]! : null;
   }
 
-  private async _single<T>(builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>): Promise<T> {
+  private async _single<T>(
+    builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
+  ): Promise<T> {
     const row = await this._maybeSingle(builder);
     if (!row) throw new WearStoreError('not_found', 'Expected exactly one row.');
     return row;
   }
 
-  private async _many<T>(builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>): Promise<T[]> {
+  private async _many<T>(
+    builder: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
+  ): Promise<T[]> {
     const { data, error } = await builder;
     if (error) throw wrap(error);
     return data ?? [];
@@ -1497,16 +1539,21 @@ export function createSupabaseWearStore(
 }
 
 // ── Types + mappers (snake_case row → camelCase domain) ─────────────────────
-type PostgrestPageBuilder<TRow> = PromiseLike<{ data: TRow[] | null; error: PostgrestError | null }> & {
-  range(from: number, to: number): PromiseLike<{ data: TRow[] | null; error: PostgrestError | null }>;
+type PostgrestPageBuilder<TRow> = PromiseLike<{
+  data: TRow[] | null;
+  error: PostgrestError | null;
+}> & {
+  range(
+    from: number,
+    to: number,
+  ): PromiseLike<{ data: TRow[] | null; error: PostgrestError | null }>;
 };
 
 const USER_COLS = 'id,handle,display_name,avatar_url,created_at,updated_at';
 const BRAND_COLS =
   'id,slug,name,tagline,website_url,logo_url,verified,owner_user_id,connect_contributor_id,created_at,updated_at';
 const PROFILE_COLS = 'user_id,bio,visibility,verified,created_at,updated_at';
-const SETTINGS_COLS =
-  'user_id,display_name_override,profile_visibility,created_at,updated_at';
+const SETTINGS_COLS = 'user_id,display_name_override,profile_visibility,created_at,updated_at';
 const POST_COLS = 'id,author_id,brand_id,body,tagged_product_ids,created_at,updated_at';
 const MEDIA_COLS = 'id,post_id,url,kind,alt_text,order_index';
 const COMMENT_COLS = 'id,post_id,author_id,parent_comment_id,body,created_at';
@@ -1516,8 +1563,7 @@ const STORY_COLS =
 const STORY_REACTION_COLS = 'id,story_id,user_id,kind,created_at';
 const HIGHLIGHT_COLS = 'id,owner_id,name,cover_url,created_at';
 const CONVERSATION_COLS = 'id,kind,name,created_by,created_at,updated_at';
-const MEMBER_COLS =
-  'conversation_id,user_id,joined_at,last_read_at,muted_until,request_state,role';
+const MEMBER_COLS = 'conversation_id,user_id,joined_at,last_read_at,muted_until,request_state,role';
 const MESSAGE_COLS = 'id,conversation_id,author_id,body,created_at,deleted_at';
 const REPORT_COLS = 'id,reporter_id,subject_kind,subject_id,reason,note,created_at';
 
@@ -1848,13 +1894,7 @@ function wrap(error: PostgrestError): WearStoreError {
  */
 function mapRpcError(error: PostgrestError): WearStoreError {
   const msg = error.message || '';
-  const known = [
-    'unauthorized',
-    'self_dm',
-    'forbidden',
-    'empty_group_name',
-    'group_too_small',
-  ];
+  const known = ['unauthorized', 'self_dm', 'forbidden', 'empty_group_name', 'group_too_small'];
   const code = known.find((k) => msg.includes(k)) ?? error.code ?? 'rpc_error';
   return new WearStoreError(code, msg);
 }

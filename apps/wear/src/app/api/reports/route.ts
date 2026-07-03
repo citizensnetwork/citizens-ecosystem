@@ -5,7 +5,14 @@ import type { ReportReason, ReportSubjectKind } from '@citizens/db';
 export const dynamic = 'force-dynamic';
 
 const SUBJECT_KINDS: readonly ReportSubjectKind[] = ['post', 'comment', 'message', 'story', 'user'];
-const REASONS: readonly ReportReason[] = ['spam', 'abuse', 'sexual', 'self_harm', 'illegal', 'other'];
+const REASONS: readonly ReportReason[] = [
+  'spam',
+  'abuse',
+  'sexual',
+  'self_harm',
+  'illegal',
+  'other',
+];
 
 /** POST /api/reports { subjectKind, subjectId, reason, note? } — file a report. */
 export const POST = handler(async (req, ctx) => {

@@ -129,9 +129,10 @@ export async function hydrateFeed(
       author: userMap.has(entry.post.authorId)
         ? toUserDto(userMap.get(entry.post.authorId)!)
         : null,
-      brand: entry.post.brandId && brandMap.has(entry.post.brandId)
-        ? toBrandDto(brandMap.get(entry.post.brandId)!)
-        : null,
+      brand:
+        entry.post.brandId && brandMap.has(entry.post.brandId)
+          ? toBrandDto(brandMap.get(entry.post.brandId)!)
+          : null,
       media: entry.media.map((m) => ({ url: m.url, kind: m.kind, altText: m.altText })),
       ...(engagement ? engagement[i]! : {}),
     })),
