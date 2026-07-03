@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#f7f6f3"/>
+  <circle cx="256" cy="200" r="80" fill="none" stroke="#c8a24f" stroke-width="12"/>
+  <path d="M256 280 L256 360" stroke="#c8a24f" stroke-width="12" stroke-linecap="round"/>
+  <path d="M216 320 L296 320" stroke="#c8a24f" stroke-width="12" stroke-linecap="round"/>
+  <path d="M160 400 Q256 440 352 400" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="176" cy="180" r="6" fill="#c8a24f"/>
+  <circle cx="336" cy="180" r="6" fill="#c8a24f"/>
+  <circle cx="256" cy="140" r="6" fill="#c8a24f"/>
+  <text x="256" y="470" text-anchor="middle" font-family="system-ui,sans-serif" font-size="36" font-weight="700" fill="#222">CITIZENS</text>
+</svg>
