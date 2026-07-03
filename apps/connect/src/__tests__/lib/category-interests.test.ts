@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { EventCategory } from "@/types/db";
 
 /**
@@ -35,13 +35,14 @@ describe("CATEGORY_INTEREST_MAP (Edge Function shared)", () => {
     "conferences-summits",
   ];
 
+  // supabase/ lives at the monorepo root (hoisted in ecosystem Step 5);
+  // resolve from this file so the path holds regardless of the vitest cwd.
   const source = readFileSync(
-    join(
-      process.cwd(),
-      "supabase",
-      "functions",
-      "_shared",
-      "category-interests.ts"
+    fileURLToPath(
+      new URL(
+        "../../../../../supabase/functions/_shared/category-interests.ts",
+        import.meta.url
+      )
     ),
     "utf-8"
   );
