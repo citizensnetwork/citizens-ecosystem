@@ -1,80 +1,78 @@
-# Citizens Wear
+# Citizens — the ecosystem monorepo
 
-> Christian clothing social platform — an extension of the [Citizens Connect](https://github.com/citizensnetwork/citizens-connect) ecosystem.
+> **Connecting the Kingdom.** (Ephesians 2:19–21)
 >
-> **By the Kingdom. With the Kingdom. For the Kingdom.**
+> One identity, one shared data plane, one build pipeline — three apps serving
+> citizens, contributors, and the needs between them.
+> North star: [`apps/connect/VISION.md`](apps/connect/VISION.md) — read it first, every time.
 
-Citizens Wear brings Christian clothing brands, citizens, and communities together in an Instagram-style social experience, while Citizens Connect brings awareness of those brands out to the wider Kingdom. The two services share identity, profiles, and catalog data through a well-defined integration contract.
+## The apps
 
-This repository is the Citizens Wear monorepo.
+| App | Path | What it is | Runtime |
+|---|---|---|---|
+| **Connect** | [`apps/connect`](apps/connect) | Map-first Christian community discovery — events, places, contributors. | Next.js (API-only) + standalone HTML frontend + Capacitor (iOS/Android) |
+| **Vision** | [`apps/vision`](apps/vision) | Impact intelligence back-office for organisations — reach, engagement, goals. | Next.js (API-only) + standalone HTML frontend (desktop) |
+| **Wear** | [`apps/wear`](apps/wear) | Kingdom fashion social platform — brands, posts, stories, DMs. | Next.js (API-only) + standalone HTML frontend |
 
-## Status
+All three share **one Supabase project** (one `auth.users`, per-app Postgres schemas
+`public` / `vision` / `wear`) governed by
+[`apps/connect/docs/SHARED_DB_CONTRACT.md`](apps/connect/docs/SHARED_DB_CONTRACT.md),
+and one static-frontend pipeline ([`packages/frontend-build`](packages/frontend-build)).
 
-**Phase 2 — Identity, profiles, follow graph.**
-
-See [`docs/rollout-plan.md`](docs/rollout-plan.md) for the full phased rollout and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current architecture.
-
-## Monorepo layout
+## Layout
 
 ```
 apps/
-  web/                  Next.js 14 App Router frontend + API routes
+  connect/         Citizens Connect (incl. android/ + ios/ Capacitor shells)
+  vision/          Citizens Vision
+  wear/            Citizens Wear
 packages/
-  ui/                   Design tokens (50/20/30 white/black/gold) and Tailwind preset
-  connect-client/       Citizens Connect integration contract + MockConnectClient
-  db/                   Wear data model — Prisma schema + in-memory WearStore
-  config/               Shared tsconfig + ESLint preset
-docs/
-  ARCHITECTURE.md
-  rollout-plan.md
-  architecture/decisions/ADR-*.md
+  frontend-build/  @citizens/frontend-build — shared esbuild static-frontend pipeline
+  connect-client/  @citizens/connect-client — typed client for Connect's /api/v1
+  db/              @citizens/db — Wear store contract + memory reference impl
+  ui/              @citizens/ui — design tokens (Wear)
+  config/          @citizens/config — shared TS/ESLint config
+supabase/          THE single migration lineage (public/vision/wear schemas, one project)
+docs/              Wear-era architecture docs + ADRs (ecosystem docs live in apps/connect/docs)
 ```
-
-## Prerequisites
-
-- Node.js 20.11+ (see `.nvmrc`)
-- pnpm 9.12+ (enable via `corepack enable`)
 
 ## Getting started
 
 ```bash
-corepack enable
+corepack enable          # pnpm via packageManager field
 pnpm install
-pnpm dev          # starts apps/wear on http://localhost:3000
+pnpm build               # turbo run build (all apps + packages)
+pnpm lint && pnpm typecheck && pnpm test
 ```
 
-Useful scripts:
+Per-app work: `pnpm --filter @citizens/wear dev`, `pnpm --filter citizens-connect test`,
+`pnpm --filter citizens-vision build`, etc.
 
-```bash
-pnpm lint         # ESLint across all packages
-pnpm typecheck    # tsc --noEmit across all packages
-pnpm test         # Vitest across all packages
-pnpm build        # Production build
-pnpm format       # Prettier write
-pnpm format:check # Prettier check (runs in CI)
-```
+## Database — one lineage, three schemas
 
-## Key endpoints (Phase 2)
+`supabase/migrations/` is owned by the **repo**, not one app (hoisted from Connect in
+ecosystem Step 5). Head **146**. Rules live in the
+[shared DB contract](apps/connect/docs/SHARED_DB_CONTRACT.md): migrations are applied via
+MCP `apply_migration` with pre-apply git tags + security-advisor checks, numbered
+sequentially across all apps. Cross-app data flows through Connect's `/api/v1`
+([contract](apps/connect/docs/api-v1.md)) — never raw sibling tables.
 
-- `GET /` — Landing page, featured brands.
-- `GET /sign-in` — Mock-token sign-in (replaced by Connect OIDC redirect in Phase 3).
-- `GET /u/[handle]` — Citizen profile, follow/unfollow, public/private, verified badge.
-- `GET /b/[slug]` — Brand profile with owner link and drops.
-- `GET /settings` — Profile & account settings skeleton.
-- `GET /health` — Liveness probe for the web service.
-- `GET /api/connect/status` — Health-checks the Citizens Connect client (mock).
-- `GET /api/session` — Lightweight session probe (`{ authenticated, user, session }`).
+## Deploys (Vercel — one project per app)
 
-## Citizens Connect integration
+Each app deploys independently. Per project, set:
 
-Wear consumes Citizens Connect via a typed contract (`@citizens/connect-client`). In Phase 1 it is backed by a `MockConnectClient` with deterministic fixtures so the app can be built, run, and tested in isolation. Phase 3 swaps the mock for a real HTTP/OIDC client without changes above the contract layer.
+- **Root Directory** = `apps/connect` | `apps/vision` | `apps/wear`
+- **Ignored Build Step** = `npx turbo-ignore` (skips builds when the app + its
+  workspace deps are unaffected)
 
-See [`docs/architecture/decisions/ADR-0002-connect-contract.md`](docs/architecture/decisions/ADR-0002-connect-contract.md).
+Deploy-gate env values per app are listed in
+[`apps/connect/RESUME_HERE.md`](apps/connect/RESUME_HERE.md) (NEXT STEPS §founder-only).
 
-## Contributing
+## History
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-## License
-
-TBD — to be finalised before `v1.0.0` (Phase 9).
+This repo grew out of `citizens-wear` (the Turborepo seed) in ecosystem Step 5
+(2026-07-03): `citizens-connect` and `citizens-vision` were lifted in with full history
+via `git filter-repo --to-subdirectory-filter`. Pre-lift anchor tags
+(`{connect,vision,wear}-pre-monorepo`) live in the three original repos.
+Project log + current state: [`apps/connect/RESUME_HERE.md`](apps/connect/RESUME_HERE.md).
+Ecosystem plan: [`apps/connect/docs/strategy/ECOSYSTEM_DECISION_BRIEF.md`](apps/connect/docs/strategy/ECOSYSTEM_DECISION_BRIEF.md).

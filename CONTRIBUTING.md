@@ -1,6 +1,6 @@
-# Contributing to Citizens Wear
+# Contributing to the Citizens monorepo
 
-Thanks for helping build Citizens Wear — a Christian clothing social platform _by, with, and for the Kingdom._
+Thanks for helping build the Citizens ecosystem — Connect, Vision and Wear — _by, with, and for the Kingdom._
 
 ## Ground rules
 
