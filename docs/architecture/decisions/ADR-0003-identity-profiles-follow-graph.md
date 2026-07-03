@@ -12,7 +12,7 @@ Phase 2 of the Citizens Wear rollout (`docs/rollout-plan.md`) lands identity, pr
 
 Phase 1 established:
 
-- The `@citizens-wear/connect-client` contract, with `MockConnectClient` backing every caller until the real Connect HTTP/OIDC surface is available (ADR-0002).
+- The `@citizens/connect-client` contract, with `MockConnectClient` backing every caller until the real Connect HTTP/OIDC surface is available (ADR-0002).
 - Design tokens, a Tailwind preset, and a crown mark.
 - Baseline CI: `format:check`, lint, typecheck, tests, build.
 
@@ -27,7 +27,7 @@ Phase 2 must answer:
 
 ### 1. Data model
 
-A new package, `@citizens-wear/db`, owns:
+A new package, `@citizens/db`, owns:
 
 - `prisma/schema.prisma` — the Prisma data model. It is the human source of truth for Wear-owned storage and will back the first real migration when Phase 3 provisions a database. It is **not** yet wired to a running Prisma client; we avoid adding Prisma as a runtime dependency until we have a database to point it at.
 - `src/contract.ts` — a TypeScript repository contract (`ProfileRepo`, `FollowRepo`, `SettingsRepo`, `WearStore`) that mirrors the schema one-for-one. All callers program against this contract.
@@ -45,7 +45,7 @@ Ownership split:
 Wear authenticates via a cookie-backed session bridged to the Connect `AuthProvider`:
 
 - `cw_session` is an `HttpOnly`, `SameSite=Lax`, `Secure`-in-prod cookie whose value is an opaque Connect-issued token.
-- Every session read goes through `apps/web/src/lib/session.ts :: getSession()`, which hands the token to `ConnectClient.auth.verifyToken` and resolves the user via `getCurrentUser`. Wear never parses the token itself.
+- Every session read goes through `apps/wear/src/lib/session.ts :: getSession()`, which hands the token to `ConnectClient.auth.verifyToken` and resolves the user via `getCurrentUser`. Wear never parses the token itself.
 - The sign-in surface today is a mock token form (`/sign-in`) — deliberately minimal so that Phase 3 can replace it with an Auth.js / NextAuth-managed OIDC redirect without touching any consumer.
 - Server actions (`followUser`, `unfollowUser`, `updateSettingsAction`) re-authenticate on every call and redirect unauthenticated callers to `/sign-in`.
 
@@ -53,9 +53,9 @@ Rationale for _not_ adopting NextAuth / Auth.js this phase: the real Connect OID
 
 ### 3. Connect contract sufficiency
 
-The existing contract already exposes everything Phase 2 needs: `AuthProvider.verifyToken` / `getCurrentUser`, `UserDirectory.getByHandle`, `BrandDirectory.getBySlug` / `listForOwner`, and `ProductCatalog.listForBrand`. No new capabilities were added to `@citizens-wear/connect-client` in Phase 2; ADR-0002 stands unamended.
+The existing contract already exposes everything Phase 2 needs: `AuthProvider.verifyToken` / `getCurrentUser`, `UserDirectory.getByHandle`, `BrandDirectory.getBySlug` / `listForOwner`, and `ProductCatalog.listForBrand`. No new capabilities were added to `@citizens/connect-client` in Phase 2; ADR-0002 stands unamended.
 
-Wear does **not** extend the Connect contract with profile/visibility/follow concepts — those are Wear-owned and stay in `@citizens-wear/db`.
+Wear does **not** extend the Connect contract with profile/visibility/follow concepts — those are Wear-owned and stay in `@citizens/db`.
 
 ### 4. Accessibility baseline
 
@@ -71,7 +71,7 @@ A full WCAG 2.1 AA audit is deferred to ARCH-GATE 4 (Phase 8) per the rollout pl
 Phase 2 adds:
 
 - 11 contract tests in `packages/db/test/contract.test.ts` covering profiles, follows, settings, and seeding.
-- A web-layer test in `apps/web/src/lib/store.test.ts` asserting the singleton and seed invariants.
+- A web-layer test in `apps/wear/src/lib/store.test.ts` asserting the singleton and seed invariants.
 
 Combined with Phase 1 tests, the project now has 28 passing tests across three packages. Coverage tooling is not yet wired; `istanbul` integration and an explicit ≥70 % gate land alongside the first real Prisma repository in Phase 3, when the store has meaningful branching logic to cover.
 

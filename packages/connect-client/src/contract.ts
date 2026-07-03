@@ -6,7 +6,7 @@
  * the Kingdom contributor directory and categories, served by Connect's real
  * `GET /api/v1/*` surface. Identity comes from the shared Supabase project
  * (one `auth.users`, ADR-0007) and users/brands/products are Wear-owned
- * (`wear.*`, `@citizens-wear/db`) — the Phase-1 assumption that Connect was
+ * (`wear.*`, `@citizens/db`) — the Phase-1 assumption that Connect was
  * an identity + clothing-catalog service (users/brands/products/OIDC) never
  * matched Connect's real shape and that surface was retired together with
  * the RSC frontend (Step 3 D-removal + E).

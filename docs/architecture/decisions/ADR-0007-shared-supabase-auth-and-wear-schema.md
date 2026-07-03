@@ -8,7 +8,7 @@
 
 ## Context
 
-ADR-0002 (Phase 1) defined `@citizens-wear/connect-client` as the capability
+ADR-0002 (Phase 1) defined `@citizens/connect-client` as the capability
 surface Wear expects from Citizens Connect — `AuthProvider` (token verify),
 `UserDirectory`, `BrandDirectory`, `ProductCatalog`, `EventBus` — and shipped a
 `MockConnectClient` so Wear could be built before Connect's surface stabilised.
@@ -51,7 +51,7 @@ citizen who signs in on Connect is the same `auth.users` row in Wear.
 
 This replaces:
 - the `cw_session` opaque-token cookie verified via `connect-client.auth`
-  (`apps/web/src/lib/session.ts`, `MOCK_SIGN_IN_TOKEN`), and
+  (`apps/wear/src/lib/session.ts`, `MOCK_SIGN_IN_TOKEN`), and
 - the never-built Connect **OIDC** flow assumed by `LOCAL-SETUP.md`.
 
 `getSession()` / `getCurrentUser()` stay as the only session entry points, but

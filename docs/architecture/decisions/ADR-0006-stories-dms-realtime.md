@@ -104,7 +104,7 @@ of `ReportRepo.listForSubject` without a migration.
 ### 4. The `RealtimeBus` interface is the seam for Phase 9
 
 We add `RealtimeBus`, `RealtimeEvent`, and `MemoryRealtimeBus` to
-`@citizens-wear/db`. Topics are scoped strings
+`@citizens/db`. Topics are scoped strings
 (`conv:${conversationId}`, `user:${userId}`, `story:${storyId}`) and
 events are a closed union — adding a new event kind is intentionally a
 breaking change so consumers get TypeScript exhaustiveness on
@@ -116,7 +116,7 @@ cannot starve the rest. This is enough to exercise the contract from
 server actions and to back a Phase 7 SSE/WebSocket endpoint. A
 broker-backed adapter (Redis pub/sub, NATS, or a managed service) lands
 with Phase 9 and must satisfy the same `RealtimeBus` surface, so call
-sites — including the server actions in `apps/web/src/lib/actions.ts`
+sites — including the server actions in `apps/wear/src/lib/actions.ts`
 that already publish `message.created`, `conversation.read`,
 `story.posted`, and `story.reaction` events — do not change.
 

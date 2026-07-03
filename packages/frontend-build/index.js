@@ -5,7 +5,7 @@
  *
  * Extracted (ecosystem Step 4) from the near-identical
  *   citizens-connect/scripts/build-frontend.js
- *   citizens-wear/apps/web/scripts/build-frontend.js
+ *   citizens-wear/apps/wear/scripts/build-frontend.js
  * so the pipeline exists ONCE. Each app keeps a thin, config-only
  * scripts/build-frontend.js wrapper supplying its screen load order, env-var
  * mapping, env global name, and mobile API base.

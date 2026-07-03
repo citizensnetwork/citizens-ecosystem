@@ -40,7 +40,7 @@ docs/
 ```bash
 corepack enable
 pnpm install
-pnpm dev          # starts apps/web on http://localhost:3000
+pnpm dev          # starts apps/wear on http://localhost:3000
 ```
 
 Useful scripts:
@@ -67,7 +67,7 @@ pnpm format:check # Prettier check (runs in CI)
 
 ## Citizens Connect integration
 
-Wear consumes Citizens Connect via a typed contract (`@citizens-wear/connect-client`). In Phase 1 it is backed by a `MockConnectClient` with deterministic fixtures so the app can be built, run, and tested in isolation. Phase 3 swaps the mock for a real HTTP/OIDC client without changes above the contract layer.
+Wear consumes Citizens Connect via a typed contract (`@citizens/connect-client`). In Phase 1 it is backed by a `MockConnectClient` with deterministic fixtures so the app can be built, run, and tested in isolation. Phase 3 swaps the mock for a real HTTP/OIDC client without changes above the contract layer.
 
 See [`docs/architecture/decisions/ADR-0002-connect-contract.md`](docs/architecture/decisions/ADR-0002-connect-contract.md).
 

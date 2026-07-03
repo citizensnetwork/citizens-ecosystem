@@ -3,7 +3,7 @@
 The **shared static-frontend build pipeline** for Citizens ecosystem apps
 (Connect · Wear · Vision). Extracted at ecosystem Step 4 from the
 near-identical `citizens-connect/scripts/build-frontend.js` and
-`citizens-wear/apps/web/scripts/build-frontend.js` so the pipeline exists
+`citizens-wear/apps/wear/scripts/build-frontend.js` so the pipeline exists
 **once**; each app keeps a thin, config-only wrapper.
 
 What one `buildFrontend()` call does for an app:
@@ -67,7 +67,7 @@ buildFrontend({
 
 | App | Wrapper | How it gets the package |
 |---|---|---|
-| **Wear** | `apps/web/scripts/build-frontend.js` | `workspace:*` (this repo) |
+| **Wear** | `apps/wear/scripts/build-frontend.js` | `workspace:*` (this repo) |
 | **Connect** | `scripts/build-frontend.js` | **Vendored copy** at `vendor/citizens-frontend-build` (`file:` dep) — separate repo + Vercel builds can't reach this workspace. Sync with `npm run sync:frontend-build`; a vitest drift-test compares the copy against this canonical source whenever the sibling checkout exists. |
 | **Vision** (Step 4c) | planned `scripts/build-frontend.js` | same vendoring pattern as Connect until the Step-5 monorepo |
 

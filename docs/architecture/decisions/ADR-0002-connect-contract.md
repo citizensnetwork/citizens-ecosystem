@@ -16,7 +16,7 @@ At the time of Phase 1, the `citizensnetwork/citizens-connect` repository is not
 
 ## Decision
 
-We define a **TypeScript contract** (`@citizens-wear/connect-client`) that declares the capability surface Wear expects from Connect:
+We define a **TypeScript contract** (`@citizens/connect-client`) that declares the capability surface Wear expects from Connect:
 
 - `AuthProvider` — `verifyToken(token)`, `getCurrentUser(session)`.
 - `UserDirectory` — `getById`, `getByHandle`, `search`.
@@ -72,7 +72,7 @@ analytics}` — a map-discovery commons with **no** users/brands/products/OIDC (
 
 1. **Identity** comes from the shared Supabase project (one `auth.users`), not `connect-client.auth`.
 2. **Users, brands, and products are Wear-owned** — `wear.users` (display-safe mirror),
-   `wear.brands`, and a deferred products model, served by `@citizens-wear/db` (`WearStore`),
+   `wear.brands`, and a deferred products model, served by `@citizens/db` (`WearStore`),
    not by Connect.
 3. **`connect-client` keeps only genuine Connect commons.** This amendment ADDS
    `ContributorDirectory` (`list`/`getBySlug`) and `CategoryDirectory` (`list`) over the real

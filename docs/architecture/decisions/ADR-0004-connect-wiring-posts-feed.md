@@ -12,8 +12,8 @@ Phase 3 of the rollout (`docs/rollout-plan.md`) wires Citizens Wear to the real 
 
 Phase 2 left us with:
 
-- `@citizens-wear/connect-client` programming against an interface, with `MockConnectClient` as the only implementation (ADR-0002, ADR-0003).
-- `@citizens-wear/db` with a `WearStore` contract + `MemoryWearStore`, carrying profiles, follows, and settings (ADR-0003).
+- `@citizens/connect-client` programming against an interface, with `MockConnectClient` as the only implementation (ADR-0002, ADR-0003).
+- `@citizens/db` with a `WearStore` contract + `MemoryWearStore`, carrying profiles, follows, and settings (ADR-0003).
 - Cookie-backed sessions that never parse the Connect token themselves.
 
 ARCH-GATE 2 must answer:
@@ -28,7 +28,7 @@ ARCH-GATE 2 must answer:
 
 ### 1. Connect contract has one interface, two implementations
 
-`@citizens-wear/connect-client` exports:
+`@citizens/connect-client` exports:
 
 - `MockConnectClient` — unchanged from Phase 1/2, backed by hand-written fixtures.
 - `HttpConnectClient` — a new fetch-based implementation that targets `{baseUrl}/v1/...`, carries an optional service API key via `x-connect-api-key`, and forwards the user's session token via `Authorization: Bearer <token>` on auth endpoints only.
