@@ -8,23 +8,23 @@
 
 ## Context
 
-ADR-0002 (Phase 1) defined `@citizens-wear/connect-client` as the capability
+ADR-0002 (Phase 1) defined `@citizens/connect-client` as the capability
 surface Wear expects from Citizens Connect — `AuthProvider` (token verify),
 `UserDirectory`, `BrandDirectory`, `ProductCatalog`, `EventBus` — and shipped a
 `MockConnectClient` so Wear could be built before Connect's surface stabilised.
-It explicitly warned: *"We could diverge from Connect's real shape if we don't
-sync early and often."*
+It explicitly warned: _"We could diverge from Connect's real shape if we don't
+sync early and often."_
 
 That sync is now overdue, and the divergence is real. Verified against the live
 `citizens-connect` repo (2026-06-21):
 
 - Connect's real cross-app surface is **`/api/v1/{events, events/[id], places,
-  contributors, contributors/[slug], contributors/[slug]/stats, categories,
-  analytics/community}`** — a map-discovery domain.
+contributors, contributors/[slug], contributors/[slug]/stats, categories,
+analytics/community}`** — a map-discovery domain.
 - Wear's `HttpConnectClient` targets **`/v1/auth/verify`, `/v1/auth/me`,
   `/v1/users/*`, `/v1/brands/*`, `/v1/products/*`, `/v1/health`** — an
   identity + clothing-catalog domain.
-- These are **disjoint**: different path prefix (`/v1` vs `/api/v1`) *and*
+- These are **disjoint**: different path prefix (`/v1` vs `/api/v1`) _and_
   different resources. Connect has **no** brands, products, citizen-user
   endpoint, OIDC issuer, or token-verify endpoint. Connect auth is **Supabase
   Google OAuth**.
@@ -33,8 +33,8 @@ Separately, the ecosystem has since made a foundational decision
 (`citizens-connect/docs/strategy/ECOSYSTEM_DECISION_BRIEF.md`, **D1**, 2026-06-16):
 **one shared Supabase project, one `auth.users`, a schema per app** (`public`/
 commons, `vision.*`, and a future `wear.*`). Citizens Vision was cut onto this
-model in June 2026. Wear's `LOCAL-SETUP.md` still assumes a *separate* Wear
-Supabase project and a Connect *OIDC* issuer — both predate and contradict D1.
+model in June 2026. Wear's `LOCAL-SETUP.md` still assumes a _separate_ Wear
+Supabase project and a Connect _OIDC_ issuer — both predate and contradict D1.
 
 So "wire Connect for real" (the Phase-3 promise of ADR-0002 and ADR-0004) cannot
 mean "flip `CONNECT_MODE=live`": the endpoints Wear's client calls do not exist.
@@ -50,8 +50,9 @@ identity plane Connect and Vision use. There is **one Kingdom identity**: a
 citizen who signs in on Connect is the same `auth.users` row in Wear.
 
 This replaces:
+
 - the `cw_session` opaque-token cookie verified via `connect-client.auth`
-  (`apps/web/src/lib/session.ts`, `MOCK_SIGN_IN_TOKEN`), and
+  (`apps/wear/src/lib/session.ts`, `MOCK_SIGN_IN_TOKEN`), and
 - the never-built Connect **OIDC** flow assumed by `LOCAL-SETUP.md`.
 
 `getSession()` / `getCurrentUser()` stay as the only session entry points, but
@@ -80,7 +81,7 @@ genuine cross-app need is reading the wider Kingdom footprint — Connect
 shared-DB contract, cross-app reads go through `/api/v1`, never raw tables).
 `MockConnectClient` is retained for tests. Whether a Wear "brand" links to a
 Connect contributor (shared org identity) is an open question (see below); the
-brand/product/user *catalog* itself is **Wear-owned** in `wear.*`.
+brand/product/user _catalog_ itself is **Wear-owned** in `wear.*`.
 
 ### 4. This is recorded now; built later
 

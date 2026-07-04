@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Citizens Connect</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- MapLibre GL JS â€” real geographic basemap (MapTiler tiles). CSS + UMD global. -->
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#F7F4EE', foreground: '#0A0908',
+          card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
+          popover: 'rgba(255,255,255,0.97)',
+          primary: '#0A0908', 'primary-foreground': '#FFFFFF',
+          secondary: '#C9A84C', 'secondary-foreground': '#0A0908',
+          muted: '#EDE8DC', 'muted-foreground': '#7A7060',
+          accent: '#F2E8CC', 'accent-foreground': '#0A0908',
+          border: 'rgba(201,168,76,0.22)',
+          destructive: '#c0392b',
+          gold: '#C9A84C', 'gold-light': '#E8D48B', 'gold-dark': '#8B6914',
+        },
+        fontFamily: {
+          sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
+          serif: ['Playfair Display', 'ui-serif', 'serif'],
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  :root { --gold:#C9A84C; --gold-light:#E8D48B; --gold-dark:#8B6914; --map-bg:#EDE5D4; }
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0; background: #F7F4EE; color: #0A0908;
+    font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+  .font-display { font-family: 'Playfair Display', serif; }
+  h1,h2,h3,h4 { font-family: 'Playfair Display', serif; font-weight: 600; line-height: 1.25; margin: 0; }
+
+  /* glassmorphism */
+  .glass {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .glass-strong {
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+  .gold-gradient { background: linear-gradient(135deg,#E8D48B 0%,#C9A84C 50%,#8B6914 100%); }
+  .gold-text {
+    background: linear-gradient(135deg,#E8D48B 0%,#C9A84C 55%,#8B6914 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { scrollbar-width: none; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.6); }
+
+  /* animations */
+  .pin-pulse::before {
+    content:''; position:absolute; inset:-5px; border-radius:50%;
+    background: inherit; opacity:.35; animation: pinPulse 2s ease-out infinite; z-index:-1;
+  }
+  @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
+  /* real-map marker pulse ring (MapLibre DOM markers) */
+  .cc-pin-pulse { animation: pinPulse 2s ease-out infinite; pointer-events:none; }
+  /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
+  .maplibregl-ctrl-bottom-right { margin-bottom: 88px; }
+  .maplibregl-ctrl-attrib { font-size: 9px; }
+  .bubble-bob { animation: bubbleBob .9s ease-in-out infinite alternate; }
+  @keyframes bubbleBob { from{transform:translateY(0)} to{transform:translateY(-4px)} }
+  .fade-in { animation: fadeIn .3s ease-out; }
+  @keyframes fadeIn { from{transform:translateY(6px)} to{transform:translateY(0)} }
+  .slide-up { animation: slideUp .42s cubic-bezier(.32,.72,0,1); }
+  @keyframes slideUp { from{transform:translateY(14px)} to{transform:translateY(0)} }
+  .slide-up-panel { animation: slideUpPanel .42s cubic-bezier(.32,.72,0,1); }
+  @keyframes slideUpPanel { from{transform:translateY(26px)} to{transform:translateY(0)} }
+  .scale-in { animation: scaleIn .25s cubic-bezier(.34,1.3,.64,1); }
+  @keyframes scaleIn { from{transform:scale(.97)} to{transform:scale(1)} }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cc-roll { display:inline-block; animation: ccRoll .5s cubic-bezier(.32,.72,0,1); }
+  @keyframes ccRoll { from { opacity:0; transform: translateY(0.6em); } to { opacity:1; transform: translateY(0); } }
+  .dash-flow { stroke-dasharray: 6 6; animation: dashFlow 1s linear infinite; }
+  @keyframes dashFlow { to { stroke-dashoffset: -12; } }
+
+  input, textarea, select, button { font-family: inherit; }
+  [data-screen] { height: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Supabase auth: UMD client + runtime config + browser auth wrapper.
+     Plain scripts (run before Babel transforms the app below). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+<!-- Cache-busting for our own no-build scripts. The static host (python
+     http.server / Capacitor) sends no cache headers, so browsers serve stale
+     copies after edits. Bump ?v= whenever you change auth-client.js or any
+     app/*.jsx so the live preview (and deployed clients) always load fresh code. -->
+<script src="auth-client.js?v=20260615b"></script>
+
+<script type="text/babel" src="app/icons.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/data.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/store.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/ui.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/auth.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/map.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/home.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/apply.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/admin.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/dashboard.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/insights.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/create.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/messages.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/profiles.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/pages.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/tweaks-panel.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/tweaks.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/shell.jsx?v=20260615b"></script>
+<script type="text/babel" src="app/app.jsx?v=20260615b"></script>
+</body>
+</html>

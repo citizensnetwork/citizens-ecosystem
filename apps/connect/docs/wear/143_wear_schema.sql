@@ -1,0 +1,24 @@
+-- ============================================================================
+-- SUPERSEDED / APPLIED — this draft has shipped.
+-- ============================================================================
+-- The canonical, corrected, and APPLIED migration now lives in the Connect
+-- migration lineage:
+--
+--     supabase/migrations/143_wear_schema.sql   (applied to xyiajtrvhlxaeplsiajj, 2026-07-01)
+--
+-- Corrections made vs this draft before applying (do not reintroduce):
+--   1. DROPPED `wear.users.email` — the mirror is public-SELECT (RLS using(true)),
+--      so an email column would leak PII to anon. Email lives in auth.users,
+--      readable only by its owner via the session.
+--   2. REORDERED the direct-messages block — a `language sql` function body is
+--      validated at CREATE time (check_function_bodies on), so the
+--      `is_conversation_member` helper cannot precede `wear.conversation_members`.
+--      Tables are now created first, then the helper, then the policies.
+--   3. ADDED `wear.is_blocked_either(uuid,uuid)` SECURITY DEFINER — a block's
+--      target must not be able to read the row proving they were blocked, so
+--      isBlockedEither() cannot be a plain select; it calls this helper.
+--   4. Hardened both SECURITY DEFINER helpers to `search_path = ''`.
+--
+-- This stub is retained only so existing links keep resolving. See the applied
+-- file for the authoritative DDL.
+-- ============================================================================

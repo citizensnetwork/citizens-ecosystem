@@ -5,3 +5,9 @@ build
 .turbo
 coverage
 pnpm-lock.yaml
+
+# Lifted apps keep their own formatting conventions (eslint-gated, never prettier-formatted)
+apps/connect
+apps/vision
+# Deno edge functions + SQL migrations — not prettier-managed
+supabase

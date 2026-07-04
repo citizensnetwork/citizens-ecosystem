@@ -10,23 +10,23 @@
   (ADR-0007 + ADR-0002 amendment, 2026-07):** identity is the **shared Citizens Supabase project**
   (one `auth.users`); brands/posts/social data are **Wear-owned** in the `wear.*` schema. Connect
   provides only the public ecosystem commons (contributors, categories) via
-  `@citizens-wear/connect-client` over its real `/api/v1`.
+  `@citizens/connect-client` over its real `/api/v1`.
 - Tracking is personalization signals + product analytics only — no surveillance.
 
 ## Phases
 
 ### Phase 1 — Foundations & Connect integration contract _(this PR)_
 
-- Monorepo (`apps/web`, `packages/ui`, `packages/connect-client`, `packages/config`) with pnpm + Turborepo.
+- Monorepo (`apps/wear`, `packages/ui`, `packages/connect-client`, `packages/config`) with pnpm + Turborepo.
 - TypeScript strict, ESLint, Prettier, CI (lint, typecheck, test, build).
 - Design tokens (50/20/30), Tailwind preset, `CrownMark` placeholder.
-- `@citizens-wear/connect-client`: `AuthProvider`, `UserDirectory`, `BrandDirectory`, `ProductCatalog`, `EventBus` + `MockConnectClient` + fixtures + contract tests.
+- `@citizens/connect-client`: `AuthProvider`, `UserDirectory`, `BrandDirectory`, `ProductCatalog`, `EventBus` + `MockConnectClient` + fixtures + contract tests.
 - Next.js landing page at `/`, `/health`, `/api/connect/status`.
 - Docs: `README`, `CONTRIBUTING`, `ARCHITECTURE.md`, ADR-0001, ADR-0002, this plan.
 
 ### Phase 2 — Identity, profiles, follow graph _(landed — ADR-0003)_
 
-- `@citizens-wear/db` with `prisma/schema.prisma` (User, Brand, Profile, Follow, UserSettings) and an in-memory `WearStore` contract + tests.
+- `@citizens/db` with `prisma/schema.prisma` (User, Brand, Profile, Follow, UserSettings) and an in-memory `WearStore` contract + tests.
 - Cookie-backed session bridged to the Connect `AuthProvider` (Auth.js-shaped; mock token today, OIDC in Phase 3).
 - Profile pages: `/u/[handle]` (user, follow/unfollow, public/private, verified badge) and `/b/[slug]` (brand, verified, drops list).
 - `/settings` skeleton (display-name override, bio, profile visibility, account kind).
@@ -66,7 +66,7 @@ The real Phase 3, executed against the Citizens ecosystem's shared-database cont
   full RLS, identity mirror (`wear.users`, display-safe, session-hydrated), Wear-owned brands.
 - **`SupabaseWearStore`** implements the full `WearStore` contract; `/api/*` route handlers
   (Bearer-token or cookie auth) expose it as the app contract.
-- **Standalone HTML frontend** (`apps/web/src/frontend/`, esbuild-precompiled, Capacitor-ready)
+- **Standalone HTML frontend** (`apps/wear/src/frontend/`, esbuild-precompiled, Capacitor-ready)
   replaced the RSC page tree; Next.js is **API-only**. Design per the Citizens Wear handoff.
 - **`connect-client` reconciled** to Connect's real `/api/v1`: contributors + categories
   directories (env: `CONNECT_MODE` / `CONNECT_API_BASE_URL` / `CONNECT_API_KEY`); the
@@ -74,7 +74,7 @@ The real Phase 3, executed against the Citizens ecosystem's shared-database cont
 
 ### Phase 4 — Posts & the feed _(landed — ADR-0004)_
 
-- `@citizens-wear/db` extended with `Post`, `PostMedia`, `Like`, `Comment`, `CommentLike`, `SaveCollection`, `SavedPost` (schema + TS contract + memory impl + contract tests).
+- `@citizens/db` extended with `Post`, `PostMedia`, `Like`, `Comment`, `CommentLike`, `SaveCollection`, `SavedPost` (schema + TS contract + memory impl + contract tests).
 - `/compose` brand post composer with opt-in "publish as brand" and product tagging scoped to that brand.
 - `/feed` chronological feed; "For You" ranker stub behind the `CW_FOR_YOU_RANKER` feature flag (freshness + follow boost).
 - `/p/[id]` post detail with threaded comments, comment likes, saves.
@@ -85,7 +85,7 @@ The real Phase 3, executed against the Citizens ecosystem's shared-database cont
 ### Phase 5 — Discovery, search, brand catalog _(landed — ADR-0005)_
 
 - Connect contract gains `BrandDirectory.search` and `ProductCatalog.search`; `MockConnectClient` and `HttpConnectClient` both implement, with contract tests for each.
-- `@citizens-wear/db` extends `PostRepo` with `searchByText`, `listByHashtag`, and `trendingHashtags`, plus a shared Unicode-aware `extractHashtags` / `normaliseHashtag` helper module.
+- `@citizens/db` extends `PostRepo` with `searchByText`, `listByHashtag`, and `trendingHashtags`, plus a shared Unicode-aware `extractHashtags` / `normaliseHashtag` helper module.
 - `/explore` discovery hub (trending hashtags, featured brands, suggested citizens, fresh drops, from-the-feed strip).
 - `/search?q=…&kind=…` unified search across citizens / brands / hashtags / posts / drops; query length capped, `kind` validated as a closed enum.
 - `/h/[tag]` hashtag feed; `PostCard` linkifies hashtags with React-escaped text segments (XSS-safe).
@@ -97,7 +97,7 @@ The real Phase 3, executed against the Citizens ecosystem's shared-database cont
 - 24h ephemeral stories with views, five-emoji reactions, and per-author highlights; followers-only audience supported. Stories tray on `/feed`, viewer at `/stories/[id]`, composer at `/compose/story`.
 - 1:1 and group conversations with message requests for non-mutuals, soft-delete of own messages, mark-read, accept/decline. Inbox at `/messages`, thread at `/messages/[id]`, new-DM at `/messages/new`.
 - Block (symmetric, also unfollows) and report (open subjects: post, comment, message, story, user). Block surfaced on profile pages.
-- `RealtimeBus` interface seam in `@citizens-wear/db` with an in-process `MemoryRealtimeBus` adapter; server actions publish typed events that a Phase 9 broker can fan out across nodes without changing call sites.
+- `RealtimeBus` interface seam in `@citizens/db` with an in-process `MemoryRealtimeBus` adapter; server actions publish typed events that a Phase 9 broker can fan out across nodes without changing call sites.
 
 **🧭 ARCH-GATE 3** — ADR-0006 (this repo). Realtime scalability seam, message-request flow, story retention/expiry, block-symmetry guarantees, report queue shape.
 

@@ -1,5 +1,5 @@
 {
-  "name": "@citizens-wear/connect-client",
+  "name": "@citizens/connect-client",
   "version": "0.0.0",
   "private": true,
   "description": "Citizens Connect integration contract and mock client for Citizens Wear",
@@ -22,13 +22,13 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@citizens-wear/config": "workspace:*",
+    "@citizens/config": "workspace:*",
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
-    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/coverage-v8": "3.2.6",
     "eslint": "8.57.0",
     "eslint-config-prettier": "9.1.0",
     "typescript": "5.5.4",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   }
 }

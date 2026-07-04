@@ -38,7 +38,7 @@ export type ColorToken = keyof typeof colors;
  * Typography stacks.
  *
  * Font loading strategy: consuming apps are responsible for loading the
- * display and body faces (e.g. Next's `next/font/google` in `apps/web`, or
+ * display and body faces (e.g. Next's `next/font/google` in `apps/wear`, or
  * self-hosted `@font-face`). The stacks below include system fallbacks so an
  * unstyled render still looks reasonable if the chosen face fails to load.
  */

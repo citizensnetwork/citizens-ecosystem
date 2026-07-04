@@ -47,7 +47,7 @@ In Phase 1 the Connect side is mocked in-process by `MockConnectClient`. Phase 3
 | -------- | ----------------------------------------------------------------- |
 | Monorepo | pnpm workspaces + Turborepo                                       |
 | Web app  | Next.js 14 (App Router) + TypeScript + React 18                   |
-| Styling  | Tailwind CSS with the `@citizens-wear/ui` design-token preset     |
+| Styling  | Tailwind CSS with the `@citizens/ui` design-token preset          |
 | API      | Next.js route handlers (tRPC added when we need typed RPC)        |
 | DB       | PostgreSQL via Prisma (Supabase-hosted when budget allows)        |
 | Auth     | Auth.js with a Citizens Connect OIDC adapter (Phase 3)            |
@@ -78,7 +78,7 @@ Shared packages are consumed from source via Next's `transpilePackages`, so no p
 
 ## 6. Citizens Connect contract
 
-All cross-service reads and writes flow through `@citizens-wear/connect-client`. The contract surfaces are:
+All cross-service reads and writes flow through `@citizens/connect-client`. The contract surfaces are:
 
 - `AuthProvider` — verify tokens, resolve sessions.
 - `UserDirectory` — read-through user lookup/search.

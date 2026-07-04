@@ -1,6 +1,6 @@
 # Citizens Wear — Vision
 
-> **Foundation scripture: Ephesians 2:19–21** — *"So then you are no longer strangers and aliens, but you are fellow citizens with the saints, and members of the household of God, built on the foundation of the apostles and prophets, Christ Jesus himself being the cornerstone, in whom the whole structure, being joined together, grows into a holy temple in the Lord."*
+> **Foundation scripture: Ephesians 2:19–21** — _"So then you are no longer strangers and aliens, but you are fellow citizens with the saints, and members of the household of God, built on the foundation of the apostles and prophets, Christ Jesus himself being the cornerstone, in whom the whole structure, being joined together, grows into a holy temple in the Lord."_
 
 ## One-line
 
@@ -16,22 +16,22 @@ To give Christians a familiar, trusted environment to **discover, follow, and sh
 
 ## Audience
 
-| Persona | Notes |
-|---|---|
-| **Citizen / consumer** | 18–34, faith-forward, design-literate, looking for modest, modern, Christ-centered apparel. |
-| **Creator / contributor** | Solo Christian designer (DTC micro-brand) → established modest-fashion labels. Lead persona at launch is the 0–2-employee micro-brand that needs trust signals more than reach. |
-| **NGO / church / organisation** | Wants to create, promote, and sell merch (drives, fundraisers, price specials). First-class persona — features should support time-bound campaigns, not just evergreen products. |
-| **Editor / volunteer moderator** | Paid editors curate the monthly Highlights and the Curated tab. Volunteer Watchers (read-only flag privileges) added later. Roles assignable by admin via a settings page. |
+| Persona                          | Notes                                                                                                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Citizen / consumer**           | 18–34, faith-forward, design-literate, looking for modest, modern, Christ-centered apparel.                                                                                      |
+| **Creator / contributor**        | Solo Christian designer (DTC micro-brand) → established modest-fashion labels. Lead persona at launch is the 0–2-employee micro-brand that needs trust signals more than reach.  |
+| **NGO / church / organisation**  | Wants to create, promote, and sell merch (drives, fundraisers, price specials). First-class persona — features should support time-bound campaigns, not just evergreen products. |
+| **Editor / volunteer moderator** | Paid editors curate the monthly Highlights and the Curated tab. Volunteer Watchers (read-only flag privileges) added later. Roles assignable by admin via a settings page.       |
 
 ## Citizens PBO ecosystem placement
 
 Citizen Wear is one **verb** of the Citizens PBO ecosystem (others include Citizens Connect, Citizens Learn, etc). Each verb is a distinct app with a single, clear function:
 
-- **Citizens Connect** — a *map application*. Visually surfaces all events, companies, stores, marketplaces, providers; gives brief image + details; routes the user to the appropriate sister app upon further enquiry. Connect is the discovery surface that **leads** users into Wear (and other ecosystem apps).
+- **Citizens Connect** — a _map application_. Visually surfaces all events, companies, stores, marketplaces, providers; gives brief image + details; routes the user to the appropriate sister app upon further enquiry. Connect is the discovery surface that **leads** users into Wear (and other ecosystem apps).
 - **Citizens Wear** — the destination for **clothing-specific** social commerce. Owns posts, follows, likes, saves, comments, stories, DMs, cart, moderation. Holds Connect ids only — never SoT user/brand/product data.
 - **Citizens Learn / etc.** — additional verbs to be defined.
 
-Wear is **clothing-specific** by name and design. Future apparel-adjacent expansion (print, accessories, home goods) belongs in Wear *only if it remains within "what you wear / clothe yourself in"*; broader lifestyle goods belong in their own ecosystem verb.
+Wear is **clothing-specific** by name and design. Future apparel-adjacent expansion (print, accessories, home goods) belongs in Wear _only if it remains within "what you wear / clothe yourself in"_; broader lifestyle goods belong in their own ecosystem verb.
 
 ## Geography
 
@@ -40,9 +40,11 @@ US, UK, **and South Africa** at MVP. Payment system must support South Africa (Z
 ## Core loops
 
 ### Citizen value loop
+
 **Discover** → **Save** → **Share-with-community** → **Buy** → **Testify** (post wearing it). The "testify" post-purchase content loop is a first-class feature, not aspirational — it closes the loop on the social commerce flywheel.
 
 ### Creator value loop
+
 **Publish drop** → **Earn follows** → **Convert to sales** → **Highlight feature** (monthly editorial slot) → **Build trust graph standing**.
 
 ## Differentiation moat
@@ -66,7 +68,7 @@ The default storefront for the next generation of Christian apparel — **1k bra
 
 ## Trust & moderation
 
-- **Brand verification gold check:** *deferred from MVP* — application progression decides this.
+- **Brand verification gold check:** _deferred from MVP_ — application progression decides this.
 - **Citizen verification:** Email only at launch (Gmail-friendly). "Sealed" tier (paid, ID-verified) Phase 8+.
 - **Content policy:** Off-topic theology debates are off-platform. Statement of Faith + Code of Conduct published; commerce-adjacent disputes only.
 - **Moderation queue:** functions built; staffed at zero at launch. Admin settings page assigns roles (paid editor, volunteer Watcher) by user lookup. Each citizen has a **username** (handle) and a **user id**.
@@ -74,16 +76,16 @@ The default storefront for the next generation of Christian apparel — **1k bra
 
 ## Product surface decisions
 
-| # | Decision | Status |
-|---|---|---|
-| 11 | Date-based ordering (not pure chrono/alphabetical). "All caught up" indicator (early-Instagram-style). Compute-friendly. Feed recycling strategy: surface previously-seen brand posts after the user reaches "all caught up", to keep brands constantly visible. | TODO Phase 7 |
-| 12 | Stories scaffolded (Phase 6). Keep ephemeral 24h for citizens; rebrand brand-side as "Drops" (timed product launches). Open to revision. | Partial |
-| 13 | Citizen↔brand DMs only at MVP. Citizen↔citizen Phase 9. | TODO |
-| 14 | Comments open by default + brand-level "comment shield" toggle. | TODO |
-| 15 | Likes/saves counts hidden publicly. Creators see their own. | TODO |
-| 16 | Hashtags + 12 curated Themes pinned to discovery. | Partial (Phase 5 hashtags exist) |
-| 17 | "Wear It" reposts allowed only when the original has a tagged product. | TODO |
-| 23 | Unified multi-brand cart. | TODO Phase 7 |
+| #   | Decision                                                                                                                                                                                                                                                         | Status                           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 11  | Date-based ordering (not pure chrono/alphabetical). "All caught up" indicator (early-Instagram-style). Compute-friendly. Feed recycling strategy: surface previously-seen brand posts after the user reaches "all caught up", to keep brands constantly visible. | TODO Phase 7                     |
+| 12  | Stories scaffolded (Phase 6). Keep ephemeral 24h for citizens; rebrand brand-side as "Drops" (timed product launches). Open to revision.                                                                                                                         | Partial                          |
+| 13  | Citizen↔brand DMs only at MVP. Citizen↔citizen Phase 9.                                                                                                                                                                                                        | TODO                             |
+| 14  | Comments open by default + brand-level "comment shield" toggle.                                                                                                                                                                                                  | TODO                             |
+| 15  | Likes/saves counts hidden publicly. Creators see their own.                                                                                                                                                                                                      | TODO                             |
+| 16  | Hashtags + 12 curated Themes pinned to discovery.                                                                                                                                                                                                                | Partial (Phase 5 hashtags exist) |
+| 17  | "Wear It" reposts allowed only when the original has a tagged product.                                                                                                                                                                                           | TODO                             |
+| 23  | Unified multi-brand cart.                                                                                                                                                                                                                                        | TODO Phase 7                     |
 
 ## "Stories / Inspiration" feature (Q28)
 

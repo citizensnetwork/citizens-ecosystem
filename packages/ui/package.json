@@ -1,5 +1,5 @@
 {
-  "name": "@citizens-wear/ui",
+  "name": "@citizens/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,7 +24,7 @@
     "react": "^18.3.0"
   },
   "devDependencies": {
-    "@citizens-wear/config": "workspace:*",
+    "@citizens/config": "workspace:*",
     "@types/react": "18.3.3",
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",

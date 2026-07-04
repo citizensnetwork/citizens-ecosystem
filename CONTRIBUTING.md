@@ -1,13 +1,13 @@
-# Contributing to Citizens Wear
+# Contributing to the Citizens monorepo
 
-Thanks for helping build Citizens Wear — a Christian clothing social platform _by, with, and for the Kingdom._
+Thanks for helping build the Citizens ecosystem — Connect, Vision and Wear — _by, with, and for the Kingdom._
 
 ## Ground rules
 
 1. **Every change ends green.** A PR is not mergeable until `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` all succeed locally _and_ in CI.
 2. **Small, reviewable PRs.** Phased work is tracked in [`docs/rollout-plan.md`](docs/rollout-plan.md). Keep PRs inside one phase where possible.
 3. **Don't clone proprietary assets.** We borrow Instagram-style _interaction patterns_, not Instagram's icons, copy, or brand. Everything visible should reinforce Citizens Wear.
-4. **Honor the Connect contract.** Cross-service data (users, brands, products) flows through `@citizens-wear/connect-client`. Don't reach around it.
+4. **Honor the Connect contract.** Cross-service data (users, brands, products) flows through `@citizens/connect-client`. Don't reach around it.
 
 ## Setup
 

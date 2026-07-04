@@ -44,7 +44,7 @@ contract.
 ### 3. Hashtags are derived, not stored separately
 
 Posts continue to carry only their body. A `hashtags` module in
-`@citizens-wear/db` extracts `#token` matches with a Unicode-aware regex
+`@citizens/db` extracts `#token` matches with a Unicode-aware regex
 that requires a non-word boundary before `#` so `salt#tee` does **not**
 parse as a hashtag. Extraction is deterministic, lower-cased, and
 de-duplicated per post. The Postgres-backed implementation that lands
@@ -110,7 +110,7 @@ closed enum validated on the server.
   contract tests now cover the new search methods.
 - The Wear store gains a small Unicode-aware extractor that the future
   Postgres implementation must reproduce verbatim. The shared
-  `extractHashtags`/`normaliseHashtag` helpers live in `@citizens-wear/db`
+  `extractHashtags`/`normaliseHashtag` helpers live in `@citizens/db`
   precisely so both implementations can call the same code.
 - Discovery is intentionally limited to the existing fixture set in mock
   mode; production search quality is a function of Citizens Connect's

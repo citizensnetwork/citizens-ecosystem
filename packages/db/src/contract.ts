@@ -10,7 +10,7 @@
  * posts/social graph are Wear-native. Connect provides only the public
  * ecosystem commons (contributors, categories) via `connect-client`.
  */
-import type { ConnectId, IsoDateTime } from '@citizens-wear/connect-client';
+import type { ConnectId, IsoDateTime } from '@citizens/connect-client';
 
 export type { ConnectId, IsoDateTime };
 

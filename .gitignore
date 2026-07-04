@@ -42,9 +42,9 @@ Old version/
 
 
 # Static HTML frontend — generated build outputs + local runtime config.
-# public/ and mobile-dist/ are produced from apps/web/src/frontend by
-# apps/web/scripts/build-frontend.js on every build; config.js carries
+# public/ and mobile-dist/ are produced from apps/wear/src/frontend by
+# apps/wear/scripts/build-frontend.js on every build; config.js carries
 # per-machine values (copy from config.example.js).
-apps/web/public/
-apps/web/mobile-dist/
-apps/web/src/frontend/config.js
+apps/wear/public/
+apps/wear/mobile-dist/
+apps/wear/src/frontend/config.js

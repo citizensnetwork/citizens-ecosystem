@@ -1,4 +1,4 @@
 module.exports = {
   root: true,
-  extends: [require.resolve('@citizens-wear/config/eslint-preset.cjs')],
+  extends: [require.resolve('@citizens/config/eslint-preset.cjs')],
 };

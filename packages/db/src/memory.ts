@@ -186,8 +186,7 @@ export class MemoryWearStore implements WearStore {
         const all = [...this._users.values()].sort((a, b) => a.handle.localeCompare(b.handle));
         const matches = q
           ? all.filter(
-              (u) =>
-                u.handle.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q),
+              (u) => u.handle.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q),
             )
           : all;
         return paginateList(matches, params);

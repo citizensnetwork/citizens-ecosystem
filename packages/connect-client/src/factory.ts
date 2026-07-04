@@ -12,7 +12,7 @@ import { HttpConnectClient } from './http/index';
  *   - `mode: 'live'` + a `baseUrl`  → `HttpConnectClient`.
  *   - anything else                 → `MockConnectClient`.
  *
- * In Next.js the app-level wiring in `apps/web/src/lib/connect.ts` reads
+ * In Next.js the app-level wiring in `apps/wear/src/lib/connect.ts` reads
  * `process.env.CONNECT_MODE`, `CONNECT_BASE_URL`, and `CONNECT_API_KEY` and
  * forwards them here.
  */

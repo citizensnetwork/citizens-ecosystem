@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.ns", "deno.unstable"]
+  },
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "std/http": "https://deno.land/std@0.177.0/http/server.ts",
+    "../_shared/push.ts": "./_shared/push.ts",
+    "../_shared/client.ts": "./_shared/client.ts",
+    "../_shared/prefs.ts": "./_shared/prefs.ts"
+  }
+}
