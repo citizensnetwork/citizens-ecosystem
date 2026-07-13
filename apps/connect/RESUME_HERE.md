@@ -779,6 +779,60 @@ addition: **Vision needs a login page** (built). Working log:
 
 ---
 
+## 3P. Wear LIVE — founder deploy · first admin · email+password auth ✅ (2026-07-13)
+
+Wear-focused session on branch `step5-monorepo-lift` (the Step-5 lift itself was committed by the
+prior session through `6f852b3`; this session ships on top of it). Working log:
+`.claude/sessions/wear-focus-admin-auth-and-roadmap.md` (root-level, gitignored).
+**No DB migration → next migration # still 147.**
+
+### Wear is DEPLOYED and in use
+- Founder deployed Wear via **Vercel CLI** (the uncommitted stragglers this created — `vercel`
+  devDep, `.vercel`/`.env*` gitignores, pulled env files, lockfile — are now committed; the stray
+  244 MB root `.pnpm/` store it left is gitignored, never committed).
+- Founder signed in with Google (`citizensnetworkpbo@gmail.com`) 2026-07-13; `wear.users` mirror
+  hydrated (`@citizensnetworkpbo`). **Wear deploy gates = DONE.**
+- **First admin granted:** `wear.user_roles` row (user `4a1b3802-4e9d-40ef-bd8d-7ec8b4d242ca`,
+  role `admin`, 2026-07-13 19:49 UTC) — the §3O/NEXT-STEPS founder action, executed via MCP.
+
+### Email+password auth SHIPPED (founder: "Google Auth may not be available soon")
+- **Frontend** (`apps/wear/src/frontend/`): `auth-client.js` +`signInWithPassword`/
+  `signUpWithPassword`/`requestPasswordReset`/`updatePassword` (+shared `webRedirectUrl()`);
+  `store.jsx` +`recovery` state (PASSWORD_RECOVERY) + 4 actions; `auth.jsx` rewritten —
+  sign-in/sign-up/forgot modes, confirm-sent/reset-sent notices, `CWScreens.ResetPassword`
+  (recovery-link landing), Google demoted to secondary (ink button); `app.jsx` Gate renders
+  ResetPassword whenever `recovery` is set. Password-manager-friendly (real `<form>`,
+  autocomplete attrs). Client rules: valid email, ≥8 chars, match confirm.
+- **Supabase auth config** (Management API PATCH, reversible): `external_email_enabled`
+  false→**true**, `password_min_length` 6→**8**. (GoTrue also requires lower+upper+digit —
+  pre-existing `password_required_characters`.)
+- **Browser-verified end-to-end** against prod: all modes render; client validation renders;
+  wrong-creds round trip returned "Email logins are disabled" BEFORE the config change and
+  "Invalid login credentials" AFTER — the full path works. Gates: **tsc 0 · eslint 0 ·
+  vitest 49/49 · frontend bundle builds**.
+- ⚠️ **Reset-link caveat (PKCE):** the recovery email must be opened in the SAME browser that
+  requested it (code verifier in localStorage) — standard supabase-js behaviour, noted in-code.
+- ⛔ **FOUNDER ACTION — custom SMTP required before real users:** no `smtp_host` configured, so
+  auth emails (sign-up confirmation + password reset) use Supabase's built-in mailer — **~2
+  emails/hour and delivered ONLY to project team-member addresses.** Dashboard → Project
+  Settings → Authentication → SMTP (Resend/Postmark/etc.). Until then, password reset works
+  reliably only for the founder's own email.
+- Connect + Vision still Google-only — **port the same email+password screens** (their
+  auth-clients share the CC_AUTH/CV_AUTH lineage) in a follow-up session; the provider is
+  already enabled project-wide.
+
+### Wear roadmap ratified (new planning doc committed)
+[`docs/Citizens_Wear_Roles_and_Concepts_MD.md`](../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
+(2026-07-13) locks the direction: single evolving account (Citizen → Creator → Brand-state →
+Admin), **Concepts marketplace** (two-stage propose→award claims, append-only status log
+`Proposed→…→Sold Out`, auto "Completed Concepts" posts), milestone royalties (10%/first-100 +
+proof-of-sale; opt-in permanent-catalogue conversion at lifetime 5% with attribution-tag removal
+but PERMANENT concept link), physical attribution required. **None of this exists in `wear.*`
+yet** — it is the next Wear schema tranche (migrations from **147**), then `/api/*` + screens.
+Open items: Brand-verification depth (KYC vs light review), Brand Workspace scope, dispute tooling.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b and 4c are ALL COMPLETE (§3L/§3N/§3O).** All three apps share one auth +
@@ -791,11 +845,18 @@ addition: **Vision needs a login page** (built). Working log:
    deleted). All code prerequisites are met; give 4c a short stabilisation window if desired.
 2. **Vision fast-follows (code, any session):** demo→live wiring of the 45 handlers into the
    HTML screens (§3O list); Timeline Map; Vision DDL from **147**.
-3. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate
-   limiting — **extract `@citizens/utils`(rate-limit) in the same change** (brief row 4;
-   Vision's copy was kept byte-compatible on purpose); Wear `/api/admin/*` + triage screen
-   (**mig 145 is live** — the DB side is ready); media upload pipeline; notifications backend;
-   full desktop layouts; Capacitor shell scaffold.
+3. **Wear build track (code, any session — see §3P roadmap):**
+   a. **Concepts marketplace schema** (migs from **147**) per
+      [docs/Citizens_Wear_Roles_and_Concepts_MD.md](../../docs/Citizens_Wear_Roles_and_Concepts_MD.md):
+      concepts, proposals (private-to-creator during bidding, public Brand tags), exclusive
+      claims, append-only status log, completed-concepts posts, royalty milestones,
+      catalogue-conversion handshake, brand verification state.
+   b. Launch-hardening fast-follows: `/api/*` rate limiting — **extract
+      `@citizens/utils`(rate-limit) in the same change** (brief row 4; Vision's copy was kept
+      byte-compatible on purpose); Wear `/api/admin/*` + triage screen (**mig 145 is live**,
+      first admin granted §3P); media upload pipeline; notifications backend; full desktop
+      layouts; Capacitor shell scaffold.
+   c. Port email+password auth screens (§3P) to Connect + Vision frontends.
 4. **Founder-only, non-code (any time):**
    - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
      + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
@@ -803,8 +864,9 @@ addition: **Vision needs a login page** (built). Working log:
      URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
    - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
      NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
-   - First **Wear moderator/admin grants**: `insert into wear.user_roles (user_id, role) …` as
-     service_role (founder via MCP/SQL — §3O 4b).
+   - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
+   - **Custom SMTP for auth emails** (§3P ⛔) — required before non-team users can receive
+     sign-up confirmation / password-reset emails.
    - Answer the **Supabase-Preview** question (§3M #2: which surface showed the error) so the
      integration can be switched off.
    - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release · **PAT rotation**
