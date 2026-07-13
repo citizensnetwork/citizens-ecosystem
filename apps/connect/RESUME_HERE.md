@@ -812,11 +812,20 @@ prior session through `6f852b3`; this session ships on top of it). Working log:
   vitest 49/49 · frontend bundle builds**.
 - ⚠️ **Reset-link caveat (PKCE):** the recovery email must be opened in the SAME browser that
   requested it (code verifier in localStorage) — standard supabase-js behaviour, noted in-code.
-- ⛔ **FOUNDER ACTION — custom SMTP required before real users:** no `smtp_host` configured, so
-  auth emails (sign-up confirmation + password reset) use Supabase's built-in mailer — **~2
-  emails/hour and delivered ONLY to project team-member addresses.** Dashboard → Project
-  Settings → Authentication → SMTP (Resend/Postmark/etc.). Until then, password reset works
-  reliably only for the founder's own email.
+- **Custom SMTP CONFIGURED via Resend (2026-07-13, same session):** Supabase auth now sends as
+  `Citizens Network <no-reply@citizenscentral.co.za>` through `smtp.resend.com:465`
+  (`rate_limit_email_sent` 2→60/hr). Resend account `citizensnetworkpbo@gmail.com`, domain
+  `citizenscentral.co.za` (eu-west-1, id `0ff087bb-8746-470a-836e-55adfc4ee8a7`).
+  ⛔ **BLOCKED on DNS verification:** the domain is `pending` in Resend — three records (DKIM
+  TXT `resend._domainkey`, MX + SPF TXT on `send`) must be added to the zone, which lives on
+  **Vercel DNS** (CLI authed as `stevo98`; `vercel dns add` was permission-blocked for founder
+  review — exact values in the session log / Resend dashboard). **Until verification passes,
+  ALL auth emails fail** (Resend rejects unverified senders — interim regression vs the
+  team-member-only built-in mailer; Google sign-in unaffected). After records land: Resend
+  dashboard → Verify (or `POST /domains/{id}/verify`), then send a test reset email.
+- **HIBP leaked-password protection = Supabase Pro-gated** — PATCH rejected on the Free org
+  ("available on Pro Plans and up"). Compensating controls live: min length 8 + GoTrue's
+  lower/upper/digit `password_required_characters`. Revisit if/when the org upgrades.
 - Connect + Vision still Google-only — **port the same email+password screens** (their
   auth-clients share the CC_AUTH/CV_AUTH lineage) in a follow-up session; the provider is
   already enabled project-wide.
