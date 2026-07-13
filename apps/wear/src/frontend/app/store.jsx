@@ -18,6 +18,10 @@
     const [authStatus, setAuthStatus] = useState('loading');
     const [me, setMe] = useState(null); // {user, profile, settings, counts, brands}
     const [authError, setAuthError] = useState(null);
+    // True while the user arrived via a password-recovery email link —
+    // the app renders the set-new-password screen regardless of authStatus
+    // (a recovery link DOES sign the user in; this flag takes precedence).
+    const [recovery, setRecovery] = useState(false);
 
     // Navigation: a simple stack. Each entry {screen, params}. The last
     // entry is what shell.jsx renders; tab switches reset the stack.
@@ -65,9 +69,11 @@
       })();
 
       const sub = window.CW_AUTH.onAuthChange(async (event) => {
+        if (event === 'PASSWORD_RECOVERY') setRecovery(true);
         if (event === 'SIGNED_IN') await completeSignIn();
         if (event === 'SIGNED_OUT') {
           setMe(null);
+          setRecovery(false);
           setAuthStatus('signedOut');
           setNav({ tab: 'home', stack: [] });
         }
@@ -90,6 +96,26 @@
       }
     }, []);
 
+    // Password credential actions. Errors are thrown to the auth screens,
+    // which render them inline next to the form they belong to.
+    const signInPassword = useCallback(async (email, password) => {
+      await window.CW_AUTH.signInWithPassword(email, password);
+      // SIGNED_IN fires through onAuthChange → completeSignIn.
+    }, []);
+
+    const signUpPassword = useCallback(async (email, password) => {
+      return window.CW_AUTH.signUpWithPassword(email, password);
+    }, []);
+
+    const requestPasswordReset = useCallback(async (email) => {
+      await window.CW_AUTH.requestPasswordReset(email);
+    }, []);
+
+    const completePasswordReset = useCallback(async (newPassword) => {
+      await window.CW_AUTH.updatePassword(newPassword);
+      setRecovery(false); // recovery session is a real session → straight in
+    }, []);
+
     const signOut = useCallback(async () => {
       await window.CW_AUTH.signOut();
     }, []);
@@ -107,7 +133,12 @@
       authStatus,
       me,
       authError,
+      recovery,
       signIn,
+      signInPassword,
+      signUpPassword,
+      requestPasswordReset,
+      completePasswordReset,
       signOut,
       refreshMe,
       nav,
