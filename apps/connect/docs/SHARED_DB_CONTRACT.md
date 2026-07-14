@@ -183,7 +183,18 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-02, project `xyiajtrvhlxaeplsiajj`, head = mig 146)
+## 9. Verification snapshot (updated 2026-07-13, project `xyiajtrvhlxaeplsiajj`, head = **mig 156**)
+
+> **2026-07-13 lineage reconciliation:** `list_migrations` shows prod head = `20260704162319 /
+> 156_vision_dormancy_watch`. Migrations **147–156 (Vision DDL: spaces, intelligence/advisory
+> engines, funnel/broadcast, space/activity metrics, org members, cross-pollination, dormancy
+> watch)** were applied 2026-07-03/04 from the **standalone `citizens-connect` checkout** while the
+> monorepo ran parallel Wear sessions; the ten files were reconciled into this monorepo lineage
+> (EOL-only diffs) on 2026-07-13. **Advisor baseline at head 156: 0 ERROR / 92 WARN / 3 INFO**
+> (WARN 72→92 = +20 `authenticated_security_definer` from Vision's intentional SECDEF pattern;
+> `auth_leaked_password_protection` = the known HIBP Pro-gate, RESUME §3P). The `vision.*` counts
+> below predate migs 147–156 — re-count when convenient. **Mig 157 (`wear` Concepts marketplace)
+> is DRAFTED + committed, NOT yet applied** — apply per R7, then re-stamp this section to head 157.
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
