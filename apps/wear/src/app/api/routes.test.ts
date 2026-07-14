@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetRateLimitStore } from '@citizens/utils';
 import { __resetWearStoreForTests } from '@/lib/store';
 
 /**
@@ -46,6 +47,7 @@ beforeEach(() => {
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   __resetWearStoreForTests();
+  resetRateLimitStore(); // every handler now passes the blanket gate
   mockSession.mockReset();
 });
 

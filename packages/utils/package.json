@@ -1,0 +1,33 @@
+{
+  "name": "@citizens/utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared pure-TS utilities for the Citizens ecosystem. First module: the Upstash-or-in-memory rate limiter (extracted verbatim from Connect; Vision's copy was kept byte-compatible for this consolidation — decision brief row 4).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rate-limit": "./src/rate-limit.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@citizens/config": "workspace:*",
+    "@typescript-eslint/eslint-plugin": "7.18.0",
+    "@typescript-eslint/parser": "7.18.0",
+    "@vitest/coverage-v8": "3.2.6",
+    "eslint": "8.57.0",
+    "eslint-config-prettier": "9.1.0",
+    "typescript": "5.5.4",
+    "vitest": "3.2.6"
+  }
+}

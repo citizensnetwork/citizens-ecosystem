@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { WearStore } from '@citizens/db';
 import { WearStoreError } from '@citizens/db';
+import { gateApiRequest } from '@citizens/utils';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { createWearServerClient } from '@/lib/supabase/server';
 import { createSupabaseWearStore } from '@/lib/supabase-wear-store';
@@ -143,12 +144,24 @@ export function errorResponse(error: unknown): NextResponse {
 /**
  * Wrap an async route handler so thrown `ApiError`/`WearStoreError`/unknowns
  * become clean JSON responses. Keeps each handler focused on the happy path.
+ *
+ * Every wrapped route also passes the blanket `@citizens/utils` rate-limit
+ * gate first (per-IP, read/write buckets — Vision's day-one pattern, closing
+ * Wear debt #1): `handler()` is the single choke point the whole `/api/*`
+ * surface goes through, so no endpoint can ship unlimited.
  */
 export function handler(
   fn: (req: Request, ctx: RouteContext, params: RouteParams) => Promise<NextResponse>,
 ): (req: Request, route: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
   return async (req, route) => {
     try {
+      const gate = await gateApiRequest(req);
+      if (gate.limited) {
+        return json(
+          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
+          { status: 429, headers: { 'Retry-After': String(gate.retryAfterSec) } },
+        );
+      }
       const ctx = await getRouteContext(req);
       const params = route?.params ? await route.params : {};
       return await fn(req, ctx, params);

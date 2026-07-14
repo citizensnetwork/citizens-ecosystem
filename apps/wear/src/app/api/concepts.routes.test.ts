@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetRateLimitStore } from '@citizens/utils';
 import { __resetWearStoreForTests } from '@/lib/store';
 
 /**
@@ -61,6 +62,7 @@ beforeEach(() => {
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   __resetWearStoreForTests();
+  resetRateLimitStore(); // every handler now passes the blanket gate
   mockSession.mockReset();
 });
 
@@ -348,6 +350,32 @@ describe('brand verification request + admin review', () => {
     const mine = await (await verificationGET(req('/api/brands/cornerstone-co/verification'), route({ slug: 'cornerstone-co' }))).json();
     expect(mine.verified).toBe(true);
     expect(mine.verification.status).toBe('approved');
+  });
+});
+
+describe('blanket rate-limit gate (@citizens/utils via handler())', () => {
+  it('429s with Retry-After once the per-IP write bucket is exhausted', async () => {
+    asUser('usr_002');
+    const make = () =>
+      conceptsPOST(
+        req('/api/concepts', {
+          ...jsonBody({ title: 'Gate probe' }),
+          headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+        }),
+        route(),
+      );
+    let last: Response | undefined;
+    for (let i = 0; i < 61; i += 1) last = await make();
+    expect(last!.status).toBe(429);
+    expect(last!.headers.get('Retry-After')).toMatch(/^\d+$/);
+    expect((await last!.json()).error).toBe('rate_limited');
+
+    // Reads ride a separate, higher bucket — still flowing for the same IP.
+    const read = await conceptsGET(
+      req('/api/concepts', { headers: { 'x-forwarded-for': '203.0.113.7' } }),
+      route(),
+    );
+    expect(read.status).toBe(200);
   });
 });
 
