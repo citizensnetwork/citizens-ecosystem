@@ -43,7 +43,18 @@ export function getWearStore(): WearStore {
           createdAt: '2026-02-02T09:30:00.000Z',
           updatedAt: '2026-02-02T09:30:00.000Z',
         },
+        {
+          id: 'usr_003',
+          handle: 'ruth',
+          displayName: 'Ruth A.',
+          avatarUrl: null,
+          createdAt: '2026-03-01T08:00:00.000Z',
+          updatedAt: '2026-03-01T08:00:00.000Z',
+        },
       ],
+      // Mig-145 platform roles: ruth is the seeded admin so the moderation
+      // and verification-review surfaces are exercisable in local dev.
+      seedRoles: [{ userId: 'usr_003', role: 'admin' }],
       seedBrands: [
         {
           id: 'brd_001',
