@@ -7,7 +7,7 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, MUTED, Avatar, BrandLogo, GoldButton, Spinner, EmptyState, ErrorNote, ScreenHeader, timeAgo, fmtCount } = window.CWUI;
+  const { GOLD, INK, MUTED, Avatar, BrandLogo, GoldButton, Spinner, EmptyState, ErrorNote, ScreenHeader, ImagePicker, timeAgo, fmtCount } = window.CWUI;
 
   const STAGES = ['proposed', 'claimed', 'in_production', 'sample_review', 'released', 'sold_out'];
   const STAGE_LABEL = {
@@ -903,8 +903,8 @@
           h('input', { value: title, onChange: (e) => setTitle(e.target.value), maxLength: 120, placeholder: 'Lion of Judah oversized tee', style: field }),
           h('div', { style: label }, 'Description'),
           h('textarea', { value: description, onChange: (e) => setDescription(e.target.value), rows: 4, maxLength: 2000, placeholder: 'The vision, the verse, the placement…', style: { ...field, resize: 'vertical', lineHeight: 1.5 } }),
-          h('div', { style: label }, 'Artwork URL'),
-          h('input', { value: mediaUrl, onChange: (e) => setMediaUrl(e.target.value), placeholder: 'https://…', style: field }),
+          h('div', { style: label }, 'Artwork'),
+          h(ImagePicker, { scope: 'concept', value: mediaUrl, onChange: setMediaUrl }),
           error ? h('div', { style: { marginTop: 12, fontSize: 12.5, fontWeight: 700, color: '#8f4a2b' } }, error) : null,
           h(
             'div',

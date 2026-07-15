@@ -944,6 +944,49 @@ export interface RoleRepo {
   getOwn(userId: ConnectId): Promise<WearPlatformRole | null>;
 }
 
+/**
+ * Notification kinds (mig 159). Each maps to a Concepts-marketplace lifecycle
+ * event; the recipient is the party who cares (creator or brand owner).
+ */
+export type NotificationType =
+  | 'concept_proposal' // a brand proposed on your concept        → creator
+  | 'concept_awarded' // your proposal was awarded                 → brand owner
+  | 'concept_advanced' // the concept advanced a stage             → creator
+  | 'royalty_proof' // proof of the milestone sale submitted       → creator
+  | 'royalty_closed' // a royalty obligation was closed            → brand owner
+  | 'conversion_proposed' // catalogue conversion proposed         → creator
+  | 'conversion_responded'; // conversion accepted/declined        → brand owner
+
+export interface WearNotification {
+  readonly id: string;
+  readonly recipientId: ConnectId;
+  readonly type: NotificationType;
+  /** Who caused it (null if that user was later deleted). */
+  readonly actorId: ConnectId | null;
+  readonly conceptId: string | null;
+  readonly brandId: ConnectId | null;
+  /** Render payload (conceptTitle / brandName / stage / accepted …). */
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly readAt: IsoDateTime | null;
+  readonly createdAt: IsoDateTime;
+}
+
+/**
+ * A recipient's own notifications. Rows are produced only by DB triggers
+ * (mig 159) — there is no create path here; the app reads and marks-read.
+ * Under RLS a caller sees ONLY their own rows (recipient-scoped policies).
+ */
+export interface NotificationRepo {
+  /** The caller's notifications, newest first. */
+  list(userId: ConnectId, params?: PageParams): Promise<Page<WearNotification>>;
+  /** How many of the caller's notifications are unread. */
+  unreadCount(userId: ConnectId): Promise<number>;
+  /** Mark specific notifications (own only) read; returns how many changed. */
+  markRead(userId: ConnectId, ids: readonly string[]): Promise<number>;
+  /** Mark every unread notification of the caller read; returns how many changed. */
+  markAllRead(userId: ConnectId): Promise<number>;
+}
+
 /** The full Wear data surface. */
 export interface WearStore {
   readonly users: UserRepo;
@@ -969,6 +1012,7 @@ export interface WearStore {
   readonly conversions: CatalogueConversionRepo;
   readonly brandVerifications: BrandVerificationRepo;
   readonly roles: RoleRepo;
+  readonly notifications: NotificationRepo;
 }
 
 /** Errors thrown by a `WearStore`. */

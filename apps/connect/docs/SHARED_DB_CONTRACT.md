@@ -183,8 +183,20 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-14, project `xyiajtrvhlxaeplsiajj`, head = **mig 157**)
+## 9. Verification snapshot (updated 2026-07-15, project `xyiajtrvhlxaeplsiajj`, head = **mig 159**)
 
+> **2026-07-15: migs 158 + 159 (`wear` media pipeline + notifications) APPLIED**
+> (pre-apply tag `connect-pre-mig158`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — byte-for-byte
+> the head-157 baseline, 0 new findings.** Neither adds a SECDEF EXECUTE grant: mig-158 is a
+> Storage bucket + 3 owner-folder `storage.objects` policies (no functions); mig-159's `wear.notify`
+> + 6 lifecycle trigger functions are all `revoke all … from public` (trigger-only, run as owner —
+> not granted to `authenticated`/`anon`), so they add 0 `*_security_definer_function_executable`
+> WARNs. **`wear.notifications`** is RLS-enabled with 3 recipient-scoped policies (no INSERT policy —
+> rows enter only via the SECDEF triggers). Prod smokes PASS: all 4 notification triggers fire with
+> correct recipient/actor/payload (concept→propose→award→advance→royalty-proof) with zero residue;
+> the `wear-media` storage wall enforces at runtime (own-folder write permitted, foreign-folder
+> denied by RLS) with zero residue. **Next migration # = 160.**
+>
 > **2026-07-14: mig 157 (`wear` Concepts marketplace) APPLIED** (`20260714… /
 > 157_wear_concepts_marketplace`; pre-apply tag `connect-pre-mig157`). **Advisor baseline at
 > head 157: 0 ERROR / 101 WARN / 3 INFO.** WARN 92→101 = exactly the **9 intentional SECDEF

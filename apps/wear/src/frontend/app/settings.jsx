@@ -27,7 +27,7 @@
   };
 
   function SettingsScreen() {
-    const { me, pop, refreshMe, signOut, openAdmin } = useStore();
+    const { me, pop, refreshMe, signOut, openAdmin, changePassword } = useStore();
     const [bio, setBio] = useState((me && me.profile && me.profile.bio) || '');
     const [displayName, setDisplayName] = useState(
       (me && me.settings && me.settings.displayNameOverride) || '',
@@ -37,6 +37,35 @@
     );
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState(null);
+
+    // ── change/set password ──
+    const [pw, setPw] = useState('');
+    const [pw2, setPw2] = useState('');
+    const [pwBusy, setPwBusy] = useState(false);
+    const [pwNote, setPwNote] = useState(null);
+
+    const savePassword = async () => {
+      setPwNote(null);
+      if (pw.length < 8) {
+        setPwNote({ ok: false, text: 'Password must be at least 8 characters.' });
+        return;
+      }
+      if (pw !== pw2) {
+        setPwNote({ ok: false, text: 'Passwords do not match.' });
+        return;
+      }
+      setPwBusy(true);
+      try {
+        await changePassword(pw);
+        setPw('');
+        setPw2('');
+        setPwNote({ ok: true, text: 'Password updated.' });
+      } catch (e) {
+        setPwNote({ ok: false, text: e.message || 'Could not update your password.' });
+      } finally {
+        setPwBusy(false);
+      }
+    };
 
     const save = async () => {
       setBusy(true);
@@ -137,6 +166,64 @@
             }),
           ),
         ),
+        h(
+          'div',
+          { style: card },
+          h('div', { style: { fontSize: 14, fontWeight: 800 } }, 'Password'),
+          h(
+            'div',
+            {
+              style: {
+                fontSize: 12.5,
+                color: '#8f8d87',
+                fontWeight: 500,
+                lineHeight: 1.55,
+                marginTop: 6,
+              },
+            },
+            'Set or change the password you use to sign in with email. If you joined with Google, adding a password lets you sign in either way.',
+          ),
+          h('div', { style: label }, 'New password'),
+          h('input', {
+            type: 'password',
+            value: pw,
+            onChange: (e) => setPw(e.target.value),
+            autoComplete: 'new-password',
+            placeholder: 'At least 8 characters',
+            style: field,
+          }),
+          h('div', { style: label }, 'Confirm new password'),
+          h('input', {
+            type: 'password',
+            value: pw2,
+            onChange: (e) => setPw2(e.target.value),
+            autoComplete: 'new-password',
+            style: field,
+          }),
+          pwNote
+            ? h(
+                'div',
+                {
+                  style: {
+                    marginTop: 12,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: pwNote.ok ? '#3f6f34' : '#8f4a2b',
+                  },
+                },
+                pwNote.text,
+              )
+            : null,
+          h(
+            'div',
+            { style: { marginTop: 16 } },
+            h(GoldButton, {
+              label: pwBusy ? 'Updating…' : 'Update password',
+              onClick: savePassword,
+              disabled: pwBusy,
+            }),
+          ),
+        ),
         me && me.role
           ? h(
               'div',
@@ -178,7 +265,7 @@
           h(
             'div',
             { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55 } },
-            'One Kingdom identity: your Google sign-in is shared across Citizens Connect, Vision, and Wear.',
+            'One Kingdom identity: your Citizens account is shared across Citizens Connect, Vision, and Wear.',
           ),
           h(
             'button',

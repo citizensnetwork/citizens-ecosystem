@@ -5,7 +5,7 @@
   const { createElement: h, useState } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, ScreenHeader } = window.CWUI;
+  const { GOLD, GoldButton, ScreenHeader, ImagePicker } = window.CWUI;
 
   const TYPES = [
     { k: 'post', label: 'Apparel Post', icon: 'tee' },
@@ -45,6 +45,7 @@
     const [brandSlug, setBrandSlug] = useState('');
     const [brandTagline, setBrandTagline] = useState('');
     const [brandWebsite, setBrandWebsite] = useState('');
+    const [brandLogo, setBrandLogo] = useState('');
 
     const myBrands = (me && me.brands) || [];
 
@@ -80,12 +81,14 @@
             slug: brandSlug.trim().toLowerCase(),
             ...(brandTagline.trim() ? { tagline: brandTagline.trim() } : {}),
             ...(brandWebsite.trim() ? { websiteUrl: brandWebsite.trim() } : {}),
+            ...(brandLogo.trim() ? { logoUrl: brandLogo.trim() } : {}),
           });
           await refreshMe();
           setBrandName('');
           setBrandSlug('');
           setBrandTagline('');
           setBrandWebsite('');
+          setBrandLogo('');
           setNote({ ok: true, text: 'Brand created. Post as it from the composer.' });
         }
       } catch (e) {
@@ -199,12 +202,11 @@
                 placeholder: 'A drop, a testimony, a word…  #hashtags become discoverable',
                 style: { ...field, resize: 'vertical', lineHeight: 1.5 },
               }),
-              h('div', { style: label }, 'Image URL (optional)'),
-              h('input', {
+              h('div', { style: label }, 'Image (optional)'),
+              h(ImagePicker, {
+                scope: 'post',
                 value: mediaUrl,
-                onChange: (e) => setMediaUrl(e.target.value),
-                placeholder: 'https://…',
-                style: field,
+                onChange: setMediaUrl,
               }),
               myBrands.length
                 ? h(
@@ -250,12 +252,11 @@
                   placeholder: 'A 24-hour word of encouragement…',
                   style: { ...field, resize: 'vertical', lineHeight: 1.5 },
                 }),
-                h('div', { style: label }, 'Image URL (optional — text story without it)'),
-                h('input', {
+                h('div', { style: label }, 'Image (optional — text story without it)'),
+                h(ImagePicker, {
+                  scope: 'story',
                   value: storyMediaUrl,
-                  onChange: (e) => setStoryMediaUrl(e.target.value),
-                  placeholder: 'https://…',
-                  style: field,
+                  onChange: setStoryMediaUrl,
                 }),
                 h('div', { style: label }, 'Audience'),
                 h(
@@ -314,6 +315,13 @@
                   onChange: (e) => setBrandWebsite(e.target.value),
                   placeholder: 'https://…',
                   style: field,
+                }),
+                h('div', { style: label }, 'Logo (optional)'),
+                h(ImagePicker, {
+                  scope: 'brand-logo',
+                  value: brandLogo,
+                  onChange: setBrandLogo,
+                  round: true,
                 }),
               ),
         note

@@ -4,6 +4,7 @@ import type {
   Page,
   PostWithMedia,
   WearBrand,
+  WearNotification,
   WearStore,
   WearUser,
 } from '@citizens/db';
@@ -67,6 +68,47 @@ export const toUserDto = (u: WearUser): UserDto => ({
   displayName: u.displayName,
   avatarUrl: u.avatarUrl,
 });
+
+export interface NotificationDto {
+  readonly id: string;
+  readonly type: string;
+  /** Who triggered it — hydrated fresh from the identity mirror (may be null). */
+  readonly actor: UserDto | null;
+  readonly conceptId: string | null;
+  readonly brandId: string | null;
+  /** Render payload written at trigger time (conceptTitle / stage / accepted …). */
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly read: boolean;
+  readonly createdAt: string;
+}
+
+/**
+ * Hydrate notifications with their actor identity, batched by unique actor id
+ * (the message text itself is composed client-side from `type` + `data`).
+ */
+export async function hydrateNotifications(
+  store: WearStore,
+  items: readonly WearNotification[],
+): Promise<NotificationDto[]> {
+  const actorIds = [...new Set(items.map((n) => n.actorId).filter((id): id is string => !!id))];
+  const actors = new Map<string, UserDto>();
+  await Promise.all(
+    actorIds.map(async (id) => {
+      const u = await store.users.getById(id);
+      if (u) actors.set(id, toUserDto(u));
+    }),
+  );
+  return items.map((n) => ({
+    id: n.id,
+    type: n.type,
+    actor: n.actorId ? (actors.get(n.actorId) ?? null) : null,
+    conceptId: n.conceptId,
+    brandId: n.brandId,
+    data: n.data,
+    read: n.readAt !== null,
+    createdAt: n.createdAt,
+  }));
+}
 
 export const toBrandDto = (b: WearBrand): BrandDto => ({
   id: b.id,

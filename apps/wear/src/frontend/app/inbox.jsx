@@ -1,13 +1,155 @@
-// ── Inbox: conversations + thread ──────────────────────────────────
+// ── Inbox: conversations + thread + notifications ──────────────────
 // GET /api/conversations, GET|POST /api/conversations/:id/messages,
-// POST /api/conversations {handle}. Messages|Notifications tabs per the
-// design (notifications = honest coming-soon state; no backend yet).
+// POST /api/conversations {handle}. Notifications tab: GET /api/notifications
+// + POST /api/notifications/read (mig-159 marketplace-event notifications).
 (function () {
   const { createElement: h, useState, useEffect, useCallback, useRef } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
   const { GOLD, INK, Avatar, Spinner, EmptyState, ErrorNote, ScreenHeader, GoldButton, timeAgo } =
     window.CWUI;
+
+  // ── Notifications ────────────────────────────────────────────────
+  const STAGE_LABEL = {
+    claimed: 'Claimed',
+    in_production: 'In Production',
+    sample_review: 'Sample Review',
+    released: 'Released',
+    sold_out: 'Sold Out',
+  };
+
+  /** Compose the human message from a notification's type + data payload. */
+  function notifMessage(n) {
+    const d = n.data || {};
+    const title = d.conceptTitle ? '“' + d.conceptTitle + '”' : 'your concept';
+    switch (n.type) {
+      case 'concept_proposal':
+        return (d.brandName || 'A verified brand') + ' proposed to make ' + title + '.';
+      case 'concept_awarded':
+        return 'Your brand was awarded the concept ' + title + '. 🎉';
+      case 'concept_advanced':
+        return title + ' advanced to ' + (STAGE_LABEL[d.stage] || d.stage) + '.';
+      case 'royalty_proof':
+        return 'Proof of the milestone sale for ' + title + ' was submitted — confirm to close it out.';
+      case 'royalty_closed':
+        return 'The royalty for ' + title + ' was closed out.';
+      case 'conversion_proposed':
+        return 'A catalogue conversion was proposed for ' + title + '.';
+      case 'conversion_responded':
+        return 'Your catalogue conversion for ' + title + (d.accepted ? ' was accepted.' : ' was declined.');
+      default:
+        return 'New activity on ' + title + '.';
+    }
+  }
+
+  function NotifRow({ n, onOpen }) {
+    return h(
+      'button',
+      {
+        onClick: onOpen,
+        style: {
+          width: '100%',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 13,
+          padding: '14px 20px',
+          border: 'none',
+          background: n.read ? 'none' : '#fdf8ec',
+          borderBottom: '1px solid #f7f5f2',
+          textAlign: 'left',
+          cursor: n.conceptId ? 'pointer' : 'default',
+        },
+      },
+      n.actor
+        ? h(Avatar, { user: n.actor, size: 42 })
+        : h(
+            'div',
+            {
+              style: {
+                width: 42,
+                height: 42,
+                borderRadius: '50%',
+                background: '#faf8f3',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #f0eee7',
+                flex: 'none',
+              },
+            },
+            Icon('bell', { size: 20, color: GOLD }),
+          ),
+      h(
+        'div',
+        { style: { flex: 1, minWidth: 0 } },
+        h(
+          'div',
+          { style: { fontSize: 13.5, fontWeight: 500, color: INK, lineHeight: 1.45 } },
+          notifMessage(n),
+        ),
+        h(
+          'div',
+          { style: { fontSize: 11, color: '#b5b3ac', fontWeight: 600, marginTop: 4 } },
+          timeAgo(n.createdAt),
+        ),
+      ),
+      !n.read
+        ? h('span', {
+            style: {
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: GOLD,
+              flex: 'none',
+              marginTop: 6,
+            },
+          })
+        : null,
+    );
+  }
+
+  function NotificationsTab() {
+    const { push } = useStore();
+    const [state, setState] = useState({ loading: true, error: null, items: [] });
+
+    const load = useCallback(async () => {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const res = await window.CW_API.get('/api/notifications?limit=40');
+        setState({ loading: false, error: null, items: res.items });
+        // Clear the unread state on view (fire-and-forget).
+        if (res.unreadCount > 0) {
+          window.CW_API.post('/api/notifications/read', { all: true }).catch(() => {});
+        }
+      } catch (e) {
+        setState((s) => ({ ...s, loading: false, error: e.message }));
+      }
+    }, []);
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    if (state.loading) return h(Spinner, {});
+    if (state.error) return h(ErrorNote, { message: state.error, onRetry: load });
+    if (!state.items.length) {
+      return h(EmptyState, {
+        icon: 'bell',
+        title: 'No notifications yet',
+        note: 'Activity on your concepts — proposals, awards, milestones, royalties — lands here.',
+      });
+    }
+    return h(
+      'div',
+      null,
+      state.items.map((n) =>
+        h(NotifRow, {
+          key: n.id,
+          n: n,
+          onOpen: () => n.conceptId && push('concept', { id: n.conceptId }),
+        }),
+      ),
+    );
+  }
 
   function InboxScreen() {
     const [tab, setTab] = useState('messages');
@@ -94,11 +236,7 @@
         ),
       ),
       tab === 'notifications'
-        ? h(EmptyState, {
-            icon: 'bell',
-            title: 'Notifications are on the way',
-            note: 'In-app notifications land in a coming Wear update. Messages are live below.',
-          })
+        ? h(NotificationsTab)
         : state.loading
           ? h(Spinner, {})
           : state.error

@@ -117,10 +117,35 @@
   }
 
   // Completes recovery (requires the recovery session) — also usable from
-  // settings later for a signed-in password change.
+  // settings for a signed-in password change / to set a first password on a
+  // Google account (which then unlocks email+password sign-in too).
   async function updatePassword(newPassword) {
     var res = await client.auth.updateUser({ password: newPassword });
     if (res.error) throw res.error;
+  }
+
+  // ── Email magic-code (passwordless secondary sign-in) ──────────────
+  // Sends a 6-digit code (mailer_otp_length=6) to an EXISTING account's
+  // email. shouldCreateUser:false keeps this a sign-in path only — new
+  // accounts come through sign-up (email+password), never a silent OTP
+  // create, and it avoids account-enumeration via the code channel. The
+  // same email also carries a magic link (emailRedirectTo) as a fallback:
+  // clicking it completes via detectSessionInUrl, exactly like recovery.
+  async function sendEmailCode(email) {
+    var res = await client.auth.signInWithOtp({
+      email: email,
+      options: { shouldCreateUser: false, emailRedirectTo: webRedirectUrl() },
+    });
+    if (res.error) throw res.error;
+  }
+
+  // Exchanges the emailed 6-digit code for a session. On success supabase-js
+  // fires SIGNED_IN through onAuthChange → the store's completeSignIn runs,
+  // so no extra plumbing is needed here.
+  async function verifyEmailCode(email, token) {
+    var res = await client.auth.verifyOtp({ email: email, token: token, type: 'email' });
+    if (res.error) throw res.error;
+    return res.data;
   }
 
   // Catches the `citizenswear://auth-callback?code=…` deep link the system
@@ -196,6 +221,8 @@
     signUpWithPassword: signUpWithPassword,
     requestPasswordReset: requestPasswordReset,
     updatePassword: updatePassword,
+    sendEmailCode: sendEmailCode,
+    verifyEmailCode: verifyEmailCode,
     loadSession: loadSession,
     getAccessToken: getAccessToken,
     signOut: signOut,
