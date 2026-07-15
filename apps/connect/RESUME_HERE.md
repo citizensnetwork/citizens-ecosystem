@@ -896,37 +896,113 @@ Contract §9 re-stamped to head 156 with the reconciliation note; **re-stamp to 
 
 ---
 
+## 3R. Wear Concepts marketplace SHIPPED END-TO-END — mig 157 APPLIED + data/API/frontend + @citizens/utils ✅ (2026-07-14/15)
+
+Wear session on `step5-monorepo-lift` (working log: `.claude/sessions/wear-concepts-apply-and-build.md`,
+root-level, gitignored). Executed NEXT-STEPS 0 + 1a + 1b(rate-limiting) in gated, committed increments.
+**Next migration # = 158.**
+
+### Migration 157 APPLIED to prod (commit `40e1aeb`)
+- `apply_migration(157_wear_concepts_marketplace)` on head 156; tag `connect-pre-mig157` was pre-set.
+- **Advisors: 0 ERROR / 101 WARN / 3 INFO = the NEW baseline.** WARN 92→101 = exactly the 9
+  intentional SECDEF EXECUTE grants mig 157 itself makes (8× authenticated RPCs + 1× anon
+  `get_concept_proposal_tags`) — same retained-by-design category as §3C/Vision's +20. 0 unexpected.
+  **Correction recorded in contract §9:** the linter DOES surface `wear.*` SECDEF fns (mig-145-era
+  "not surfaced" note is obsolete).
+- Structural QA exact: **wear.\* = 32 tables / 0 without RLS / 70 policies / 21 fns / 19 enums / 18 triggers.**
+- Rolled-back prod smokes ALL PASS (verified-guard 42501 · unverified-brand proposal denied ·
+  full happy path concept→propose→award→advance→released-auto-post→conversion · non-creator award
+  42501 · backwards/repeat stage 22023 · direct status-log insert denied). Zero residue verified.
+- SHARED_DB_CONTRACT §9 re-stamped to **head 157**.
+
+### Data plane (commit `ef5f432`) + /api/* (commit `22ff29b`) + rate limiting (commit `022e160`)
+- **`packages/db`**: WearStore contract +8 repos (`concepts`, `conceptProposals`, `conceptClaims`,
+  `conceptStatusLog`, `royalties`, `conversions`, `brandVerifications`, `roles`); `Report` gains
+  mig-145 `status/handledBy/handledAt` + `listForModeration`/`triage`; `Post` gains `conceptId`.
+  MemoryWearStore = the semantic spec (replicates the DB triggers: auto Completed-Concepts post
+  w/ media copy + dup guard; brand-verified sync; concept re-open on revoke). Error codes ==
+  the RPCs' raise messages. **+23 contract tests (db 92/92).**
+- **`SupabaseWearStore`**: reads via RLS, lifecycle writes via `.rpc()`; `mapRpcError` extended
+  with all mig-157 raise messages; `_getOwnRole` via self-SELECT `user_roles`.
+- **17 new `/api/*` routes** (Bearer-or-cookie `handler()` pattern): concepts CRUD/upvote/
+  proposals/status-advance, proposals PATCH(withdraw/resubmit)+award, claims revoke/conversions/
+  royalties, conversions PATCH(accept/decline/cancel), royalties list+proof+close,
+  `brands/[slug]/{verification,proposals,claims}`, `admin/{verifications,reports}` queues +
+  review/triage. `/api/me` now returns `role`. **Serializer rules live:** `BrandDto.verified`
+  authoritative from `wear.brands.verified`; `PostDto.concept` = permanent link with `creator`
+  tag ONLY while `claims.attribution_public`. Wear now registers 40 API routes. +12 route tests.
+- **NEW `packages/utils` (@citizens/utils)** — brief row 4 delivered: `rate-limit.ts` extracted
+  VERBATIM from Connect (superset presets; Vision's copy stays byte-compatible for later
+  consolidation) + `gate.ts` (Vision's api-gate generalised: per-IP, 240 GET / 60 write per min).
+  **ALL Wear `/api/*` now rate-limited** via the single `handler()` choke point (429 +
+  Retry-After) — **Wear debt #1 CLOSED**. 7 package tests; workspace turbo **27/27 green**
+  (Connect 637 · db 92 · utils 7 · wear 61 · Vision all green).
+
+### Frontend (commit `bd8bc4e`) — browser-verified END-TO-END against prod
+- New IIFE modules: **`concepts.jsx`** (browse w/ stage filters, detail w/ Journey stepper from
+  the append-only log, create, upvotes, propose form, creator award list, brand advance,
+  royalty proof/close, conversion handshake) and **`adminq.jsx`** (brand-verification queue +
+  mig-145 reports triage). Wiring: `store.jsx` nav actions; `shell.jsx` routes + sidebar
+  Concepts + role-gated Admin item; `discover.jsx` marketplace banner; `settings.jsx` role-gated
+  admin card; `brand.jsx` owner VerificationSection; `home.jsx` PostCard concept-attribution
+  chip. Build order + dev index.html tags updated (17 screens compile).
+- **Prod E2E in the browser** (dev server :3000 w/ real Supabase env; two disposable test users,
+  each flow driven through the real UI): password sign-in → mirror hydrate → create concept →
+  upvote → create brand → request verification → admin queue APPROVE (badge flips via trigger) →
+  verified brand proposes (public tag + party-scoped details) → creator awards (CLAIMED +
+  milestone 10%/100 committed) → advance In Production (timeline note) → RELEASED → auto
+  Completed-Concepts post in feed w/ "Concept by @creator" chip → proof of 100th sale submitted →
+  creator confirms close-out → conversion proposed → creator accepts → **feed chip flips to
+  "From a community concept" (tag retired, link permanent)** + lifetime 5% ACTIVE. Zero console
+  errors. **All test data + users deleted after — zero residue verified** (founder's admin role
+  row untouched).
+
+### ⚠️ Follow-up found during cleanup (record for mig 158, NOT yet fixed)
+Deleting an `auth.users` row for a user who is BOTH a brand owner and a conversion actor can
+fail mid-cascade: the `SET NULL` audit-column cascades (e.g. `catalogue_conversions.proposed_by`)
+race the `ON DELETE CASCADE` chain (`brands→claims→conversions`), and the FK re-check on
+`claim_id` sees the already-deleted claim → 23503. **Repro:** single-statement delete of both
+smoke users. **Impact:** future account-deletion flows for brand owners. **Fix candidates:**
+make the marketplace `claim_id`/`concept_id` FKs `DEFERRABLE INITIALLY DEFERRED`, or route
+account deletion through an explicit bottom-up SECDEF cleanup fn. Deleting bottom-up works today.
+
+### Also this session
+- `.claude/launch.json` gains `wear-dev` (next dev :3000); `apps/wear/.env.development.local`
+  (gitignored) carries the shared-project env for local dev — regenerate from
+  `.env.wear.production.local` (`vercel env pull` output) if missing.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3, 4, 4b, 4c AND 5 are COMPLETE** — the monorepo lift **is merged to `main`**
-> ([PR #23](https://github.com/citizensnetwork/citizens-ecosystem/pull/23)); work continues on
-> `step5-monorepo-lift` (ahead of main — merge when ready). All three apps share one auth +
-> one Postgres + the static-HTML frontend model.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair).
+> **Steps 3, 4, 4b, 4c, 5 AND the Wear Concepts marketplace (§3R) are COMPLETE.**
+> `step5-monorepo-lift` was merged to `main` again at end of the §3R session (2026-07-15,
+> founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 158.**
 
-0. **APPLY MIGRATION 157** (`supabase/migrations/157_wear_concepts_marketplace.sql`) via MCP
-   `apply_migration` (tag `connect-pre-mig157` already set) → advisors **0 ERROR / 0 new vs
-   92 WARN / 3 INFO baseline** → structural QA (wear.* = 32 tables / 0 without RLS / ~70 policies /
-   21 fns / 19 enums) → rolled-back smokes (file footer checklist) → contract §9 → head 157.
-1. **Wear build track (current focus — §3P roadmap + §3Q):**
-   a. ~~Concepts marketplace schema~~ → **drafted as mig 157, apply per step 0**; then the
-      **API + screens tranche**: `/api/concepts*` routes (list/detail/create/upvote/proposals/
-      award/status-advance/conversions/royalties + brand-verification request/review), `WearStore`
-      repos (memory spec + supabase adapter + contract tests), Discover/Profile/Brand concept
-      screens, admin verification queue. Serializers: brand `verified` badge now authoritative;
-      render creator tag only when `claims.attribution_public`.
-   b. Launch-hardening fast-follows: `/api/*` rate limiting — **extract
-      `@citizens/utils`(rate-limit) in the same change** (brief row 4; Vision's copy was kept
-      byte-compatible on purpose); Wear `/api/admin/*` + triage screen (**mig 145 is live**,
-      first admin granted §3P); media upload pipeline; notifications backend; full desktop
-      layouts; Capacitor shell scaffold.
-   c. Port email+password auth screens (§3P) to Connect + Vision frontends.
+1. **Wear build track (current focus — §3P roadmap; marketplace core is DONE §3R):**
+   a. **Deploy the marketplace**: founder redeploys Wear on Vercel from `main` (the built
+      bundle ships the new screens; env unchanged). Then founder (already wear admin) can
+      verify real brands from the in-app Admin queue.
+   b. Launch-hardening fast-follows, in rough order of value: **media upload pipeline**
+      (posts/concepts are URL-only — Supabase Storage bucket + signed upload, mirror Connect's
+      mig-122 bucket-limits pattern); **notifications backend** (award/status-advance/proposal/
+      royalty events are natural triggers; tab is a placeholder); **mig 158**: fix the §3R
+      account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace
+      schema follow-ups; full desktop layouts; Capacitor shell scaffold (JS side is ready).
+   c. Port email+password auth screens (§3P) from Wear to Connect + Vision frontends — shared
+      CC_AUTH/CV_AUTH lineage, provider already enabled project-wide. (Was this session's
+      stretch goal; not reached.)
+   d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
+      tooling, proposal notifications, concept search/categories, creator portfolio surface.
 2. **Vision (verify-then-continue):** migs 147–156 + demo→live wiring increments 1–7 shipped from
    the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
    this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
    (currently BEHIND it), then continue Vision fast-follows (Timeline Map; remaining wiring).
-3. **Monorepo hygiene:** merge `step5-monorepo-lift` → `main` (PR); commit-or-park the standalone
-   `citizens-connect` dirty tree; retire the standalone checkouts to read-only.
+3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R);
+   commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
+   to read-only. Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their copies
+   are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
 4. **Founder-only, non-code (any time):**
    - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
      + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
@@ -962,6 +1038,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **156** live; **157 drafted, unapplied**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **157** live; next # = **158**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).
