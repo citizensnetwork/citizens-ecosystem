@@ -183,8 +183,22 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-15, project `xyiajtrvhlxaeplsiajj`, head = **mig 159**)
+## 9. Verification snapshot (updated 2026-07-15, project `xyiajtrvhlxaeplsiajj`, head = **mig 160**)
 
+> **2026-07-15: mig 160 (`wear` content-permission model) APPLIED** (pre-apply tag
+> `wear-pre-mig160`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — 0 new findings vs head-159.**
+> Tighten-only; no functions/tables/grants added. `wear.posts` insert now requires an owned
+> **verified** brand + mandatory `brand_id` (base-Citizen self-posts retired — the Home feed is
+> brand apparel by construction); `wear.brands` insert is **admin-only** (self-serve creation
+> removed at the RLS layer, not just the UI). Owner UPDATE/DELETE preserved; mig-157 verified-column
+> guard intact. Net **+2 policies** (the mig-143 `brands_owner_write` FOR-ALL policy split into
+> `brands_owner_update` + `brands_owner_delete` + `brands_admin_insert`). Rolled-back prod smokes all
+> PASS: verified-brand post OK; null-brand / unverified-brand / non-admin-brand-insert all `42501`;
+> admin brand-mint OK; owner tagline update OK; owner self-verify `42501` (guard). Ratified in
+> [`ECOSYSTEM_PROFILE_LEVELS §3.2`](./ECOSYSTEM_PROFILE_LEVELS.md) +
+> [`Citizens_Wear_Roles_and_Concepts_MD §6`](../../../docs/Citizens_Wear_Roles_and_Concepts_MD.md).
+> **Next migration # = 161.**
+>
 > **2026-07-15: migs 158 + 159 (`wear` media pipeline + notifications) APPLIED**
 > (pre-apply tag `connect-pre-mig158`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — byte-for-byte
 > the head-157 baseline, 0 new findings.** Neither adds a SECDEF EXECUTE grant: mig-158 is a
@@ -219,9 +233,14 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
-- **`wear.*` (mig 143 + 144 + 145 + 146 + 157):** **32 base tables** (all RLS-enabled, **0 without
-  RLS**), **70 RLS policies**, **21 functions**, **19 enums**, **18 triggers** (live-counted
-  post-157). **Mig-157 Concepts marketplace tier:** 9 tables (`concepts`, `concept_media`,
+- **`wear.*` (migs 143–146 + 157 + 159 + 160):** **75 RLS policies** (live-counted post-160:
+  `wear.posts`=3, `wear.brands`=4 after the mig-160 split; **0 tables without RLS**). Table/function/
+  enum/trigger counts below are **post-157** (**32 base tables**, **21 functions**, **19 enums**,
+  **18 triggers**) — migs 158–160 add the `wear-media` bucket, the `wear.notifications` table + its
+  lifecycle triggers, and the brands-policy split; recount when convenient. **Mig-160
+  content-permission model:** `wear.posts` insert requires an owned **verified** brand (brand_id
+  mandatory); `wear.brands` insert is `wear.is_admin()`-only (self-serve retired), owner keeps
+  UPDATE/DELETE. **Mig-157 Concepts marketplace tier:** 9 tables (`concepts`, `concept_media`,
   `concept_upvotes`, `concept_proposals` — party-scoped details, `concept_claims` — one ACTIVE
   claim per concept via partial unique index, `concept_status_log` — append-only by construction
   (no write policy AND no write grant), `royalty_obligations`, `catalogue_conversions`,

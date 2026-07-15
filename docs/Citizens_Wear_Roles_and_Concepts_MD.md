@@ -112,3 +112,66 @@ This is flagged as a feature to define requirements for on arrival, not to be pl
 - Whether Brand verification for elevation includes formal business/KYC documentation or a lighter internal review process
 - Full detail and scope of the Brand Workspace (Section 5)
 - Whether Admin-side dispute resolution tooling is needed for milestone/royalty disputes between Creators and Brands
+
+---
+
+## 6. Role progression & content-permission model — **RATIFIED 2026-07-15**
+
+Design session (founder ↔ Claude) that turned §1's tiers into a concrete, lazily-progressing
+capability model and a two-surface content split. This section is normative for Wear; it is
+mirrored in [`apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md`](../apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md)
+§3.2 (the ecosystem capability contract) and enforced at the DB by **migration 160**.
+
+### 6.1 The four rungs (lazy role progression)
+
+| Tier | How reached | Adds |
+|---|---|---|
+| **Citizen** | default | browse, save to boards, purchase, follow, comment, **submit Concepts**, post **Stories** |
+| **Creator** | **auto-badge** at **>10 Concepts posted** (derived, no application) | the Concepts-page **stories bar** ("concept-statuses") |
+| **Brand** | **verified state layered on a Creator** — *not a separate signup* | create **Posts** (Home apparel feed); once verified, **propose / claim / produce** Concepts |
+| **Admin** | granted manually | moderation, verification approval, dispute resolution, sign-in-as (impersonation) |
+
+- **Roles are lazy/derived.** Creator badge and Brand *eligibility* are computed from activity;
+  only the Brand grant itself is stored (it required a human approval).
+- **Brand genesis is assigned, never self-created.** A Brand row is minted by an admin —
+  either directly (launch/partner brands, the bootstrap that lets the first Concepts be
+  claimed) or by approving a citizen's **Become-a-Brand application**.
+- **Brand eligibility gates** (what unlocks the *Become-a-Brand* button in settings):
+  **≈20 Concepts posted + 10 Concepts claimed** + a customer-support **email** and **contact
+  number** + **no sustained history of being reported**. The application form collects: Brand
+  Name\*, bio, socials, email\*, contact number\*, delivery options\* (+ more), and agreement to
+  the Ts&Cs, the Citizens Code of Conduct, and the note on monthly platform fees.
+- **Bootstrap grace:** the first 100 Wear Concepts (platform-wide) are all promoted to
+  concept-statuses regardless of their creator's badge, to seed the community surface at launch.
+- Progression can never be the *genesis* of Brand on its own (it is circular — claiming
+  requires an already-verified Brand); it gates the **invitation to apply**, and an admin
+  makes the grant. This preserves §1's trust-oriented (not popularity-oriented) gate.
+
+### 6.2 Two content surfaces
+
+- **Home feed** — **Brands' Posts + Stories** (apparel). Per-post **Share** (Instagram-style)
+  is a planned add. *[Stories currently act as brand-page redirects, not full-screen — fix planned.]*
+- **Concepts page** — the **community's own creations**: Concepts + a **concept-stories bar** +
+  **like / comment / share** on Concepts. This attention is what draws Brands to a design, so
+  it is where a Creator's value accrues. *(Concept comments/shares/stories are NEW schema —
+  DEFERRED; today Concepts have upvotes only.)*
+
+### 6.3 Content-permission rules (what mig 160 enforces now)
+
+- **Posts are Brand-tier:** a Post must be authored by a user who **owns the attributed brand**
+  and that brand must be **`verified`**. `brand_id` is mandatory — base-Citizen "self-posts"
+  are retired. Enforced in the UI (Create screen), the API (`POST /api/posts`), **and** RLS
+  (`wear.posts` insert `WITH CHECK`).
+- **Brand creation is admin-only:** the self-serve *Create Brand* tile is removed and
+  `wear.brands` INSERT is restricted to `wear.is_admin()` at RLS (service-role seeding bypasses
+  RLS). Brand owners keep UPDATE/DELETE of their own row; `verified` stays admin-managed
+  (mig 157 column guard).
+- **Base Citizens keep Concepts + Stories** (no capability removed mid-flight); the
+  bifurcation of Stories into Brand-Home-stories vs Creator-concept-stories lands with the
+  concept-stories build.
+
+### 6.4 Deferred (designed here, built later)
+
+Creator-badge derivation + concept-stories/comments/shares; the Become-a-Brand application form
++ eligibility derivation + admin approval → mint flow; per-post Share; full-screen Home stories;
+admin sign-in-as (impersonation — a security-sensitive surface, own design).

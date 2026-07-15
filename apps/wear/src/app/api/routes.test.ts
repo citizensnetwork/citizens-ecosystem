@@ -110,36 +110,92 @@ describe('brands', () => {
     expect(data.owner.handle).toBe('hannah');
   });
 
-  it('creates a brand for the signed-in owner', async () => {
-    asUser('usr_002');
+  it('admin mints a brand (self-serve creation is retired — mig 160)', async () => {
+    asUser('usr_003'); // ruth = seeded admin
     const res = await brandsPOST(
       req('/api/brands', jsonBody({ slug: 'kingdom-threads', name: 'Kingdom Threads' })),
+      route(),
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).ownerUserId).toBe('usr_003');
+  });
+
+  it('admin may mint a brand owned by an approved applicant', async () => {
+    asUser('usr_003');
+    const res = await brandsPOST(
+      req(
+        '/api/brands',
+        jsonBody({ slug: 'anchor-crown', name: 'Anchor & Crown', ownerId: 'usr_002' }),
+      ),
       route(),
     );
     expect(res.status).toBe(201);
     expect((await res.json()).ownerUserId).toBe('usr_002');
   });
 
-  it('422s a brand create with no name', async () => {
+  it('403s a non-admin brand create', async () => {
     asUser('usr_002');
+    const res = await brandsPOST(
+      req('/api/brands', jsonBody({ slug: 'kingdom-threads', name: 'Kingdom Threads' })),
+      route(),
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('admin_only');
+  });
+
+  it('422s an admin brand create with no name', async () => {
+    asUser('usr_003');
     const res = await brandsPOST(req('/api/brands', jsonBody({ slug: 'x' })), route());
     expect(res.status).toBe(422);
   });
 });
 
 describe('posts + feed', () => {
-  it('creates a post and hydrates its author', async () => {
-    asUser('usr_001');
-    const res = await postsPOST(req('/api/posts', jsonBody({ body: 'Wear the Kingdom' })), route());
+  it('creates a post as a verified brand and hydrates its author', async () => {
+    asUser('usr_001'); // owns the verified brand salt-and-light
+    const res = await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Wear the Kingdom', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     expect(res.status).toBe(201);
     expect((await res.json()).author.handle).toBe('hannah');
   });
 
   it('422s an empty post', async () => {
     asUser('usr_001');
-    const res = await postsPOST(req('/api/posts', jsonBody({ body: '   ' })), route());
+    const res = await postsPOST(
+      req('/api/posts', jsonBody({ body: '   ', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     expect(res.status).toBe(422);
     expect((await res.json()).error).toBe('empty_post');
+  });
+
+  it('403s a post with no brand (posts are brand-tier — mig 160)', async () => {
+    asUser('usr_001');
+    const res = await postsPOST(req('/api/posts', jsonBody({ body: 'As myself' })), route());
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('brand_required');
+  });
+
+  it('403s a post as an unverified brand', async () => {
+    asUser('usr_002'); // owns cornerstone-co (verified: false)
+    const res = await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Too soon', brandSlug: 'cornerstone-co' })),
+      route(),
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('brand_not_verified');
+  });
+
+  it('403s a post as a brand you do not own', async () => {
+    asUser('usr_002');
+    const res = await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Not mine', brandSlug: 'salt-and-light' })),
+      route(),
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('not_brand_owner');
   });
 
   it('returns the signed-in user home feed', async () => {
@@ -152,7 +208,10 @@ describe('posts + feed', () => {
 
   it('feed items carry engagement counts and viewer flags', async () => {
     asUser('usr_001');
-    await postsPOST(req('/api/posts', jsonBody({ body: 'Count me' })), route());
+    await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Count me', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     const res = await feedGET(req('/api/feed?mode=chronological'), route());
     const item = (await res.json()).items[0];
     expect(item).toMatchObject({
@@ -170,6 +229,7 @@ describe('posts + feed', () => {
         '/api/posts',
         jsonBody({
           body: 'With media',
+          brandSlug: 'salt-and-light',
           mediaUrls: ['https://images.example/tee.jpg', 'javascript:alert(1)'],
         }),
       ),
@@ -236,7 +296,10 @@ describe('PATCH /api/me', () => {
 describe('GET /api/me/saves (boards)', () => {
   it('returns the default collection with hydrated saved posts', async () => {
     asUser('usr_001');
-    const created = await postsPOST(req('/api/posts', jsonBody({ body: 'Saved grail' })), route());
+    const created = await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Saved grail', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     const post = await created.json();
     await savePOST(req(`/api/posts/${post.id}/save`, { method: 'POST' }), route({ id: post.id }));
 
@@ -252,7 +315,10 @@ describe('GET /api/me/saves (boards)', () => {
 describe('GET /api/hashtags/trending', () => {
   it('surfaces hashtags from recent posts', async () => {
     asUser('usr_001');
-    await postsPOST(req('/api/posts', jsonBody({ body: 'New drop #FaithOverFear' })), route());
+    await postsPOST(
+      req('/api/posts', jsonBody({ body: 'New drop #FaithOverFear', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     anonymous();
     const res = await trendingGET(req('/api/hashtags/trending?limit=5'), route());
     expect(res.status).toBe(200);
@@ -264,7 +330,10 @@ describe('GET /api/hashtags/trending', () => {
 describe('GET /api/users/:handle posts', () => {
   it('includes the author post grid', async () => {
     asUser('usr_001');
-    await postsPOST(req('/api/posts', jsonBody({ body: 'Grid post' })), route());
+    await postsPOST(
+      req('/api/posts', jsonBody({ body: 'Grid post', brandSlug: 'salt-and-light' })),
+      route(),
+    );
     const res = await userGET(req('/api/users/hannah'), route({ handle: 'hannah' }));
     const data = await res.json();
     expect(data.posts.items.map((p: { body: string }) => p.body)).toContain('Grid post');

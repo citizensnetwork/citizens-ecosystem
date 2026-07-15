@@ -322,6 +322,11 @@
     const { useState, useRef } = React;
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState(null);
+    // `uploaded` = the current value came from an upload this session, so we show
+    // a clean "uploaded ✓" state and DON'T surface the raw storage URL (§3U-1a).
+    // The manual URL input hides behind an "or paste a URL" toggle.
+    const [uploaded, setUploaded] = useState(false);
+    const [showPaste, setShowPaste] = useState(false);
     const inputRef = useRef(null);
 
     const onFile = async (e) => {
@@ -333,14 +338,29 @@
       try {
         const url = await window.CW_API.uploadImage(file, scope);
         onChange(url);
+        setUploaded(true);
+        setShowPaste(false);
       } catch (ex) {
         setErr((ex && ex.message) || 'Upload failed — paste an image URL instead.');
+        setShowPaste(true); // fall back to the manual path
       } finally {
         setBusy(false);
       }
     };
 
+    const clear = () => {
+      onChange('');
+      setUploaded(false);
+      setShowPaste(false);
+      setErr(null);
+    };
+
     const previewSize = round ? 72 : 96;
+    // Show the raw URL field only when it's actually needed: a pasted/preloaded
+    // value (so it stays editable) or an explicit paste toggle. Never for a
+    // fresh upload — that's the leak §3U-1a closes.
+    const showUrlField = !uploaded && (showPaste || !!value);
+
     return h(
       'div',
       null,
@@ -369,7 +389,7 @@
         : null,
       h(
         'div',
-        { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        { style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' } },
         h(
           'button',
           {
@@ -392,12 +412,29 @@
           Icon('plus', { size: 15, color: GOLD, sw: 2 }),
           busy ? 'Uploading…' : value ? 'Replace image' : 'Upload image',
         ),
+        value && uploaded
+          ? h(
+              'span',
+              {
+                style: {
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#3f6f34',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                },
+              },
+              Icon('check', { size: 14, color: '#3f6f34', sw: 3 }),
+              'Image uploaded',
+            )
+          : null,
         value
           ? h(
               'button',
               {
                 type: 'button',
-                onClick: () => onChange(''),
+                onClick: clear,
                 style: {
                   border: 'none',
                   background: 'transparent',
@@ -417,23 +454,46 @@
             err,
           )
         : null,
-      h('input', {
-        value: value || '',
-        onChange: (e) => onChange(e.target.value),
-        placeholder: placeholder || 'or paste an image URL (https://…)',
-        style: {
-          width: '100%',
-          border: '1px solid #efedea',
-          borderRadius: 12,
-          padding: '10px 12px',
-          fontSize: 12.5,
-          fontWeight: 500,
-          outline: 'none',
-          background: '#fff',
-          color: '#1a1a1a',
-          marginTop: 9,
-        },
-      }),
+      showUrlField
+        ? h('input', {
+            value: value || '',
+            onChange: (e) => {
+              onChange(e.target.value);
+              setUploaded(false);
+            },
+            placeholder: placeholder || 'or paste an image URL (https://…)',
+            style: {
+              width: '100%',
+              border: '1px solid #efedea',
+              borderRadius: 12,
+              padding: '10px 12px',
+              fontSize: 12.5,
+              fontWeight: 500,
+              outline: 'none',
+              background: '#fff',
+              color: '#1a1a1a',
+              marginTop: 9,
+            },
+          })
+        : !uploaded && !value
+          ? h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => setShowPaste(true),
+                style: {
+                  border: 'none',
+                  background: 'transparent',
+                  color: MUTED,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  marginTop: 9,
+                  padding: 0,
+                },
+              },
+              'or paste a URL',
+            )
+          : null,
     );
   }
 

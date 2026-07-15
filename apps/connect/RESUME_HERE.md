@@ -1155,6 +1155,69 @@ continuation prompt. Shared across all 3 apps → fully revertible.
 
 ---
 
+## 3V. Wear identity & content-permission model — DESIGNED + ENFORCEMENT CORE SHIPPED ✅ (2026-07-15)
+
+Design-first session (grill → agree model → build) resolving §3U items 2 + 3. Ran on
+`step5-monorepo-lift`. **mig 160 APPLIED + verified in prod.** Offload log:
+`.claude/sessions/wear-identity-content-permission.md`.
+
+### The ratified model (founder, 2026-07-15) — normative
+Recorded in [`docs/Citizens_Wear_Roles_and_Concepts_MD.md` §6](../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
++ [`ECOSYSTEM_PROFILE_LEVELS §3.2/P1.1`](./docs/ECOSYSTEM_PROFILE_LEVELS.md).
+
+**Four-rung lazy ladder** (each rung *adds to* the Citizen base; roles derived from activity
+until Brand, which is a stored admin grant):
+- **Citizen** — submit Concepts, post Stories, comment, save-to-boards, follow, purchase.
+- **Creator** — auto-badge at **>10 Concepts posted**; unlocks the Concepts-page **stories bar**
+  ("concept-statuses"). *(Derivation + concept-stories = DEFERRED.)*
+- **Brand** — a **verified** `wear.brands` row the user owns; may create **Posts** + (verified)
+  propose/claim/produce. **Assigned, never self-created:** eligibility-gated (≈20 Concepts posted +
+  10 claimed + support email/contact + clean report history) → **Become-a-Brand application** in
+  Settings → admin approval mints the row. Launch/partner brands admin-minted directly (bootstrap).
+- **Admin** — moderation, verification approval, dispute resolution, sign-in-as (impersonation).
+
+**Two content surfaces:** Home = Brands' Posts + Stories (apparel). Concepts page = community
+Concepts + concept-stories bar + like/comment/share (the attention that attracts Brands). Both
+largely exist already in nav (Home tab + Concepts tab).
+
+### Shipped this session (all gates green: tsc · vitest 89/89 · eslint 0-err · build)
+- **Docs-first:** ECOSYSTEM_PROFILE_LEVELS §3.2 + P1.1 rewritten to the 4-tier / admin-assigned
+  model; roles MD §6 added; SHARED_DB_CONTRACT §9 stamped head→**160**.
+- **mig 160** (`160_wear_content_permission_model.sql`) **APPLIED** (tag `wear-pre-mig160` @93a741d;
+  advisor **0 ERROR / 0 new** vs head-159; 7 rolled-back prod smokes PASS). Enforces at RLS:
+  (a) `wear.posts` insert → author owns an attributed **verified** brand + `brand_id` mandatory
+  (base-Citizen self-posts retired); (b) `wear.brands` insert → `wear.is_admin()` only (self-serve
+  retired); owner UPDATE/DELETE preserved; mig-157 verified-column guard intact. wear policies 73→75.
+- **API:** `POST /api/posts` requires an owned+verified brand (403 chain: `brand_required` /
+  `not_brand_owner` / `brand_not_verified`) then validates body; `POST /api/brands` is admin-only
+  (`admin_only` 403; optional `ownerId` for admin-mint-for-applicant). RLS is the backstop.
+- **UI** (`apps/wear/src/frontend/app/create.jsx`): self-serve **Brand tile removed**; **Post tile
+  only** for verified-brand owners; base Citizen sees **Story + Concept** (Concept routes to the
+  Concepts-page create); "Post as" lists verified brands only (Myself retired); pending-verification
+  hint for owners of an unverified brand.
+- **Quick win §3U-1a** (`ui.jsx` `ImagePicker`): after upload shows "Image uploaded ✓ / Replace /
+  Remove" and **hides the raw storage URL**; the manual URL input is behind an **"or paste a URL"**
+  toggle (auto-revealed for a pasted/preloaded value or on upload error).
+- **Tests** (`routes.test.ts`): brands create is admin-only (+ non-admin 403, admin-mint-for-owner);
+  every post creates as the verified `salt-and-light`; +3 negative-path gate tests.
+- **§3U email template (code-as-hero) = APPLIED by founder ✅** (dropped from founder-actions).
+
+### Deferred (DESIGNED here, build is the next Wear increment) — "the progression epic"
+1. **Creator badge derivation** — lazy compute (>10 Concepts) + badge surfacing; the first-100-Wear-
+   Concepts bootstrap grace.
+2. **Concept-stories bar + Concept like/comment/share** — NEW schema (concept_comments, concept
+   stories/statuses, shares); today Concepts have upvotes only. This is the community surface's heart.
+3. **Become-a-Brand application** — eligibility derivation (≈20 posted + 10 claimed + support
+   email/contact + no sustained reports) → settings button → application form (Brand Name*, bio,
+   socials, email*, contact*, delivery options*, Ts&Cs/Code-of-Conduct/monthly-fee agreements) →
+   admin queue → approve = mint verified `wear.brands` row (the `POST /api/brands` `ownerId` path +
+   RLS `brands_admin_insert` already support the mint; needs an applications table + admin UI).
+4. **Per-post Share** on Home (Instagram-style). 5. **Full-screen Home stories** (currently act as
+   brand-page redirects, not full-screen). 6. **Admin sign-in-as (impersonation)** — security-sensitive,
+   own design. 7. **Stories bifurcation** (Brand-Home-stories vs Creator-concept-stories) lands with #2.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S) AND the media-upload
@@ -1163,10 +1226,13 @@ continuation prompt. Shared across all 3 apps → fully revertible.
 > 2026-07-15). All three apps share one auth + one Postgres + the static-HTML model.
 > **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 160.**
 >
-> **▶ RECOMMENDED next session (founder's clearest signal): the Wear identity & content-permission
-> DESIGN session** — §3U items 2 + 3 (remove self-serve Create-Brand; brand-only posts / citizen
-> concepts+stories). Grill/decide the Brand-identity model first, then implement. Quick wins to fold in:
-> §3U email template (code-as-hero) + §3U-1a (hide the raw upload URL in ImagePicker).
+> **▶ RECOMMENDED next session: the Wear "progression epic"** (§3V deferred list). The identity &
+> content-permission MODEL is now ratified + enforced (§3V, mig 160 live: Posts are verified-brand-only,
+> self-serve brand creation retired, ImagePicker URL hidden, email template applied). The natural next
+> build is the community surface + the earned ladder: **(1)** Concept like/comment/share + a
+> concept-stories bar (NEW schema — the biggest piece); **(2)** Creator-badge derivation (>10 Concepts);
+> **(3)** the Become-a-Brand application form + eligibility gates + admin approval→mint. Smaller wins:
+> per-post Share, full-screen Home stories. Design detail for all of these is in §3V.
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**
@@ -1188,13 +1254,13 @@ continuation prompt. Shared across all 3 apps → fully revertible.
       (§3S) if magic-code is wanted there. (Still not reached — good next task.)
    d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
       tooling, ~~proposal notifications~~ ✅ **DONE §3T**, concept search/categories, creator portfolio.
-   f. **▶ Wear identity & content-permission rework (§3U-2 + §3U-3 — founder's clearest next signal).**
-      DESIGN/GRILL SESSION FIRST, then build: (i) remove the self-serve **Create Brand** tile from
-      `create.jsx` — a Brand is an upstream identity (assigned / progressed into); (ii) **only Brand
-      users create POSTS**; base Citizens create **concepts + stories**. Reshapes the mig-145 roles +
-      `ECOSYSTEM_PROFILE_LEVELS` + "Creator"-tier model. Decide: what IS a Brand, how one becomes one
-      (assign vs progress), the base-vs-brand capability matrix, feed composition, and how it squares
-      with the marketplace's "any citizen may create a Concept" rule. **Do this next.**
+   f. ~~**Wear identity & content-permission rework (§3U-2 + §3U-3).**~~ ✅ **DONE §3V (2026-07-15)** —
+      model ratified (4-tier lazy ladder: Citizen → Creator → Brand → Admin; two content surfaces) and
+      the **enforcement core** shipped + verified: self-serve Create-Brand tile removed; **Posts gated
+      to owned + verified Brand** (UI + API + RLS **mig 160**, applied); base Citizens keep Concepts +
+      Stories; ImagePicker raw-URL hidden. The **progression epic** (Creator badge, concept-stories/
+      comments/shares, Become-a-Brand application, per-post Share, full-screen stories, impersonation)
+      is DESIGNED + deferred — see §3V "Deferred" list; it's the recommended next session.
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
@@ -1213,10 +1279,9 @@ continuation prompt. Shared across all 3 apps → fully revertible.
    - ~~**Wear deploy gates**~~ ✅ **DONE §3T/§3U** — Wear live; env set; Supabase Redirect URLs now
      include the Vercel deploy-hash wildcard `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`
      (fixed the magic-link→Connect redirect + reset/confirmation links).
-   - **§3U email template — code-as-hero (⏳ ready to paste):** Supabase Dashboard → Authentication →
-     Email Templates → **Magic Link** → replace body with the code-first HTML (in the §3U close-out
-     message / continuation prompt). Makes `{{ .Token }}` the hero, link a same-device fallback. Shared
-     across all 3 apps; revertible.
+   - ~~**§3U email template — code-as-hero**~~ ✅ **DONE (founder applied, confirmed §3V 2026-07-15).**
+     Supabase Dashboard → Authentication → Email Templates → Magic Link now leads with `{{ .Token }}`
+     (the 6-digit code as hero; link a same-device fallback). Shared across all 3 apps; revertible.
    - **§3U address hygiene (roadmap):** put Wear/Connect/Vision behind **stable custom domains** (e.g.
      `wear.citizenscentral.co.za`) + a **branded storage asset origin** so URLs stop leaking
      `*.vercel.app` deploy-hashes and `xyiajtrvhlxaeplsiajj.supabase.co`.

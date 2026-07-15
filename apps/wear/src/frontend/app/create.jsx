@@ -1,17 +1,16 @@
-// ── Create: post / story / brand ───────────────────────────────────
-// The design's create grid, reduced to the three creation types the
-// backend actually supports: POST /api/posts, /api/stories, /api/brands.
+// ── Create: post / story / concept ─────────────────────────────────
+// Ratified content-permission model (2026-07-15, mig 160):
+//   • POSTS are Brand-tier — only a user who owns a *verified* brand may post,
+//     and every post is published AS that brand (Home = brand apparel feed).
+//   • Base Citizens create STORIES + CONCEPTS (the community surface). The
+//     Concept tile routes to the Concepts-page create flow.
+//   • The self-serve "New Brand" tile is gone — a Brand is an assigned identity
+//     (Become-a-Brand application → admin approval).
 (function () {
   const { createElement: h, useState } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, ScreenHeader, ImagePicker } = window.CWUI;
-
-  const TYPES = [
-    { k: 'post', label: 'Apparel Post', icon: 'tee' },
-    { k: 'story', label: 'Story', icon: 'clock' },
-    { k: 'brand', label: 'New Brand', icon: 'plus' },
-  ];
+  const { GOLD, GoldButton, ImagePicker } = window.CWUI;
 
   const field = {
     width: '100%',
@@ -27,7 +26,7 @@
   const label = { fontSize: 12, fontWeight: 700, color: '#4a4a4a', margin: '14px 0 6px' };
 
   function CreateScreen() {
-    const { me, setTab, refreshMe } = useStore();
+    const { me, push } = useStore();
     const [mode, setMode] = useState('post');
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState(null); // {ok, text}
@@ -40,32 +39,40 @@
     const [caption, setCaption] = useState('');
     const [storyMediaUrl, setStoryMediaUrl] = useState('');
     const [audience, setAudience] = useState('public');
-    // brand fields
-    const [brandName, setBrandName] = useState('');
-    const [brandSlug, setBrandSlug] = useState('');
-    const [brandTagline, setBrandTagline] = useState('');
-    const [brandWebsite, setBrandWebsite] = useState('');
-    const [brandLogo, setBrandLogo] = useState('');
 
     const myBrands = (me && me.brands) || [];
+    const verifiedBrands = myBrands.filter((b) => b.verified);
+    const canPost = verifiedBrands.length > 0;
+    // Owns brand(s) but none verified yet → transparent pending state.
+    const pendingBrandOnly = !canPost && myBrands.length > 0;
+    // The active brand identity a post publishes as (always a verified brand).
+    const activeBrand = asBrand || (verifiedBrands[0] && verifiedBrands[0].slug) || '';
+    // 'post' collapses to 'story' for anyone who can't post (e.g. before `me`
+    // loads, or a base Citizen) so the screen always renders a valid form.
+    const effectiveMode = canPost ? mode : mode === 'post' ? 'story' : mode;
+
+    const TYPES = [];
+    if (canPost) TYPES.push({ k: 'post', label: 'Apparel Post', icon: 'tee' });
+    TYPES.push({ k: 'story', label: 'Story', icon: 'clock' });
+    TYPES.push({ k: 'concept', label: 'Concept', icon: 'star', nav: true });
 
     const submit = async () => {
       setBusy(true);
       setNote(null);
       try {
-        if (mode === 'post') {
+        if (effectiveMode === 'post') {
           await window.CW_API.post('/api/posts', {
             body,
             ...(mediaUrl.trim() ? { mediaUrls: [mediaUrl.trim()] } : {}),
-            ...(asBrand ? { brandSlug: asBrand } : {}),
+            brandSlug: activeBrand,
           });
           setBody('');
           setMediaUrl('');
           setNote({
             ok: true,
-            text: 'Posted. It is live on your profile and your followers’ feeds.',
+            text: 'Posted. It is live on your brand and your followers’ feeds.',
           });
-        } else if (mode === 'story') {
+        } else {
           await window.CW_API.post('/api/stories', {
             mediaKind: storyMediaUrl.trim() ? 'image' : 'text',
             ...(storyMediaUrl.trim() ? { mediaUrl: storyMediaUrl.trim() } : {}),
@@ -75,21 +82,6 @@
           setCaption('');
           setStoryMediaUrl('');
           setNote({ ok: true, text: 'Story shared — it lives for 24 hours.' });
-        } else {
-          await window.CW_API.post('/api/brands', {
-            name: brandName,
-            slug: brandSlug.trim().toLowerCase(),
-            ...(brandTagline.trim() ? { tagline: brandTagline.trim() } : {}),
-            ...(brandWebsite.trim() ? { websiteUrl: brandWebsite.trim() } : {}),
-            ...(brandLogo.trim() ? { logoUrl: brandLogo.trim() } : {}),
-          });
-          await refreshMe();
-          setBrandName('');
-          setBrandSlug('');
-          setBrandTagline('');
-          setBrandWebsite('');
-          setBrandLogo('');
-          setNote({ ok: true, text: 'Brand created. Post as it from the composer.' });
         }
       } catch (e) {
         setNote({ ok: false, text: e.message || 'Could not create.' });
@@ -99,11 +91,18 @@
     };
 
     const canSubmit =
-      mode === 'post'
-        ? body.trim().length > 0
-        : mode === 'story'
-          ? caption.trim().length > 0 || storyMediaUrl.trim().length > 0
-          : brandName.trim().length > 0 && brandSlug.trim().length > 0;
+      effectiveMode === 'post'
+        ? body.trim().length > 0 && !!activeBrand
+        : caption.trim().length > 0 || storyMediaUrl.trim().length > 0;
+
+    const onTile = (t) => {
+      if (t.nav) {
+        push('createConcept', {});
+        return;
+      }
+      setMode(t.k);
+      setNote(null);
+    };
 
     return h(
       'div',
@@ -118,7 +117,9 @@
         h(
           'div',
           { style: { fontSize: 13.5, color: '#a09e97', fontWeight: 500, marginTop: 6 } },
-          'What would you like to create?',
+          canPost
+            ? 'What would you like to create?'
+            : 'Share a design Concept or a 24-hour Story.',
         ),
       ),
       // type grid (design's create tiles)
@@ -127,7 +128,7 @@
         {
           style: {
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateColumns: 'repeat(' + TYPES.length + ', 1fr)',
             gap: 14,
             padding: '20px 20px 0',
           },
@@ -137,19 +138,16 @@
             'button',
             {
               key: t.k,
-              onClick: () => {
-                setMode(t.k);
-                setNote(null);
-              },
+              onClick: () => onTile(t),
               style: {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 10,
-                border: mode === t.k ? '1.5px solid ' + GOLD : '1px solid #efedea',
+                border: effectiveMode === t.k && !t.nav ? '1.5px solid ' + GOLD : '1px solid #efedea',
                 borderRadius: 18,
                 padding: '20px 8px',
-                background: mode === t.k ? '#fdf8ec' : '#fff',
+                background: effectiveMode === t.k && !t.nav ? '#fdf8ec' : '#fff',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               },
             },
@@ -167,7 +165,11 @@
                   border: '1px solid #f0eee7',
                 },
               },
-              Icon(t.icon, { size: 26, color: mode === t.k ? GOLD : '#2a2a2a', sw: 1.8 }),
+              Icon(t.icon, {
+                size: 26,
+                color: effectiveMode === t.k && !t.nav ? GOLD : '#2a2a2a',
+                sw: 1.8,
+              }),
             ),
             h(
               'span',
@@ -189,7 +191,27 @@
       h(
         'div',
         { style: { padding: '22px 20px 0' } },
-        mode === 'post'
+        // Pending-verification hint for owners whose brand isn't approved yet.
+        pendingBrandOnly
+          ? h(
+              'div',
+              {
+                style: {
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  marginBottom: 4,
+                  background: '#fdf8ec',
+                  color: '#7a6212',
+                  border: '1px solid #f0e2b0',
+                },
+              },
+              'Your brand is pending verification — you’ll be able to post apparel once it’s approved. Meanwhile, share Concepts and Stories.',
+            )
+          : null,
+        effectiveMode === 'post'
           ? h(
               'div',
               null,
@@ -208,7 +230,9 @@
                 value: mediaUrl,
                 onChange: setMediaUrl,
               }),
-              myBrands.length
+              // Publish AS: a verified brand you own. One brand → a label;
+              // several → chips. (Base "Myself" posting is retired — mig 160.)
+              verifiedBrands.length > 1
                 ? h(
                     'div',
                     null,
@@ -216,16 +240,17 @@
                     h(
                       'div',
                       { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-                      [{ slug: '', name: 'Myself' }].concat(myBrands).map((b) =>
+                      verifiedBrands.map((b) =>
                         h(
                           'button',
                           {
-                            key: b.slug || 'self',
+                            key: b.slug,
                             onClick: () => setAsBrand(b.slug),
                             style: {
-                              border: '1px solid ' + (asBrand === b.slug ? '#1a1a1a' : '#e6e3dc'),
-                              background: asBrand === b.slug ? '#1a1a1a' : '#fff',
-                              color: asBrand === b.slug ? '#fff' : '#4a4a4a',
+                              border:
+                                '1px solid ' + (activeBrand === b.slug ? '#1a1a1a' : '#e6e3dc'),
+                              background: activeBrand === b.slug ? '#1a1a1a' : '#fff',
+                              color: activeBrand === b.slug ? '#fff' : '#4a4a4a',
                               borderRadius: 999,
                               padding: '8px 16px',
                               fontSize: 12.5,
@@ -237,93 +262,59 @@
                       ),
                     ),
                   )
-                : null,
+                : verifiedBrands.length === 1
+                  ? h(
+                      'div',
+                      { style: { ...label, color: '#a09e97', fontWeight: 600 } },
+                      'Posting as ' + verifiedBrands[0].name,
+                    )
+                  : null,
             )
-          : mode === 'story'
-            ? h(
+          : h(
+              'div',
+              null,
+              h('div', { style: label }, 'Caption'),
+              h('textarea', {
+                value: caption,
+                onChange: (e) => setCaption(e.target.value),
+                rows: 3,
+                maxLength: 280,
+                placeholder: 'A 24-hour word of encouragement…',
+                style: { ...field, resize: 'vertical', lineHeight: 1.5 },
+              }),
+              h('div', { style: label }, 'Image (optional — text story without it)'),
+              h(ImagePicker, {
+                scope: 'story',
+                value: storyMediaUrl,
+                onChange: setStoryMediaUrl,
+              }),
+              h('div', { style: label }, 'Audience'),
+              h(
                 'div',
-                null,
-                h('div', { style: label }, 'Caption'),
-                h('textarea', {
-                  value: caption,
-                  onChange: (e) => setCaption(e.target.value),
-                  rows: 3,
-                  maxLength: 280,
-                  placeholder: 'A 24-hour word of encouragement…',
-                  style: { ...field, resize: 'vertical', lineHeight: 1.5 },
-                }),
-                h('div', { style: label }, 'Image (optional — text story without it)'),
-                h(ImagePicker, {
-                  scope: 'story',
-                  value: storyMediaUrl,
-                  onChange: setStoryMediaUrl,
-                }),
-                h('div', { style: label }, 'Audience'),
-                h(
-                  'div',
-                  { style: { display: 'flex', gap: 8 } },
-                  ['public', 'followers'].map((a) =>
-                    h(
-                      'button',
-                      {
-                        key: a,
-                        onClick: () => setAudience(a),
-                        style: {
-                          flex: 1,
-                          border: '1px solid ' + (audience === a ? '#1a1a1a' : '#e6e3dc'),
-                          background: audience === a ? '#1a1a1a' : '#fff',
-                          color: audience === a ? '#fff' : '#4a4a4a',
-                          borderRadius: 12,
-                          padding: '11px',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          textTransform: 'capitalize',
-                        },
+                { style: { display: 'flex', gap: 8 } },
+                ['public', 'followers'].map((a) =>
+                  h(
+                    'button',
+                    {
+                      key: a,
+                      onClick: () => setAudience(a),
+                      style: {
+                        flex: 1,
+                        border: '1px solid ' + (audience === a ? '#1a1a1a' : '#e6e3dc'),
+                        background: audience === a ? '#1a1a1a' : '#fff',
+                        color: audience === a ? '#fff' : '#4a4a4a',
+                        borderRadius: 12,
+                        padding: '11px',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
                       },
-                      a,
-                    ),
+                    },
+                    a,
                   ),
                 ),
-              )
-            : h(
-                'div',
-                null,
-                h('div', { style: label }, 'Brand name'),
-                h('input', {
-                  value: brandName,
-                  onChange: (e) => setBrandName(e.target.value),
-                  placeholder: 'Kingdom Co.',
-                  style: field,
-                }),
-                h('div', { style: label }, 'Slug (your brand’s @handle)'),
-                h('input', {
-                  value: brandSlug,
-                  onChange: (e) => setBrandSlug(e.target.value),
-                  placeholder: 'kingdom-co',
-                  style: field,
-                }),
-                h('div', { style: label }, 'Tagline (optional)'),
-                h('input', {
-                  value: brandTagline,
-                  onChange: (e) => setBrandTagline(e.target.value),
-                  placeholder: 'Wear the Kingdom.',
-                  style: field,
-                }),
-                h('div', { style: label }, 'Website (optional)'),
-                h('input', {
-                  value: brandWebsite,
-                  onChange: (e) => setBrandWebsite(e.target.value),
-                  placeholder: 'https://…',
-                  style: field,
-                }),
-                h('div', { style: label }, 'Logo (optional)'),
-                h(ImagePicker, {
-                  scope: 'brand-logo',
-                  value: brandLogo,
-                  onChange: setBrandLogo,
-                  round: true,
-                }),
               ),
+            ),
         note
           ? h(
               'div',
@@ -347,13 +338,7 @@
           'div',
           { style: { marginTop: 20 } },
           h(GoldButton, {
-            label: busy
-              ? 'Working…'
-              : mode === 'post'
-                ? 'Create New Post'
-                : mode === 'story'
-                  ? 'Share Story'
-                  : 'Create Brand',
+            label: busy ? 'Working…' : effectiveMode === 'post' ? 'Create New Post' : 'Share Story',
             onClick: submit,
             disabled: busy || !canSubmit,
             icon: Icon('plus', { size: 17, color: '#fff' }),
