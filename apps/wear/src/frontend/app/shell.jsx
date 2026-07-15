@@ -53,6 +53,14 @@
         return h(S.Post, { params });
       case 'settings':
         return h(S.Settings, {});
+      case 'concepts':
+        return h(S.Concepts, {});
+      case 'concept':
+        return h(S.ConceptDetail, { params });
+      case 'createConcept':
+        return h(S.CreateConcept, {});
+      case 'admin':
+        return h(S.AdminQueue, {});
       default:
         return h(S.Home, {});
     }
@@ -109,7 +117,7 @@
   }
 
   function Sidebar() {
-    const { nav, setTab, openSettings } = useStore();
+    const { nav, setTab, openSettings, openConcepts, openAdmin, me } = useStore();
     const overlayTop = nav.stack.length ? nav.stack[nav.stack.length - 1].screen : null;
     const item = (t, onClick, activeOverride) => {
       const active =
@@ -176,6 +184,14 @@
       ),
       TABS.map((t) => item(t, () => setTab(t.k))),
       h('div', { style: { height: 1, background: '#f0eee9', margin: '11px 10px' } }),
+      item(
+        { k: 'concepts', label: 'Concepts', icon: 'tee' },
+        openConcepts,
+        overlayTop === 'concepts' || overlayTop === 'concept' || overlayTop === 'createConcept',
+      ),
+      me && me.role
+        ? item({ k: 'admin', label: 'Admin', icon: 'doc' }, openAdmin, overlayTop === 'admin')
+        : null,
       item(
         { k: 'settings', label: 'Settings', icon: 'sliders' },
         openSettings,

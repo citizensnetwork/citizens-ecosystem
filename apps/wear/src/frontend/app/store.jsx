@@ -149,6 +149,9 @@
       openBrand: (slug) => push('brand', { slug }),
       openUser: (handle) => push('user', { handle }),
       openSettings: () => push('settings', {}),
+      openConcepts: () => push('concepts', {}),
+      openConcept: (id) => push('concept', { id }),
+      openAdmin: () => push('admin', {}),
     };
 
     return React.createElement(StoreContext.Provider, { value }, children);
