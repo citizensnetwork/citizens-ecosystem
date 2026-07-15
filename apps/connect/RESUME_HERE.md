@@ -1093,36 +1093,108 @@ notifications.
 - **§3R account-deletion cascade wrinkle** still open (deliberately NOT bundled to keep these migs focused).
 - Nav-level unread badge (needs app-level unread polling) — out of scope for the stub.
 - **Founder:** redeploy Wear on Vercel so the built bundle ships the ImagePicker + notifications tab
-  (mig-158/159 are already live; no deploy needed for the DB side).
+  (mig-158/159 are already live; no deploy needed for the DB side). ✅ **DONE — §3T live in prod
+  (image upload + OTP code both confirmed working).**
+
+---
+
+## 3U. Session wrap 2026-07-15(b) — magic-link redirect fixed, code-first auth, NEW product-direction items
+
+Closing conversation after §3T shipped + went live. **No code/DB change this session → next migration #
+still 160.** §3T verified live by founder. The items below are **captured for a future session** (founder:
+"continue with all of this, but not in this session").
+
+### Auth — magic-link redirect RESOLVED (founder) + durable follow-up
+- **Symptom:** the emailed magic LINK (`…/auth/v1/verify?…&redirect_to=https://www.citizenscentral.co.za`)
+  landed on **Connect**, not Wear. The 6-digit CODE worked (it needs no redirect).
+- **Root cause:** one shared Supabase project = one **Site URL** (`www.citizenscentral.co.za` = Connect).
+  Wear's `sendEmailCode` DOES pass `emailRedirectTo` (`apps/wear/src/frontend/auth-client.js:137` →
+  `window.location.origin`), but GoTrue only honors a redirect that matches the **Redirect URLs**
+  allow-list; a miss silently falls back to Site URL. **Wear's live deploy served from a Vercel
+  DEPLOYMENT-HASH url** (`citizens-ecosystem-wear-rigs91i7i-citizensecosystem-projects.vercel.app/index.html`),
+  NOT the stable alias `citizens-ecosystem-wear.vercel.app` that was already listed → fallback to Connect.
+- **Founder fix (done):** added `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`
+  to Redirect URLs (covers all deploy-hash urls). **Same gap also affected Wear password-reset +
+  signup-confirmation links — now fixed too.**
+- **⏳ Durable follow-up (roadmap → address-hygiene):** Vercel deploy-hash urls are ugly + leak project
+  internals. Move all three apps to **stable custom domains** (e.g. `wear.citizenscentral.co.za`) and use
+  those as the canonical redirect origin.
+- **PKCE design note:** the magic link only completes in the SAME browser that requested it (code_verifier
+  in localStorage); the CODE has no such limit. **DECISION: the 6-digit code is the primary/robust auth
+  path; the link is a same-device convenience.**
+
+### Auth email template — code-as-hero (APPROVED "let's try it, can revert"; ⏳ PENDING dashboard apply)
+Restructure the SHARED Magic-Link email template so `{{ .Token }}` (the 6-digit code) is the visual hero
+and the link is a de-emphasised same-device fallback. **NOT applied this session** — email templates are
+Dashboard/Mgmt-API only (no MCP/SQL tool). Ready-to-paste HTML lives in the founder-actions list + the
+continuation prompt. Shared across all 3 apps → fully revertible.
+
+### NEW product-direction decisions (design/build in a FUTURE session)
+1. **Address / URL hygiene** — internal addresses leak everywhere: the uploaded image's raw
+   `xyiajtrvhlxaeplsiajj.supabase.co/storage/…` URL shows in the ImagePicker text input; browser URL bar +
+   hover-preview expose Vercel/Supabase internals. Two layers:
+   - **(a) Quick UI win** — after a successful UPLOAD, `CWUI.ImagePicker` (`apps/wear/src/frontend/app/ui.jsx`)
+     should show an "Image uploaded ✓ / Replace / Remove" state and NOT render the raw public URL in a
+     visible field; put the manual URL text input behind an "or paste a URL" toggle (only the paste path
+     needs a visible input). Contained change, no backend.
+   - **(b) Infra** — custom domains for all apps + a **branded storage asset origin** (Supabase custom
+     storage domain / CDN proxy) so asset URLs aren't `*.supabase.co`. Ties to the magic-link custom-domain
+     follow-up above.
+2. **Remove "Create Brand" from the Create screen** — a Brand is an **upstream identity** (assigned, or
+   progressed into), never self-created by a base user. Drop the `brand` tile + its form from
+   `apps/wear/src/frontend/app/create.jsx` (the `POST /api/brands` path may stay for the sanctioned
+   assignment/progression flow, TBD in the design session below).
+3. **Content-creation permission model rework (BIGGEST)** — feeds are primarily brand apparel, so
+   **only Brand users create POSTS**; a base Citizen creates **concepts + stories** (not posts). This
+   reshapes who-can-create-what and touches the identity/roles model (mig-145 `user_roles` +
+   `ECOSYSTEM_PROFILE_LEVELS` + the derived "Creator" tier). Founder flagged it as **"maybe an entire
+   questioning session"** → **run a design/grill session FIRST** (What is a Brand? How does one become one
+   — assigned vs progressed? base-vs-brand capabilities matrix; feed composition; how this meets the
+   marketplace's "any citizen may create a Concept" rule), THEN implement. Items 2 + 3 are the same
+   identity-model thread — do them together.
 
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S) AND the media-upload
-> pipeline + notifications backend (§3T) are COMPLETE.**
-> `step5-monorepo-lift` was merged to `main` again at end of the §3R session (2026-07-15,
-> founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
+> pipeline + notifications backend (§3T, live) are COMPLETE.**
+> `step5-monorepo-lift` was merged to `main` at end of the §3R AND §3T sessions (PR #28,
+> 2026-07-15). All three apps share one auth + one Postgres + the static-HTML model.
 > **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 160.**
+>
+> **▶ RECOMMENDED next session (founder's clearest signal): the Wear identity & content-permission
+> DESIGN session** — §3U items 2 + 3 (remove self-serve Create-Brand; brand-only posts / citizen
+> concepts+stories). Grill/decide the Brand-identity model first, then implement. Quick wins to fold in:
+> §3U email template (code-as-hero) + §3U-1a (hide the raw upload URL in ImagePicker).
 
-1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S):**
-   a. **Deploy the marketplace + new auth UI**: founder redeploys Wear on Vercel (bundle now ships
-      magic-code login + change-password; env unchanged). The **feed is already seeded in prod** (§3S)
-      — no deploy needed for it to appear. Founder (wear admin) can verify the 2 pending brands
-      (Lily & Field, Anchor & Crown) from the in-app Admin queue. Do the §3S live email test.
+1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
+   media + notifications DONE §3T):**
+   a. ~~**Deploy the marketplace + new auth UI**~~ ✅ **DONE §3T** — Wear is live on Vercel; image upload
+      + OTP-code sign-in both confirmed working. Magic-link redirect gap fixed (§3U). Founder (wear admin)
+      can still verify the 2 pending brands (Lily & Field, Anchor & Crown) from the in-app Admin queue.
    b. Launch-hardening fast-follows: ~~**media upload pipeline**~~ ✅ **DONE §3T** (mig 158,
       user-authed signed upload, wired post/story/brand-logo/concept); ~~**notifications backend**~~
       ✅ **DONE §3T** (mig 159, marketplace-event triggers + inbox tab). Still open, in rough order
-      of value: **mig 160**: fix the §3R account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF
-      cleanup fn) + any marketplace schema follow-ups; **brand-logo edit UI** (create-time works;
-      no edit surface in brand.jsx); proposal-mockup upload + story video (pipeline is images-only
-      today); full desktop layouts; Capacitor shell scaffold (JS side is ready).
+      of value: **§3U-1a quick win** — hide the raw uploaded-image URL in `ImagePicker` (show
+      "uploaded ✓ / Replace"; manual URL behind an "or paste a URL" toggle); **mig 160**: fix the §3R
+      account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace schema
+      follow-ups; **brand-logo edit UI** (create-time works; no edit surface in brand.jsx);
+      proposal-mockup upload + story video (pipeline is images-only today); full desktop layouts;
+      Capacitor shell scaffold (JS side is ready).
    c. Port the Wear auth screens to Connect + Vision frontends — now **email+password (§3P) AND
       email magic-code + change-password (§3S)**; shared CC_AUTH/CV_AUTH lineage, provider already
       enabled project-wide. Each app's magic-link email template also needs the `{{ .Token }}` edit
       (§3S) if magic-code is wanted there. (Still not reached — good next task.)
    d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
-      tooling, proposal notifications, concept search/categories, creator portfolio surface.
+      tooling, ~~proposal notifications~~ ✅ **DONE §3T**, concept search/categories, creator portfolio.
+   f. **▶ Wear identity & content-permission rework (§3U-2 + §3U-3 — founder's clearest next signal).**
+      DESIGN/GRILL SESSION FIRST, then build: (i) remove the self-serve **Create Brand** tile from
+      `create.jsx` — a Brand is an upstream identity (assigned / progressed into); (ii) **only Brand
+      users create POSTS**; base Citizens create **concepts + stories**. Reshapes the mig-145 roles +
+      `ECOSYSTEM_PROFILE_LEVELS` + "Creator"-tier model. Decide: what IS a Brand, how one becomes one
+      (assign vs progress), the base-vs-brand capability matrix, feed composition, and how it squares
+      with the marketplace's "any citizen may create a Concept" rule. **Do this next.**
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
@@ -1133,15 +1205,21 @@ notifications.
    the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
    this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
    (currently BEHIND it), then continue Vision fast-follows (Timeline Map; remaining wiring).
-3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R);
-   commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
+3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R, then §3T
+   via **PR #28**); commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
    to read-only. Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their copies
    are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
 4. **Founder-only, non-code (any time):**
-   - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
-     + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
-     (`https://citizens-connect.vercel.app`), optional CONNECT_API_KEY; Supabase Auth Redirect
-     URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
+   - ~~**Wear deploy gates**~~ ✅ **DONE §3T/§3U** — Wear live; env set; Supabase Redirect URLs now
+     include the Vercel deploy-hash wildcard `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`
+     (fixed the magic-link→Connect redirect + reset/confirmation links).
+   - **§3U email template — code-as-hero (⏳ ready to paste):** Supabase Dashboard → Authentication →
+     Email Templates → **Magic Link** → replace body with the code-first HTML (in the §3U close-out
+     message / continuation prompt). Makes `{{ .Token }}` the hero, link a same-device fallback. Shared
+     across all 3 apps; revertible.
+   - **§3U address hygiene (roadmap):** put Wear/Connect/Vision behind **stable custom domains** (e.g.
+     `wear.citizenscentral.co.za`) + a **branded storage asset origin** so URLs stop leaking
+     `*.vercel.app` deploy-hashes and `xyiajtrvhlxaeplsiajj.supabase.co`.
    - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
      NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
    - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
