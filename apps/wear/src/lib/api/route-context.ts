@@ -43,7 +43,8 @@ export interface RouteContext {
   readonly identity: SessionIdentity | null;
 }
 
-function bearerToken(req: Request): string | null {
+/** Extract the `Authorization: Bearer <token>` access token, or null. */
+export function bearerToken(req: Request): string | null {
   const header = req.headers.get('authorization');
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(header.trim());

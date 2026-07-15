@@ -47,6 +47,8 @@ import {
   type LikeRepo,
   type Message,
   type MessageRepo,
+  type NotificationRepo,
+  type NotificationType,
   type Page,
   type PageParams,
   type Post,
@@ -76,6 +78,7 @@ import {
   type UserRepo,
   type UserSettings,
   type WearBrand,
+  type WearNotification,
   type WearPlatformRole,
   type WearStore,
   type WearUser,
@@ -122,6 +125,7 @@ export class SupabaseWearStore implements WearStore {
   public readonly conversions: CatalogueConversionRepo;
   public readonly brandVerifications: BrandVerificationRepo;
   public readonly roles: RoleRepo;
+  public readonly notifications: NotificationRepo;
 
   private readonly db: SupabaseClient;
   private readonly now: () => Date;
@@ -153,6 +157,7 @@ export class SupabaseWearStore implements WearStore {
     this.conversions = this._conversions();
     this.brandVerifications = this._brandVerifications();
     this.roles = this._roles();
+    this.notifications = this._notifications();
   }
 
   // ── Identity mirror ───────────────────────────────────────────────────────
@@ -2078,6 +2083,58 @@ export class SupabaseWearStore implements WearStore {
     };
   }
 
+  // ── Notifications (mig 159) ───────────────────────────────────────────────
+  // Read + mark-read only; rows are produced by the DB triggers. RLS scopes
+  // every query to the caller's own rows, so the explicit `recipient_id` filters
+  // are belt-and-braces (and let markAll/count run without an extra round-trip).
+  private _notifications(): NotificationRepo {
+    return {
+      list: async (userId, params) =>
+        this._pageFrom(
+          this.db
+            .from('notifications')
+            .select(NOTIFICATION_COLS)
+            .eq('recipient_id', userId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
+          params,
+          mapNotification,
+        ),
+      unreadCount: async (userId) =>
+        this._count(
+          this.db
+            .from('notifications')
+            .select('id', { count: 'exact', head: true })
+            .eq('recipient_id', userId)
+            .is('read_at', null),
+        ),
+      markRead: async (userId, ids) => {
+        if (!ids.length) return 0;
+        const rows = await this._many(
+          this.db
+            .from('notifications')
+            .update({ read_at: this.now().toISOString() })
+            .eq('recipient_id', userId)
+            .is('read_at', null)
+            .in('id', [...ids])
+            .select('id'),
+        );
+        return rows.length;
+      },
+      markAllRead: async (userId) => {
+        const rows = await this._many(
+          this.db
+            .from('notifications')
+            .update({ read_at: this.now().toISOString() })
+            .eq('recipient_id', userId)
+            .is('read_at', null)
+            .select('id'),
+        );
+        return rows.length;
+      },
+    };
+  }
+
   /** Caller's mig-145 platform role (user_roles is self-SELECT under RLS). */
   private async _getOwnRole(userId: ConnectId): Promise<WearPlatformRole | null> {
     const row = await this._maybeSingle(
@@ -2278,6 +2335,8 @@ const MEMBER_COLS = 'conversation_id,user_id,joined_at,last_read_at,muted_until,
 const MESSAGE_COLS = 'id,conversation_id,author_id,body,created_at,deleted_at';
 const REPORT_COLS =
   'id,reporter_id,subject_kind,subject_id,reason,note,status,handled_by,handled_at,created_at';
+const NOTIFICATION_COLS =
+  'id,recipient_id,type,actor_id,concept_id,brand_id,data,read_at,created_at';
 // Mig 157 — Concepts marketplace
 const CONCEPT_COLS = 'id,creator_id,title,description,status,created_at,updated_at';
 const CONCEPT_MEDIA_COLS = 'id,concept_id,url,kind,alt_text,order_index';
@@ -2440,6 +2499,18 @@ interface ReportRow {
   status: Report['status'];
   handled_by: string | null;
   handled_at: string | null;
+  created_at: string;
+}
+// Mig 159 — notifications
+interface NotificationRow {
+  id: string;
+  recipient_id: string;
+  type: NotificationType;
+  actor_id: string | null;
+  concept_id: string | null;
+  brand_id: string | null;
+  data: Record<string, unknown> | null;
+  read_at: string | null;
   created_at: string;
 }
 // Mig 157 — Concepts marketplace rows
@@ -2696,6 +2767,17 @@ const mapReport = (r: ReportRow): Report => ({
   status: r.status,
   handledBy: r.handled_by,
   handledAt: r.handled_at,
+  createdAt: r.created_at,
+});
+const mapNotification = (r: NotificationRow): WearNotification => ({
+  id: r.id,
+  recipientId: r.recipient_id,
+  type: r.type,
+  actorId: r.actor_id,
+  conceptId: r.concept_id,
+  brandId: r.brand_id,
+  data: r.data ?? {},
+  readAt: r.read_at,
   createdAt: r.created_at,
 });
 // Mig 157 — Concepts marketplace mappers

@@ -1038,24 +1038,85 @@ lazy-ensure in place first would break new Connect sign-ups (dozens of `public.*
 
 ---
 
+## 3T. Wear media-upload pipeline + notifications backend SHIPPED ✅ (2026-07-15)
+
+Wear launch-hardening (NEXT STEPS 1b) on `step5-monorepo-lift`. Working log:
+`.claude/sessions/wear-media-upload-and-notifications.md` (gitignored). **Migs 158 + 159 APPLIED
+to prod** (pre-apply tag `connect-pre-mig158`); **advisor 0 ERROR / 101 WARN / 3 INFO = §3R
+baseline, 0 new findings.** **Next migration # = 160.** Gates: turbo typecheck **12/12** · turbo
+test **11/11** (Connect 637 · db 99 · wear 84 · utils 7 · Vision) · wear `next build` OK (43 routes)
+· build-frontend 17 screens.
+
+### Slice 1 — media-upload pipeline (posts / stories / brand logos / concept artwork)
+Mirrors Connect's signed-upload pattern, but **user-authed mint — NO service_role in Wear** (rule 6 /
+R3: RLS is the wall). All media columns already exist as `text`, so the pipeline is **purely additive**
+— an upload just yields a public URL that flows into the same fields; the URL text input stays as the
+fallback (kept inside the picker).
+- **Mig 158** `158_wear_media_bucket.sql`: `wear-media` bucket (public, images-only jpeg/png/gif/webp,
+  15 MB; svg blocked = stored-XSS backstop) + 3 owner-folder `storage.objects` policies
+  (`foldername[1] = auth.uid()`). **Runtime-verified against prod:** own-folder write permitted,
+  foreign-folder denied by RLS (zero residue).
+- **`POST /api/media/sign`** (`apps/wear/src/app/api/media/sign/route.ts`) mints a signed upload URL via
+  a request-scoped client authed as the user (`lib/supabase/storage.ts` `getRequestStorageClient`);
+  path built server-side `{uid}/{scope}/{ts}-{rand}.{ext}` (ext from MIME, never filename); per-user
+  heavy cap + blanket per-IP gate; 503-degrades with no env. `lib/media.ts` = pure validation (unit-tested).
+- Frontend: `CW_API.uploadImage` (two-phase → `uploadToSignedUrl`) + reusable `CWUI.ImagePicker`
+  (upload button + preview + URL fallback). Wired create.jsx **post/story + NEW brand-logo field** and
+  concepts.jsx **artwork**. Tests: media.test.ts (11) + sign/route.test.ts (6).
+- **Hardening found + fixed:** `brands.logoUrl` + `websiteUrl` were NOT `safeUrl`-validated (posts/
+  stories/concepts already were) — now validated in the brands POST + PATCH.
+
+### Slice 2 — notifications backend (stub → real)
+The Inbox "Notifications" tab was a coming-soon placeholder; now backed by real marketplace-event
+notifications.
+- **Mig 159** `159_wear_notifications.sql`: `wear.notification_type` enum + `wear.notifications` table
+  (recipient-scoped RLS: read/mark-read/delete own; **no INSERT policy** — trigger-only) + `wear.notify()`
+  best-effort SECDEF helper (swallows insert errors → can't break a marketplace txn) + **6 SECDEF
+  triggers**: proposal→creator, award→brand owner, status-advance→creator, royalty proof→creator /
+  close→brand owner (conversion-supersede close skipped to match memory + avoid double-notify),
+  conversion propose→creator / respond→brand owner. All `set search_path=''`, `revoke all from public`.
+  **Prod smoke: all 4 tested triggers fire with correct recipient/actor/payload; zero residue.**
+- Data plane: `NotificationRepo` in the `@citizens/db` contract (+`WearNotification`, `NotificationType`);
+  MemoryWearStore emits from its 7 lifecycle methods (mirrors the DB triggers — the contract-test spec);
+  SupabaseWearStore reads via RLS + marks-read. `GET /api/notifications` (+unreadCount) +
+  `POST /api/notifications/read` ({ids}|{all}); `hydrateNotifications` batches actor identity. No PII in
+  payload (conceptTitle/brandName/stage only — never proposal pricing). Tests: db/notifications.test.ts (7)
+  + notifications.routes.test.ts (6).
+- Frontend: `inbox.jsx` NotificationsTab (message composed client-side from type+data; mark-all-read on
+  view; tap → concept detail).
+
+### Known follow-ups (noted, deliberate)
+- **Brand-logo EDIT UI:** logo is settable at brand CREATE; `PATCH /api/brands/:slug` accepts `logoUrl`
+  but there's no brand-edit surface in `brand.jsx` yet.
+- **Proposal mockups + story video:** the pipeline is images-only + wired to post/story/brand/concept;
+  proposal `mockup_urls[]` stay URL-only, and no video scope (bucket is images-only) — easy extensions.
+- **§3R account-deletion cascade wrinkle** still open (deliberately NOT bundled to keep these migs focused).
+- Nav-level unread badge (needs app-level unread polling) — out of scope for the stub.
+- **Founder:** redeploy Wear on Vercel so the built bundle ships the ImagePicker + notifications tab
+  (mig-158/159 are already live; no deploy needed for the DB side).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3, 4, 4b, 4c, 5 AND the Wear Concepts marketplace (§3R) are COMPLETE.**
+> **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S) AND the media-upload
+> pipeline + notifications backend (§3T) are COMPLETE.**
 > `step5-monorepo-lift` was merged to `main` again at end of the §3R session (2026-07-15,
 > founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 158.**
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 160.**
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S):**
    a. **Deploy the marketplace + new auth UI**: founder redeploys Wear on Vercel (bundle now ships
       magic-code login + change-password; env unchanged). The **feed is already seeded in prod** (§3S)
       — no deploy needed for it to appear. Founder (wear admin) can verify the 2 pending brands
       (Lily & Field, Anchor & Crown) from the in-app Admin queue. Do the §3S live email test.
-   b. Launch-hardening fast-follows, in rough order of value: **media upload pipeline**
-      (posts/concepts are URL-only — Supabase Storage bucket + signed upload, mirror Connect's
-      mig-122 bucket-limits pattern); **notifications backend** (award/status-advance/proposal/
-      royalty events are natural triggers; tab is a placeholder); **mig 158**: fix the §3R
-      account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace
-      schema follow-ups; full desktop layouts; Capacitor shell scaffold (JS side is ready).
+   b. Launch-hardening fast-follows: ~~**media upload pipeline**~~ ✅ **DONE §3T** (mig 158,
+      user-authed signed upload, wired post/story/brand-logo/concept); ~~**notifications backend**~~
+      ✅ **DONE §3T** (mig 159, marketplace-event triggers + inbox tab). Still open, in rough order
+      of value: **mig 160**: fix the §3R account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF
+      cleanup fn) + any marketplace schema follow-ups; **brand-logo edit UI** (create-time works;
+      no edit surface in brand.jsx); proposal-mockup upload + story video (pipeline is images-only
+      today); full desktop layouts; Capacitor shell scaffold (JS side is ready).
    c. Port the Wear auth screens to Connect + Vision frontends — now **email+password (§3P) AND
       email magic-code + change-password (§3S)**; shared CC_AUTH/CV_AUTH lineage, provider already
       enabled project-wide. Each app's magic-link email template also needs the `{{ .Token }}` edit
@@ -1111,6 +1172,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **157** live; next # = **158**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **159** live; next # = **160**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

@@ -41,10 +41,40 @@
     return data;
   }
 
+  // Two-phase image upload: (1) ask our API for a signed upload URL, (2) push the
+  // bytes STRAIGHT to Supabase Storage with that token — the API never sees them
+  // (mirrors Connect's uploadMedia). Returns the public URL. Throws on failure so
+  // callers can fall back to the URL text input.
+  async function uploadImage(file, scope) {
+    const meta = await call('/api/media/sign', {
+      method: 'POST',
+      body: { scope: scope, filename: file.name, contentType: file.type, size: file.size },
+    });
+    const sb = window.CW_AUTH && window.CW_AUTH.supabase;
+    if (!sb || !sb.storage) {
+      const e = new Error('Upload is unavailable right now.');
+      e.code = 'no_storage_client';
+      throw e;
+    }
+    const up = await sb.storage
+      .from(meta.bucket)
+      .uploadToSignedUrl(meta.path, meta.token, file, {
+        contentType: file.type || undefined,
+        upsert: true,
+      });
+    if (up.error) {
+      const e = new Error('Upload failed. Please try again.');
+      e.code = 'upload_failed';
+      throw e;
+    }
+    return meta.publicUrl;
+  }
+
   window.CW_API = {
     get: (path) => call(path),
     post: (path, body) => call(path, { method: 'POST', body: body === undefined ? {} : body }),
     patch: (path, body) => call(path, { method: 'PATCH', body }),
     del: (path, body) => call(path, { method: 'DELETE', body }),
+    uploadImage: uploadImage,
   };
 })();

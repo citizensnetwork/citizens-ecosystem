@@ -310,6 +310,133 @@
     );
   }
 
+  /**
+   * Image picker with a URL fallback. Uploads a chosen file straight to Supabase
+   * Storage (via CW_API.uploadImage) and calls `onChange(url)` with the resulting
+   * public URL; typing/pasting a URL into the fallback field also drives
+   * `onChange`. The URL path keeps working everywhere uploads can't (dev/preview,
+   * an upload error) — the value is always just a URL string. `round` renders the
+   * preview as a circle (brand logos); `accept` defaults to the bucket's images.
+   */
+  function ImagePicker({ scope, value, onChange, placeholder, round }) {
+    const { useState, useRef } = React;
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState(null);
+    const inputRef = useRef(null);
+
+    const onFile = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (e.target) e.target.value = ''; // let the same file be re-picked
+      if (!file) return;
+      setErr(null);
+      setBusy(true);
+      try {
+        const url = await window.CW_API.uploadImage(file, scope);
+        onChange(url);
+      } catch (ex) {
+        setErr((ex && ex.message) || 'Upload failed — paste an image URL instead.');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const previewSize = round ? 72 : 96;
+    return h(
+      'div',
+      null,
+      h('input', {
+        ref: inputRef,
+        type: 'file',
+        accept: 'image/png,image/jpeg,image/gif,image/webp',
+        onChange: onFile,
+        style: { display: 'none' },
+      }),
+      value
+        ? h('img', {
+            src: value,
+            alt: 'preview',
+            referrerPolicy: 'no-referrer',
+            style: {
+              width: previewSize,
+              height: previewSize,
+              objectFit: 'cover',
+              borderRadius: round ? '50%' : 12,
+              border: '1px solid #efedea',
+              display: 'block',
+              marginBottom: 10,
+            },
+          })
+        : null,
+      h(
+        'div',
+        { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        h(
+          'button',
+          {
+            type: 'button',
+            onClick: () => inputRef.current && inputRef.current.click(),
+            disabled: busy,
+            style: {
+              border: '1px solid #e6e3dc',
+              background: busy ? '#faf8f3' : '#fff',
+              color: '#2a2a2a',
+              borderRadius: 11,
+              padding: '9px 16px',
+              fontSize: 12.5,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+            },
+          },
+          Icon('plus', { size: 15, color: GOLD, sw: 2 }),
+          busy ? 'Uploading…' : value ? 'Replace image' : 'Upload image',
+        ),
+        value
+          ? h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => onChange(''),
+                style: {
+                  border: 'none',
+                  background: 'transparent',
+                  color: MUTED,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                },
+              },
+              'Remove',
+            )
+          : null,
+      ),
+      err
+        ? h(
+            'div',
+            { style: { fontSize: 11.5, color: '#8f4a2b', fontWeight: 600, marginTop: 7 } },
+            err,
+          )
+        : null,
+      h('input', {
+        value: value || '',
+        onChange: (e) => onChange(e.target.value),
+        placeholder: placeholder || 'or paste an image URL (https://…)',
+        style: {
+          width: '100%',
+          border: '1px solid #efedea',
+          borderRadius: 12,
+          padding: '10px 12px',
+          fontSize: 12.5,
+          fontWeight: 500,
+          outline: 'none',
+          background: '#fff',
+          color: '#1a1a1a',
+          marginTop: 9,
+        },
+      }),
+    );
+  }
+
   window.CWUI = {
     GOLD,
     INK,
@@ -322,6 +449,7 @@
     EmptyState,
     ErrorNote,
     ScreenHeader,
+    ImagePicker,
     timeAgo,
     fmtCount,
   };

@@ -37,6 +37,8 @@ import type {
   LikeRepo,
   Message,
   MessageRepo,
+  NotificationRepo,
+  NotificationType,
   Page,
   PageParams,
   Post,
@@ -63,6 +65,7 @@ import type {
   UserRepo,
   UserSettings,
   WearBrand,
+  WearNotification,
   WearPlatformRole,
   WearStore,
   WearUser,
@@ -123,6 +126,7 @@ export class MemoryWearStore implements WearStore {
   public readonly conversions: CatalogueConversionRepo;
   public readonly brandVerifications: BrandVerificationRepo;
   public readonly roles: RoleRepo;
+  public readonly notifications: NotificationRepo;
 
   private readonly _now: () => Date;
   private readonly _users = new Map<ConnectId, WearUser>();
@@ -170,6 +174,9 @@ export class MemoryWearStore implements WearStore {
   private readonly _conversions = new Map<string, CatalogueConversion>();
   /** Keyed by brandId (PK — one lifecycle row per brand). */
   private readonly _brandVerifications = new Map<ConnectId, BrandVerification>();
+  // Mig 159 — notifications (trigger-produced in prod; emitted by the lifecycle
+  // methods here to mirror the DB triggers).
+  private readonly _notifications = new Map<string, WearNotification>();
   private _nextId = 1;
 
   public constructor(options: MemoryWearStoreOptions = {}) {
@@ -1213,6 +1220,50 @@ export class MemoryWearStore implements WearStore {
       getOwn: async (userId) => this._roles.get(userId) ?? null,
     };
 
+    // Mig 159 — notifications. Reads/marks-read only; rows are produced by the
+    // lifecycle methods below (mirroring the DB triggers via _emitNotification).
+    this.notifications = {
+      list: async (userId, params) => {
+        const items = [...this._notifications.values()]
+          .filter((n) => n.recipientId === userId)
+          .sort(
+            (a, b) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+          );
+        return paginateList(items, params);
+      },
+      unreadCount: async (userId) => {
+        let n = 0;
+        for (const notif of this._notifications.values()) {
+          if (notif.recipientId === userId && notif.readAt === null) n += 1;
+        }
+        return n;
+      },
+      markRead: async (userId, ids) => {
+        const ts = this._now().toISOString();
+        let count = 0;
+        for (const id of ids) {
+          const notif = this._notifications.get(id);
+          if (notif && notif.recipientId === userId && notif.readAt === null) {
+            this._notifications.set(id, { ...notif, readAt: ts });
+            count += 1;
+          }
+        }
+        return count;
+      },
+      markAllRead: async (userId) => {
+        const ts = this._now().toISOString();
+        let count = 0;
+        for (const [id, notif] of this._notifications.entries()) {
+          if (notif.recipientId === userId && notif.readAt === null) {
+            this._notifications.set(id, { ...notif, readAt: ts });
+            count += 1;
+          }
+        }
+        return count;
+      },
+    };
+
     // ─────────────────────────────────────────────────────────────────────
     // Mig 157 — Concepts marketplace. The rules below ARE the semantic spec
     // for `SupabaseWearStore`: they mirror the RLS policies + SECDEF RPCs of
@@ -1394,6 +1445,14 @@ export class MemoryWearStore implements WearStore {
           updatedAt: ts,
         };
         this._conceptProposals.set(proposal.id, proposal);
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_proposal',
+          actorId: callerId,
+          conceptId: concept.id,
+          brandId: brand.id,
+          data: { conceptTitle: concept.title, brandName: brand.name },
+        });
         return proposal;
       },
       getById: async (id, callerId) => {
@@ -1558,6 +1617,14 @@ export class MemoryWearStore implements WearStore {
           updatedAt: ts,
         };
         this._royalties.set(royalty.id, royalty);
+        this._emitNotification({
+          recipientId: brand.ownerUserId,
+          type: 'concept_awarded',
+          actorId: callerId,
+          conceptId: concept.id,
+          brandId: brand.id,
+          data: { conceptTitle: concept.title, brandName: brand.name },
+        });
         return claim;
       },
       getById: async (claimId) => this._conceptClaims.get(claimId) ?? null,
@@ -1629,6 +1696,14 @@ export class MemoryWearStore implements WearStore {
         };
         this._conceptStatusLog.set(entry.id, entry);
         this._concepts.set(conceptId, { ...concept, status, updatedAt: ts });
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_advanced',
+          actorId: callerId,
+          conceptId,
+          brandId: claim.brandId,
+          data: { conceptTitle: concept.title, stage: status, note: entry.note },
+        });
         if (status === 'released') {
           this._createCompletedConceptPost(claim);
         }
@@ -1676,6 +1751,15 @@ export class MemoryWearStore implements WearStore {
           updatedAt: ts,
         };
         this._royalties.set(obligationId, next);
+        const proofConcept = claim ? this._concepts.get(claim.conceptId) : undefined;
+        this._emitNotification({
+          recipientId: proofConcept?.creatorId,
+          type: 'royalty_proof',
+          actorId: callerId,
+          conceptId: claim?.conceptId ?? null,
+          brandId: claim?.brandId ?? null,
+          data: { conceptTitle: proofConcept?.title ?? null },
+        });
         return next;
       },
       close: async (obligationId, callerId) => {
@@ -1703,6 +1787,17 @@ export class MemoryWearStore implements WearStore {
           updatedAt: ts,
         };
         this._royalties.set(obligationId, next);
+        const closedClaim = this._conceptClaims.get(ob.claimId);
+        const closedBrand = closedClaim ? this._brands.get(closedClaim.brandId) : undefined;
+        const closedConcept = closedClaim ? this._concepts.get(closedClaim.conceptId) : undefined;
+        this._emitNotification({
+          recipientId: closedBrand?.ownerUserId,
+          type: 'royalty_closed',
+          actorId: callerId,
+          conceptId: closedClaim?.conceptId ?? null,
+          brandId: closedClaim?.brandId ?? null,
+          data: { conceptTitle: closedConcept?.title ?? null },
+        });
         return next;
       },
     };
@@ -1740,6 +1835,14 @@ export class MemoryWearStore implements WearStore {
           updatedAt: ts,
         };
         this._conversions.set(conversion.id, conversion);
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'conversion_proposed',
+          actorId: callerId,
+          conceptId: claim.conceptId,
+          brandId: claim.brandId,
+          data: { conceptTitle: concept.title },
+        });
         return conversion;
       },
       respond: async (conversionId, callerId, accept) => {
@@ -1757,6 +1860,15 @@ export class MemoryWearStore implements WearStore {
           throw new WearStoreError('unauthorized', 'Only the creator can respond.');
         }
         const ts = this._now().toISOString();
+        const respondBrand = this._brands.get(claim.brandId);
+        this._emitNotification({
+          recipientId: respondBrand?.ownerUserId,
+          type: 'conversion_responded',
+          actorId: callerId,
+          conceptId: claim.conceptId,
+          brandId: claim.brandId,
+          data: { conceptTitle: concept.title, accepted: accept },
+        });
         if (!accept) {
           const declined: CatalogueConversion = {
             ...conv,
@@ -2021,6 +2133,35 @@ export class MemoryWearStore implements WearStore {
         orderIndex: m.orderIndex,
       })),
     );
+  }
+
+  /**
+   * Mirrors `wear.notify` + the mig-159 lifecycle triggers: append a
+   * best-effort notification, skipping null recipients and self-notifications.
+   */
+  private _emitNotification(input: {
+    recipientId: ConnectId | null | undefined;
+    type: NotificationType;
+    actorId?: ConnectId | null;
+    conceptId?: string | null;
+    brandId?: ConnectId | null;
+    data?: Record<string, unknown>;
+  }): void {
+    const recipient = input.recipientId;
+    if (!recipient) return;
+    if (input.actorId && input.actorId === recipient) return;
+    const notif: WearNotification = {
+      id: this._id('ntf'),
+      recipientId: recipient,
+      type: input.type,
+      actorId: input.actorId ?? null,
+      conceptId: input.conceptId ?? null,
+      brandId: input.brandId ?? null,
+      data: input.data ?? {},
+      readAt: null,
+      createdAt: this._now().toISOString(),
+    };
+    this._notifications.set(notif.id, notif);
   }
 
   /** Mirrors `trg_sync_brand_verified`: cache the outcome onto the brand. */
