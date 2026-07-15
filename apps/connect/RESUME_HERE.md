@@ -973,6 +973,71 @@ account deletion through an explicit bottom-up SECDEF cleanup fn. Deleting botto
 
 ---
 
+## 3S. Wear email magic-code login + change-password + LAUNCH FEED SEEDED ✅ (2026-07-15)
+
+Wear session on `step5-monorepo-lift`, commit **`f8fce07`** (pushed `a43f76d..f8fce07`; branch is
+2 behind `origin/main` — founder merges when ready, as in §3R). Working log:
+`.claude/sessions/wear-email-login-and-feed-seed.md` (gitignored). **No migration → head still 157.**
+Gates: **tsc 0 · vitest 61/61 · eslint clean**. Security advisors **0 ERROR / 101 WARN / 3 INFO**
+(= §3R baseline; the seed is DATA-only + the one auth-config change is a template edit → 0 new findings).
+
+### Founder asks this session (all delivered)
+1. Resend DNS verified (`citizenscentral.co.za`) → **finish username/email login.** It was already
+   code-complete (§3P); DNS was the only blocker. Live auth config confirms `external_email_enabled`,
+   Resend SMTP (`no-reply@citizenscentral.co.za`), `site_url=https://www.citizenscentral.co.za`,
+   `mailer_autoconfirm=false`. **Added the missing piece: a "Change password" card in Settings**
+   (`settings.jsx`) — also lets a Google-only account set a first password.
+2. Secondary "code login" → founder chose **email magic-code** (passwordless 6-digit OTP). Shipped:
+   `auth-client.js` `sendEmailCode`/`verifyEmailCode` (`signInWithOtp` `shouldCreateUser:false` →
+   sign-in only, no enumeration); `store.jsx` wiring; `auth.jsx` new `code`/`codeVerify` modes +
+   "Email me a 6-digit sign-in code instead" entry. **Browser-verified the render** (localhost:3006).
+   Email OTP was already provisioned project-side; the **magic-link email template was edited via
+   Mgmt API to carry `{{ .Token }}` + keep the link fallback** (subject "Your Citizens sign-in code").
+   True email-AS-2FA (password+code) is NOT native → deliberately not built (founder: don't overcomplicate).
+   Authenticator TOTP MFA is already enabled project-side if ever wanted.
+3. Seed the feed with ~5 Brands → **[`apps/wear/scripts/seed/`](../../apps/wear/scripts/seed/)**
+   (`seed-feed.sql` idempotent + `teardown-feed.sql` cascade-clean + README). Applied to prod via
+   `execute_sql`. **5 ORIGINAL Kingdom-aligned brands** (Cornerstone Apparel✅, Lily & Field⏳,
+   Salt & Light Threads✅, Ubuntu Kingdom Co.✅, Anchor & Crown⏳; ✅=verified, ⏳=pending in the admin
+   queue), 2 citizen personas (@gracelethabo, @thabo_m), **8 posts + media, 33 follows, 33 likes,
+   9 comments, 4 stories (14-day)**, and **one realized Concept** "The Living Water hoodie"
+   (proposed→awarded→**released** via the real RPCs; milestone royalty active; auto completed-concept
+   post w/ attribution chip → @gracelethabo). All SQL-verified.
+
+### Founder decision recorded — NO auto cross-platform footprint (important architecture note)
+Brand owners MUST exist in `auth.users` (`wear.users.id` FKs to it ON DELETE CASCADE), and Connect's
+`on_auth_user_created → public.handle_new_user` trigger auto-creates a `public.profiles` row for EVERY
+new auth user. The seed **deletes those rows in-transaction** → seed identities live ONLY in `wear.*`
+(**verified `seed_connect_profiles = 0`**). Founder wants this ecosystem-wide: **a member should only
+gain a platform profile when they actually sign in there.** Wear + Vision already do this (lazy
+hydration); **Connect is the lone eager one.** ⇒ **RECOMMENDED future change (own tested session,
+NOT done here — it touches LIVE Connect auth):** drop/guard that trigger AND add a lazy idempotent
+"ensure profile on first Connect sign-in" (mirror Wear's `/api/me/hydrate`). Doing it without the
+lazy-ensure in place first would break new Connect sign-ups (dozens of `public.*` tables FK `profiles`).
+
+### Notes / honesty
+- Live feed screenshot NOT captured: password sign-in wouldn't complete under **local next-dev +
+  browser automation** (no `/api` hit; a hydrate/PKCE-storage quirk of the no-build CDN-React app under
+  automation — NOT my changes; email+password against **prod** is browser-proven in §3P/§3R). Feed is
+  fully SQL-verified + covered by passing route tests; founder will see it live on deploy.
+- Disposable password test user (`feedcheck@seed…`) was created for the screenshot attempt and
+  **deleted** (verified). The 7 real seed identities have **no password** (not sign-in-able; they only
+  own content — reassign `wear.brands.owner_user_id` to hand a brand to a real owner later).
+- Seed media is URL-only (Unsplash/ui-avatars, all HTTP-200-checked) — swap to real uploads once the
+  storage pipeline ships.
+
+### ⛔ Founder actions to make this fully live
+1. **Redeploy Wear** on Vercel from the branch/main so the built bundle ships the magic-code + change-
+   password UI (the seed is already in prod — no deploy needed for the feed to appear).
+2. **Live email test**: sign up a real address (confirm email), request a reset, request a magic code —
+   confirm all three arrive via Resend now that DNS is verified.
+3. Confirm the **live Wear origin is in Supabase Auth redirect allow-list** (has
+   `citizens-wear.vercel.app/**`, `citizens-ecosystem-wear.vercel.app/**`, `www.citizenscentral.co.za/**`).
+4. When the Wear **mobile shell** ships: add `citizenswear://auth-callback` to the allow-list
+   (only `citizensconnect://` is there today) — non-blocking for web.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5 AND the Wear Concepts marketplace (§3R) are COMPLETE.**
@@ -980,21 +1045,29 @@ account deletion through an explicit bottom-up SECDEF cleanup fn. Deleting botto
 > founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
 > **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 158.**
 
-1. **Wear build track (current focus — §3P roadmap; marketplace core is DONE §3R):**
-   a. **Deploy the marketplace**: founder redeploys Wear on Vercel from `main` (the built
-      bundle ships the new screens; env unchanged). Then founder (already wear admin) can
-      verify real brands from the in-app Admin queue.
+1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S):**
+   a. **Deploy the marketplace + new auth UI**: founder redeploys Wear on Vercel (bundle now ships
+      magic-code login + change-password; env unchanged). The **feed is already seeded in prod** (§3S)
+      — no deploy needed for it to appear. Founder (wear admin) can verify the 2 pending brands
+      (Lily & Field, Anchor & Crown) from the in-app Admin queue. Do the §3S live email test.
    b. Launch-hardening fast-follows, in rough order of value: **media upload pipeline**
       (posts/concepts are URL-only — Supabase Storage bucket + signed upload, mirror Connect's
       mig-122 bucket-limits pattern); **notifications backend** (award/status-advance/proposal/
       royalty events are natural triggers; tab is a placeholder); **mig 158**: fix the §3R
       account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace
       schema follow-ups; full desktop layouts; Capacitor shell scaffold (JS side is ready).
-   c. Port email+password auth screens (§3P) from Wear to Connect + Vision frontends — shared
-      CC_AUTH/CV_AUTH lineage, provider already enabled project-wide. (Was this session's
-      stretch goal; not reached.)
+   c. Port the Wear auth screens to Connect + Vision frontends — now **email+password (§3P) AND
+      email magic-code + change-password (§3S)**; shared CC_AUTH/CV_AUTH lineage, provider already
+      enabled project-wide. Each app's magic-link email template also needs the `{{ .Token }}` edit
+      (§3S) if magic-code is wanted there. (Still not reached — good next task.)
    d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
       tooling, proposal notifications, concept search/categories, creator portfolio surface.
+   e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
+      auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
+      and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
+      land the lazy-ensure BEFORE removing the trigger or new Connect sign-ups break. Touches LIVE
+      Connect auth → migration + Connect frontend + full regression. Not urgent; the §3S seed already
+      achieves the no-footprint end-state on its own.
 2. **Vision (verify-then-continue):** migs 147–156 + demo→live wiring increments 1–7 shipped from
    the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
    this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
