@@ -20,6 +20,7 @@
     "@capacitor/core": "^6.0.0",
     "@citizens/connect-client": "workspace:*",
     "@citizens/db": "workspace:*",
+    "@citizens/utils": "workspace:*",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.102.1",
     "next": "15.5.18",

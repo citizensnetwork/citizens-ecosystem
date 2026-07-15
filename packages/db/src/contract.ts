@@ -110,6 +110,12 @@ export interface Post {
   readonly updatedAt: IsoDateTime;
   /** Product ids tagged on the post. Read-only snapshots from Connect. */
   readonly taggedProductIds: readonly ConnectId[];
+  /**
+   * Relational attribution for auto "Completed Concepts" posts (mig 157):
+   * the link to the source concept persists PERMANENTLY, while the PUBLIC
+   * creator tag renders only when the claim's `attributionPublic` is true.
+   */
+  readonly conceptId: string | null;
 }
 
 export type PostMediaKind = 'image' | 'video';
@@ -462,6 +468,9 @@ export interface BlockRepo {
 export type ReportSubjectKind = 'post' | 'comment' | 'message' | 'story' | 'user';
 export type ReportReason = 'spam' | 'abuse' | 'sexual' | 'self_harm' | 'illegal' | 'other';
 
+/** Mig-145 triage lifecycle: `open → reviewed → actioned | dismissed`. */
+export type ReportStatus = 'open' | 'reviewed' | 'actioned' | 'dismissed';
+
 export interface Report {
   readonly id: string;
   readonly reporterId: ConnectId;
@@ -469,6 +478,9 @@ export interface Report {
   readonly subjectId: string;
   readonly reason: ReportReason;
   readonly note: string | null;
+  readonly status: ReportStatus;
+  readonly handledBy: ConnectId | null;
+  readonly handledAt: IsoDateTime | null;
   readonly createdAt: IsoDateTime;
 }
 
@@ -482,6 +494,21 @@ export interface ReportRepo {
   }): Promise<Report>;
   listForSubject(subjectKind: ReportSubjectKind, subjectId: string): Promise<readonly Report[]>;
   listByReporter(reporterId: ConnectId): Promise<readonly Report[]>;
+  /**
+   * Moderation queue (mig 145). Caller must hold a platform role — under RLS
+   * a non-moderator simply sees no rows; `MemoryWearStore` throws `forbidden`
+   * to make the misuse loud in tests. Newest first, optionally filtered.
+   */
+  listForModeration(
+    callerId: ConnectId,
+    filter?: { readonly status?: ReportStatus },
+  ): Promise<readonly Report[]>;
+  /** Moderator triage: `open → reviewed → actioned | dismissed`. */
+  triage(
+    reportId: string,
+    callerId: ConnectId,
+    status: Exclude<ReportStatus, 'open'>,
+  ): Promise<Report>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -590,6 +617,333 @@ export interface BrandRepo {
   update(brandId: ConnectId, ownerId: ConnectId, patch: UpdateBrandInput): Promise<WearBrand>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Concepts marketplace (mig 157) — the ratified Wear roadmap's first tranche
+// (docs/Citizens_Wear_Roles_and_Concepts_MD.md): public upvotable Concepts,
+// private brand Proposals with public brand tags, exclusive creator-awarded
+// Claims, an append-only status log (forward-only lifecycle), milestone/
+// lifetime Royalties, the two-party catalogue-conversion handshake, and the
+// brand-verification lifecycle that now gates marketplace power.
+//
+// `MemoryWearStore` is the semantic spec: every rule below mirrors the RLS
+// policies + SECURITY DEFINER RPCs of migration 157 exactly, and the error
+// `code`s equal the RPCs' `raise exception` messages so callers are
+// storage-agnostic.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Lifecycle order IS the enum order (forward-only transitions, mig 157 §1). */
+export const CONCEPT_STAGES = [
+  'proposed',
+  'claimed',
+  'in_production',
+  'sample_review',
+  'released',
+  'sold_out',
+] as const;
+export type ConceptStage = (typeof CONCEPT_STAGES)[number];
+
+export type ConceptProposalStatus = 'submitted' | 'withdrawn' | 'awarded' | 'declined';
+export type ConceptClaimStatus = 'active' | 'revoked';
+export type RoyaltyKind = 'milestone' | 'lifetime';
+export type RoyaltyStatus = 'active' | 'proof_submitted' | 'closed';
+export type CatalogueConversionStatus = 'proposed' | 'accepted' | 'declined' | 'cancelled';
+export type BrandVerificationStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
+/** Mig-145 platform roles. `admin` implies moderator capability. */
+export type WearPlatformRole = 'moderator' | 'admin';
+
+export interface Concept {
+  readonly id: string;
+  readonly creatorId: ConnectId;
+  readonly title: string;
+  readonly description: string | null;
+  /** Cached stage; the append-only status log is the truth post-claim. */
+  readonly status: ConceptStage;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface ConceptMedia {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly url: string;
+  readonly kind: PostMediaKind;
+  readonly altText: string | null;
+  readonly orderIndex: number;
+}
+
+export interface ConceptWithMedia {
+  readonly concept: Concept;
+  readonly media: readonly ConceptMedia[];
+}
+
+export interface ConceptUpvote {
+  readonly conceptId: string;
+  readonly userId: ConnectId;
+  readonly createdAt: IsoDateTime;
+}
+
+/** The PUBLIC proposal surface: brand tags only, details stay private. */
+export interface ConceptProposalTag {
+  readonly brandId: ConnectId;
+  readonly proposedAt: IsoDateTime;
+}
+
+export interface ConceptProposal {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly brandId: ConnectId;
+  readonly status: ConceptProposalStatus;
+  readonly mockupUrls: readonly string[];
+  readonly materials: string | null;
+  readonly estUnitPrice: number | null;
+  readonly moq: number | null;
+  readonly estTurnaroundDays: number | null;
+  readonly note: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface ConceptClaim {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly brandId: ConnectId;
+  readonly proposalId: string | null;
+  readonly status: ConceptClaimStatus;
+  readonly awardedBy: ConnectId | null;
+  readonly awardedAt: IsoDateTime;
+  /** Flipped false ONLY by catalogue conversion; the claim row persists. */
+  readonly attributionPublic: boolean;
+  readonly attributionNote: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface ConceptStatusLogEntry {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly claimId: string;
+  readonly status: ConceptStage;
+  readonly note: string | null;
+  readonly createdBy: ConnectId | null;
+  readonly createdAt: IsoDateTime;
+}
+
+export interface RoyaltyObligation {
+  readonly id: string;
+  readonly claimId: string;
+  readonly kind: RoyaltyKind;
+  readonly pct: number;
+  readonly thresholdUnits: number | null;
+  readonly status: RoyaltyStatus;
+  readonly proofUrl: string | null;
+  readonly proofNote: string | null;
+  readonly proofSubmittedAt: IsoDateTime | null;
+  readonly closedAt: IsoDateTime | null;
+  readonly closedBy: ConnectId | null;
+  readonly closedNote: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface CatalogueConversion {
+  readonly id: string;
+  readonly claimId: string;
+  readonly status: CatalogueConversionStatus;
+  readonly proposedBy: ConnectId | null;
+  readonly proposedAt: IsoDateTime;
+  readonly respondedBy: ConnectId | null;
+  readonly respondedAt: IsoDateTime | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface BrandVerification {
+  readonly brandId: ConnectId;
+  readonly status: BrandVerificationStatus;
+  readonly note: string | null;
+  readonly requestedBy: ConnectId | null;
+  readonly requestedAt: IsoDateTime;
+  readonly reviewedBy: ConnectId | null;
+  readonly reviewedAt: IsoDateTime | null;
+  readonly reviewNote: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface CreateConceptInput {
+  readonly creatorId: ConnectId;
+  readonly title: string;
+  readonly description?: string | null;
+  readonly media?: readonly Omit<ConceptMedia, 'id' | 'conceptId'>[];
+}
+
+export interface UpdateConceptInput {
+  readonly title?: string;
+  readonly description?: string | null;
+  /** Replace-all media set (artwork is frozen once claimed). */
+  readonly media?: readonly Omit<ConceptMedia, 'id' | 'conceptId'>[];
+}
+
+export interface ConceptListFilter extends PageParams {
+  readonly status?: ConceptStage;
+  readonly creatorId?: ConnectId;
+}
+
+/**
+ * Concepts + their media + upvotes. Creator may edit/delete ONLY while the
+ * concept is 'proposed' (post-award the design is production input); a
+ * moderator may delete at any stage (mig-145 takedown). Reads are public.
+ */
+export interface ConceptRepo {
+  create(input: CreateConceptInput): Promise<ConceptWithMedia>;
+  getById(id: string): Promise<ConceptWithMedia | null>;
+  /** Public browse, newest first, optional stage/creator filter. */
+  list(filter?: ConceptListFilter): Promise<Page<ConceptWithMedia>>;
+  update(conceptId: string, callerId: ConnectId, patch: UpdateConceptInput): Promise<ConceptWithMedia>;
+  delete(conceptId: string, callerId: ConnectId): Promise<void>;
+  upvote(conceptId: string, userId: ConnectId): Promise<ConceptUpvote>;
+  removeUpvote(conceptId: string, userId: ConnectId): Promise<void>;
+  upvoteCount(conceptId: string): Promise<number>;
+  hasUpvoted(conceptId: string, userId: ConnectId): Promise<boolean>;
+}
+
+export interface CreateProposalInput {
+  readonly conceptId: string;
+  readonly brandId: ConnectId;
+  readonly mockupUrls?: readonly string[];
+  readonly materials?: string | null;
+  readonly estUnitPrice?: number | null;
+  readonly moq?: number | null;
+  readonly estTurnaroundDays?: number | null;
+  readonly note?: string | null;
+}
+
+export interface UpdateProposalInput {
+  readonly mockupUrls?: readonly string[];
+  readonly materials?: string | null;
+  readonly estUnitPrice?: number | null;
+  readonly moq?: number | null;
+  readonly estTurnaroundDays?: number | null;
+  readonly note?: string | null;
+}
+
+/**
+ * Brand proposals. Details are PRIVATE to the concept's creator, the
+ * proposing brand's owner, and moderators; the public sees only
+ * `publicTags`. Only VERIFIED brands may pitch, only while the concept is
+ * open, never across a block. One proposal per (concept, brand).
+ */
+export interface ConceptProposalRepo {
+  create(callerId: ConnectId, input: CreateProposalInput): Promise<ConceptProposal>;
+  /** Party-scoped read — returns null for everyone else (RLS semantics). */
+  getById(id: string, callerId: ConnectId): Promise<ConceptProposal | null>;
+  /** Proposals on a concept visible to `callerId` under the party predicate. */
+  listForConcept(conceptId: string, callerId: ConnectId): Promise<readonly ConceptProposal[]>;
+  /** A brand's pipeline (owner or moderator view). */
+  listForBrand(brandId: ConnectId, callerId: ConnectId): Promise<readonly ConceptProposal[]>;
+  /** Edit while 'submitted' (brand must still be verified, concept open). */
+  update(proposalId: string, callerId: ConnectId, patch: UpdateProposalInput): Promise<ConceptProposal>;
+  /** Withdraw while bidding (allowed even if verification lapsed mid-bid). */
+  withdraw(proposalId: string, callerId: ConnectId): Promise<ConceptProposal>;
+  /** Re-enter a withdrawn/declined proposal once the concept is open again. */
+  resubmit(proposalId: string, callerId: ConnectId): Promise<ConceptProposal>;
+  /** PUBLIC brand tags (anon-safe; mirrors wear.get_concept_proposal_tags). */
+  publicTags(conceptId: string): Promise<readonly ConceptProposalTag[]>;
+}
+
+/**
+ * Exclusive claims. `award` mirrors `wear.award_concept_claim`: creator-only,
+ * winning proposal → 'awarded', all other submitted proposals → 'declined',
+ * concept → 'claimed', a 'claimed' log entry, and the milestone royalty
+ * (10% / first 100 units) committed atomically. Claims are public reads;
+ * `revoke` is the admin dispute lever (re-opens the concept).
+ */
+export interface ConceptClaimRepo {
+  award(proposalId: string, callerId: ConnectId): Promise<ConceptClaim>;
+  getById(claimId: string): Promise<ConceptClaim | null>;
+  getActiveForConcept(conceptId: string): Promise<ConceptClaim | null>;
+  listForBrand(brandId: ConnectId): Promise<readonly ConceptClaim[]>;
+  revoke(claimId: string, callerId: ConnectId): Promise<ConceptClaim>;
+}
+
+/**
+ * The append-only public timeline. `advance` mirrors
+ * `wear.advance_concept_status`: active-claim brand owner only, forward-only
+ * (enum order IS lifecycle order, skips allowed), never back to/below
+ * 'claimed'. Advancing to 'released' auto-creates the "Completed Concepts"
+ * post (artwork copied, attribution relational via `posts.conceptId`).
+ */
+export interface ConceptStatusLogRepo {
+  listForConcept(conceptId: string): Promise<readonly ConceptStatusLogEntry[]>;
+  advance(
+    conceptId: string,
+    callerId: ConnectId,
+    status: ConceptStage,
+    note?: string | null,
+  ): Promise<ConceptStatusLogEntry>;
+}
+
+/**
+ * Royalty obligations. Party-scoped reads (proof docs may carry sales data).
+ * `submitProof` is brand-side (milestone only, re-submission allowed while
+ * open); `close` is creator-side confirmation of a submitted proof — or an
+ * admin from any open state (dispute lever).
+ */
+export interface RoyaltyRepo {
+  listForClaim(claimId: string, callerId: ConnectId): Promise<readonly RoyaltyObligation[]>;
+  /** Every obligation where the caller is the brand owner or the creator. */
+  listForUser(callerId: ConnectId): Promise<readonly RoyaltyObligation[]>;
+  submitProof(
+    obligationId: string,
+    callerId: ConnectId,
+    proofUrl: string,
+    note?: string | null,
+  ): Promise<RoyaltyObligation>;
+  close(obligationId: string, callerId: ConnectId): Promise<RoyaltyObligation>;
+}
+
+/**
+ * Catalogue-conversion handshake (two-party). Brand proposes once released;
+ * creator accepts (public tag dropped, milestone royalty closed as
+ * superseded, lifetime 5% committed "in its place") or declines; brand may
+ * cancel a pending handshake. One open-or-accepted handshake per claim.
+ */
+export interface CatalogueConversionRepo {
+  propose(claimId: string, callerId: ConnectId): Promise<CatalogueConversion>;
+  respond(conversionId: string, callerId: ConnectId, accept: boolean): Promise<CatalogueConversion>;
+  cancel(conversionId: string, callerId: ConnectId): Promise<CatalogueConversion>;
+  listForClaim(claimId: string, callerId: ConnectId): Promise<readonly CatalogueConversion[]>;
+}
+
+/**
+ * Brand-verification lifecycle. Owner requests ('pending'); owner may
+ * RE-request only after 'rejected'; review (approve/reject/revoke) is
+ * ADMIN-only. The outcome syncs `WearBrand.verified` (the authoritative
+ * badge + marketplace gate).
+ */
+export interface BrandVerificationRepo {
+  request(brandId: ConnectId, callerId: ConnectId, note?: string | null): Promise<BrandVerification>;
+  /** Owner/moderator read — null for everyone else (RLS semantics). */
+  getForBrand(brandId: ConnectId, callerId: ConnectId): Promise<BrandVerification | null>;
+  /** Moderation queue: all pending requests (moderator); own rows otherwise. */
+  listPending(callerId: ConnectId): Promise<readonly BrandVerification[]>;
+  review(
+    brandId: ConnectId,
+    callerId: ConnectId,
+    decision: Extract<BrandVerificationStatus, 'approved' | 'rejected' | 'revoked'>,
+    reviewNote?: string | null,
+  ): Promise<BrandVerification>;
+}
+
+/**
+ * Platform roles (mig 145). Under RLS a user can only read their OWN row
+ * (`user_roles` is service_role-managed, self-SELECT only), so the repo
+ * exposes exactly that.
+ */
+export interface RoleRepo {
+  getOwn(userId: ConnectId): Promise<WearPlatformRole | null>;
+}
+
 /** The full Wear data surface. */
 export interface WearStore {
   readonly users: UserRepo;
@@ -607,6 +961,14 @@ export interface WearStore {
   readonly messages: MessageRepo;
   readonly blocks: BlockRepo;
   readonly reports: ReportRepo;
+  readonly concepts: ConceptRepo;
+  readonly conceptProposals: ConceptProposalRepo;
+  readonly conceptClaims: ConceptClaimRepo;
+  readonly conceptStatusLog: ConceptStatusLogRepo;
+  readonly royalties: RoyaltyRepo;
+  readonly conversions: CatalogueConversionRepo;
+  readonly brandVerifications: BrandVerificationRepo;
+  readonly roles: RoleRepo;
 }
 
 /** Errors thrown by a `WearStore`. */

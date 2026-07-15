@@ -48,3 +48,7 @@ Old version/
 apps/wear/public/
 apps/wear/mobile-dist/
 apps/wear/src/frontend/config.js
+
+.vercel
+.env*.local
+.pnpm/

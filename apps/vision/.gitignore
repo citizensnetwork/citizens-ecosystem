@@ -65,3 +65,6 @@ supabase/.branches/
 /public/config.js
 /public/config.example.js
 /public/app/
+
+.vercel
+.env*

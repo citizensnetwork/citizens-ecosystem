@@ -183,12 +183,47 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-02, project `xyiajtrvhlxaeplsiajj`, head = mig 146)
+## 9. Verification snapshot (updated 2026-07-14, project `xyiajtrvhlxaeplsiajj`, head = **mig 157**)
+
+> **2026-07-14: mig 157 (`wear` Concepts marketplace) APPLIED** (`20260714… /
+> 157_wear_concepts_marketplace`; pre-apply tag `connect-pre-mig157`). **Advisor baseline at
+> head 157: 0 ERROR / 101 WARN / 3 INFO.** WARN 92→101 = exactly the **9 intentional SECDEF
+> EXECUTE grants mig 157 itself makes** (8× `authenticated` on the new marketplace RPCs + 1×
+> `anon` on `get_concept_proposal_tags`, the deliberately public tag reader) — the same
+> retained-by-design category as Connect's kept fns and Vision's +20. Zero unexpected findings.
+> **Correction:** the linter DOES now surface `wear.*` SECDEF fns (the 92 baseline already
+> contained 6 pre-existing ones from migs 143–145) — the older "not surfaced" note below is
+> obsolete. Rolled-back prod smokes all PASS (verified-column guard 42501; unverified-brand
+> proposal denied; full happy path concept→propose→award→advance→released-auto-post→conversion;
+> non-creator award 42501; backwards/repeat stage rejected; direct status-log insert denied).
+>
+> **2026-07-13 lineage reconciliation:** `list_migrations` shows migrations **147–156 (Vision
+> DDL)** were applied 2026-07-03/04 from the **standalone `citizens-connect` checkout** while the
+> monorepo ran parallel Wear sessions; the ten files were reconciled into this monorepo lineage
+> (EOL-only diffs) on 2026-07-13. (WARN 72→92 = +20 `authenticated_security_definer` from
+> Vision's intentional SECDEF pattern; `auth_leaked_password_protection` = the known HIBP
+> Pro-gate, RESUME §3P). The `vision.*` counts below predate migs 147–156 — re-count when
+> convenient.
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
-- **`wear.*` (mig 143 + 144 + 145 + 146):** **23 base tables** (all RLS-enabled, **0 without RLS**),
-  **48 RLS policies**, **9 functions** — `set_updated_at`; the two READ-path SECURITY DEFINER helpers
+- **`wear.*` (mig 143 + 144 + 145 + 146 + 157):** **32 base tables** (all RLS-enabled, **0 without
+  RLS**), **70 RLS policies**, **21 functions**, **19 enums**, **18 triggers** (live-counted
+  post-157). **Mig-157 Concepts marketplace tier:** 9 tables (`concepts`, `concept_media`,
+  `concept_upvotes`, `concept_proposals` — party-scoped details, `concept_claims` — one ACTIVE
+  claim per concept via partial unique index, `concept_status_log` — append-only by construction
+  (no write policy AND no write grant), `royalty_obligations`, `catalogue_conversions`,
+  `brand_verifications`), 7 enums (`concept_stage` in lifecycle order → forward-only = native
+  enum `<`), 8 SECDEF RPCs (`award_concept_claim`, `advance_concept_status`,
+  `propose/respond/cancel_catalogue_conversion`, `submit_royalty_proof`,
+  `close_royalty_obligation` — EXECUTE `authenticated`+`service_role`;
+  `get_concept_proposal_tags` — the ONLY anon-executable one, returns (brand_id, created_at)
+  only), 4 SECDEF/guard trigger fns (verified-column guard, brand-verified sync,
+  auto-Completed-Concepts post on `released`, concept re-open on claim revoke),
+  `posts.concept_id` (relational attribution), explicit least-priv grants (146 lesson). Also
+  closed 3 pre-existing holes: `brands.verified`/`profiles.verified` now admin-managed
+  (column-guard trigger); `posts`/`stories` `brand_id` writes now ownership-checked.
+  Pre-157 detail: `set_updated_at`; the two READ-path SECURITY DEFINER helpers
   `is_conversation_member` + `is_blocked_either`; the four **mig-144 write-path** helpers
   (`create_direct_conversation`, `create_group_conversation` — SECDEF RPCs, EXECUTE
   `authenticated`+`service_role` only, internal `auth.uid()` actor-guard; `bump_conversation_updated_at`,
@@ -205,7 +240,8 @@ Confirmed live:
   self-insert denied; moderator sees the queue, triages, `is_admin()` stays false. `wear.users` mirror
   carries **no email column** (display-safe, public-SELECT). **Security advisors: 0 ERROR** and **0 new
   findings** vs the mig-142 baseline (72 WARN / 3 INFO unchanged; all pre-existing `public.*`;
-  note the linter does not currently surface `wear.*` SECDEF fns at all).
+  the "linter does not surface `wear.*` SECDEF fns" observation made then is now OBSOLETE — see
+  the 2026-07-14 correction in the blockquote above).
   **PostgREST-exposed** (`wear` added to Exposed schemas, 2026-07-01). Mig 144 rationale: 143's RLS
   cannot express DM/group creation (inserting the *other* member's row), the `conversations.updated_at`
   bump, or block→symmetric-unfollow — the `SupabaseWearStore` port delegates those to these helpers,

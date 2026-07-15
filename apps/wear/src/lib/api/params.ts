@@ -27,6 +27,24 @@ export function bodyStringArray(body: unknown, key: string): string[] {
   return [];
 }
 
+/** Read a finite positive number from a parsed JSON body (else null). */
+export function bodyNumber(body: unknown, key: string): number | null {
+  if (body && typeof body === 'object' && key in body) {
+    const v = (body as Record<string, unknown>)[key];
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  }
+  return null;
+}
+
+/** Read a boolean field from a parsed JSON body (undefined when absent). */
+export function bodyBoolean(body: unknown, key: string): boolean | undefined {
+  if (body && typeof body === 'object' && key in body) {
+    const v = (body as Record<string, unknown>)[key];
+    if (typeof v === 'boolean') return v;
+  }
+  return undefined;
+}
+
 /** Safely parse a request JSON body, returning `{}` on any error. */
 export async function readJsonBody(req: Request): Promise<unknown> {
   try {

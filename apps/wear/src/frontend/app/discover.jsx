@@ -9,7 +9,7 @@
   const { GOLD, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote } = window.CWUI;
 
   function DiscoverScreen() {
-    const { openBrand, openUser } = useStore();
+    const { openBrand, openUser, openConcepts } = useStore();
     const [q, setQ] = useState('');
     const [results, setResults] = useState(null); // {users, brands} | null
     const [searching, setSearching] = useState(false);
@@ -184,6 +184,60 @@
             : h(
                 'div',
                 null,
+                // Concepts marketplace entry (mig 157)
+                h(
+                  'button',
+                  {
+                    onClick: openConcepts,
+                    style: {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 13,
+                      margin: '14px 18px 2px',
+                      width: 'calc(100% - 36px)',
+                      textAlign: 'left',
+                      background: '#0e0e0e',
+                      border: 'none',
+                      borderRadius: 18,
+                      padding: '16px 18px',
+                    },
+                  },
+                  h(
+                    'div',
+                    {
+                      style: {
+                        width: 42,
+                        height: 42,
+                        borderRadius: 13,
+                        background: 'rgba(242,186,27,0.16)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flex: 'none',
+                      },
+                    },
+                    Icon('tee', { size: 22, color: GOLD }),
+                  ),
+                  h(
+                    'div',
+                    { style: { flex: 1, minWidth: 0, lineHeight: 1.35 } },
+                    h(
+                      'div',
+                      { style: { fontSize: 14, fontWeight: 800, color: '#fff' } },
+                      'Concepts marketplace',
+                    ),
+                    h(
+                      'div',
+                      { style: { fontSize: 11.5, color: '#b9b7b0', fontWeight: 500 } },
+                      'Post a design · brands propose · royalties honoured',
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { style: { transform: 'rotate(180deg)', display: 'flex', flex: 'none' } },
+                    Icon('back', { size: 18, color: GOLD }),
+                  ),
+                ),
                 // Featured brands rail
                 sectionTitle('Featured Brands', '14px 18px 12px'),
                 state.brands.length

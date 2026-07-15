@@ -2,9 +2,25 @@ import type {
   BlockEdge,
   BlockRepo,
   BrandRepo,
+  BrandVerification,
+  BrandVerificationRepo,
+  CatalogueConversion,
+  CatalogueConversionRepo,
   Comment,
   CommentLikeEdge,
   CommentRepo,
+  Concept,
+  ConceptClaim,
+  ConceptClaimRepo,
+  ConceptMedia,
+  ConceptProposal,
+  ConceptProposalRepo,
+  ConceptRepo,
+  ConceptStage,
+  ConceptStatusLogEntry,
+  ConceptStatusLogRepo,
+  ConceptUpvote,
+  ConceptWithMedia,
   ConnectId,
   Conversation,
   ConversationMember,
@@ -31,6 +47,9 @@ import type {
   ProfileRepo,
   Report,
   ReportRepo,
+  RoleRepo,
+  RoyaltyObligation,
+  RoyaltyRepo,
   SaveCollection,
   SaveRepo,
   SettingsRepo,
@@ -44,10 +63,11 @@ import type {
   UserRepo,
   UserSettings,
   WearBrand,
+  WearPlatformRole,
   WearStore,
   WearUser,
 } from './contract';
-import { WearStoreError } from './contract';
+import { CONCEPT_STAGES, WearStoreError } from './contract';
 import { extractHashtags, normaliseHashtag } from './hashtags';
 
 /**
@@ -75,6 +95,8 @@ export interface MemoryWearStoreOptions {
     readonly messages?: readonly Message[];
   }[];
   readonly seedBlocks?: readonly BlockEdge[];
+  /** Mig-145 platform roles (service_role-managed in prod; seed-only here). */
+  readonly seedRoles?: readonly { readonly userId: ConnectId; readonly role: WearPlatformRole }[];
 }
 
 export class MemoryWearStore implements WearStore {
@@ -93,6 +115,14 @@ export class MemoryWearStore implements WearStore {
   public readonly messages: MessageRepo;
   public readonly blocks: BlockRepo;
   public readonly reports: ReportRepo;
+  public readonly concepts: ConceptRepo;
+  public readonly conceptProposals: ConceptProposalRepo;
+  public readonly conceptClaims: ConceptClaimRepo;
+  public readonly conceptStatusLog: ConceptStatusLogRepo;
+  public readonly royalties: RoyaltyRepo;
+  public readonly conversions: CatalogueConversionRepo;
+  public readonly brandVerifications: BrandVerificationRepo;
+  public readonly roles: RoleRepo;
 
   private readonly _now: () => Date;
   private readonly _users = new Map<ConnectId, WearUser>();
@@ -126,6 +156,20 @@ export class MemoryWearStore implements WearStore {
   /** Keyed by `${actorId}->${targetId}`. */
   private readonly _blocks = new Map<string, BlockEdge>();
   private readonly _reports = new Map<string, Report>();
+  // Mig 145 — platform roles
+  private readonly _roles = new Map<ConnectId, WearPlatformRole>();
+  // Mig 157 — Concepts marketplace
+  private readonly _concepts = new Map<string, Concept>();
+  private readonly _conceptMedia = new Map<string, ConceptMedia[]>();
+  /** Keyed by `${conceptId}:${userId}`. */
+  private readonly _conceptUpvotes = new Map<string, ConceptUpvote>();
+  private readonly _conceptProposals = new Map<string, ConceptProposal>();
+  private readonly _conceptClaims = new Map<string, ConceptClaim>();
+  private readonly _conceptStatusLog = new Map<string, ConceptStatusLogEntry>();
+  private readonly _royalties = new Map<string, RoyaltyObligation>();
+  private readonly _conversions = new Map<string, CatalogueConversion>();
+  /** Keyed by brandId (PK — one lifecycle row per brand). */
+  private readonly _brandVerifications = new Map<ConnectId, BrandVerification>();
   private _nextId = 1;
 
   public constructor(options: MemoryWearStoreOptions = {}) {
@@ -170,6 +214,9 @@ export class MemoryWearStore implements WearStore {
     }
     for (const b of options.seedBlocks ?? []) {
       this._blocks.set(edgeKey(b.actorId, b.targetId), b);
+    }
+    for (const r of options.seedRoles ?? []) {
+      this._roles.set(r.userId, r.role);
     }
 
     this.users = {
@@ -410,6 +457,7 @@ export class MemoryWearStore implements WearStore {
           createdAt,
           updatedAt: createdAt,
           taggedProductIds: [...(input.taggedProductIds ?? [])],
+          conceptId: null,
         };
         const media: PostMedia[] = (input.media ?? []).map((m, i) => ({
           ...m,
@@ -1118,6 +1166,9 @@ export class MemoryWearStore implements WearStore {
           subjectId,
           reason,
           note: (note ?? '').trim() ? note!.trim().slice(0, 2000) : null,
+          status: 'open',
+          handledBy: null,
+          handledAt: null,
           createdAt: this._now().toISOString(),
         };
         this._reports.set(report.id, report);
@@ -1131,11 +1182,856 @@ export class MemoryWearStore implements WearStore {
         [...this._reports.values()]
           .filter((r) => r.reporterId === reporterId)
           .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+      listForModeration: async (callerId, filter) => {
+        if (!this._isModerator(callerId)) {
+          throw new WearStoreError('forbidden', 'Moderators only.');
+        }
+        return [...this._reports.values()]
+          .filter((r) => !filter?.status || r.status === filter.status)
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      },
+      triage: async (reportId, callerId, status) => {
+        if (!this._isModerator(callerId)) {
+          throw new WearStoreError('forbidden', 'Moderators only.');
+        }
+        const report = this._reports.get(reportId);
+        if (!report) {
+          throw new WearStoreError('report_not_found', `Unknown report ${reportId}.`);
+        }
+        const next: Report = {
+          ...report,
+          status,
+          handledBy: callerId,
+          handledAt: this._now().toISOString(),
+        };
+        this._reports.set(reportId, next);
+        return next;
+      },
+    };
+
+    this.roles = {
+      getOwn: async (userId) => this._roles.get(userId) ?? null,
+    };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Mig 157 — Concepts marketplace. The rules below ARE the semantic spec
+    // for `SupabaseWearStore`: they mirror the RLS policies + SECDEF RPCs of
+    // migration 157, and error codes equal the RPCs' raise messages.
+    // ─────────────────────────────────────────────────────────────────────
+    this.concepts = {
+      create: async (input) => {
+        const title = input.title.trim();
+        if (!title) {
+          throw new WearStoreError('empty_concept', 'Concept title must not be empty.');
+        }
+        const ts = this._now().toISOString();
+        const concept: Concept = {
+          id: this._id('cpt'),
+          creatorId: input.creatorId,
+          title,
+          description: (input.description ?? '').trim() || null,
+          status: 'proposed',
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._concepts.set(concept.id, concept);
+        this._conceptMedia.set(
+          concept.id,
+          (input.media ?? []).map((m, i) => ({
+            ...m,
+            id: this._id('cme'),
+            conceptId: concept.id,
+            orderIndex: m.orderIndex ?? i,
+          })),
+        );
+        return this._readConcept(concept.id)!;
+      },
+      getById: async (id) => this._readConcept(id),
+      list: async (filter) => {
+        const items = [...this._concepts.values()]
+          .filter((c) => !filter?.status || c.status === filter.status)
+          .filter((c) => !filter?.creatorId || c.creatorId === filter.creatorId)
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+          .map((c) => this._readConcept(c.id)!);
+        return paginateList(items, filter);
+      },
+      update: async (conceptId, callerId, patch) => {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        if (concept.creatorId !== callerId) {
+          throw new WearStoreError('forbidden', 'Only the creator can edit this concept.');
+        }
+        if (concept.status !== 'proposed') {
+          throw new WearStoreError('concept_not_open', 'Concept is frozen once claimed.');
+        }
+        const title = patch.title !== undefined ? patch.title.trim() : concept.title;
+        if (!title) {
+          throw new WearStoreError('empty_concept', 'Concept title must not be empty.');
+        }
+        const next: Concept = {
+          ...concept,
+          title,
+          ...(patch.description !== undefined
+            ? { description: (patch.description ?? '').trim() || null }
+            : {}),
+          updatedAt: this._now().toISOString(),
+        };
+        this._concepts.set(conceptId, next);
+        if (patch.media !== undefined) {
+          this._conceptMedia.set(
+            conceptId,
+            patch.media.map((m, i) => ({
+              ...m,
+              id: this._id('cme'),
+              conceptId,
+              orderIndex: m.orderIndex ?? i,
+            })),
+          );
+        }
+        return this._readConcept(conceptId)!;
+      },
+      delete: async (conceptId, callerId) => {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) return;
+        if (!this._isModerator(callerId)) {
+          if (concept.creatorId !== callerId) {
+            throw new WearStoreError('forbidden', 'Only the creator can delete this concept.');
+          }
+          if (concept.status !== 'proposed') {
+            throw new WearStoreError('concept_not_open', 'Concept is frozen once claimed.');
+          }
+        }
+        // FK cascade (mig 157): media, upvotes, proposals, claims, log rows.
+        this._concepts.delete(conceptId);
+        this._conceptMedia.delete(conceptId);
+        for (const key of [...this._conceptUpvotes.keys()]) {
+          if (key.startsWith(`${conceptId}:`)) this._conceptUpvotes.delete(key);
+        }
+        const claimIds = new Set<string>();
+        for (const [id, cl] of [...this._conceptClaims.entries()]) {
+          if (cl.conceptId === conceptId) {
+            claimIds.add(id);
+            this._conceptClaims.delete(id);
+          }
+        }
+        for (const [id, p] of [...this._conceptProposals.entries()]) {
+          if (p.conceptId === conceptId) this._conceptProposals.delete(id);
+        }
+        for (const [id, entry] of [...this._conceptStatusLog.entries()]) {
+          if (entry.conceptId === conceptId) this._conceptStatusLog.delete(id);
+        }
+        for (const [id, ob] of [...this._royalties.entries()]) {
+          if (claimIds.has(ob.claimId)) this._royalties.delete(id);
+        }
+        for (const [id, conv] of [...this._conversions.entries()]) {
+          if (claimIds.has(conv.claimId)) this._conversions.delete(id);
+        }
+      },
+      upvote: async (conceptId, userId) => {
+        if (!this._concepts.has(conceptId)) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        const key = `${conceptId}:${userId}`;
+        const existing = this._conceptUpvotes.get(key);
+        if (existing) return existing;
+        const vote: ConceptUpvote = { conceptId, userId, createdAt: this._now().toISOString() };
+        this._conceptUpvotes.set(key, vote);
+        return vote;
+      },
+      removeUpvote: async (conceptId, userId) => {
+        this._conceptUpvotes.delete(`${conceptId}:${userId}`);
+      },
+      upvoteCount: async (conceptId) => {
+        let n = 0;
+        for (const v of this._conceptUpvotes.values()) if (v.conceptId === conceptId) n += 1;
+        return n;
+      },
+      hasUpvoted: async (conceptId, userId) => this._conceptUpvotes.has(`${conceptId}:${userId}`),
+    };
+
+    this.conceptProposals = {
+      create: async (callerId, input) => {
+        const brand = this._brands.get(input.brandId);
+        if (!brand) {
+          throw new WearStoreError('brand_not_found', `Unknown brand ${input.brandId}.`);
+        }
+        if (brand.ownerUserId !== callerId) {
+          throw new WearStoreError('forbidden', 'Only the brand owner can propose.');
+        }
+        if (!brand.verified) {
+          throw new WearStoreError('brand_not_verified', 'Only verified brands may propose.');
+        }
+        const concept = this._concepts.get(input.conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${input.conceptId}.`);
+        }
+        if (concept.status !== 'proposed') {
+          throw new WearStoreError('concept_not_open', 'Concept is no longer open for proposals.');
+        }
+        if (this._isBlockedEither(callerId, concept.creatorId)) {
+          throw new WearStoreError('forbidden', 'Cannot propose across a block.');
+        }
+        for (const p of this._conceptProposals.values()) {
+          if (p.conceptId === input.conceptId && p.brandId === input.brandId) {
+            throw new WearStoreError('proposal_exists', 'This brand already proposed.');
+          }
+        }
+        const ts = this._now().toISOString();
+        const proposal: ConceptProposal = {
+          id: this._id('cpp'),
+          conceptId: input.conceptId,
+          brandId: input.brandId,
+          status: 'submitted',
+          mockupUrls: [...(input.mockupUrls ?? [])],
+          materials: (input.materials ?? '').trim() || null,
+          estUnitPrice: input.estUnitPrice ?? null,
+          moq: input.moq ?? null,
+          estTurnaroundDays: input.estTurnaroundDays ?? null,
+          note: (input.note ?? '').trim() || null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._conceptProposals.set(proposal.id, proposal);
+        return proposal;
+      },
+      getById: async (id, callerId) => {
+        const p = this._conceptProposals.get(id);
+        if (!p || !this._canSeeProposal(p, callerId)) return null;
+        return p;
+      },
+      listForConcept: async (conceptId, callerId) =>
+        [...this._conceptProposals.values()]
+          .filter((p) => p.conceptId === conceptId && this._canSeeProposal(p, callerId))
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+      listForBrand: async (brandId, callerId) =>
+        [...this._conceptProposals.values()]
+          .filter((p) => p.brandId === brandId && this._canSeeProposal(p, callerId))
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+      update: async (proposalId, callerId, patch) => {
+        const proposal = this._requireOwnedProposal(proposalId, callerId);
+        if (proposal.status !== 'submitted') {
+          throw new WearStoreError('proposal_not_open', 'Only a submitted proposal can be edited.');
+        }
+        const brand = this._brands.get(proposal.brandId);
+        if (!brand?.verified) {
+          throw new WearStoreError('brand_not_verified', 'Brand verification lapsed.');
+        }
+        const concept = this._concepts.get(proposal.conceptId);
+        if (!concept || concept.status !== 'proposed') {
+          throw new WearStoreError('concept_not_open', 'Concept is no longer open.');
+        }
+        const next: ConceptProposal = {
+          ...proposal,
+          ...(patch.mockupUrls !== undefined ? { mockupUrls: [...patch.mockupUrls] } : {}),
+          ...(patch.materials !== undefined
+            ? { materials: (patch.materials ?? '').trim() || null }
+            : {}),
+          ...(patch.estUnitPrice !== undefined ? { estUnitPrice: patch.estUnitPrice } : {}),
+          ...(patch.moq !== undefined ? { moq: patch.moq } : {}),
+          ...(patch.estTurnaroundDays !== undefined
+            ? { estTurnaroundDays: patch.estTurnaroundDays }
+            : {}),
+          ...(patch.note !== undefined ? { note: (patch.note ?? '').trim() || null } : {}),
+          updatedAt: this._now().toISOString(),
+        };
+        this._conceptProposals.set(proposalId, next);
+        return next;
+      },
+      withdraw: async (proposalId, callerId) => {
+        const proposal = this._requireOwnedProposal(proposalId, callerId);
+        if (proposal.status === 'awarded') {
+          throw new WearStoreError('forbidden', 'An awarded proposal cannot be withdrawn.');
+        }
+        if (proposal.status === 'withdrawn') return proposal;
+        const next: ConceptProposal = {
+          ...proposal,
+          status: 'withdrawn',
+          updatedAt: this._now().toISOString(),
+        };
+        this._conceptProposals.set(proposalId, next);
+        return next;
+      },
+      resubmit: async (proposalId, callerId) => {
+        const proposal = this._requireOwnedProposal(proposalId, callerId);
+        if (proposal.status !== 'withdrawn' && proposal.status !== 'declined') {
+          throw new WearStoreError('proposal_not_open', 'Only withdrawn/declined can re-enter.');
+        }
+        const brand = this._brands.get(proposal.brandId);
+        if (!brand?.verified) {
+          throw new WearStoreError('brand_not_verified', 'Only verified brands may propose.');
+        }
+        const concept = this._concepts.get(proposal.conceptId);
+        if (!concept || concept.status !== 'proposed') {
+          throw new WearStoreError('concept_not_open', 'Concept is no longer open.');
+        }
+        const next: ConceptProposal = {
+          ...proposal,
+          status: 'submitted',
+          updatedAt: this._now().toISOString(),
+        };
+        this._conceptProposals.set(proposalId, next);
+        return next;
+      },
+      publicTags: async (conceptId) =>
+        [...this._conceptProposals.values()]
+          .filter((p) => p.conceptId === conceptId && p.status !== 'withdrawn')
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+          .map((p) => ({ brandId: p.brandId, proposedAt: p.createdAt })),
+    };
+
+    this.conceptClaims = {
+      award: async (proposalId, callerId) => {
+        // Mirrors wear.award_concept_claim guard-for-guard, in order.
+        const proposal = this._conceptProposals.get(proposalId);
+        if (!proposal) {
+          throw new WearStoreError('proposal_not_found', `Unknown proposal ${proposalId}.`);
+        }
+        const concept = this._concepts.get(proposal.conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${proposal.conceptId}.`);
+        }
+        if (concept.creatorId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the creator can award their concept.');
+        }
+        if (concept.status !== 'proposed') {
+          throw new WearStoreError('concept_not_open', 'Concept already claimed.');
+        }
+        if (proposal.status !== 'submitted') {
+          throw new WearStoreError('proposal_not_open', 'Proposal is not open.');
+        }
+        const brand = this._brands.get(proposal.brandId);
+        if (!brand || !brand.verified) {
+          throw new WearStoreError('brand_not_verified', 'Brand is not verified.');
+        }
+        if (this._isBlockedEither(callerId, brand.ownerUserId)) {
+          throw new WearStoreError('forbidden', 'Cannot award across a block.');
+        }
+        const ts = this._now().toISOString();
+        const claim: ConceptClaim = {
+          id: this._id('clm'),
+          conceptId: concept.id,
+          brandId: proposal.brandId,
+          proposalId: proposal.id,
+          status: 'active',
+          awardedBy: callerId,
+          awardedAt: ts,
+          attributionPublic: true,
+          attributionNote: null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._conceptClaims.set(claim.id, claim);
+        this._conceptProposals.set(proposal.id, { ...proposal, status: 'awarded', updatedAt: ts });
+        for (const [id, p] of this._conceptProposals.entries()) {
+          if (p.conceptId === concept.id && p.id !== proposal.id && p.status === 'submitted') {
+            this._conceptProposals.set(id, { ...p, status: 'declined', updatedAt: ts });
+          }
+        }
+        this._concepts.set(concept.id, { ...concept, status: 'claimed', updatedAt: ts });
+        const entry: ConceptStatusLogEntry = {
+          id: this._id('csl'),
+          conceptId: concept.id,
+          claimId: claim.id,
+          status: 'claimed',
+          note: null,
+          createdBy: callerId,
+          createdAt: ts,
+        };
+        this._conceptStatusLog.set(entry.id, entry);
+        // Doc §3.1: 10% on the first 100 units, committed at the point of claim.
+        const royalty: RoyaltyObligation = {
+          id: this._id('roy'),
+          claimId: claim.id,
+          kind: 'milestone',
+          pct: 10,
+          thresholdUnits: 100,
+          status: 'active',
+          proofUrl: null,
+          proofNote: null,
+          proofSubmittedAt: null,
+          closedAt: null,
+          closedBy: null,
+          closedNote: null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._royalties.set(royalty.id, royalty);
+        return claim;
+      },
+      getById: async (claimId) => this._conceptClaims.get(claimId) ?? null,
+      getActiveForConcept: async (conceptId) => {
+        for (const cl of this._conceptClaims.values()) {
+          if (cl.conceptId === conceptId && cl.status === 'active') return cl;
+        }
+        return null;
+      },
+      listForBrand: async (brandId) =>
+        [...this._conceptClaims.values()]
+          .filter((cl) => cl.brandId === brandId)
+          .sort((a, b) => Date.parse(b.awardedAt) - Date.parse(a.awardedAt)),
+      revoke: async (claimId, callerId) => {
+        const claim = this._conceptClaims.get(claimId);
+        if (!claim) {
+          throw new WearStoreError('claim_not_found', `Unknown claim ${claimId}.`);
+        }
+        if (!this._isAdmin(callerId)) {
+          throw new WearStoreError('forbidden', 'Only an admin can revoke a claim.');
+        }
+        if (claim.status === 'revoked') return claim;
+        const ts = this._now().toISOString();
+        const next: ConceptClaim = { ...claim, status: 'revoked', updatedAt: ts };
+        this._conceptClaims.set(claimId, next);
+        // Mirrors trg_reopen_concept_on_claim_revoke.
+        const concept = this._concepts.get(claim.conceptId);
+        if (concept) {
+          this._concepts.set(concept.id, { ...concept, status: 'proposed', updatedAt: ts });
+        }
+        return next;
+      },
+    };
+
+    this.conceptStatusLog = {
+      listForConcept: async (conceptId) =>
+        [...this._conceptStatusLog.values()]
+          .filter((e) => e.conceptId === conceptId)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id)),
+      advance: async (conceptId, callerId, status, note) => {
+        // Mirrors wear.advance_concept_status guard-for-guard, in order.
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        const claim = await this.conceptClaims.getActiveForConcept(conceptId);
+        if (!claim) {
+          throw new WearStoreError('no_active_claim', 'Concept has no active claim.');
+        }
+        const brand = this._brands.get(claim.brandId);
+        if (!brand || brand.ownerUserId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the claiming brand can advance.');
+        }
+        if (stageIndex(status) <= stageIndex('claimed')) {
+          throw new WearStoreError('invalid_stage', 'Brands own the log after claimed.');
+        }
+        if (stageIndex(status) <= stageIndex(concept.status)) {
+          throw new WearStoreError('stage_not_forward', 'Stage transitions are forward-only.');
+        }
+        const ts = this._now().toISOString();
+        const entry: ConceptStatusLogEntry = {
+          id: this._id('csl'),
+          conceptId,
+          claimId: claim.id,
+          status,
+          note: (note ?? '').trim().slice(0, 500) || null,
+          createdBy: callerId,
+          createdAt: ts,
+        };
+        this._conceptStatusLog.set(entry.id, entry);
+        this._concepts.set(conceptId, { ...concept, status, updatedAt: ts });
+        if (status === 'released') {
+          this._createCompletedConceptPost(claim);
+        }
+        return entry;
+      },
+    };
+
+    this.royalties = {
+      listForClaim: async (claimId, callerId) =>
+        [...this._royalties.values()]
+          .filter((ob) => ob.claimId === claimId && this._canSeeObligation(ob, callerId))
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+      listForUser: async (callerId) =>
+        [...this._royalties.values()]
+          .filter((ob) => this._canSeeObligation(ob, callerId))
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+      submitProof: async (obligationId, callerId, proofUrl, note) => {
+        // Mirrors wear.submit_royalty_proof guard-for-guard.
+        const ob = this._royalties.get(obligationId);
+        if (!ob) {
+          throw new WearStoreError('obligation_not_found', `Unknown obligation ${obligationId}.`);
+        }
+        if (ob.kind !== 'milestone') {
+          throw new WearStoreError('not_milestone', 'Proof applies to the milestone royalty.');
+        }
+        if (ob.status === 'closed') {
+          throw new WearStoreError('already_closed', 'Obligation already closed.');
+        }
+        const claim = this._conceptClaims.get(ob.claimId);
+        const brand = claim ? this._brands.get(claim.brandId) : undefined;
+        if (!brand || brand.ownerUserId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the claiming brand submits proof.');
+        }
+        const url = proofUrl.trim();
+        if (!url) {
+          throw new WearStoreError('proof_url_required', 'Provide a proof url.');
+        }
+        const ts = this._now().toISOString();
+        const next: RoyaltyObligation = {
+          ...ob,
+          status: 'proof_submitted',
+          proofUrl: url,
+          proofNote: (note ?? '').trim().slice(0, 500) || null,
+          proofSubmittedAt: ts,
+          updatedAt: ts,
+        };
+        this._royalties.set(obligationId, next);
+        return next;
+      },
+      close: async (obligationId, callerId) => {
+        // Mirrors wear.close_royalty_obligation guard-for-guard.
+        const ob = this._royalties.get(obligationId);
+        if (!ob) {
+          throw new WearStoreError('obligation_not_found', `Unknown obligation ${obligationId}.`);
+        }
+        if (ob.status === 'closed') {
+          throw new WearStoreError('already_closed', 'Obligation already closed.');
+        }
+        if (!this._isAdmin(callerId)) {
+          const claim = this._conceptClaims.get(ob.claimId);
+          const concept = claim ? this._concepts.get(claim.conceptId) : undefined;
+          if (ob.status !== 'proof_submitted' || !concept || concept.creatorId !== callerId) {
+            throw new WearStoreError('unauthorized', 'Creator confirms a submitted proof.');
+          }
+        }
+        const ts = this._now().toISOString();
+        const next: RoyaltyObligation = {
+          ...ob,
+          status: 'closed',
+          closedAt: ts,
+          closedBy: callerId,
+          updatedAt: ts,
+        };
+        this._royalties.set(obligationId, next);
+        return next;
+      },
+    };
+
+    this.conversions = {
+      propose: async (claimId, callerId) => {
+        // Mirrors wear.propose_catalogue_conversion guard-for-guard.
+        const claim = this._conceptClaims.get(claimId);
+        if (!claim || claim.status !== 'active') {
+          throw new WearStoreError('claim_not_active', 'Claim is not active.');
+        }
+        const brand = this._brands.get(claim.brandId);
+        if (!brand || brand.ownerUserId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the claiming brand can propose.');
+        }
+        const concept = this._concepts.get(claim.conceptId);
+        if (!concept || stageIndex(concept.status) < stageIndex('released')) {
+          throw new WearStoreError('not_released', 'Conversion requires a released concept.');
+        }
+        for (const conv of this._conversions.values()) {
+          if (conv.claimId === claimId && (conv.status === 'proposed' || conv.status === 'accepted')) {
+            throw new WearStoreError('conversion_already_open', 'A handshake is already open.');
+          }
+        }
+        const ts = this._now().toISOString();
+        const conversion: CatalogueConversion = {
+          id: this._id('ccv'),
+          claimId,
+          status: 'proposed',
+          proposedBy: callerId,
+          proposedAt: ts,
+          respondedBy: null,
+          respondedAt: null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._conversions.set(conversion.id, conversion);
+        return conversion;
+      },
+      respond: async (conversionId, callerId, accept) => {
+        // Mirrors wear.respond_catalogue_conversion guard-for-guard.
+        const conv = this._conversions.get(conversionId);
+        if (!conv || conv.status !== 'proposed') {
+          throw new WearStoreError('conversion_not_open', 'Conversion is not open.');
+        }
+        const claim = this._conceptClaims.get(conv.claimId);
+        if (!claim || claim.status !== 'active') {
+          throw new WearStoreError('claim_not_active', 'Claim is not active.');
+        }
+        const concept = this._concepts.get(claim.conceptId);
+        if (!concept || concept.creatorId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the creator can respond.');
+        }
+        const ts = this._now().toISOString();
+        if (!accept) {
+          const declined: CatalogueConversion = {
+            ...conv,
+            status: 'declined',
+            respondedBy: callerId,
+            respondedAt: ts,
+            updatedAt: ts,
+          };
+          this._conversions.set(conversionId, declined);
+          return declined;
+        }
+        const accepted: CatalogueConversion = {
+          ...conv,
+          status: 'accepted',
+          respondedBy: callerId,
+          respondedAt: ts,
+          updatedAt: ts,
+        };
+        this._conversions.set(conversionId, accepted);
+        // Public tag dropped; the claim row (concept↔item link) persists.
+        this._conceptClaims.set(claim.id, { ...claim, attributionPublic: false, updatedAt: ts });
+        // Milestone closed as superseded; lifetime 5% committed "in its place".
+        for (const [id, ob] of this._royalties.entries()) {
+          if (ob.claimId === claim.id && ob.kind === 'milestone' && ob.status !== 'closed') {
+            this._royalties.set(id, {
+              ...ob,
+              status: 'closed',
+              closedAt: ts,
+              closedBy: callerId,
+              closedNote: 'superseded by catalogue conversion (lifetime 5%)',
+              updatedAt: ts,
+            });
+          }
+        }
+        const hasLifetime = [...this._royalties.values()].some(
+          (ob) => ob.claimId === claim.id && ob.kind === 'lifetime',
+        );
+        if (!hasLifetime) {
+          const lifetimeId = this._id('roy');
+          this._royalties.set(lifetimeId, {
+            id: lifetimeId,
+            claimId: claim.id,
+            kind: 'lifetime',
+            pct: 5,
+            thresholdUnits: null,
+            status: 'active',
+            proofUrl: null,
+            proofNote: null,
+            proofSubmittedAt: null,
+            closedAt: null,
+            closedBy: null,
+            closedNote: null,
+            createdAt: ts,
+            updatedAt: ts,
+          });
+        }
+        return accepted;
+      },
+      cancel: async (conversionId, callerId) => {
+        // Mirrors wear.cancel_catalogue_conversion guard-for-guard.
+        const conv = this._conversions.get(conversionId);
+        if (!conv || conv.status !== 'proposed') {
+          throw new WearStoreError('conversion_not_open', 'Conversion is not open.');
+        }
+        const claim = this._conceptClaims.get(conv.claimId);
+        const brand = claim ? this._brands.get(claim.brandId) : undefined;
+        if (!brand || brand.ownerUserId !== callerId) {
+          throw new WearStoreError('unauthorized', 'Only the proposing brand can cancel.');
+        }
+        const ts = this._now().toISOString();
+        const cancelled: CatalogueConversion = { ...conv, status: 'cancelled', updatedAt: ts };
+        this._conversions.set(conversionId, cancelled);
+        return cancelled;
+      },
+      listForClaim: async (claimId, callerId) =>
+        [...this._conversions.values()]
+          .filter((conv) => conv.claimId === claimId && this._canSeeConversion(conv, callerId))
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    };
+
+    this.brandVerifications = {
+      request: async (brandId, callerId, note) => {
+        const brand = this._brands.get(brandId);
+        if (!brand) {
+          throw new WearStoreError('brand_not_found', `Unknown brand ${brandId}.`);
+        }
+        if (brand.ownerUserId !== callerId) {
+          throw new WearStoreError('forbidden', 'Only the brand owner can request verification.');
+        }
+        const ts = this._now().toISOString();
+        const existing = this._brandVerifications.get(brandId);
+        if (existing && existing.status !== 'rejected') {
+          throw new WearStoreError('verification_exists', 'A verification request already exists.');
+        }
+        const next: BrandVerification = existing
+          ? {
+              ...existing,
+              status: 'pending',
+              note: (note ?? '').trim().slice(0, 2000) || null,
+              requestedBy: callerId,
+              requestedAt: ts,
+              updatedAt: ts,
+            }
+          : {
+              brandId,
+              status: 'pending',
+              note: (note ?? '').trim().slice(0, 2000) || null,
+              requestedBy: callerId,
+              requestedAt: ts,
+              reviewedBy: null,
+              reviewedAt: null,
+              reviewNote: null,
+              createdAt: ts,
+              updatedAt: ts,
+            };
+        this._brandVerifications.set(brandId, next);
+        this._syncBrandVerified(brandId, next.status);
+        return next;
+      },
+      getForBrand: async (brandId, callerId) => {
+        const row = this._brandVerifications.get(brandId);
+        if (!row) return null;
+        const brand = this._brands.get(brandId);
+        const isOwner = !!brand && brand.ownerUserId === callerId;
+        if (!isOwner && !this._isModerator(callerId)) return null;
+        return row;
+      },
+      listPending: async (callerId) => {
+        const moderator = this._isModerator(callerId);
+        return [...this._brandVerifications.values()]
+          .filter((v) => v.status === 'pending')
+          .filter((v) => {
+            if (moderator) return true;
+            const brand = this._brands.get(v.brandId);
+            return !!brand && brand.ownerUserId === callerId;
+          })
+          .sort((a, b) => Date.parse(a.requestedAt) - Date.parse(b.requestedAt));
+      },
+      review: async (brandId, callerId, decision, reviewNote) => {
+        if (!this._isAdmin(callerId)) {
+          throw new WearStoreError('forbidden', 'Only an admin can review verification.');
+        }
+        const row = this._brandVerifications.get(brandId);
+        if (!row) {
+          throw new WearStoreError('verification_not_found', `No request for brand ${brandId}.`);
+        }
+        const ts = this._now().toISOString();
+        const next: BrandVerification = {
+          ...row,
+          status: decision,
+          reviewedBy: callerId,
+          reviewedAt: ts,
+          reviewNote: (reviewNote ?? '').trim().slice(0, 2000) || null,
+          updatedAt: ts,
+        };
+        this._brandVerifications.set(brandId, next);
+        this._syncBrandVerified(brandId, decision);
+        return next;
+      },
     };
   }
 
   private _isBlockedEither(a: ConnectId, b: ConnectId): boolean {
     return this._blocks.has(edgeKey(a, b)) || this._blocks.has(edgeKey(b, a));
+  }
+
+  // ── Mig 145/157 helpers ─────────────────────────────────────────────────
+  /** `wear.is_moderator()`: any platform-role row (admin included). */
+  private _isModerator(userId: ConnectId): boolean {
+    return this._roles.has(userId);
+  }
+
+  /** `wear.is_admin()`: role = 'admin'. */
+  private _isAdmin(userId: ConnectId): boolean {
+    return this._roles.get(userId) === 'admin';
+  }
+
+  private _readConcept(id: string): ConceptWithMedia | null {
+    const concept = this._concepts.get(id);
+    if (!concept) return null;
+    const media = [...(this._conceptMedia.get(id) ?? [])].sort(
+      (a, b) => a.orderIndex - b.orderIndex,
+    );
+    return { concept, media };
+  }
+
+  /** The mig-157 proposal party predicate: brand owner, creator, moderator. */
+  private _canSeeProposal(p: ConceptProposal, callerId: ConnectId): boolean {
+    if (this._isModerator(callerId)) return true;
+    const brand = this._brands.get(p.brandId);
+    if (brand && brand.ownerUserId === callerId) return true;
+    const concept = this._concepts.get(p.conceptId);
+    return !!concept && concept.creatorId === callerId;
+  }
+
+  private _claimParties(claimId: string): { ownerId: ConnectId | null; creatorId: ConnectId | null } {
+    const claim = this._conceptClaims.get(claimId);
+    if (!claim) return { ownerId: null, creatorId: null };
+    const brand = this._brands.get(claim.brandId);
+    const concept = this._concepts.get(claim.conceptId);
+    return { ownerId: brand?.ownerUserId ?? null, creatorId: concept?.creatorId ?? null };
+  }
+
+  private _canSeeObligation(ob: RoyaltyObligation, callerId: ConnectId): boolean {
+    if (this._isModerator(callerId)) return true;
+    const { ownerId, creatorId } = this._claimParties(ob.claimId);
+    return callerId === ownerId || callerId === creatorId;
+  }
+
+  private _canSeeConversion(conv: CatalogueConversion, callerId: ConnectId): boolean {
+    if (this._isModerator(callerId)) return true;
+    const { ownerId, creatorId } = this._claimParties(conv.claimId);
+    return callerId === ownerId || callerId === creatorId;
+  }
+
+  private _requireOwnedProposal(proposalId: string, callerId: ConnectId): ConceptProposal {
+    const proposal = this._conceptProposals.get(proposalId);
+    if (!proposal) {
+      throw new WearStoreError('proposal_not_found', `Unknown proposal ${proposalId}.`);
+    }
+    const brand = this._brands.get(proposal.brandId);
+    if (!brand || brand.ownerUserId !== callerId) {
+      throw new WearStoreError('forbidden', 'Only the proposing brand can do this.');
+    }
+    return proposal;
+  }
+
+  /**
+   * Mirrors `trg_completed_concept_post` (mig 157 §14): on 'released', create
+   * the "Completed Concepts" post as the brand owner, copy the concept
+   * artwork, duplicate-guarded per (concept, brand). The body carries NO
+   * usernames — attribution renders relationally via `post.conceptId`.
+   */
+  private _createCompletedConceptPost(claim: ConceptClaim): void {
+    if (claim.status !== 'active') return;
+    const brand = this._brands.get(claim.brandId);
+    if (!brand) return;
+    for (const p of this._posts.values()) {
+      if (p.conceptId === claim.conceptId && p.brandId === brand.id) return;
+    }
+    const concept = this._concepts.get(claim.conceptId);
+    const ts = this._now().toISOString();
+    const post: Post = {
+      id: this._id('pst'),
+      authorId: brand.ownerUserId,
+      brandId: brand.id,
+      body: `Completed Concept — "${concept?.title ?? 'Untitled'}"`,
+      createdAt: ts,
+      updatedAt: ts,
+      taggedProductIds: [],
+      conceptId: claim.conceptId,
+    };
+    this._posts.set(post.id, post);
+    this._postMedia.set(
+      post.id,
+      [...(this._conceptMedia.get(claim.conceptId) ?? [])].map((m) => ({
+        id: this._id('med'),
+        postId: post.id,
+        url: m.url,
+        kind: m.kind,
+        altText: m.altText,
+        orderIndex: m.orderIndex,
+      })),
+    );
+  }
+
+  /** Mirrors `trg_sync_brand_verified`: cache the outcome onto the brand. */
+  private _syncBrandVerified(brandId: ConnectId, status: BrandVerification['status']): void {
+    const brand = this._brands.get(brandId);
+    if (!brand) return;
+    this._brands.set(brandId, {
+      ...brand,
+      verified: status === 'approved',
+      updatedAt: this._now().toISOString(),
+    });
   }
 
   /**
@@ -1250,6 +2146,11 @@ function paginateList<T>(items: readonly T[], params?: PageParams): Page<T> {
 
 function edgeKey(actorId: ConnectId, targetId: ConnectId): string {
   return `${actorId}->${targetId}`;
+}
+
+/** Lifecycle position — enum order IS lifecycle order (mig 157 §1). */
+function stageIndex(stage: ConceptStage): number {
+  return CONCEPT_STAGES.indexOf(stage);
 }
 
 function memberKey(conversationId: string, userId: ConnectId): string {

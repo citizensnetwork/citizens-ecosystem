@@ -27,7 +27,7 @@
   };
 
   function SettingsScreen() {
-    const { me, pop, refreshMe, signOut } = useStore();
+    const { me, pop, refreshMe, signOut, openAdmin } = useStore();
     const [bio, setBio] = useState((me && me.profile && me.profile.bio) || '');
     const [displayName, setDisplayName] = useState(
       (me && me.settings && me.settings.displayNameOverride) || '',
@@ -137,6 +137,40 @@
             }),
           ),
         ),
+        me && me.role
+          ? h(
+              'div',
+              { style: card },
+              h(
+                'div',
+                { style: { fontSize: 14, fontWeight: 800, marginBottom: 6 } },
+                'Admin & moderation',
+              ),
+              h(
+                'div',
+                { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55 } },
+                'You hold the ' + me.role + ' role. Review brand verifications and triage reports.',
+              ),
+              h(
+                'button',
+                {
+                  onClick: openAdmin,
+                  style: {
+                    width: '100%',
+                    marginTop: 14,
+                    border: '1.5px solid ' + GOLD,
+                    background: '#fff',
+                    color: '#7a6212',
+                    borderRadius: 13,
+                    padding: 13,
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                  },
+                },
+                'Open the queues',
+              ),
+            )
+          : null,
         h(
           'div',
           { style: card },

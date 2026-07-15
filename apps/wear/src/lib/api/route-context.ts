@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { WearStore } from '@citizens/db';
 import { WearStoreError } from '@citizens/db';
+import { gateApiRequest } from '@citizens/utils';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { createWearServerClient } from '@/lib/supabase/server';
 import { createSupabaseWearStore } from '@/lib/supabase-wear-store';
@@ -143,12 +144,24 @@ export function errorResponse(error: unknown): NextResponse {
 /**
  * Wrap an async route handler so thrown `ApiError`/`WearStoreError`/unknowns
  * become clean JSON responses. Keeps each handler focused on the happy path.
+ *
+ * Every wrapped route also passes the blanket `@citizens/utils` rate-limit
+ * gate first (per-IP, read/write buckets — Vision's day-one pattern, closing
+ * Wear debt #1): `handler()` is the single choke point the whole `/api/*`
+ * surface goes through, so no endpoint can ship unlimited.
  */
 export function handler(
   fn: (req: Request, ctx: RouteContext, params: RouteParams) => Promise<NextResponse>,
 ): (req: Request, route: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
   return async (req, route) => {
     try {
+      const gate = await gateApiRequest(req);
+      if (gate.limited) {
+        return json(
+          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
+          { status: 429, headers: { 'Retry-After': String(gate.retryAfterSec) } },
+        );
+      }
       const ctx = await getRouteContext(req);
       const params = route?.params ? await route.params : {};
       return await fn(req, ctx, params);
@@ -184,4 +197,27 @@ const STORE_ERROR_STATUS: Record<string, number> = {
   empty_story: 422,
   empty_group_name: 422,
   group_too_small: 422,
+  // Mig 157 — Concepts marketplace (codes mirror the SECDEF RPC raise messages)
+  concept_not_found: 404,
+  proposal_not_found: 404,
+  claim_not_found: 404,
+  obligation_not_found: 404,
+  verification_not_found: 404,
+  report_not_found: 404,
+  empty_concept: 422,
+  invalid_stage: 422,
+  not_milestone: 422,
+  proof_url_required: 422,
+  brand_not_verified: 403,
+  concept_not_open: 409,
+  proposal_not_open: 409,
+  proposal_exists: 409,
+  verification_exists: 409,
+  claim_not_active: 409,
+  no_active_claim: 409,
+  stage_not_forward: 409,
+  not_released: 409,
+  conversion_not_open: 409,
+  conversion_already_open: 409,
+  already_closed: 409,
 };

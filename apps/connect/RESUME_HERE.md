@@ -779,23 +779,230 @@ addition: **Vision needs a login page** (built). Working log:
 
 ---
 
+## 3P. Wear LIVE — founder deploy · first admin · email+password auth ✅ (2026-07-13)
+
+Wear-focused session on branch `step5-monorepo-lift` (the Step-5 lift itself was committed by the
+prior session through `6f852b3`; this session ships on top of it). Working log:
+`.claude/sessions/wear-focus-admin-auth-and-roadmap.md` (root-level, gitignored).
+**No DB migration → next migration # still 147.**
+
+### Wear is DEPLOYED and in use
+- Founder deployed Wear via **Vercel CLI** (the uncommitted stragglers this created — `vercel`
+  devDep, `.vercel`/`.env*` gitignores, pulled env files, lockfile — are now committed; the stray
+  244 MB root `.pnpm/` store it left is gitignored, never committed).
+- Founder signed in with Google (`citizensnetworkpbo@gmail.com`) 2026-07-13; `wear.users` mirror
+  hydrated (`@citizensnetworkpbo`). **Wear deploy gates = DONE.**
+- **First admin granted:** `wear.user_roles` row (user `4a1b3802-4e9d-40ef-bd8d-7ec8b4d242ca`,
+  role `admin`, 2026-07-13 19:49 UTC) — the §3O/NEXT-STEPS founder action, executed via MCP.
+
+### Email+password auth SHIPPED (founder: "Google Auth may not be available soon")
+- **Frontend** (`apps/wear/src/frontend/`): `auth-client.js` +`signInWithPassword`/
+  `signUpWithPassword`/`requestPasswordReset`/`updatePassword` (+shared `webRedirectUrl()`);
+  `store.jsx` +`recovery` state (PASSWORD_RECOVERY) + 4 actions; `auth.jsx` rewritten —
+  sign-in/sign-up/forgot modes, confirm-sent/reset-sent notices, `CWScreens.ResetPassword`
+  (recovery-link landing), Google demoted to secondary (ink button); `app.jsx` Gate renders
+  ResetPassword whenever `recovery` is set. Password-manager-friendly (real `<form>`,
+  autocomplete attrs). Client rules: valid email, ≥8 chars, match confirm.
+- **Supabase auth config** (Management API PATCH, reversible): `external_email_enabled`
+  false→**true**, `password_min_length` 6→**8**. (GoTrue also requires lower+upper+digit —
+  pre-existing `password_required_characters`.)
+- **Browser-verified end-to-end** against prod: all modes render; client validation renders;
+  wrong-creds round trip returned "Email logins are disabled" BEFORE the config change and
+  "Invalid login credentials" AFTER — the full path works. Gates: **tsc 0 · eslint 0 ·
+  vitest 49/49 · frontend bundle builds**.
+- ⚠️ **Reset-link caveat (PKCE):** the recovery email must be opened in the SAME browser that
+  requested it (code verifier in localStorage) — standard supabase-js behaviour, noted in-code.
+- **Custom SMTP CONFIGURED via Resend (2026-07-13, same session):** Supabase auth now sends as
+  `Citizens Network <no-reply@citizenscentral.co.za>` through `smtp.resend.com:465`
+  (`rate_limit_email_sent` 2→60/hr). Resend account `citizensnetworkpbo@gmail.com`, domain
+  `citizenscentral.co.za` (eu-west-1, id `0ff087bb-8746-470a-836e-55adfc4ee8a7`).
+  ⛔ **BLOCKED on DNS verification:** the domain is `pending` in Resend — three records (DKIM
+  TXT `resend._domainkey`, MX + SPF TXT on `send`) must be added to the zone, which lives on
+  **Vercel DNS** (CLI authed as `stevo98`; `vercel dns add` was permission-blocked for founder
+  review — exact values in the session log / Resend dashboard). **Until verification passes,
+  ALL auth emails fail** (Resend rejects unverified senders — interim regression vs the
+  team-member-only built-in mailer; Google sign-in unaffected). After records land: Resend
+  dashboard → Verify (or `POST /domains/{id}/verify`), then send a test reset email.
+- **HIBP leaked-password protection = Supabase Pro-gated** — PATCH rejected on the Free org
+  ("available on Pro Plans and up"). Compensating controls live: min length 8 + GoTrue's
+  lower/upper/digit `password_required_characters`. Revisit if/when the org upgrades.
+- Connect + Vision still Google-only — **port the same email+password screens** (their
+  auth-clients share the CC_AUTH/CV_AUTH lineage) in a follow-up session; the provider is
+  already enabled project-wide.
+
+### Wear roadmap ratified (new planning doc committed)
+[`docs/Citizens_Wear_Roles_and_Concepts_MD.md`](../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
+(2026-07-13) locks the direction: single evolving account (Citizen → Creator → Brand-state →
+Admin), **Concepts marketplace** (two-stage propose→award claims, append-only status log
+`Proposed→…→Sold Out`, auto "Completed Concepts" posts), milestone royalties (10%/first-100 +
+proof-of-sale; opt-in permanent-catalogue conversion at lifetime 5% with attribution-tag removal
+but PERMANENT concept link), physical attribution required. **None of this exists in `wear.*`
+yet** — it is the next Wear schema tranche (migrations from **147**), then `/api/*` + screens.
+Open items: Brand-verification depth (KYC vs light review), Brand Workspace scope, dispute tooling.
+
+---
+
+## 3Q. Wear Concepts marketplace schema DRAFTED (mig 157) + LINEAGE DRIFT REPAIRED ✅ (2026-07-13)
+
+Wear session on `step5-monorepo-lift` (working log: `.claude/sessions/wear-concepts-marketplace-schema.md`,
+root-level, gitignored). Executed NEXT-STEPS 3a as far as this session's permissions allowed.
+
+### ⚠️ ROOT FINDING — the migration lineage had FORKED (now repaired)
+- Prod (`list_migrations`) head = **`20260704162319 / 156_vision_dormancy_watch`** — NOT 146 as
+  §3P believed. A parallel Vision session (2026-07-03/04) worked in the **standalone
+  `citizens-connect` checkout** and applied migrations **147–156** (Vision DDL: spaces,
+  intelligence/advisory engines, funnel/broadcast, space+activity metrics, org members,
+  cross-pollination, dormancy watch) + shipped Vision demo→live wiring increments 1–7 in the
+  standalone `citizens-vision` repo (its `main` @ `3c77959`). The monorepo never received any of it.
+- **Repaired here:** the ten files copied verbatim (EOL-normalised; diffs were CRLF-only) into the
+  monorepo's canonical `supabase/migrations/`. The standalone `citizens-connect` RESUME (§3Q–§3W
+  there) remains the authoritative detail for those sessions until a doc-merge absorbs it here.
+- **⛔ CONVERGENCE RULE: all future sessions run in the MONOREPO.** The standalone
+  `citizens-connect` checkout still has uncommitted changes (`RESUME_HERE.md`, `.gitignore`,
+  decision brief) — commit/park it and treat it as read-only history, or the fork will recur.
+
+### Wear Concepts marketplace — migration 157 DRAFTED + COMMITTED, ⛔ NOT APPLIED
+[`supabase/migrations/157_wear_concepts_marketplace.sql`](../../supabase/migrations/157_wear_concepts_marketplace.sql)
+(drafted as 147, renumbered after the drift discovery; pre-apply tag **`connect-pre-mig157`** set).
+The MCP `apply_migration` call was **permission-blocked** by this session's mode — applying is the
+FIRST action of the next session (checklist in the file footer). Design (full rationale in header +
+file comments): **9 tables** (`concepts`, `concept_media`, `concept_upvotes`, `concept_proposals`,
+`concept_claims`, `concept_status_log` — append-only by construction, `royalty_obligations`,
+`catalogue_conversions`, `brand_verifications`), **7 enums** (incl. `concept_stage` in lifecycle
+order → forward-only = native enum `<`), **8 SECDEF RPCs** (`award_concept_claim`,
+`advance_concept_status`, `propose/respond/cancel_catalogue_conversion`, `submit_royalty_proof`,
+`close_royalty_obligation`, `get_concept_proposal_tags` — the only anon-executable one, returns
+(brand_id, created_at) ONLY), **4 trigger fns / 11 triggers** (verified-column guard, brand-verified
+sync from `brand_verifications`, auto Completed-Concepts post on Released, concept re-open on claim
+revoke), `posts.concept_id` column (relational attribution — catalogue conversion flips
+`claims.attribution_public` without rewriting content), explicit least-priv grants (146 lesson).
+Key semantics: milestone royalty 10%/first-100 auto-committed at award; conversion accept closes
+milestone + commits lifetime 5% ("in its place", doc §3.3); proof→creator-confirm close-out;
+one active claim per concept via partial unique index; every RPC has the §3E null-uid guard first.
+
+### Vibe-security: 3 PRE-EXISTING holes closed inside mig 157 (PostgREST-reachable, none via /api/*)
+1. `wear.brands.verified` was **owner-writable** (143 `brands_owner_write` FOR ALL) — self-escalation
+   once verification gates marketplace power → column-guard trigger (admin/definer/service only).
+2. `wear.profiles.verified` was **self-writable** — self-badging → same guard.
+3. `wear.posts.brand_id` / `wear.stories.brand_id` **unchecked on write** — any user could post AS
+   any brand → policies recreated with ownership check (+ `concept_id` active-claim check on posts).
+Verified no live app path breaks: brand PATCH passes name/tagline/websiteUrl/logoUrl only;
+`/api/me` never passes `verified`; store insert paths don't set the guarded columns.
+
+### Advisor baseline re-captured at head 156 (read-only, this session)
+**0 ERROR / 92 WARN / 3 INFO.** WARN 72→92 = +20 `authenticated_security_definer` (Vision migs
+147–156's intentional pattern) + the known `auth_leaked_password_protection` HIBP Pro-gate (§3P).
+Contract §9 re-stamped to head 156 with the reconciliation note; **re-stamp to 157 after apply.**
+
+---
+
+## 3R. Wear Concepts marketplace SHIPPED END-TO-END — mig 157 APPLIED + data/API/frontend + @citizens/utils ✅ (2026-07-14/15)
+
+Wear session on `step5-monorepo-lift` (working log: `.claude/sessions/wear-concepts-apply-and-build.md`,
+root-level, gitignored). Executed NEXT-STEPS 0 + 1a + 1b(rate-limiting) in gated, committed increments.
+**Next migration # = 158.**
+
+### Migration 157 APPLIED to prod (commit `40e1aeb`)
+- `apply_migration(157_wear_concepts_marketplace)` on head 156; tag `connect-pre-mig157` was pre-set.
+- **Advisors: 0 ERROR / 101 WARN / 3 INFO = the NEW baseline.** WARN 92→101 = exactly the 9
+  intentional SECDEF EXECUTE grants mig 157 itself makes (8× authenticated RPCs + 1× anon
+  `get_concept_proposal_tags`) — same retained-by-design category as §3C/Vision's +20. 0 unexpected.
+  **Correction recorded in contract §9:** the linter DOES surface `wear.*` SECDEF fns (mig-145-era
+  "not surfaced" note is obsolete).
+- Structural QA exact: **wear.\* = 32 tables / 0 without RLS / 70 policies / 21 fns / 19 enums / 18 triggers.**
+- Rolled-back prod smokes ALL PASS (verified-guard 42501 · unverified-brand proposal denied ·
+  full happy path concept→propose→award→advance→released-auto-post→conversion · non-creator award
+  42501 · backwards/repeat stage 22023 · direct status-log insert denied). Zero residue verified.
+- SHARED_DB_CONTRACT §9 re-stamped to **head 157**.
+
+### Data plane (commit `ef5f432`) + /api/* (commit `22ff29b`) + rate limiting (commit `022e160`)
+- **`packages/db`**: WearStore contract +8 repos (`concepts`, `conceptProposals`, `conceptClaims`,
+  `conceptStatusLog`, `royalties`, `conversions`, `brandVerifications`, `roles`); `Report` gains
+  mig-145 `status/handledBy/handledAt` + `listForModeration`/`triage`; `Post` gains `conceptId`.
+  MemoryWearStore = the semantic spec (replicates the DB triggers: auto Completed-Concepts post
+  w/ media copy + dup guard; brand-verified sync; concept re-open on revoke). Error codes ==
+  the RPCs' raise messages. **+23 contract tests (db 92/92).**
+- **`SupabaseWearStore`**: reads via RLS, lifecycle writes via `.rpc()`; `mapRpcError` extended
+  with all mig-157 raise messages; `_getOwnRole` via self-SELECT `user_roles`.
+- **17 new `/api/*` routes** (Bearer-or-cookie `handler()` pattern): concepts CRUD/upvote/
+  proposals/status-advance, proposals PATCH(withdraw/resubmit)+award, claims revoke/conversions/
+  royalties, conversions PATCH(accept/decline/cancel), royalties list+proof+close,
+  `brands/[slug]/{verification,proposals,claims}`, `admin/{verifications,reports}` queues +
+  review/triage. `/api/me` now returns `role`. **Serializer rules live:** `BrandDto.verified`
+  authoritative from `wear.brands.verified`; `PostDto.concept` = permanent link with `creator`
+  tag ONLY while `claims.attribution_public`. Wear now registers 40 API routes. +12 route tests.
+- **NEW `packages/utils` (@citizens/utils)** — brief row 4 delivered: `rate-limit.ts` extracted
+  VERBATIM from Connect (superset presets; Vision's copy stays byte-compatible for later
+  consolidation) + `gate.ts` (Vision's api-gate generalised: per-IP, 240 GET / 60 write per min).
+  **ALL Wear `/api/*` now rate-limited** via the single `handler()` choke point (429 +
+  Retry-After) — **Wear debt #1 CLOSED**. 7 package tests; workspace turbo **27/27 green**
+  (Connect 637 · db 92 · utils 7 · wear 61 · Vision all green).
+
+### Frontend (commit `bd8bc4e`) — browser-verified END-TO-END against prod
+- New IIFE modules: **`concepts.jsx`** (browse w/ stage filters, detail w/ Journey stepper from
+  the append-only log, create, upvotes, propose form, creator award list, brand advance,
+  royalty proof/close, conversion handshake) and **`adminq.jsx`** (brand-verification queue +
+  mig-145 reports triage). Wiring: `store.jsx` nav actions; `shell.jsx` routes + sidebar
+  Concepts + role-gated Admin item; `discover.jsx` marketplace banner; `settings.jsx` role-gated
+  admin card; `brand.jsx` owner VerificationSection; `home.jsx` PostCard concept-attribution
+  chip. Build order + dev index.html tags updated (17 screens compile).
+- **Prod E2E in the browser** (dev server :3000 w/ real Supabase env; two disposable test users,
+  each flow driven through the real UI): password sign-in → mirror hydrate → create concept →
+  upvote → create brand → request verification → admin queue APPROVE (badge flips via trigger) →
+  verified brand proposes (public tag + party-scoped details) → creator awards (CLAIMED +
+  milestone 10%/100 committed) → advance In Production (timeline note) → RELEASED → auto
+  Completed-Concepts post in feed w/ "Concept by @creator" chip → proof of 100th sale submitted →
+  creator confirms close-out → conversion proposed → creator accepts → **feed chip flips to
+  "From a community concept" (tag retired, link permanent)** + lifetime 5% ACTIVE. Zero console
+  errors. **All test data + users deleted after — zero residue verified** (founder's admin role
+  row untouched).
+
+### ⚠️ Follow-up found during cleanup (record for mig 158, NOT yet fixed)
+Deleting an `auth.users` row for a user who is BOTH a brand owner and a conversion actor can
+fail mid-cascade: the `SET NULL` audit-column cascades (e.g. `catalogue_conversions.proposed_by`)
+race the `ON DELETE CASCADE` chain (`brands→claims→conversions`), and the FK re-check on
+`claim_id` sees the already-deleted claim → 23503. **Repro:** single-statement delete of both
+smoke users. **Impact:** future account-deletion flows for brand owners. **Fix candidates:**
+make the marketplace `claim_id`/`concept_id` FKs `DEFERRABLE INITIALLY DEFERRED`, or route
+account deletion through an explicit bottom-up SECDEF cleanup fn. Deleting bottom-up works today.
+
+### Also this session
+- `.claude/launch.json` gains `wear-dev` (next dev :3000); `apps/wear/.env.development.local`
+  (gitignored) carries the shared-project env for local dev — regenerate from
+  `.env.wear.production.local` (`vercel env pull` output) if missing.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3, 4, 4b and 4c are ALL COMPLETE (§3L/§3N/§3O).** All three apps share one auth +
-> one Postgres + the static-HTML frontend model on one `@citizens/frontend-build` pipeline.
-> **No monorepo yet** — that is Step 5, now unblocked. Roadmap order = the ratified
-> [brief §6](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md).
+> **Steps 3, 4, 4b, 4c, 5 AND the Wear Concepts marketplace (§3R) are COMPLETE.**
+> `step5-monorepo-lift` was merged to `main` again at end of the §3R session (2026-07-15,
+> founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 158.**
 
-1. **Step 5 — the monorepo lift** (grow Wear → `citizens`, `git filter-repo` Connect + Vision
-   in, hoist `supabase/`; the two vendored frontend-build copies flip to `workspace:*` and are
-   deleted). All code prerequisites are met; give 4c a short stabilisation window if desired.
-2. **Vision fast-follows (code, any session):** demo→live wiring of the 45 handlers into the
-   HTML screens (§3O list); Timeline Map; Vision DDL from **147**.
-3. **Wear launch-hardening fast-follows (code, any session, parallel):** `/api/*` rate
-   limiting — **extract `@citizens/utils`(rate-limit) in the same change** (brief row 4;
-   Vision's copy was kept byte-compatible on purpose); Wear `/api/admin/*` + triage screen
-   (**mig 145 is live** — the DB side is ready); media upload pipeline; notifications backend;
-   full desktop layouts; Capacitor shell scaffold.
+1. **Wear build track (current focus — §3P roadmap; marketplace core is DONE §3R):**
+   a. **Deploy the marketplace**: founder redeploys Wear on Vercel from `main` (the built
+      bundle ships the new screens; env unchanged). Then founder (already wear admin) can
+      verify real brands from the in-app Admin queue.
+   b. Launch-hardening fast-follows, in rough order of value: **media upload pipeline**
+      (posts/concepts are URL-only — Supabase Storage bucket + signed upload, mirror Connect's
+      mig-122 bucket-limits pattern); **notifications backend** (award/status-advance/proposal/
+      royalty events are natural triggers; tab is a placeholder); **mig 158**: fix the §3R
+      account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace
+      schema follow-ups; full desktop layouts; Capacitor shell scaffold (JS side is ready).
+   c. Port email+password auth screens (§3P) from Wear to Connect + Vision frontends — shared
+      CC_AUTH/CV_AUTH lineage, provider already enabled project-wide. (Was this session's
+      stretch goal; not reached.)
+   d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
+      tooling, proposal notifications, concept search/categories, creator portfolio surface.
+2. **Vision (verify-then-continue):** migs 147–156 + demo→live wiring increments 1–7 shipped from
+   the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
+   this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
+   (currently BEHIND it), then continue Vision fast-follows (Timeline Map; remaining wiring).
+3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R);
+   commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
+   to read-only. Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their copies
+   are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
 4. **Founder-only, non-code (any time):**
    - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
      + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
@@ -803,8 +1010,9 @@ addition: **Vision needs a login page** (built). Working log:
      URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
    - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
      NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
-   - First **Wear moderator/admin grants**: `insert into wear.user_roles (user_id, role) …` as
-     service_role (founder via MCP/SQL — §3O 4b).
+   - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
+   - **Custom SMTP for auth emails** (§3P ⛔) — required before non-team users can receive
+     sign-up confirmation / password-reset emails.
    - Answer the **Supabase-Preview** question (§3M #2: which surface showed the error) so the
      integration can be switched off.
    - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release · **PAT rotation**
@@ -830,6 +1038,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **146**, `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **157** live; next # = **158**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

@@ -6,12 +6,14 @@
 //  (window.supabase) and window.__CW_ENV (config.js) loaded first, then
 //  exposes window.CW_AUTH for app/store.jsx.
 //
-//  Google is the only provider — the SHARED Citizens Supabase project
-//  (one auth.users across Connect → Vision → Wear, ADR-0007). Wear-side
-//  identity (handle/displayName) lives in the wear.users mirror and is
-//  hydrated via POST /api/me/hydrate after sign-in — this file never
-//  reads app tables. If config/Supabase is missing, CW_AUTH is null and
-//  the app shows a "not configured" notice on the auth screen.
+//  Providers: email+password (primary — Google availability is not
+//  guaranteed long-term) and Google OAuth, both against the SHARED
+//  Citizens Supabase project (one auth.users across Connect → Vision →
+//  Wear, ADR-0007). Wear-side identity (handle/displayName) lives in the
+//  wear.users mirror and is hydrated via POST /api/me/hydrate after
+//  sign-in — this file never reads app tables. If config/Supabase is
+//  missing, CW_AUTH is null and the app shows a "not configured" notice
+//  on the auth screen.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   var env = window.__CW_ENV || {};
@@ -47,6 +49,18 @@
     );
   }
 
+  // The web return URL for every email link (OAuth return, sign-up
+  // confirmation, password recovery). A bare hostname has no scheme;
+  // Supabase would treat it as a relative path on its own domain and the
+  // redirect would 404 (Connect lesson).
+  function webRedirectUrl() {
+    var origin = env.FRONTEND_ORIGIN || window.location.origin;
+    if (origin && !/^https?:\/\//i.test(origin)) {
+      origin = 'https://' + origin;
+    }
+    return origin + window.location.pathname;
+  }
+
   // Sign in / sign up with Google (OAuth — same call for both).
   // Web: in-page redirect to Google and back to the app origin (supabase-js
   // detectSessionInUrl completes the PKCE exchange on return).
@@ -55,18 +69,7 @@
   // deep link (listenForNativeAuthCallback) — Connect runbook Step 3 / §B1.
   async function signInWithGoogle() {
     var native = isNativeShell();
-    var redirectTo;
-    if (native) {
-      redirectTo = NATIVE_REDIRECT;
-    } else {
-      var origin = env.FRONTEND_ORIGIN || window.location.origin;
-      // A bare hostname has no scheme; Supabase would treat it as a relative
-      // path on its own domain and the redirect would 404 (Connect lesson).
-      if (origin && !/^https?:\/\//i.test(origin)) {
-        origin = 'https://' + origin;
-      }
-      redirectTo = origin + window.location.pathname;
-    }
+    var redirectTo = native ? NATIVE_REDIRECT : webRedirectUrl();
     var res = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -79,6 +82,45 @@
     if (native && res.data && res.data.url && window.CapBrowser) {
       await window.CapBrowser.open({ url: res.data.url });
     }
+  }
+
+  // ── Email + password (primary credential — works without Google) ──
+
+  async function signInWithPassword(email, password) {
+    var res = await client.auth.signInWithPassword({ email: email, password: password });
+    if (res.error) throw res.error;
+    return res.data;
+  }
+
+  // Returns { needsConfirmation } — true when the project requires the user
+  // to click the confirmation email before a session is issued (the link
+  // redirects back here and detectSessionInUrl signs them in).
+  async function signUpWithPassword(email, password) {
+    var res = await client.auth.signUp({
+      email: email,
+      password: password,
+      options: { emailRedirectTo: webRedirectUrl() },
+    });
+    if (res.error) throw res.error;
+    return { needsConfirmation: !(res.data && res.data.session) };
+  }
+
+  // Sends the recovery email. The link must be opened in the SAME browser
+  // the request was made from (PKCE code verifier lives in localStorage);
+  // supabase-js then fires PASSWORD_RECOVERY through onAuthChange and the
+  // app shows the set-new-password screen.
+  async function requestPasswordReset(email) {
+    var res = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: webRedirectUrl(),
+    });
+    if (res.error) throw res.error;
+  }
+
+  // Completes recovery (requires the recovery session) — also usable from
+  // settings later for a signed-in password change.
+  async function updatePassword(newPassword) {
+    var res = await client.auth.updateUser({ password: newPassword });
+    if (res.error) throw res.error;
   }
 
   // Catches the `citizenswear://auth-callback?code=…` deep link the system
@@ -150,6 +192,10 @@
 
   window.CW_AUTH = {
     signInWithGoogle: signInWithGoogle,
+    signInWithPassword: signInWithPassword,
+    signUpWithPassword: signUpWithPassword,
+    requestPasswordReset: requestPasswordReset,
+    updatePassword: updatePassword,
     loadSession: loadSession,
     getAccessToken: getAccessToken,
     signOut: signOut,

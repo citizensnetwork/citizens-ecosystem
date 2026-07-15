@@ -1,4 +1,12 @@
-import type { FeedPage, PostWithMedia, WearBrand, WearStore, WearUser } from '@citizens/db';
+import type {
+  ConceptWithMedia,
+  FeedPage,
+  Page,
+  PostWithMedia,
+  WearBrand,
+  WearStore,
+  WearUser,
+} from '@citizens/db';
 
 /**
  * DTO shaping for the `/api/*` surface. Post authors and brands are resolved
@@ -36,6 +44,16 @@ export interface PostDto {
     readonly kind: string;
     readonly altText: string | null;
   }[];
+  /**
+   * Completed-Concepts attribution (mig 157). The concept link is PERMANENT;
+   * `creator` renders ONLY while the claim's `attributionPublic` is true —
+   * catalogue conversion nulls the tag without touching the link.
+   */
+  readonly concept?: {
+    readonly id: string;
+    readonly title: string;
+    readonly creator: UserDto | null;
+  } | null;
   /** Engagement (present when the serializer is asked to include it). */
   readonly likeCount?: number;
   readonly commentCount?: number;
@@ -60,11 +78,36 @@ export const toBrandDto = (b: WearBrand): BrandDto => ({
   ownerUserId: b.ownerUserId,
 });
 
-/** Hydrate a single post with its author + (optional) brand. */
+/**
+ * Completed-Concepts attribution for a post (mig 157 serializer rule): the
+ * concept link is always attached; the creator tag renders ONLY when the
+ * post's brand holds the concept's active claim with `attributionPublic`.
+ */
+async function conceptAttribution(
+  store: WearStore,
+  post: PostWithMedia['post'],
+): Promise<PostDto['concept']> {
+  if (!post.conceptId) return null;
+  const [entry, claim] = await Promise.all([
+    store.concepts.getById(post.conceptId),
+    store.conceptClaims.getActiveForConcept(post.conceptId),
+  ]);
+  if (!entry) return null;
+  const tagPublic = !!claim && claim.brandId === post.brandId && claim.attributionPublic;
+  const creator = tagPublic ? await store.users.getById(entry.concept.creatorId) : null;
+  return {
+    id: entry.concept.id,
+    title: entry.concept.title,
+    creator: creator ? toUserDto(creator) : null,
+  };
+}
+
+/** Hydrate a single post with its author + (optional) brand + concept tag. */
 export async function hydratePost(store: WearStore, entry: PostWithMedia): Promise<PostDto> {
-  const [author, brand] = await Promise.all([
+  const [author, brand, concept] = await Promise.all([
     store.users.getById(entry.post.authorId),
     entry.post.brandId ? store.brands.getById(entry.post.brandId) : Promise.resolve(null),
+    conceptAttribution(store, entry.post),
   ]);
   return {
     id: entry.post.id,
@@ -74,6 +117,7 @@ export async function hydratePost(store: WearStore, entry: PostWithMedia): Promi
     author: author ? toUserDto(author) : null,
     brand: brand ? toBrandDto(brand) : null,
     media: entry.media.map((m) => ({ url: m.url, kind: m.kind, altText: m.altText })),
+    concept,
   };
 }
 
@@ -120,6 +164,11 @@ export async function hydrateFeed(
       )
     : null;
 
+  // Completed-Concepts attribution — rare in a page, resolved per post.
+  const concepts = await Promise.all(
+    page.items.map(({ post }) => conceptAttribution(store, post)),
+  );
+
   return {
     items: page.items.map((entry, i) => ({
       id: entry.post.id,
@@ -134,8 +183,70 @@ export async function hydrateFeed(
           ? toBrandDto(brandMap.get(entry.post.brandId)!)
           : null,
       media: entry.media.map((m) => ({ url: m.url, kind: m.kind, altText: m.altText })),
+      concept: concepts[i] ?? null,
       ...(engagement ? engagement[i]! : {}),
     })),
     nextCursor: page.nextCursor,
   };
+}
+
+// ── Concepts marketplace DTOs ────────────────────────────────────────────────
+
+export interface ConceptCardDto {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly status: string;
+  readonly createdAt: string;
+  readonly creator: UserDto | null;
+  readonly media: readonly {
+    readonly url: string;
+    readonly kind: string;
+    readonly altText: string | null;
+  }[];
+  readonly upvotes: number;
+  readonly viewerUpvoted: boolean;
+  /** Public brand tags ("3 brands proposed") — never proposal details. */
+  readonly proposalCount: number;
+  /** The claiming brand once awarded (claims are public info). */
+  readonly claimedBy: BrandDto | null;
+}
+
+/** Hydrate one concept card (browse + detail share this shape). */
+export async function hydrateConcept(
+  store: WearStore,
+  entry: ConceptWithMedia,
+  viewerId: string | null,
+): Promise<ConceptCardDto> {
+  const [creator, upvotes, viewerUpvoted, tags, claim] = await Promise.all([
+    store.users.getById(entry.concept.creatorId),
+    store.concepts.upvoteCount(entry.concept.id),
+    viewerId ? store.concepts.hasUpvoted(entry.concept.id, viewerId) : Promise.resolve(false),
+    store.conceptProposals.publicTags(entry.concept.id),
+    store.conceptClaims.getActiveForConcept(entry.concept.id),
+  ]);
+  const claimedBrand = claim ? await store.brands.getById(claim.brandId) : null;
+  return {
+    id: entry.concept.id,
+    title: entry.concept.title,
+    description: entry.concept.description,
+    status: entry.concept.status,
+    createdAt: entry.concept.createdAt,
+    creator: creator ? toUserDto(creator) : null,
+    media: entry.media.map((m) => ({ url: m.url, kind: m.kind, altText: m.altText })),
+    upvotes,
+    viewerUpvoted,
+    proposalCount: tags.length,
+    claimedBy: claimedBrand ? toBrandDto(claimedBrand) : null,
+  };
+}
+
+/** Hydrate a browse page of concept cards (fan-out bounded by page size). */
+export async function hydrateConceptPage(
+  store: WearStore,
+  page: Page<ConceptWithMedia>,
+  viewerId: string | null,
+): Promise<{ items: ConceptCardDto[]; nextCursor: string | null }> {
+  const items = await Promise.all(page.items.map((c) => hydrateConcept(store, c, viewerId)));
+  return { items, nextCursor: page.nextCursor };
 }

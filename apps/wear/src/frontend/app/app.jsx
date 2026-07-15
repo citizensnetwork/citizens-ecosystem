@@ -6,7 +6,11 @@
   const { Crown } = window.CWIcons;
 
   function Gate() {
-    const { authStatus } = useStore();
+    const { authStatus, recovery } = useStore();
+    // Password-recovery link landing: takes precedence over everything —
+    // the recovery session signs the user in, but they came here to set a
+    // new password, not to browse.
+    if (recovery) return h(window.CWScreens.ResetPassword, {});
     if (authStatus === 'loading') {
       return h(
         'div',

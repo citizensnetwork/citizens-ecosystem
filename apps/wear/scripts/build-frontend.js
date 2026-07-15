@@ -47,6 +47,8 @@ buildFrontend({
     'post.jsx',
     'brand.jsx',
     'profile.jsx',
+    'concepts.jsx',
+    'adminq.jsx',
     'settings.jsx',
     'shell.jsx',
     'app.jsx',

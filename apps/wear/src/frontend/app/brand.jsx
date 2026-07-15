@@ -8,6 +8,134 @@
   const { GOLD, Avatar, Spinner, ErrorNote, ScreenHeader, FollowButton } = window.CWUI;
   const PostCard = () => window.CWScreens.PostCard;
 
+  /**
+   * Owner-only verification panel (mig 157): verification now gates
+   * marketplace power (only verified brands may propose/claim), so the
+   * request lifecycle lives right on the brand page. Status comes from
+   * GET /api/brands/:slug/verification; the badge itself is authoritative
+   * from wear.brands.verified.
+   */
+  function VerificationSection({ brand }) {
+    const [state, setState] = useState({ loading: true, verification: null });
+    const [note, setNote] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+
+    const load = useCallback(async () => {
+      try {
+        const res = await window.CW_API.get(
+          '/api/brands/' + encodeURIComponent(brand.slug) + '/verification',
+        );
+        setState({ loading: false, verification: res.verification });
+      } catch (e) {
+        setState({ loading: false, verification: null });
+      }
+    }, [brand.slug]);
+    useEffect(() => {
+      load();
+    }, [load]);
+
+    if (state.loading || brand.verified) return null;
+    const v = state.verification;
+    const canRequest = !v || v.status === 'rejected';
+
+    const request = async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        await window.CW_API.post(
+          '/api/brands/' + encodeURIComponent(brand.slug) + '/verification',
+          { note },
+        );
+        await load();
+      } catch (e) {
+        setError(e.message || 'Could not send the request.');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    return h(
+      'div',
+      {
+        style: {
+          margin: '14px 0 0',
+          border: '1px solid #f0e2b0',
+          background: '#fdf9ec',
+          borderRadius: 14,
+          padding: '13px 15px',
+        },
+      },
+      h(
+        'div',
+        { style: { fontSize: 12.5, fontWeight: 800, color: '#7a6212' } },
+        v && v.status === 'pending'
+          ? 'Verification pending review'
+          : v && v.status === 'rejected'
+            ? 'Verification was rejected'
+            : v && v.status === 'revoked'
+              ? 'Verification was revoked'
+              : 'Get verified to join the Concepts marketplace',
+      ),
+      h(
+        'div',
+        { style: { fontSize: 11.5, color: '#8a7a3a', fontWeight: 500, lineHeight: 1.5, marginTop: 3 } },
+        v && v.status === 'pending'
+          ? 'An admin will review your request. Only verified brands can propose on concepts.'
+          : v && v.reviewNote
+            ? 'Reviewer: ' + v.reviewNote
+            : 'Only verified brands can propose on concepts and claim designs.',
+      ),
+      canRequest
+        ? h(
+            'div',
+            { style: { marginTop: 10 } },
+            h('input', {
+              value: note,
+              onChange: (e) => setNote(e.target.value),
+              maxLength: 2000,
+              placeholder: 'Business details, registration, links…',
+              style: {
+                width: '100%',
+                border: '1px solid #efe4bd',
+                borderRadius: 11,
+                padding: '10px 12px',
+                fontSize: 12.5,
+                fontWeight: 500,
+                outline: 'none',
+                background: '#fff',
+                marginBottom: 8,
+              },
+            }),
+            error
+              ? h(
+                  'div',
+                  { style: { fontSize: 11.5, fontWeight: 700, color: '#8f4a2b', marginBottom: 8 } },
+                  error,
+                )
+              : null,
+            h(
+              'button',
+              {
+                onClick: request,
+                disabled: busy,
+                style: {
+                  border: 'none',
+                  background: GOLD,
+                  color: '#fff',
+                  borderRadius: 11,
+                  padding: '9px 18px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                },
+              },
+              busy ? 'Sending…' : v ? 'Re-request verification' : 'Request verification',
+            ),
+          )
+        : null,
+    );
+  }
+
   function BrandScreen({ params }) {
     const { pop, me, openUser, setTab } = useStore();
     const [state, setState] = useState({ loading: true, error: null, data: null });
@@ -246,6 +374,7 @@
               brand.websiteUrl.replace(/^https?:\/\//, ''),
             )
           : null,
+        isOwner ? h(VerificationSection, { brand }) : null,
         !isOwner && owner
           ? h(
               'div',

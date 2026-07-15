@@ -10,7 +10,7 @@
 
   /** Feed card, faithful to the design (header / media / actions / caption). */
   function PostCard({ post }) {
-    const { openPost, openBrand, openUser } = useStore();
+    const { openPost, openBrand, openUser, openConcept } = useStore();
     const [liked, setLiked] = useState(!!post.viewerLiked);
     const [saved, setSaved] = useState(!!post.viewerSaved);
     const [likeCount, setLikeCount] = useState(post.likeCount || 0);
@@ -189,6 +189,34 @@
             post.body,
           ),
         ),
+        // Completed-Concepts attribution (mig 157): the concept link is
+        // PERMANENT; the creator tag renders ONLY while the claim keeps
+        // attributionPublic (catalogue conversion retires the tag, not the link).
+        post.concept
+          ? h(
+              'button',
+              {
+                onClick: () => openConcept(post.concept.id),
+                style: {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  border: 'none',
+                  background: '#faf6ec',
+                  borderRadius: 9,
+                  padding: '5px 10px',
+                  marginTop: 7,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: '#7a6212',
+                },
+              },
+              Icon('star', { size: 13, color: '#F2BA1B' }),
+              post.concept.creator
+                ? 'Concept by @' + post.concept.creator.handle
+                : 'From a community concept',
+            )
+          : null,
         h(
           'div',
           {
