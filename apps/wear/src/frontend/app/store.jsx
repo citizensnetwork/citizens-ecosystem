@@ -116,6 +116,23 @@
       setRecovery(false); // recovery session is a real session → straight in
     }, []);
 
+    // Change/set the signed-in user's password (settings) — also lets a
+    // Google-only account add a password to unlock email+password sign-in.
+    const changePassword = useCallback(async (newPassword) => {
+      await window.CW_AUTH.updatePassword(newPassword);
+    }, []);
+
+    // Email magic-code (passwordless secondary sign-in). sendEmailCode mails a
+    // 6-digit code; verifyEmailCode exchanges it for a session (SIGNED_IN then
+    // flows through onAuthChange → completeSignIn, same as every other path).
+    const sendEmailCode = useCallback(async (email) => {
+      await window.CW_AUTH.sendEmailCode(email);
+    }, []);
+
+    const verifyEmailCode = useCallback(async (email, token) => {
+      await window.CW_AUTH.verifyEmailCode(email, token);
+    }, []);
+
     const signOut = useCallback(async () => {
       await window.CW_AUTH.signOut();
     }, []);
@@ -139,6 +156,9 @@
       signUpPassword,
       requestPasswordReset,
       completePasswordReset,
+      changePassword,
+      sendEmailCode,
+      verifyEmailCode,
       signOut,
       refreshMe,
       nav,

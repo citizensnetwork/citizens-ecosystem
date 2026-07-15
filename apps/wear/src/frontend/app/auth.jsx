@@ -224,15 +224,24 @@
   // ── the auth screen (signed-out gate) ────────────────────────────
 
   function AuthScreen() {
-    const { signIn, signInPassword, signUpPassword, requestPasswordReset, authStatus, authError } =
-      useStore();
+    const {
+      signIn,
+      signInPassword,
+      signUpPassword,
+      requestPasswordReset,
+      sendEmailCode,
+      verifyEmailCode,
+      authStatus,
+      authError,
+    } = useStore();
     const unconfigured = authStatus === 'unconfigured';
 
-    // 'signin' | 'signup' | 'forgot' | 'confirmSent' | 'resetSent'
+    // 'signin' | 'signup' | 'forgot' | 'confirmSent' | 'resetSent' | 'code' | 'codeVerify'
     const [mode, setMode] = useState('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
+    const [code, setCode] = useState('');
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
 
@@ -241,6 +250,7 @@
       setError(null);
       setPassword('');
       setConfirm('');
+      setCode('');
     };
 
     async function submit(e) {
@@ -276,6 +286,19 @@
           setBusy(true);
           await requestPasswordReset(email.trim());
           setMode('resetSent');
+        } else if (mode === 'code') {
+          setBusy(true);
+          await sendEmailCode(email.trim());
+          setMode('codeVerify');
+        } else if (mode === 'codeVerify') {
+          const digits = code.replace(/\D/g, '');
+          if (digits.length !== 6) {
+            setError('Enter the 6-digit code from your email.');
+            return;
+          }
+          setBusy(true);
+          await verifyEmailCode(email.trim(), digits);
+          // SIGNED_IN takes over via the store; no local transition needed.
         }
       } catch (err) {
         setError(err.message || 'Something went wrong. Please try again.');
@@ -318,6 +341,41 @@
       );
     }
 
+    if (mode === 'codeVerify') {
+      return h(
+        Page,
+        { tagline: 'Enter the 6-digit code we emailed to ' + email.trim() + '.' },
+        h(
+          'form',
+          { onSubmit: submit, style: { display: 'flex', flexDirection: 'column', gap: 14 } },
+          h(TextField, {
+            label: 'Sign-in code',
+            type: 'text',
+            value: code,
+            onChange: (v) => setCode(v.replace(/\D/g, '').slice(0, 6)),
+            autoComplete: 'one-time-code',
+            placeholder: '123456',
+            autoFocus: true,
+          }),
+          h(FormError, { message: error || authError }),
+          busy
+            ? h(Spinner, { size: 20 })
+            : h(GoldButton, { label: 'Verify & sign in' }),
+        ),
+        h(
+          'div',
+          { style: { textAlign: 'center', marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 } },
+          h(LinkButton, {
+            label: 'Send a new code',
+            onClick: () => switchMode('code'),
+            muted: true,
+          }),
+          h(LinkButton, { label: 'Back to sign in', onClick: () => switchMode('signin') }),
+        ),
+      );
+    }
+
+    const emailOnly = mode === 'forgot' || mode === 'code';
     const fields = [
       h(TextField, {
         key: 'email',
@@ -329,7 +387,7 @@
         placeholder: 'you@example.com',
       }),
     ];
-    if (mode !== 'forgot') {
+    if (!emailOnly) {
       fields.push(
         h(TextField, {
           key: 'pw',
@@ -360,7 +418,9 @@
         tagline:
           mode === 'forgot'
             ? 'Enter your account email and we will send you a reset link.'
-            : 'Faith-rooted fashion and the brands behind it — one Kingdom identity across every Citizens app.',
+            : mode === 'code'
+              ? 'Enter your account email and we will send you a 6-digit sign-in code.'
+              : 'Faith-rooted fashion and the brands behind it — one Kingdom identity across every Citizens app.',
       },
       h(
         'form',
@@ -375,13 +435,27 @@
                   ? 'Sign in'
                   : mode === 'signup'
                     ? 'Create account'
-                    : 'Send reset link',
+                    : mode === 'code'
+                      ? 'Send code'
+                      : 'Send reset link',
             }),
       ),
       mode === 'signin'
         ? h(
             'div',
-            { style: { textAlign: 'center', marginTop: 12 } },
+            {
+              style: {
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                alignItems: 'center',
+                marginTop: 12,
+              },
+            },
+            h(LinkButton, {
+              label: 'Email me a 6-digit sign-in code instead',
+              onClick: () => switchMode('code'),
+            }),
             h(LinkButton, {
               label: 'Forgot password?',
               onClick: () => switchMode('forgot'),
@@ -389,7 +463,7 @@
             }),
           )
         : null,
-      mode !== 'forgot'
+      !emailOnly
         ? h(
             'div',
             {},
