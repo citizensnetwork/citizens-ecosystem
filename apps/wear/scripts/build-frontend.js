@@ -49,6 +49,7 @@ buildFrontend({
     'profile.jsx',
     'concepts.jsx',
     'adminq.jsx',
+    'brandapply.jsx',
     'settings.jsx',
     'shell.jsx',
     'app.jsx',
