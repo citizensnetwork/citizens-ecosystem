@@ -1,4 +1,5 @@
 import type {
+  BrandApplication,
   ConceptStatusEntry,
   ConceptWithMedia,
   FeedPage,
@@ -68,6 +69,46 @@ export const toUserDto = (u: WearUser): UserDto => ({
   handle: u.handle,
   displayName: u.displayName,
   avatarUrl: u.avatarUrl,
+});
+
+/** Become-a-Brand application (mig 162) — the applicant's own view AND the
+ * admin queue card share one shape (applications are moderator-readable). */
+export interface BrandApplicationDto {
+  readonly id: string;
+  readonly applicantId: string;
+  readonly status: BrandApplication['status'];
+  readonly brandName: string;
+  readonly bio: string | null;
+  readonly socials: Readonly<Record<string, string>>;
+  readonly supportEmail: string;
+  readonly contactNumber: string;
+  readonly deliveryOptions: string;
+  readonly agreeTerms: boolean;
+  readonly agreeConduct: boolean;
+  readonly agreeFees: boolean;
+  readonly reviewNote: string | null;
+  readonly mintedBrandId: string | null;
+  readonly createdAt: string;
+  readonly reviewedAt: string | null;
+}
+
+export const toBrandApplicationDto = (a: BrandApplication): BrandApplicationDto => ({
+  id: a.id,
+  applicantId: a.applicantId,
+  status: a.status,
+  brandName: a.brandName,
+  bio: a.bio,
+  socials: a.socials,
+  supportEmail: a.supportEmail,
+  contactNumber: a.contactNumber,
+  deliveryOptions: a.deliveryOptions,
+  agreeTerms: a.agreeTerms,
+  agreeConduct: a.agreeConduct,
+  agreeFees: a.agreeFees,
+  reviewNote: a.reviewNote,
+  mintedBrandId: a.mintedBrandId,
+  createdAt: a.createdAt,
+  reviewedAt: a.reviewedAt,
 });
 
 export interface NotificationDto {

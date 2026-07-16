@@ -223,4 +223,17 @@ const STORE_ERROR_STATUS: Record<string, number> = {
   already_closed: 409,
   // Mig 161 — community engagement on Concepts
   status_not_found: 404,
+  // Mig 162 — Become-a-Brand applications
+  not_eligible: 403,
+  application_pending: 409,
+  application_not_open: 409,
+  application_not_found: 404,
+  agreements_required: 422,
+  invalid_brand_name: 422,
+  invalid_support_email: 422,
+  invalid_contact_number: 422,
+  invalid_delivery_options: 422,
+  invalid_bio: 422,
+  invalid_socials: 422,
+  invalid_application: 422,
 };

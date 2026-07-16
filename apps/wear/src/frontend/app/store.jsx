@@ -197,6 +197,7 @@
       openConcepts: () => push('concepts', {}),
       openConcept: (id) => push('concept', { id }),
       openAdmin: () => push('admin', {}),
+      openBrandApply: () => push('brandApply', {}),
     };
 
     return React.createElement(StoreContext.Provider, { value }, children);

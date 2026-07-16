@@ -183,8 +183,34 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-16, project `xyiajtrvhlxaeplsiajj`, head = **mig 161**)
+## 9. Verification snapshot (updated 2026-07-16, project `xyiajtrvhlxaeplsiajj`, head = **mig 162**)
 
+> **2026-07-16: mig 162 (`wear` Become-a-Brand applications) APPLIED** (pre-apply tag
+> `wear-pre-mig162` @b0a84a9). **Advisor: 0 ERROR / 102 WARN / 3 INFO — the single new WARN
+> is the INTENTIONAL `wear.brand_eligibility` SECDEF EXECUTE grant to `authenticated` (the
+> mig-157 pattern, which added 9 such documented WARNs): the fn IS the eligibility read API
+> and the INSERT `WITH CHECK` requires the caller to hold EXECUTE; it self-guards to
+> self-or-moderator and reads nothing but counts. Every other finding is baseline-identical.**
+> Rolled-back prod smokes 6/6 PASS (ineligible INSERT 42501; eligibility(other) 42501;
+> eligibility(self) live counts; decided-row UPDATE 0 rows; column-grant brand_name rewrite
+> 42501; decision UPDATE + trigger notification w/ institutional null actor + brandSlug).
+> Adds
+> `wear.brand_applications` (immutable once submitted — no owner UPDATE/DELETE; **one open
+> application per user** via a partial unique index; re-apply after rejection = a NEW row;
+> decided rows immutable for everyone — the admin UPDATE policy's USING requires
+> `status='pending'`; **column-scoped UPDATE grant** = only the decision stamp is ever
+> writable), the **SECDEF `wear.brand_eligibility(p_user)`** derivation (self-or-moderator
+> guard; posted ≥20 / own-concepts-claimed ≥10 / zero ACTIONED user-reports — also called
+> inside the INSERT `WITH CHECK`, so eligibility is RLS-hard), **+2 `wear.notification_type`
+> values** (`brand_application_approved` / `_rejected`) and the decision-notify trigger
+> (institutional: actor null; payload carries the minted brand's slug for the inbox deep
+> link). **Approve = mint**: the admin route reuses the mig-160 `brands_admin_insert` path
+> with `verified=true` (the mig-157 column guard admits admins). Grill decisions ratified
+> 2026-07-16 (locked-once-submitted · immediate re-apply · 20/10/0 RLS-hard · admin direct
+> mint stays the below-threshold valve). wear tables 37→**38**, policies 83→**86**,
+> fns 32→**34**, enums 22→**23**. Design: roles MD §6.1 + RESUME §3X.
+> **Next migration # = 163.**
+>
 > **2026-07-16: mig 161 (`wear` concept engagement — the community Concepts surface) APPLIED**
 > (pre-apply tag `wear-pre-mig161` @de042fa). **Advisor: 0 ERROR / 101 WARN / 3 INFO — signature
 > byte-identical to the head-160 baseline (sha 658f66c4), 0 new findings.** Adds 4 tables

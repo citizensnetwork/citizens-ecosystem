@@ -1,6 +1,9 @@
 import type {
   BlockEdge,
   BlockRepo,
+  BrandApplication,
+  BrandApplicationRepo,
+  BrandEligibility,
   BrandRepo,
   BrandVerification,
   BrandVerificationRepo,
@@ -77,6 +80,8 @@ import type {
 } from './contract';
 import {
   BOOTSTRAP_GRACE_STATUSES,
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
   CONCEPT_STAGES,
   CONCEPT_STATUS_TTL_MS,
   CREATOR_BADGE_MIN_CONCEPTS,
@@ -138,6 +143,7 @@ export class MemoryWearStore implements WearStore {
   public readonly royalties: RoyaltyRepo;
   public readonly conversions: CatalogueConversionRepo;
   public readonly brandVerifications: BrandVerificationRepo;
+  public readonly brandApplications: BrandApplicationRepo;
   public readonly roles: RoleRepo;
   public readonly notifications: NotificationRepo;
 
@@ -195,6 +201,8 @@ export class MemoryWearStore implements WearStore {
   private readonly _conversions = new Map<string, CatalogueConversion>();
   /** Keyed by brandId (PK — one lifecycle row per brand). */
   private readonly _brandVerifications = new Map<ConnectId, BrandVerification>();
+  // Mig 162 — Become-a-Brand applications (insertion order = creation order).
+  private readonly _brandApplications = new Map<string, BrandApplication>();
   // Mig 159 — notifications (trigger-produced in prod; emitted by the lifecycle
   // methods here to mirror the DB triggers).
   private readonly _notifications = new Map<string, WearNotification>();
@@ -343,7 +351,9 @@ export class MemoryWearStore implements WearStore {
           tagline: input.tagline ?? null,
           websiteUrl: input.websiteUrl ?? null,
           logoUrl: input.logoUrl ?? null,
-          verified: false,
+          // Mig 162 admin mint: prod's protect_verified_column guard admits
+          // admins only; here the API's admin gate is the caller's promise.
+          verified: input.verified ?? false,
           ownerUserId: input.ownerId,
           connectContributorId: input.connectContributorId ?? null,
           createdAt: ts,
@@ -2199,6 +2209,162 @@ export class MemoryWearStore implements WearStore {
         return next;
       },
     };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Mig 162 — Become-a-Brand applications. The rules below mirror the RLS
+    // policies + CHECK constraints of migration 162 exactly (the semantic
+    // spec): immutable once submitted, one open per user, immediate re-apply
+    // after rejection (a NEW row), eligibility RLS-hard, decided rows
+    // immutable for everyone, decision notification trigger-produced.
+    // ─────────────────────────────────────────────────────────────────────
+    this.brandApplications = {
+      eligibility: async (userId, callerId) => this._brandEligibility(userId, callerId),
+      submit: async (callerId, input) => {
+        // Field validation mirrors the table CHECKs (mig 162 §2).
+        const brandName = input.brandName.trim();
+        if (brandName.length < 2 || brandName.length > 80) {
+          throw new WearStoreError('invalid_brand_name', 'Brand name must be 2–80 characters.');
+        }
+        const bio = (input.bio ?? '').trim() || null;
+        if (bio && bio.length > 500) {
+          throw new WearStoreError('invalid_bio', 'Bio must be at most 500 characters.');
+        }
+        const supportEmail = input.supportEmail.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(supportEmail) || supportEmail.length > 254) {
+          throw new WearStoreError('invalid_support_email', 'A valid support email is required.');
+        }
+        const contactNumber = input.contactNumber.trim();
+        if (contactNumber.length < 7 || contactNumber.length > 32) {
+          throw new WearStoreError(
+            'invalid_contact_number',
+            'A contact number (7–32 characters) is required.',
+          );
+        }
+        const deliveryOptions = input.deliveryOptions.trim();
+        if (deliveryOptions.length < 3 || deliveryOptions.length > 500) {
+          throw new WearStoreError(
+            'invalid_delivery_options',
+            'Describe your delivery options (3–500 characters).',
+          );
+        }
+        const socials: Record<string, string> = {};
+        for (const [key, value] of Object.entries(input.socials ?? {})) {
+          if (typeof value === 'string' && value.trim()) socials[key] = value.trim();
+        }
+        if (JSON.stringify(socials).length > 2000) {
+          throw new WearStoreError('invalid_socials', 'Social links are too long.');
+        }
+        if (!(input.agreeTerms && input.agreeConduct && input.agreeFees)) {
+          throw new WearStoreError(
+            'agreements_required',
+            'The Ts&Cs, Code of Conduct, and platform-fee agreements are all required.',
+          );
+        }
+        // One OPEN application per user (the partial unique index).
+        for (const row of this._brandApplications.values()) {
+          if (row.applicantId === callerId && row.status === 'pending') {
+            throw new WearStoreError(
+              'application_pending',
+              'You already have an application under review.',
+            );
+          }
+        }
+        // Eligibility — the RLS WITH CHECK backstop (ratified hard).
+        const gate = this._brandEligibility(callerId, callerId);
+        if (!gate.eligible) {
+          throw new WearStoreError(
+            'not_eligible',
+            'The Become-a-Brand gate is not met yet — keep creating.',
+          );
+        }
+        const ts = this._now().toISOString();
+        const created: BrandApplication = {
+          id: this._id('bap'),
+          applicantId: callerId,
+          status: 'pending',
+          brandName,
+          bio,
+          socials,
+          supportEmail,
+          contactNumber,
+          deliveryOptions,
+          agreeTerms: true,
+          agreeConduct: true,
+          agreeFees: true,
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: null,
+          mintedBrandId: null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._brandApplications.set(created.id, created);
+        return created;
+      },
+      getOwnLatest: async (callerId) => {
+        // Map iteration preserves insertion order — the last match IS the
+        // latest attempt even when test clocks produce identical timestamps.
+        let latest: BrandApplication | null = null;
+        for (const row of this._brandApplications.values()) {
+          if (row.applicantId === callerId) latest = row;
+        }
+        return latest;
+      },
+      getById: async (id, callerId) => {
+        const row = this._brandApplications.get(id);
+        if (!row) return null;
+        if (row.applicantId !== callerId && !this._isModerator(callerId)) return null;
+        return row;
+      },
+      listPending: async (callerId) => {
+        if (!this._isModerator(callerId)) {
+          throw new WearStoreError('forbidden', 'Moderators only.');
+        }
+        return [...this._brandApplications.values()]
+          .filter((a) => a.status === 'pending')
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      },
+      review: async (id, callerId, decision, opts) => {
+        if (!this._isAdmin(callerId)) {
+          throw new WearStoreError('forbidden', 'Only an admin can decide applications.');
+        }
+        const row = this._brandApplications.get(id);
+        if (!row) {
+          throw new WearStoreError('application_not_found', `Unknown application ${id}.`);
+        }
+        // Decided rows are immutable for EVERYONE (RLS USING status='pending').
+        if (row.status !== 'pending') {
+          throw new WearStoreError('application_not_open', 'This application was already decided.');
+        }
+        const ts = this._now().toISOString();
+        const next: BrandApplication = {
+          ...row,
+          status: decision,
+          reviewedBy: callerId,
+          reviewedAt: ts,
+          reviewNote: (opts?.reviewNote ?? '').trim().slice(0, 2000) || null,
+          // The mint invariant: only an approval carries a brand.
+          mintedBrandId: decision === 'approved' ? (opts?.mintedBrandId ?? null) : null,
+          updatedAt: ts,
+        };
+        this._brandApplications.set(id, next);
+        // Mirrors trg_notify_on_brand_application_decision (mig 162):
+        // institutional voice — actor null, deep link to the newborn brand.
+        const minted = next.mintedBrandId ? this._brands.get(next.mintedBrandId) : undefined;
+        this._emitNotification({
+          recipientId: next.applicantId,
+          type: decision === 'approved' ? 'brand_application_approved' : 'brand_application_rejected',
+          actorId: null,
+          brandId: next.mintedBrandId,
+          data: {
+            brandName: next.brandName,
+            reviewNote: next.reviewNote,
+            brandSlug: minted?.slug ?? null,
+          },
+        });
+        return next;
+      },
+    };
   }
 
   private _isBlockedEither(a: ConnectId, b: ConnectId): boolean {
@@ -2214,6 +2380,42 @@ export class MemoryWearStore implements WearStore {
   /** `wear.is_admin()`: role = 'admin'. */
   private _isAdmin(userId: ConnectId): boolean {
     return this._roles.get(userId) === 'admin';
+  }
+
+  /**
+   * Mirrors `wear.brand_eligibility()` (mig 162, SECDEF): the derived §6.1
+   * gate. Self-or-moderator read; claimed = cached stage past 'proposed'
+   * (forward-only; a revoked claim re-opens the concept and drops out);
+   * only admin-ACTIONED reports against the user themselves block.
+   */
+  private _brandEligibility(userId: ConnectId, callerId: ConnectId): BrandEligibility {
+    if (callerId !== userId && !this._isModerator(callerId)) {
+      throw new WearStoreError('forbidden', 'Own eligibility (or moderator) only.');
+    }
+    let conceptsPosted = 0;
+    let conceptsClaimed = 0;
+    for (const concept of this._concepts.values()) {
+      if (concept.creatorId !== userId) continue;
+      conceptsPosted += 1;
+      if (concept.status !== 'proposed') conceptsClaimed += 1;
+    }
+    let actionedReports = 0;
+    for (const report of this._reports.values()) {
+      if (report.subjectKind === 'user' && report.subjectId === userId && report.status === 'actioned') {
+        actionedReports += 1;
+      }
+    }
+    return {
+      eligible:
+        conceptsPosted >= BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED &&
+        conceptsClaimed >= BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED &&
+        actionedReports === 0,
+      conceptsPosted,
+      conceptsClaimed,
+      actionedReports,
+      conceptsPostedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
+      conceptsClaimedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
+    };
   }
 
   private _readConcept(id: string): ConceptWithMedia | null {

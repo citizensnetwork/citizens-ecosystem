@@ -292,3 +292,50 @@ begin
 
   raise notice 'wear engagement seed applied (concepts +2, statuses auto-promoted, comments/shares live)';
 end $engage$;
+
+-- ============================================================================
+-- §13 — mig-162 Become-a-Brand demo application
+-- ----------------------------------------------------------------------------
+-- SEPARATE guarded block (the §12 pattern): one PENDING application from
+-- Thabo M. so the founder's Admin queue → Applications tab has a real card to
+-- decide on. service_role bypasses RLS — including the eligibility WITH CHECK
+-- — which is fine for demo data: the card's eligibility chips will honestly
+-- show Thabo's real (below-gate) numbers, demonstrating exactly what the
+-- admin sees. Approving it exercises the full mint path end-to-end.
+-- Teardown: unchanged — deleting the seed auth.users cascades through
+-- wear.users → brand_applications (applicant FK).
+-- ============================================================================
+do $brandapp$
+declare
+  c2 uuid := '5eed0012-0000-4000-a000-000000000012'; -- Thabo M.
+  -- fixed id doubles as this block's idempotency guard
+  app1 uuid := '5eedba01-0000-4000-a000-0000000000b1';
+begin
+  if not exists (select 1 from wear.users where id = c2) then
+    raise notice 'wear brand-application seed skipped — run the base seed first';
+    return;
+  end if;
+  if exists (select 1 from wear.brand_applications where id = app1) then
+    raise notice 'wear brand-application seed already present — skipping';
+    return;
+  end if;
+  -- The one-pending index also guards a manual re-run after a decision.
+  if exists (select 1 from wear.brand_applications
+             where applicant_id = c2 and status = 'pending') then
+    raise notice 'wear brand-application seed skipped — Thabo already has an open application';
+    return;
+  end if;
+
+  insert into wear.brand_applications
+    (id, applicant_id, brand_name, bio, socials, support_email, contact_number,
+     delivery_options, agree_terms, agree_conduct, agree_fees)
+  values
+    (app1, c2, $t$Mustard Seed Supply$t$,
+     $t$Small-batch caps and tees grown out of my Concepts — starting with the Mustard Seed cap the community carried this far.$t$,
+     '{"instagram":"@mustardseedsupply","website":"https://mustardseed.example"}'::jsonb,
+     'hello@mustardseed.example', '+27 82 555 0134',
+     $t$Courier nationwide (3–5 days); pickup at the Hatfield Saturday market.$t$,
+     true, true, true);
+
+  raise notice 'wear brand-application seed applied (1 pending application for the admin queue)';
+end $brandapp$;

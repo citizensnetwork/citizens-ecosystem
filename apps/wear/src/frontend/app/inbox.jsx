@@ -52,6 +52,14 @@
         return (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') + ' liked ' + title + '. ❤️';
       case 'concept_share':
         return (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') + ' shared ' + title + ' — your design is travelling.';
+      // Mig 162 — the Become-a-Brand decision (institutional; no actor).
+      case 'brand_application_approved':
+        return 'Your Become-a-Brand application for “' + (d.brandName || 'your brand') + '” was approved — welcome, Brand! 🎉 Your page is live.';
+      case 'brand_application_rejected':
+        return (
+          'Your Become-a-Brand application for “' + (d.brandName || 'your brand') + '” was not approved this time.' +
+          (d.reviewNote ? ' Note from the team: “' + d.reviewNote + '”' : ' You may apply again whenever you are ready.')
+        );
       default:
         return 'New activity on ' + title + '.';
     }
@@ -72,7 +80,7 @@
           background: n.read ? 'none' : '#fdf8ec',
           borderBottom: '1px solid #f7f5f2',
           textAlign: 'left',
-          cursor: n.conceptId ? 'pointer' : 'default',
+          cursor: n.conceptId || (n.data && n.data.brandSlug) ? 'pointer' : 'default',
         },
       },
       n.actor
@@ -160,7 +168,12 @@
         h(NotifRow, {
           key: n.id,
           n: n,
-          onOpen: () => n.conceptId && push('concept', { id: n.conceptId }),
+          // Concepts open the concept; a minted-brand decision opens the
+          // newborn brand page (slug travels in the trigger payload).
+          onOpen: () =>
+            n.conceptId
+              ? push('concept', { id: n.conceptId })
+              : n.data && n.data.brandSlug && push('brand', { slug: n.data.brandSlug }),
         }),
       ),
     );

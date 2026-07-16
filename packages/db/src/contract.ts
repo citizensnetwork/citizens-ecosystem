@@ -591,6 +591,13 @@ export interface CreateBrandInput {
   readonly websiteUrl?: string | null;
   readonly logoUrl?: string | null;
   readonly connectContributorId?: ConnectId | null;
+  /**
+   * Mint the brand born-verified (mig 162 approve path). ADMIN-only: the
+   * mig-157 `protect_verified_column` guard admits `wear.is_admin()` and
+   * raises 42501 for anyone else — the API's admin gate is the front door,
+   * the column guard the wall.
+   */
+  readonly verified?: boolean;
 }
 
 export interface UpdateBrandInput {
@@ -1026,6 +1033,101 @@ export interface RoleRepo {
   getOwn(userId: ConnectId): Promise<WearPlatformRole | null>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Mig 162 — the Become-a-Brand application (§6.1, ratified 2026-07-15/16).
+// Brand genesis is assigned, never self-created: eligibility (derived, never
+// stored) unlocks the Settings application; an admin decision mints the
+// verified `wear.brands` row via the mig-160 admin-insert path. Applications
+// are IMMUTABLE once submitted (no edits, no withdraw); a rejection permits
+// an IMMEDIATE re-apply as a NEW row; at most one open application per user.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Eligibility thresholds (§6.1) — mirror the literals in
+ * `wear.brand_eligibility()` (mig 162); tuning is a one-line migration. */
+export const BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED = 20;
+export const BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED = 10;
+
+export type BrandApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+/**
+ * The derived §6.1 gate: concepts posted ≥ 20, own concepts claimed ≥ 10
+ * (cached stage > 'proposed' — forward-only lifecycle; a revoked claim
+ * re-opens the concept and correctly leaves the count), and zero
+ * admin-ACTIONED reports against the user (accusations alone never block).
+ * Support email/contact are required FORM fields, not gate inputs.
+ */
+export interface BrandEligibility {
+  readonly eligible: boolean;
+  readonly conceptsPosted: number;
+  readonly conceptsClaimed: number;
+  readonly actionedReports: number;
+  readonly conceptsPostedRequired: number;
+  readonly conceptsClaimedRequired: number;
+}
+
+export interface BrandApplication {
+  readonly id: string;
+  readonly applicantId: ConnectId;
+  readonly status: BrandApplicationStatus;
+  readonly brandName: string;
+  readonly bio: string | null;
+  /** Flat string map ({instagram, tiktok, x, website, …} — UI-defined keys). */
+  readonly socials: Readonly<Record<string, string>>;
+  readonly supportEmail: string;
+  readonly contactNumber: string;
+  readonly deliveryOptions: string;
+  readonly agreeTerms: boolean;
+  readonly agreeConduct: boolean;
+  readonly agreeFees: boolean;
+  readonly reviewedBy: ConnectId | null;
+  readonly reviewedAt: IsoDateTime | null;
+  readonly reviewNote: string | null;
+  /** Set on approval: the verified brand the decision minted. */
+  readonly mintedBrandId: ConnectId | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface SubmitBrandApplicationInput {
+  readonly brandName: string;
+  readonly bio?: string | null;
+  readonly socials?: Readonly<Record<string, string>>;
+  readonly supportEmail: string;
+  readonly contactNumber: string;
+  readonly deliveryOptions: string;
+  readonly agreeTerms: boolean;
+  readonly agreeConduct: boolean;
+  readonly agreeFees: boolean;
+}
+
+/**
+ * The Become-a-Brand application lifecycle. `submit` enforces the full gate
+ * (validation, all three agreements, one-open-per-user, eligibility — the
+ * RLS backstop's mirror); `review` is the ADMIN decision on a pending row
+ * (decided rows are immutable for everyone) and emits the applicant's
+ * notification (trigger-produced in prod; mirrored inline in memory).
+ * The approve MINT itself is the route's job via `BrandRepo.create`
+ * (`verified: true`, the mig-160 admin path) — passed back in as
+ * `mintedBrandId` so the application records what it produced.
+ */
+export interface BrandApplicationRepo {
+  /** The §6.1 derivation — own numbers, or any user's for a moderator. */
+  eligibility(userId: ConnectId, callerId: ConnectId): Promise<BrandEligibility>;
+  submit(callerId: ConnectId, input: SubmitBrandApplicationInput): Promise<BrandApplication>;
+  /** The caller's LATEST attempt (any status), or null — the Settings state. */
+  getOwnLatest(callerId: ConnectId): Promise<BrandApplication | null>;
+  /** Applicant-or-moderator read — null for everyone else (RLS semantics). */
+  getById(id: string, callerId: ConnectId): Promise<BrandApplication | null>;
+  /** The admin queue: pending applications, oldest first (moderator view). */
+  listPending(callerId: ConnectId): Promise<readonly BrandApplication[]>;
+  review(
+    id: string,
+    callerId: ConnectId,
+    decision: Extract<BrandApplicationStatus, 'approved' | 'rejected'>,
+    opts?: { readonly reviewNote?: string | null; readonly mintedBrandId?: ConnectId | null },
+  ): Promise<BrandApplication>;
+}
+
 /**
  * Notification kinds (mig 159). Each maps to a Concepts-marketplace lifecycle
  * event; the recipient is the party who cares (creator or brand owner).
@@ -1041,7 +1143,10 @@ export type NotificationType =
   // Mig 161 — community engagement on Concepts (§6.2):
   | 'concept_comment' // someone commented on your concept (or replied to you)
   | 'concept_upvote' // someone liked your concept                 → creator
-  | 'concept_share'; // someone shared your concept                → creator
+  | 'concept_share' // someone shared your concept                 → creator
+  // Mig 162 — the Become-a-Brand decision (institutional: actor is null):
+  | 'brand_application_approved' // your application was approved  → applicant
+  | 'brand_application_rejected'; // …was not approved this time   → applicant
 
 export interface WearNotification {
   readonly id: string;
@@ -1099,6 +1204,7 @@ export interface WearStore {
   readonly royalties: RoyaltyRepo;
   readonly conversions: CatalogueConversionRepo;
   readonly brandVerifications: BrandVerificationRepo;
+  readonly brandApplications: BrandApplicationRepo;
   readonly roles: RoleRepo;
   readonly notifications: NotificationRepo;
 }

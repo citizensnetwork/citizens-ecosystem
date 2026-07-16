@@ -180,7 +180,12 @@ mirrored in [`apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md`](../apps/connect/do
 2026-07-16)** — badge surfaced on `/api/me` + profiles, statuses bar + engagement live.
 ~~Per-post Share; full-screen Home stories~~ ✅ **SHIPPED (same session)** — share sheet +
 `?post=`/`?concept=` deep links; the Home tray now plays stories in a full-screen viewer.
-Still deferred: the **Become-a-Brand application** form + eligibility derivation + admin
-approval → mint flow (the `POST /api/brands` `ownerId` + `brands_admin_insert` mint path is
-ready); **share-to-DM** (the `dm` channel value is reserved); **admin sign-in-as**
+~~The **Become-a-Brand application** form + eligibility derivation + admin approval → mint
+flow~~ ✅ **SHIPPED (mig 162, 2026-07-16)** — `wear.brand_applications` (immutable once
+submitted; one open per user; immediate re-apply after rejection as a NEW row — all ratified
+2026-07-16), the SECDEF `wear.brand_eligibility()` derivation (§6.1's 20 posted / 10 claimed /
+zero actioned reports, enforced UI + API + RLS `WITH CHECK`), the Settings panel + application
+form, the admin queue tab, and approve-mints-verified-brand via the existing
+`POST /api/brands` `ownerId` + `brands_admin_insert` path (+ decision notifications).
+Still deferred: **share-to-DM** (the `dm` channel value is reserved); **admin sign-in-as**
 (impersonation — a security-sensitive surface, own design).

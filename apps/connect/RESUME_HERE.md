@@ -1274,37 +1274,107 @@ the 2 seeded promotions; advisor signature unchanged; performance advisors show 
 "unused" indexes; **0 unindexed FKs**).
 
 ### Still deferred from §3V (the remaining epic)
-1. **Become-a-Brand application** (§3V-3 — THE next Wear increment): eligibility derivation
-   (≈20 Concepts posted + 10 claimed + support email + contact + no sustained reports) → Settings
-   form (Brand Name*, bio, socials, email*, contact*, delivery options*, Ts&Cs/Code-of-Conduct/
-   monthly-fee agreements) → **needs a `wear.brand_applications` table (mig 162)** + admin queue
-   UI (adminq.jsx has the verifications pattern) → approve mints via the EXISTING
-   `POST /api/brands` `ownerId` + `brands_admin_insert` path (ready since mig 160).
+1. ~~**Become-a-Brand application** (§3V-3)~~ ✅ **DONE §3X (2026-07-16, mig 162 live).**
 2. **Admin sign-in-as (impersonation)** — security-sensitive, own design session (§3V-6).
 3. Fast-follows logged in the offload: share-to-DM ('dm' channel reserved), upvote-notification
    dedupe, `auth_rls_initplan` sweep migration, statuses-bar pagination.
 
 ---
 
+## 3X. Wear Become-a-Brand application — SHIPPED ✅ (2026-07-16, mig 162 live)
+
+§3V-3 / §3W deferred №1 — the last big rung of the progression epic — built + prod-verified in
+one session on `step5-monorepo-lift`. **mig 162 APPLIED.** Founder ratified all four grill
+decisions in-session (AskUserQuestion): **(1) locked once submitted** (immutable — no edits, no
+withdraw); **(2) immediate re-apply after rejection** (each attempt = a NEW row, history visible
+to admins; one-pending rule is the throttle); **(3) eligibility 20/10/0 RLS-HARD** (20 Concepts
+posted + 10 of the applicant's Concepts claimed + zero admin-ACTIONED user-reports; support
+email/contact are required FORM fields, not unlock inputs; admin direct-mint via `POST
+/api/brands` stays the below-threshold override valve); **(4) apply pre-authorized once green.**
+Offload log: `.claude/sessions/wear-become-a-brand.md`.
+
+### What shipped (all gates green: turbo lint 12/12 · typecheck 12/12 · test 11/11 — Wear
+### 106/106 (+12), db 99 — · build 8/8)
+- **mig 162** (`162_wear_brand_applications.sql`) **APPLIED** (tag `wear-pre-mig162` @b0a84a9;
+  advisor **0 ERROR / 102 WARN / 3 INFO — the single new WARN is the INTENTIONAL
+  `brand_eligibility` SECDEF EXECUTE grant** (mig-157 precedent), all else baseline-identical;
+  **6/6 rolled-back prod smokes PASS**). Adds `wear.brand_applications` (§6.1 form fields, all
+  CHECK-bounded; agreements CHECK — an un-agreed application is invalid data; lifecycle
+  invariants pending⇔undecided + mint-only-on-approve; **one open application per user** via
+  partial unique index), SECDEF **`wear.brand_eligibility(p_user)`** (self-or-moderator guard;
+  also called in the INSERT `WITH CHECK` → eligibility is RLS-hard), the decision-notify
+  trigger (+2 `notification_type` values; institutional null actor; payload carries
+  `brandSlug` for the inbox deep link), and a **column-scoped UPDATE grant** — only the
+  decision stamp is ever writable, so even an admin can never rewrite what an applicant
+  attested; decided rows are immutable for EVERYONE (admin UPDATE policy USING requires
+  `status='pending'`). wear: 38 tables / 86 policies / 34 fns / 23 enums.
+- **Approve = mint:** the admin route reuses the EXISTING mig-160 path — `brands.create`
+  (`brands_admin_insert` RLS) with **`verified: true`** (the mig-157 `protect_verified_column`
+  guard admits admins; `CreateBrandInput.verified` added) — then stamps the application with
+  `mintedBrandId`. A slug clash that already belongs to THIS applicant is reused (crash-retry
+  converges); anyone else's slug → 409.
+- **Store:** `WearStore` += `brandApplications` repo (eligibility / submit / getOwnLatest /
+  getById / listPending / review) in contract + MemoryWearStore (semantic spec — mirrors every
+  RLS rule + the notify trigger inline) + SupabaseWearStore (RPC + table ops; 23505→
+  `application_pending`, 42501→`not_eligible`, 23514→per-constraint memory codes).
+  `BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED/CLAIMED` (20/10) mirror the DB literals.
+- **API:** GET+POST `/api/brand-applications` (own panel {eligibility, application} — fetched
+  lazily by Settings, NOT on `/api/me`, keeping boot lean; submit with clean 4xx chain);
+  GET `/api/admin/brand-applications` (queue, applicant + LIVE eligibility snapshot per card);
+  POST `/api/admin/brand-applications/[id]` (admin-gated decide; approve/reject + notify via
+  trigger). +12 `STORE_ERROR_STATUS` codes; `BrandApplicationDto`. **+12 route tests** (gate
+  walls, one-pending, actioned-report block, mint+notify, immutability, immediate re-apply,
+  slug-clash convergence).
+- **UI:** Settings **"Become a Brand" card** (hidden for brand owners; pending/rejected/
+  eligible/progress states with ✓-gates rows; refetches when the nav stack pops back);
+  **`brandapply.jsx`** form screen (§6.1 fields + 3 agreement checkboxes, missing-list +
+  disabled submit, success state); **adminq.jsx Applications tab** (now the DEFAULT tab —
+  applicant card + eligibility GateChips + slug/note inputs + Approve-&-mint / Reject);
+  inbox renders both decision notifications (approved deep-links to the newborn brand via
+  `brandSlug`); `openBrandApply` + `brandApply` screen registered; index.html `?v=20260716a`.
+- **Seed §13** applied to prod: 1 pending demo application (**Mustard Seed Supply** / thabo_m)
+  so the founder's Admin queue has a real card to decide — approving it exercises the full
+  mint path end-to-end. Fixed-id + one-pending guards keep it idempotent; teardown unchanged
+  (FK cascade).
+- **Docs:** SHARED_DB_CONTRACT §9 stamped head→**162** (**next # = 163**); roles MD §6.4
+  Become-a-Brand marked shipped.
+
+### Verified in prod (rolled back)
+Ineligible INSERT → 42501; `brand_eligibility(other)` as non-moderator → 42501; self-read
+returns live counts; decided-row UPDATE → 0 rows; `brand_name` rewrite as admin → 42501
+(column grant); decision UPDATE fires the notification with institutional null actor +
+`brandSlug` payload. Structural QA counts verified live.
+
+### Remaining from the progression epic
+**Admin sign-in-as (impersonation)** — security-sensitive, own design session (§3V-6) — plus
+the offload-logged fast-follows (share-to-DM, upvote-notification dedupe, `auth_rls_initplan`
+sweep, statuses-bar pagination). Product fast-follows spotted this session: Ts&Cs / Code of
+Conduct / fee-schedule DOCUMENTS don't exist yet (the form's checkboxes reference them
+nominally — founder to supply text); brand-logo upload isn't part of the application (admin
+can add post-mint via brand edit).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
-> notifications (§3T), the identity/content-permission model (§3V, mig 160) AND the community
-> Concepts surface (§3W, mig 161 — engagement triad + concept-stories bar + Creator badge +
-> full-screen stories + per-post share) are COMPLETE.**
+> notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
+> Concepts surface (§3W, mig 161) AND the Become-a-Brand application (§3X, mig 162 —
+> eligibility-gated Settings form + admin queue + approve-mints-verified-brand + decision
+> notifications) are COMPLETE.**
 > `step5-monorepo-lift` was merged to `main` at end of the §3R AND §3T sessions (PR #28,
-> 2026-07-15); §3V+§3W commits are on `step5-monorepo-lift` awaiting the next merge.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 162.**
+> 2026-07-15); §3V+§3W+§3X commits are on `step5-monorepo-lift` awaiting the next merge.
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 163.**
 >
-> **▶ RECOMMENDED next session: the Become-a-Brand application** (§3V-3 / §3W deferred №1) — the
-> last big rung of the progression epic. Everything it needs is staged: eligibility inputs are
-> queryable (`concepts.countByCreator` + claims by creator + `wear.reports`), the admin-mint path
-> is live (`POST /api/brands` `ownerId` + `brands_admin_insert`, mig 160), adminq.jsx already has
-> the verifications-queue pattern to clone. Build: **mig 162** `wear.brand_applications` (ask
-> before applying) → eligibility derivation (≈20 posted + 10 claimed + support email/contact +
-> clean reports) → Settings "Become a Brand" form (unlocks at eligibility; Brand Name*, bio,
-> socials, email*, contact*, delivery options*, Ts&Cs/CoC/fees agreements) → admin queue tab →
-> approve = mint verified brand + notify. Design detail: §3V + roles MD §6.1.
+> **▶ RECOMMENDED next session — pick one:** (a) **merge `step5-monorepo-lift` → `main`**
+> (three shipped increments are stacked on the branch — §3V/§3W/§3X, all gates green — a
+> clean PR merge de-risks the branch and redeploys Wear with the new UI); or (b) the **Wear
+> founder walk-through**: decide the live "Mustard Seed Supply" demo application from the
+> Admin queue → Applications tab (approving exercises the full mint in prod), then verify the
+> Settings "Become a Brand" panel as a citizen; or (c) start the **admin sign-in-as
+> (impersonation) design session** (§3V-6 — the epic's last deferred piece, security-sensitive,
+> own session). The founder also owes the platform its **Ts&Cs / Code of Conduct / fee-schedule
+> documents** — the application form's checkboxes reference them nominally (§3X remaining).
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**
@@ -1334,9 +1404,12 @@ the 2 seeded promotions; advisor signature unchanged; performance advisors show 
    g. ~~**Wear progression epic — community Concepts surface.**~~ ✅ **DONE §3W (2026-07-16,
       mig 161 live)** — concept like(=upvote re-skin)/comments/shares, the concept-stories bar
       (trigger-promoted; Creator badge >10 concepts + first-100 bootstrap grace), full-screen
-      Home stories, per-post Share, deep links, engagement notifications, seed §12. Remaining
-      from the epic: **Become-a-Brand application (mig 162 — recommended next)** + admin
-      impersonation + offload-logged fast-follows.
+      Home stories, per-post Share, deep links, engagement notifications, seed §12.
+   h. ~~**Become-a-Brand application.**~~ ✅ **DONE §3X (2026-07-16, mig 162 live)** —
+      eligibility 20/10/0 RLS-hard, Settings panel + form, admin queue tab (default),
+      approve-mints-verified-brand, decision notifications, seed §13 demo card. Remaining
+      from the epic: **admin sign-in-as (impersonation, §3V-6)** + offload-logged
+      fast-follows + founder-supplied Ts&Cs/CoC/fee documents.
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
