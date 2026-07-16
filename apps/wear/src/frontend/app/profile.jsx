@@ -64,7 +64,7 @@
       );
     }
 
-    const { user, profile, counts, brands, posts } = state.data;
+    const { user, profile, counts, brands, posts, creator } = state.data;
 
     const toggleFollow = async () => {
       const next = !following;
@@ -165,6 +165,31 @@
           { style: { fontSize: 13, color: '#a09e97', fontWeight: 500, marginTop: 1 } },
           '@' + user.handle,
         ),
+        // Derived Creator badge (§6.1: auto at >10 Concepts posted)
+        creator
+          ? h(
+              'div',
+              {
+                style: {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  background: '#faf6ec',
+                  border: '1px solid #f0e2b0',
+                  borderRadius: 9,
+                  padding: '4px 11px',
+                  marginTop: 9,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.4px',
+                  textTransform: 'uppercase',
+                  color: '#7a6212',
+                },
+              },
+              Icon('star', { size: 12, color: GOLD, fill: GOLD }),
+              'Creator',
+            )
+          : null,
         h(
           'div',
           { style: { display: 'flex', gap: 38, marginTop: 18 } },

@@ -30,13 +30,60 @@
       case 'concept_advanced':
         return title + ' advanced to ' + (STAGE_LABEL[d.stage] || d.stage) + '.';
       case 'royalty_proof':
-        return 'Proof of the milestone sale for ' + title + ' was submitted — confirm to close it out.';
+        return (
+          'Proof of the milestone sale for ' + title + ' was submitted — confirm to close it out.'
+        );
       case 'royalty_closed':
         return 'The royalty for ' + title + ' was closed out.';
       case 'conversion_proposed':
         return 'A catalogue conversion was proposed for ' + title + '.';
       case 'conversion_responded':
-        return 'Your catalogue conversion for ' + title + (d.accepted ? ' was accepted.' : ' was declined.');
+        return (
+          'Your catalogue conversion for ' +
+          title +
+          (d.accepted ? ' was accepted.' : ' was declined.')
+        );
+      // Mig 161 — community engagement on Concepts. The actor's name renders
+      // from the avatar row; `who` keeps the sentence readable without it.
+      case 'concept_comment': {
+        const who = n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone';
+        return (
+          who +
+          (d.reply ? ' replied to your comment on ' : ' commented on ') +
+          title +
+          (d.excerpt ? ': “' + d.excerpt + '”' : '.')
+        );
+      }
+      case 'concept_upvote':
+        return (
+          (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') +
+          ' liked ' +
+          title +
+          '. ❤️'
+        );
+      case 'concept_share':
+        return (
+          (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') +
+          ' shared ' +
+          title +
+          ' — your design is travelling.'
+        );
+      // Mig 162 — the Become-a-Brand decision (institutional; no actor).
+      case 'brand_application_approved':
+        return (
+          'Your Become-a-Brand application for “' +
+          (d.brandName || 'your brand') +
+          '” was approved — welcome, Brand! 🎉 Your page is live.'
+        );
+      case 'brand_application_rejected':
+        return (
+          'Your Become-a-Brand application for “' +
+          (d.brandName || 'your brand') +
+          '” was not approved this time.' +
+          (d.reviewNote
+            ? ' Note from the team: “' + d.reviewNote + '”'
+            : ' You may apply again whenever you are ready.')
+        );
       default:
         return 'New activity on ' + title + '.';
     }
@@ -57,7 +104,7 @@
           background: n.read ? 'none' : '#fdf8ec',
           borderBottom: '1px solid #f7f5f2',
           textAlign: 'left',
-          cursor: n.conceptId ? 'pointer' : 'default',
+          cursor: n.conceptId || (n.data && n.data.brandSlug) ? 'pointer' : 'default',
         },
       },
       n.actor
@@ -145,7 +192,12 @@
         h(NotifRow, {
           key: n.id,
           n: n,
-          onOpen: () => n.conceptId && push('concept', { id: n.conceptId }),
+          // Concepts open the concept; a minted-brand decision opens the
+          // newborn brand page (slug travels in the trigger payload).
+          onOpen: () =>
+            n.conceptId
+              ? push('concept', { id: n.conceptId })
+              : n.data && n.data.brandSlug && push('brand', { slug: n.data.brandSlug }),
         }),
       ),
     );

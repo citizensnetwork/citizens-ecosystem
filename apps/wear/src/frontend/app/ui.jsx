@@ -3,7 +3,7 @@
 // gold #F2BA1B on white, Manrope, 14–18px radii, soft borders.
 // Exposes window.CWUI.
 (function () {
-  const { createElement: h } = React;
+  const { createElement: h, useEffect, useRef, useState } = React;
   const { Crown, Icon } = window.CWIcons;
 
   const GOLD = '#F2BA1B';
@@ -322,6 +322,11 @@
     const { useState, useRef } = React;
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState(null);
+    // `uploaded` = the current value came from an upload this session, so we show
+    // a clean "uploaded ✓" state and DON'T surface the raw storage URL (§3U-1a).
+    // The manual URL input hides behind an "or paste a URL" toggle.
+    const [uploaded, setUploaded] = useState(false);
+    const [showPaste, setShowPaste] = useState(false);
     const inputRef = useRef(null);
 
     const onFile = async (e) => {
@@ -333,14 +338,29 @@
       try {
         const url = await window.CW_API.uploadImage(file, scope);
         onChange(url);
+        setUploaded(true);
+        setShowPaste(false);
       } catch (ex) {
         setErr((ex && ex.message) || 'Upload failed — paste an image URL instead.');
+        setShowPaste(true); // fall back to the manual path
       } finally {
         setBusy(false);
       }
     };
 
+    const clear = () => {
+      onChange('');
+      setUploaded(false);
+      setShowPaste(false);
+      setErr(null);
+    };
+
     const previewSize = round ? 72 : 96;
+    // Show the raw URL field only when it's actually needed: a pasted/preloaded
+    // value (so it stays editable) or an explicit paste toggle. Never for a
+    // fresh upload — that's the leak §3U-1a closes.
+    const showUrlField = !uploaded && (showPaste || !!value);
+
     return h(
       'div',
       null,
@@ -369,7 +389,7 @@
         : null,
       h(
         'div',
-        { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        { style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' } },
         h(
           'button',
           {
@@ -392,12 +412,29 @@
           Icon('plus', { size: 15, color: GOLD, sw: 2 }),
           busy ? 'Uploading…' : value ? 'Replace image' : 'Upload image',
         ),
+        value && uploaded
+          ? h(
+              'span',
+              {
+                style: {
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#3f6f34',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                },
+              },
+              Icon('check', { size: 14, color: '#3f6f34', sw: 3 }),
+              'Image uploaded',
+            )
+          : null,
         value
           ? h(
               'button',
               {
                 type: 'button',
-                onClick: () => onChange(''),
+                onClick: clear,
                 style: {
                   border: 'none',
                   background: 'transparent',
@@ -417,24 +454,255 @@
             err,
           )
         : null,
-      h('input', {
-        value: value || '',
-        onChange: (e) => onChange(e.target.value),
-        placeholder: placeholder || 'or paste an image URL (https://…)',
-        style: {
-          width: '100%',
-          border: '1px solid #efedea',
-          borderRadius: 12,
-          padding: '10px 12px',
-          fontSize: 12.5,
-          fontWeight: 500,
-          outline: 'none',
-          background: '#fff',
-          color: '#1a1a1a',
-          marginTop: 9,
-        },
-      }),
+      showUrlField
+        ? h('input', {
+            value: value || '',
+            onChange: (e) => {
+              onChange(e.target.value);
+              setUploaded(false);
+            },
+            placeholder: placeholder || 'or paste an image URL (https://…)',
+            style: {
+              width: '100%',
+              border: '1px solid #efedea',
+              borderRadius: 12,
+              padding: '10px 12px',
+              fontSize: 12.5,
+              fontWeight: 500,
+              outline: 'none',
+              background: '#fff',
+              color: '#1a1a1a',
+              marginTop: 9,
+            },
+          })
+        : !uploaded && !value
+          ? h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => setShowPaste(true),
+                style: {
+                  border: 'none',
+                  background: 'transparent',
+                  color: MUTED,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  marginTop: 9,
+                  padding: 0,
+                },
+              },
+              'or paste a URL',
+            )
+          : null,
     );
+  }
+
+  // ── Full-screen story viewer (Home stories + concept-statuses) ─────
+  // Instagram-style overlay: progress bars, tap left/right to navigate,
+  // 5s auto-advance, swallow-nothing close. `items` are already loaded:
+  //   { id, mediaUrl?, caption?, title?, subtitle?, cta?: {label, onClick} }
+  // `onView(item)` fires once per item as it becomes active (view recording
+  // is the caller's concern — viewer stays presentational).
+  function StoryViewer({ author, items, initialIndex, onClose, onView }) {
+    const [idx, setIdx] = useState(initialIndex || 0);
+    const item = items[idx];
+    const seenRef = useRef({});
+
+    useEffect(() => {
+      if (!item || !onView) return;
+      if (seenRef.current[item.id]) return;
+      seenRef.current[item.id] = true;
+      onView(item);
+    }, [item, onView]);
+
+    // Auto-advance; the key on idx restarts the timer per item.
+    useEffect(() => {
+      if (!item) return undefined;
+      const t = setTimeout(() => {
+        setIdx((i) => {
+          if (i + 1 < items.length) return i + 1;
+          onClose();
+          return i;
+        });
+      }, 5000);
+      return () => clearTimeout(t);
+    }, [idx, item, items.length, onClose]);
+
+    if (!item) return null;
+    const go = (delta) => {
+      const next = idx + delta;
+      if (next < 0) return;
+      if (next >= items.length) {
+        onClose();
+        return;
+      }
+      setIdx(next);
+    };
+
+    return h(
+      'div',
+      {
+        className: 'fade-in',
+        style: {
+          position: 'fixed',
+          inset: 0,
+          zIndex: 90,
+          background: 'rgba(10,9,7,0.96)',
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      },
+      // progress bars
+      h(
+        'div',
+        { style: { display: 'flex', gap: 5, padding: '14px 14px 0' } },
+        items.map((s, i) =>
+          h('div', {
+            key: s.id || i,
+            style: {
+              flex: 1,
+              height: 3,
+              borderRadius: 2,
+              background:
+                i < idx ? GOLD : i === idx ? 'rgba(242,186,27,0.55)' : 'rgba(255,255,255,0.22)',
+            },
+          }),
+        ),
+      ),
+      // header
+      h(
+        'div',
+        { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' } },
+        author ? h(Avatar, { user: author, size: 34 }) : null,
+        h(
+          'div',
+          { style: { flex: 1, minWidth: 0, lineHeight: 1.25 } },
+          h(
+            'div',
+            { style: { fontSize: 13, fontWeight: 800, color: '#fff' } },
+            (author && (author.displayName || author.handle)) || item.title || 'Story',
+          ),
+          item.subtitle
+            ? h(
+                'div',
+                { style: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 600 } },
+                item.subtitle,
+              )
+            : null,
+        ),
+        h(
+          'button',
+          {
+            onClick: onClose,
+            'aria-label': 'Close',
+            style: {
+              border: 'none',
+              background: 'none',
+              color: '#fff',
+              fontSize: 26,
+              lineHeight: 1,
+              padding: '2px 6px',
+              fontWeight: 300,
+            },
+          },
+          '×',
+        ),
+      ),
+      // media / caption stage; halves navigate back/forward
+      h(
+        'div',
+        {
+          style: {
+            flex: 1,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 0,
+          },
+        },
+        item.mediaUrl
+          ? h('img', {
+              src: item.mediaUrl,
+              alt: item.caption || item.title || '',
+              style: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
+            })
+          : h(
+              'div',
+              {
+                style: {
+                  padding: '0 34px',
+                  textAlign: 'center',
+                  fontSize: 21,
+                  fontWeight: 700,
+                  lineHeight: 1.5,
+                  color: '#fff',
+                },
+              },
+              item.caption || item.title || '',
+            ),
+        h('button', {
+          onClick: () => go(-1),
+          'aria-label': 'Previous',
+          style: { position: 'absolute', inset: '0 66% 0 0', border: 'none', background: 'none' },
+        }),
+        h('button', {
+          onClick: () => go(1),
+          'aria-label': 'Next',
+          style: { position: 'absolute', inset: '0 0 0 34%', border: 'none', background: 'none' },
+        }),
+      ),
+      // caption + CTA footer
+      h(
+        'div',
+        { style: { padding: '14px 20px 30px' } },
+        item.mediaUrl && item.caption
+          ? h(
+              'div',
+              {
+                style: {
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#fff',
+                  lineHeight: 1.5,
+                  marginBottom: item.cta ? 12 : 0,
+                },
+              },
+              item.caption,
+            )
+          : null,
+        item.cta
+          ? h(GoldButton, {
+              label: item.cta.label,
+              onClick: item.cta.onClick,
+              style: { padding: '12px', fontSize: 13.5 },
+            })
+          : null,
+      ),
+    );
+  }
+
+  /**
+   * Share `{ url, title, text }` via the system share sheet when available,
+   * falling back to the clipboard. Resolves 'native' | 'link' | null (failed/
+   * dismissed) so callers can record the channel used.
+   */
+  async function shareLink({ url, title, text }) {
+    if (navigator.share) {
+      try {
+        await navigator.share({ url, title, text });
+        return 'native';
+      } catch (e) {
+        if (e && e.name === 'AbortError') return null; // user dismissed the sheet
+        // fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      return 'link';
+    } catch (e) {
+      return null;
+    }
   }
 
   window.CWUI = {
@@ -450,6 +718,8 @@
     ErrorNote,
     ScreenHeader,
     ImagePicker,
+    StoryViewer,
+    shareLink,
     timeAgo,
     fmtCount,
   };

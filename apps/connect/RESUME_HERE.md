@@ -1093,36 +1093,323 @@ notifications.
 - **§3R account-deletion cascade wrinkle** still open (deliberately NOT bundled to keep these migs focused).
 - Nav-level unread badge (needs app-level unread polling) — out of scope for the stub.
 - **Founder:** redeploy Wear on Vercel so the built bundle ships the ImagePicker + notifications tab
-  (mig-158/159 are already live; no deploy needed for the DB side).
+  (mig-158/159 are already live; no deploy needed for the DB side). ✅ **DONE — §3T live in prod
+  (image upload + OTP code both confirmed working).**
+
+---
+
+## 3U. Session wrap 2026-07-15(b) — magic-link redirect fixed, code-first auth, NEW product-direction items
+
+Closing conversation after §3T shipped + went live. **No code/DB change this session → next migration #
+still 160.** §3T verified live by founder. The items below are **captured for a future session** (founder:
+"continue with all of this, but not in this session").
+
+### Auth — magic-link redirect RESOLVED (founder) + durable follow-up
+- **Symptom:** the emailed magic LINK (`…/auth/v1/verify?…&redirect_to=https://www.citizenscentral.co.za`)
+  landed on **Connect**, not Wear. The 6-digit CODE worked (it needs no redirect).
+- **Root cause:** one shared Supabase project = one **Site URL** (`www.citizenscentral.co.za` = Connect).
+  Wear's `sendEmailCode` DOES pass `emailRedirectTo` (`apps/wear/src/frontend/auth-client.js:137` →
+  `window.location.origin`), but GoTrue only honors a redirect that matches the **Redirect URLs**
+  allow-list; a miss silently falls back to Site URL. **Wear's live deploy served from a Vercel
+  DEPLOYMENT-HASH url** (`citizens-ecosystem-wear-rigs91i7i-citizensecosystem-projects.vercel.app/index.html`),
+  NOT the stable alias `citizens-ecosystem-wear.vercel.app` that was already listed → fallback to Connect.
+- **Founder fix (done):** added `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`
+  to Redirect URLs (covers all deploy-hash urls). **Same gap also affected Wear password-reset +
+  signup-confirmation links — now fixed too.**
+- **⏳ Durable follow-up (roadmap → address-hygiene):** Vercel deploy-hash urls are ugly + leak project
+  internals. Move all three apps to **stable custom domains** (e.g. `wear.citizenscentral.co.za`) and use
+  those as the canonical redirect origin.
+- **PKCE design note:** the magic link only completes in the SAME browser that requested it (code_verifier
+  in localStorage); the CODE has no such limit. **DECISION: the 6-digit code is the primary/robust auth
+  path; the link is a same-device convenience.**
+
+### Auth email template — code-as-hero (APPROVED "let's try it, can revert"; ⏳ PENDING dashboard apply)
+Restructure the SHARED Magic-Link email template so `{{ .Token }}` (the 6-digit code) is the visual hero
+and the link is a de-emphasised same-device fallback. **NOT applied this session** — email templates are
+Dashboard/Mgmt-API only (no MCP/SQL tool). Ready-to-paste HTML lives in the founder-actions list + the
+continuation prompt. Shared across all 3 apps → fully revertible.
+
+### NEW product-direction decisions (design/build in a FUTURE session)
+1. **Address / URL hygiene** — internal addresses leak everywhere: the uploaded image's raw
+   `xyiajtrvhlxaeplsiajj.supabase.co/storage/…` URL shows in the ImagePicker text input; browser URL bar +
+   hover-preview expose Vercel/Supabase internals. Two layers:
+   - **(a) Quick UI win** — after a successful UPLOAD, `CWUI.ImagePicker` (`apps/wear/src/frontend/app/ui.jsx`)
+     should show an "Image uploaded ✓ / Replace / Remove" state and NOT render the raw public URL in a
+     visible field; put the manual URL text input behind an "or paste a URL" toggle (only the paste path
+     needs a visible input). Contained change, no backend.
+   - **(b) Infra** — custom domains for all apps + a **branded storage asset origin** (Supabase custom
+     storage domain / CDN proxy) so asset URLs aren't `*.supabase.co`. Ties to the magic-link custom-domain
+     follow-up above.
+2. **Remove "Create Brand" from the Create screen** — a Brand is an **upstream identity** (assigned, or
+   progressed into), never self-created by a base user. Drop the `brand` tile + its form from
+   `apps/wear/src/frontend/app/create.jsx` (the `POST /api/brands` path may stay for the sanctioned
+   assignment/progression flow, TBD in the design session below).
+3. **Content-creation permission model rework (BIGGEST)** — feeds are primarily brand apparel, so
+   **only Brand users create POSTS**; a base Citizen creates **concepts + stories** (not posts). This
+   reshapes who-can-create-what and touches the identity/roles model (mig-145 `user_roles` +
+   `ECOSYSTEM_PROFILE_LEVELS` + the derived "Creator" tier). Founder flagged it as **"maybe an entire
+   questioning session"** → **run a design/grill session FIRST** (What is a Brand? How does one become one
+   — assigned vs progressed? base-vs-brand capabilities matrix; feed composition; how this meets the
+   marketplace's "any citizen may create a Concept" rule), THEN implement. Items 2 + 3 are the same
+   identity-model thread — do them together.
+
+---
+
+## 3V. Wear identity & content-permission model — DESIGNED + ENFORCEMENT CORE SHIPPED ✅ (2026-07-15)
+
+Design-first session (grill → agree model → build) resolving §3U items 2 + 3. Ran on
+`step5-monorepo-lift`. **mig 160 APPLIED + verified in prod.** Offload log:
+`.claude/sessions/wear-identity-content-permission.md`.
+
+### The ratified model (founder, 2026-07-15) — normative
+Recorded in [`docs/Citizens_Wear_Roles_and_Concepts_MD.md` §6](../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
++ [`ECOSYSTEM_PROFILE_LEVELS §3.2/P1.1`](./docs/ECOSYSTEM_PROFILE_LEVELS.md).
+
+**Four-rung lazy ladder** (each rung *adds to* the Citizen base; roles derived from activity
+until Brand, which is a stored admin grant):
+- **Citizen** — submit Concepts, post Stories, comment, save-to-boards, follow, purchase.
+- **Creator** — auto-badge at **>10 Concepts posted**; unlocks the Concepts-page **stories bar**
+  ("concept-statuses"). *(Derivation + concept-stories = DEFERRED.)*
+- **Brand** — a **verified** `wear.brands` row the user owns; may create **Posts** + (verified)
+  propose/claim/produce. **Assigned, never self-created:** eligibility-gated (≈20 Concepts posted +
+  10 claimed + support email/contact + clean report history) → **Become-a-Brand application** in
+  Settings → admin approval mints the row. Launch/partner brands admin-minted directly (bootstrap).
+- **Admin** — moderation, verification approval, dispute resolution, sign-in-as (impersonation).
+
+**Two content surfaces:** Home = Brands' Posts + Stories (apparel). Concepts page = community
+Concepts + concept-stories bar + like/comment/share (the attention that attracts Brands). Both
+largely exist already in nav (Home tab + Concepts tab).
+
+### Shipped this session (all gates green: tsc · vitest 89/89 · eslint 0-err · build)
+- **Docs-first:** ECOSYSTEM_PROFILE_LEVELS §3.2 + P1.1 rewritten to the 4-tier / admin-assigned
+  model; roles MD §6 added; SHARED_DB_CONTRACT §9 stamped head→**160**.
+- **mig 160** (`160_wear_content_permission_model.sql`) **APPLIED** (tag `wear-pre-mig160` @93a741d;
+  advisor **0 ERROR / 0 new** vs head-159; 7 rolled-back prod smokes PASS). Enforces at RLS:
+  (a) `wear.posts` insert → author owns an attributed **verified** brand + `brand_id` mandatory
+  (base-Citizen self-posts retired); (b) `wear.brands` insert → `wear.is_admin()` only (self-serve
+  retired); owner UPDATE/DELETE preserved; mig-157 verified-column guard intact. wear policies 73→75.
+- **API:** `POST /api/posts` requires an owned+verified brand (403 chain: `brand_required` /
+  `not_brand_owner` / `brand_not_verified`) then validates body; `POST /api/brands` is admin-only
+  (`admin_only` 403; optional `ownerId` for admin-mint-for-applicant). RLS is the backstop.
+- **UI** (`apps/wear/src/frontend/app/create.jsx`): self-serve **Brand tile removed**; **Post tile
+  only** for verified-brand owners; base Citizen sees **Story + Concept** (Concept routes to the
+  Concepts-page create); "Post as" lists verified brands only (Myself retired); pending-verification
+  hint for owners of an unverified brand.
+- **Quick win §3U-1a** (`ui.jsx` `ImagePicker`): after upload shows "Image uploaded ✓ / Replace /
+  Remove" and **hides the raw storage URL**; the manual URL input is behind an **"or paste a URL"**
+  toggle (auto-revealed for a pasted/preloaded value or on upload error).
+- **Tests** (`routes.test.ts`): brands create is admin-only (+ non-admin 403, admin-mint-for-owner);
+  every post creates as the verified `salt-and-light`; +3 negative-path gate tests.
+- **§3U email template (code-as-hero) = APPLIED by founder ✅** (dropped from founder-actions).
+
+### Deferred (DESIGNED here, build is the next Wear increment) — "the progression epic"
+1. **Creator badge derivation** — lazy compute (>10 Concepts) + badge surfacing; the first-100-Wear-
+   Concepts bootstrap grace.
+2. **Concept-stories bar + Concept like/comment/share** — NEW schema (concept_comments, concept
+   stories/statuses, shares); today Concepts have upvotes only. This is the community surface's heart.
+3. **Become-a-Brand application** — eligibility derivation (≈20 posted + 10 claimed + support
+   email/contact + no sustained reports) → settings button → application form (Brand Name*, bio,
+   socials, email*, contact*, delivery options*, Ts&Cs/Code-of-Conduct/monthly-fee agreements) →
+   admin queue → approve = mint verified `wear.brands` row (the `POST /api/brands` `ownerId` path +
+   RLS `brands_admin_insert` already support the mint; needs an applications table + admin UI).
+4. **Per-post Share** on Home (Instagram-style). 5. **Full-screen Home stories** (currently act as
+   brand-page redirects, not full-screen). 6. **Admin sign-in-as (impersonation)** — security-sensitive,
+   own design. 7. **Stories bifurcation** (Brand-Home-stories vs Creator-concept-stories) lands with #2.
+
+---
+
+## 3W. Wear community Concepts surface — SHIPPED ✅ (2026-07-16, mig 161 live)
+
+§3V's "progression epic" items **1, 2, 4 and 5** built + verified in one session on
+`step5-monorepo-lift`. **mig 161 APPLIED + prod-verified.** Founder ratified all four design
+decisions in-session (AskUserQuestion). Offload log: `.claude/sessions/wear-progression-epic.md`.
+
+### What shipped (all gates green: turbo lint 12/12 · typecheck 12/12 · test 11/11 — Wear 94/94,
+### Connect 637 — · build 8/8)
+- **mig 161** (`161_wear_concept_engagement.sql`) **APPLIED** (tag `wear-pre-mig161` @de042fa;
+  advisor security 0 ERROR / 101 WARN / 3 INFO — **signature byte-identical to head-160, 0 new**;
+  10/10 rolled-back prod smokes PASS). Adds: `wear.concept_comments` (threaded, wear.comments
+  mirror + moderator takedown), `wear.concept_shares` (**distinct-sharer** pk(concept,user),
+  INSERT-only social proof, channel enum `link|native|dm`-reserved), `wear.concept_statuses`
+  (**the concept-stories bar** — trigger-promoted, NO client write path) + `concept_status_views`
+  (story_views mirror), 2 enums, +3 `notification_type` values, 4 SECDEF trigger fns (promotion +
+  comment/upvote/share notify; all revoke-from-public, empty search_path). Every new FK indexed.
+  wear: 37 tables / 83 policies / 32 fns / 22 enums.
+- **The lazy Creator ladder is live (§6.1):** `wear.promote_concept_status()` promotes each new
+  Concept for 24h when the creator has **>10 live concepts** (badge lane) ELSE while **<100
+  bootstrap-grace statuses** have ever been issued (self-terminating partial-index counter; badge
+  promotions never consume grace slots; no retro-backfill — grace starts at 0). Badge itself is
+  DERIVED, never stored: `/api/me` → `creator:{earned, conceptCount, threshold:11}`;
+  `/api/users/[handle]` → `creator` flag; profile renders a gold CREATOR chip; the create-Concept
+  screen shows badge progress ("N more Concepts…").
+- **Likes:** ratified as the EXISTING `concept_upvotes` re-skinned (heart + like language, №
+  schema/API change — §3V's new-schema list deliberately omitted it).
+- **API:** GET+POST `/api/concepts/[id]/comments` (500-char cap, parent validated same-concept);
+  POST `/api/concepts/[id]/share` (idempotent → `{shares, viewerShared}`; channel whitelist —
+  'dm' NOT client-acceptable yet); GET `/api/concepts/statuses` (public bar, viewerSeen) +
+  POST `/api/concepts/statuses/[id]/view`; GET `/api/stories/author/[userId]` (active-for-viewer,
+  audience+block rules preserved) + POST `/api/stories/[id]/view`. `hydrateConcept` +=
+  commentCount/shareCount/viewerShared. Store: `WearStore` += `conceptComments`,
+  `conceptStatuses` repos + `concepts.share/shareCount/hasShared/countByCreator`; MemoryWearStore
+  mirrors ALL mig-161 triggers inline (lockstep rule), SupabaseWearStore implements against RLS.
+- **UI:** shared **StoryViewer** overlay in `ui.jsx` (progress bars, tap-nav, 5s auto-advance,
+  per-item CTA) + `shareLink()` helper (share sheet → clipboard, returns channel). Concepts page:
+  **statuses bar** (bubbles grouped by creator, gold ring unseen, plays in the viewer, records
+  views), **comments thread** (1-level replies + reply chip), **ShareButton** (records channel,
+  "Link copied"), heart LikeButton. Home: tray now plays stories **full-screen** (§3V-5 fixed —
+  was a profile redirect) + **per-post Share** (§3V-4, client-only per design). Deep links:
+  `?concept=<id>` / `?post=<id>` consumed after sign-in (store.jsx), URL scrubbed. Inbox renders
+  the 3 new notification types. Pre-existing `myBrands` useMemo lint warning FIXED (eslint 0/0).
+- **Seed:** `seed-feed.sql` gained an independently-guarded **§12 engagement block** — applied to
+  prod: +2 community concepts (auto-promoted → **the bar is live** with 2 grace statuses),
+  4 comments (1 threaded), 5 shares, 16 real trigger-fired notifications. Teardown unchanged
+  (cascades cover mig-161 tables). README updated.
+- **Docs:** SHARED_DB_CONTRACT §9 stamped head→**161** (**next # = 162**); roles MD §6.2/§6.4
+  marked shipped.
+
+### Verified in prod
+Anonymous RLS probes return the new engagement fields on live concepts; the statuses bar returns
+the 2 seeded promotions; advisor signature unchanged; performance advisors show 0 new categories
+(only the schema-wide `auth_rls_initplan`/`multiple_permissive_policies` house patterns + fresh
+"unused" indexes; **0 unindexed FKs**).
+
+### Still deferred from §3V (the remaining epic)
+1. ~~**Become-a-Brand application** (§3V-3)~~ ✅ **DONE §3X (2026-07-16, mig 162 live).**
+2. **Admin sign-in-as (impersonation)** — security-sensitive, own design session (§3V-6).
+3. Fast-follows logged in the offload: share-to-DM ('dm' channel reserved), upvote-notification
+   dedupe, `auth_rls_initplan` sweep migration, statuses-bar pagination.
+
+---
+
+## 3X. Wear Become-a-Brand application — SHIPPED ✅ (2026-07-16, mig 162 live)
+
+§3V-3 / §3W deferred №1 — the last big rung of the progression epic — built + prod-verified in
+one session on `step5-monorepo-lift`. **mig 162 APPLIED.** Founder ratified all four grill
+decisions in-session (AskUserQuestion): **(1) locked once submitted** (immutable — no edits, no
+withdraw); **(2) immediate re-apply after rejection** (each attempt = a NEW row, history visible
+to admins; one-pending rule is the throttle); **(3) eligibility 20/10/0 RLS-HARD** (20 Concepts
+posted + 10 of the applicant's Concepts claimed + zero admin-ACTIONED user-reports; support
+email/contact are required FORM fields, not unlock inputs; admin direct-mint via `POST
+/api/brands` stays the below-threshold override valve); **(4) apply pre-authorized once green.**
+Offload log: `.claude/sessions/wear-become-a-brand.md`.
+
+### What shipped (all gates green: turbo lint 12/12 · typecheck 12/12 · test 11/11 — Wear
+### 106/106 (+12), db 99 — · build 8/8)
+- **mig 162** (`162_wear_brand_applications.sql`) **APPLIED** (tag `wear-pre-mig162` @b0a84a9;
+  advisor **0 ERROR / 102 WARN / 3 INFO — the single new WARN is the INTENTIONAL
+  `brand_eligibility` SECDEF EXECUTE grant** (mig-157 precedent), all else baseline-identical;
+  **6/6 rolled-back prod smokes PASS**). Adds `wear.brand_applications` (§6.1 form fields, all
+  CHECK-bounded; agreements CHECK — an un-agreed application is invalid data; lifecycle
+  invariants pending⇔undecided + mint-only-on-approve; **one open application per user** via
+  partial unique index), SECDEF **`wear.brand_eligibility(p_user)`** (self-or-moderator guard;
+  also called in the INSERT `WITH CHECK` → eligibility is RLS-hard), the decision-notify
+  trigger (+2 `notification_type` values; institutional null actor; payload carries
+  `brandSlug` for the inbox deep link), and a **column-scoped UPDATE grant** — only the
+  decision stamp is ever writable, so even an admin can never rewrite what an applicant
+  attested; decided rows are immutable for EVERYONE (admin UPDATE policy USING requires
+  `status='pending'`). wear: 38 tables / 86 policies / 34 fns / 23 enums.
+- **Approve = mint:** the admin route reuses the EXISTING mig-160 path — `brands.create`
+  (`brands_admin_insert` RLS) with **`verified: true`** (the mig-157 `protect_verified_column`
+  guard admits admins; `CreateBrandInput.verified` added) — then stamps the application with
+  `mintedBrandId`. A slug clash that already belongs to THIS applicant is reused (crash-retry
+  converges); anyone else's slug → 409.
+- **Store:** `WearStore` += `brandApplications` repo (eligibility / submit / getOwnLatest /
+  getById / listPending / review) in contract + MemoryWearStore (semantic spec — mirrors every
+  RLS rule + the notify trigger inline) + SupabaseWearStore (RPC + table ops; 23505→
+  `application_pending`, 42501→`not_eligible`, 23514→per-constraint memory codes).
+  `BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED/CLAIMED` (20/10) mirror the DB literals.
+- **API:** GET+POST `/api/brand-applications` (own panel {eligibility, application} — fetched
+  lazily by Settings, NOT on `/api/me`, keeping boot lean; submit with clean 4xx chain);
+  GET `/api/admin/brand-applications` (queue, applicant + LIVE eligibility snapshot per card);
+  POST `/api/admin/brand-applications/[id]` (admin-gated decide; approve/reject + notify via
+  trigger). +12 `STORE_ERROR_STATUS` codes; `BrandApplicationDto`. **+12 route tests** (gate
+  walls, one-pending, actioned-report block, mint+notify, immutability, immediate re-apply,
+  slug-clash convergence).
+- **UI:** Settings **"Become a Brand" card** (hidden for brand owners; pending/rejected/
+  eligible/progress states with ✓-gates rows; refetches when the nav stack pops back);
+  **`brandapply.jsx`** form screen (§6.1 fields + 3 agreement checkboxes, missing-list +
+  disabled submit, success state); **adminq.jsx Applications tab** (now the DEFAULT tab —
+  applicant card + eligibility GateChips + slug/note inputs + Approve-&-mint / Reject);
+  inbox renders both decision notifications (approved deep-links to the newborn brand via
+  `brandSlug`); `openBrandApply` + `brandApply` screen registered; index.html `?v=20260716a`.
+- **Seed §13** applied to prod: 1 pending demo application (**Mustard Seed Supply** / thabo_m)
+  so the founder's Admin queue has a real card to decide — approving it exercises the full
+  mint path end-to-end. Fixed-id + one-pending guards keep it idempotent; teardown unchanged
+  (FK cascade).
+- **Docs:** SHARED_DB_CONTRACT §9 stamped head→**162** (**next # = 163**); roles MD §6.4
+  Become-a-Brand marked shipped.
+
+### Verified in prod (rolled back)
+Ineligible INSERT → 42501; `brand_eligibility(other)` as non-moderator → 42501; self-read
+returns live counts; decided-row UPDATE → 0 rows; `brand_name` rewrite as admin → 42501
+(column grant); decision UPDATE fires the notification with institutional null actor +
+`brandSlug` payload. Structural QA counts verified live.
+
+### Remaining from the progression epic
+**Admin sign-in-as (impersonation)** — security-sensitive, own design session (§3V-6) — plus
+the offload-logged fast-follows (share-to-DM, upvote-notification dedupe, `auth_rls_initplan`
+sweep, statuses-bar pagination). Product fast-follows spotted this session: Ts&Cs / Code of
+Conduct / fee-schedule DOCUMENTS don't exist yet (the form's checkboxes reference them
+nominally — founder to supply text); brand-logo upload isn't part of the application (admin
+can add post-mint via brand edit).
 
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S) AND the media-upload
-> pipeline + notifications backend (§3T) are COMPLETE.**
-> `step5-monorepo-lift` was merged to `main` again at end of the §3R session (2026-07-15,
-> founder-authorized). All three apps share one auth + one Postgres + the static-HTML model.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 160.**
+> **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
+> notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
+> Concepts surface (§3W, mig 161) AND the Become-a-Brand application (§3X, mig 162 —
+> eligibility-gated Settings form + admin queue + approve-mints-verified-brand + decision
+> notifications) are COMPLETE.**
+> `step5-monorepo-lift` was merged to `main` at end of the §3R AND §3T sessions (PR #28,
+> 2026-07-15); §3V+§3W+§3X commits are on `step5-monorepo-lift` awaiting the next merge.
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 163.**
+>
+> **▶ RECOMMENDED next session — pick one:** (a) **merge `step5-monorepo-lift` → `main`**
+> (three shipped increments are stacked on the branch — §3V/§3W/§3X, all gates green — a
+> clean PR merge de-risks the branch and redeploys Wear with the new UI); or (b) the **Wear
+> founder walk-through**: decide the live "Mustard Seed Supply" demo application from the
+> Admin queue → Applications tab (approving exercises the full mint in prod), then verify the
+> Settings "Become a Brand" panel as a citizen; or (c) start the **admin sign-in-as
+> (impersonation) design session** (§3V-6 — the epic's last deferred piece, security-sensitive,
+> own session). The founder also owes the platform its **Ts&Cs / Code of Conduct / fee-schedule
+> documents** — the application form's checkboxes reference them nominally (§3X remaining).
 
-1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S):**
-   a. **Deploy the marketplace + new auth UI**: founder redeploys Wear on Vercel (bundle now ships
-      magic-code login + change-password; env unchanged). The **feed is already seeded in prod** (§3S)
-      — no deploy needed for it to appear. Founder (wear admin) can verify the 2 pending brands
-      (Lily & Field, Anchor & Crown) from the in-app Admin queue. Do the §3S live email test.
+1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
+   media + notifications DONE §3T):**
+   a. ~~**Deploy the marketplace + new auth UI**~~ ✅ **DONE §3T** — Wear is live on Vercel; image upload
+      + OTP-code sign-in both confirmed working. Magic-link redirect gap fixed (§3U). Founder (wear admin)
+      can still verify the 2 pending brands (Lily & Field, Anchor & Crown) from the in-app Admin queue.
    b. Launch-hardening fast-follows: ~~**media upload pipeline**~~ ✅ **DONE §3T** (mig 158,
       user-authed signed upload, wired post/story/brand-logo/concept); ~~**notifications backend**~~
       ✅ **DONE §3T** (mig 159, marketplace-event triggers + inbox tab). Still open, in rough order
-      of value: **mig 160**: fix the §3R account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF
-      cleanup fn) + any marketplace schema follow-ups; **brand-logo edit UI** (create-time works;
-      no edit surface in brand.jsx); proposal-mockup upload + story video (pipeline is images-only
-      today); full desktop layouts; Capacitor shell scaffold (JS side is ready).
+      of value: **§3U-1a quick win** — hide the raw uploaded-image URL in `ImagePicker` (show
+      "uploaded ✓ / Replace"; manual URL behind an "or paste a URL" toggle); **mig 160**: fix the §3R
+      account-deletion cascade wrinkle (DEFERRABLE FKs or SECDEF cleanup fn) + any marketplace schema
+      follow-ups; **brand-logo edit UI** (create-time works; no edit surface in brand.jsx);
+      proposal-mockup upload + story video (pipeline is images-only today); full desktop layouts;
+      Capacitor shell scaffold (JS side is ready).
    c. Port the Wear auth screens to Connect + Vision frontends — now **email+password (§3P) AND
       email magic-code + change-password (§3S)**; shared CC_AUTH/CV_AUTH lineage, provider already
       enabled project-wide. Each app's magic-link email template also needs the `{{ .Token }}` edit
       (§3S) if magic-code is wanted there. (Still not reached — good next task.)
    d. Marketplace v2 candidates (see §3R + doc Open Items): brand Workspace scope, dispute
-      tooling, proposal notifications, concept search/categories, creator portfolio surface.
+      tooling, ~~proposal notifications~~ ✅ **DONE §3T**, concept search/categories, creator portfolio.
+   f. ~~**Wear identity & content-permission rework (§3U-2 + §3U-3).**~~ ✅ **DONE §3V (2026-07-15)** —
+      model ratified (4-tier lazy ladder: Citizen → Creator → Brand → Admin; two content surfaces) and
+      the **enforcement core** shipped + verified: self-serve Create-Brand tile removed; **Posts gated
+      to owned + verified Brand** (UI + API + RLS **mig 160**, applied); base Citizens keep Concepts +
+      Stories; ImagePicker raw-URL hidden.
+   g. ~~**Wear progression epic — community Concepts surface.**~~ ✅ **DONE §3W (2026-07-16,
+      mig 161 live)** — concept like(=upvote re-skin)/comments/shares, the concept-stories bar
+      (trigger-promoted; Creator badge >10 concepts + first-100 bootstrap grace), full-screen
+      Home stories, per-post Share, deep links, engagement notifications, seed §12.
+   h. ~~**Become-a-Brand application.**~~ ✅ **DONE §3X (2026-07-16, mig 162 live)** —
+      eligibility 20/10/0 RLS-hard, Settings panel + form, admin queue tab (default),
+      approve-mints-verified-brand, decision notifications, seed §13 demo card. Remaining
+      from the epic: **admin sign-in-as (impersonation, §3V-6)** + offload-logged
+      fast-follows + founder-supplied Ts&Cs/CoC/fee documents.
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
@@ -1133,15 +1420,20 @@ notifications.
    the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
    this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
    (currently BEHIND it), then continue Vision fast-follows (Timeline Map; remaining wiring).
-3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R);
-   commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
+3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R, then §3T
+   via **PR #28**); commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
    to read-only. Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their copies
    are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
 4. **Founder-only, non-code (any time):**
-   - **Wear deploy gates ⛔** (values in §3L/LOCAL-SETUP §2): Vercel env NEXT_PUBLIC_SUPABASE_URL
-     + ANON_KEY (shared project), CONNECT_MODE=live + CONNECT_API_BASE_URL
-     (`https://citizens-connect.vercel.app`), optional CONNECT_API_KEY; Supabase Auth Redirect
-     URLs → Wear prod origin. (`wear` Exposed-schemas ✅ done.)
+   - ~~**Wear deploy gates**~~ ✅ **DONE §3T/§3U** — Wear live; env set; Supabase Redirect URLs now
+     include the Vercel deploy-hash wildcard `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`
+     (fixed the magic-link→Connect redirect + reset/confirmation links).
+   - ~~**§3U email template — code-as-hero**~~ ✅ **DONE (founder applied, confirmed §3V 2026-07-15).**
+     Supabase Dashboard → Authentication → Email Templates → Magic Link now leads with `{{ .Token }}`
+     (the 6-digit code as hero; link a same-device fallback). Shared across all 3 apps; revertible.
+   - **§3U address hygiene (roadmap):** put Wear/Connect/Vision behind **stable custom domains** (e.g.
+     `wear.citizenscentral.co.za`) + a **branded storage asset origin** so URLs stop leaking
+     `*.vercel.app` deploy-hashes and `xyiajtrvhlxaeplsiajj.supabase.co`.
    - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
      NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
    - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
@@ -1172,6 +1464,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **159** live; next # = **160**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **161** live; next # = **162**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

@@ -1,6 +1,9 @@
 import type {
   BlockEdge,
   BlockRepo,
+  BrandApplication,
+  BrandApplicationRepo,
+  BrandEligibility,
   BrandRepo,
   BrandVerification,
   BrandVerificationRepo,
@@ -12,13 +15,18 @@ import type {
   Concept,
   ConceptClaim,
   ConceptClaimRepo,
+  ConceptComment,
+  ConceptCommentRepo,
   ConceptMedia,
   ConceptProposal,
   ConceptProposalRepo,
   ConceptRepo,
+  ConceptShare,
   ConceptStage,
+  ConceptStatus,
   ConceptStatusLogEntry,
   ConceptStatusLogRepo,
+  ConceptStatusRepo,
   ConceptUpvote,
   ConceptWithMedia,
   ConnectId,
@@ -70,7 +78,15 @@ import type {
   WearStore,
   WearUser,
 } from './contract';
-import { CONCEPT_STAGES, WearStoreError } from './contract';
+import {
+  BOOTSTRAP_GRACE_STATUSES,
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
+  CONCEPT_STAGES,
+  CONCEPT_STATUS_TTL_MS,
+  CREATOR_BADGE_MIN_CONCEPTS,
+  WearStoreError,
+} from './contract';
 import { extractHashtags, normaliseHashtag } from './hashtags';
 
 /**
@@ -119,12 +135,15 @@ export class MemoryWearStore implements WearStore {
   public readonly blocks: BlockRepo;
   public readonly reports: ReportRepo;
   public readonly concepts: ConceptRepo;
+  public readonly conceptComments: ConceptCommentRepo;
+  public readonly conceptStatuses: ConceptStatusRepo;
   public readonly conceptProposals: ConceptProposalRepo;
   public readonly conceptClaims: ConceptClaimRepo;
   public readonly conceptStatusLog: ConceptStatusLogRepo;
   public readonly royalties: RoyaltyRepo;
   public readonly conversions: CatalogueConversionRepo;
   public readonly brandVerifications: BrandVerificationRepo;
+  public readonly brandApplications: BrandApplicationRepo;
   public readonly roles: RoleRepo;
   public readonly notifications: NotificationRepo;
 
@@ -167,6 +186,14 @@ export class MemoryWearStore implements WearStore {
   private readonly _conceptMedia = new Map<string, ConceptMedia[]>();
   /** Keyed by `${conceptId}:${userId}`. */
   private readonly _conceptUpvotes = new Map<string, ConceptUpvote>();
+  // Mig 161 — community engagement on Concepts
+  private readonly _conceptComments = new Map<string, ConceptComment>();
+  /** Keyed by `${conceptId}:${userId}` (distinct-sharer PK). */
+  private readonly _conceptShares = new Map<string, ConceptShare>();
+  /** Keyed by conceptId (unique — a concept is promoted at most once). */
+  private readonly _conceptStatuses = new Map<string, ConceptStatus>();
+  /** Keyed by `${statusId}:${viewerId}`. */
+  private readonly _conceptStatusViews = new Set<string>();
   private readonly _conceptProposals = new Map<string, ConceptProposal>();
   private readonly _conceptClaims = new Map<string, ConceptClaim>();
   private readonly _conceptStatusLog = new Map<string, ConceptStatusLogEntry>();
@@ -174,6 +201,8 @@ export class MemoryWearStore implements WearStore {
   private readonly _conversions = new Map<string, CatalogueConversion>();
   /** Keyed by brandId (PK — one lifecycle row per brand). */
   private readonly _brandVerifications = new Map<ConnectId, BrandVerification>();
+  // Mig 162 — Become-a-Brand applications (insertion order = creation order).
+  private readonly _brandApplications = new Map<string, BrandApplication>();
   // Mig 159 — notifications (trigger-produced in prod; emitted by the lifecycle
   // methods here to mirror the DB triggers).
   private readonly _notifications = new Map<string, WearNotification>();
@@ -322,7 +351,9 @@ export class MemoryWearStore implements WearStore {
           tagline: input.tagline ?? null,
           websiteUrl: input.websiteUrl ?? null,
           logoUrl: input.logoUrl ?? null,
-          verified: false,
+          // Mig 162 admin mint: prod's protect_verified_column guard admits
+          // admins only; here the API's admin gate is the caller's promise.
+          verified: input.verified ?? false,
           ownerUserId: input.ownerId,
           connectContributorId: input.connectContributorId ?? null,
           createdAt: ts,
@@ -1227,8 +1258,7 @@ export class MemoryWearStore implements WearStore {
         const items = [...this._notifications.values()]
           .filter((n) => n.recipientId === userId)
           .sort(
-            (a, b) =>
-              Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
           );
         return paginateList(items, params);
       },
@@ -1295,9 +1325,15 @@ export class MemoryWearStore implements WearStore {
             orderIndex: m.orderIndex ?? i,
           })),
         );
+        this._promoteConceptStatus(concept);
         return this._readConcept(concept.id)!;
       },
       getById: async (id) => this._readConcept(id),
+      countByCreator: async (creatorId) => {
+        let n = 0;
+        for (const c of this._concepts.values()) if (c.creatorId === creatorId) n += 1;
+        return n;
+      },
       list: async (filter) => {
         const items = [...this._concepts.values()]
           .filter((c) => !filter?.status || c.status === filter.status)
@@ -1360,6 +1396,20 @@ export class MemoryWearStore implements WearStore {
         for (const key of [...this._conceptUpvotes.keys()]) {
           if (key.startsWith(`${conceptId}:`)) this._conceptUpvotes.delete(key);
         }
+        // FK cascade (mig 161): comments, shares, the status + its views.
+        for (const [id, c] of [...this._conceptComments.entries()]) {
+          if (c.conceptId === conceptId) this._conceptComments.delete(id);
+        }
+        for (const key of [...this._conceptShares.keys()]) {
+          if (key.startsWith(`${conceptId}:`)) this._conceptShares.delete(key);
+        }
+        const status = this._conceptStatuses.get(conceptId);
+        if (status) {
+          this._conceptStatuses.delete(conceptId);
+          for (const key of [...this._conceptStatusViews]) {
+            if (key.startsWith(`${status.id}:`)) this._conceptStatusViews.delete(key);
+          }
+        }
         const claimIds = new Set<string>();
         for (const [id, cl] of [...this._conceptClaims.entries()]) {
           if (cl.conceptId === conceptId) {
@@ -1381,7 +1431,8 @@ export class MemoryWearStore implements WearStore {
         }
       },
       upvote: async (conceptId, userId) => {
-        if (!this._concepts.has(conceptId)) {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
           throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
         }
         const key = `${conceptId}:${userId}`;
@@ -1389,6 +1440,14 @@ export class MemoryWearStore implements WearStore {
         if (existing) return existing;
         const vote: ConceptUpvote = { conceptId, userId, createdAt: this._now().toISOString() };
         this._conceptUpvotes.set(key, vote);
+        // Mirrors trg_notify_on_concept_upvote (mig 161): fresh rows only.
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_upvote',
+          actorId: userId,
+          conceptId,
+          data: { conceptTitle: concept.title },
+        });
         return vote;
       },
       removeUpvote: async (conceptId, userId) => {
@@ -1400,6 +1459,126 @@ export class MemoryWearStore implements WearStore {
         return n;
       },
       hasUpvoted: async (conceptId, userId) => this._conceptUpvotes.has(`${conceptId}:${userId}`),
+      share: async (conceptId, userId, channel) => {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        const key = `${conceptId}:${userId}`;
+        const existing = this._conceptShares.get(key);
+        if (existing) return existing; // distinct-sharer: first share wins (23505 mirror)
+        const share: ConceptShare = {
+          conceptId,
+          userId,
+          channel: channel ?? 'link',
+          createdAt: this._now().toISOString(),
+        };
+        this._conceptShares.set(key, share);
+        // Mirrors trg_notify_on_concept_share (mig 161).
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_share',
+          actorId: userId,
+          conceptId,
+          data: { conceptTitle: concept.title },
+        });
+        return share;
+      },
+      shareCount: async (conceptId) => {
+        let n = 0;
+        for (const s of this._conceptShares.values()) if (s.conceptId === conceptId) n += 1;
+        return n;
+      },
+      hasShared: async (conceptId, userId) => this._conceptShares.has(`${conceptId}:${userId}`),
+    };
+
+    // Mig 161 — community engagement on Concepts. Same lockstep rule as the
+    // marketplace: these mirror the RLS policies + SECDEF triggers exactly.
+    this.conceptComments = {
+      create: async (input) => {
+        const concept = this._concepts.get(input.conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${input.conceptId}.`);
+        }
+        const body = input.body.trim();
+        if (!body) {
+          throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
+        }
+        let parent: ConceptComment | null = null;
+        if (input.parentCommentId) {
+          parent = this._conceptComments.get(input.parentCommentId) ?? null;
+          if (!parent || parent.conceptId !== input.conceptId) {
+            throw new WearStoreError('comment_not_found', 'Parent comment not found.');
+          }
+        }
+        const comment: ConceptComment = {
+          id: this._id('ccm'),
+          conceptId: input.conceptId,
+          authorId: input.authorId,
+          parentCommentId: parent ? parent.id : null,
+          body,
+          createdAt: this._now().toISOString(),
+        };
+        this._conceptComments.set(comment.id, comment);
+        // Mirrors trg_notify_on_concept_comment: creator always; a reply also
+        // reaches the parent author (skip the duplicate when they coincide).
+        const data = { conceptTitle: concept.title, excerpt: body.slice(0, 120) };
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_comment',
+          actorId: input.authorId,
+          conceptId: input.conceptId,
+          data,
+        });
+        if (parent && parent.authorId !== concept.creatorId) {
+          this._emitNotification({
+            recipientId: parent.authorId,
+            type: 'concept_comment',
+            actorId: input.authorId,
+            conceptId: input.conceptId,
+            data: { ...data, reply: true },
+          });
+        }
+        return comment;
+      },
+      listForConcept: async (conceptId) =>
+        [...this._conceptComments.values()]
+          .filter((c) => c.conceptId === conceptId)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+      countForConcept: async (conceptId) => {
+        let n = 0;
+        for (const c of this._conceptComments.values()) if (c.conceptId === conceptId) n += 1;
+        return n;
+      },
+    };
+
+    this.conceptStatuses = {
+      listActive: async (viewerId) => {
+        const nowMs = this._now().getTime();
+        return [...this._conceptStatuses.values()]
+          .filter((s) => Date.parse(s.expiresAt) > nowMs)
+          .sort(
+            // Same-ms ties (common under the test clock) break newest-id-first.
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+          )
+          .map((status) => ({
+            status,
+            viewerSeen: viewerId ? this._conceptStatusViews.has(`${status.id}:${viewerId}`) : false,
+          }));
+      },
+      recordView: async (statusId, viewerId) => {
+        let found = false;
+        for (const s of this._conceptStatuses.values()) {
+          if (s.id === statusId) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new WearStoreError('status_not_found', `Unknown concept status ${statusId}.`);
+        }
+        this._conceptStatusViews.add(`${statusId}:${viewerId}`);
+      },
     };
 
     this.conceptProposals = {
@@ -1663,7 +1842,9 @@ export class MemoryWearStore implements WearStore {
       listForConcept: async (conceptId) =>
         [...this._conceptStatusLog.values()]
           .filter((e) => e.conceptId === conceptId)
-          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id)),
+          .sort(
+            (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id),
+          ),
       advance: async (conceptId, callerId, status, note) => {
         // Mirrors wear.advance_concept_status guard-for-guard, in order.
         const concept = this._concepts.get(conceptId);
@@ -1818,7 +1999,10 @@ export class MemoryWearStore implements WearStore {
           throw new WearStoreError('not_released', 'Conversion requires a released concept.');
         }
         for (const conv of this._conversions.values()) {
-          if (conv.claimId === claimId && (conv.status === 'proposed' || conv.status === 'accepted')) {
+          if (
+            conv.claimId === claimId &&
+            (conv.status === 'proposed' || conv.status === 'accepted')
+          ) {
             throw new WearStoreError('conversion_already_open', 'A handshake is already open.');
           }
         }
@@ -2029,6 +2213,163 @@ export class MemoryWearStore implements WearStore {
         return next;
       },
     };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Mig 162 — Become-a-Brand applications. The rules below mirror the RLS
+    // policies + CHECK constraints of migration 162 exactly (the semantic
+    // spec): immutable once submitted, one open per user, immediate re-apply
+    // after rejection (a NEW row), eligibility RLS-hard, decided rows
+    // immutable for everyone, decision notification trigger-produced.
+    // ─────────────────────────────────────────────────────────────────────
+    this.brandApplications = {
+      eligibility: async (userId, callerId) => this._brandEligibility(userId, callerId),
+      submit: async (callerId, input) => {
+        // Field validation mirrors the table CHECKs (mig 162 §2).
+        const brandName = input.brandName.trim();
+        if (brandName.length < 2 || brandName.length > 80) {
+          throw new WearStoreError('invalid_brand_name', 'Brand name must be 2–80 characters.');
+        }
+        const bio = (input.bio ?? '').trim() || null;
+        if (bio && bio.length > 500) {
+          throw new WearStoreError('invalid_bio', 'Bio must be at most 500 characters.');
+        }
+        const supportEmail = input.supportEmail.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(supportEmail) || supportEmail.length > 254) {
+          throw new WearStoreError('invalid_support_email', 'A valid support email is required.');
+        }
+        const contactNumber = input.contactNumber.trim();
+        if (contactNumber.length < 7 || contactNumber.length > 32) {
+          throw new WearStoreError(
+            'invalid_contact_number',
+            'A contact number (7–32 characters) is required.',
+          );
+        }
+        const deliveryOptions = input.deliveryOptions.trim();
+        if (deliveryOptions.length < 3 || deliveryOptions.length > 500) {
+          throw new WearStoreError(
+            'invalid_delivery_options',
+            'Describe your delivery options (3–500 characters).',
+          );
+        }
+        const socials: Record<string, string> = {};
+        for (const [key, value] of Object.entries(input.socials ?? {})) {
+          if (typeof value === 'string' && value.trim()) socials[key] = value.trim();
+        }
+        if (JSON.stringify(socials).length > 2000) {
+          throw new WearStoreError('invalid_socials', 'Social links are too long.');
+        }
+        if (!(input.agreeTerms && input.agreeConduct && input.agreeFees)) {
+          throw new WearStoreError(
+            'agreements_required',
+            'The Ts&Cs, Code of Conduct, and platform-fee agreements are all required.',
+          );
+        }
+        // One OPEN application per user (the partial unique index).
+        for (const row of this._brandApplications.values()) {
+          if (row.applicantId === callerId && row.status === 'pending') {
+            throw new WearStoreError(
+              'application_pending',
+              'You already have an application under review.',
+            );
+          }
+        }
+        // Eligibility — the RLS WITH CHECK backstop (ratified hard).
+        const gate = this._brandEligibility(callerId, callerId);
+        if (!gate.eligible) {
+          throw new WearStoreError(
+            'not_eligible',
+            'The Become-a-Brand gate is not met yet — keep creating.',
+          );
+        }
+        const ts = this._now().toISOString();
+        const created: BrandApplication = {
+          id: this._id('bap'),
+          applicantId: callerId,
+          status: 'pending',
+          brandName,
+          bio,
+          socials,
+          supportEmail,
+          contactNumber,
+          deliveryOptions,
+          agreeTerms: true,
+          agreeConduct: true,
+          agreeFees: true,
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: null,
+          mintedBrandId: null,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+        this._brandApplications.set(created.id, created);
+        return created;
+      },
+      getOwnLatest: async (callerId) => {
+        // Map iteration preserves insertion order — the last match IS the
+        // latest attempt even when test clocks produce identical timestamps.
+        let latest: BrandApplication | null = null;
+        for (const row of this._brandApplications.values()) {
+          if (row.applicantId === callerId) latest = row;
+        }
+        return latest;
+      },
+      getById: async (id, callerId) => {
+        const row = this._brandApplications.get(id);
+        if (!row) return null;
+        if (row.applicantId !== callerId && !this._isModerator(callerId)) return null;
+        return row;
+      },
+      listPending: async (callerId) => {
+        if (!this._isModerator(callerId)) {
+          throw new WearStoreError('forbidden', 'Moderators only.');
+        }
+        return [...this._brandApplications.values()]
+          .filter((a) => a.status === 'pending')
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      },
+      review: async (id, callerId, decision, opts) => {
+        if (!this._isAdmin(callerId)) {
+          throw new WearStoreError('forbidden', 'Only an admin can decide applications.');
+        }
+        const row = this._brandApplications.get(id);
+        if (!row) {
+          throw new WearStoreError('application_not_found', `Unknown application ${id}.`);
+        }
+        // Decided rows are immutable for EVERYONE (RLS USING status='pending').
+        if (row.status !== 'pending') {
+          throw new WearStoreError('application_not_open', 'This application was already decided.');
+        }
+        const ts = this._now().toISOString();
+        const next: BrandApplication = {
+          ...row,
+          status: decision,
+          reviewedBy: callerId,
+          reviewedAt: ts,
+          reviewNote: (opts?.reviewNote ?? '').trim().slice(0, 2000) || null,
+          // The mint invariant: only an approval carries a brand.
+          mintedBrandId: decision === 'approved' ? (opts?.mintedBrandId ?? null) : null,
+          updatedAt: ts,
+        };
+        this._brandApplications.set(id, next);
+        // Mirrors trg_notify_on_brand_application_decision (mig 162):
+        // institutional voice — actor null, deep link to the newborn brand.
+        const minted = next.mintedBrandId ? this._brands.get(next.mintedBrandId) : undefined;
+        this._emitNotification({
+          recipientId: next.applicantId,
+          type:
+            decision === 'approved' ? 'brand_application_approved' : 'brand_application_rejected',
+          actorId: null,
+          brandId: next.mintedBrandId,
+          data: {
+            brandName: next.brandName,
+            reviewNote: next.reviewNote,
+            brandSlug: minted?.slug ?? null,
+          },
+        });
+        return next;
+      },
+    };
   }
 
   private _isBlockedEither(a: ConnectId, b: ConnectId): boolean {
@@ -2044,6 +2385,46 @@ export class MemoryWearStore implements WearStore {
   /** `wear.is_admin()`: role = 'admin'. */
   private _isAdmin(userId: ConnectId): boolean {
     return this._roles.get(userId) === 'admin';
+  }
+
+  /**
+   * Mirrors `wear.brand_eligibility()` (mig 162, SECDEF): the derived §6.1
+   * gate. Self-or-moderator read; claimed = cached stage past 'proposed'
+   * (forward-only; a revoked claim re-opens the concept and drops out);
+   * only admin-ACTIONED reports against the user themselves block.
+   */
+  private _brandEligibility(userId: ConnectId, callerId: ConnectId): BrandEligibility {
+    if (callerId !== userId && !this._isModerator(callerId)) {
+      throw new WearStoreError('forbidden', 'Own eligibility (or moderator) only.');
+    }
+    let conceptsPosted = 0;
+    let conceptsClaimed = 0;
+    for (const concept of this._concepts.values()) {
+      if (concept.creatorId !== userId) continue;
+      conceptsPosted += 1;
+      if (concept.status !== 'proposed') conceptsClaimed += 1;
+    }
+    let actionedReports = 0;
+    for (const report of this._reports.values()) {
+      if (
+        report.subjectKind === 'user' &&
+        report.subjectId === userId &&
+        report.status === 'actioned'
+      ) {
+        actionedReports += 1;
+      }
+    }
+    return {
+      eligible:
+        conceptsPosted >= BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED &&
+        conceptsClaimed >= BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED &&
+        actionedReports === 0,
+      conceptsPosted,
+      conceptsClaimed,
+      actionedReports,
+      conceptsPostedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
+      conceptsClaimedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
+    };
   }
 
   private _readConcept(id: string): ConceptWithMedia | null {
@@ -2064,7 +2445,10 @@ export class MemoryWearStore implements WearStore {
     return !!concept && concept.creatorId === callerId;
   }
 
-  private _claimParties(claimId: string): { ownerId: ConnectId | null; creatorId: ConnectId | null } {
+  private _claimParties(claimId: string): {
+    ownerId: ConnectId | null;
+    creatorId: ConnectId | null;
+  } {
     const claim = this._conceptClaims.get(claimId);
     if (!claim) return { ownerId: null, creatorId: null };
     const brand = this._brands.get(claim.brandId);
@@ -2162,6 +2546,39 @@ export class MemoryWearStore implements WearStore {
       createdAt: this._now().toISOString(),
     };
     this._notifications.set(notif.id, notif);
+  }
+
+  /**
+   * Mirrors `wear.promote_concept_status` (mig 161): promote a freshly-posted
+   * Concept into the concept-stories bar when the creator holds the derived
+   * Creator badge (>10 live concepts, counting this one) or while the
+   * first-100 bootstrap grace is open. Badge promotions never consume grace
+   * slots; the grace counter is statuses issued, self-terminating at 100.
+   */
+  private _promoteConceptStatus(concept: Concept): void {
+    let byCreator = 0;
+    for (const c of this._concepts.values()) if (c.creatorId === concept.creatorId) byCreator += 1;
+    let reason: ConceptStatus['reason'];
+    if (byCreator >= CREATOR_BADGE_MIN_CONCEPTS) {
+      reason = 'creator_badge';
+    } else {
+      let grace = 0;
+      for (const s of this._conceptStatuses.values()) {
+        if (s.reason === 'bootstrap_grace') grace += 1;
+      }
+      if (grace >= BOOTSTRAP_GRACE_STATUSES) return;
+      reason = 'bootstrap_grace';
+    }
+    if (this._conceptStatuses.has(concept.id)) return;
+    const ts = this._now();
+    this._conceptStatuses.set(concept.id, {
+      id: this._id('cst'),
+      conceptId: concept.id,
+      creatorId: concept.creatorId,
+      reason,
+      createdAt: ts.toISOString(),
+      expiresAt: new Date(ts.getTime() + CONCEPT_STATUS_TTL_MS).toISOString(),
+    });
   }
 
   /** Mirrors `trg_sync_brand_verified`: cache the outcome onto the brand. */

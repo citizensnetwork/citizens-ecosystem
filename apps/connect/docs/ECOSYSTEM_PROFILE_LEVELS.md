@@ -66,11 +66,29 @@ They are deliberately **not** unified into one table — the *contract* is the s
   `role` column is protected against self-escalation (`protect_role_column`).
 - Capability gate: `is_approved_contributor()` — events/places/broadcasts creation.
 
-### 3.2 Wear — **Creator** (default) and **Brand** (owner-verified)
-- Every Citizen is already a *Creator*: posts/stories/comments are open to any signed-in user
-  under per-user RLS (P0.2 — the social floor is level 0).
-- The organisational tier is a **Brand**: `wear.brands.owner_user_id` (mig 143). Creation is
-  self-service; `verified boolean` marks recognised brands (Wear-side flag).
+### 3.2 Wear — **Citizen → Creator → Brand** (a lazy, earned ladder)
+> **Ratified 2026-07-15 (founder).** Wear's creating tier is a *progression*, not a single
+> flag. Each rung is *added to* the Citizen base; roles are **lazily derived** from activity
+> (no eager grant) until Brand, which is an admin-approved, stored state. Source of truth:
+> [`docs/Citizens_Wear_Roles_and_Concepts_MD.md`](../../../docs/Citizens_Wear_Roles_and_Concepts_MD.md) §6.
+
+- **Citizen** (the base here): submit **Concepts**, post **Stories**, comment, save-to-boards,
+  follow, purchase. Concepts are the base creation and are **never level-gated** (mig 157
+  `concepts_creator_insert`; P0.2 holds — the social floor is Concepts + Stories, not Posts).
+- **Creator** — an **earned badge**, derived (no application) once the user has posted **>10
+  Concepts**. Unlocks the Concepts-page **stories bar** ("concept-statuses"). The community
+  Concepts surface (like/comment/share) is where a design earns the attention that attracts
+  Brands. *[DESIGNED — derivation + concept-stories/comments/shares build DEFERRED.]*
+- **Brand** — the organisational tier: a `wear.brands` row the user **owns** (mig 143) **and**
+  `verified = true` (mig 157 `brand_verifications`, admin-reviewed). A Brand may create **Posts**
+  (the Home apparel feed) and, being verified, **propose/claim/produce** Concepts. Brand status
+  is **assigned, never self-created**: eligibility is progression-gated (≈20 Concepts posted +
+  10 Concepts claimed + a customer-support email/contact + no sustained report history), after
+  which a **Become-a-Brand application** (in settings) is submitted to admins, who approve and
+  mint the brand row. Launch/partner brands are **admin-minted directly** (the bootstrap that
+  lets the first Concepts ever be claimed).
+  *[ENFORCED as of **mig 160**: Posts require an owned **verified** brand (UI + API + RLS);
+  brand-row INSERT is **admin-only** at RLS. Application UI + eligibility-derivation DEFERRED.]*
 - Optional Connect link: `wear.brands.connect_contributor_id` — value-ref to
   `public.profiles.id`, **ownership-verified** (resolve `/api/v1/contributors/{slug}` → require
   `profile.id == auth.uid`), no cross-schema FK. A Wear Brand may *point at* a Connect
@@ -91,8 +109,11 @@ They are deliberately **not** unified into one table — the *contract* is the s
 
 **Rules**
 - **P1.1** The creating tier is **granted by the app that owns the surface**: Connect by admin
-  approval, Wear by self-service brand creation (+ verification flag), Vision by org authority.
-  No app may auto-grant another app's tier.
+  approval, Wear by **admin-approved Brand assignment** (a progression-gated *Become-a-Brand*
+  application; brand-row INSERT is admin-only at RLS — mig 160 — with `verified` as the
+  marketplace-claim gate), Vision by org authority. No app may auto-grant another app's tier,
+  and no app's creating tier is ever self-service (Wear's earlier self-service brand creation
+  was retired 2026-07-15).
 - **P1.2** **No cross-app inheritance.** A Connect Contributor is NOT automatically a Wear Brand
   or a Vision org_admin (and vice versa). Cross-app links (`connect_contributor_id` in both
   `wear.brands` and `vision.organisations`) are *references with ownership proof*, never

@@ -17,19 +17,29 @@ export const GET = handler(async (req, ctx) => {
 });
 
 /**
- * POST /api/brands — create a brand owned by the signed-in user. An optional
- * `connectContributorId` link is set by the caller only after the ownership-
- * verified link flow (see /api/brands/:slug/link, STEP3 §5 Q4).
+ * POST /api/brands — mint a brand. Brand creation is **admin-assigned** (mig
+ * 160, ratified 2026-07-15): the self-serve path is retired. A Citizen becomes
+ * a Brand via the progression-gated *Become-a-Brand* application → admin
+ * approval; an admin mints the row (optionally owned by the approved applicant
+ * via `ownerId`). RLS (`brands_admin_insert`) is the wall — this is the clean
+ * 403 front door.
  */
 export const POST = handler(async (req, ctx) => {
   const userId = requireUserId(ctx);
+  if ((await ctx.store.roles.getOwn(userId)) !== 'admin') {
+    throw new ApiError(
+      403,
+      'admin_only',
+      'Brands are assigned by Citizens Wear. Apply from Settings once eligible.',
+    );
+  }
   const body = await readJsonBody(req);
   const slug = bodyString(body, 'slug');
   const name = bodyString(body, 'name');
   if (!slug) throw new ApiError(422, 'invalid_slug', 'A brand slug is required.');
   if (!name) throw new ApiError(422, 'invalid_name', 'A brand name is required.');
   const brand = await ctx.store.brands.create({
-    ownerId: userId,
+    ownerId: bodyString(body, 'ownerId') || userId,
     slug,
     name,
     tagline: bodyString(body, 'tagline') || null,

@@ -1,6 +1,7 @@
 import { handler, json, requireUserId } from '@/lib/api/route-context';
 import { toBrandDto, toUserDto } from '@/lib/api/serializers';
 import { bodyString, readJsonBody } from '@/lib/api/params';
+import { CREATOR_BADGE_MIN_CONCEPTS } from '@citizens/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,18 +10,20 @@ const MAX_DISPLAY_NAME = 80;
 
 /**
  * GET /api/me — the signed-in user's mirror row, profile, settings, counts,
- * owned brands (so the composer can offer "post as brand" in one call), and
- * mig-145 platform role (drives the admin/moderation nav).
+ * owned brands (so the composer can offer "post as brand" in one call),
+ * mig-145 platform role (drives the admin/moderation nav), and the derived
+ * Creator badge (§6.1: lazy — recomputed here, never stored).
  */
 export const GET = handler(async (_req, ctx) => {
   const userId = requireUserId(ctx);
-  const [user, profile, settings, counts, brands, role] = await Promise.all([
+  const [user, profile, settings, counts, brands, role, conceptCount] = await Promise.all([
     ctx.store.users.getById(userId),
     ctx.store.profiles.getOrCreate(userId),
     ctx.store.settings.get(userId),
     ctx.store.follows.counts(userId),
     ctx.store.brands.listForOwner(userId),
     ctx.store.roles.getOwn(userId),
+    ctx.store.concepts.countByCreator(userId),
   ]);
   return json({
     user: user ? toUserDto(user) : null,
@@ -29,6 +32,11 @@ export const GET = handler(async (_req, ctx) => {
     counts,
     brands: brands.map(toBrandDto),
     role,
+    creator: {
+      earned: conceptCount >= CREATOR_BADGE_MIN_CONCEPTS,
+      conceptCount,
+      threshold: CREATOR_BADGE_MIN_CONCEPTS,
+    },
   });
 });
 

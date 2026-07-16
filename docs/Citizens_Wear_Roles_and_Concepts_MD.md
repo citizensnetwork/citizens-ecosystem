@@ -1,4 +1,5 @@
 # Citizens Wear — Roles, Concepts Marketplace & Royalty Model
+
 **Status:** Confirmed direction — ready to inform build planning
 **Last updated:** July 13, 2026
 
@@ -8,15 +9,16 @@
 
 Citizens Wear uses a single evolving account type rather than separate profile schemas per tier. Elevation is achieved through badges and permission states layered onto one underlying user object — this avoids onboarding forks, account-type migrations, and duplicated permission logic.
 
-| Tier | How it's reached | Core capabilities |
-|---|---|---|
-| **Citizen** | Default on signup | Browse feeds, save to boards, follow, comment, purchase |
-| **Creator** | Opt-in / auto-unlocked | Everything above + submit Concepts, build a public design portfolio, earn badges |
-| **Brand** | Elevated *state* of Creator — not a separate account type | Everything above + propose on Concepts, claim/produce, post apparel status & release updates, appear in "active Brand" community surfaces |
-| **Admin** | Granted manually | Moderation, Brand verification approval, dispute resolution on claims |
+| Tier        | How it's reached                                          | Core capabilities                                                                                                                         |
+| ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Citizen** | Default on signup                                         | Browse feeds, save to boards, follow, comment, purchase                                                                                   |
+| **Creator** | Opt-in / auto-unlocked                                    | Everything above + submit Concepts, build a public design portfolio, earn badges                                                          |
+| **Brand**   | Elevated _state_ of Creator — not a separate account type | Everything above + propose on Concepts, claim/produce, post apparel status & release updates, appear in "active Brand" community surfaces |
+| **Admin**   | Granted manually                                          | Moderation, Brand verification approval, dispute resolution on claims                                                                     |
 
 **Brand qualification** is a combination of:
-- **Track record** — Concepts successfully claimed *and fulfilled* (not just claimed)
+
+- **Track record** — Concepts successfully claimed _and fulfilled_ (not just claimed)
 - **Verification** — a lightweight business/production-partner verification step, since Brand status carries the ability to make public release-date and status claims that Citizens may purchase against
 
 This two-part gate (delivery record + verification) is intentional: raw claim/upvote counts measure design popularity, not production trustworthiness. Brand status is fundamentally a trust and fulfillment claim, so it needs a trust-oriented gate, not a popularity-oriented one.
@@ -50,6 +52,7 @@ Once claimed, status updates become a Brand-authored, append-only log — the sa
 ### 2.3 Automatic "Completed Concepts" posting
 
 When a claim's status is updated to **Released**, that update is automatically converted into a post in the Brand's **Completed Concepts** profile section. No separate manual posting step is required. The post carries:
+
 - The design artwork
 - The originating Citizen/Creator's username (tagged)
 - The Brand's username
@@ -80,10 +83,10 @@ Drop culture is the platform default — most Christian apparel designs are not 
 
 ### 3.3 Reward summary
 
-| Party | Reward |
-|---|---|
+| Party       | Reward                                                                                                                                                                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Creator** | Money (milestone royalty, or lifetime 5% if converted to permanent catalogue) + physical attribution (username on garment, placement within Brand-set constraints) + digital attribution (tagged appearance in Brand's Completed Concepts) |
-| **Brand** | Retained majority margin + reputation (visible track record, upvotes on shipped work, public trust signal that feeds future proposal competitiveness) |
+| **Brand**   | Retained majority margin + reputation (visible track record, upvotes on shipped work, public trust signal that feeds future proposal competitiveness)                                                                                      |
 
 ---
 
@@ -109,6 +112,84 @@ This is flagged as a feature to define requirements for on arrival, not to be pl
 ---
 
 ## Open Items for Future Decisions
+
 - Whether Brand verification for elevation includes formal business/KYC documentation or a lighter internal review process
 - Full detail and scope of the Brand Workspace (Section 5)
 - Whether Admin-side dispute resolution tooling is needed for milestone/royalty disputes between Creators and Brands
+
+---
+
+## 6. Role progression & content-permission model — **RATIFIED 2026-07-15**
+
+Design session (founder ↔ Claude) that turned §1's tiers into a concrete, lazily-progressing
+capability model and a two-surface content split. This section is normative for Wear; it is
+mirrored in [`apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md`](../apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md)
+§3.2 (the ecosystem capability contract) and enforced at the DB by **migration 160**.
+
+### 6.1 The four rungs (lazy role progression)
+
+| Tier        | How reached                                                         | Adds                                                                                        |
+| ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Citizen** | default                                                             | browse, save to boards, purchase, follow, comment, **submit Concepts**, post **Stories**    |
+| **Creator** | **auto-badge** at **>10 Concepts posted** (derived, no application) | the Concepts-page **stories bar** ("concept-statuses")                                      |
+| **Brand**   | **verified state layered on a Creator** — _not a separate signup_   | create **Posts** (Home apparel feed); once verified, **propose / claim / produce** Concepts |
+| **Admin**   | granted manually                                                    | moderation, verification approval, dispute resolution, sign-in-as (impersonation)           |
+
+- **Roles are lazy/derived.** Creator badge and Brand _eligibility_ are computed from activity;
+  only the Brand grant itself is stored (it required a human approval).
+- **Brand genesis is assigned, never self-created.** A Brand row is minted by an admin —
+  either directly (launch/partner brands, the bootstrap that lets the first Concepts be
+  claimed) or by approving a citizen's **Become-a-Brand application**.
+- **Brand eligibility gates** (what unlocks the _Become-a-Brand_ button in settings):
+  **≈20 Concepts posted + 10 Concepts claimed** + a customer-support **email** and **contact
+  number** + **no sustained history of being reported**. The application form collects: Brand
+  Name\*, bio, socials, email\*, contact number\*, delivery options\* (+ more), and agreement to
+  the Ts&Cs, the Citizens Code of Conduct, and the note on monthly platform fees.
+- **Bootstrap grace:** the first 100 Wear Concepts (platform-wide) are all promoted to
+  concept-statuses regardless of their creator's badge, to seed the community surface at launch.
+- Progression can never be the _genesis_ of Brand on its own (it is circular — claiming
+  requires an already-verified Brand); it gates the **invitation to apply**, and an admin
+  makes the grant. This preserves §1's trust-oriented (not popularity-oriented) gate.
+
+### 6.2 Two content surfaces
+
+- **Home feed** — **Brands' Posts + Stories** (apparel). Per-post **Share** (Instagram-style)
+  is a planned add. _[Stories currently act as brand-page redirects, not full-screen — fix planned.]_
+- **Concepts page** — the **community's own creations**: Concepts + a **concept-stories bar** +
+  **like / comment / share** on Concepts. This attention is what draws Brands to a design, so
+  it is where a Creator's value accrues. _(✅ SHIPPED 2026-07-16, **migration 161**:
+  `wear.concept_comments` (threaded), `wear.concept_shares` (distinct-sharer social proof),
+  `wear.concept_statuses` + views (the bar — trigger-promoted, no client write path), and
+  engagement notifications. "Like" rides the existing upvote storage, re-skinned. The Creator
+  badge derives lazily (>10 Concepts) exactly as §6.1 specifies; the first-100 bootstrap grace
+  is a self-terminating status counter.)_
+
+### 6.3 Content-permission rules (what mig 160 enforces now)
+
+- **Posts are Brand-tier:** a Post must be authored by a user who **owns the attributed brand**
+  and that brand must be **`verified`**. `brand_id` is mandatory — base-Citizen "self-posts"
+  are retired. Enforced in the UI (Create screen), the API (`POST /api/posts`), **and** RLS
+  (`wear.posts` insert `WITH CHECK`).
+- **Brand creation is admin-only:** the self-serve _Create Brand_ tile is removed and
+  `wear.brands` INSERT is restricted to `wear.is_admin()` at RLS (service-role seeding bypasses
+  RLS). Brand owners keep UPDATE/DELETE of their own row; `verified` stays admin-managed
+  (mig 157 column guard).
+- **Base Citizens keep Concepts + Stories** (no capability removed mid-flight); the
+  bifurcation of Stories into Brand-Home-stories vs Creator-concept-stories lands with the
+  concept-stories build.
+
+### 6.4 Deferred (designed here, built later)
+
+~~Creator-badge derivation + concept-stories/comments/shares~~ ✅ **SHIPPED (mig 161,
+2026-07-16)** — badge surfaced on `/api/me` + profiles, statuses bar + engagement live.
+~~Per-post Share; full-screen Home stories~~ ✅ **SHIPPED (same session)** — share sheet +
+`?post=`/`?concept=` deep links; the Home tray now plays stories in a full-screen viewer.
+~~The **Become-a-Brand application** form + eligibility derivation + admin approval → mint
+flow~~ ✅ **SHIPPED (mig 162, 2026-07-16)** — `wear.brand_applications` (immutable once
+submitted; one open per user; immediate re-apply after rejection as a NEW row — all ratified
+2026-07-16), the SECDEF `wear.brand_eligibility()` derivation (§6.1's 20 posted / 10 claimed /
+zero actioned reports, enforced UI + API + RLS `WITH CHECK`), the Settings panel + application
+form, the admin queue tab, and approve-mints-verified-brand via the existing
+`POST /api/brands` `ownerId` + `brands_admin_insert` path (+ decision notifications).
+Still deferred: **share-to-DM** (the `dm` channel value is reserved); **admin sign-in-as**
+(impersonation — a security-sensitive surface, own design).

@@ -53,6 +53,8 @@
         return h(S.Post, { params });
       case 'settings':
         return h(S.Settings, {});
+      case 'brandApply':
+        return h(S.BrandApply, {});
       case 'concepts':
         return h(S.Concepts, {});
       case 'concept':

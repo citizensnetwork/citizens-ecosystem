@@ -6,24 +6,36 @@ posts with imagery, a follow graph, likes/comments, stories, and one realized
 **Concepts-marketplace** item (proposed → awarded → released) so the in-feed
 attribution chip renders.
 
+The file carries two independently-guarded blocks: the **base seed** (above)
+and the **§12 mig-161 engagement block** — two fresh community Concepts (their
+inserts fire the concept-status promotion trigger, so the Concepts-page
+stories bar is alive for 24h after seeding), threaded comments, and recorded
+shares. Each block no-ops when its own marker rows exist, so re-running the
+file on a prod that has only the base seed adds just the engagement content.
+
 ## Files
+
 - [`seed-feed.sql`](./seed-feed.sql) — idempotent seed (no-op if already applied).
-- [`teardown-feed.sql`](./teardown-feed.sql) — full, clean removal.
+- [`teardown-feed.sql`](./teardown-feed.sql) — full, clean removal (cascades
+  cover the mig-161 tables: statuses/views/comments/shares hang off concepts
+  and the 7 seed users).
 
 ## What gets created
-| Brand | Handle | Verified | Vibe |
-|---|---|---|---|
-| Cornerstone Apparel | `@cornerstoneapparel` | ✅ | Streetwear "built on the Rock" (Pretoria) |
-| Lily & Field | `@lilyandfield` | ⏳ pending | Considered, modest womenswear |
-| Salt & Light Threads | `@saltandlightthreads` | ✅ | Conversation tees; 10% to city missions |
-| Ubuntu Kingdom Co. | `@ubuntukingdomco` | ✅ | Hand-knit by a Mamelodi makers' collective |
-| Anchor & Crown | `@anchorandcrown` | ⏳ pending | Faith-forward caps & accessories |
+
+| Brand                | Handle                 | Verified   | Vibe                                       |
+| -------------------- | ---------------------- | ---------- | ------------------------------------------ |
+| Cornerstone Apparel  | `@cornerstoneapparel`  | ✅         | Streetwear "built on the Rock" (Pretoria)  |
+| Lily & Field         | `@lilyandfield`        | ⏳ pending | Considered, modest womenswear              |
+| Salt & Light Threads | `@saltandlightthreads` | ✅         | Conversation tees; 10% to city missions    |
+| Ubuntu Kingdom Co.   | `@ubuntukingdomco`     | ✅         | Hand-knit by a Mamelodi makers' collective |
+| Anchor & Crown       | `@anchorandcrown`      | ⏳ pending | Faith-forward caps & accessories           |
 
 Plus citizens `@gracelethabo` (concept creator) and `@thabo_m`. The two
 `pending` brand verifications land in the in-app **Admin queue** so the founder
 can approve them live.
 
 ## Key design decisions
+
 - **Zero cross-platform footprint.** Brand owners must exist in `auth.users`
   (`wear.users.id` FKs to it), and the `on_auth_user_created` trigger auto-adds
   a Connect `public.profiles` row. The seed **deletes those rows in the same
@@ -43,6 +55,7 @@ can approve them live.
   hand a brand over later.
 
 ## Run / remove (via Supabase MCP `execute_sql`, or psql as a superuser/owner)
+
 ```sql
 \i seed-feed.sql      -- apply (idempotent)
 \i teardown-feed.sql  -- remove (cascade-clean)

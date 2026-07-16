@@ -1,4 +1,6 @@
 import type {
+  BrandApplication,
+  ConceptStatusEntry,
   ConceptWithMedia,
   FeedPage,
   Page,
@@ -67,6 +69,46 @@ export const toUserDto = (u: WearUser): UserDto => ({
   handle: u.handle,
   displayName: u.displayName,
   avatarUrl: u.avatarUrl,
+});
+
+/** Become-a-Brand application (mig 162) — the applicant's own view AND the
+ * admin queue card share one shape (applications are moderator-readable). */
+export interface BrandApplicationDto {
+  readonly id: string;
+  readonly applicantId: string;
+  readonly status: BrandApplication['status'];
+  readonly brandName: string;
+  readonly bio: string | null;
+  readonly socials: Readonly<Record<string, string>>;
+  readonly supportEmail: string;
+  readonly contactNumber: string;
+  readonly deliveryOptions: string;
+  readonly agreeTerms: boolean;
+  readonly agreeConduct: boolean;
+  readonly agreeFees: boolean;
+  readonly reviewNote: string | null;
+  readonly mintedBrandId: string | null;
+  readonly createdAt: string;
+  readonly reviewedAt: string | null;
+}
+
+export const toBrandApplicationDto = (a: BrandApplication): BrandApplicationDto => ({
+  id: a.id,
+  applicantId: a.applicantId,
+  status: a.status,
+  brandName: a.brandName,
+  bio: a.bio,
+  socials: a.socials,
+  supportEmail: a.supportEmail,
+  contactNumber: a.contactNumber,
+  deliveryOptions: a.deliveryOptions,
+  agreeTerms: a.agreeTerms,
+  agreeConduct: a.agreeConduct,
+  agreeFees: a.agreeFees,
+  reviewNote: a.reviewNote,
+  mintedBrandId: a.mintedBrandId,
+  createdAt: a.createdAt,
+  reviewedAt: a.reviewedAt,
 });
 
 export interface NotificationDto {
@@ -207,9 +249,7 @@ export async function hydrateFeed(
     : null;
 
   // Completed-Concepts attribution — rare in a page, resolved per post.
-  const concepts = await Promise.all(
-    page.items.map(({ post }) => conceptAttribution(store, post)),
-  );
+  const concepts = await Promise.all(page.items.map(({ post }) => conceptAttribution(store, post)));
 
   return {
     items: page.items.map((entry, i) => ({
@@ -248,6 +288,10 @@ export interface ConceptCardDto {
   }[];
   readonly upvotes: number;
   readonly viewerUpvoted: boolean;
+  /** Community engagement (mig 161): comment thread size + distinct sharers. */
+  readonly commentCount: number;
+  readonly shareCount: number;
+  readonly viewerShared: boolean;
   /** Public brand tags ("3 brands proposed") — never proposal details. */
   readonly proposalCount: number;
   /** The claiming brand once awarded (claims are public info). */
@@ -260,13 +304,17 @@ export async function hydrateConcept(
   entry: ConceptWithMedia,
   viewerId: string | null,
 ): Promise<ConceptCardDto> {
-  const [creator, upvotes, viewerUpvoted, tags, claim] = await Promise.all([
-    store.users.getById(entry.concept.creatorId),
-    store.concepts.upvoteCount(entry.concept.id),
-    viewerId ? store.concepts.hasUpvoted(entry.concept.id, viewerId) : Promise.resolve(false),
-    store.conceptProposals.publicTags(entry.concept.id),
-    store.conceptClaims.getActiveForConcept(entry.concept.id),
-  ]);
+  const [creator, upvotes, viewerUpvoted, commentCount, shareCount, viewerShared, tags, claim] =
+    await Promise.all([
+      store.users.getById(entry.concept.creatorId),
+      store.concepts.upvoteCount(entry.concept.id),
+      viewerId ? store.concepts.hasUpvoted(entry.concept.id, viewerId) : Promise.resolve(false),
+      store.conceptComments.countForConcept(entry.concept.id),
+      store.concepts.shareCount(entry.concept.id),
+      viewerId ? store.concepts.hasShared(entry.concept.id, viewerId) : Promise.resolve(false),
+      store.conceptProposals.publicTags(entry.concept.id),
+      store.conceptClaims.getActiveForConcept(entry.concept.id),
+    ]);
   const claimedBrand = claim ? await store.brands.getById(claim.brandId) : null;
   return {
     id: entry.concept.id,
@@ -278,6 +326,9 @@ export async function hydrateConcept(
     media: entry.media.map((m) => ({ url: m.url, kind: m.kind, altText: m.altText })),
     upvotes,
     viewerUpvoted,
+    commentCount,
+    shareCount,
+    viewerShared,
     proposalCount: tags.length,
     claimedBy: claimedBrand ? toBrandDto(claimedBrand) : null,
   };
@@ -291,4 +342,74 @@ export async function hydrateConceptPage(
 ): Promise<{ items: ConceptCardDto[]; nextCursor: string | null }> {
   const items = await Promise.all(page.items.map((c) => hydrateConcept(store, c, viewerId)));
   return { items, nextCursor: page.nextCursor };
+}
+
+// ── Concept-stories bar ("concept-statuses", mig 161) ───────────────────────
+
+export interface ConceptStatusDto {
+  readonly id: string;
+  readonly reason: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly viewerSeen: boolean;
+  readonly creator: UserDto | null;
+  /** The promoted concept's render payload (title + hero artwork). */
+  readonly concept: {
+    readonly id: string;
+    readonly title: string;
+    readonly status: string;
+    readonly media: {
+      readonly url: string;
+      readonly kind: string;
+      readonly altText: string | null;
+    } | null;
+  } | null;
+}
+
+/**
+ * Hydrate active bar entries: creator identities deduped, the concept's title
+ * + hero artwork attached (a status RENDERS its concept, §6.1). Statuses whose
+ * concept vanished mid-flight serialize with `concept: null` and are dropped
+ * by the route.
+ */
+export async function hydrateConceptStatuses(
+  store: WearStore,
+  entries: readonly ConceptStatusEntry[],
+): Promise<ConceptStatusDto[]> {
+  const creatorIds = [...new Set(entries.map((e) => e.status.creatorId))];
+  const creators = new Map<string, UserDto>();
+  await Promise.all(
+    creatorIds.map(async (id) => {
+      const u = await store.users.getById(id);
+      if (u) creators.set(id, toUserDto(u));
+    }),
+  );
+  const concepts = await Promise.all(
+    entries.map((e) => store.concepts.getById(e.status.conceptId)),
+  );
+  return entries.map((e, i) => {
+    const entry = concepts[i];
+    return {
+      id: e.status.id,
+      reason: e.status.reason,
+      createdAt: e.status.createdAt,
+      expiresAt: e.status.expiresAt,
+      viewerSeen: e.viewerSeen,
+      creator: creators.get(e.status.creatorId) ?? null,
+      concept: entry
+        ? {
+            id: entry.concept.id,
+            title: entry.concept.title,
+            status: entry.concept.status,
+            media: entry.media.length
+              ? {
+                  url: entry.media[0]!.url,
+                  kind: entry.media[0]!.kind,
+                  altText: entry.media[0]!.altText,
+                }
+              : null,
+          }
+        : null,
+    };
+  });
 }

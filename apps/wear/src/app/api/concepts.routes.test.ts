@@ -18,10 +18,7 @@ import {
   PATCH as conceptPATCH,
 } from './concepts/[id]/route';
 import { DELETE as unvotePOST, POST as upvotePOST } from './concepts/[id]/upvote/route';
-import {
-  GET as proposalsGET,
-  POST as proposalsPOST,
-} from './concepts/[id]/proposals/route';
+import { GET as proposalsGET, POST as proposalsPOST } from './concepts/[id]/proposals/route';
 import { POST as statusPOST } from './concepts/[id]/status/route';
 import { PATCH as proposalPATCH } from './proposals/[id]/route';
 import { POST as awardPOST } from './proposals/[id]/award/route';
@@ -31,13 +28,22 @@ import { PATCH as conversionPATCH } from './conversions/[id]/route';
 import { GET as royaltiesGET } from './royalties/route';
 import { POST as proofPOST } from './royalties/[id]/proof/route';
 import { POST as closePOST } from './royalties/[id]/close/route';
-import { GET as verificationGET, POST as verificationPOST } from './brands/[slug]/verification/route';
+import {
+  GET as verificationGET,
+  POST as verificationPOST,
+} from './brands/[slug]/verification/route';
 import { GET as adminVerificationsGET } from './admin/verifications/route';
 import { POST as adminReviewPOST } from './admin/verifications/[brandId]/route';
 import { GET as adminReportsGET } from './admin/reports/route';
 import { POST as adminTriagePOST } from './admin/reports/[id]/route';
 import { POST as reportsPOST } from './reports/route';
 import { GET as feedGET } from './feed/route';
+import { GET as commentsGET, POST as commentsPOST } from './concepts/[id]/comments/route';
+import { POST as sharePOST } from './concepts/[id]/share/route';
+import { GET as statusesGET } from './concepts/statuses/route';
+import { POST as statusViewPOST } from './concepts/statuses/[id]/view/route';
+import { GET as meGET } from './me/route';
+import { GET as notificationsGET } from './notifications/route';
 
 const req = (url: string, init?: RequestInit): Request =>
   new Request(`http://localhost${url}`, init);
@@ -103,7 +109,10 @@ async function createClaim(): Promise<{ conceptId: string; claimId: string }> {
   const conceptId = await createConcept();
   const proposalId = await createProposal(conceptId);
   asUser('usr_002'); // the creator awards
-  const res = await awardPOST(req(`/api/proposals/${proposalId}/award`, jsonBody({})), route({ id: proposalId }));
+  const res = await awardPOST(
+    req(`/api/proposals/${proposalId}/award`, jsonBody({})),
+    route({ id: proposalId }),
+  );
   expect(res.status).toBe(201);
   return { conceptId, claimId: (await res.json()).claim.id as string };
 }
@@ -112,14 +121,18 @@ describe('concepts browse/create/detail', () => {
   it('anonymous browse works; create requires auth', async () => {
     anonymous();
     expect((await conceptsGET(req('/api/concepts'), route())).status).toBe(200);
-    expect((await conceptsPOST(req('/api/concepts', jsonBody({ title: 'X' })), route())).status).toBe(401);
+    expect(
+      (await conceptsPOST(req('/api/concepts', jsonBody({ title: 'X' })), route())).status,
+    ).toBe(401);
   });
 
   it('creates, details (tags + stepper log + claim), edits, and deletes', async () => {
     const conceptId = await createConcept();
 
     anonymous();
-    const detail = await (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).json();
+    const detail = await (
+      await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))
+    ).json();
     expect(detail.concept.title).toBe('Lion of Judah tee');
     expect(detail.concept.status).toBe('proposed');
     expect(detail.concept.media).toHaveLength(1);
@@ -148,16 +161,35 @@ describe('concepts browse/create/detail', () => {
     ).toBe(403);
 
     asUser('usr_002');
-    expect((await conceptDELETE(req(`/api/concepts/${conceptId}`, { method: 'DELETE' }), route({ id: conceptId }))).status).toBe(200);
-    expect((await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).status).toBe(404);
+    expect(
+      (
+        await conceptDELETE(
+          req(`/api/concepts/${conceptId}`, { method: 'DELETE' }),
+          route({ id: conceptId }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).status,
+    ).toBe(404);
   });
 
   it('upvotes toggle and count', async () => {
     const conceptId = await createConcept();
     asUser('usr_001');
-    const up = await (await upvotePOST(req(`/api/concepts/${conceptId}/upvote`, { method: 'POST' }), route({ id: conceptId }))).json();
+    const up = await (
+      await upvotePOST(
+        req(`/api/concepts/${conceptId}/upvote`, { method: 'POST' }),
+        route({ id: conceptId }),
+      )
+    ).json();
     expect(up).toEqual({ upvotes: 1, viewerUpvoted: true });
-    const down = await (await unvotePOST(req(`/api/concepts/${conceptId}/upvote`, { method: 'DELETE' }), route({ id: conceptId }))).json();
+    const down = await (
+      await unvotePOST(
+        req(`/api/concepts/${conceptId}/upvote`, { method: 'DELETE' }),
+        route({ id: conceptId }),
+      )
+    ).json();
     expect(down).toEqual({ upvotes: 0, viewerUpvoted: false });
   });
 });
@@ -179,14 +211,18 @@ describe('proposals: verified-only, party-scoped, public tags', () => {
 
     // Public tag surfaces on the detail; details stay party-scoped.
     anonymous();
-    const detail = await (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).json();
+    const detail = await (
+      await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))
+    ).json();
     expect(detail.proposalTags).toHaveLength(1);
     expect(detail.proposalTags[0].brand.slug).toBe('salt-and-light');
     expect(detail.concept.proposalCount).toBe(1);
 
     // usr_003 (admin/moderator) sees details; a stranger's list is empty.
     asUser('usr_003');
-    const modList = await (await proposalsGET(req(`/api/concepts/${conceptId}/proposals`), route({ id: conceptId }))).json();
+    const modList = await (
+      await proposalsGET(req(`/api/concepts/${conceptId}/proposals`), route({ id: conceptId }))
+    ).json();
     expect(modList.proposals).toHaveLength(1);
     expect(modList.proposals[0].estUnitPrice).toBe(199);
   });
@@ -197,17 +233,26 @@ describe('proposals: verified-only, party-scoped, public tags', () => {
 
     asUser('usr_001');
     const edited = await (
-      await proposalPATCH(req(`/api/proposals/${proposalId}`, jsonBody({ moq: 50 }, 'PATCH')), route({ id: proposalId }))
+      await proposalPATCH(
+        req(`/api/proposals/${proposalId}`, jsonBody({ moq: 50 }, 'PATCH')),
+        route({ id: proposalId }),
+      )
     ).json();
     expect(edited.proposal.moq).toBe(50);
 
     const withdrawn = await (
-      await proposalPATCH(req(`/api/proposals/${proposalId}`, jsonBody({ action: 'withdraw' }, 'PATCH')), route({ id: proposalId }))
+      await proposalPATCH(
+        req(`/api/proposals/${proposalId}`, jsonBody({ action: 'withdraw' }, 'PATCH')),
+        route({ id: proposalId }),
+      )
     ).json();
     expect(withdrawn.proposal.status).toBe('withdrawn');
 
     const resubmitted = await (
-      await proposalPATCH(req(`/api/proposals/${proposalId}`, jsonBody({ action: 'resubmit' }, 'PATCH')), route({ id: proposalId }))
+      await proposalPATCH(
+        req(`/api/proposals/${proposalId}`, jsonBody({ action: 'resubmit' }, 'PATCH')),
+        route({ id: proposalId }),
+      )
     ).json();
     expect(resubmitted.proposal.status).toBe('submitted');
   });
@@ -218,7 +263,10 @@ describe('award → advance → released auto-post → conversion (the happy pat
     const conceptId = await createConcept();
     const proposalId = await createProposal(conceptId);
     asUser('usr_001'); // brand owner, NOT the creator
-    const res = await awardPOST(req(`/api/proposals/${proposalId}/award`, jsonBody({})), route({ id: proposalId }));
+    const res = await awardPOST(
+      req(`/api/proposals/${proposalId}/award`, jsonBody({})),
+      route({ id: proposalId }),
+    );
     expect(res.status).toBe(401);
     expect((await res.json()).error).toBe('unauthorized');
   });
@@ -228,7 +276,9 @@ describe('award → advance → released auto-post → conversion (the happy pat
 
     // Award side-effects: stage cached, log entry, milestone royalty.
     anonymous();
-    let detail = await (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).json();
+    let detail = await (
+      await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))
+    ).json();
     expect(detail.concept.status).toBe('claimed');
     expect(detail.concept.claimedBy.slug).toBe('salt-and-light');
     expect(detail.statusLog.map((e: { status: string }) => e.status)).toEqual(['claimed']);
@@ -236,46 +286,83 @@ describe('award → advance → released auto-post → conversion (the happy pat
     asUser('usr_001');
     const royalties = await (await royaltiesGET(req('/api/royalties'), route())).json();
     expect(royalties.royalties).toHaveLength(1);
-    expect(royalties.royalties[0]).toMatchObject({ kind: 'milestone', pct: 10, thresholdUnits: 100 });
+    expect(royalties.royalties[0]).toMatchObject({
+      kind: 'milestone',
+      pct: 10,
+      thresholdUnits: 100,
+    });
 
     // Backwards/repeat stages rejected; forward advance works (brand only).
     asUser('usr_002');
     expect(
-      (await statusPOST(req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'in_production' })), route({ id: conceptId }))).status,
+      (
+        await statusPOST(
+          req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'in_production' })),
+          route({ id: conceptId }),
+        )
+      ).status,
     ).toBe(401);
     asUser('usr_001');
     expect(
-      (await statusPOST(req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'claimed' })), route({ id: conceptId }))).status,
+      (
+        await statusPOST(
+          req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'claimed' })),
+          route({ id: conceptId }),
+        )
+      ).status,
     ).toBe(422);
     const advanced = await statusPOST(
-      req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'in_production', note: 'cutting fabric' })),
+      req(
+        `/api/concepts/${conceptId}/status`,
+        jsonBody({ status: 'in_production', note: 'cutting fabric' }),
+      ),
       route({ id: conceptId }),
     );
     expect(advanced.status).toBe(201);
     expect(
-      (await statusPOST(req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'in_production' })), route({ id: conceptId }))).status,
+      (
+        await statusPOST(
+          req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'in_production' })),
+          route({ id: conceptId }),
+        )
+      ).status,
     ).toBe(409);
 
     // Released → auto Completed-Concepts post with the PUBLIC creator tag.
-    await statusPOST(req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'released' })), route({ id: conceptId }));
+    await statusPOST(
+      req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'released' })),
+      route({ id: conceptId }),
+    );
     const feed = await (await feedGET(req('/api/feed'), route())).json();
-    const auto = feed.items.find((p: { concept?: { id: string } | null }) => p.concept?.id === conceptId);
+    const auto = feed.items.find(
+      (p: { concept?: { id: string } | null }) => p.concept?.id === conceptId,
+    );
     expect(auto).toBeDefined();
     expect(auto.brand.slug).toBe('salt-and-light');
     expect(auto.brand.verified).toBe(true); // badge is authoritative from wear.brands.verified
     expect(auto.concept.creator.handle).toBe('samuel'); // attribution_public=true
 
     // Conversion handshake: brand proposes, creator accepts.
-    const conv = await (await conversionsPOST(req(`/api/claims/${claimId}/conversions`, jsonBody({})), route({ id: claimId }))).json();
+    const conv = await (
+      await conversionsPOST(
+        req(`/api/claims/${claimId}/conversions`, jsonBody({})),
+        route({ id: claimId }),
+      )
+    ).json();
     asUser('usr_002');
     const accepted = await (
-      await conversionPATCH(req(`/api/conversions/${conv.conversion.id}`, jsonBody({ action: 'accept' }, 'PATCH')), route({ id: conv.conversion.id }))
+      await conversionPATCH(
+        req(`/api/conversions/${conv.conversion.id}`, jsonBody({ action: 'accept' }, 'PATCH')),
+        route({ id: conv.conversion.id }),
+      )
     ).json();
     expect(accepted.conversion.status).toBe('accepted');
 
     // The tag is dropped but the concept link persists (permanent).
     const feedAfter = await (await feedGET(req('/api/feed'), route())).json();
-    const autoAfter = feedAfter.items.find((p: { concept?: { id: string } | null }) => p.concept?.id === conceptId);
+    const autoAfter = feedAfter.items.find(
+      (p: { concept?: { id: string } | null }) => p.concept?.id === conceptId,
+    );
     expect(autoAfter.concept.creator).toBeNull();
     expect(autoAfter.concept.id).toBe(conceptId);
 
@@ -291,33 +378,54 @@ describe('award → advance → released auto-post → conversion (the happy pat
   it('royalty proof → creator close-out over the API', async () => {
     const { conceptId, claimId } = await createClaim();
     asUser('usr_001');
-    await statusPOST(req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'released' })), route({ id: conceptId }));
+    await statusPOST(
+      req(`/api/concepts/${conceptId}/status`, jsonBody({ status: 'released' })),
+      route({ id: conceptId }),
+    );
     const list = await (await royaltiesGET(req('/api/royalties'), route())).json();
     const obId = list.royalties[0].id as string;
 
     expect(
-      (await proofPOST(req(`/api/royalties/${obId}/proof`, jsonBody({ proofUrl: 'not-a-url' })), route({ id: obId }))).status,
+      (
+        await proofPOST(
+          req(`/api/royalties/${obId}/proof`, jsonBody({ proofUrl: 'not-a-url' })),
+          route({ id: obId }),
+        )
+      ).status,
     ).toBe(422);
     const proved = await proofPOST(
-      req(`/api/royalties/${obId}/proof`, jsonBody({ proofUrl: 'https://proof.test/100th', note: 'Invoice #100' })),
+      req(
+        `/api/royalties/${obId}/proof`,
+        jsonBody({ proofUrl: 'https://proof.test/100th', note: 'Invoice #100' }),
+      ),
       route({ id: obId }),
     );
     expect((await proved.json()).royalty.status).toBe('proof_submitted');
 
     asUser('usr_002'); // creator confirms
-    const closed = await closePOST(req(`/api/royalties/${obId}/close`, jsonBody({})), route({ id: obId }));
+    const closed = await closePOST(
+      req(`/api/royalties/${obId}/close`, jsonBody({})),
+      route({ id: obId }),
+    );
     expect((await closed.json()).royalty.status).toBe('closed');
   });
 
   it('admin revoke re-opens the concept', async () => {
     const { conceptId, claimId } = await createClaim();
     asUser('usr_001');
-    expect((await revokePOST(req(`/api/claims/${claimId}/revoke`, jsonBody({})), route({ id: claimId }))).status).toBe(403);
+    expect(
+      (await revokePOST(req(`/api/claims/${claimId}/revoke`, jsonBody({})), route({ id: claimId })))
+        .status,
+    ).toBe(403);
     asUser('usr_003');
-    const revoked = await (await revokePOST(req(`/api/claims/${claimId}/revoke`, jsonBody({})), route({ id: claimId }))).json();
+    const revoked = await (
+      await revokePOST(req(`/api/claims/${claimId}/revoke`, jsonBody({})), route({ id: claimId }))
+    ).json();
     expect(revoked.claim.status).toBe('revoked');
     anonymous();
-    const detail = await (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).json();
+    const detail = await (
+      await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))
+    ).json();
     expect(detail.concept.status).toBe('proposed');
   });
 });
@@ -333,21 +441,33 @@ describe('brand verification request + admin review', () => {
 
     // Queue is role-gated.
     asUser('usr_001');
-    expect((await adminVerificationsGET(req('/api/admin/verifications'), route())).status).toBe(403);
+    expect((await adminVerificationsGET(req('/api/admin/verifications'), route())).status).toBe(
+      403,
+    );
     asUser('usr_003');
-    const queue = await (await adminVerificationsGET(req('/api/admin/verifications'), route())).json();
+    const queue = await (
+      await adminVerificationsGET(req('/api/admin/verifications'), route())
+    ).json();
     expect(queue.verifications).toHaveLength(1);
     expect(queue.verifications[0].brand.slug).toBe('cornerstone-co');
     const brandId = queue.verifications[0].brandId as string;
 
     const reviewed = await adminReviewPOST(
-      req(`/api/admin/verifications/${brandId}`, jsonBody({ decision: 'approved', reviewNote: 'Docs check out.' })),
+      req(
+        `/api/admin/verifications/${brandId}`,
+        jsonBody({ decision: 'approved', reviewNote: 'Docs check out.' }),
+      ),
       route({ brandId }),
     );
     expect((await reviewed.json()).verification.status).toBe('approved');
 
     asUser('usr_002');
-    const mine = await (await verificationGET(req('/api/brands/cornerstone-co/verification'), route({ slug: 'cornerstone-co' }))).json();
+    const mine = await (
+      await verificationGET(
+        req('/api/brands/cornerstone-co/verification'),
+        route({ slug: 'cornerstone-co' }),
+      )
+    ).json();
     expect(mine.verified).toBe(true);
     expect(mine.verification.status).toBe('approved');
   });
@@ -379,12 +499,226 @@ describe('blanket rate-limit gate (@citizens/utils via handler())', () => {
   });
 });
 
+describe('concept engagement — comments/shares/statuses (mig 161)', () => {
+  it('comments: anon reads, auth writes, thread hydrates, reply notifies parent', async () => {
+    const conceptId = await createConcept(); // samuel (usr_002) is the creator
+
+    anonymous();
+    expect(
+      (await commentsGET(req(`/api/concepts/${conceptId}/comments`), route({ id: conceptId })))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await commentsPOST(
+          req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'X' })),
+          route({ id: conceptId }),
+        )
+      ).status,
+    ).toBe(401);
+
+    asUser('usr_001'); // hannah comments on samuel's concept
+    const created = await commentsPOST(
+      req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'This needs to exist.' })),
+      route({ id: conceptId }),
+    );
+    expect(created.status).toBe(201);
+    const commentId = (await created.json()).id as string;
+
+    asUser('usr_003'); // ruth replies to hannah's comment
+    const reply = await commentsPOST(
+      req(
+        `/api/concepts/${conceptId}/comments`,
+        jsonBody({ body: 'Agreed!', parentCommentId: commentId }),
+      ),
+      route({ id: conceptId }),
+    );
+    expect(reply.status).toBe(201);
+
+    const thread = await (
+      await commentsGET(req(`/api/concepts/${conceptId}/comments`), route({ id: conceptId }))
+    ).json();
+    expect(thread.comments).toHaveLength(2);
+    expect(thread.comments[0].author.handle).toBe('hannah');
+    expect(thread.comments[1].parentCommentId).toBe(commentId);
+
+    // Trigger mirror: creator (samuel) got both; parent author (hannah) got the reply.
+    asUser('usr_002');
+    const samuelInbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    expect(
+      samuelInbox.items.filter((n: { type: string }) => n.type === 'concept_comment'),
+    ).toHaveLength(2);
+    asUser('usr_001');
+    const hannahInbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    const replyNotif = hannahInbox.items.filter(
+      (n: { type: string }) => n.type === 'concept_comment',
+    );
+    expect(replyNotif).toHaveLength(1);
+    expect(replyNotif[0].data.reply).toBe(true);
+
+    // Empty body + unknown concept guardrails.
+    expect(
+      (
+        await commentsPOST(
+          req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: '   ' })),
+          route({ id: conceptId }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (await commentsGET(req('/api/concepts/nope/comments'), route({ id: 'nope' }))).status,
+    ).toBe(404);
+  });
+
+  it('share: distinct-sharer idempotency + count + creator notification', async () => {
+    const conceptId = await createConcept();
+
+    anonymous();
+    expect(
+      (
+        await sharePOST(
+          req(`/api/concepts/${conceptId}/share`, jsonBody({})),
+          route({ id: conceptId }),
+        )
+      ).status,
+    ).toBe(401);
+
+    asUser('usr_001');
+    const first = await (
+      await sharePOST(
+        req(`/api/concepts/${conceptId}/share`, jsonBody({ channel: 'native' })),
+        route({ id: conceptId }),
+      )
+    ).json();
+    expect(first).toEqual({ shares: 1, viewerShared: true });
+    // Re-sharing does not inflate the count (social proof is non-gameable).
+    const second = await (
+      await sharePOST(
+        req(`/api/concepts/${conceptId}/share`, jsonBody({})),
+        route({ id: conceptId }),
+      )
+    ).json();
+    expect(second).toEqual({ shares: 1, viewerShared: true });
+    asUser('usr_003');
+    const third = await (
+      await sharePOST(
+        req(`/api/concepts/${conceptId}/share`, jsonBody({})),
+        route({ id: conceptId }),
+      )
+    ).json();
+    expect(third.shares).toBe(2);
+
+    asUser('usr_002'); // creator sees exactly one share notification per sharer
+    const inbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    expect(inbox.items.filter((n: { type: string }) => n.type === 'concept_share')).toHaveLength(2);
+
+    expect(
+      (await sharePOST(req('/api/concepts/nope/share', jsonBody({})), route({ id: 'nope' })))
+        .status,
+    ).toBe(404);
+  });
+
+  it('detail carries commentCount/shareCount/viewerShared', async () => {
+    const conceptId = await createConcept();
+    asUser('usr_001');
+    await commentsPOST(
+      req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'Word.' })),
+      route({ id: conceptId }),
+    );
+    await sharePOST(
+      req(`/api/concepts/${conceptId}/share`, jsonBody({})),
+      route({ id: conceptId }),
+    );
+    const detail = await (
+      await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))
+    ).json();
+    expect(detail.concept.commentCount).toBe(1);
+    expect(detail.concept.shareCount).toBe(1);
+    expect(detail.concept.viewerShared).toBe(true);
+  });
+
+  it('statuses bar: bootstrap grace promotes, views flip seen-state', async () => {
+    const conceptId = await createConcept(); // samuel has ≤10 concepts → grace
+
+    anonymous();
+    const anonBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(anonBar.statuses).toHaveLength(1);
+    expect(anonBar.statuses[0].reason).toBe('bootstrap_grace');
+    expect(anonBar.statuses[0].concept.id).toBe(conceptId);
+    expect(anonBar.statuses[0].concept.media.url).toBe('https://cdn.test/art.png');
+    expect(anonBar.statuses[0].creator.handle).toBe('samuel');
+    expect(anonBar.statuses[0].viewerSeen).toBe(false);
+    const statusId = anonBar.statuses[0].id as string;
+
+    // Viewing requires auth; then the bar reflects the seen-state.
+    expect(
+      (
+        await statusViewPOST(
+          req(`/api/concepts/statuses/${statusId}/view`, jsonBody({})),
+          route({ id: statusId }),
+        )
+      ).status,
+    ).toBe(401);
+    asUser('usr_001');
+    expect(
+      (
+        await statusViewPOST(
+          req(`/api/concepts/statuses/${statusId}/view`, jsonBody({})),
+          route({ id: statusId }),
+        )
+      ).status,
+    ).toBe(201);
+    const seenBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(seenBar.statuses[0].viewerSeen).toBe(true);
+    asUser('usr_003'); // another viewer still unseen
+    const otherBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(otherBar.statuses[0].viewerSeen).toBe(false);
+
+    expect(
+      (
+        await statusViewPOST(
+          req('/api/concepts/statuses/nope/view', jsonBody({})),
+          route({ id: 'nope' }),
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it('creator badge: earned at >10 concepts; statuses switch to creator_badge', async () => {
+    asUser('usr_001');
+    const before = await (await meGET(req('/api/me'), route())).json();
+    expect(before.creator).toEqual({ earned: false, conceptCount: 0, threshold: 11 });
+
+    for (let i = 1; i <= 11; i += 1) {
+      const res = await conceptsPOST(
+        req('/api/concepts', jsonBody({ title: `Design ${i}` })),
+        route(),
+      );
+      expect(res.status).toBe(201);
+    }
+    const after = await (await meGET(req('/api/me'), route())).json();
+    expect(after.creator).toEqual({ earned: true, conceptCount: 11, threshold: 11 });
+
+    // Every concept was promoted; only the 11th rode the badge lane (the
+    // first ten consumed grace slots), and newest-first surfaces it on top.
+    const bar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(bar.statuses).toHaveLength(11);
+    expect(bar.statuses[0].reason).toBe('creator_badge');
+    const reasons = bar.statuses.map((s: { reason: string }) => s.reason);
+    expect(reasons.filter((r: string) => r === 'creator_badge')).toHaveLength(1);
+    expect(reasons.filter((r: string) => r === 'bootstrap_grace')).toHaveLength(10);
+  });
+});
+
 describe('admin reports triage queue (mig 145)', () => {
   it('report → open queue → triage; plain users are shut out', async () => {
     asUser('usr_001');
     const report = await (
       await reportsPOST(
-        req('/api/reports', jsonBody({ subjectKind: 'post', subjectId: 'pst_seed_002', reason: 'spam' })),
+        req(
+          '/api/reports',
+          jsonBody({ subjectKind: 'post', subjectId: 'pst_seed_002', reason: 'spam' }),
+        ),
         route(),
       )
     ).json();
@@ -398,12 +732,17 @@ describe('admin reports triage queue (mig 145)', () => {
     const id = queue.reports[0].id as string;
 
     const triaged = await (
-      await adminTriagePOST(req(`/api/admin/reports/${id}`, jsonBody({ status: 'dismissed' })), route({ id }))
+      await adminTriagePOST(
+        req(`/api/admin/reports/${id}`, jsonBody({ status: 'dismissed' })),
+        route({ id }),
+      )
     ).json();
     expect(triaged.report.status).toBe('dismissed');
     expect(triaged.report.handledBy).toBe('usr_003');
 
-    const openAfter = await (await adminReportsGET(req('/api/admin/reports?status=open'), route())).json();
+    const openAfter = await (
+      await adminReportsGET(req('/api/admin/reports?status=open'), route())
+    ).json();
     expect(openAfter.reports).toHaveLength(0);
   });
 });

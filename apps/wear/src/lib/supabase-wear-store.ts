@@ -1,10 +1,16 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import {
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
+  BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
   WearStoreError,
   extractHashtags,
   normaliseHashtag,
   type BlockEdge,
   type BlockRepo,
+  type BrandApplication,
+  type BrandApplicationRepo,
+  type BrandApplicationStatus,
+  type BrandEligibility,
   type BrandRepo,
   type BrandVerification,
   type BrandVerificationRepo,
@@ -18,14 +24,19 @@ import {
   type ConceptClaim,
   type ConceptClaimRepo,
   type ConceptClaimStatus,
+  type ConceptComment,
+  type ConceptCommentRepo,
   type ConceptMedia,
   type ConceptProposal,
   type ConceptProposalRepo,
   type ConceptProposalStatus,
   type ConceptRepo,
+  type ConceptShare,
   type ConceptStage,
+  type ConceptStatus,
   type ConceptStatusLogEntry,
   type ConceptStatusLogRepo,
+  type ConceptStatusRepo,
   type ConceptUpvote,
   type ConceptWithMedia,
   type ConnectId,
@@ -118,12 +129,15 @@ export class SupabaseWearStore implements WearStore {
   public readonly blocks: BlockRepo;
   public readonly reports: ReportRepo;
   public readonly concepts: ConceptRepo;
+  public readonly conceptComments: ConceptCommentRepo;
+  public readonly conceptStatuses: ConceptStatusRepo;
   public readonly conceptProposals: ConceptProposalRepo;
   public readonly conceptClaims: ConceptClaimRepo;
   public readonly conceptStatusLog: ConceptStatusLogRepo;
   public readonly royalties: RoyaltyRepo;
   public readonly conversions: CatalogueConversionRepo;
   public readonly brandVerifications: BrandVerificationRepo;
+  public readonly brandApplications: BrandApplicationRepo;
   public readonly roles: RoleRepo;
   public readonly notifications: NotificationRepo;
 
@@ -150,12 +164,15 @@ export class SupabaseWearStore implements WearStore {
     this.blocks = this._blocks();
     this.reports = this._reports();
     this.concepts = this._concepts();
+    this.conceptComments = this._conceptComments();
+    this.conceptStatuses = this._conceptStatuses();
     this.conceptProposals = this._conceptProposals();
     this.conceptClaims = this._conceptClaims();
     this.conceptStatusLog = this._conceptStatusLog();
     this.royalties = this._royalties();
     this.conversions = this._conversions();
     this.brandVerifications = this._brandVerifications();
+    this.brandApplications = this._brandApplications();
     this.roles = this._roles();
     this.notifications = this._notifications();
   }
@@ -280,6 +297,9 @@ export class SupabaseWearStore implements WearStore {
             logo_url: input.logoUrl ?? null,
             owner_user_id: input.ownerId,
             connect_contributor_id: input.connectContributorId ?? null,
+            // Mig 162 admin mint: sent ONLY when requested — the mig-157
+            // protect_verified_column guard admits admins and 42501s others.
+            ...(input.verified ? { verified: true } : {}),
           })
           .select(BRAND_COLS)
           .single();
@@ -1547,6 +1567,13 @@ export class SupabaseWearStore implements WearStore {
         );
         return { concept: mapConcept(row), media: media.map(mapConceptMedia) };
       },
+      countByCreator: async (creatorId) =>
+        this._count(
+          this.db
+            .from('concepts')
+            .select('id', { count: 'exact', head: true })
+            .eq('creator_id', creatorId),
+        ),
       list: async (filter) => {
         let builder = this.db
           .from('concepts')
@@ -1668,6 +1695,142 @@ export class SupabaseWearStore implements WearStore {
         );
         return !!row;
       },
+      share: async (conceptId, userId, channel) => {
+        const { data, error } = await this.db
+          .from('concept_shares')
+          .insert({ concept_id: conceptId, user_id: userId, channel: channel ?? 'link' })
+          .select(SHARE_COLS);
+        if (!error && data?.length) return mapShare(data[0] as ShareRow);
+        if (error && error.code === '23505') {
+          // Distinct-sharer PK: the first share stands.
+          const existing = await this._single(
+            this.db
+              .from('concept_shares')
+              .select(SHARE_COLS)
+              .eq('concept_id', conceptId)
+              .eq('user_id', userId),
+          );
+          return mapShare(existing);
+        }
+        if (error && error.code === '23503') {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        throw wrap(error!);
+      },
+      shareCount: async (conceptId) =>
+        this._count(
+          this.db
+            .from('concept_shares')
+            .select('concept_id', { count: 'exact', head: true })
+            .eq('concept_id', conceptId),
+        ),
+      hasShared: async (conceptId, userId) => {
+        const row = await this._maybeSingle(
+          this.db
+            .from('concept_shares')
+            .select('concept_id')
+            .eq('concept_id', conceptId)
+            .eq('user_id', userId),
+        );
+        return !!row;
+      },
+    };
+  }
+
+  // Mig 161 — community engagement on Concepts. Notifications and status
+  // promotion are DB-trigger-side here (SECDEF, mig 161); only the memory
+  // store mirrors them inline.
+  private _conceptComments(): ConceptCommentRepo {
+    return {
+      create: async (input) => {
+        const body = input.body.trim();
+        if (!body) {
+          throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
+        }
+        if (input.parentCommentId) {
+          const parent = await this._maybeSingle(
+            this.db
+              .from('concept_comments')
+              .select('id,concept_id')
+              .eq('id', input.parentCommentId),
+          );
+          if (!parent || parent.concept_id !== input.conceptId) {
+            throw new WearStoreError('comment_not_found', 'Parent comment not found.');
+          }
+        }
+        const { data, error } = await this.db
+          .from('concept_comments')
+          .insert({
+            concept_id: input.conceptId,
+            author_id: input.authorId,
+            body,
+            parent_comment_id: input.parentCommentId ?? null,
+          })
+          .select(CONCEPT_COMMENT_COLS);
+        if (!error && data?.length) return mapConceptComment(data[0] as ConceptCommentRow);
+        if (error && error.code === '23503') {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${input.conceptId}.`);
+        }
+        throw wrap(error!);
+      },
+      listForConcept: async (conceptId) => {
+        const rows = await this._many(
+          this.db
+            .from('concept_comments')
+            .select(CONCEPT_COMMENT_COLS)
+            .eq('concept_id', conceptId)
+            .order('created_at', { ascending: true }),
+        );
+        return rows.map(mapConceptComment);
+      },
+      countForConcept: async (conceptId) =>
+        this._count(
+          this.db
+            .from('concept_comments')
+            .select('id', { count: 'exact', head: true })
+            .eq('concept_id', conceptId),
+        ),
+    };
+  }
+
+  private _conceptStatuses(): ConceptStatusRepo {
+    return {
+      listActive: async (viewerId) => {
+        const rows = await this._many(
+          this.db
+            .from('concept_statuses')
+            .select(CONCEPT_STATUS_COLS)
+            .gt('expires_at', this.now().toISOString())
+            .order('created_at', { ascending: false }),
+        );
+        const statuses = rows.map(mapConceptStatus);
+        if (!statuses.length || !viewerId) {
+          return statuses.map((status) => ({ status, viewerSeen: false }));
+        }
+        // RLS scopes concept_status_views to the viewer's own rows.
+        const seenRows = await this._many(
+          this.db
+            .from('concept_status_views')
+            .select('status_id')
+            .eq('viewer_id', viewerId)
+            .in(
+              'status_id',
+              statuses.map((s) => s.id),
+            ),
+        );
+        const seen = new Set(seenRows.map((r) => r.status_id));
+        return statuses.map((status) => ({ status, viewerSeen: seen.has(status.id) }));
+      },
+      recordView: async (statusId, viewerId) => {
+        const { error } = await this.db
+          .from('concept_status_views')
+          .insert({ status_id: statusId, viewer_id: viewerId });
+        if (!error || error.code === '23505') return; // already seen is fine
+        if (error.code === '23503') {
+          throw new WearStoreError('status_not_found', `Unknown concept status ${statusId}.`);
+        }
+        throw wrap(error);
+      },
     };
   }
 
@@ -1774,7 +1937,10 @@ export class SupabaseWearStore implements WearStore {
         );
         // RLS WITH CHECK re-verifies brand verification + concept openness.
         if (!row) {
-          throw new WearStoreError('concept_not_open', 'Concept or verification is no longer open.');
+          throw new WearStoreError(
+            'concept_not_open',
+            'Concept or verification is no longer open.',
+          );
         }
         return mapProposal(row);
       },
@@ -2004,7 +2170,10 @@ export class SupabaseWearStore implements WearStore {
         );
         if (existing) {
           if (existing.status !== 'rejected') {
-            throw new WearStoreError('verification_exists', 'A verification request already exists.');
+            throw new WearStoreError(
+              'verification_exists',
+              'A verification request already exists.',
+            );
           }
           // Owner re-request after 'rejected' (the RLS owner_rerequest policy).
           const row = await this._maybeSingle(
@@ -2029,7 +2198,10 @@ export class SupabaseWearStore implements WearStore {
           .single();
         if (error) {
           if (error.code === '23505') {
-            throw new WearStoreError('verification_exists', 'A verification request already exists.');
+            throw new WearStoreError(
+              'verification_exists',
+              'A verification request already exists.',
+            );
           }
           throw wrap(error);
         }
@@ -2074,6 +2246,148 @@ export class SupabaseWearStore implements WearStore {
         }
         return mapVerification(row);
       },
+    };
+  }
+
+  // ── Become-a-Brand applications (mig 162) ─────────────────────────────────
+  private _brandApplications(): BrandApplicationRepo {
+    return {
+      eligibility: async (userId) => this._brandEligibility(userId),
+      submit: async (callerId, input) => {
+        // Pre-check for the clean error code; the RLS WITH CHECK (which calls
+        // the same SECDEF fn) + the partial unique index remain the wall.
+        const gate = await this._brandEligibility(callerId);
+        if (!gate.eligible) {
+          throw new WearStoreError(
+            'not_eligible',
+            'The Become-a-Brand gate is not met yet — keep creating.',
+          );
+        }
+        const socials: Record<string, string> = {};
+        for (const [key, value] of Object.entries(input.socials ?? {})) {
+          if (typeof value === 'string' && value.trim()) socials[key] = value.trim();
+        }
+        const { data, error } = await this.db
+          .from('brand_applications')
+          .insert({
+            applicant_id: callerId,
+            brand_name: input.brandName.trim(),
+            bio: (input.bio ?? '').trim() || null,
+            socials,
+            support_email: input.supportEmail.trim(),
+            contact_number: input.contactNumber.trim(),
+            delivery_options: input.deliveryOptions.trim(),
+            agree_terms: input.agreeTerms,
+            agree_conduct: input.agreeConduct,
+            agree_fees: input.agreeFees,
+          })
+          .select(BRAND_APPLICATION_COLS)
+          .single();
+        if (error) {
+          // 23505 = the one-pending partial unique; 42501 = the RLS backstop
+          // (eligibility flipped between the pre-check and the insert);
+          // 23514 = a table CHECK — map the constraint to the memory-spec code.
+          if (error.code === '23505') {
+            throw new WearStoreError(
+              'application_pending',
+              'You already have an application under review.',
+            );
+          }
+          if (error.code === '42501') {
+            throw new WearStoreError(
+              'not_eligible',
+              'The Become-a-Brand gate is not met yet — keep creating.',
+            );
+          }
+          if (error.code === '23514') throw mapApplicationCheckError(error);
+          throw wrap(error);
+        }
+        return mapBrandApplication(data as BrandApplicationRow);
+      },
+      getOwnLatest: async (callerId) => {
+        const row = await this._maybeSingle(
+          this.db
+            .from('brand_applications')
+            .select(BRAND_APPLICATION_COLS)
+            .eq('applicant_id', callerId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(1),
+        );
+        return row ? mapBrandApplication(row) : null;
+      },
+      getById: async (id) => {
+        // RLS: applicant + moderators only — everyone else sees no row.
+        const row = await this._maybeSingle(
+          this.db.from('brand_applications').select(BRAND_APPLICATION_COLS).eq('id', id),
+        );
+        return row ? mapBrandApplication(row) : null;
+      },
+      listPending: async () => {
+        // RLS scopes rows: moderators see the whole queue, an applicant only
+        // their own pending row (MemoryWearStore throws `forbidden` instead to
+        // make misuse loud in tests — the reports.listForModeration precedent).
+        const rows = await this._many(
+          this.db
+            .from('brand_applications')
+            .select(BRAND_APPLICATION_COLS)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: true }),
+        );
+        return rows.map(mapBrandApplication);
+      },
+      review: async (id, callerId, decision, opts) => {
+        if ((await this._getOwnRole(callerId)) !== 'admin') {
+          throw new WearStoreError('forbidden', 'Only an admin can decide applications.');
+        }
+        // The `.eq('status','pending')` mirrors the RLS USING clause: decided
+        // rows are immutable for everyone. The decision trigger notifies.
+        const row = await this._maybeSingle(
+          this.db
+            .from('brand_applications')
+            .update({
+              status: decision,
+              reviewed_by: callerId,
+              reviewed_at: this.now().toISOString(),
+              review_note: (opts?.reviewNote ?? '').trim().slice(0, 2000) || null,
+              minted_brand_id: decision === 'approved' ? (opts?.mintedBrandId ?? null) : null,
+            })
+            .eq('id', id)
+            .eq('status', 'pending')
+            .select(BRAND_APPLICATION_COLS),
+        );
+        if (!row) {
+          const existing = await this._maybeSingle(
+            this.db.from('brand_applications').select('id,status').eq('id', id),
+          );
+          throw existing
+            ? new WearStoreError('application_not_open', 'This application was already decided.')
+            : new WearStoreError('application_not_found', `Unknown application ${id}.`);
+        }
+        return mapBrandApplication(row);
+      },
+    };
+  }
+
+  /** `wear.brand_eligibility()` (mig 162, SECDEF): self-or-moderator guarded. */
+  private async _brandEligibility(userId: ConnectId): Promise<BrandEligibility> {
+    const data = await this._rpcRow('brand_eligibility', { p_user: userId });
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | {
+          concepts_posted: number;
+          concepts_claimed: number;
+          actioned_reports: number;
+          eligible: boolean;
+        }
+      | undefined;
+    if (!row) throw new WearStoreError('rpc_error', 'brand_eligibility returned no row.');
+    return {
+      eligible: row.eligible,
+      conceptsPosted: row.concepts_posted,
+      conceptsClaimed: row.concepts_claimed,
+      actionedReports: row.actioned_reports,
+      conceptsPostedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_POSTED,
+      conceptsClaimedRequired: BRAND_ELIGIBILITY_MIN_CONCEPTS_CLAIMED,
     };
   }
 
@@ -2163,9 +2477,7 @@ export class SupabaseWearStore implements WearStore {
     return row;
   }
 
-  private async _attachConceptMedia(
-    concepts: readonly Concept[],
-  ): Promise<ConceptWithMedia[]> {
+  private async _attachConceptMedia(concepts: readonly Concept[]): Promise<ConceptWithMedia[]> {
     if (!concepts.length) return [];
     const media = await this._many(
       this.db
@@ -2341,6 +2653,10 @@ const NOTIFICATION_COLS =
 const CONCEPT_COLS = 'id,creator_id,title,description,status,created_at,updated_at';
 const CONCEPT_MEDIA_COLS = 'id,concept_id,url,kind,alt_text,order_index';
 const UPVOTE_COLS = 'concept_id,user_id,created_at';
+// Mig 161 — community engagement on Concepts
+const CONCEPT_COMMENT_COLS = 'id,concept_id,author_id,parent_comment_id,body,created_at';
+const SHARE_COLS = 'concept_id,user_id,channel,created_at';
+const CONCEPT_STATUS_COLS = 'id,concept_id,creator_id,reason,created_at,expires_at';
 const PROPOSAL_COLS =
   'id,concept_id,brand_id,status,mockup_urls,materials,est_unit_price,moq,est_turnaround_days,note,created_at,updated_at';
 const CLAIM_COLS =
@@ -2352,6 +2668,9 @@ const CONVERSION_COLS =
   'id,claim_id,status,proposed_by,proposed_at,responded_by,responded_at,created_at,updated_at';
 const VERIFICATION_COLS =
   'brand_id,status,note,requested_by,requested_at,reviewed_by,reviewed_at,review_note,created_at,updated_at';
+// Mig 162 — Become-a-Brand applications
+const BRAND_APPLICATION_COLS =
+  'id,applicant_id,status,brand_name,bio,socials,support_email,contact_number,delivery_options,agree_terms,agree_conduct,agree_fees,reviewed_by,reviewed_at,review_note,minted_brand_id,created_at,updated_at';
 
 const FOR_YOU_CANDIDATES = 500;
 const TRENDING_CANDIDATES = 1000;
@@ -2536,6 +2855,28 @@ interface UpvoteRow {
   user_id: string;
   created_at: string;
 }
+interface ConceptCommentRow {
+  id: string;
+  concept_id: string;
+  author_id: string;
+  parent_comment_id: string | null;
+  body: string;
+  created_at: string;
+}
+interface ShareRow {
+  concept_id: string;
+  user_id: string;
+  channel: ConceptShare['channel'];
+  created_at: string;
+}
+interface ConceptStatusRow {
+  id: string;
+  concept_id: string;
+  creator_id: string;
+  reason: ConceptStatus['reason'];
+  created_at: string;
+  expires_at: string;
+}
 interface ProposalRow {
   id: string;
   concept_id: string;
@@ -2611,6 +2952,26 @@ interface VerificationRow {
   created_at: string;
   updated_at: string;
 }
+interface BrandApplicationRow {
+  id: string;
+  applicant_id: string;
+  status: BrandApplicationStatus;
+  brand_name: string;
+  bio: string | null;
+  socials: Record<string, string> | null;
+  support_email: string;
+  contact_number: string;
+  delivery_options: string;
+  agree_terms: boolean;
+  agree_conduct: boolean;
+  agree_fees: boolean;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  minted_brand_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const mapUser = (r: UserRow): WearUser => ({
   id: r.id,
@@ -2630,6 +2991,26 @@ const mapBrand = (r: BrandRow): WearBrand => ({
   verified: r.verified,
   ownerUserId: r.owner_user_id,
   connectContributorId: r.connect_contributor_id,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+const mapBrandApplication = (r: BrandApplicationRow): BrandApplication => ({
+  id: r.id,
+  applicantId: r.applicant_id,
+  status: r.status,
+  brandName: r.brand_name,
+  bio: r.bio,
+  socials: r.socials ?? {},
+  supportEmail: r.support_email,
+  contactNumber: r.contact_number,
+  deliveryOptions: r.delivery_options,
+  agreeTerms: r.agree_terms,
+  agreeConduct: r.agree_conduct,
+  agreeFees: r.agree_fees,
+  reviewedBy: r.reviewed_by,
+  reviewedAt: r.reviewed_at,
+  reviewNote: r.review_note,
+  mintedBrandId: r.minted_brand_id,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -2803,6 +3184,28 @@ const mapUpvote = (r: UpvoteRow): ConceptUpvote => ({
   userId: r.user_id,
   createdAt: r.created_at,
 });
+const mapConceptComment = (r: ConceptCommentRow): ConceptComment => ({
+  id: r.id,
+  conceptId: r.concept_id,
+  authorId: r.author_id,
+  parentCommentId: r.parent_comment_id,
+  body: r.body,
+  createdAt: r.created_at,
+});
+const mapShare = (r: ShareRow): ConceptShare => ({
+  conceptId: r.concept_id,
+  userId: r.user_id,
+  channel: r.channel,
+  createdAt: r.created_at,
+});
+const mapConceptStatus = (r: ConceptStatusRow): ConceptStatus => ({
+  id: r.id,
+  conceptId: r.concept_id,
+  creatorId: r.creator_id,
+  reason: r.reason,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+});
 const mapProposal = (r: ProposalRow): ConceptProposal => ({
   id: r.id,
   conceptId: r.concept_id,
@@ -2906,6 +3309,37 @@ function escapeLike(input: string): string {
 
 function wrap(error: PostgrestError): WearStoreError {
   return new WearStoreError(error.code || 'db_error', error.message);
+}
+
+/**
+ * Map a mig-162 `brand_applications` CHECK violation (23514) onto the same
+ * `WearStoreError` codes `MemoryWearStore.submit` throws, keyed by the
+ * violated constraint's name in the Postgres error message.
+ */
+const APPLICATION_CHECK_CODES: readonly (readonly [string, string, string])[] = [
+  ['brand_name', 'invalid_brand_name', 'Brand name must be 2–80 characters.'],
+  ['support_email', 'invalid_support_email', 'A valid support email is required.'],
+  ['contact_number', 'invalid_contact_number', 'A contact number (7–32 characters) is required.'],
+  [
+    'delivery_options',
+    'invalid_delivery_options',
+    'Describe your delivery options (3–500 characters).',
+  ],
+  ['bio', 'invalid_bio', 'Bio must be at most 500 characters.'],
+  ['socials', 'invalid_socials', 'Social links are too long.'],
+  [
+    'agreements',
+    'agreements_required',
+    'The Ts&Cs, Code of Conduct, and platform-fee agreements are all required.',
+  ],
+];
+
+function mapApplicationCheckError(error: PostgrestError): WearStoreError {
+  const msg = error.message || '';
+  for (const [needle, code, human] of APPLICATION_CHECK_CODES) {
+    if (msg.includes(needle)) return new WearStoreError(code, human);
+  }
+  return new WearStoreError('invalid_application', msg || 'The application is invalid.');
 }
 
 /**

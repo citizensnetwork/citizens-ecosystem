@@ -13,8 +13,7 @@ vi.mock('@/lib/session', () => ({ getSession: () => mockSession() }));
 
 import { POST as signPOST } from './route';
 
-const req = (init?: RequestInit): Request =>
-  new Request('http://localhost/api/media/sign', init);
+const req = (init?: RequestInit): Request => new Request('http://localhost/api/media/sign', init);
 const route = () => ({ params: Promise.resolve({}) });
 const body = (b: unknown): RequestInit => ({
   method: 'POST',
@@ -56,20 +55,14 @@ describe('POST /api/media/sign', () => {
 
   it('400s an svg (stored-XSS vector)', async () => {
     asUser('usr_001');
-    const res = await signPOST(
-      req(body({ ...valid, contentType: 'image/svg+xml' })),
-      route(),
-    );
+    const res = await signPOST(req(body({ ...valid, contentType: 'image/svg+xml' })), route());
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('invalid_media');
   });
 
   it('400s an oversize image', async () => {
     asUser('usr_001');
-    const res = await signPOST(
-      req(body({ ...valid, size: 16 * 1024 * 1024 })),
-      route(),
-    );
+    const res = await signPOST(req(body({ ...valid, size: 16 * 1024 * 1024 })), route());
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('invalid_media');
   });

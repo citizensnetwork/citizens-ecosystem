@@ -56,12 +56,10 @@
       e.code = 'no_storage_client';
       throw e;
     }
-    const up = await sb.storage
-      .from(meta.bucket)
-      .uploadToSignedUrl(meta.path, meta.token, file, {
-        contentType: file.type || undefined,
-        upsert: true,
-      });
+    const up = await sb.storage.from(meta.bucket).uploadToSignedUrl(meta.path, meta.token, file, {
+      contentType: file.type || undefined,
+      upsert: true,
+    });
     if (up.error) {
       const e = new Error('Upload failed. Please try again.');
       e.code = 'upload_failed';

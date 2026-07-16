@@ -183,8 +183,66 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-15, project `xyiajtrvhlxaeplsiajj`, head = **mig 159**)
+## 9. Verification snapshot (updated 2026-07-16, project `xyiajtrvhlxaeplsiajj`, head = **mig 162**)
 
+> **2026-07-16: mig 162 (`wear` Become-a-Brand applications) APPLIED** (pre-apply tag
+> `wear-pre-mig162` @b0a84a9). **Advisor: 0 ERROR / 102 WARN / 3 INFO — the single new WARN
+> is the INTENTIONAL `wear.brand_eligibility` SECDEF EXECUTE grant to `authenticated` (the
+> mig-157 pattern, which added 9 such documented WARNs): the fn IS the eligibility read API
+> and the INSERT `WITH CHECK` requires the caller to hold EXECUTE; it self-guards to
+> self-or-moderator and reads nothing but counts. Every other finding is baseline-identical.**
+> Rolled-back prod smokes 6/6 PASS (ineligible INSERT 42501; eligibility(other) 42501;
+> eligibility(self) live counts; decided-row UPDATE 0 rows; column-grant brand_name rewrite
+> 42501; decision UPDATE + trigger notification w/ institutional null actor + brandSlug).
+> Adds
+> `wear.brand_applications` (immutable once submitted — no owner UPDATE/DELETE; **one open
+> application per user** via a partial unique index; re-apply after rejection = a NEW row;
+> decided rows immutable for everyone — the admin UPDATE policy's USING requires
+> `status='pending'`; **column-scoped UPDATE grant** = only the decision stamp is ever
+> writable), the **SECDEF `wear.brand_eligibility(p_user)`** derivation (self-or-moderator
+> guard; posted ≥20 / own-concepts-claimed ≥10 / zero ACTIONED user-reports — also called
+> inside the INSERT `WITH CHECK`, so eligibility is RLS-hard), **+2 `wear.notification_type`
+> values** (`brand_application_approved` / `_rejected`) and the decision-notify trigger
+> (institutional: actor null; payload carries the minted brand's slug for the inbox deep
+> link). **Approve = mint**: the admin route reuses the mig-160 `brands_admin_insert` path
+> with `verified=true` (the mig-157 column guard admits admins). Grill decisions ratified
+> 2026-07-16 (locked-once-submitted · immediate re-apply · 20/10/0 RLS-hard · admin direct
+> mint stays the below-threshold valve). wear tables 37→**38**, policies 83→**86**,
+> fns 32→**34**, enums 22→**23**. Design: roles MD §6.1 + RESUME §3X.
+> **Next migration # = 163.**
+>
+> **2026-07-16: mig 161 (`wear` concept engagement — the community Concepts surface) APPLIED**
+> (pre-apply tag `wear-pre-mig161` @de042fa). **Advisor: 0 ERROR / 101 WARN / 3 INFO — signature
+> byte-identical to the head-160 baseline (sha 658f66c4), 0 new findings.** Adds 4 tables
+> (`wear.concept_comments` — the wear.comments mirror incl. moderator takedown;
+> `wear.concept_shares` — distinct-sharer pk (concept,user), INSERT-only social proof;
+> `wear.concept_statuses` — the concept-stories bar, **no client write path at all** (rows enter
+> only via the SECDEF promotion trigger: Creator badge >10 concepts, else first-100
+> bootstrap-grace, self-terminating partial-index counter); `wear.concept_status_views` —
+> story_views mirror), 2 enums, **+3 `wear.notification_type` values** (`concept_comment` /
+> `concept_upvote` / `concept_share`) and 4 trigger fns (`promote_concept_status` + 3 notify
+> triggers — all `revoke … from public`, run-as-owner, so 0 new SECDEF-EXECUTE WARNs). Every new
+> FK is indexed. wear policies 75→**83**, tables 33→**37**, fns 28→**32**, enums 20→**22**.
+> Rolled-back prod smokes 10/10 PASS (spoofed comment-author denied; duplicate share 23505;
+> client status-INSERT denied; grace promotion fires; status-view privacy holds; comment/upvote/
+> share each notify the creator). Design ratified in
+> [`Citizens_Wear_Roles_and_Concepts_MD §6`](../../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
+> §6.1/§6.2 + RESUME §3W. **Next migration # = 162.**
+>
+> **2026-07-15: mig 160 (`wear` content-permission model) APPLIED** (pre-apply tag
+> `wear-pre-mig160`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — 0 new findings vs head-159.**
+> Tighten-only; no functions/tables/grants added. `wear.posts` insert now requires an owned
+> **verified** brand + mandatory `brand_id` (base-Citizen self-posts retired — the Home feed is
+> brand apparel by construction); `wear.brands` insert is **admin-only** (self-serve creation
+> removed at the RLS layer, not just the UI). Owner UPDATE/DELETE preserved; mig-157 verified-column
+> guard intact. Net **+2 policies** (the mig-143 `brands_owner_write` FOR-ALL policy split into
+> `brands_owner_update` + `brands_owner_delete` + `brands_admin_insert`). Rolled-back prod smokes all
+> PASS: verified-brand post OK; null-brand / unverified-brand / non-admin-brand-insert all `42501`;
+> admin brand-mint OK; owner tagline update OK; owner self-verify `42501` (guard). Ratified in
+> [`ECOSYSTEM_PROFILE_LEVELS §3.2`](./ECOSYSTEM_PROFILE_LEVELS.md) +
+> [`Citizens_Wear_Roles_and_Concepts_MD §6`](../../../docs/Citizens_Wear_Roles_and_Concepts_MD.md).
+> **Next migration # = 161.**
+>
 > **2026-07-15: migs 158 + 159 (`wear` media pipeline + notifications) APPLIED**
 > (pre-apply tag `connect-pre-mig158`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — byte-for-byte
 > the head-157 baseline, 0 new findings.** Neither adds a SECDEF EXECUTE grant: mig-158 is a
@@ -219,9 +277,14 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 Confirmed live:
 - **Schemas:** `public`, `vision`, **`wear`** present.
-- **`wear.*` (mig 143 + 144 + 145 + 146 + 157):** **32 base tables** (all RLS-enabled, **0 without
-  RLS**), **70 RLS policies**, **21 functions**, **19 enums**, **18 triggers** (live-counted
-  post-157). **Mig-157 Concepts marketplace tier:** 9 tables (`concepts`, `concept_media`,
+- **`wear.*` (migs 143–146 + 157 + 159 + 160):** **75 RLS policies** (live-counted post-160:
+  `wear.posts`=3, `wear.brands`=4 after the mig-160 split; **0 tables without RLS**). Table/function/
+  enum/trigger counts below are **post-157** (**32 base tables**, **21 functions**, **19 enums**,
+  **18 triggers**) — migs 158–160 add the `wear-media` bucket, the `wear.notifications` table + its
+  lifecycle triggers, and the brands-policy split; recount when convenient. **Mig-160
+  content-permission model:** `wear.posts` insert requires an owned **verified** brand (brand_id
+  mandatory); `wear.brands` insert is `wear.is_admin()`-only (self-serve retired), owner keeps
+  UPDATE/DELETE. **Mig-157 Concepts marketplace tier:** 9 tables (`concepts`, `concept_media`,
   `concept_upvotes`, `concept_proposals` — party-scoped details, `concept_claims` — one ACTIVE
   claim per concept via partial unique index, `concept_status_log` — append-only by construction
   (no write policy AND no write grant), `royalty_obligations`, `catalogue_conversions`,
