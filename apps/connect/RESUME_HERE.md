@@ -1355,26 +1355,78 @@ can add post-mint via brand edit).
 
 ---
 
+## 3Y. Merge §3V/§3W/§3X → main + prod fix + impersonation design ratified — SHIPPED ✅ (2026-07-16)
+
+Two goals in one session on `step5-monorepo-lift` → `main`. Offload log:
+`.claude/sessions/wear-merge-and-impersonation.md`.
+
+### Goal 1 — merged the progression epic to `main` (PR #29, MERGED)
+
+- **PR [#29](https://github.com/citizensnetwork/citizens-ecosystem/pull/29) MERGED** (merge commit
+  `c478255`): §3V mig 160 (identity/content-permission) + §3W mig 161 (Concepts engagement) +
+  §3X mig 162 (Become-a-Brand). All four workspace gates re-run green (lint 12/12 · typecheck
+  12/12 · test 11/11 — db 99 · wear 106 · Connect 637 · build 8/8). Migrations were already
+  applied to the shared project in their own sessions; this was the code merge only.
+- **Caught + fixed a CI-only gate**: the CI "Verify" job also runs **`pnpm format:check`**
+  (prettier) — NOT part of the local turbo gates. 24 files had committed prettier drift →
+  `pnpm format` (commit `a16eac3`). ⚠ **Future sessions: run `pnpm format:check` locally before
+  pushing** or CI reds the PR.
+- **Found + fixed a PRODUCTION bundle bug** (PR
+  [#30](https://github.com/citizensnetwork/citizens-ecosystem/pull/30), MERGED, commit `840636`):
+  `apps/wear/scripts/build-frontend.js` `appFileOrder` OMITTED `brandapply.jsx`, so the
+  Become-a-Brand **form screen** (§3X) worked in dev (runtime-Babel) but was **broken in the
+  production bundle** (`shell.jsx case 'brandApply' → S.BrandApply` undefined). Added it → build
+  now compiles 18 screens (was 17). Slipped all gates because nothing cross-checks index.html's
+  script list vs appFileOrder — **a build/test guard for that is a worthwhile fast-follow.**
+- **Prod verified:** `https://citizens-ecosystem-wear.vercel.app` now serves `bundle.7656bcd515.js`
+  (byte-identical to the fixed local build) containing `CWScreens.BrandApply` + `brand-applications`
+  + `Become a Brand` + `conceptsClaimed` + `Applications` + `shareLink`. The Become-a-Brand form
+  works in prod. (Deploy-hash `*-projects.vercel.app` URLs are behind Vercel auth protection →
+  curl gets an SSO shell; the **stable alias is the unprotected, up-to-date public URL**. Wear
+  DOES auto-deploy to prod on push to main.)
+- **⚠ CI infra debt flagged (NOT silently changed):** the CI "Verify" job's final step
+  `pnpm audit --audit-level moderate` now fails on **every** run repo-wide — npm retired the legacy
+  audit endpoint (HTTP 410); reproduces locally on pnpm 9.12.0. Main is UNPROTECTED (no required
+  checks) so it does not block merges, but CI is perpetually red on that step. Fixing it is a
+  security-gate policy call (blocking→advisory) or a pnpm bump → left for founder ratification.
+
+### Goal 2 — admin sign-in-as (impersonation) DESIGN RATIFIED (build not started)
+
+Design-first, security-sensitive. Grilled against the auth/RLS plumbing, ratified via
+AskUserQuestion, and **recorded normatively in the roles MD §7**
+(`docs/Citizens_Wear_Roles_and_Concepts_MD.md`). Ratified 2026-07-16: **(1)** phased mechanism —
+**read-only act-as (Phase 1) built next**, write-as-user (Phase 2) designed later in its own
+session; **(2)** target = **ANY user of any tier** (Citizen…Admin) — admin-impersonating-admin is
+the sensitive Phase-2 edge; **(3)** DMs **readable with a per-access logged reason**; **(4)** the
+impersonated user is **notified after the session** (trigger-produced, +1 notification_type);
+**(5)** **admin-only** (`is_admin()`, not moderators). Audit core = **mig 163**
+`wear.impersonation_sessions` + `impersonation_actions` (append-only, service_role/SECDEF-written)
++ persistent banner + 30-min time-box + adminq/profile entry. **No code written — clean stop at
+docs** (per the design-first mandate). Full Phase-1 build checklist + open questions in roles MD §7.5–7.6.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
-> Concepts surface (§3W, mig 161) AND the Become-a-Brand application (§3X, mig 162 —
-> eligibility-gated Settings form + admin queue + approve-mints-verified-brand + decision
-> notifications) are COMPLETE.**
-> `step5-monorepo-lift` was merged to `main` at end of the §3R AND §3T sessions (PR #28,
-> 2026-07-15); §3V+§3W+§3X commits are on `step5-monorepo-lift` awaiting the next merge.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 163.**
+> Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162) AND the merge
+> of all three to `main` + prod fix (§3Y) are COMPLETE.**
+> `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
+> (the prod bundle fix). `main` HEAD = `840636…`. **⛔ Sessions must run in the MONOREPO only**
+> (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent #28/#29/#30).**
+> **Next migration # = 163.** **Advisor baseline @ head-162 = 0 ERROR / 102 WARN / 3 INFO** (the
+> 102nd WARN is the intentional `brand_eligibility` SECDEF grant — compare against THIS, not 101).
 >
-> **▶ RECOMMENDED next session — pick one:** (a) **merge `step5-monorepo-lift` → `main`**
-> (three shipped increments are stacked on the branch — §3V/§3W/§3X, all gates green — a
-> clean PR merge de-risks the branch and redeploys Wear with the new UI); or (b) the **Wear
-> founder walk-through**: decide the live "Mustard Seed Supply" demo application from the
-> Admin queue → Applications tab (approving exercises the full mint in prod), then verify the
-> Settings "Become a Brand" panel as a citizen; or (c) start the **admin sign-in-as
-> (impersonation) design session** (§3V-6 — the epic's last deferred piece, security-sensitive,
-> own session). The founder also owes the platform its **Ts&Cs / Code of Conduct / fee-schedule
-> documents** — the application form's checkboxes reference them nominally (§3X remaining).
+> **▶ RECOMMENDED next session — pick one:** (a) **Build impersonation Phase 1** — the ratified
+> design is in **roles MD §7** (read-only admin sign-in-as; mig 163 audit tables; admin-only;
+> DM-with-reason; notify-after; banner + 30-min time-box). Design-first work is DONE, so this is a
+> clean build session; or (b) the **Wear founder walk-through**: decide the live "Mustard Seed
+> Supply" demo application from Admin → Applications (approving mints a real verified brand in
+> prod), then verify the Settings "Become a Brand" form as a citizen (now fixed & live); or
+> (c) **fix the CI `pnpm audit` gate** (§3Y — npm 410, repo-wide red; a background task chip was
+> spawned for it). The founder also still owes the platform its **Ts&Cs / Code of Conduct /
+> fee-schedule documents** — the application form's checkboxes reference them nominally.
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**

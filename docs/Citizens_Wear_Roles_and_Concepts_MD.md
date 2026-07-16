@@ -1,7 +1,7 @@
 # Citizens Wear — Roles, Concepts Marketplace & Royalty Model
 
 **Status:** Confirmed direction — ready to inform build planning
-**Last updated:** July 13, 2026
+**Last updated:** July 16, 2026
 
 ---
 
@@ -192,4 +192,105 @@ zero actioned reports, enforced UI + API + RLS `WITH CHECK`), the Settings panel
 form, the admin queue tab, and approve-mints-verified-brand via the existing
 `POST /api/brands` `ownerId` + `brands_admin_insert` path (+ decision notifications).
 Still deferred: **share-to-DM** (the `dm` channel value is reserved); **admin sign-in-as**
-(impersonation — a security-sensitive surface, own design).
+(impersonation — **DESIGN RATIFIED 2026-07-16, see §7 below; build not yet started**).
+
+---
+
+## 7. Admin sign-in-as (impersonation) — **DESIGN RATIFIED 2026-07-16 (build not started)**
+
+Design session (founder ↔ Claude, AskUserQuestion) that turned §6.1's admin "sign-in-as"
+capability into a concrete, security-first plan. **This section is normative; no code exists
+yet.** It was ratified design-first precisely because impersonation is the most sensitive
+capability on the platform and must not be half-built at the end of a long context. The **next
+session builds Phase 1** from this spec (likely **migration 163**).
+
+### 7.1 The mechanism constraint (why the obvious approach is wrong)
+
+Wear's static frontend holds the Supabase session in `localStorage` and sends
+`Authorization: Bearer <access_token>`; `getRouteContext` (`apps/wear/src/lib/api/route-context.ts`)
+binds a `wear`-scoped `supabase-js` client to that token, so **RLS keys off the JWT `sub` =
+`auth.uid()`** — RLS is the only isolation wall (SHARED_DB_CONTRACT R3).
+
+- A naive `X-Impersonate: <userId>` header **cannot work safely or usefully**: it does not change
+  `auth.uid()`, so RLS still sees the admin and rejects any write-as-user via `WITH CHECK`. It
+  "bypasses nothing" but also cannot truly act as the target.
+- Therefore only two real mechanisms exist, and we adopt them in **phases**:
+  - **Phase 1 — read-only act-as (BUILD NEXT).** The admin keeps their own identity/token. The
+    backend serves the target's exact view through **`is_admin()`-gated privileged reads**
+    (SECURITY DEFINER reader functions and/or a tightly-scoped `service_role` read path), every
+    one audited. **No write-as-user is possible.** For these specific reads, the wall is
+    `is_admin()` + audit (R3.2/R3.3 sanction `service_role`/SECDEF for privileged reads); RLS
+    still governs everything the admin does as themselves.
+  - **Phase 2 — full become-the-user / write-as-user (DESIGN LATER, own ratified session).**
+    A `service_role` backend mints a **genuine short-lived token** with `sub = target` so the app
+    literally becomes the target and **RLS genuinely applies** to read AND write. This is full
+    account takeover and needs its own guardrail + audit design before any build.
+
+### 7.2 Ratified decisions (2026-07-16)
+
+1. **Phased mechanism (Q1).** Build **read-only act-as (Phase 1) now**; **design & prepare for
+   write-as-user (Phase 2) in a future session** — do not build write-mode yet.
+2. **Target = ANY user, any tier (Q1 note).** Sign-in-as targets **any `wear.users` row** —
+   Citizen, Creator, Brand, or **Admin** — it is an admin's ability to view **any** account, not
+   just a ground-level Citizen. ⚠ **Admin-impersonating-admin** is the most sensitive case;
+   harmless in read-only Phase 1, but Phase 2 (write) MUST prevent it from becoming a
+   privilege-escalation / lateral-movement vector (e.g. an admin acting-as another admin to grant
+   roles). Flag for the Phase 2 design.
+3. **DMs readable WITH a logged reason (Q2).** During a read-only session the admin may read the
+   target's private DMs, but **each DM access writes an extra audit reason** (surfaced as a
+   required prompt). Everything else (profile, feed, their content, a settings _view_) is visible
+   without the extra step.
+4. **Notify the user AFTER the session (Q3).** The impersonated user receives an in-app
+   notification: _"An administrator accessed your account for support on <date>."_ — models
+   Kingdom transparency/honour. Emitted **trigger-produced only** (mig-159 invariant) on session
+   close; adds **+1 `notification_type`** (`account_accessed_by_admin` or similar). Inbox renders it.
+5. **Admin only (Q4).** Gated on **`wear.is_admin()`** — NOT `is_moderator()`. Moderators do not
+   get impersonation in any phase unless separately ratified.
+
+### 7.3 Audit model (migration 163 — the core of doing this safely)
+
+- **`wear.impersonation_sessions`** (append-only, immutable): `id`, `admin_id` → `wear.users`,
+  `target_user_id` → `wear.users`, `reason` (required at start), `started_at`, `ended_at`
+  (null while active), `expires_at` (the time-box), created/updated. RLS: SELECT for
+  `is_admin()`; INSERT/UPDATE via a controlled path only (no client free-write). A partial unique
+  index enforces **at most one active session per admin** (and arguably per target).
+- **`wear.impersonation_actions`** (child log): every privileged read performed while
+  impersonating — `session_id`, `at`, `action` (e.g. `view_feed`, `view_profile`,
+  `view_dm_thread`), `detail` jsonb, and the **DM-access `reason`** (decision 3). Append-only.
+- Both are **`service_role`/SECDEF-written**, hardened per R3.3 (empty/`pg_catalog` search_path,
+  `EXECUTE` revoked from public). The notify (decision 4) is an AFTER-UPDATE trigger on
+  `impersonation_sessions` when `ended_at` flips non-null.
+
+### 7.4 Entry / exit UX (non-negotiable safety rails)
+
+- **Entry** from the admin surface: a user's profile / the admin queue (the store already exposes
+  `openUser`) → "View as user" → a **required reason** prompt → session opens.
+- **Persistent, unmissable banner** for the entire session ("Viewing as @handle — Exit"),
+  visually distinct, always on top.
+- **Time-box:** sessions **auto-expire** (proposed **30 min**); expiry ends the session and fires
+  the notify. Explicit "Exit" also ends it.
+- **Never exposed:** password / security credentials (not readable anyway) and any account-settings
+  **mutation** (settings are view-only in Phase 1; Phase 2 must decide explicitly).
+
+### 7.5 Phase 1 build checklist (next session)
+
+1. **mig 163**: the two audit tables + enum(s) + `account_accessed_by_admin` notification value +
+   the SECDEF start/append/end functions + close-notify trigger; advisors 0 ERROR / 0 new vs the
+   head-162 baseline (**0 ERROR / 102 WARN / 3 INFO** — the 102nd WARN is the intentional
+   `brand_eligibility` grant; a Phase-1 SECDEF EXECUTE grant may add one more _intentional_ WARN,
+   document it like mig-162).
+2. **Store + API**: an admin-only `/api/admin/impersonation` surface (start w/ reason, read-as
+   endpoints, DM-access-with-reason, end) + `is_admin()` gate + audit writes; contract + memory
+   (semantic mirror of every rule + the notify trigger) + supabase stores.
+3. **Frontend**: reason prompt, persistent banner, "view-as" read screens sourced from the
+   audited read path, exit control, 30-min auto-expiry; inbox renders the new notification.
+4. Seed an idempotent demo (an admin sign-in-as of a seeded citizen) so the surface is walkable.
+
+### 7.6 Open questions for the Phase 1 build session
+
+- Read path: dedicated per-view SECDEF reader fns (most faithful to "RLS is the wall", more code)
+  vs a single tightly-gated `service_role` read path (fewer moving parts, must be airtight)?
+  Decide against R3 at build time.
+- One active session per admin, per target, or both? (Recommend per-admin at least.)
+- Exact notification copy + whether it links to the audit summary the user may request.
+- Phase 2 (write-as-user) guardrails, esp. the admin-impersonating-admin lockout — its own session.
