@@ -43,10 +43,12 @@ export const PATCH = handler(async (req, ctx, params) => {
         .filter((u): u is string => !!u)
         .slice(0, MAX_MOCKUPS);
     }
-    if ('materials' in body) patch.materials = bodyString(body, 'materials').slice(0, MAX_TEXT) || null;
+    if ('materials' in body)
+      patch.materials = bodyString(body, 'materials').slice(0, MAX_TEXT) || null;
     if ('estUnitPrice' in body) patch.estUnitPrice = bodyNumber(body, 'estUnitPrice');
     if ('moq' in body) patch.moq = bodyNumber(body, 'moq');
-    if ('estTurnaroundDays' in body) patch.estTurnaroundDays = bodyNumber(body, 'estTurnaroundDays');
+    if ('estTurnaroundDays' in body)
+      patch.estTurnaroundDays = bodyNumber(body, 'estTurnaroundDays');
     if ('note' in body) patch.note = bodyString(body, 'note').slice(0, MAX_TEXT) || null;
   }
   return json({ proposal: await ctx.store.conceptProposals.update(params.id!, userId, patch) });

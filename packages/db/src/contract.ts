@@ -808,7 +808,11 @@ export interface ConceptRepo {
   countByCreator(creatorId: ConnectId): Promise<number>;
   /** Public browse, newest first, optional stage/creator filter. */
   list(filter?: ConceptListFilter): Promise<Page<ConceptWithMedia>>;
-  update(conceptId: string, callerId: ConnectId, patch: UpdateConceptInput): Promise<ConceptWithMedia>;
+  update(
+    conceptId: string,
+    callerId: ConnectId,
+    patch: UpdateConceptInput,
+  ): Promise<ConceptWithMedia>;
   delete(conceptId: string, callerId: ConnectId): Promise<void>;
   upvote(conceptId: string, userId: ConnectId): Promise<ConceptUpvote>;
   removeUpvote(conceptId: string, userId: ConnectId): Promise<void>;
@@ -931,7 +935,11 @@ export interface ConceptProposalRepo {
   /** A brand's pipeline (owner or moderator view). */
   listForBrand(brandId: ConnectId, callerId: ConnectId): Promise<readonly ConceptProposal[]>;
   /** Edit while 'submitted' (brand must still be verified, concept open). */
-  update(proposalId: string, callerId: ConnectId, patch: UpdateProposalInput): Promise<ConceptProposal>;
+  update(
+    proposalId: string,
+    callerId: ConnectId,
+    patch: UpdateProposalInput,
+  ): Promise<ConceptProposal>;
   /** Withdraw while bidding (allowed even if verification lapsed mid-bid). */
   withdraw(proposalId: string, callerId: ConnectId): Promise<ConceptProposal>;
   /** Re-enter a withdrawn/declined proposal once the concept is open again. */
@@ -1011,7 +1019,11 @@ export interface CatalogueConversionRepo {
  * badge + marketplace gate).
  */
 export interface BrandVerificationRepo {
-  request(brandId: ConnectId, callerId: ConnectId, note?: string | null): Promise<BrandVerification>;
+  request(
+    brandId: ConnectId,
+    callerId: ConnectId,
+    note?: string | null,
+  ): Promise<BrandVerification>;
   /** Owner/moderator read — null for everyone else (RLS semantics). */
   getForBrand(brandId: ConnectId, callerId: ConnectId): Promise<BrandVerification | null>;
   /** Moderation queue: all pending requests (moderator); own rows otherwise. */

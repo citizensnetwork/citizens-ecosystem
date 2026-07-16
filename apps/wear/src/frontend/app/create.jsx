@@ -117,9 +117,7 @@
         h(
           'div',
           { style: { fontSize: 13.5, color: '#a09e97', fontWeight: 500, marginTop: 6 } },
-          canPost
-            ? 'What would you like to create?'
-            : 'Share a design Concept or a 24-hour Story.',
+          canPost ? 'What would you like to create?' : 'Share a design Concept or a 24-hour Story.',
         ),
       ),
       // type grid (design's create tiles)
@@ -144,7 +142,8 @@
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 10,
-                border: effectiveMode === t.k && !t.nav ? '1.5px solid ' + GOLD : '1px solid #efedea',
+                border:
+                  effectiveMode === t.k && !t.nav ? '1.5px solid ' + GOLD : '1px solid #efedea',
                 borderRadius: 18,
                 padding: '20px 8px',
                 background: effectiveMode === t.k && !t.nav ? '#fdf8ec' : '#fff',

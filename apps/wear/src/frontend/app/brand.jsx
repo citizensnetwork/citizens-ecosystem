@@ -79,7 +79,15 @@
       ),
       h(
         'div',
-        { style: { fontSize: 11.5, color: '#8a7a3a', fontWeight: 500, lineHeight: 1.5, marginTop: 3 } },
+        {
+          style: {
+            fontSize: 11.5,
+            color: '#8a7a3a',
+            fontWeight: 500,
+            lineHeight: 1.5,
+            marginTop: 3,
+          },
+        },
         v && v.status === 'pending'
           ? 'An admin will review your request. Only verified brands can propose on concepts.'
           : v && v.reviewNote

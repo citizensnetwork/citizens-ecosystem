@@ -358,13 +358,19 @@
             autoFocus: true,
           }),
           h(FormError, { message: error || authError }),
-          busy
-            ? h(Spinner, { size: 20 })
-            : h(GoldButton, { label: 'Verify & sign in' }),
+          busy ? h(Spinner, { size: 20 }) : h(GoldButton, { label: 'Verify & sign in' }),
         ),
         h(
           'div',
-          { style: { textAlign: 'center', marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 } },
+          {
+            style: {
+              textAlign: 'center',
+              marginTop: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            },
+          },
           h(LinkButton, {
             label: 'Send a new code',
             onClick: () => switchMode('code'),

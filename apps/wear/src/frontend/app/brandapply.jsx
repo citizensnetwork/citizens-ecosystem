@@ -159,7 +159,15 @@
             h('div', { style: { fontSize: 15.5, fontWeight: 800 } }, 'Application received'),
             h(
               'div',
-              { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.6, marginTop: 8 } },
+              {
+                style: {
+                  fontSize: 12.5,
+                  color: '#8f8d87',
+                  fontWeight: 500,
+                  lineHeight: 1.6,
+                  marginTop: 8,
+                },
+              },
               'The Citizens Wear team is reviewing “' +
                 form.brandName.trim() +
                 '”. You will get a notification with the decision — nothing else to do for now.',
@@ -190,7 +198,15 @@
           h('div', { style: { fontSize: 14, fontWeight: 800 } }, 'Your Brand'),
           h(
             'div',
-            { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55, marginTop: 6 } },
+            {
+              style: {
+                fontSize: 12.5,
+                color: '#8f8d87',
+                fontWeight: 500,
+                lineHeight: 1.55,
+                marginTop: 6,
+              },
+            },
             'Brands on Citizens Wear carry real trust: they propose on Concepts, produce for the community, and honour creators. Tell us who you are — once submitted, the application is locked until the team decides.',
           ),
           h('div', { style: label }, 'Brand name *'),
@@ -271,21 +287,41 @@
           'div',
           { style: card },
           h('div', { style: { fontSize: 14, fontWeight: 800, marginBottom: 4 } }, 'Agreements *'),
-          h(Agreement, { checked: form.agreeTerms, onToggle: toggle('agreeTerms') },
-            'I agree to the Citizens Wear Terms & Conditions, including the creator royalty commitments Brands make when claiming Concepts.'),
-          h(Agreement, { checked: form.agreeConduct, onToggle: toggle('agreeConduct') },
-            'I agree to uphold the Citizens Code of Conduct — honouring God, the community, and every creator in how this brand operates.'),
-          h(Agreement, { checked: form.agreeFees, onToggle: toggle('agreeFees') },
-            'I understand verified Brands contribute a monthly platform fee once trading, as communicated by the Citizens Wear team.'),
+          h(
+            Agreement,
+            { checked: form.agreeTerms, onToggle: toggle('agreeTerms') },
+            'I agree to the Citizens Wear Terms & Conditions, including the creator royalty commitments Brands make when claiming Concepts.',
+          ),
+          h(
+            Agreement,
+            { checked: form.agreeConduct, onToggle: toggle('agreeConduct') },
+            'I agree to uphold the Citizens Code of Conduct — honouring God, the community, and every creator in how this brand operates.',
+          ),
+          h(
+            Agreement,
+            { checked: form.agreeFees, onToggle: toggle('agreeFees') },
+            'I understand verified Brands contribute a monthly platform fee once trading, as communicated by the Citizens Wear team.',
+          ),
           note
             ? h(
                 'div',
-                { style: { marginTop: 10, fontSize: 12.5, fontWeight: 600, color: note.ok ? '#3f6f34' : '#8f4a2b' } },
+                {
+                  style: {
+                    marginTop: 10,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: note.ok ? '#3f6f34' : '#8f4a2b',
+                  },
+                },
                 note.text,
               )
             : null,
           !ready
-            ? h('div', { style: { ...hint, marginTop: 12 } }, 'Still needed: ' + missing.join(', ') + '.')
+            ? h(
+                'div',
+                { style: { ...hint, marginTop: 12 } },
+                'Still needed: ' + missing.join(', ') + '.',
+              )
             : null,
           h(
             'div',

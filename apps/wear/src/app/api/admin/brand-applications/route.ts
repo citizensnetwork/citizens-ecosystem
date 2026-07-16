@@ -33,9 +33,7 @@ export const GET = handler(async (_req, ctx) => {
     role,
     applications: pending.map((a) => ({
       ...toBrandApplicationDto(a),
-      applicant: applicants.has(a.applicantId)
-        ? toUserDto(applicants.get(a.applicantId)!)
-        : null,
+      applicant: applicants.has(a.applicantId) ? toUserDto(applicants.get(a.applicantId)!) : null,
       eligibility: gates.get(a.applicantId) ?? null,
     })),
   });

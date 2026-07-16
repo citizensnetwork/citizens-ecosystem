@@ -61,9 +61,7 @@ export const POST = handler(async (req, ctx) => {
   const rand = Math.random().toString(36).slice(2, 8);
   const path = `${userId}/${scopeFolder(scope as UploadScope)}/${Date.now()}-${rand}.${ext}`;
 
-  const { data: signed, error } = await client.storage
-    .from(BUCKET)
-    .createSignedUploadUrl(path);
+  const { data: signed, error } = await client.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error || !signed) {
     console.error('[api/media/sign] createSignedUploadUrl error:', error);
     throw new ApiError(500, 'sign_failed', 'Could not start the upload. Please try again.');

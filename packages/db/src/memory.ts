@@ -1258,8 +1258,7 @@ export class MemoryWearStore implements WearStore {
         const items = [...this._notifications.values()]
           .filter((n) => n.recipientId === userId)
           .sort(
-            (a, b) =>
-              Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
           );
         return paginateList(items, params);
       },
@@ -1843,7 +1842,9 @@ export class MemoryWearStore implements WearStore {
       listForConcept: async (conceptId) =>
         [...this._conceptStatusLog.values()]
           .filter((e) => e.conceptId === conceptId)
-          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id)),
+          .sort(
+            (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id),
+          ),
       advance: async (conceptId, callerId, status, note) => {
         // Mirrors wear.advance_concept_status guard-for-guard, in order.
         const concept = this._concepts.get(conceptId);
@@ -1998,7 +1999,10 @@ export class MemoryWearStore implements WearStore {
           throw new WearStoreError('not_released', 'Conversion requires a released concept.');
         }
         for (const conv of this._conversions.values()) {
-          if (conv.claimId === claimId && (conv.status === 'proposed' || conv.status === 'accepted')) {
+          if (
+            conv.claimId === claimId &&
+            (conv.status === 'proposed' || conv.status === 'accepted')
+          ) {
             throw new WearStoreError('conversion_already_open', 'A handshake is already open.');
           }
         }
@@ -2353,7 +2357,8 @@ export class MemoryWearStore implements WearStore {
         const minted = next.mintedBrandId ? this._brands.get(next.mintedBrandId) : undefined;
         this._emitNotification({
           recipientId: next.applicantId,
-          type: decision === 'approved' ? 'brand_application_approved' : 'brand_application_rejected',
+          type:
+            decision === 'approved' ? 'brand_application_approved' : 'brand_application_rejected',
           actorId: null,
           brandId: next.mintedBrandId,
           data: {
@@ -2401,7 +2406,11 @@ export class MemoryWearStore implements WearStore {
     }
     let actionedReports = 0;
     for (const report of this._reports.values()) {
-      if (report.subjectKind === 'user' && report.subjectId === userId && report.status === 'actioned') {
+      if (
+        report.subjectKind === 'user' &&
+        report.subjectId === userId &&
+        report.status === 'actioned'
+      ) {
         actionedReports += 1;
       }
     }
@@ -2436,7 +2445,10 @@ export class MemoryWearStore implements WearStore {
     return !!concept && concept.creatorId === callerId;
   }
 
-  private _claimParties(claimId: string): { ownerId: ConnectId | null; creatorId: ConnectId | null } {
+  private _claimParties(claimId: string): {
+    ownerId: ConnectId | null;
+    creatorId: ConnectId | null;
+  } {
     const claim = this._conceptClaims.get(claimId);
     if (!claim) return { ownerId: null, creatorId: null };
     const brand = this._brands.get(claim.brandId);

@@ -53,7 +53,11 @@
         },
         met ? '✓' : '·',
       ),
-      h('span', { style: { fontSize: 12.5, fontWeight: 600, color: met ? '#3f6f34' : '#6a6862' } }, text),
+      h(
+        'span',
+        { style: { fontSize: 12.5, fontWeight: 600, color: met ? '#3f6f34' : '#6a6862' } },
+        text,
+      ),
     );
   }
 
@@ -85,37 +89,85 @@
 
     const body = (() => {
       if (state.loading) {
-        return h('div', { style: { fontSize: 12.5, color: '#b5b3ac', fontWeight: 600, marginTop: 10 } }, 'Checking your progress…');
+        return h(
+          'div',
+          { style: { fontSize: 12.5, color: '#b5b3ac', fontWeight: 600, marginTop: 10 } },
+          'Checking your progress…',
+        );
       }
       if (state.error || !state.data) {
-        return h('div', { style: { fontSize: 12.5, color: '#8f4a2b', fontWeight: 600, marginTop: 10 } }, state.error || 'Could not load your progress.');
+        return h(
+          'div',
+          { style: { fontSize: 12.5, color: '#8f4a2b', fontWeight: 600, marginTop: 10 } },
+          state.error || 'Could not load your progress.',
+        );
       }
       const { eligibility: e, application: a } = state.data;
       if (a && a.status === 'pending') {
         return h(
           'div',
           { style: { marginTop: 10 } },
-          h('div', { style: { fontSize: 13, fontWeight: 800, color: '#7a6212' } }, '“' + a.brandName + '” is under review'),
           h(
             'div',
-            { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55, marginTop: 5 } },
-            'Submitted ' + timeAgo(a.createdAt) + ' ago. The team will decide soon — the answer lands in your inbox.',
+            { style: { fontSize: 13, fontWeight: 800, color: '#7a6212' } },
+            '“' + a.brandName + '” is under review',
+          ),
+          h(
+            'div',
+            {
+              style: {
+                fontSize: 12.5,
+                color: '#8f8d87',
+                fontWeight: 500,
+                lineHeight: 1.55,
+                marginTop: 5,
+              },
+            },
+            'Submitted ' +
+              timeAgo(a.createdAt) +
+              ' ago. The team will decide soon — the answer lands in your inbox.',
           ),
         );
       }
       const gates = h(
         'div',
         { style: { marginTop: 8 } },
-        h(GateRow, { met: e.conceptsPosted >= e.conceptsPostedRequired, text: 'Concepts posted · ' + e.conceptsPosted + ' / ' + e.conceptsPostedRequired }),
-        h(GateRow, { met: e.conceptsClaimed >= e.conceptsClaimedRequired, text: 'Your Concepts claimed by Brands · ' + e.conceptsClaimed + ' / ' + e.conceptsClaimedRequired }),
-        h(GateRow, { met: e.actionedReports === 0, text: e.actionedReports === 0 ? 'Standing with the community · clear' : 'A sustained report currently holds this door closed' }),
+        h(GateRow, {
+          met: e.conceptsPosted >= e.conceptsPostedRequired,
+          text: 'Concepts posted · ' + e.conceptsPosted + ' / ' + e.conceptsPostedRequired,
+        }),
+        h(GateRow, {
+          met: e.conceptsClaimed >= e.conceptsClaimedRequired,
+          text:
+            'Your Concepts claimed by Brands · ' +
+            e.conceptsClaimed +
+            ' / ' +
+            e.conceptsClaimedRequired,
+        }),
+        h(GateRow, {
+          met: e.actionedReports === 0,
+          text:
+            e.actionedReports === 0
+              ? 'Standing with the community · clear'
+              : 'A sustained report currently holds this door closed',
+        }),
       );
       const rejectedNote =
         a && a.status === 'rejected'
           ? h(
               'div',
-              { style: { fontSize: 12.5, color: '#8f4a2b', fontWeight: 600, lineHeight: 1.55, marginTop: 10 } },
-              'Your previous application was not approved' + (a.reviewNote ? ': “' + a.reviewNote + '”' : '.') + (e.eligible ? ' You may apply again right away.' : ''),
+              {
+                style: {
+                  fontSize: 12.5,
+                  color: '#8f4a2b',
+                  fontWeight: 600,
+                  lineHeight: 1.55,
+                  marginTop: 10,
+                },
+              },
+              'Your previous application was not approved' +
+                (a.reviewNote ? ': “' + a.reviewNote + '”' : '.') +
+                (e.eligible ? ' You may apply again right away.' : ''),
             )
           : null;
       if (e.eligible) {
@@ -127,7 +179,10 @@
           h(
             'div',
             { style: { marginTop: 14 } },
-            h(GoldButton, { label: a && a.status === 'rejected' ? 'Apply again' : 'Apply now', onClick: openBrandApply }),
+            h(GoldButton, {
+              label: a && a.status === 'rejected' ? 'Apply again' : 'Apply now',
+              onClick: openBrandApply,
+            }),
           ),
         );
       }
@@ -138,7 +193,15 @@
         gates,
         h(
           'div',
-          { style: { fontSize: 12, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55, marginTop: 10 } },
+          {
+            style: {
+              fontSize: 12,
+              color: '#8f8d87',
+              fontWeight: 500,
+              lineHeight: 1.55,
+              marginTop: 10,
+            },
+          },
           'Brands are grown here, not bought: keep posting Concepts and serving the community — the door opens on track record.',
         ),
       );
@@ -150,7 +213,15 @@
       h('div', { style: { fontSize: 14, fontWeight: 800 } }, 'Become a Brand'),
       h(
         'div',
-        { style: { fontSize: 12.5, color: '#8f8d87', fontWeight: 500, lineHeight: 1.55, marginTop: 6 } },
+        {
+          style: {
+            fontSize: 12.5,
+            color: '#8f8d87',
+            fontWeight: 500,
+            lineHeight: 1.55,
+            marginTop: 6,
+          },
+        },
         'Verified Brands post to the Home feed, propose on Concepts, and produce for the Kingdom community.',
       ),
       body,

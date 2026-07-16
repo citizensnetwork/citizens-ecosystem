@@ -7,8 +7,19 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote, StoryViewer, shareLink, timeAgo, fmtCount } =
-    window.CWUI;
+  const {
+    GOLD,
+    INK,
+    Avatar,
+    BrandLogo,
+    Spinner,
+    EmptyState,
+    ErrorNote,
+    StoryViewer,
+    shareLink,
+    timeAgo,
+    fmtCount,
+  } = window.CWUI;
 
   /** Feed card, faithful to the design (header / media / actions / caption). */
   function PostCard({ post }) {

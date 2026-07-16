@@ -120,11 +120,15 @@ describe('NotificationRepo — royalty', () => {
 
     await store.royalties.submitProof(ob!.id, 'usr_b', 'https://proof.test/100th');
     const creator = await store.notifications.list('usr_c');
-    expect(creator.items.some((n) => n.type === 'royalty_proof' && n.actorId === 'usr_b')).toBe(true);
+    expect(creator.items.some((n) => n.type === 'royalty_proof' && n.actorId === 'usr_b')).toBe(
+      true,
+    );
 
     await store.royalties.close(ob!.id, 'usr_c');
     const owner = await store.notifications.list('usr_b');
-    expect(owner.items.some((n) => n.type === 'royalty_closed' && n.actorId === 'usr_c')).toBe(true);
+    expect(owner.items.some((n) => n.type === 'royalty_closed' && n.actorId === 'usr_c')).toBe(
+      true,
+    );
   });
 });
 

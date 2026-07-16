@@ -249,9 +249,7 @@ export async function hydrateFeed(
     : null;
 
   // Completed-Concepts attribution — rare in a page, resolved per post.
-  const concepts = await Promise.all(
-    page.items.map(({ post }) => conceptAttribution(store, post)),
-  );
+  const concepts = await Promise.all(page.items.map(({ post }) => conceptAttribution(store, post)));
 
   return {
     items: page.items.map((entry, i) => ({
@@ -360,7 +358,11 @@ export interface ConceptStatusDto {
     readonly id: string;
     readonly title: string;
     readonly status: string;
-    readonly media: { readonly url: string; readonly kind: string; readonly altText: string | null } | null;
+    readonly media: {
+      readonly url: string;
+      readonly kind: string;
+      readonly altText: string | null;
+    } | null;
   } | null;
 }
 

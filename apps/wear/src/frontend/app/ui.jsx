@@ -563,7 +563,8 @@
               flex: 1,
               height: 3,
               borderRadius: 2,
-              background: i < idx ? GOLD : i === idx ? 'rgba(242,186,27,0.55)' : 'rgba(255,255,255,0.22)',
+              background:
+                i < idx ? GOLD : i === idx ? 'rgba(242,186,27,0.55)' : 'rgba(255,255,255,0.22)',
             },
           }),
         ),
@@ -582,7 +583,11 @@
             (author && (author.displayName || author.handle)) || item.title || 'Story',
           ),
           item.subtitle
-            ? h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 600 } }, item.subtitle)
+            ? h(
+                'div',
+                { style: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 600 } },
+                item.subtitle,
+              )
             : null,
         ),
         h(
@@ -590,7 +595,15 @@
           {
             onClick: onClose,
             'aria-label': 'Close',
-            style: { border: 'none', background: 'none', color: '#fff', fontSize: 26, lineHeight: 1, padding: '2px 6px', fontWeight: 300 },
+            style: {
+              border: 'none',
+              background: 'none',
+              color: '#fff',
+              fontSize: 26,
+              lineHeight: 1,
+              padding: '2px 6px',
+              fontWeight: 300,
+            },
           },
           '×',
         ),
@@ -598,7 +611,16 @@
       // media / caption stage; halves navigate back/forward
       h(
         'div',
-        { style: { flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 } },
+        {
+          style: {
+            flex: 1,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 0,
+          },
+        },
         item.mediaUrl
           ? h('img', {
               src: item.mediaUrl,
@@ -607,7 +629,16 @@
             })
           : h(
               'div',
-              { style: { padding: '0 34px', textAlign: 'center', fontSize: 21, fontWeight: 700, lineHeight: 1.5, color: '#fff' } },
+              {
+                style: {
+                  padding: '0 34px',
+                  textAlign: 'center',
+                  fontSize: 21,
+                  fontWeight: 700,
+                  lineHeight: 1.5,
+                  color: '#fff',
+                },
+              },
               item.caption || item.title || '',
             ),
         h('button', {
@@ -626,10 +657,26 @@
         'div',
         { style: { padding: '14px 20px 30px' } },
         item.mediaUrl && item.caption
-          ? h('div', { style: { fontSize: 14, fontWeight: 600, color: '#fff', lineHeight: 1.5, marginBottom: item.cta ? 12 : 0 } }, item.caption)
+          ? h(
+              'div',
+              {
+                style: {
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#fff',
+                  lineHeight: 1.5,
+                  marginBottom: item.cta ? 12 : 0,
+                },
+              },
+              item.caption,
+            )
           : null,
         item.cta
-          ? h(GoldButton, { label: item.cta.label, onClick: item.cta.onClick, style: { padding: '12px', fontSize: 13.5 } })
+          ? h(GoldButton, {
+              label: item.cta.label,
+              onClick: item.cta.onClick,
+              style: { padding: '12px', fontSize: 13.5 },
+            })
           : null,
       ),
     );

@@ -1937,7 +1937,10 @@ export class SupabaseWearStore implements WearStore {
         );
         // RLS WITH CHECK re-verifies brand verification + concept openness.
         if (!row) {
-          throw new WearStoreError('concept_not_open', 'Concept or verification is no longer open.');
+          throw new WearStoreError(
+            'concept_not_open',
+            'Concept or verification is no longer open.',
+          );
         }
         return mapProposal(row);
       },
@@ -2167,7 +2170,10 @@ export class SupabaseWearStore implements WearStore {
         );
         if (existing) {
           if (existing.status !== 'rejected') {
-            throw new WearStoreError('verification_exists', 'A verification request already exists.');
+            throw new WearStoreError(
+              'verification_exists',
+              'A verification request already exists.',
+            );
           }
           // Owner re-request after 'rejected' (the RLS owner_rerequest policy).
           const row = await this._maybeSingle(
@@ -2192,7 +2198,10 @@ export class SupabaseWearStore implements WearStore {
           .single();
         if (error) {
           if (error.code === '23505') {
-            throw new WearStoreError('verification_exists', 'A verification request already exists.');
+            throw new WearStoreError(
+              'verification_exists',
+              'A verification request already exists.',
+            );
           }
           throw wrap(error);
         }
@@ -2468,9 +2477,7 @@ export class SupabaseWearStore implements WearStore {
     return row;
   }
 
-  private async _attachConceptMedia(
-    concepts: readonly Concept[],
-  ): Promise<ConceptWithMedia[]> {
+  private async _attachConceptMedia(concepts: readonly Concept[]): Promise<ConceptWithMedia[]> {
     if (!concepts.length) return [];
     const media = await this._many(
       this.db
@@ -3313,10 +3320,18 @@ const APPLICATION_CHECK_CODES: readonly (readonly [string, string, string])[] = 
   ['brand_name', 'invalid_brand_name', 'Brand name must be 2–80 characters.'],
   ['support_email', 'invalid_support_email', 'A valid support email is required.'],
   ['contact_number', 'invalid_contact_number', 'A contact number (7–32 characters) is required.'],
-  ['delivery_options', 'invalid_delivery_options', 'Describe your delivery options (3–500 characters).'],
+  [
+    'delivery_options',
+    'invalid_delivery_options',
+    'Describe your delivery options (3–500 characters).',
+  ],
   ['bio', 'invalid_bio', 'Bio must be at most 500 characters.'],
   ['socials', 'invalid_socials', 'Social links are too long.'],
-  ['agreements', 'agreements_required', 'The Ts&Cs, Code of Conduct, and platform-fee agreements are all required.'],
+  [
+    'agreements',
+    'agreements_required',
+    'The Ts&Cs, Code of Conduct, and platform-fee agreements are all required.',
+  ],
 ];
 
 function mapApplicationCheckError(error: PostgrestError): WearStoreError {

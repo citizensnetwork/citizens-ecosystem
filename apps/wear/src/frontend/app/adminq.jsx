@@ -13,7 +13,18 @@
 (function () {
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, MUTED, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote, ScreenHeader, timeAgo } = window.CWUI;
+  const {
+    GOLD,
+    INK,
+    MUTED,
+    Avatar,
+    BrandLogo,
+    Spinner,
+    EmptyState,
+    ErrorNote,
+    ScreenHeader,
+    timeAgo,
+  } = window.CWUI;
 
   const card = {
     background: '#fff',
@@ -52,7 +63,13 @@
     const role = me && me.role;
     const isAdmin = role === 'admin';
     const [tab, setTab] = useState('applications');
-    const [state, setState] = useState({ loading: true, error: null, applications: [], verifications: [], reports: [] });
+    const [state, setState] = useState({
+      loading: true,
+      error: null,
+      applications: [],
+      verifications: [],
+      reports: [],
+    });
     const [busy, setBusy] = useState(null);
     const [note, setNote] = useState(null);
 
@@ -64,7 +81,13 @@
           window.CW_API.get('/api/admin/verifications'),
           window.CW_API.get('/api/admin/reports?status=open'),
         ]);
-        setState({ loading: false, error: null, applications: a.applications, verifications: v.verifications, reports: r.reports });
+        setState({
+          loading: false,
+          error: null,
+          applications: a.applications,
+          verifications: v.verifications,
+          reports: r.reports,
+        });
       } catch (e) {
         setState((s) => ({ ...s, loading: false, error: e.message }));
       }
@@ -92,7 +115,11 @@
         'div',
         { className: 'cwsc', style: { height: '100%', background: '#fcfbf9' } },
         h(ScreenHeader, { title: 'Admin', onBack: pop }),
-        h(EmptyState, { icon: 'doc', title: 'Moderators only', note: 'This area needs a platform role.' }),
+        h(EmptyState, {
+          icon: 'doc',
+          title: 'Moderators only',
+          note: 'This area needs a platform role.',
+        }),
       );
     }
 
@@ -106,12 +133,35 @@
       h(
         'div',
         { style: { display: 'flex', gap: 8, padding: '4px 18px 14px', overflowX: 'auto' } },
-        h('button', { onClick: () => setTab('applications'), style: chipButton(tab === 'applications') }, 'Applications (' + state.applications.length + ')'),
-        h('button', { onClick: () => setTab('verifications'), style: chipButton(tab === 'verifications') }, 'Verifications (' + state.verifications.length + ')'),
-        h('button', { onClick: () => setTab('reports'), style: chipButton(tab === 'reports') }, 'Reports (' + state.reports.length + ')'),
+        h(
+          'button',
+          { onClick: () => setTab('applications'), style: chipButton(tab === 'applications') },
+          'Applications (' + state.applications.length + ')',
+        ),
+        h(
+          'button',
+          { onClick: () => setTab('verifications'), style: chipButton(tab === 'verifications') },
+          'Verifications (' + state.verifications.length + ')',
+        ),
+        h(
+          'button',
+          { onClick: () => setTab('reports'), style: chipButton(tab === 'reports') },
+          'Reports (' + state.reports.length + ')',
+        ),
       ),
       note
-        ? h('div', { style: { margin: '0 18px 12px', fontSize: 12.5, fontWeight: 700, color: note.ok ? '#3f6f34' : '#8f4a2b' } }, note.text)
+        ? h(
+            'div',
+            {
+              style: {
+                margin: '0 18px 12px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: note.ok ? '#3f6f34' : '#8f4a2b',
+              },
+            },
+            note.text,
+          )
         : null,
       state.loading
         ? h(Spinner, {})
@@ -158,7 +208,11 @@
       'div',
       { style: { display: 'flex', gap: 8, fontSize: 12, lineHeight: 1.5, marginTop: 4 } },
       h('span', { style: { color: MUTED, fontWeight: 700, flex: 'none', width: 62 } }, label),
-      h('span', { style: { color: '#4a4a4a', fontWeight: 500, minWidth: 0, overflowWrap: 'anywhere' } }, value),
+      h(
+        'span',
+        { style: { color: '#4a4a4a', fontWeight: 500, minWidth: 0, overflowWrap: 'anywhere' } },
+        value,
+      ),
     );
   }
 
@@ -185,7 +239,16 @@
         'button',
         {
           onClick: () => app.applicant && openUser(app.applicant.handle),
-          style: { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', padding: 0, width: '100%', textAlign: 'left' },
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            width: '100%',
+            textAlign: 'left',
+          },
         },
         app.applicant ? h(Avatar, { user: app.applicant, size: 36 }) : null,
         h(
@@ -195,12 +258,29 @@
           h(
             'div',
             { style: { fontSize: 11.5, color: MUTED, fontWeight: 600 } },
-            (app.applicant ? (app.applicant.displayName || '@' + app.applicant.handle) + ' · ' : '') + 'applied ' + timeAgo(app.createdAt) + ' ago',
+            (app.applicant
+              ? (app.applicant.displayName || '@' + app.applicant.handle) + ' · '
+              : '') +
+              'applied ' +
+              timeAgo(app.createdAt) +
+              ' ago',
           ),
         ),
       ),
       app.bio
-        ? h('div', { style: { fontSize: 12.5, color: '#5a5a5a', fontWeight: 500, lineHeight: 1.5, marginTop: 8 } }, app.bio)
+        ? h(
+            'div',
+            {
+              style: {
+                fontSize: 12.5,
+                color: '#5a5a5a',
+                fontWeight: 500,
+                lineHeight: 1.5,
+                marginTop: 8,
+              },
+            },
+            app.bio,
+          )
         : null,
       h(
         'div',
@@ -219,9 +299,21 @@
         ? h(
             'div',
             { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 11 } },
-            h(GateChip, { met: e.conceptsPosted >= e.conceptsPostedRequired, text: 'POSTED ' + e.conceptsPosted + '/' + e.conceptsPostedRequired }),
-            h(GateChip, { met: e.conceptsClaimed >= e.conceptsClaimedRequired, text: 'CLAIMED ' + e.conceptsClaimed + '/' + e.conceptsClaimedRequired }),
-            h(GateChip, { met: e.actionedReports === 0, text: e.actionedReports === 0 ? 'REPORTS CLEAR' : e.actionedReports + ' ACTIONED REPORT' + (e.actionedReports > 1 ? 'S' : '') }),
+            h(GateChip, {
+              met: e.conceptsPosted >= e.conceptsPostedRequired,
+              text: 'POSTED ' + e.conceptsPosted + '/' + e.conceptsPostedRequired,
+            }),
+            h(GateChip, {
+              met: e.conceptsClaimed >= e.conceptsClaimedRequired,
+              text: 'CLAIMED ' + e.conceptsClaimed + '/' + e.conceptsClaimedRequired,
+            }),
+            h(GateChip, {
+              met: e.actionedReports === 0,
+              text:
+                e.actionedReports === 0
+                  ? 'REPORTS CLEAR'
+                  : e.actionedReports + ' ACTIONED REPORT' + (e.actionedReports > 1 ? 'S' : ''),
+            }),
           )
         : null,
       h(
@@ -236,8 +328,20 @@
             h(
               'div',
               { style: { display: 'flex', gap: 8 } },
-              h('input', { value: slug, onChange: (ev) => setSlug(slugify(ev.target.value) || ev.target.value.toLowerCase()), placeholder: 'brand-slug', style: input }),
-              h('input', { value: reviewNote, onChange: (ev) => setReviewNote(ev.target.value), maxLength: 2000, placeholder: 'Note to the applicant (optional)', style: { ...input, flex: 1.6 } }),
+              h('input', {
+                value: slug,
+                onChange: (ev) =>
+                  setSlug(slugify(ev.target.value) || ev.target.value.toLowerCase()),
+                placeholder: 'brand-slug',
+                style: input,
+              }),
+              h('input', {
+                value: reviewNote,
+                onChange: (ev) => setReviewNote(ev.target.value),
+                maxLength: 2000,
+                placeholder: 'Note to the applicant (optional)',
+                style: { ...input, flex: 1.6 },
+              }),
             ),
             h(
               'div',
@@ -249,7 +353,12 @@
                   onClick: () =>
                     act(
                       'app-approve:' + app.id,
-                      () => window.CW_API.post('/api/admin/brand-applications/' + app.id, { decision: 'approved', slug, reviewNote }),
+                      () =>
+                        window.CW_API.post('/api/admin/brand-applications/' + app.id, {
+                          decision: 'approved',
+                          slug,
+                          reviewNote,
+                        }),
                       'Brand minted — ' + app.brandName + ' is live and verified.',
                     ),
                   style: actionButton(true),
@@ -263,7 +372,11 @@
                   onClick: () =>
                     act(
                       'app-reject:' + app.id,
-                      () => window.CW_API.post('/api/admin/brand-applications/' + app.id, { decision: 'rejected', reviewNote }),
+                      () =>
+                        window.CW_API.post('/api/admin/brand-applications/' + app.id, {
+                          decision: 'rejected',
+                          reviewNote,
+                        }),
                       'Application rejected — the citizen may re-apply once ready.',
                     ),
                   style: actionButton(false),
@@ -278,13 +391,21 @@
 
   function ApplicationQueue({ items, isAdmin, busy, act, openUser }) {
     if (!items.length) {
-      return h(EmptyState, { icon: 'check', title: 'Queue is clear', note: 'No pending Become-a-Brand applications.' });
+      return h(EmptyState, {
+        icon: 'check',
+        title: 'Queue is clear',
+        note: 'No pending Become-a-Brand applications.',
+      });
     }
     return h(
       'div',
       null,
       !isAdmin
-        ? h('div', { style: { margin: '0 18px 12px', fontSize: 12, color: MUTED, fontWeight: 600 } }, 'You can view the queue; application decisions are admin-only.')
+        ? h(
+            'div',
+            { style: { margin: '0 18px 12px', fontSize: 12, color: MUTED, fontWeight: 600 } },
+            'You can view the queue; application decisions are admin-only.',
+          )
         : null,
       items.map((app) => h(ApplicationCard, { key: app.id, app, isAdmin, busy, act, openUser })),
     );
@@ -292,13 +413,21 @@
 
   function VerificationQueue({ items, isAdmin, busy, act, openBrand }) {
     if (!items.length) {
-      return h(EmptyState, { icon: 'check', title: 'Queue is clear', note: 'No pending brand-verification requests.' });
+      return h(EmptyState, {
+        icon: 'check',
+        title: 'Queue is clear',
+        note: 'No pending brand-verification requests.',
+      });
     }
     return h(
       'div',
       null,
       !isAdmin
-        ? h('div', { style: { margin: '0 18px 12px', fontSize: 12, color: MUTED, fontWeight: 600 } }, 'You can view the queue; verification decisions are admin-only.')
+        ? h(
+            'div',
+            { style: { margin: '0 18px 12px', fontSize: 12, color: MUTED, fontWeight: 600 } },
+            'You can view the queue; verification decisions are admin-only.',
+          )
         : null,
       items.map((v) =>
         h(
@@ -308,18 +437,47 @@
             'button',
             {
               onClick: () => v.brand && openBrand(v.brand.slug),
-              style: { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', padding: 0, width: '100%', textAlign: 'left' },
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                border: 'none',
+                background: 'none',
+                padding: 0,
+                width: '100%',
+                textAlign: 'left',
+              },
             },
             v.brand ? h(BrandLogo, { brand: v.brand, size: 36 }) : null,
             h(
               'div',
               { style: { flex: 1, minWidth: 0, lineHeight: 1.3 } },
-              h('div', { style: { fontSize: 13.5, fontWeight: 800 } }, v.brand ? v.brand.name : v.brandId),
-              h('div', { style: { fontSize: 11.5, color: MUTED, fontWeight: 600 } }, 'Requested ' + timeAgo(v.requestedAt) + ' ago'),
+              h(
+                'div',
+                { style: { fontSize: 13.5, fontWeight: 800 } },
+                v.brand ? v.brand.name : v.brandId,
+              ),
+              h(
+                'div',
+                { style: { fontSize: 11.5, color: MUTED, fontWeight: 600 } },
+                'Requested ' + timeAgo(v.requestedAt) + ' ago',
+              ),
             ),
           ),
           v.note
-            ? h('div', { style: { fontSize: 12.5, color: '#5a5a5a', fontWeight: 500, lineHeight: 1.5, marginTop: 8 } }, v.note)
+            ? h(
+                'div',
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: '#5a5a5a',
+                    fontWeight: 500,
+                    lineHeight: 1.5,
+                    marginTop: 8,
+                  },
+                },
+                v.note,
+              )
             : null,
           isAdmin
             ? h(
@@ -329,7 +487,15 @@
                   'button',
                   {
                     disabled: !!busy,
-                    onClick: () => act('approve:' + v.brandId, () => window.CW_API.post('/api/admin/verifications/' + v.brandId, { decision: 'approved' }), 'Brand approved — badge is live.'),
+                    onClick: () =>
+                      act(
+                        'approve:' + v.brandId,
+                        () =>
+                          window.CW_API.post('/api/admin/verifications/' + v.brandId, {
+                            decision: 'approved',
+                          }),
+                        'Brand approved — badge is live.',
+                      ),
                     style: actionButton(true),
                   },
                   busy === 'approve:' + v.brandId ? '…' : 'Approve',
@@ -338,7 +504,15 @@
                   'button',
                   {
                     disabled: !!busy,
-                    onClick: () => act('reject:' + v.brandId, () => window.CW_API.post('/api/admin/verifications/' + v.brandId, { decision: 'rejected' }), 'Request rejected — the owner may re-request.'),
+                    onClick: () =>
+                      act(
+                        'reject:' + v.brandId,
+                        () =>
+                          window.CW_API.post('/api/admin/verifications/' + v.brandId, {
+                            decision: 'rejected',
+                          }),
+                        'Request rejected — the owner may re-request.',
+                      ),
                     style: actionButton(false),
                   },
                   busy === 'reject:' + v.brandId ? '…' : 'Reject',
@@ -364,12 +538,48 @@
           h(
             'div',
             { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-            h('span', { style: { fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px', color: '#8f4a2b', background: '#faf0ea', border: '1px solid #f0ddd0', borderRadius: 8, padding: '4px 9px' } }, r.reason),
-            h('div', { style: { flex: 1, fontSize: 12.5, fontWeight: 800 } }, r.subjectKind + ' · ' + r.subjectId.slice(0, 12) + '…'),
-            h('span', { style: { fontSize: 11, color: MUTED, fontWeight: 600 } }, timeAgo(r.createdAt)),
+            h(
+              'span',
+              {
+                style: {
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px',
+                  color: '#8f4a2b',
+                  background: '#faf0ea',
+                  border: '1px solid #f0ddd0',
+                  borderRadius: 8,
+                  padding: '4px 9px',
+                },
+              },
+              r.reason,
+            ),
+            h(
+              'div',
+              { style: { flex: 1, fontSize: 12.5, fontWeight: 800 } },
+              r.subjectKind + ' · ' + r.subjectId.slice(0, 12) + '…',
+            ),
+            h(
+              'span',
+              { style: { fontSize: 11, color: MUTED, fontWeight: 600 } },
+              timeAgo(r.createdAt),
+            ),
           ),
           r.note
-            ? h('div', { style: { fontSize: 12.5, color: '#5a5a5a', fontWeight: 500, lineHeight: 1.5, marginTop: 7 } }, r.note)
+            ? h(
+                'div',
+                {
+                  style: {
+                    fontSize: 12.5,
+                    color: '#5a5a5a',
+                    fontWeight: 500,
+                    lineHeight: 1.5,
+                    marginTop: 7,
+                  },
+                },
+                r.note,
+              )
             : null,
           h(
             'div',
@@ -380,7 +590,12 @@
                 {
                   key: s,
                   disabled: !!busy,
-                  onClick: () => act(s + ':' + r.id, () => window.CW_API.post('/api/admin/reports/' + r.id, { status: s }), 'Report ' + s + '.'),
+                  onClick: () =>
+                    act(
+                      s + ':' + r.id,
+                      () => window.CW_API.post('/api/admin/reports/' + r.id, { status: s }),
+                      'Report ' + s + '.',
+                    ),
                   style: actionButton(s === 'actioned'),
                 },
                 busy === s + ':' + r.id ? '…' : s.charAt(0).toUpperCase() + s.slice(1),
