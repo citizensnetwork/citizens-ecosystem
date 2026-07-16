@@ -1406,27 +1406,65 @@ docs** (per the design-first mandate). Full Phase-1 build checklist + open quest
 
 ---
 
+## 3Z. CI security-audit gate restored — OSV-Scanner (blocking) + advisory baseline — SHIPPED ✅ (2026-07-16)
+
+Founder-started follow-up to §3Y's flagged CI debt. Ratified via AskUserQuestion. Offload log:
+`.claude/sessions/wear-merge-and-impersonation.md`.
+
+- **Root cause:** the CI "Verify" job's `pnpm audit --audit-level moderate` step failed on every
+  run — npm **permanently retired** the legacy audit endpoint it calls (HTTP 410). Confirmed to
+  reproduce on **pnpm 9.12.0 AND 10.x**, so no pnpm bump fixes it. The step provided zero security
+  value and kept CI perpetually red (non-blocking only because `main` is unprotected).
+- **Fix (PR #32, MERGED):** replaced it with **OSV-Scanner** (`google/osv-scanner`), pinned to
+  **v2.3.8** + a **pinned SHA-256** of the linux binary (supply-chain hardening), invoked
+  `scan --config=osv-scanner.toml -L pnpm-lock.yaml`. It reads `pnpm-lock.yaml` against OSV.dev
+  (no npm endpoint) and **blocks** the build on any known advisory (ratified: blocking gate).
+- **The gate immediately surfaced 27 unique advisories** (38 counting duplicate hits; 15 High /
+  14 Med / 7 Low / 2 Unknown) that were latent for months while `pnpm audit` was silently broken.
+  Only **esbuild** is a direct dep; the rest are transitive; two **`sandbox`** advisories have no
+  upstream fix.
+- **Founder decision:** **baseline now, remediate in a follow-up.** `osv-scanner.toml` (repo root)
+  ignores exactly those 27 (each documented with package + severity + reason). CI is **green now**
+  and the gate blocks any **new** advisory. CI confirms: _"Filtered 38 vulnerabilities … No issues
+  found."_
+- **⚠ OPEN DEBT (own session — see the ▶ item below):** clear the `osv-scanner.toml` baseline by
+  actually fixing the deps. The repo already remediates transitive vulns via root package.json
+  **`pnpm.overrides`** (established pattern). Safe bumps: `@tootallnate/once`, `ajv`, `minimatch`,
+  `tar`, `smol-toml`, `path-to-regexp@6.x`, `esbuild` (direct — override exists, lockfile stale).
+  **Risky:** `undici` 5.28.4→**6.x major** (tree already carries 6.27/7.28 for other importers) and
+  `path-to-regexp@8.x→8.4.0` (feeds **Next.js routing**). **Unfixable:** `sandbox`×2 (find the
+  puller; drop/replace or keep documented). Remove each entry from `osv-scanner.toml` as fixed;
+  keep gates green throughout; verify OSV-Scanner via a test PR (the binary can't run locally on
+  Windows). A background task chip carries the full remediation brief.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
-> Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162) AND the merge
-> of all three to `main` + prod fix (§3Y) are COMPLETE.**
+> Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162), the merge
+> of all three to `main` + prod fix (§3Y) AND the CI OSV-Scanner audit gate (§3Z) are COMPLETE.**
 > `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
-> (the prod bundle fix). `main` HEAD = `840636…`. **⛔ Sessions must run in the MONOREPO only**
-> (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent #28/#29/#30).**
-> **Next migration # = 163.** **Advisor baseline @ head-162 = 0 ERROR / 102 WARN / 3 INFO** (the
-> 102nd WARN is the intentional `brand_eligibility` SECDEF grant — compare against THIS, not 101).
+> (prod bundle fix) + **PR #31** (docs) + **PR #32** (CI audit gate). **⛔ Sessions must run in the
+> MONOREPO only** (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent
+> #28–#32).** **Next migration # = 163.** **Advisor baseline @ head-162 = 0 ERROR / 102 WARN /
+> 3 INFO** (the 102nd WARN is the intentional `brand_eligibility` SECDEF grant — compare against
+> THIS, not 101). **CI note:** the Verify job now runs a **blocking OSV-Scanner** step; a new
+> dependency advisory not in `osv-scanner.toml` will red CI — fix the dep, don't just add to the
+> baseline. Run `pnpm format:check` locally before pushing (CI gate the turbo gates omit).
 >
 > **▶ RECOMMENDED next session — pick one:** (a) **Build impersonation Phase 1** — the ratified
 > design is in **roles MD §7** (read-only admin sign-in-as; mig 163 audit tables; admin-only;
 > DM-with-reason; notify-after; banner + 30-min time-box). Design-first work is DONE, so this is a
-> clean build session; or (b) the **Wear founder walk-through**: decide the live "Mustard Seed
-> Supply" demo application from Admin → Applications (approving mints a real verified brand in
-> prod), then verify the Settings "Become a Brand" form as a citizen (now fixed & live); or
-> (c) **fix the CI `pnpm audit` gate** (§3Y — npm 410, repo-wide red; a background task chip was
-> spawned for it). The founder also still owes the platform its **Ts&Cs / Code of Conduct /
-> fee-schedule documents** — the application form's checkboxes reference them nominally.
+> clean build session; or (b) **clear the OSV-Scanner dependency baseline (§3Z)** — the biggest
+> hygiene win: remediate the 27 baselined advisories via `pnpm.overrides`, empty `osv-scanner.toml`
+> down to only genuinely-unfixable entries, keep all gates green (a task chip carries the full
+> brief); or (c) the **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
+> application from Admin → Applications (approving mints a real verified brand in prod), then verify
+> the Settings "Become a Brand" form as a citizen (now fixed & live). The founder also still owes
+> the platform its **Ts&Cs / Code of Conduct / fee-schedule documents** — the application form's
+> checkboxes reference them nominally.
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**
