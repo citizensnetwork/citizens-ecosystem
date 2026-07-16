@@ -1,11 +1,13 @@
 // ── Home: stories tray + feed ──────────────────────────────────────
 // GET /api/stories (tray) + GET /api/feed (hydrated cards with counts).
 // PostCard is the design's canonical feed card, reused by brand/profile.
+// Tray bubbles open the full-screen StoryViewer (§3V item 5 — they used to
+// deep-link to the author's profile); posts carry a client-side Share.
 (function () {
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote, timeAgo, fmtCount } =
+  const { GOLD, INK, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote, StoryViewer, shareLink, timeAgo, fmtCount } =
     window.CWUI;
 
   /** Feed card, faithful to the design (header / media / actions / caption). */
@@ -50,6 +52,23 @@
         if (typeof res.saved === 'boolean') setSaved(res.saved);
       } catch (e) {
         setSaved(!next);
+      }
+    };
+
+    // Per-post Share (§3V item 4): share sheet / copy link, client-only —
+    // the deep link (?post=<id>) lands on this post after sign-in.
+    const [shareNote, setShareNote] = useState(null);
+    const sharePost = async () => {
+      const url =
+        window.location.origin + window.location.pathname + '?post=' + encodeURIComponent(post.id);
+      const channel = await shareLink({
+        url,
+        title: author.name + ' on Citizens Wear',
+        text: post.body ? post.body.slice(0, 120) : 'Seen on Citizens Wear',
+      });
+      if (channel === 'link') {
+        setShareNote('Link copied');
+        setTimeout(() => setShareNote(null), 1800);
       }
     };
 
@@ -151,6 +170,25 @@
             { style: { fontSize: 12.5, fontWeight: 700, color: INK } },
             fmtCount(post.commentCount || 0),
           ),
+        ),
+        h(
+          'button',
+          {
+            onClick: sharePost,
+            'aria-label': 'Share post',
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              border: 'none',
+              background: 'none',
+              padding: 0,
+            },
+          },
+          Icon('share', { size: 23, color: INK }),
+          shareNote
+            ? h('span', { style: { fontSize: 11.5, fontWeight: 700, color: '#7a6212' } }, shareNote)
+            : null,
         ),
         h('div', { style: { flex: 1 } }),
         h(
@@ -254,15 +292,52 @@
     );
   }
 
-  function StoriesTray({ tray }) {
-    const { setTab, openUser } = useStore();
+  function StoriesTray({ tray, onSeen }) {
+    const { setTab } = useStore();
+    const [viewer, setViewer] = useState(null); // { author, items } | null
     const items = [{ you: true, name: 'Your Story' }].concat(tray || []);
+
+    // Full-screen viewer (§3V item 5) — the bubble used to deep-link to the
+    // author's profile instead of playing their stories.
+    const openAuthor = async (entry) => {
+      if (!entry.author) return;
+      try {
+        const res = await window.CW_API.get('/api/stories/author/' + entry.author.id);
+        if (!res.stories.length) return;
+        setViewer({
+          author: res.author,
+          authorId: entry.author.id,
+          items: res.stories.map((s) => ({
+            id: s.id,
+            mediaUrl: s.mediaUrl,
+            caption: s.caption,
+            subtitle: timeAgo(s.createdAt) + ' ago',
+          })),
+        });
+      } catch (e) {
+        /* viewer is best-effort; the tray stays usable */
+      }
+    };
+
     return h(
       'div',
       {
         className: 'cwsc',
         style: { display: 'flex', gap: 15, overflowX: 'auto', padding: '15px 18px 8px' },
       },
+      viewer
+        ? h(StoryViewer, {
+            author: viewer.author,
+            items: viewer.items,
+            onClose: () => {
+              if (onSeen) onSeen(viewer.authorId);
+              setViewer(null);
+            },
+            onView: (item) => {
+              window.CW_API.post('/api/stories/' + item.id + '/view').catch(() => {});
+            },
+          })
+        : null,
       items.map((s, i) => {
         const you = !!s.you;
         const ring = you
@@ -273,7 +348,7 @@
         const name = you
           ? 'Your Story'
           : (s.author && (s.author.displayName || s.author.handle)) || 'Story';
-        const onClick = you ? () => setTab('create') : () => s.author && openUser(s.author.handle);
+        const onClick = you ? () => setTab('create') : () => openAuthor(s);
         return h(
           'button',
           {
@@ -444,7 +519,16 @@
           ),
         ),
       ),
-      h(StoriesTray, { tray: state.tray }),
+      h(StoriesTray, {
+        tray: state.tray,
+        onSeen: (authorId) =>
+          setState((s) => ({
+            ...s,
+            tray: s.tray.map((t) =>
+              t.author && t.author.id === authorId ? { ...t, hasUnseen: false } : t,
+            ),
+          })),
+      }),
       h('div', { style: { height: 1, background: '#efedea', margin: '6px 18px 0' } }),
       state.loading
         ? h(Spinner, {})

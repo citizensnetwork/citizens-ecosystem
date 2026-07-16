@@ -153,8 +153,12 @@ mirrored in [`apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md`](../apps/connect/do
   is a planned add. *[Stories currently act as brand-page redirects, not full-screen — fix planned.]*
 - **Concepts page** — the **community's own creations**: Concepts + a **concept-stories bar** +
   **like / comment / share** on Concepts. This attention is what draws Brands to a design, so
-  it is where a Creator's value accrues. *(Concept comments/shares/stories are NEW schema —
-  DEFERRED; today Concepts have upvotes only.)*
+  it is where a Creator's value accrues. *(✅ SHIPPED 2026-07-16, **migration 161**:
+  `wear.concept_comments` (threaded), `wear.concept_shares` (distinct-sharer social proof),
+  `wear.concept_statuses` + views (the bar — trigger-promoted, no client write path), and
+  engagement notifications. "Like" rides the existing upvote storage, re-skinned. The Creator
+  badge derives lazily (>10 Concepts) exactly as §6.1 specifies; the first-100 bootstrap grace
+  is a self-terminating status counter.)*
 
 ### 6.3 Content-permission rules (what mig 160 enforces now)
 
@@ -172,6 +176,11 @@ mirrored in [`apps/connect/docs/ECOSYSTEM_PROFILE_LEVELS.md`](../apps/connect/do
 
 ### 6.4 Deferred (designed here, built later)
 
-Creator-badge derivation + concept-stories/comments/shares; the Become-a-Brand application form
-+ eligibility derivation + admin approval → mint flow; per-post Share; full-screen Home stories;
-admin sign-in-as (impersonation — a security-sensitive surface, own design).
+~~Creator-badge derivation + concept-stories/comments/shares~~ ✅ **SHIPPED (mig 161,
+2026-07-16)** — badge surfaced on `/api/me` + profiles, statuses bar + engagement live.
+~~Per-post Share; full-screen Home stories~~ ✅ **SHIPPED (same session)** — share sheet +
+`?post=`/`?concept=` deep links; the Home tray now plays stories in a full-screen viewer.
+Still deferred: the **Become-a-Brand application** form + eligibility derivation + admin
+approval → mint flow (the `POST /api/brands` `ownerId` + `brands_admin_insert` mint path is
+ready); **share-to-DM** (the `dm` channel value is reserved); **admin sign-in-as**
+(impersonation — a security-sensitive surface, own design).

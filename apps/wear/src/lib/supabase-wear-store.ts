@@ -18,14 +18,19 @@ import {
   type ConceptClaim,
   type ConceptClaimRepo,
   type ConceptClaimStatus,
+  type ConceptComment,
+  type ConceptCommentRepo,
   type ConceptMedia,
   type ConceptProposal,
   type ConceptProposalRepo,
   type ConceptProposalStatus,
   type ConceptRepo,
+  type ConceptShare,
   type ConceptStage,
+  type ConceptStatus,
   type ConceptStatusLogEntry,
   type ConceptStatusLogRepo,
+  type ConceptStatusRepo,
   type ConceptUpvote,
   type ConceptWithMedia,
   type ConnectId,
@@ -118,6 +123,8 @@ export class SupabaseWearStore implements WearStore {
   public readonly blocks: BlockRepo;
   public readonly reports: ReportRepo;
   public readonly concepts: ConceptRepo;
+  public readonly conceptComments: ConceptCommentRepo;
+  public readonly conceptStatuses: ConceptStatusRepo;
   public readonly conceptProposals: ConceptProposalRepo;
   public readonly conceptClaims: ConceptClaimRepo;
   public readonly conceptStatusLog: ConceptStatusLogRepo;
@@ -150,6 +157,8 @@ export class SupabaseWearStore implements WearStore {
     this.blocks = this._blocks();
     this.reports = this._reports();
     this.concepts = this._concepts();
+    this.conceptComments = this._conceptComments();
+    this.conceptStatuses = this._conceptStatuses();
     this.conceptProposals = this._conceptProposals();
     this.conceptClaims = this._conceptClaims();
     this.conceptStatusLog = this._conceptStatusLog();
@@ -1547,6 +1556,13 @@ export class SupabaseWearStore implements WearStore {
         );
         return { concept: mapConcept(row), media: media.map(mapConceptMedia) };
       },
+      countByCreator: async (creatorId) =>
+        this._count(
+          this.db
+            .from('concepts')
+            .select('id', { count: 'exact', head: true })
+            .eq('creator_id', creatorId),
+        ),
       list: async (filter) => {
         let builder = this.db
           .from('concepts')
@@ -1667,6 +1683,142 @@ export class SupabaseWearStore implements WearStore {
             .eq('user_id', userId),
         );
         return !!row;
+      },
+      share: async (conceptId, userId, channel) => {
+        const { data, error } = await this.db
+          .from('concept_shares')
+          .insert({ concept_id: conceptId, user_id: userId, channel: channel ?? 'link' })
+          .select(SHARE_COLS);
+        if (!error && data?.length) return mapShare(data[0] as ShareRow);
+        if (error && error.code === '23505') {
+          // Distinct-sharer PK: the first share stands.
+          const existing = await this._single(
+            this.db
+              .from('concept_shares')
+              .select(SHARE_COLS)
+              .eq('concept_id', conceptId)
+              .eq('user_id', userId),
+          );
+          return mapShare(existing);
+        }
+        if (error && error.code === '23503') {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        throw wrap(error!);
+      },
+      shareCount: async (conceptId) =>
+        this._count(
+          this.db
+            .from('concept_shares')
+            .select('concept_id', { count: 'exact', head: true })
+            .eq('concept_id', conceptId),
+        ),
+      hasShared: async (conceptId, userId) => {
+        const row = await this._maybeSingle(
+          this.db
+            .from('concept_shares')
+            .select('concept_id')
+            .eq('concept_id', conceptId)
+            .eq('user_id', userId),
+        );
+        return !!row;
+      },
+    };
+  }
+
+  // Mig 161 — community engagement on Concepts. Notifications and status
+  // promotion are DB-trigger-side here (SECDEF, mig 161); only the memory
+  // store mirrors them inline.
+  private _conceptComments(): ConceptCommentRepo {
+    return {
+      create: async (input) => {
+        const body = input.body.trim();
+        if (!body) {
+          throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
+        }
+        if (input.parentCommentId) {
+          const parent = await this._maybeSingle(
+            this.db
+              .from('concept_comments')
+              .select('id,concept_id')
+              .eq('id', input.parentCommentId),
+          );
+          if (!parent || parent.concept_id !== input.conceptId) {
+            throw new WearStoreError('comment_not_found', 'Parent comment not found.');
+          }
+        }
+        const { data, error } = await this.db
+          .from('concept_comments')
+          .insert({
+            concept_id: input.conceptId,
+            author_id: input.authorId,
+            body,
+            parent_comment_id: input.parentCommentId ?? null,
+          })
+          .select(CONCEPT_COMMENT_COLS);
+        if (!error && data?.length) return mapConceptComment(data[0] as ConceptCommentRow);
+        if (error && error.code === '23503') {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${input.conceptId}.`);
+        }
+        throw wrap(error!);
+      },
+      listForConcept: async (conceptId) => {
+        const rows = await this._many(
+          this.db
+            .from('concept_comments')
+            .select(CONCEPT_COMMENT_COLS)
+            .eq('concept_id', conceptId)
+            .order('created_at', { ascending: true }),
+        );
+        return rows.map(mapConceptComment);
+      },
+      countForConcept: async (conceptId) =>
+        this._count(
+          this.db
+            .from('concept_comments')
+            .select('id', { count: 'exact', head: true })
+            .eq('concept_id', conceptId),
+        ),
+    };
+  }
+
+  private _conceptStatuses(): ConceptStatusRepo {
+    return {
+      listActive: async (viewerId) => {
+        const rows = await this._many(
+          this.db
+            .from('concept_statuses')
+            .select(CONCEPT_STATUS_COLS)
+            .gt('expires_at', this.now().toISOString())
+            .order('created_at', { ascending: false }),
+        );
+        const statuses = rows.map(mapConceptStatus);
+        if (!statuses.length || !viewerId) {
+          return statuses.map((status) => ({ status, viewerSeen: false }));
+        }
+        // RLS scopes concept_status_views to the viewer's own rows.
+        const seenRows = await this._many(
+          this.db
+            .from('concept_status_views')
+            .select('status_id')
+            .eq('viewer_id', viewerId)
+            .in(
+              'status_id',
+              statuses.map((s) => s.id),
+            ),
+        );
+        const seen = new Set(seenRows.map((r) => r.status_id));
+        return statuses.map((status) => ({ status, viewerSeen: seen.has(status.id) }));
+      },
+      recordView: async (statusId, viewerId) => {
+        const { error } = await this.db
+          .from('concept_status_views')
+          .insert({ status_id: statusId, viewer_id: viewerId });
+        if (!error || error.code === '23505') return; // already seen is fine
+        if (error.code === '23503') {
+          throw new WearStoreError('status_not_found', `Unknown concept status ${statusId}.`);
+        }
+        throw wrap(error);
       },
     };
   }
@@ -2341,6 +2493,10 @@ const NOTIFICATION_COLS =
 const CONCEPT_COLS = 'id,creator_id,title,description,status,created_at,updated_at';
 const CONCEPT_MEDIA_COLS = 'id,concept_id,url,kind,alt_text,order_index';
 const UPVOTE_COLS = 'concept_id,user_id,created_at';
+// Mig 161 — community engagement on Concepts
+const CONCEPT_COMMENT_COLS = 'id,concept_id,author_id,parent_comment_id,body,created_at';
+const SHARE_COLS = 'concept_id,user_id,channel,created_at';
+const CONCEPT_STATUS_COLS = 'id,concept_id,creator_id,reason,created_at,expires_at';
 const PROPOSAL_COLS =
   'id,concept_id,brand_id,status,mockup_urls,materials,est_unit_price,moq,est_turnaround_days,note,created_at,updated_at';
 const CLAIM_COLS =
@@ -2535,6 +2691,28 @@ interface UpvoteRow {
   concept_id: string;
   user_id: string;
   created_at: string;
+}
+interface ConceptCommentRow {
+  id: string;
+  concept_id: string;
+  author_id: string;
+  parent_comment_id: string | null;
+  body: string;
+  created_at: string;
+}
+interface ShareRow {
+  concept_id: string;
+  user_id: string;
+  channel: ConceptShare['channel'];
+  created_at: string;
+}
+interface ConceptStatusRow {
+  id: string;
+  concept_id: string;
+  creator_id: string;
+  reason: ConceptStatus['reason'];
+  created_at: string;
+  expires_at: string;
 }
 interface ProposalRow {
   id: string;
@@ -2802,6 +2980,28 @@ const mapUpvote = (r: UpvoteRow): ConceptUpvote => ({
   conceptId: r.concept_id,
   userId: r.user_id,
   createdAt: r.created_at,
+});
+const mapConceptComment = (r: ConceptCommentRow): ConceptComment => ({
+  id: r.id,
+  conceptId: r.concept_id,
+  authorId: r.author_id,
+  parentCommentId: r.parent_comment_id,
+  body: r.body,
+  createdAt: r.created_at,
+});
+const mapShare = (r: ShareRow): ConceptShare => ({
+  conceptId: r.concept_id,
+  userId: r.user_id,
+  channel: r.channel,
+  createdAt: r.created_at,
+});
+const mapConceptStatus = (r: ConceptStatusRow): ConceptStatus => ({
+  id: r.id,
+  conceptId: r.concept_id,
+  creatorId: r.creator_id,
+  reason: r.reason,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
 });
 const mapProposal = (r: ProposalRow): ConceptProposal => ({
   id: r.id,

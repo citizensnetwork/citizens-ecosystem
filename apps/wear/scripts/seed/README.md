@@ -6,9 +6,18 @@ posts with imagery, a follow graph, likes/comments, stories, and one realized
 **Concepts-marketplace** item (proposed → awarded → released) so the in-feed
 attribution chip renders.
 
+The file carries two independently-guarded blocks: the **base seed** (above)
+and the **§12 mig-161 engagement block** — two fresh community Concepts (their
+inserts fire the concept-status promotion trigger, so the Concepts-page
+stories bar is alive for 24h after seeding), threaded comments, and recorded
+shares. Each block no-ops when its own marker rows exist, so re-running the
+file on a prod that has only the base seed adds just the engagement content.
+
 ## Files
 - [`seed-feed.sql`](./seed-feed.sql) — idempotent seed (no-op if already applied).
-- [`teardown-feed.sql`](./teardown-feed.sql) — full, clean removal.
+- [`teardown-feed.sql`](./teardown-feed.sql) — full, clean removal (cascades
+  cover the mig-161 tables: statuses/views/comments/shares hang off concepts
+  and the 7 seed users).
 
 ## What gets created
 | Brand | Handle | Verified | Vibe |

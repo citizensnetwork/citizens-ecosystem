@@ -221,4 +221,6 @@ const STORE_ERROR_STATUS: Record<string, number> = {
   conversion_not_open: 409,
   conversion_already_open: 409,
   already_closed: 409,
+  // Mig 161 — community engagement on Concepts
+  status_not_found: 404,
 };

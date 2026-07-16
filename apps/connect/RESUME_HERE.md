@@ -1218,21 +1218,93 @@ largely exist already in nav (Home tab + Concepts tab).
 
 ---
 
+## 3W. Wear community Concepts surface — SHIPPED ✅ (2026-07-16, mig 161 live)
+
+§3V's "progression epic" items **1, 2, 4 and 5** built + verified in one session on
+`step5-monorepo-lift`. **mig 161 APPLIED + prod-verified.** Founder ratified all four design
+decisions in-session (AskUserQuestion). Offload log: `.claude/sessions/wear-progression-epic.md`.
+
+### What shipped (all gates green: turbo lint 12/12 · typecheck 12/12 · test 11/11 — Wear 94/94,
+### Connect 637 — · build 8/8)
+- **mig 161** (`161_wear_concept_engagement.sql`) **APPLIED** (tag `wear-pre-mig161` @de042fa;
+  advisor security 0 ERROR / 101 WARN / 3 INFO — **signature byte-identical to head-160, 0 new**;
+  10/10 rolled-back prod smokes PASS). Adds: `wear.concept_comments` (threaded, wear.comments
+  mirror + moderator takedown), `wear.concept_shares` (**distinct-sharer** pk(concept,user),
+  INSERT-only social proof, channel enum `link|native|dm`-reserved), `wear.concept_statuses`
+  (**the concept-stories bar** — trigger-promoted, NO client write path) + `concept_status_views`
+  (story_views mirror), 2 enums, +3 `notification_type` values, 4 SECDEF trigger fns (promotion +
+  comment/upvote/share notify; all revoke-from-public, empty search_path). Every new FK indexed.
+  wear: 37 tables / 83 policies / 32 fns / 22 enums.
+- **The lazy Creator ladder is live (§6.1):** `wear.promote_concept_status()` promotes each new
+  Concept for 24h when the creator has **>10 live concepts** (badge lane) ELSE while **<100
+  bootstrap-grace statuses** have ever been issued (self-terminating partial-index counter; badge
+  promotions never consume grace slots; no retro-backfill — grace starts at 0). Badge itself is
+  DERIVED, never stored: `/api/me` → `creator:{earned, conceptCount, threshold:11}`;
+  `/api/users/[handle]` → `creator` flag; profile renders a gold CREATOR chip; the create-Concept
+  screen shows badge progress ("N more Concepts…").
+- **Likes:** ratified as the EXISTING `concept_upvotes` re-skinned (heart + like language, №
+  schema/API change — §3V's new-schema list deliberately omitted it).
+- **API:** GET+POST `/api/concepts/[id]/comments` (500-char cap, parent validated same-concept);
+  POST `/api/concepts/[id]/share` (idempotent → `{shares, viewerShared}`; channel whitelist —
+  'dm' NOT client-acceptable yet); GET `/api/concepts/statuses` (public bar, viewerSeen) +
+  POST `/api/concepts/statuses/[id]/view`; GET `/api/stories/author/[userId]` (active-for-viewer,
+  audience+block rules preserved) + POST `/api/stories/[id]/view`. `hydrateConcept` +=
+  commentCount/shareCount/viewerShared. Store: `WearStore` += `conceptComments`,
+  `conceptStatuses` repos + `concepts.share/shareCount/hasShared/countByCreator`; MemoryWearStore
+  mirrors ALL mig-161 triggers inline (lockstep rule), SupabaseWearStore implements against RLS.
+- **UI:** shared **StoryViewer** overlay in `ui.jsx` (progress bars, tap-nav, 5s auto-advance,
+  per-item CTA) + `shareLink()` helper (share sheet → clipboard, returns channel). Concepts page:
+  **statuses bar** (bubbles grouped by creator, gold ring unseen, plays in the viewer, records
+  views), **comments thread** (1-level replies + reply chip), **ShareButton** (records channel,
+  "Link copied"), heart LikeButton. Home: tray now plays stories **full-screen** (§3V-5 fixed —
+  was a profile redirect) + **per-post Share** (§3V-4, client-only per design). Deep links:
+  `?concept=<id>` / `?post=<id>` consumed after sign-in (store.jsx), URL scrubbed. Inbox renders
+  the 3 new notification types. Pre-existing `myBrands` useMemo lint warning FIXED (eslint 0/0).
+- **Seed:** `seed-feed.sql` gained an independently-guarded **§12 engagement block** — applied to
+  prod: +2 community concepts (auto-promoted → **the bar is live** with 2 grace statuses),
+  4 comments (1 threaded), 5 shares, 16 real trigger-fired notifications. Teardown unchanged
+  (cascades cover mig-161 tables). README updated.
+- **Docs:** SHARED_DB_CONTRACT §9 stamped head→**161** (**next # = 162**); roles MD §6.2/§6.4
+  marked shipped.
+
+### Verified in prod
+Anonymous RLS probes return the new engagement fields on live concepts; the statuses bar returns
+the 2 seeded promotions; advisor signature unchanged; performance advisors show 0 new categories
+(only the schema-wide `auth_rls_initplan`/`multiple_permissive_policies` house patterns + fresh
+"unused" indexes; **0 unindexed FKs**).
+
+### Still deferred from §3V (the remaining epic)
+1. **Become-a-Brand application** (§3V-3 — THE next Wear increment): eligibility derivation
+   (≈20 Concepts posted + 10 claimed + support email + contact + no sustained reports) → Settings
+   form (Brand Name*, bio, socials, email*, contact*, delivery options*, Ts&Cs/Code-of-Conduct/
+   monthly-fee agreements) → **needs a `wear.brand_applications` table (mig 162)** + admin queue
+   UI (adminq.jsx has the verifications pattern) → approve mints via the EXISTING
+   `POST /api/brands` `ownerId` + `brands_admin_insert` path (ready since mig 160).
+2. **Admin sign-in-as (impersonation)** — security-sensitive, own design session (§3V-6).
+3. Fast-follows logged in the offload: share-to-DM ('dm' channel reserved), upvote-notification
+   dedupe, `auth_rls_initplan` sweep migration, statuses-bar pagination.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S) AND the media-upload
-> pipeline + notifications backend (§3T, live) are COMPLETE.**
+> **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
+> notifications (§3T), the identity/content-permission model (§3V, mig 160) AND the community
+> Concepts surface (§3W, mig 161 — engagement triad + concept-stories bar + Creator badge +
+> full-screen stories + per-post share) are COMPLETE.**
 > `step5-monorepo-lift` was merged to `main` at end of the §3R AND §3T sessions (PR #28,
-> 2026-07-15). All three apps share one auth + one Postgres + the static-HTML model.
-> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 160.**
+> 2026-07-15); §3V+§3W commits are on `step5-monorepo-lift` awaiting the next merge.
+> **⛔ Sessions must run in the MONOREPO only** (see §3Q drift repair). **Next migration # = 162.**
 >
-> **▶ RECOMMENDED next session: the Wear "progression epic"** (§3V deferred list). The identity &
-> content-permission MODEL is now ratified + enforced (§3V, mig 160 live: Posts are verified-brand-only,
-> self-serve brand creation retired, ImagePicker URL hidden, email template applied). The natural next
-> build is the community surface + the earned ladder: **(1)** Concept like/comment/share + a
-> concept-stories bar (NEW schema — the biggest piece); **(2)** Creator-badge derivation (>10 Concepts);
-> **(3)** the Become-a-Brand application form + eligibility gates + admin approval→mint. Smaller wins:
-> per-post Share, full-screen Home stories. Design detail for all of these is in §3V.
+> **▶ RECOMMENDED next session: the Become-a-Brand application** (§3V-3 / §3W deferred №1) — the
+> last big rung of the progression epic. Everything it needs is staged: eligibility inputs are
+> queryable (`concepts.countByCreator` + claims by creator + `wear.reports`), the admin-mint path
+> is live (`POST /api/brands` `ownerId` + `brands_admin_insert`, mig 160), adminq.jsx already has
+> the verifications-queue pattern to clone. Build: **mig 162** `wear.brand_applications` (ask
+> before applying) → eligibility derivation (≈20 posted + 10 claimed + support email/contact +
+> clean reports) → Settings "Become a Brand" form (unlocks at eligibility; Brand Name*, bio,
+> socials, email*, contact*, delivery options*, Ts&Cs/CoC/fees agreements) → admin queue tab →
+> approve = mint verified brand + notify. Design detail: §3V + roles MD §6.1.
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**
@@ -1258,9 +1330,13 @@ largely exist already in nav (Home tab + Concepts tab).
       model ratified (4-tier lazy ladder: Citizen → Creator → Brand → Admin; two content surfaces) and
       the **enforcement core** shipped + verified: self-serve Create-Brand tile removed; **Posts gated
       to owned + verified Brand** (UI + API + RLS **mig 160**, applied); base Citizens keep Concepts +
-      Stories; ImagePicker raw-URL hidden. The **progression epic** (Creator badge, concept-stories/
-      comments/shares, Become-a-Brand application, per-post Share, full-screen stories, impersonation)
-      is DESIGNED + deferred — see §3V "Deferred" list; it's the recommended next session.
+      Stories; ImagePicker raw-URL hidden.
+   g. ~~**Wear progression epic — community Concepts surface.**~~ ✅ **DONE §3W (2026-07-16,
+      mig 161 live)** — concept like(=upvote re-skin)/comments/shares, the concept-stories bar
+      (trigger-promoted; Creator badge >10 concepts + first-100 bootstrap grace), full-screen
+      Home stories, per-post Share, deep links, engagement notifications, seed §12. Remaining
+      from the epic: **Become-a-Brand application (mig 162 — recommended next)** + admin
+      impersonation + offload-logged fast-follows.
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
@@ -1315,6 +1391,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **159** live; next # = **160**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **161** live; next # = **162**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

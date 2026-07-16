@@ -37,6 +37,21 @@
         return 'A catalogue conversion was proposed for ' + title + '.';
       case 'conversion_responded':
         return 'Your catalogue conversion for ' + title + (d.accepted ? ' was accepted.' : ' was declined.');
+      // Mig 161 — community engagement on Concepts. The actor's name renders
+      // from the avatar row; `who` keeps the sentence readable without it.
+      case 'concept_comment': {
+        const who = n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone';
+        return (
+          who +
+          (d.reply ? ' replied to your comment on ' : ' commented on ') +
+          title +
+          (d.excerpt ? ': “' + d.excerpt + '”' : '.')
+        );
+      }
+      case 'concept_upvote':
+        return (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') + ' liked ' + title + '. ❤️';
+      case 'concept_share':
+        return (n.actor ? n.actor.displayName || '@' + n.actor.handle : 'Someone') + ' shared ' + title + ' — your design is travelling.';
       default:
         return 'New activity on ' + title + '.';
     }

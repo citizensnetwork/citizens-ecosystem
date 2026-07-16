@@ -1,13 +1,16 @@
-// ── Concepts marketplace (mig 157) ─────────────────────────────────
-// Browse/detail/create for design Concepts, plus every party flow:
-// upvotes, brand proposals (verified-only), creator award, the
-// append-only status stepper, royalty proof/close-out, and the
+// ── Concepts marketplace (mig 157 + 161) ───────────────────────────
+// The COMMUNITY surface (§6.2): browse/detail/create for design Concepts
+// with the full engagement triad — like (rides the upvote storage),
+// threaded comments, recorded shares — plus the concept-stories bar
+// ("concept-statuses", Creator-badge/bootstrap-grace promotions) and every
+// marketplace party flow: brand proposals (verified-only), creator award,
+// the append-only status stepper, royalty proof/close-out, and the
 // catalogue-conversion handshake. All via /api/concepts* (Bearer).
 (function () {
-  const { createElement: h, useState, useEffect, useCallback } = React;
+  const { createElement: h, useState, useEffect, useCallback, useMemo } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, MUTED, Avatar, BrandLogo, GoldButton, Spinner, EmptyState, ErrorNote, ScreenHeader, ImagePicker, timeAgo, fmtCount } = window.CWUI;
+  const { GOLD, INK, MUTED, Avatar, BrandLogo, GoldButton, Spinner, EmptyState, ErrorNote, ScreenHeader, ImagePicker, StoryViewer, shareLink, timeAgo, fmtCount } = window.CWUI;
 
   const STAGES = ['proposed', 'claimed', 'in_production', 'sample_review', 'released', 'sold_out'];
   const STAGE_LABEL = {
@@ -64,7 +67,9 @@
     );
   }
 
-  function UpvoteButton({ concept, compact }) {
+  // The ratified "like" (§6.2) — rides the existing upvote storage/API,
+  // re-skinned from star to heart (presentation only, counts carry over).
+  function LikeButton({ concept, compact }) {
     const [n, setN] = useState(concept.upvotes || 0);
     const [on, setOn] = useState(!!concept.viewerUpvoted);
     const [busy, setBusy] = useState(false);
@@ -92,6 +97,7 @@
       'button',
       {
         onClick: toggle,
+        'aria-label': on ? 'Unlike' : 'Like',
         style: {
           display: 'flex',
           alignItems: 'center',
@@ -103,12 +109,192 @@
           flex: 'none',
         },
       },
-      Icon('star', { size: compact ? 14 : 16, color: on ? GOLD : '#9a9892', fill: on ? GOLD : null }),
+      Icon('heart', { size: compact ? 14 : 16, color: on ? GOLD : '#9a9892', fill: on ? GOLD : null }),
       h(
         'span',
         { style: { fontSize: compact ? 12 : 13, fontWeight: 800, color: on ? '#7a6212' : '#6a6a6a' } },
         fmtCount(n),
       ),
+    );
+  }
+
+  // Recorded share (§6.2 — distinct-sharer social proof): system share sheet
+  // when available, clipboard fallback; the deep link lands on this concept.
+  function ShareButton({ concept, compact }) {
+    const [n, setN] = useState(concept.shareCount || 0);
+    const [done, setDone] = useState(!!concept.viewerShared);
+    const [note, setNote] = useState(null); // 'Link copied' toast text
+    const share = async (e) => {
+      e.stopPropagation();
+      const url =
+        window.location.origin + window.location.pathname + '?concept=' + encodeURIComponent(concept.id);
+      const channel = await shareLink({
+        url,
+        title: concept.title,
+        text: '“' + concept.title + '” — a community concept on Citizens Wear',
+      });
+      if (!channel) return; // dismissed / no clipboard
+      if (channel === 'link') {
+        setNote('Link copied');
+        setTimeout(() => setNote(null), 1800);
+      }
+      try {
+        const res = await window.CW_API.post('/api/concepts/' + concept.id + '/share', { channel });
+        setN(res.shares);
+        setDone(res.viewerShared);
+      } catch (err) {
+        /* recording is best-effort — the share itself already happened */
+      }
+    };
+    return h(
+      'button',
+      {
+        onClick: share,
+        'aria-label': 'Share concept',
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          border: '1px solid ' + (done ? GOLD : '#e6e3dc'),
+          background: done ? '#fdf6e3' : '#fff',
+          borderRadius: 10,
+          padding: compact ? '5px 11px' : '8px 15px',
+          flex: 'none',
+          position: 'relative',
+        },
+      },
+      Icon('share', { size: compact ? 14 : 16, color: done ? GOLD : '#9a9892' }),
+      h(
+        'span',
+        { style: { fontSize: compact ? 12 : 13, fontWeight: 800, color: done ? '#7a6212' : '#6a6a6a' } },
+        note || fmtCount(n),
+      ),
+    );
+  }
+
+  // ── Concept-statuses bar (mig 161) ─────────────────────────────────
+  // One bubble per creator with active promotions; gold ring while any of
+  // theirs is unseen. Tapping plays them in the shared StoryViewer (each
+  // status RENDERS its concept: artwork + title + "View concept" CTA).
+  function StatusesBar({ statuses, onSeen }) {
+    const { me, push } = useStore();
+    const [viewing, setViewing] = useState(null); // creator id whose run is open
+    const groups = useMemo(() => {
+      const byCreator = new Map();
+      for (const s of statuses) {
+        if (!s.creator) continue;
+        const g = byCreator.get(s.creator.id) || { creator: s.creator, items: [] };
+        g.items.push(s);
+        byCreator.set(s.creator.id, g);
+      }
+      return [...byCreator.values()];
+    }, [statuses]);
+
+    if (!groups.length) return null;
+    const open = groups.find((g) => g.creator.id === viewing);
+
+    return h(
+      'div',
+      null,
+      h(
+        'div',
+        {
+          className: 'cwsc',
+          style: { display: 'flex', gap: 14, overflowX: 'auto', padding: '2px 18px 12px' },
+        },
+        groups.map((g) => {
+          const unseen = g.items.some((s) => !s.viewerSeen);
+          return h(
+            'button',
+            {
+              key: g.creator.id,
+              onClick: () => setViewing(g.creator.id),
+              style: {
+                flex: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 6,
+                border: 'none',
+                background: 'none',
+                width: 60,
+                padding: 0,
+              },
+            },
+            h(
+              'div',
+              {
+                style: {
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  padding: 2.5,
+                  background: unseen ? 'linear-gradient(135deg,#e8c45c,#b8902a)' : '#dcd9d2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+              },
+              h(
+                'div',
+                {
+                  style: {
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    border: '2.5px solid #fff',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#f2f0ea',
+                  },
+                },
+                h(Avatar, { user: g.creator, size: 46 }),
+              ),
+            ),
+            h(
+              'span',
+              {
+                style: {
+                  fontSize: 10.5,
+                  color: '#4a4a4a',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 60,
+                },
+              },
+              g.creator.displayName || '@' + g.creator.handle,
+            ),
+          );
+        }),
+      ),
+      open
+        ? h(StoryViewer, {
+            author: open.creator,
+            items: open.items.map((s) => ({
+              id: s.id,
+              mediaUrl: s.concept.media && s.concept.media.url,
+              caption: s.concept.title,
+              subtitle: timeAgo(s.createdAt) + ' ago · community concept',
+              cta: {
+                label: 'View concept',
+                onClick: () => {
+                  setViewing(null);
+                  push('concept', { id: s.concept.id });
+                },
+              },
+            })),
+            onClose: () => setViewing(null),
+            onView: (item) => {
+              if (!me) return;
+              window.CW_API.post('/api/concepts/statuses/' + item.id + '/view').catch(() => {});
+              onSeen(item.id);
+            },
+          })
+        : null,
     );
   }
 
@@ -124,14 +310,17 @@
     const { pop, push } = useStore();
     const [filter, setFilter] = useState('');
     const [state, setState] = useState({ loading: true, error: null, items: [] });
+    const [statuses, setStatuses] = useState([]);
 
     const load = useCallback(async () => {
       setState((s) => ({ ...s, loading: true, error: null }));
       try {
-        const res = await window.CW_API.get(
-          '/api/concepts?limit=30' + (filter ? '&status=' + filter : ''),
-        );
+        const [res, bar] = await Promise.all([
+          window.CW_API.get('/api/concepts?limit=30' + (filter ? '&status=' + filter : '')),
+          window.CW_API.get('/api/concepts/statuses').catch(() => ({ statuses: [] })),
+        ]);
         setState({ loading: false, error: null, items: res.items });
+        setStatuses(bar.statuses || []);
       } catch (e) {
         setState((s) => ({ ...s, loading: false, error: e.message }));
       }
@@ -139,6 +328,14 @@
     useEffect(() => {
       load();
     }, [load]);
+
+    const markSeen = useCallback(
+      (statusId) =>
+        setStatuses((list) =>
+          list.map((s) => (s.id === statusId ? { ...s, viewerSeen: true } : s)),
+        ),
+      [],
+    );
 
     return h(
       'div',
@@ -168,6 +365,7 @@
           Icon('plus', { size: 19, color: '#fff', sw: 2.2 }),
         ),
       }),
+      h(StatusesBar, { statuses, onSeen: markSeen }),
       h(
         'div',
         { style: { display: 'flex', gap: 8, padding: '4px 18px 14px' } },
@@ -242,7 +440,15 @@
                 concept.proposalCount + (concept.proposalCount === 1 ? ' brand proposed' : ' brands proposed'),
               )
             : null,
-          h(UpvoteButton, { concept, compact: true }),
+          concept.commentCount
+            ? h(
+                'span',
+                { style: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, color: '#8a8880' } },
+                Icon('comment', { size: 13, color: '#9a9892' }),
+                fmtCount(concept.commentCount),
+              )
+            : null,
+          h(LikeButton, { concept, compact: true }),
         ),
       ),
     );
@@ -313,17 +519,23 @@
     const [proposals, setProposals] = useState(null);
     const [royalties, setRoyalties] = useState(null);
     const [conversions, setConversions] = useState(null);
+    const [comments, setComments] = useState(null); // public thread (mig 161)
     const [busy, setBusy] = useState(null); // action key currently in flight
     const [note, setNote] = useState(null); // {ok, text}
 
     const myUserId = me && me.user && me.user.id;
-    const myBrands = (me && me.brands) || [];
+    // Stable reference: a fresh `[]` each render would churn the `load`
+    // callback's deps and refetch on every render (pre-existing lint warning).
+    const myBrands = useMemo(() => (me && me.brands) || [], [me]);
 
     const load = useCallback(async () => {
       setState((s) => ({ ...s, loading: true, error: null }));
       try {
         const data = await window.CW_API.get('/api/concepts/' + params.id);
         setState({ loading: false, error: null, data });
+        window.CW_API.get('/api/concepts/' + params.id + '/comments')
+          .then((r) => setComments(r.comments))
+          .catch(() => setComments([]));
         const isCreator = data.concept.creator && data.concept.creator.id === myUserId;
         const myClaimBrand =
           data.claim && myBrands.find((b) => b.id === data.claim.brandId);
@@ -435,7 +647,8 @@
                 h('div', { style: { fontSize: 11, color: MUTED, fontWeight: 600 } }, concept.creator ? '@' + concept.creator.handle : ''),
               ),
             ),
-            h(UpvoteButton, { concept }),
+            h(LikeButton, { concept }),
+            h(ShareButton, { concept }),
           ),
         ),
 
@@ -506,6 +719,9 @@
             : null,
         ),
 
+        // Community thread (mig 161)
+        h(CommentsCard, { conceptId: concept.id, comments, setComments, me, openUser }),
+
         note
           ? h('div', { style: { margin: '0 18px 14px', fontSize: 12.5, fontWeight: 700, color: note.ok ? '#3f6f34' : '#8f4a2b' } }, note.text)
           : null,
@@ -553,6 +769,151 @@
           ? h(RoyaltyCard, { royalties, isCreator: !!isCreator, isBrand: !!myClaimBrand, busyKey: busy, act })
           : null,
       ),
+    );
+  }
+
+  // ── Community thread (mig 161) ─────────────────────────────────────
+  // Flat list with one-level reply threading (parentCommentId), matching the
+  // posts-comments shape. The composer pins replies via a dismissible chip.
+  function CommentsCard({ conceptId, comments, setComments, me, openUser }) {
+    const [text, setText] = useState('');
+    const [replyTo, setReplyTo] = useState(null); // comment being replied to
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const signedIn = !!(me && me.user);
+
+    const roots = (comments || []).filter((c) => !c.parentCommentId);
+    const repliesFor = (id) => (comments || []).filter((c) => c.parentCommentId === id);
+
+    const submit = async () => {
+      if (!text.trim() || busy) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const created = await window.CW_API.post('/api/concepts/' + conceptId + '/comments', {
+          body: text,
+          parentCommentId: replyTo ? replyTo.id : undefined,
+        });
+        // The API returns the bare row; hydrate the author locally (it's us).
+        setComments((list) => [
+          ...(list || []),
+          { ...created, author: me.user },
+        ]);
+        setText('');
+        setReplyTo(null);
+      } catch (e) {
+        setError(e.message || 'Could not post your comment.');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const CommentRow = ({ c, depth }) =>
+      h(
+        'div',
+        { style: { display: 'flex', gap: 9, padding: '9px 0 0', marginLeft: depth ? 30 : 0 } },
+        h(
+          'button',
+          {
+            onClick: () => c.author && openUser(c.author.handle),
+            style: { border: 'none', background: 'none', padding: 0, flex: 'none', alignSelf: 'flex-start' },
+          },
+          h(Avatar, { user: c.author, size: depth ? 22 : 27 }),
+        ),
+        h(
+          'div',
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            'div',
+            { style: { fontSize: 12.5, lineHeight: 1.5, wordBreak: 'break-word' } },
+            h('span', { style: { fontWeight: 800 } }, (c.author ? c.author.displayName : 'Unknown') + ' '),
+            c.body,
+          ),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 12, marginTop: 2 } },
+            h('span', { style: { fontSize: 10.5, color: MUTED, fontWeight: 600 } }, timeAgo(c.createdAt) + ' ago'),
+            signedIn && !depth
+              ? h(
+                  'button',
+                  {
+                    onClick: () => setReplyTo(c),
+                    style: { border: 'none', background: 'none', padding: 0, fontSize: 10.5, color: '#7a6212', fontWeight: 700 },
+                  },
+                  'Reply',
+                )
+              : null,
+          ),
+        ),
+      );
+
+    return h(
+      'div',
+      { style: card },
+      h(
+        'div',
+        { style: sectionTitle },
+        'Conversation' + (comments && comments.length ? ' (' + comments.length + ')' : ''),
+      ),
+      comments === null
+        ? h(Spinner, { size: 18 })
+        : !comments.length
+          ? h('div', { style: { fontSize: 12.5, color: MUTED, fontWeight: 500 } }, 'Be the first to speak life over this design.')
+          : roots.map((c) =>
+              h(
+                'div',
+                { key: c.id },
+                h(CommentRow, { c, depth: 0 }),
+                repliesFor(c.id).map((r) => h(CommentRow, { key: r.id, c: r, depth: 1 })),
+              ),
+            ),
+      signedIn
+        ? h(
+            'div',
+            { style: { marginTop: 13 } },
+            replyTo
+              ? h(
+                  'div',
+                  { style: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 } },
+                  h(
+                    'span',
+                    { style: { fontSize: 11, fontWeight: 700, color: '#7a6212', background: '#faf6ec', borderRadius: 8, padding: '4px 9px' } },
+                    'Replying to ' + (replyTo.author ? '@' + replyTo.author.handle : 'comment'),
+                  ),
+                  h(
+                    'button',
+                    {
+                      onClick: () => setReplyTo(null),
+                      'aria-label': 'Cancel reply',
+                      style: { border: 'none', background: 'none', padding: 0, fontSize: 14, color: MUTED, fontWeight: 700 },
+                    },
+                    '×',
+                  ),
+                )
+              : null,
+            h(
+              'div',
+              { style: { display: 'flex', gap: 8 } },
+              h('input', {
+                value: text,
+                onChange: (e) => setText(e.target.value),
+                onKeyDown: (e) => {
+                  if (e.key === 'Enter') submit();
+                },
+                maxLength: 500,
+                placeholder: replyTo ? 'Write your reply…' : 'Add to the conversation…',
+                style: { ...field, flex: 1 },
+              }),
+              h(GoldButton, {
+                label: busy ? '…' : 'Send',
+                disabled: busy || !text.trim(),
+                onClick: submit,
+                style: { width: 'auto', padding: '11px 18px', fontSize: 13 },
+              }),
+            ),
+            error ? h('div', { style: { marginTop: 7, fontSize: 12, fontWeight: 700, color: '#8f4a2b' } }, error) : null,
+          )
+        : null,
     );
   }
 
@@ -861,12 +1222,13 @@
 
   // ── Create ─────────────────────────────────────────────────────────
   function CreateConceptScreen() {
-    const { pop, push } = useStore();
+    const { pop, push, me, refreshMe } = useStore();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [mediaUrl, setMediaUrl] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
+    const creator = me && me.creator; // { earned, conceptCount, threshold } — derived, §6.1
 
     const submit = async () => {
       setBusy(true);
@@ -877,6 +1239,7 @@
           description: description || undefined,
           mediaUrls: mediaUrl ? [mediaUrl] : [],
         });
+        refreshMe().catch(() => {}); // the badge is derived from concept count
         pop();
         push('concept', { id: created.id });
       } catch (e) {
@@ -899,6 +1262,30 @@
           'div',
           { style: card },
           h('div', { style: { fontSize: 12.5, color: MUTED, fontWeight: 500, lineHeight: 1.55 } }, 'Share a design idea with the Kingdom. Verified brands can propose to produce it — you choose who gets to make it real, and royalties are committed the moment you award it.'),
+          // Creator-badge progression (§6.1: auto at >10 Concepts, derived).
+          creator
+            ? h(
+                'div',
+                {
+                  style: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    background: '#faf6ec',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    marginTop: 11,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: '#7a6212',
+                  },
+                },
+                Icon('star', { size: 14, color: GOLD, fill: creator.earned ? GOLD : null }),
+                creator.earned
+                  ? 'Creator — your Concepts join the statuses bar for 24h.'
+                  : creator.threshold - creator.conceptCount + ' more Concept' + (creator.threshold - creator.conceptCount === 1 ? '' : 's') + ' to your Creator badge (' + creator.conceptCount + '/' + creator.threshold + ').',
+              )
+            : null,
           h('div', { style: label }, 'Title'),
           h('input', { value: title, onChange: (e) => setTitle(e.target.value), maxLength: 120, placeholder: 'Lion of Judah oversized tee', style: field }),
           h('div', { style: label }, 'Description'),

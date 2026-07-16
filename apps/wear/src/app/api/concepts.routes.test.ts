@@ -38,6 +38,12 @@ import { GET as adminReportsGET } from './admin/reports/route';
 import { POST as adminTriagePOST } from './admin/reports/[id]/route';
 import { POST as reportsPOST } from './reports/route';
 import { GET as feedGET } from './feed/route';
+import { GET as commentsGET, POST as commentsPOST } from './concepts/[id]/comments/route';
+import { POST as sharePOST } from './concepts/[id]/share/route';
+import { GET as statusesGET } from './concepts/statuses/route';
+import { POST as statusViewPOST } from './concepts/statuses/[id]/view/route';
+import { GET as meGET } from './me/route';
+import { GET as notificationsGET } from './notifications/route';
 
 const req = (url: string, init?: RequestInit): Request =>
   new Request(`http://localhost${url}`, init);
@@ -376,6 +382,142 @@ describe('blanket rate-limit gate (@citizens/utils via handler())', () => {
       route(),
     );
     expect(read.status).toBe(200);
+  });
+});
+
+describe('concept engagement — comments/shares/statuses (mig 161)', () => {
+  it('comments: anon reads, auth writes, thread hydrates, reply notifies parent', async () => {
+    const conceptId = await createConcept(); // samuel (usr_002) is the creator
+
+    anonymous();
+    expect((await commentsGET(req(`/api/concepts/${conceptId}/comments`), route({ id: conceptId }))).status).toBe(200);
+    expect(
+      (await commentsPOST(req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'X' })), route({ id: conceptId }))).status,
+    ).toBe(401);
+
+    asUser('usr_001'); // hannah comments on samuel's concept
+    const created = await commentsPOST(
+      req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'This needs to exist.' })),
+      route({ id: conceptId }),
+    );
+    expect(created.status).toBe(201);
+    const commentId = (await created.json()).id as string;
+
+    asUser('usr_003'); // ruth replies to hannah's comment
+    const reply = await commentsPOST(
+      req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'Agreed!', parentCommentId: commentId })),
+      route({ id: conceptId }),
+    );
+    expect(reply.status).toBe(201);
+
+    const thread = await (await commentsGET(req(`/api/concepts/${conceptId}/comments`), route({ id: conceptId }))).json();
+    expect(thread.comments).toHaveLength(2);
+    expect(thread.comments[0].author.handle).toBe('hannah');
+    expect(thread.comments[1].parentCommentId).toBe(commentId);
+
+    // Trigger mirror: creator (samuel) got both; parent author (hannah) got the reply.
+    asUser('usr_002');
+    const samuelInbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    expect(samuelInbox.items.filter((n: { type: string }) => n.type === 'concept_comment')).toHaveLength(2);
+    asUser('usr_001');
+    const hannahInbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    const replyNotif = hannahInbox.items.filter((n: { type: string }) => n.type === 'concept_comment');
+    expect(replyNotif).toHaveLength(1);
+    expect(replyNotif[0].data.reply).toBe(true);
+
+    // Empty body + unknown concept guardrails.
+    expect(
+      (await commentsPOST(req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: '   ' })), route({ id: conceptId }))).status,
+    ).toBe(422);
+    expect((await commentsGET(req('/api/concepts/nope/comments'), route({ id: 'nope' }))).status).toBe(404);
+  });
+
+  it('share: distinct-sharer idempotency + count + creator notification', async () => {
+    const conceptId = await createConcept();
+
+    anonymous();
+    expect((await sharePOST(req(`/api/concepts/${conceptId}/share`, jsonBody({})), route({ id: conceptId }))).status).toBe(401);
+
+    asUser('usr_001');
+    const first = await (
+      await sharePOST(req(`/api/concepts/${conceptId}/share`, jsonBody({ channel: 'native' })), route({ id: conceptId }))
+    ).json();
+    expect(first).toEqual({ shares: 1, viewerShared: true });
+    // Re-sharing does not inflate the count (social proof is non-gameable).
+    const second = await (
+      await sharePOST(req(`/api/concepts/${conceptId}/share`, jsonBody({})), route({ id: conceptId }))
+    ).json();
+    expect(second).toEqual({ shares: 1, viewerShared: true });
+    asUser('usr_003');
+    const third = await (
+      await sharePOST(req(`/api/concepts/${conceptId}/share`, jsonBody({})), route({ id: conceptId }))
+    ).json();
+    expect(third.shares).toBe(2);
+
+    asUser('usr_002'); // creator sees exactly one share notification per sharer
+    const inbox = await (await notificationsGET(req('/api/notifications'), route())).json();
+    expect(inbox.items.filter((n: { type: string }) => n.type === 'concept_share')).toHaveLength(2);
+
+    expect((await sharePOST(req('/api/concepts/nope/share', jsonBody({})), route({ id: 'nope' }))).status).toBe(404);
+  });
+
+  it('detail carries commentCount/shareCount/viewerShared', async () => {
+    const conceptId = await createConcept();
+    asUser('usr_001');
+    await commentsPOST(req(`/api/concepts/${conceptId}/comments`, jsonBody({ body: 'Word.' })), route({ id: conceptId }));
+    await sharePOST(req(`/api/concepts/${conceptId}/share`, jsonBody({})), route({ id: conceptId }));
+    const detail = await (await conceptGET(req(`/api/concepts/${conceptId}`), route({ id: conceptId }))).json();
+    expect(detail.concept.commentCount).toBe(1);
+    expect(detail.concept.shareCount).toBe(1);
+    expect(detail.concept.viewerShared).toBe(true);
+  });
+
+  it('statuses bar: bootstrap grace promotes, views flip seen-state', async () => {
+    const conceptId = await createConcept(); // samuel has ≤10 concepts → grace
+
+    anonymous();
+    const anonBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(anonBar.statuses).toHaveLength(1);
+    expect(anonBar.statuses[0].reason).toBe('bootstrap_grace');
+    expect(anonBar.statuses[0].concept.id).toBe(conceptId);
+    expect(anonBar.statuses[0].concept.media.url).toBe('https://cdn.test/art.png');
+    expect(anonBar.statuses[0].creator.handle).toBe('samuel');
+    expect(anonBar.statuses[0].viewerSeen).toBe(false);
+    const statusId = anonBar.statuses[0].id as string;
+
+    // Viewing requires auth; then the bar reflects the seen-state.
+    expect((await statusViewPOST(req(`/api/concepts/statuses/${statusId}/view`, jsonBody({})), route({ id: statusId }))).status).toBe(401);
+    asUser('usr_001');
+    expect((await statusViewPOST(req(`/api/concepts/statuses/${statusId}/view`, jsonBody({})), route({ id: statusId }))).status).toBe(201);
+    const seenBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(seenBar.statuses[0].viewerSeen).toBe(true);
+    asUser('usr_003'); // another viewer still unseen
+    const otherBar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(otherBar.statuses[0].viewerSeen).toBe(false);
+
+    expect((await statusViewPOST(req('/api/concepts/statuses/nope/view', jsonBody({})), route({ id: 'nope' }))).status).toBe(404);
+  });
+
+  it('creator badge: earned at >10 concepts; statuses switch to creator_badge', async () => {
+    asUser('usr_001');
+    const before = await (await meGET(req('/api/me'), route())).json();
+    expect(before.creator).toEqual({ earned: false, conceptCount: 0, threshold: 11 });
+
+    for (let i = 1; i <= 11; i += 1) {
+      const res = await conceptsPOST(req('/api/concepts', jsonBody({ title: `Design ${i}` })), route());
+      expect(res.status).toBe(201);
+    }
+    const after = await (await meGET(req('/api/me'), route())).json();
+    expect(after.creator).toEqual({ earned: true, conceptCount: 11, threshold: 11 });
+
+    // Every concept was promoted; only the 11th rode the badge lane (the
+    // first ten consumed grace slots), and newest-first surfaces it on top.
+    const bar = await (await statusesGET(req('/api/concepts/statuses'), route())).json();
+    expect(bar.statuses).toHaveLength(11);
+    expect(bar.statuses[0].reason).toBe('creator_badge');
+    const reasons = bar.statuses.map((s: { reason: string }) => s.reason);
+    expect(reasons.filter((r: string) => r === 'creator_badge')).toHaveLength(1);
+    expect(reasons.filter((r: string) => r === 'bootstrap_grace')).toHaveLength(10);
   });
 });
 

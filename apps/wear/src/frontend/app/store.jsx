@@ -13,6 +13,30 @@
 
   const StoreContext = createContext(null);
 
+  /**
+   * Boot deep link: shared links carry `?concept=<id>` (or `?post=<id>`) —
+   * consumed once after sign-in, pushed onto the nav stack, then scrubbed
+   * from the URL so refreshes land normally.
+   */
+  function consumeDeepLink(setNav) {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const conceptId = q.get('concept');
+      const postId = q.get('post');
+      if (!conceptId && !postId) return;
+      const entry = conceptId
+        ? { screen: 'concept', params: { id: conceptId } }
+        : { screen: 'post', params: { id: postId } };
+      setNav((n) => ({ ...n, stack: [...n.stack, entry] }));
+      q.delete('concept');
+      q.delete('post');
+      const rest = q.toString();
+      window.history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : ''));
+    } catch (e) {
+      /* deep links are best-effort */
+    }
+  }
+
   function Provider({ children }) {
     // 'loading' | 'signedOut' | 'signedIn' | 'unconfigured'
     const [authStatus, setAuthStatus] = useState('loading');
@@ -41,6 +65,7 @@
         await refreshMe();
         setAuthStatus('signedIn');
         setAuthError(null);
+        consumeDeepLink(setNav);
       } catch (e) {
         console.error('[CWStore] sign-in hydration failed', e);
         setAuthError(e.message || 'Could not load your Wear profile.');

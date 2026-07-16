@@ -797,6 +797,8 @@ export interface ConceptListFilter extends PageParams {
 export interface ConceptRepo {
   create(input: CreateConceptInput): Promise<ConceptWithMedia>;
   getById(id: string): Promise<ConceptWithMedia | null>;
+  /** Live concepts by `creatorId` — the Creator-badge derivation input (§6.1). */
+  countByCreator(creatorId: ConnectId): Promise<number>;
   /** Public browse, newest first, optional stage/creator filter. */
   list(filter?: ConceptListFilter): Promise<Page<ConceptWithMedia>>;
   update(conceptId: string, callerId: ConnectId, patch: UpdateConceptInput): Promise<ConceptWithMedia>;
@@ -805,6 +807,86 @@ export interface ConceptRepo {
   removeUpvote(conceptId: string, userId: ConnectId): Promise<void>;
   upvoteCount(conceptId: string): Promise<number>;
   hasUpvoted(conceptId: string, userId: ConnectId): Promise<boolean>;
+  /**
+   * Record a share (mig 161). DISTINCT-SHARER semantics: one row per
+   * (concept, user) — repeat shares return the existing row (the count is
+   * non-gameable social proof, §6.2). Shares are never retracted.
+   */
+  share(conceptId: string, userId: ConnectId, channel?: ConceptShareChannel): Promise<ConceptShare>;
+  shareCount(conceptId: string): Promise<number>;
+  hasShared(conceptId: string, userId: ConnectId): Promise<boolean>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mig 161 — the community Concepts surface (ratified §6.2): comments, shares,
+// and the concept-stories bar ("concept-statuses"). A status is a PROMOTION
+// OF A CONCEPT — system-issued by the DB trigger (or its in-memory mirror)
+// when the creator holds the derived Creator badge (>10 concepts posted) or
+// while the first-100 bootstrap grace is open. There is no client write path.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Creator badge (§6.1, derived — never stored): auto at >10 Concepts posted. */
+export const CREATOR_BADGE_MIN_CONCEPTS = 11;
+/** Bootstrap grace (§6.1): the first 100 Wear Concepts are all promoted. */
+export const BOOTSTRAP_GRACE_STATUSES = 100;
+/** Concept-statuses live 24h (materialised expiry, stories precedent). */
+export const CONCEPT_STATUS_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface ConceptComment {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly authorId: ConnectId;
+  readonly parentCommentId: string | null;
+  readonly body: string;
+  readonly createdAt: IsoDateTime;
+}
+
+export type ConceptShareChannel = 'link' | 'native' | 'dm';
+
+export interface ConceptShare {
+  readonly conceptId: string;
+  readonly userId: ConnectId;
+  readonly channel: ConceptShareChannel;
+  readonly createdAt: IsoDateTime;
+}
+
+export type ConceptStatusReason = 'creator_badge' | 'bootstrap_grace';
+
+export interface ConceptStatus {
+  readonly id: string;
+  readonly conceptId: string;
+  readonly creatorId: ConnectId;
+  readonly reason: ConceptStatusReason;
+  readonly createdAt: IsoDateTime;
+  readonly expiresAt: IsoDateTime;
+}
+
+/** A bar entry: the status plus the viewer's seen-state (gold-ring styling). */
+export interface ConceptStatusEntry {
+  readonly status: ConceptStatus;
+  readonly viewerSeen: boolean;
+}
+
+/** Threaded comments on a Concept (wear.concept_comments — comments mirror). */
+export interface ConceptCommentRepo {
+  create(input: {
+    readonly conceptId: string;
+    readonly authorId: ConnectId;
+    readonly body: string;
+    readonly parentCommentId?: string | null;
+  }): Promise<ConceptComment>;
+  listForConcept(conceptId: string): Promise<readonly ConceptComment[]>;
+  countForConcept(conceptId: string): Promise<number>;
+}
+
+/**
+ * The concept-stories bar. Rows are trigger-created (promotion) — this repo
+ * only reads active statuses and records seen-state.
+ */
+export interface ConceptStatusRepo {
+  /** Active (non-expired) statuses, newest first, with the viewer's seen-state. */
+  listActive(viewerId: ConnectId | null): Promise<readonly ConceptStatusEntry[]>;
+  recordView(statusId: string, viewerId: ConnectId): Promise<void>;
 }
 
 export interface CreateProposalInput {
@@ -955,7 +1037,11 @@ export type NotificationType =
   | 'royalty_proof' // proof of the milestone sale submitted       → creator
   | 'royalty_closed' // a royalty obligation was closed            → brand owner
   | 'conversion_proposed' // catalogue conversion proposed         → creator
-  | 'conversion_responded'; // conversion accepted/declined        → brand owner
+  | 'conversion_responded' // conversion accepted/declined         → brand owner
+  // Mig 161 — community engagement on Concepts (§6.2):
+  | 'concept_comment' // someone commented on your concept (or replied to you)
+  | 'concept_upvote' // someone liked your concept                 → creator
+  | 'concept_share'; // someone shared your concept                → creator
 
 export interface WearNotification {
   readonly id: string;
@@ -1005,6 +1091,8 @@ export interface WearStore {
   readonly blocks: BlockRepo;
   readonly reports: ReportRepo;
   readonly concepts: ConceptRepo;
+  readonly conceptComments: ConceptCommentRepo;
+  readonly conceptStatuses: ConceptStatusRepo;
   readonly conceptProposals: ConceptProposalRepo;
   readonly conceptClaims: ConceptClaimRepo;
   readonly conceptStatusLog: ConceptStatusLogRepo;

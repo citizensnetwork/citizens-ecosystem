@@ -215,3 +215,80 @@ begin
 
   raise notice 'wear feed seed applied (brands=5, concept=released, footprint=wear-only)';
 end $seed$;
+
+-- ============================================================================
+-- §12 — mig-161 community-engagement block (concept comments/shares/statuses)
+-- ----------------------------------------------------------------------------
+-- SEPARATE guarded block: the base seed above is already live in prod (its o1
+-- guard makes it a no-op there), so this block re-runs independently. It adds
+-- two FRESH community Concepts (their INSERTs fire the mig-161 promotion
+-- trigger → the concept-stories bar is alive for 24h after seeding), plus
+-- comments (with one threaded reply), shares, and likes on the marketplace
+-- concept. Engagement notifications fire through the real SECDEF triggers.
+-- Teardown: unchanged — deleting the 7 seed auth.users cascades through
+-- concepts → statuses/comments/shares/views.
+-- ============================================================================
+do $engage$
+declare
+  o1 uuid := '5eed0001-0000-4000-a000-000000000001'; -- Cornerstone owner
+  o2 uuid := '5eed0002-0000-4000-a000-000000000002'; -- Lily & Field owner
+  o3 uuid := '5eed0003-0000-4000-a000-000000000003'; -- Salt & Light owner
+  o5 uuid := '5eed0005-0000-4000-a000-000000000005'; -- Anchor & Crown owner
+  c1 uuid := '5eed0011-0000-4000-a000-000000000011'; -- Grace Lethabo
+  c2 uuid := '5eed0012-0000-4000-a000-000000000012'; -- Thabo M.
+  -- fixed ids double as this block's idempotency guard
+  concept2 uuid := '5eedc002-0000-4000-a000-0000000000c2';
+  concept3 uuid := '5eedc003-0000-4000-a000-0000000000c3';
+  concept1 uuid; cm1 uuid;
+begin
+  if not exists (select 1 from auth.users where id = c1) then
+    raise notice 'wear engagement seed skipped — run the base seed first';
+    return;
+  end if;
+  if exists (select 1 from wear.concepts where id = concept2) then
+    raise notice 'wear engagement seed already present — skipping';
+    return;
+  end if;
+  select id into concept1 from wear.concepts
+    where creator_id = c1 and title = 'The Living Water hoodie' limit 1;
+
+  -- ── fresh community concepts (INSERT fires the promotion trigger) ──
+  insert into wear.concepts (id, creator_id, title, description) values
+    (concept2, c2, $t$The Mustard Seed cap$t$,
+     $t$A minimal dad cap with a single embroidered mustard seed above the brim — "faith as small as a mustard seed" (Matthew 17:20). Earthy olive, one size.$t$),
+    (concept3, c1, $t$Wait Upon the Lord windbreaker$t$,
+     $t$A lightweight running windbreaker with "they shall mount up with wings as eagles" (Isaiah 40:31) across the shoulders. Reflective print for early-morning runs.$t$);
+  insert into wear.concept_media (concept_id, url, alt_text) values
+    (concept2,'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=70',$t$Olive dad cap concept$t$),
+    (concept3,'https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=800&q=70',$t$Windbreaker concept$t$);
+
+  -- ── engagement: likes (upvotes), comments (+one reply), shares ──
+  insert into wear.concept_upvotes (concept_id, user_id) values
+    (concept2, c1),(concept2, o1),(concept2, o3),
+    (concept3, c2),(concept3, o2),(concept3, o5)
+    on conflict do nothing;
+
+  insert into wear.concept_comments (id, concept_id, author_id, body) values
+    ('5eedcc01-0000-4000-a000-0000000000d1', concept2, c1,
+     $t$The restraint of a single seed says more than a full print ever could. I want one.$t$),
+    ('5eedcc02-0000-4000-a000-0000000000d2', concept3, c2,
+     $t$Isaiah 40:31 on a runner's jacket — this is exactly the kind of quiet witness I love.$t$);
+  insert into wear.concept_comments (concept_id, author_id, parent_comment_id, body) values
+    (concept2, o3, '5eedcc01-0000-4000-a000-0000000000d1',
+     $t$Agreed — we'd tie a give-back to every unit if we made this.$t$);
+
+  insert into wear.concept_shares (concept_id, user_id, channel) values
+    (concept2, c1, 'link'),(concept2, o3, 'native'),(concept3, c2, 'link')
+    on conflict do nothing;
+
+  -- engagement on the original marketplace concept too (if present)
+  if concept1 is not null then
+    insert into wear.concept_comments (concept_id, author_id, body) values
+      (concept1, c2, $t$Watching this go from idea to numbered edition was the best thing on my feed.$t$);
+    insert into wear.concept_shares (concept_id, user_id, channel) values
+      (concept1, c2, 'link'),(concept1, o5, 'native')
+      on conflict do nothing;
+  end if;
+
+  raise notice 'wear engagement seed applied (concepts +2, statuses auto-promoted, comments/shares live)';
+end $engage$;

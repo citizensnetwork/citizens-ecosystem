@@ -12,13 +12,18 @@ import type {
   Concept,
   ConceptClaim,
   ConceptClaimRepo,
+  ConceptComment,
+  ConceptCommentRepo,
   ConceptMedia,
   ConceptProposal,
   ConceptProposalRepo,
   ConceptRepo,
+  ConceptShare,
   ConceptStage,
+  ConceptStatus,
   ConceptStatusLogEntry,
   ConceptStatusLogRepo,
+  ConceptStatusRepo,
   ConceptUpvote,
   ConceptWithMedia,
   ConnectId,
@@ -70,7 +75,13 @@ import type {
   WearStore,
   WearUser,
 } from './contract';
-import { CONCEPT_STAGES, WearStoreError } from './contract';
+import {
+  BOOTSTRAP_GRACE_STATUSES,
+  CONCEPT_STAGES,
+  CONCEPT_STATUS_TTL_MS,
+  CREATOR_BADGE_MIN_CONCEPTS,
+  WearStoreError,
+} from './contract';
 import { extractHashtags, normaliseHashtag } from './hashtags';
 
 /**
@@ -119,6 +130,8 @@ export class MemoryWearStore implements WearStore {
   public readonly blocks: BlockRepo;
   public readonly reports: ReportRepo;
   public readonly concepts: ConceptRepo;
+  public readonly conceptComments: ConceptCommentRepo;
+  public readonly conceptStatuses: ConceptStatusRepo;
   public readonly conceptProposals: ConceptProposalRepo;
   public readonly conceptClaims: ConceptClaimRepo;
   public readonly conceptStatusLog: ConceptStatusLogRepo;
@@ -167,6 +180,14 @@ export class MemoryWearStore implements WearStore {
   private readonly _conceptMedia = new Map<string, ConceptMedia[]>();
   /** Keyed by `${conceptId}:${userId}`. */
   private readonly _conceptUpvotes = new Map<string, ConceptUpvote>();
+  // Mig 161 — community engagement on Concepts
+  private readonly _conceptComments = new Map<string, ConceptComment>();
+  /** Keyed by `${conceptId}:${userId}` (distinct-sharer PK). */
+  private readonly _conceptShares = new Map<string, ConceptShare>();
+  /** Keyed by conceptId (unique — a concept is promoted at most once). */
+  private readonly _conceptStatuses = new Map<string, ConceptStatus>();
+  /** Keyed by `${statusId}:${viewerId}`. */
+  private readonly _conceptStatusViews = new Set<string>();
   private readonly _conceptProposals = new Map<string, ConceptProposal>();
   private readonly _conceptClaims = new Map<string, ConceptClaim>();
   private readonly _conceptStatusLog = new Map<string, ConceptStatusLogEntry>();
@@ -1295,9 +1316,15 @@ export class MemoryWearStore implements WearStore {
             orderIndex: m.orderIndex ?? i,
           })),
         );
+        this._promoteConceptStatus(concept);
         return this._readConcept(concept.id)!;
       },
       getById: async (id) => this._readConcept(id),
+      countByCreator: async (creatorId) => {
+        let n = 0;
+        for (const c of this._concepts.values()) if (c.creatorId === creatorId) n += 1;
+        return n;
+      },
       list: async (filter) => {
         const items = [...this._concepts.values()]
           .filter((c) => !filter?.status || c.status === filter.status)
@@ -1360,6 +1387,20 @@ export class MemoryWearStore implements WearStore {
         for (const key of [...this._conceptUpvotes.keys()]) {
           if (key.startsWith(`${conceptId}:`)) this._conceptUpvotes.delete(key);
         }
+        // FK cascade (mig 161): comments, shares, the status + its views.
+        for (const [id, c] of [...this._conceptComments.entries()]) {
+          if (c.conceptId === conceptId) this._conceptComments.delete(id);
+        }
+        for (const key of [...this._conceptShares.keys()]) {
+          if (key.startsWith(`${conceptId}:`)) this._conceptShares.delete(key);
+        }
+        const status = this._conceptStatuses.get(conceptId);
+        if (status) {
+          this._conceptStatuses.delete(conceptId);
+          for (const key of [...this._conceptStatusViews]) {
+            if (key.startsWith(`${status.id}:`)) this._conceptStatusViews.delete(key);
+          }
+        }
         const claimIds = new Set<string>();
         for (const [id, cl] of [...this._conceptClaims.entries()]) {
           if (cl.conceptId === conceptId) {
@@ -1381,7 +1422,8 @@ export class MemoryWearStore implements WearStore {
         }
       },
       upvote: async (conceptId, userId) => {
-        if (!this._concepts.has(conceptId)) {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
           throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
         }
         const key = `${conceptId}:${userId}`;
@@ -1389,6 +1431,14 @@ export class MemoryWearStore implements WearStore {
         if (existing) return existing;
         const vote: ConceptUpvote = { conceptId, userId, createdAt: this._now().toISOString() };
         this._conceptUpvotes.set(key, vote);
+        // Mirrors trg_notify_on_concept_upvote (mig 161): fresh rows only.
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_upvote',
+          actorId: userId,
+          conceptId,
+          data: { conceptTitle: concept.title },
+        });
         return vote;
       },
       removeUpvote: async (conceptId, userId) => {
@@ -1400,6 +1450,126 @@ export class MemoryWearStore implements WearStore {
         return n;
       },
       hasUpvoted: async (conceptId, userId) => this._conceptUpvotes.has(`${conceptId}:${userId}`),
+      share: async (conceptId, userId, channel) => {
+        const concept = this._concepts.get(conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${conceptId}.`);
+        }
+        const key = `${conceptId}:${userId}`;
+        const existing = this._conceptShares.get(key);
+        if (existing) return existing; // distinct-sharer: first share wins (23505 mirror)
+        const share: ConceptShare = {
+          conceptId,
+          userId,
+          channel: channel ?? 'link',
+          createdAt: this._now().toISOString(),
+        };
+        this._conceptShares.set(key, share);
+        // Mirrors trg_notify_on_concept_share (mig 161).
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_share',
+          actorId: userId,
+          conceptId,
+          data: { conceptTitle: concept.title },
+        });
+        return share;
+      },
+      shareCount: async (conceptId) => {
+        let n = 0;
+        for (const s of this._conceptShares.values()) if (s.conceptId === conceptId) n += 1;
+        return n;
+      },
+      hasShared: async (conceptId, userId) => this._conceptShares.has(`${conceptId}:${userId}`),
+    };
+
+    // Mig 161 — community engagement on Concepts. Same lockstep rule as the
+    // marketplace: these mirror the RLS policies + SECDEF triggers exactly.
+    this.conceptComments = {
+      create: async (input) => {
+        const concept = this._concepts.get(input.conceptId);
+        if (!concept) {
+          throw new WearStoreError('concept_not_found', `Unknown concept ${input.conceptId}.`);
+        }
+        const body = input.body.trim();
+        if (!body) {
+          throw new WearStoreError('empty_comment', 'Comment body must not be empty.');
+        }
+        let parent: ConceptComment | null = null;
+        if (input.parentCommentId) {
+          parent = this._conceptComments.get(input.parentCommentId) ?? null;
+          if (!parent || parent.conceptId !== input.conceptId) {
+            throw new WearStoreError('comment_not_found', 'Parent comment not found.');
+          }
+        }
+        const comment: ConceptComment = {
+          id: this._id('ccm'),
+          conceptId: input.conceptId,
+          authorId: input.authorId,
+          parentCommentId: parent ? parent.id : null,
+          body,
+          createdAt: this._now().toISOString(),
+        };
+        this._conceptComments.set(comment.id, comment);
+        // Mirrors trg_notify_on_concept_comment: creator always; a reply also
+        // reaches the parent author (skip the duplicate when they coincide).
+        const data = { conceptTitle: concept.title, excerpt: body.slice(0, 120) };
+        this._emitNotification({
+          recipientId: concept.creatorId,
+          type: 'concept_comment',
+          actorId: input.authorId,
+          conceptId: input.conceptId,
+          data,
+        });
+        if (parent && parent.authorId !== concept.creatorId) {
+          this._emitNotification({
+            recipientId: parent.authorId,
+            type: 'concept_comment',
+            actorId: input.authorId,
+            conceptId: input.conceptId,
+            data: { ...data, reply: true },
+          });
+        }
+        return comment;
+      },
+      listForConcept: async (conceptId) =>
+        [...this._conceptComments.values()]
+          .filter((c) => c.conceptId === conceptId)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+      countForConcept: async (conceptId) => {
+        let n = 0;
+        for (const c of this._conceptComments.values()) if (c.conceptId === conceptId) n += 1;
+        return n;
+      },
+    };
+
+    this.conceptStatuses = {
+      listActive: async (viewerId) => {
+        const nowMs = this._now().getTime();
+        return [...this._conceptStatuses.values()]
+          .filter((s) => Date.parse(s.expiresAt) > nowMs)
+          .sort(
+            // Same-ms ties (common under the test clock) break newest-id-first.
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+          )
+          .map((status) => ({
+            status,
+            viewerSeen: viewerId ? this._conceptStatusViews.has(`${status.id}:${viewerId}`) : false,
+          }));
+      },
+      recordView: async (statusId, viewerId) => {
+        let found = false;
+        for (const s of this._conceptStatuses.values()) {
+          if (s.id === statusId) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new WearStoreError('status_not_found', `Unknown concept status ${statusId}.`);
+        }
+        this._conceptStatusViews.add(`${statusId}:${viewerId}`);
+      },
     };
 
     this.conceptProposals = {
@@ -2162,6 +2332,39 @@ export class MemoryWearStore implements WearStore {
       createdAt: this._now().toISOString(),
     };
     this._notifications.set(notif.id, notif);
+  }
+
+  /**
+   * Mirrors `wear.promote_concept_status` (mig 161): promote a freshly-posted
+   * Concept into the concept-stories bar when the creator holds the derived
+   * Creator badge (>10 live concepts, counting this one) or while the
+   * first-100 bootstrap grace is open. Badge promotions never consume grace
+   * slots; the grace counter is statuses issued, self-terminating at 100.
+   */
+  private _promoteConceptStatus(concept: Concept): void {
+    let byCreator = 0;
+    for (const c of this._concepts.values()) if (c.creatorId === concept.creatorId) byCreator += 1;
+    let reason: ConceptStatus['reason'];
+    if (byCreator >= CREATOR_BADGE_MIN_CONCEPTS) {
+      reason = 'creator_badge';
+    } else {
+      let grace = 0;
+      for (const s of this._conceptStatuses.values()) {
+        if (s.reason === 'bootstrap_grace') grace += 1;
+      }
+      if (grace >= BOOTSTRAP_GRACE_STATUSES) return;
+      reason = 'bootstrap_grace';
+    }
+    if (this._conceptStatuses.has(concept.id)) return;
+    const ts = this._now();
+    this._conceptStatuses.set(concept.id, {
+      id: this._id('cst'),
+      conceptId: concept.id,
+      creatorId: concept.creatorId,
+      reason,
+      createdAt: ts.toISOString(),
+      expiresAt: new Date(ts.getTime() + CONCEPT_STATUS_TTL_MS).toISOString(),
+    });
   }
 
   /** Mirrors `trg_sync_brand_verified`: cache the outcome onto the brand. */

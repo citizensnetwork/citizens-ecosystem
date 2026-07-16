@@ -183,8 +183,26 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-15, project `xyiajtrvhlxaeplsiajj`, head = **mig 160**)
+## 9. Verification snapshot (updated 2026-07-16, project `xyiajtrvhlxaeplsiajj`, head = **mig 161**)
 
+> **2026-07-16: mig 161 (`wear` concept engagement — the community Concepts surface) APPLIED**
+> (pre-apply tag `wear-pre-mig161` @de042fa). **Advisor: 0 ERROR / 101 WARN / 3 INFO — signature
+> byte-identical to the head-160 baseline (sha 658f66c4), 0 new findings.** Adds 4 tables
+> (`wear.concept_comments` — the wear.comments mirror incl. moderator takedown;
+> `wear.concept_shares` — distinct-sharer pk (concept,user), INSERT-only social proof;
+> `wear.concept_statuses` — the concept-stories bar, **no client write path at all** (rows enter
+> only via the SECDEF promotion trigger: Creator badge >10 concepts, else first-100
+> bootstrap-grace, self-terminating partial-index counter); `wear.concept_status_views` —
+> story_views mirror), 2 enums, **+3 `wear.notification_type` values** (`concept_comment` /
+> `concept_upvote` / `concept_share`) and 4 trigger fns (`promote_concept_status` + 3 notify
+> triggers — all `revoke … from public`, run-as-owner, so 0 new SECDEF-EXECUTE WARNs). Every new
+> FK is indexed. wear policies 75→**83**, tables 33→**37**, fns 28→**32**, enums 20→**22**.
+> Rolled-back prod smokes 10/10 PASS (spoofed comment-author denied; duplicate share 23505;
+> client status-INSERT denied; grace promotion fires; status-view privacy holds; comment/upvote/
+> share each notify the creator). Design ratified in
+> [`Citizens_Wear_Roles_and_Concepts_MD §6`](../../../docs/Citizens_Wear_Roles_and_Concepts_MD.md)
+> §6.1/§6.2 + RESUME §3W. **Next migration # = 162.**
+>
 > **2026-07-15: mig 160 (`wear` content-permission model) APPLIED** (pre-apply tag
 > `wear-pre-mig160`). **Advisor: 0 ERROR / 101 WARN / 3 INFO — 0 new findings vs head-159.**
 > Tighten-only; no functions/tables/grants added. `wear.posts` insert now requires an owned
