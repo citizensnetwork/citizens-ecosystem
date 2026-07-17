@@ -1,120 +1,28 @@
-# OSV-Scanner configuration — dependency-advisory BASELINE
-# =========================================================
+# OSV-Scanner configuration — dependency-advisory baseline (NOW EMPTY)
+# =====================================================================
 # The CI "Verify" job scans pnpm-lock.yaml with OSV-Scanner and BLOCKS on any
-# known vulnerability (ratified 2026-07-16). When the gate was introduced it
-# surfaced 27 unique advisories (38 counting duplicate hits across package
-# versions) that had been latent for months because the previous `pnpm audit`
-# step was silently broken (npm retired its endpoint → HTTP 410).
+# known vulnerability (`osv-scanner scan --config=osv-scanner.toml -L
+# pnpm-lock.yaml`, pinned v2.3.8). This file is intentionally kept (CI passes
+# `--config=osv-scanner.toml`) but carries NO ignored advisories.
 #
-# Per the founder's decision (2026-07-16, RESUME §3Z): BASELINE these existing
-# advisories here so CI is green now and the gate blocks any NEW advisory going
-# forward, then clear this baseline in a dedicated dependency-remediation
-# session. All but `esbuild` are transitive; `esbuild` is the only direct dep;
-# the two `sandbox` advisories have no fix available upstream.
+# History: when the blocking gate was introduced (2026-07-16, RESUME §3Z) it
+# surfaced 27 pre-existing advisories that had been latent while the previous
+# `pnpm audit` step was silently broken (npm retired its endpoint → HTTP 410).
+# Those were temporarily BASELINED here, then fully REMEDIATED (2026-07-16,
+# RESUME §3AA):
 #
-# ⚠ Every entry below is TEMPORARY debt to be removed — do not add to this file
-# to silence new advisories; fix the dependency instead. Remediation plan:
-# bump the fixable transitives via `pnpm.overrides` (root package.json) + the
-# esbuild direct dep, handle the risky ones carefully (undici 5→6 major;
-# path-to-regexp feeds Next.js routing), and keep only genuinely-unfixable
-# advisories (sandbox) here with an explicit justification. No `ignoreUntil` is
-# set (to avoid surprise CI reds); the follow-up task drives the cleanup.
-
-# ── @tootallnate/once (transitive) — 2.0.0 → 2.0.1 ──────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-vpq2-c234-7xj6"
-reason = "Baseline 2026-07-16 (transitive @tootallnate/once, CVSS 3.3). Fixable via override; tracked for remediation (RESUME §3Z)."
-
-# ── ajv (transitive) — 8.6.3 → 8.18.0 ──────────────────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-2g4f-4pwh-qvx6"
-reason = "Baseline 2026-07-16 (transitive ajv, CVSS 5.5). Fixable via override; tracked for remediation (RESUME §3Z)."
-
-# ── esbuild (DIRECT dep) — 0.28.0 → 0.28.1 ─────────────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-g7r4-m6w7-qqqr"
-reason = "Baseline 2026-07-16 (direct esbuild, CVSS 2.5). An override already exists but the lockfile is stale; refresh lockfile in remediation (RESUME §3Z)."
-
-# ── minimatch (transitive) — 10.1.1 → 10.2.3 ───────────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-23c5-xmqv-rm74"
-reason = "Baseline 2026-07-16 (transitive minimatch, CVSS 7.5). Fixable via override; tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-3ppc-4f35-3m26"
-reason = "Baseline 2026-07-16 (transitive minimatch, CVSS 8.7). Fixable via override; tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-7r86-cg39-jmmj"
-reason = "Baseline 2026-07-16 (transitive minimatch, CVSS 7.5). Fixable via override; tracked for remediation (RESUME §3Z)."
-
-# ── path-to-regexp (transitive; feeds Next.js routing — bump carefully) ─────
-[[IgnoredVulns]]
-id = "GHSA-9wv6-86v2-598j"
-reason = "Baseline 2026-07-16 (transitive path-to-regexp 6.1.0→6.3.0, CVSS 7.7). Fixable; verify Next routing in remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-27v5-c462-wpq7"
-reason = "Baseline 2026-07-16 (transitive path-to-regexp 8.x→8.4.0, CVSS 5.9). Fixable; verify Next routing in remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-j3q9-mxjg-w52f"
-reason = "Baseline 2026-07-16 (transitive path-to-regexp 8.x→8.4.0, CVSS 7.5). Fixable; verify Next routing in remediation (RESUME §3Z)."
-
-# ── sandbox (transitive) — NO FIX AVAILABLE upstream ────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-fm4j-4xhm-xpwx"
-reason = "Baseline 2026-07-16 (transitive sandbox 3.4.0, no upstream fix). Assess whether the pulling dep can be dropped/replaced in remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-gc25-3vc5-2jf9"
-reason = "Baseline 2026-07-16 (transitive sandbox 3.4.0, no upstream fix). Assess whether the pulling dep can be dropped/replaced in remediation (RESUME §3Z)."
-
-# ── smol-toml (transitive) — 1.5.2 → 1.6.1 ─────────────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-v3rj-xjv7-4jmq"
-reason = "Baseline 2026-07-16 (transitive smol-toml, CVSS 5.3). Fixable via override; tracked for remediation (RESUME §3Z)."
-
-# ── tar (transitive) — 7.5.7 → 7.5.16 ──────────────────────────────────────
-[[IgnoredVulns]]
-id = "GHSA-83g3-92jg-28cx"
-reason = "Baseline 2026-07-16 (transitive tar, CVSS 7.1). Fixable via override; tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-9ppj-qmqm-q256"
-reason = "Baseline 2026-07-16 (transitive tar, CVSS 8.2). Fixable via override; tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-qffp-2rhf-9h96"
-reason = "Baseline 2026-07-16 (transitive tar, CVSS 8.2). Fixable via override; tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-vmf3-w455-68vh"
-reason = "Baseline 2026-07-16 (transitive tar, CVSS 6.9). Fixable via override; tracked for remediation (RESUME §3Z)."
-
-# ── undici (transitive) — 5.28.4 → 6.x (MAJOR bump — highest remediation risk) ─
-[[IgnoredVulns]]
-id = "GHSA-2mjp-6q6p-2qxm"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 6.5; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-35p6-xmwp-9g52"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 3.7; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-4992-7rv2-5pvq"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 4.6; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-c76h-2ccp-4975"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 6.8; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-cxrh-j4jr-qwg3"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 3.1; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-g8m3-5g58-fq7m"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 3.7; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-g9mf-h72j-4rw9"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 5.9; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-p88m-4jfj-68fv"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 5.9; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-v9p9-hfj2-hcw8"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 7.5; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-vrm6-8vpv-qv8q"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 7.5; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
-[[IgnoredVulns]]
-id = "GHSA-vxpw-j846-p89q"
-reason = "Baseline 2026-07-16 (transitive undici 5.28.4, CVSS 7.5; fix needs 6.x major). Tracked for remediation (RESUME §3Z)."
+#   • 26 of the 27 advisories (undici×11, tar×4, minimatch×3, path-to-regexp×3,
+#     sandbox×2, ajv, smol-toml, @tootallnate/once) all traced — via `pnpm why`
+#     — to a SINGLE root devDependency: `vercel ^55.0.0` (the Vercel CLI). That
+#     dep was added accidentally by a local `vercel deploy` (commit dfcf476,
+#     "founder Vercel-CLI deploy stragglers"); no script, CI job, or app import
+#     used it. Removing it dropped every one of those advisories (and ~2.4k lines
+#     of lockfile). Deploys are unaffected: Vercel builds via Git integration and
+#     `npx vercel` still works on demand.
+#   • The 27th (esbuild 0.28.0 → GHSA-g7r4-m6w7-qqqr) is a genuine transitive of
+#     `vite` (app build). Fixed by tightening the `pnpm.overrides` esbuild floor
+#     to `>=0.28.1` (root package.json) so the whole tree resolves to 0.28.1.
+#
+# ⚠ Do NOT add IgnoredVulns entries here to silence NEW advisories — fix the
+# dependency instead (bump via pnpm.overrides, or drop the pulling dep). The gate
+# is meant to block; this file staying empty is the goal.
