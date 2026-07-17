@@ -177,7 +177,8 @@ next migration # still 141.** Investigation corrected the assumed threat model:
 | `.claude/sessions/*.json` advisor dumps | — | Gitignored, local-only, contain no PAT/service_role. | — |
 
 **Net:** the only genuinely sensitive secret (PAT) was *not* publicly exposed via the repo; it is now out of the
-config file and awaiting the founder's rotation. Anon-key "leak" was a false positive (publishable by design).
+config file and **✅ has been ROTATED by the founder (confirmed 2026-07-17)** — this item is CLOSED.
+Anon-key "leak" was a false positive (publishable by design).
 
 ---
 
@@ -1554,15 +1555,17 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
    - **§3U address hygiene (roadmap):** put Wear/Connect/Vision behind **stable custom domains** (e.g.
      `wear.citizenscentral.co.za`) + a **branded storage asset origin** so URLs stop leaking
      `*.vercel.app` deploy-hashes and `xyiajtrvhlxaeplsiajj.supabase.co`.
-   - **Vision deploy gates ⛔** (§3F + §3O): same env pattern (+ optional
-     NEXT_PUBLIC_MAPTILER_KEY) + Supabase **Exposed schemas → add `vision`** + its redirect URL.
+   - **Vision deploy gates — PARTIALLY DONE** (§3F + §3O): ~~Supabase **Exposed schemas → add
+     `vision`**~~ ✅ **DONE (founder, confirmed 2026-07-17)**. ⛔ **STILL OWED:** the same env
+     pattern (+ optional `NEXT_PUBLIC_MAPTILER_KEY`) **+ Vision's redirect URL**. Vision stays
+     non-functional until those two land.
    - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
    - **Custom SMTP for auth emails** (§3P ⛔) — required before non-team users can receive
      sign-up confirmation / password-reset emails.
    - Answer the **Supabase-Preview** question (§3M #2: which surface showed the error) so the
      integration can be switched off.
-   - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release · **PAT rotation**
-     still owed (§3D).
+   - ~~**PAT rotation** (§3D)~~ ✅ **DONE (founder, confirmed 2026-07-17)** — §3D is fully closed.
+   - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release still owed.
 
 > Optional Connect-side polish if a session wants a low-risk in-repo task: the accepted demo debt
 > in `src/frontend/app/store.jsx` (`if (!realUser)` graceful-degradation branches, §2M) — harmless,
