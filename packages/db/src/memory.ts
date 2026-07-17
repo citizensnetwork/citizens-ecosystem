@@ -41,6 +41,13 @@ import type {
   FollowEdge,
   FollowRepo,
   HighlightRepo,
+  ImpersonatedFeedItem,
+  ImpersonatedSavedPost,
+  ImpersonationActionEntry,
+  ImpersonationActionKind,
+  ImpersonationEndCause,
+  ImpersonationRepo,
+  ImpersonationSession,
   LikeEdge,
   LikeRepo,
   Message,
@@ -85,6 +92,9 @@ import {
   CONCEPT_STAGES,
   CONCEPT_STATUS_TTL_MS,
   CREATOR_BADGE_MIN_CONCEPTS,
+  IMPERSONATION_REASON_MAX,
+  IMPERSONATION_REASON_MIN,
+  IMPERSONATION_SESSION_TTL_MS,
   WearStoreError,
 } from './contract';
 import { extractHashtags, normaliseHashtag } from './hashtags';
@@ -146,6 +156,7 @@ export class MemoryWearStore implements WearStore {
   public readonly brandApplications: BrandApplicationRepo;
   public readonly roles: RoleRepo;
   public readonly notifications: NotificationRepo;
+  public readonly impersonation: ImpersonationRepo;
 
   private readonly _now: () => Date;
   private readonly _users = new Map<ConnectId, WearUser>();
@@ -206,6 +217,10 @@ export class MemoryWearStore implements WearStore {
   // Mig 159 — notifications (trigger-produced in prod; emitted by the lifecycle
   // methods here to mirror the DB triggers).
   private readonly _notifications = new Map<string, WearNotification>();
+  // Mig 163 — impersonation Phase 1 (append-only audit; runtime state only,
+  // never seeded — a session is always born through `impersonation.start`).
+  private readonly _impersonationSessions = new Map<string, ImpersonationSession>();
+  private readonly _impersonationActions = new Map<string, ImpersonationActionEntry>();
   private _nextId = 1;
 
   public constructor(options: MemoryWearStoreOptions = {}) {
@@ -1291,6 +1306,343 @@ export class MemoryWearStore implements WearStore {
           }
         }
         return count;
+      },
+    };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Mig 163 — admin sign-in-as, Phase 1 (roles MD §7). The rules below ARE
+    // the semantic spec for `SupabaseWearStore`: they mirror the SECDEF fns
+    // exactly — error codes equal the raise messages, every view appends its
+    // audit entry BEFORE returning data, expiry refuses without closing
+    // (`start`'s lazy sweep + `end` do the closing, like the prod cron), and
+    // every close emits the target's `account_accessed_by_admin` notification
+    // with the institutional NULL actor (the close-trigger mirror).
+    // ─────────────────────────────────────────────────────────────────────
+    this.impersonation = {
+      start: async (callerId, targetUserId, reason) => {
+        this._requireImpersonationAdmin(callerId);
+        const trimmed = (reason ?? '').trim();
+        if (
+          trimmed.length < IMPERSONATION_REASON_MIN ||
+          trimmed.length > IMPERSONATION_REASON_MAX
+        ) {
+          throw new WearStoreError('reason_required', 'A reason of 5–500 characters is required.');
+        }
+        if (targetUserId === callerId) {
+          throw new WearStoreError('cannot_impersonate_self', 'You cannot sign in as yourself.');
+        }
+        if (!this._users.has(targetUserId)) {
+          throw new WearStoreError('user_not_found', 'No such user.');
+        }
+        // Self-healing sweep (the start fn + prod cron): close EXPIRED
+        // sessions holding either uniqueness slot — each close notifies.
+        const nowMs = this._now().getTime();
+        for (const [id, s] of this._impersonationSessions.entries()) {
+          if (
+            s.endedAt === null &&
+            Date.parse(s.expiresAt) <= nowMs &&
+            (s.adminId === callerId || s.targetUserId === targetUserId)
+          ) {
+            this._closeImpersonationSession(id, 'expired');
+          }
+        }
+        // Ratified §7.6b "both": one active per admin AND one per target.
+        for (const s of this._impersonationSessions.values()) {
+          if (s.endedAt === null && s.adminId === callerId) {
+            throw new WearStoreError(
+              'impersonation_active',
+              'You already have an active sign-in-as session.',
+            );
+          }
+        }
+        for (const s of this._impersonationSessions.values()) {
+          if (s.endedAt === null && s.targetUserId === targetUserId) {
+            throw new WearStoreError(
+              'target_under_review',
+              'This account is already being viewed by an administrator.',
+            );
+          }
+        }
+        const ts = this._now();
+        const session: ImpersonationSession = {
+          id: this._id('imps'),
+          adminId: callerId,
+          targetUserId,
+          reason: trimmed,
+          startedAt: ts.toISOString(),
+          expiresAt: new Date(ts.getTime() + IMPERSONATION_SESSION_TTL_MS).toISOString(),
+          endedAt: null,
+          endCause: null,
+          createdAt: ts.toISOString(),
+          updatedAt: ts.toISOString(),
+        };
+        this._impersonationSessions.set(session.id, session);
+        return session;
+      },
+      end: async (callerId, sessionId) => {
+        this._requireImpersonationAdmin(callerId);
+        const s = this._impersonationSessions.get(sessionId);
+        if (!s || s.adminId !== callerId) {
+          throw new WearStoreError('session_not_found', 'No such impersonation session.');
+        }
+        if (s.endedAt !== null) {
+          throw new WearStoreError('session_not_active', 'This session has already ended.');
+        }
+        const expired = this._now().getTime() >= Date.parse(s.expiresAt);
+        return this._closeImpersonationSession(sessionId, expired ? 'expired' : 'admin_exit');
+      },
+      getActive: async (callerId) => {
+        // RLS semantics for reads: a non-admin simply sees no rows.
+        if (!this._isAdmin(callerId)) return null;
+        const nowMs = this._now().getTime();
+        for (const s of this._impersonationSessions.values()) {
+          if (s.adminId === callerId && s.endedAt === null && Date.parse(s.expiresAt) > nowMs) {
+            return s;
+          }
+        }
+        return null;
+      },
+      listActions: async (callerId, sessionId) => {
+        if (!this._isAdmin(callerId)) return [];
+        return [...this._impersonationActions.values()]
+          .filter((a) => a.sessionId === sessionId)
+          .sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id.localeCompare(b.id));
+      },
+      viewProfile: async (callerId, sessionId) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        this._auditImpersonation(sessionId, 'view_profile', {});
+        const t = s.targetUserId;
+        const user = this._users.get(t);
+        if (!user) throw new WearStoreError('user_not_found', 'No such user.');
+        const profile = this._profiles.get(t) ?? null;
+        const settings = this._settings.get(t) ?? null;
+        let followers = 0;
+        let following = 0;
+        for (const f of this._follows.values()) {
+          if (f.targetId === t) followers += 1;
+          if (f.actorId === t) following += 1;
+        }
+        let posts = 0;
+        for (const p of this._posts.values()) if (p.authorId === t) posts += 1;
+        let concepts = 0;
+        for (const c of this._concepts.values()) if (c.creatorId === t) concepts += 1;
+        const brands = [...this._brands.values()]
+          .filter((b) => b.ownerUserId === t)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+          .map((b) => ({
+            id: b.id,
+            slug: b.slug,
+            name: b.name,
+            verified: b.verified,
+            logoUrl: b.logoUrl,
+          }));
+        return {
+          user: {
+            id: user.id,
+            handle: user.handle,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+            createdAt: user.createdAt,
+          },
+          profile: profile
+            ? { bio: profile.bio, visibility: profile.visibility, verified: profile.verified }
+            : null,
+          settings: settings
+            ? {
+                displayNameOverride: settings.displayNameOverride,
+                profileVisibility: settings.profileVisibility,
+              }
+            : null,
+          role: this._roles.get(t) ?? null,
+          counts: { followers, following, posts, concepts },
+          creator: {
+            earned: concepts >= CREATOR_BADGE_MIN_CONCEPTS,
+            conceptCount: concepts,
+            threshold: CREATOR_BADGE_MIN_CONCEPTS,
+          },
+          brands,
+        };
+      },
+      viewFeed: async (callerId, sessionId, opts) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        const mode = opts?.mode === 'chronological' ? 'chronological' : 'for-you';
+        const limit = Math.min(Math.max(opts?.limit ?? 20, 1), 50);
+        const offset = Math.max(opts?.offset ?? 0, 0);
+        this._auditImpersonation(sessionId, 'view_feed', { mode, limit, offset });
+        const t = s.targetUserId;
+        // The app's own composition, AS THE TARGET (follows ∪ self; no block
+        // filter — the real feeds apply none).
+        const following = new Set<ConnectId>([t]);
+        for (const edge of this._follows.values()) {
+          if (edge.actorId === t) following.add(edge.targetId);
+        }
+        let ordered: Post[];
+        if (mode === 'chronological') {
+          ordered = [...this._posts.values()]
+            .filter((p) => following.has(p.authorId))
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+        } else {
+          const nowMs = this._now().getTime();
+          ordered = [...this._posts.values()]
+            .map((p) => {
+              const ageMs = nowMs - Date.parse(p.createdAt);
+              const freshness = Math.max(0, 1 - ageMs / (1000 * 60 * 60 * 24 * 7));
+              return { p, score: (following.has(p.authorId) ? 2 : 0) + freshness };
+            })
+            .sort(
+              (a, b) => b.score - a.score || Date.parse(b.p.createdAt) - Date.parse(a.p.createdAt),
+            )
+            .map((x) => x.p);
+        }
+        const items = ordered
+          .slice(offset, offset + limit)
+          .map((p) => this._impersonatedFeedItem(p, t));
+        return {
+          mode,
+          items,
+          nextOffset: items.length === limit ? offset + limit : null,
+        };
+      },
+      viewSaves: async (callerId, sessionId) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        this._auditImpersonation(sessionId, 'view_saves', {});
+        const t = s.targetUserId;
+        const collections = [...this._saveCollections.values()]
+          .filter((c) => c.ownerId === t)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+          .map((raw) => {
+            const c = this._snapshotCollection(raw);
+            // postIds is append-ordered; prod orders newest save first.
+            const posts: ImpersonatedSavedPost[] = [...c.postIds]
+              .reverse()
+              .map((postId): ImpersonatedSavedPost | null => {
+                const p = this._posts.get(postId);
+                if (!p) return null;
+                const author = this._users.get(p.authorId) ?? null;
+                return {
+                  id: p.id,
+                  body: p.body,
+                  createdAt: p.createdAt,
+                  savedAt: null, // memory keeps no per-save timestamp
+                  author: author
+                    ? {
+                        handle: author.handle,
+                        displayName: author.displayName,
+                        avatarUrl: author.avatarUrl,
+                      }
+                    : null,
+                  media: this._impersonatedMedia(p.id),
+                };
+              })
+              .filter((x): x is ImpersonatedSavedPost => x !== null);
+            return { id: c.id, name: c.name, createdAt: c.createdAt, posts };
+          });
+        return { collections };
+      },
+      viewNotifications: async (callerId, sessionId, limit) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        const lim = Math.min(Math.max(limit ?? 50, 1), 100);
+        this._auditImpersonation(sessionId, 'view_notifications', { limit: lim });
+        const t = s.targetUserId;
+        const all = [...this._notifications.values()].filter((n) => n.recipientId === t);
+        const unreadCount = all.filter((n) => n.readAt === null).length;
+        const items = all
+          .sort(
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id),
+          )
+          .slice(0, lim)
+          .map((n) => {
+            const actor = n.actorId ? (this._users.get(n.actorId) ?? null) : null;
+            return {
+              id: n.id,
+              type: n.type,
+              data: n.data,
+              conceptId: n.conceptId,
+              brandId: n.brandId,
+              readAt: n.readAt,
+              createdAt: n.createdAt,
+              actor: actor
+                ? {
+                    handle: actor.handle,
+                    displayName: actor.displayName,
+                    avatarUrl: actor.avatarUrl,
+                  }
+                : null,
+            };
+          });
+        return { unreadCount, items };
+      },
+      viewConversations: async (callerId, sessionId) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        this._auditImpersonation(sessionId, 'view_conversations', {});
+        const t = s.targetUserId;
+        const conversations = [];
+        for (const m of this._convMembers.values()) {
+          if (m.userId !== t) continue;
+          const conv = this._conversations.get(m.conversationId);
+          if (!conv) continue;
+          let messageCount = 0;
+          for (const msg of this._messages.values()) {
+            if (msg.conversationId === conv.id) messageCount += 1;
+          }
+          conversations.push({
+            id: conv.id,
+            kind: conv.kind,
+            name: conv.name,
+            updatedAt: conv.updatedAt,
+            lastReadAt: m.lastReadAt,
+            requestState: m.requestState,
+            messageCount,
+            members: this._impersonatedMembers(conv.id),
+          });
+        }
+        conversations.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+        return { conversations };
+      },
+      viewDmThread: async (callerId, sessionId, conversationId, reason) => {
+        const s = this._validateImpersonation(callerId, sessionId);
+        const trimmed = (reason ?? '').trim();
+        if (
+          trimmed.length < IMPERSONATION_REASON_MIN ||
+          trimmed.length > IMPERSONATION_REASON_MAX
+        ) {
+          throw new WearStoreError(
+            'dm_reason_required',
+            'A reason of 5–500 characters is required to open a DM thread.',
+          );
+        }
+        const t = s.targetUserId;
+        // Fail closed: a conversation the TARGET is not in does not exist here.
+        if (!this._convMembers.has(memberKey(conversationId, t))) {
+          throw new WearStoreError('conversation_not_found', 'Conversation not found.');
+        }
+        this._auditImpersonation(sessionId, 'view_dm_thread', { conversationId }, trimmed);
+        const conv = this._conversations.get(conversationId);
+        if (!conv) throw new WearStoreError('conversation_not_found', 'Conversation not found.');
+        const messages = [...this._messages.values()]
+          .filter((m) => m.conversationId === conversationId)
+          .sort(
+            (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id),
+          )
+          .slice(-500)
+          .map((m) => {
+            const u = this._users.get(m.authorId) ?? null;
+            return {
+              id: m.id,
+              authorId: m.authorId,
+              author: u
+                ? { handle: u.handle, displayName: u.displayName, avatarUrl: u.avatarUrl }
+                : null,
+              body: m.deletedAt === null ? m.body : null,
+              deleted: m.deletedAt !== null,
+              createdAt: m.createdAt,
+            };
+          });
+        return {
+          conversation: { id: conv.id, kind: conv.kind, name: conv.name },
+          members: this._impersonatedMembers(conversationId),
+          messages,
+        };
       },
     };
 
@@ -2546,6 +2898,158 @@ export class MemoryWearStore implements WearStore {
       createdAt: this._now().toISOString(),
     };
     this._notifications.set(notif.id, notif);
+  }
+
+  // ── Mig 163 impersonation helpers (mirror the SECDEF fns) ────────────────
+  /** `impersonation_start/_end`'s admin gate (`wear.is_admin()` in prod). */
+  private _requireImpersonationAdmin(callerId: ConnectId): void {
+    if (!callerId || !this._isAdmin(callerId)) {
+      throw new WearStoreError('forbidden', 'Administrators only.');
+    }
+  }
+
+  /**
+   * Mirrors `wear.impersonation_validate`: admin + own + open + inside the
+   * box. Refuses an expired session WITHOUT closing it (in prod a raise
+   * would roll the close back; `start`'s sweep / `end` / the cron close).
+   */
+  private _validateImpersonation(callerId: ConnectId, sessionId: string): ImpersonationSession {
+    this._requireImpersonationAdmin(callerId);
+    const s = this._impersonationSessions.get(sessionId);
+    if (!s || s.adminId !== callerId) {
+      throw new WearStoreError('session_not_found', 'No such impersonation session.');
+    }
+    if (s.endedAt !== null) {
+      throw new WearStoreError('session_not_active', 'This session has already ended.');
+    }
+    if (Date.parse(s.expiresAt) <= this._now().getTime()) {
+      throw new WearStoreError('session_expired', 'This sign-in-as session has expired.');
+    }
+    return s;
+  }
+
+  /** Mirrors `wear.impersonation_audit`: the unskippable per-read log row. */
+  private _auditImpersonation(
+    sessionId: string,
+    action: ImpersonationActionKind,
+    detail: Record<string, unknown>,
+    dmReason: string | null = null,
+  ): void {
+    const entry: ImpersonationActionEntry = {
+      id: this._id('impa'),
+      sessionId,
+      at: this._now().toISOString(),
+      action,
+      detail,
+      dmReason,
+    };
+    this._impersonationActions.set(entry.id, entry);
+  }
+
+  /**
+   * Close a session and notify the target — the mirror of the one-shot close
+   * stamp + `trg_notify_on_impersonation_close` (institutional NULL actor;
+   * expiry closes AT the box end, exactly like the prod cron/end fn).
+   */
+  private _closeImpersonationSession(
+    sessionId: string,
+    cause: ImpersonationEndCause,
+  ): ImpersonationSession {
+    const s = this._impersonationSessions.get(sessionId);
+    if (!s || s.endedAt !== null) {
+      throw new WearStoreError('session_not_active', 'This session has already ended.');
+    }
+    const endedAt = cause === 'expired' ? s.expiresAt : this._now().toISOString();
+    const closed: ImpersonationSession = {
+      ...s,
+      endedAt,
+      endCause: cause,
+      updatedAt: this._now().toISOString(),
+    };
+    this._impersonationSessions.set(sessionId, closed);
+    this._emitNotification({
+      recipientId: closed.targetUserId,
+      type: 'account_accessed_by_admin',
+      actorId: null,
+      data: {
+        sessionId: closed.id,
+        startedAt: closed.startedAt,
+        endedAt: closed.endedAt,
+        date: closed.startedAt.slice(0, 10),
+      },
+    });
+    return closed;
+  }
+
+  /** One feed post hydrated AS THE TARGET (`wear.impersonation_post_jsonb`). */
+  private _impersonatedFeedItem(post: Post, target: ConnectId): ImpersonatedFeedItem {
+    const author = this._users.get(post.authorId) ?? null;
+    const brand = post.brandId ? (this._brands.get(post.brandId) ?? null) : null;
+    let likeCount = 0;
+    for (const l of this._likes.values()) if (l.postId === post.id) likeCount += 1;
+    let commentCount = 0;
+    for (const c of this._comments.values()) if (c.postId === post.id) commentCount += 1;
+    let viewerSaved = false;
+    for (const sc of this._saveCollections.values()) {
+      if (sc.ownerId === target && this._savedPosts.has(`${sc.id}:${post.id}`)) {
+        viewerSaved = true;
+        break;
+      }
+    }
+    return {
+      id: post.id,
+      body: post.body,
+      conceptId: post.conceptId,
+      createdAt: post.createdAt,
+      author: author
+        ? {
+            id: author.id,
+            handle: author.handle,
+            displayName: author.displayName,
+            avatarUrl: author.avatarUrl,
+          }
+        : null,
+      brand: brand
+        ? {
+            id: brand.id,
+            slug: brand.slug,
+            name: brand.name,
+            verified: brand.verified,
+            logoUrl: brand.logoUrl,
+          }
+        : null,
+      media: this._impersonatedMedia(post.id),
+      likeCount,
+      commentCount,
+      viewerLiked: this._likes.has(`${post.id}:${target}`),
+      viewerSaved,
+    };
+  }
+
+  private _impersonatedMedia(postId: string) {
+    return (this._postMedia.get(postId) ?? [])
+      .slice()
+      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .map((m) => ({ url: m.url, kind: m.kind, altText: m.altText }));
+  }
+
+  /** A conversation's members hydrated to display identity, handle-sorted. */
+  private _impersonatedMembers(conversationId: string) {
+    return [...this._convMembers.values()]
+      .filter((cm) => cm.conversationId === conversationId)
+      .map((cm) => {
+        const u = this._users.get(cm.userId);
+        return u
+          ? {
+              userId: u.id,
+              handle: u.handle,
+              displayName: u.displayName,
+              avatarUrl: u.avatarUrl,
+            }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => a.handle.localeCompare(b.handle));
   }
 
   /**

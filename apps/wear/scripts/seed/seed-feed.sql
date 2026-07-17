@@ -339,3 +339,85 @@ begin
 
   raise notice 'wear brand-application seed applied (1 pending application for the admin queue)';
 end $brandapp$;
+
+-- ============================================================================
+-- §14 — mig-163 impersonation Phase 1 demo (admin sign-in-as of a citizen)
+-- ----------------------------------------------------------------------------
+-- SEPARATE guarded block (the §12/§13 pattern). Seeds ONE completed, audited
+-- sign-in-as session so the founder can immediately see (a) the target's
+-- after-the-fact inbox notification and (b) a reviewable audit trail — without
+-- occupying the founder's own one-active-session slot (the session is left
+-- CLOSED, so no live banner ambushes them; they walk the LIVE flow by clicking
+-- "View as user (admin)" on any profile in the running app).
+--
+-- The session is inserted OPEN then UPDATEd to closed — deliberately: the
+-- close-notify trigger is AFTER UPDATE (mig-159 invariant), so a direct
+-- insert-as-closed would NOT deliver the notification. This drives the exact
+-- state transition the app's Exit control does. Immutability holds: the
+-- BEFORE-UPDATE guard permits an open→closed transition that changes only the
+-- close stamp, which is all we touch.
+--
+-- Admin is resolved dynamically from wear.user_roles (role='admin') so the
+-- block is portable; the target is the seeded citizen @gracelethabo (c1).
+-- Fixed session id doubles as the idempotency guard. Teardown UNCHANGED:
+-- deleting c1 cascades the session → its actions → the notification.
+-- ============================================================================
+do $imp$
+declare
+  c1    uuid := '5eed0011-0000-4000-a000-000000000011'; -- Grace Lethabo (target)
+  sess  uuid := '5eed5e55-0000-4000-a000-0000000000e1'; -- fixed id = guard
+  admin uuid;
+begin
+  select user_id into admin
+    from wear.user_roles where role = 'admin' order by created_at limit 1;
+  if admin is null then
+    raise notice 'wear impersonation seed skipped — no wear admin exists yet';
+    return;
+  end if;
+  if not exists (select 1 from wear.users where id = c1) then
+    raise notice 'wear impersonation seed skipped — run the base seed first';
+    return;
+  end if;
+  if admin = c1 then
+    raise notice 'wear impersonation seed skipped — the only admin is the demo target';
+    return;
+  end if;
+  if exists (select 1 from wear.impersonation_sessions where id = sess) then
+    raise notice 'wear impersonation seed already present — skipping';
+    return;
+  end if;
+  -- Can't seed a second demo if this admin already holds an active session
+  -- (the partial unique index would reject the open insert).
+  if exists (select 1 from wear.impersonation_sessions
+             where admin_id = admin and ended_at is null) then
+    raise notice 'wear impersonation seed skipped — the admin has an active session';
+    return;
+  end if;
+
+  -- 1) Open the session (5 min ago; a 30-min box, as the start fn stamps).
+  insert into wear.impersonation_sessions
+    (id, admin_id, target_user_id, reason, started_at, expires_at)
+  values
+    (sess, admin, c1,
+     'Support demo: reviewing a reported issue on this account',
+     now() - interval '5 minutes', now() + interval '25 minutes');
+
+  -- 2) The audited reads the admin performed (append-only; a DM open carries
+  --    its own reason, everything else does not — the CHECK enforces this).
+  insert into wear.impersonation_actions (session_id, at, action, detail, dm_reason)
+  values
+    (sess, now() - interval '4 minutes 40 seconds', 'view_profile', '{}'::jsonb, null),
+    (sess, now() - interval '4 minutes 20 seconds', 'view_feed',
+       jsonb_build_object('mode','for-you','limit',20,'offset',0), null),
+    (sess, now() - interval '3 minutes 30 seconds', 'view_dm_thread',
+       jsonb_build_object('conversationId','(demo)'),
+       'Following up the specific thread the user reported');
+
+  -- 3) Close it (admin exit) → the AFTER-UPDATE trigger notifies @gracelethabo
+  --    with the institutional voice ("An administrator accessed your account…").
+  update wear.impersonation_sessions
+     set ended_at = now() - interval '3 minutes', end_cause = 'admin_exit'
+   where id = sess;
+
+  raise notice 'wear impersonation seed applied (1 closed audited session + target notification)';
+end $imp$;

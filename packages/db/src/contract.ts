@@ -1158,7 +1158,10 @@ export type NotificationType =
   | 'concept_share' // someone shared your concept                 → creator
   // Mig 162 — the Become-a-Brand decision (institutional: actor is null):
   | 'brand_application_approved' // your application was approved  → applicant
-  | 'brand_application_rejected'; // …was not approved this time   → applicant
+  | 'brand_application_rejected' // …was not approved this time    → applicant
+  // Mig 163 — impersonation Phase 1 (institutional: actor is null; fired by
+  // the close trigger when an admin sign-in-as session ends — roles MD §7.2-4):
+  | 'account_accessed_by_admin'; // an admin viewed your account   → target
 
 export interface WearNotification {
   readonly id: string;
@@ -1190,6 +1193,245 @@ export interface NotificationRepo {
   markAllRead(userId: ConnectId): Promise<number>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Mig 163 — admin sign-in-as, Phase 1 (roles MD §7, ratified 2026-07-16/17).
+// READ-ONLY act-as: the admin keeps their own identity; the target's view is
+// served exclusively through audited privileged reads. Every view method
+// writes an audit action BEFORE returning data (in prod the SECDEF reader fn
+// does both in one call — an unaudited read is structurally impossible; the
+// memory store mirrors that inline). No write-as-user exists anywhere.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** The §7.4 time-box: sessions auto-expire after 30 minutes. */
+export const IMPERSONATION_SESSION_TTL_MS = 30 * 60 * 1000;
+/** Start/DM reasons must be 5–500 chars (mirrors the mig-163 CHECKs). */
+export const IMPERSONATION_REASON_MIN = 5;
+export const IMPERSONATION_REASON_MAX = 500;
+
+export type ImpersonationEndCause = 'admin_exit' | 'expired';
+
+export interface ImpersonationSession {
+  readonly id: string;
+  readonly adminId: ConnectId;
+  readonly targetUserId: ConnectId;
+  /** Why this account is being viewed — required BEFORE the session exists. */
+  readonly reason: string;
+  readonly startedAt: IsoDateTime;
+  readonly expiresAt: IsoDateTime;
+  readonly endedAt: IsoDateTime | null;
+  readonly endCause: ImpersonationEndCause | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export type ImpersonationActionKind =
+  | 'view_profile'
+  | 'view_feed'
+  | 'view_saves'
+  | 'view_notifications'
+  | 'view_conversations'
+  | 'view_dm_thread';
+
+/** One audited privileged read (append-only; DM opens carry their reason). */
+export interface ImpersonationActionEntry {
+  readonly id: string;
+  readonly sessionId: string;
+  readonly at: IsoDateTime;
+  readonly action: ImpersonationActionKind;
+  readonly detail: Readonly<Record<string, unknown>>;
+  readonly dmReason: string | null;
+}
+
+/** Display identity as the readers hydrate it (no ids beyond what's needed). */
+export interface ImpersonatedUserRef {
+  readonly handle: string;
+  readonly displayName: string;
+  readonly avatarUrl: string | null;
+}
+
+export interface ImpersonatedBrandRef {
+  readonly id: ConnectId;
+  readonly slug: string;
+  readonly name: string;
+  readonly verified: boolean;
+  readonly logoUrl: string | null;
+}
+
+export interface ImpersonatedMediaRef {
+  readonly url: string;
+  readonly kind: PostMediaKind;
+  readonly altText: string | null;
+}
+
+/** The target's own profile + settings VIEW (never a mutation surface). */
+export interface ImpersonatedProfileView {
+  readonly user: ImpersonatedUserRef & { readonly id: ConnectId; readonly createdAt: IsoDateTime };
+  readonly profile: {
+    readonly bio: string | null;
+    readonly visibility: ProfileVisibility;
+    readonly verified: boolean;
+  } | null;
+  readonly settings: {
+    readonly displayNameOverride: string | null;
+    readonly profileVisibility: ProfileVisibility;
+  } | null;
+  readonly role: WearPlatformRole | null;
+  readonly counts: {
+    readonly followers: number;
+    readonly following: number;
+    readonly posts: number;
+    readonly concepts: number;
+  };
+  readonly creator: {
+    readonly earned: boolean;
+    readonly conceptCount: number;
+    readonly threshold: number;
+  };
+  readonly brands: readonly ImpersonatedBrandRef[];
+}
+
+export interface ImpersonatedFeedItem {
+  readonly id: string;
+  readonly body: string;
+  readonly conceptId: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly author: (ImpersonatedUserRef & { readonly id: ConnectId }) | null;
+  readonly brand: ImpersonatedBrandRef | null;
+  readonly media: readonly ImpersonatedMediaRef[];
+  readonly likeCount: number;
+  readonly commentCount: number;
+  /** Engagement state AS THE TARGET (their likes, their saves). */
+  readonly viewerLiked: boolean;
+  readonly viewerSaved: boolean;
+}
+
+export interface ImpersonatedFeedView {
+  readonly mode: 'for-you' | 'chronological';
+  readonly items: readonly ImpersonatedFeedItem[];
+  readonly nextOffset: number | null;
+}
+
+export interface ImpersonatedSavedPost {
+  readonly id: string;
+  readonly body: string;
+  readonly createdAt: IsoDateTime;
+  /** Save timestamp (null in the memory store, which keeps no per-save time). */
+  readonly savedAt: IsoDateTime | null;
+  readonly author: ImpersonatedUserRef | null;
+  readonly media: readonly ImpersonatedMediaRef[];
+}
+
+export interface ImpersonatedSavesView {
+  readonly collections: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly createdAt: IsoDateTime;
+    readonly posts: readonly ImpersonatedSavedPost[];
+  }[];
+}
+
+export interface ImpersonatedNotificationsView {
+  readonly unreadCount: number;
+  readonly items: readonly {
+    readonly id: string;
+    readonly type: NotificationType;
+    readonly data: Readonly<Record<string, unknown>>;
+    readonly conceptId: string | null;
+    readonly brandId: ConnectId | null;
+    readonly readAt: IsoDateTime | null;
+    readonly createdAt: IsoDateTime;
+    readonly actor: ImpersonatedUserRef | null;
+  }[];
+}
+
+/**
+ * Conversation LIST metadata ONLY — member identities and timestamps, never
+ * message bodies (not even previews): the per-thread reason gate is the only
+ * door to DM content (§7.2-3).
+ */
+export interface ImpersonatedConversationsView {
+  readonly conversations: readonly {
+    readonly id: string;
+    readonly kind: ConversationKind;
+    readonly name: string | null;
+    readonly updatedAt: IsoDateTime;
+    readonly lastReadAt: IsoDateTime | null;
+    readonly requestState: ConversationRequestState;
+    readonly messageCount: number;
+    readonly members: readonly (ImpersonatedUserRef & { readonly userId: ConnectId })[];
+  }[];
+}
+
+export interface ImpersonatedDmThreadView {
+  readonly conversation: {
+    readonly id: string;
+    readonly kind: ConversationKind;
+    readonly name: string | null;
+  };
+  readonly members: readonly (ImpersonatedUserRef & { readonly userId: ConnectId })[];
+  readonly messages: readonly {
+    readonly id: string;
+    readonly authorId: ConnectId;
+    readonly author: ImpersonatedUserRef | null;
+    /** Soft-deleted messages render as deleted, never as their old body. */
+    readonly body: string | null;
+    readonly deleted: boolean;
+    readonly createdAt: IsoDateTime;
+  }[];
+}
+
+export interface ImpersonationFeedOptions {
+  readonly mode?: 'for-you' | 'chronological';
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+/**
+ * Admin sign-in-as (Phase 1, read-only). Lifecycle + audited readers. Every
+ * method is admin-gated (`wear.is_admin()` in prod; the role map here);
+ * sessions are time-boxed (30 min), unique per admin AND per target while
+ * active (ratified §7.6b "both"), and immutable once closed. `end` emits the
+ * target's `account_accessed_by_admin` notification (trigger-produced in
+ * prod; mirrored inline in memory) — as does expiry, via the prod cron sweep
+ * or the memory store's lazy sweep in `start`.
+ *
+ * Error codes (== the mig-163 raise messages): `forbidden`, `reason_required`,
+ * `cannot_impersonate_self`, `user_not_found`, `impersonation_active`,
+ * `target_under_review`, `session_not_found`, `session_not_active`,
+ * `session_expired`, `dm_reason_required`, `conversation_not_found`.
+ */
+export interface ImpersonationRepo {
+  start(
+    callerId: ConnectId,
+    targetUserId: ConnectId,
+    reason: string,
+  ): Promise<ImpersonationSession>;
+  end(callerId: ConnectId, sessionId: string): Promise<ImpersonationSession>;
+  /** The caller's ACTIVE session or null (banner restore). Expired ⇒ null. */
+  getActive(callerId: ConnectId): Promise<ImpersonationSession | null>;
+  /** Audit review: a session's actions, oldest first (admins only ⇒ else []). */
+  listActions(callerId: ConnectId, sessionId: string): Promise<readonly ImpersonationActionEntry[]>;
+  viewProfile(callerId: ConnectId, sessionId: string): Promise<ImpersonatedProfileView>;
+  viewFeed(
+    callerId: ConnectId,
+    sessionId: string,
+    opts?: ImpersonationFeedOptions,
+  ): Promise<ImpersonatedFeedView>;
+  viewSaves(callerId: ConnectId, sessionId: string): Promise<ImpersonatedSavesView>;
+  viewNotifications(
+    callerId: ConnectId,
+    sessionId: string,
+    limit?: number,
+  ): Promise<ImpersonatedNotificationsView>;
+  viewConversations(callerId: ConnectId, sessionId: string): Promise<ImpersonatedConversationsView>;
+  viewDmThread(
+    callerId: ConnectId,
+    sessionId: string,
+    conversationId: string,
+    reason: string,
+  ): Promise<ImpersonatedDmThreadView>;
+}
+
 /** The full Wear data surface. */
 export interface WearStore {
   readonly users: UserRepo;
@@ -1219,6 +1461,7 @@ export interface WearStore {
   readonly brandApplications: BrandApplicationRepo;
   readonly roles: RoleRepo;
   readonly notifications: NotificationRepo;
+  readonly impersonation: ImpersonationRepo;
 }
 
 /** Errors thrown by a `WearStore`. */

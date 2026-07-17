@@ -9,7 +9,16 @@
     window.CWUI;
 
   function ProfileScreen({ params }) {
-    const { me, pop, setTab, openBrand, openPost, openSettings } = useStore();
+    const {
+      me,
+      pop,
+      setTab,
+      openBrand,
+      openPost,
+      openSettings,
+      startImpersonation,
+      impersonation,
+    } = useStore();
     const own = !params || !params.handle; // profile tab (no handle) = me
     const handle = own ? me && me.user && me.user.handle : params.handle;
 
@@ -83,6 +92,27 @@
         setTab('inbox');
       } catch (e) {
         /* self-DM */
+      }
+    };
+
+    // Admin sign-in-as (mig 163): admins only, never on self, never while a
+    // session is already live. A reason is REQUIRED before the session opens
+    // (§7.4) — collected via a prompt, validated ≥5 chars.
+    const isAdmin = me && me.role === 'admin';
+    const alreadyImpersonating = !!(impersonation && impersonation.session);
+    const viewAsUser = async () => {
+      const reason = window.prompt(
+        'Reason for viewing @' + user.handle + "'s account (required, logged):",
+      );
+      if (reason === null) return; // cancelled
+      if (reason.trim().length < 5) {
+        window.alert('A reason of at least 5 characters is required.');
+        return;
+      }
+      try {
+        await startImpersonation(user.id, reason.trim());
+      } catch (e) {
+        window.alert(e.message || 'Could not start the session.');
       }
     };
 
@@ -274,6 +304,29 @@
                 ),
               ),
         ),
+        // Admin-only "View as user" (mig 163). Distinct danger styling so it
+        // reads as a privileged, audited action — never a casual one.
+        !own && isAdmin
+          ? h(
+              'button',
+              {
+                onClick: viewAsUser,
+                disabled: alreadyImpersonating,
+                style: {
+                  width: '100%',
+                  marginTop: 10,
+                  border: '1px solid #f0c8c2',
+                  background: alreadyImpersonating ? '#f5f5f4' : '#fdf2f0',
+                  color: alreadyImpersonating ? '#a09e97' : '#b42318',
+                  borderRadius: 12,
+                  padding: 11,
+                  fontSize: 13,
+                  fontWeight: 800,
+                },
+              },
+              alreadyImpersonating ? 'Already viewing an account' : 'View as user (admin)',
+            )
+          : null,
       ),
       // owned brands
       brands && brands.length

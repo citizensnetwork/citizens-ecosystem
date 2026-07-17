@@ -63,9 +63,86 @@
         return h(S.CreateConcept, {});
       case 'admin':
         return h(S.AdminQueue, {});
+      case 'impersonate':
+        return h(S.Impersonate, {});
       default:
         return h(S.Home, {});
     }
+  }
+
+  // Persistent, unmissable banner for the whole sign-in-as session (§7.4).
+  // Fixed to the very top, visually distinct (danger red), always on top,
+  // with the one-tap Exit control. Rendered above BOTH layouts.
+  function ImpersonationBanner() {
+    const { impersonation, exitImpersonation, openImpersonate, nav } = useStore();
+    if (!impersonation || !impersonation.session) return null;
+    const t = impersonation.target;
+    const handle = t ? '@' + t.handle : 'user';
+    const onView = nav.stack.length && nav.stack[nav.stack.length - 1].screen === 'impersonate';
+    return h(
+      'div',
+      {
+        style: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 60,
+          background: '#b42318',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: 'calc(8px + var(--safe-top)) 14px 8px',
+          boxShadow: '0 2px 10px -2px rgba(0,0,0,0.4)',
+        },
+      },
+      Icon('user', { size: 15, color: '#fff' }),
+      h(
+        'div',
+        { style: { flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, lineHeight: 1.25 } },
+        h('span', null, 'Viewing as ' + handle),
+        h(
+          'span',
+          { style: { display: 'block', fontSize: 10.5, fontWeight: 600, opacity: 0.85 } },
+          'Read-only admin session · audited',
+        ),
+      ),
+      onView
+        ? null
+        : h(
+            'button',
+            {
+              onClick: openImpersonate,
+              style: {
+                border: '1px solid rgba(255,255,255,0.5)',
+                background: 'transparent',
+                color: '#fff',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 11.5,
+                fontWeight: 700,
+              },
+            },
+            'View',
+          ),
+      h(
+        'button',
+        {
+          onClick: () => exitImpersonation(),
+          style: {
+            border: 'none',
+            background: '#fff',
+            color: '#b42318',
+            borderRadius: 8,
+            padding: '5px 12px',
+            fontSize: 11.5,
+            fontWeight: 800,
+          },
+        },
+        'Exit',
+      ),
+    );
   }
 
   function BottomNav() {
@@ -241,6 +318,7 @@
           h(
             'div',
             { style: { flex: 1, minWidth: 0, position: 'relative', background: '#fcfbf9' } },
+            h(ImpersonationBanner, {}),
             h(
               'div',
               {
@@ -264,6 +342,7 @@
     return h(
       'div',
       { style: { height: '100%', position: 'relative', background: '#fff', overflow: 'hidden' } },
+      h(ImpersonationBanner, {}),
       h(
         'div',
         {

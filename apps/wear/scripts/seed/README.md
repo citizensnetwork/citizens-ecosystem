@@ -6,19 +6,37 @@ posts with imagery, a follow graph, likes/comments, stories, and one realized
 **Concepts-marketplace** item (proposed → awarded → released) so the in-feed
 attribution chip renders.
 
-The file carries two independently-guarded blocks: the **base seed** (above)
-and the **§12 mig-161 engagement block** — two fresh community Concepts (their
+The file carries four independently-guarded blocks: the **base seed** (above),
+the **§12 mig-161 engagement block** — two fresh community Concepts (their
 inserts fire the concept-status promotion trigger, so the Concepts-page
 stories bar is alive for 24h after seeding), threaded comments, and recorded
-shares. Each block no-ops when its own marker rows exist, so re-running the
-file on a prod that has only the base seed adds just the engagement content.
+shares; the **§13 mig-162 block** — one pending Become-a-Brand application for
+the Admin queue; and the **§14 mig-163 block** — one completed, audited admin
+sign-in-as of `@gracelethabo` (see below). Each block no-ops when its own
+marker rows exist, so re-running the file on a prod that has only the base seed
+adds just the newer content.
+
+### §14 — impersonation Phase 1 demo
+
+One **closed, fully audited** admin sign-in-as session targeting
+`@gracelethabo`: three audit actions (`view_profile`, `view_feed`, and a
+`view_dm_thread` carrying its own access reason) plus the target's
+after-the-fact inbox notification _"An administrator accessed your account for
+support…"_ (institutional voice — null actor). The admin is resolved
+dynamically from `wear.user_roles` (the founder), and the session is left
+**closed** so it never occupies the founder's one-active-session slot or throws
+up a surprise banner — the live flow is walked by clicking **"View as user
+(admin)"** on any profile in the running app. The session is inserted open then
+closed so the `AFTER UPDATE` close-notify trigger actually delivers the
+notification (an insert-as-closed would not).
 
 ## Files
 
 - [`seed-feed.sql`](./seed-feed.sql) — idempotent seed (no-op if already applied).
 - [`teardown-feed.sql`](./teardown-feed.sql) — full, clean removal (cascades
   cover the mig-161 tables: statuses/views/comments/shares hang off concepts
-  and the 7 seed users).
+  and the 7 seed users; the §14 impersonation session + its actions + the
+  target notification cascade from `@gracelethabo`).
 
 ## What gets created
 

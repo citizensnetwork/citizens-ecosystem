@@ -183,8 +183,33 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-16, project `xyiajtrvhlxaeplsiajj`, head = **mig 162**)
+## 9. Verification snapshot (updated 2026-07-17, project `xyiajtrvhlxaeplsiajj`, head = **mig 163**)
 
+> **2026-07-17: mig 163 (`wear` impersonation Phase 1 — admin read-only sign-in-as) APPLIED**
+> (pre-apply tag `wear-pre-mig163` @8cd6314). **Advisor: 0 ERROR / 110 WARN / 3 INFO — the +8
+> WARNs vs the head-162 baseline are EXACTLY the intentional SECDEF EXECUTE grants to
+> `authenticated` on `impersonation_start`/`impersonation_end` + the six `impersonation_view_*`
+> readers (verified by name; the R3.2/R3.3-sanctioned privileged-read pattern — every fn
+> self-guards on `wear.is_admin()` + session ownership and writes its own audit row before
+> returning data, so an unaudited privileged read is structurally impossible). The four internal
+> helpers + three trigger fns hold no role grants → no WARN surface. 0 unexpected findings.**
+> Rolled-back prod smokes **18/18 PASS** (non-admin/self/short-reason/double-start/second-admin
+> denials; foreign-session probe; blank DM reason; 7 reads = 7 audit rows w/ DM reason;
+> authenticated CAN run the granted path; direct INSERT denied; open-session start facts frozen;
+> actions append-only; closed sessions immutable even for the owner; end → `admin_exit` + exactly
+> one `account_accessed_by_admin` notification with NULL actor + sessionId payload; expired
+> session refuses reads then closes as `expired` + notifies). Adds `wear.impersonation_sessions`
+> (reason REQUIRED 5–500; 30-min box; **two partial unique indexes** = one ACTIVE session per
+> admin AND per target — §7.6b ratified "both"; SELECT-only grants, RLS `is_admin()`, writes only
+> inside the SECDEF fns) + `wear.impersonation_actions` (per-read log; `view_dm_thread` rows MUST
+> carry a `dm_reason` — CHECK-enforced), **+1 `wear.notification_type` value**
+> (`account_accessed_by_admin`, institutional NULL actor, fired by the close trigger — mig-159
+> invariant) and the pg_cron `impersonation-expiry-sweep` (*/5 min — guarantees the after-session
+> notification for abandoned sessions). Phase 1 is READ-ONLY by construction: no write-as-user
+> mechanism exists anywhere (Phase 2 = its own ratified design). wear tables 38→**40**, policies
+> 86→**88**, fns 34→**49**, enums 23→**25**. Design: roles MD §7 + RESUME §3AB.
+> **Next migration # = 164.**
+>
 > **2026-07-16: mig 162 (`wear` Become-a-Brand applications) APPLIED** (pre-apply tag
 > `wear-pre-mig162` @b0a84a9). **Advisor: 0 ERROR / 102 WARN / 3 INFO — the single new WARN
 > is the INTENTIONAL `wear.brand_eligibility` SECDEF EXECUTE grant to `authenticated` (the

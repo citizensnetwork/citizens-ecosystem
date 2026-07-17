@@ -50,6 +50,7 @@ buildFrontend({
     'concepts.jsx',
     'adminq.jsx',
     'brandapply.jsx',
+    'impersonate.jsx',
     'settings.jsx',
     'shell.jsx',
     'app.jsx',
