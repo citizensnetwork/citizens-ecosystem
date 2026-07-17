@@ -1427,15 +1427,44 @@ Founder-started follow-up to §3Y's flagged CI debt. Ratified via AskUserQuestio
   ignores exactly those 27 (each documented with package + severity + reason). CI is **green now**
   and the gate blocks any **new** advisory. CI confirms: _"Filtered 38 vulnerabilities … No issues
   found."_
-- **⚠ OPEN DEBT (own session — see the ▶ item below):** clear the `osv-scanner.toml` baseline by
-  actually fixing the deps. The repo already remediates transitive vulns via root package.json
-  **`pnpm.overrides`** (established pattern). Safe bumps: `@tootallnate/once`, `ajv`, `minimatch`,
-  `tar`, `smol-toml`, `path-to-regexp@6.x`, `esbuild` (direct — override exists, lockfile stale).
-  **Risky:** `undici` 5.28.4→**6.x major** (tree already carries 6.27/7.28 for other importers) and
-  `path-to-regexp@8.x→8.4.0` (feeds **Next.js routing**). **Unfixable:** `sandbox`×2 (find the
-  puller; drop/replace or keep documented). Remove each entry from `osv-scanner.toml` as fixed;
-  keep gates green throughout; verify OSV-Scanner via a test PR (the binary can't run locally on
-  Windows). A background task chip carries the full remediation brief.
+- **✅ OPEN DEBT NOW RESOLVED → see §3AA.** The `osv-scanner.toml` baseline has been fully
+  cleared (all 27 advisories genuinely fixed, baseline empty). Details in §3AA below.
+
+---
+
+## 3AA. OSV-Scanner baseline CLEARED — all 27 advisories fixed — PR #33 (green, awaiting merge) (2026-07-16)
+
+Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-baseline-clearance.md`.
+
+- **Root cause (the big finding):** `pnpm why -r` proved **26 of the 27 baselined advisories came
+  from a SINGLE root devDependency — `vercel ^55.0.0` (the Vercel CLI)**: undici×11, tar×4,
+  minimatch×3, path-to-regexp×3, sandbox×2, ajv, smol-toml, @tootallnate/once all lived inside
+  its `@vercel/*` tree. That devDep was added **accidentally** by a local `vercel deploy` (commit
+  `dfcf476`, "founder Vercel-CLI deploy stragglers"). **No npm script, CI job, or app import used
+  it** (the real `@vercel/speed-insights` runtime dep in Connect is separate and clean).
+- **Fix (PR #33):** **removed `vercel` from root devDependencies** → dropped all 26 advisories +
+  **~2.4k lines of lockfile bloat** in one move. This was also the **only** way to clear the two
+  `sandbox` advisories (no upstream fix — they'd have stayed baselined forever otherwise). The
+  **27th** advisory (`esbuild 0.28.0`, GHSA-g7r4-m6w7-qqqr) is a genuine `vite` transitive — fixed
+  by tightening the `pnpm.overrides` esbuild floor to **`>=0.28.1`** (vite 8.1.3's own peer req);
+  tree now resolves to a single `esbuild@0.28.1`. Redundant `esbuild@>=0.27.3 <0.28.1` override dropped.
+- **The "risky" tranches evaporated:** removing `vercel` meant `path-to-regexp` is gone entirely
+  (**Next.js here never pulled it** — all 3 Next builds compiled routing fine), `undici` 5.28.4 is
+  gone (app code never used it — no 5→6 major bump needed), and `sandbox` is simply gone.
+- **`osv-scanner.toml` is now EMPTY of `IgnoredVulns`** (documentary header only). The blocking gate
+  still reds on any NEW advisory.
+- **Verification:** all gates green (format:check, lint 12/12, typecheck 12/12, test 11/11 —
+  Connect 637 / Vision 661, build 8/8); `pnpm install --frozen-lockfile` clean; **CI Verify green
+  with OSV-Scanner reporting _"Scanned pnpm-lock.yaml … found 927 packages / No issues found"_**
+  (nothing filtered — vs the old "Filtered 38 vulnerabilities"). All 3 Vercel deployments
+  (Connect/Vision/Wear) passed → CLI removal does not break deploys.
+- **Deploy note for the founder:** you can still deploy manually via `npx vercel` (or a global
+  install); the `.vercel` project links are untouched. Don't `pnpm add vercel` again — it re-injects
+  the whole advisory tree. Prefer `npx vercel@latest` on demand.
+- **⏳ PENDING:** merge of **PR #33** — CI is fully green; the automated merge was blocked for the
+  agent, so the **founder needs to merge it** (or grant a merge permission rule). Once merged, main
+  is clean. Dependabot PRs (#9–#17, #24–#27) are unaffected (none bump these deps) — they'll just
+  auto-rebase their lockfiles against the new base.
 
 ---
 
@@ -1444,7 +1473,8 @@ Founder-started follow-up to §3Y's flagged CI debt. Ratified via AskUserQuestio
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
 > Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162), the merge
-> of all three to `main` + prod fix (§3Y) AND the CI OSV-Scanner audit gate (§3Z) are COMPLETE.**
+> of all three to `main` + prod fix (§3Y), the CI OSV-Scanner audit gate (§3Z) AND the full
+> clearance of its 27-advisory baseline (§3AA, PR #33 — green, awaiting founder merge) are COMPLETE.**
 > `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
 > (prod bundle fix) + **PR #31** (docs) + **PR #32** (CI audit gate). **⛔ Sessions must run in the
 > MONOREPO only** (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent
@@ -1457,10 +1487,9 @@ Founder-started follow-up to §3Y's flagged CI debt. Ratified via AskUserQuestio
 > **▶ RECOMMENDED next session — pick one:** (a) **Build impersonation Phase 1** — the ratified
 > design is in **roles MD §7** (read-only admin sign-in-as; mig 163 audit tables; admin-only;
 > DM-with-reason; notify-after; banner + 30-min time-box). Design-first work is DONE, so this is a
-> clean build session; or (b) **clear the OSV-Scanner dependency baseline (§3Z)** — the biggest
-> hygiene win: remediate the 27 baselined advisories via `pnpm.overrides`, empty `osv-scanner.toml`
-> down to only genuinely-unfixable entries, keep all gates green (a task chip carries the full
-> brief); or (c) the **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
+> clean build session; or (b) **merge PR #33** (§3AA) — the OSV-Scanner baseline clearance is DONE
+> and CI-green; it only needs the founder to click merge (the agent's auto-merge was blocked), after
+> which the dependency-hygiene debt is fully closed; or (c) the **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
 > application from Admin → Applications (approving mints a real verified brand in prod), then verify
 > the Settings "Become a Brand" form as a citizen (now fixed & live). The founder also still owes
 > the platform its **Ts&Cs / Code of Conduct / fee-schedule documents** — the application form's
