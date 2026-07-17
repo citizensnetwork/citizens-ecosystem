@@ -4,10 +4,10 @@
  * + auth-client.js into hashed, minified bundles (no runtime Babel-standalone
  * JIT), and generate config.js from env vars.
  *
- * The pipeline lives in @citizens/frontend-build (ecosystem Step 4), vendored
- * at vendor/citizens-frontend-build — canonical source is
- * citizens-wear/packages/frontend-build, see vendor/README.md. This file only
- * supplies Vision's configuration: screen load order, env-var mapping.
+ * The pipeline lives in @citizens/frontend-build (ecosystem Step 4), consumed
+ * as a workspace package (workspace:* → packages/frontend-build in this
+ * monorepo — no vendored copy). This file only supplies Vision's
+ * configuration: screen load order, env-var mapping.
  * esbuild is passed in from HERE so the output is built with this app's own
  * pinned esbuild version.
  *
@@ -37,7 +37,7 @@ buildFrontend({
   // Every screen module, in dependency order (later files reference
   // `window.*` globals set by earlier ones).
   appFileOrder: [
-    'data.jsx', 'store.jsx', 'ui.jsx', 'login.jsx',
+    'data.jsx', 'store.jsx', 'live.jsx', 'ui.jsx', 'login.jsx',
     'home.jsx', 'views.jsx', 'shell.jsx', 'app.jsx',
   ],
 

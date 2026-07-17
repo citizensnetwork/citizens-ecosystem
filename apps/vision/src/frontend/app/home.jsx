@@ -8,7 +8,7 @@
 //  backend calc rows drop straight in later (§4 contract).
 // ════════════════════════════════════════════════════════════════════
 (() => {
-  const { Card, SectionTitle, Ring, Spark, tone, sevMeta, Icon } = window.UI;
+  const { Card, SectionTitle, Ring, Spark, tone, sevMeta, Icon, Btn } = window.UI;
   const D = window.CV_DATA;
 
   // One observation/advisory card, five layers. Used by Home, the
@@ -16,10 +16,20 @@
   function ObservationCard({ obs, onDismiss }) {
     const [open, setOpen] = React.useState(false);
     const [tab, setTab] = React.useState("contributions");
-    const t = D.narrativeTemplates[obs.type];
+    const t = D.narrativeTemplates[obs.type] || {};
     const meta = sevMeta(obs.severity);
-    const title = D.fill(t.title, obs.data);
-    const body = D.fill(t.body, obs.data);
+    // Live advisories arrive pre-rendered (server-side substitution by the
+    // advisory engine — spec §3.7c); demo observations/advisories fill a
+    // narrative template here. Authoring rule 4 (graceful degradation): a
+    // neutral observation renders the template's neutral sentence as its
+    // conclusion; bodyKey selects a slot-complete variant while some calc
+    // outputs are still unbuilt.
+    const prerendered = typeof obs.title === "string";
+    const bodyTemplate = (obs.bodyKey && t[obs.bodyKey]) || t.body;
+    const title = prerendered ? obs.title
+      : obs.neutral ? D.fill(t.neutral, obs.data) : D.fill(t.title, obs.data);
+    const body = prerendered ? (obs.body || null)
+      : obs.neutral ? null : D.fill(bodyTemplate, obs.data);
 
     const tabs = [
       ["contributions", "Contributions"],
@@ -39,7 +49,7 @@
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Layer 1 — Conclusion, plain language, first. */}
             <div style={{ fontSize: 16, fontWeight: 800 }}>{title}</div>
-            <div style={{ marginTop: 4, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55 }}>{body}</div>
+            {body ? <div style={{ marginTop: 4, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55 }}>{body}</div> : null}
           </div>
           <button onClick={() => setOpen(!open)} style={{
             border: "1px solid var(--border)", background: "var(--surface-sunk)",
@@ -102,7 +112,7 @@
                   ))}
                   <tr>
                     <td style={{ padding: "6px 10px 6px 0", color: "var(--text-tertiary)", fontFamily: "ui-monospace, monospace" }}>source</td>
-                    <td style={{ padding: "6px 0", color: "var(--text-tertiary)" }}>{t.source}</td>
+                    <td style={{ padding: "6px 0", color: "var(--text-tertiary)" }}>{t.source || obs.source || "advisory_outputs"}</td>
                   </tr>
                 </tbody>
               </table>
@@ -122,10 +132,38 @@
     );
   }
 
-  function Home() {
+  // Home advisory banner (spec §3.1c — dashboard alerts). Surfaces the
+  // highest-severity active advisory + a jump to the Advisories screen.
+  // Works for demo (template-filled) and live (pre-rendered) advisories;
+  // renders nothing when the list is empty, so an all-clear home stays calm.
+  function AdvisoryBanner({ goView }) {
+    const items = D.advisories || [];
+    if (!items.length) return null;
+    const titleOf = (a) => typeof a.title === "string" ? a.title
+      : (D.narrativeTemplates[a.type] ? D.fill(D.narrativeTemplates[a.type].title, a.data) : "Advisory");
+    const rank = { critical: 0, warning: 1, good: 2, info: 3 };
+    const top = items.slice().sort((a, b) => (rank[a.severity] ?? 4) - (rank[b.severity] ?? 4))[0];
+    const meta = sevMeta(top.severity);
+    const n = items.length;
+    return (
+      <Card style={{ marginBottom: 16, borderLeft: "4px solid " + meta.color, display: "flex", gap: 14, alignItems: "center" }}>
+        <span style={{ color: meta.color }}><Icon name="alert" size={22} /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 14.5 }}>{titleOf(top)}</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
+            {n === 1 ? "1 advisory needs your attention" : n + " advisories need your attention"}
+          </div>
+        </div>
+        {goView ? <Btn kind="ghost" style={{ fontSize: 13 }} onClick={() => goView("advisories")}>Review</Btn> : null}
+      </Card>
+    );
+  }
+
+  function Home({ goView }) {
     const org = D.org;
     return (
       <div className="fade-in">
+        <AdvisoryBanner goView={goView} />
         <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: 16, alignItems: "start" }}>
           {/* Health gauge */}
           <Card>

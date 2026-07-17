@@ -6,6 +6,9 @@
 
   function App() {
     const auth = window.CV_STORE.useSession();
+    // Live-data overlay: mutates window.CV_DATA when real metrics load, and
+    // this hook's state change re-renders the tree onto them (live.jsx).
+    const live = window.CV_LIVE.useLiveData(auth);
     const [view, setView] = React.useState("home");
     const [metric, setMetric] = React.useState("reach");
     const [filter, setFilter] = React.useState(undefined);
@@ -39,7 +42,7 @@
     }
 
     const content =
-      view === "home" ? <S.Home /> :
+      view === "home" ? <S.Home goView={goView} /> :
       view === "spaces" ? <S.Spaces goView={goView} filter={filter} /> :
       view === "configureSpaces" ? <S.ConfigureSpaces /> :
       view === "activities" ? <S.Activities /> :
@@ -56,13 +59,13 @@
         <S.Settings theme={theme} setTheme={setTheme}
           navHidden={navHidden} setNavHidden={setNavHidden}
           navTree={window.CV_NAV_TREE} />
-      ) : <S.Home />;
+      ) : <S.Home goView={goView} />;
 
     return (
       <S.Shell session={auth.session} view={view} metric={metric} filter={filter}
         goView={goView} theme={theme} setTheme={setTheme}
         navHidden={navHidden} setNavHidden={setNavHidden}
-        depth={depth} setDepth={setDepth} onSignOut={auth.signOut}>
+        depth={depth} setDepth={setDepth} onSignOut={auth.signOut} dataMode={live}>
         {content}
       </S.Shell>
     );
