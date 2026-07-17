@@ -46,7 +46,7 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "@vercel/speed-insights": "^2.0.0",
-    "class-variance-authority": "0.7.0",
+    "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "lucide-react": "0.441.0",
     "maplibre-gl": "^5.22.0",
