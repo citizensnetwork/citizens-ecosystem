@@ -274,11 +274,16 @@ binds a `wear`-scoped `supabase-js` client to that token, so **RLS keys off the 
 
 ### 7.5 Phase 1 build checklist (next session)
 
-1. **mig 163**: the two audit tables + enum(s) + `account_accessed_by_admin` notification value +
-   the SECDEF start/append/end functions + close-notify trigger; advisors 0 ERROR / 0 new vs the
-   head-162 baseline (**0 ERROR / 102 WARN / 3 INFO** — the 102nd WARN is the intentional
-   `brand_eligibility` grant; a Phase-1 SECDEF EXECUTE grant may add one more _intentional_ WARN,
-   document it like mig-162).
+1. ~~**mig 163**: the two audit tables + enum(s) + `account_accessed_by_admin` notification value +
+   the SECDEF start/append/end functions + close-notify trigger~~ ✅ **SHIPPED (mig 163 APPLIED
+   2026-07-17, tag `wear-pre-mig163`)** — advisors **0 ERROR / 110 WARN / 3 INFO**: the +8 WARNs
+   vs head-162 are the intentional EXECUTE grants on `impersonation_start`/`_end` + the six
+   per-view readers (§7.6a ratified per-view SECDEF; each writes its own audit row before
+   returning data — an unaudited read is structurally impossible). 18/18 rolled-back prod smokes
+   PASS. Also: TWO partial unique indexes (one active per admin AND per target — §7.6b "both"),
+   immutability triggers (open rows = only the close stamp writable; closed rows frozen; actions
+   append-only), and the `impersonation-expiry-sweep` cron (*/5 min) that guarantees the
+   after-session notification for abandoned sessions.
 2. **Store + API**: an admin-only `/api/admin/impersonation` surface (start w/ reason, read-as
    endpoints, DM-access-with-reason, end) + `is_admin()` gate + audit writes; contract + memory
    (semantic mirror of every rule + the notify trigger) + supabase stores.
@@ -286,11 +291,20 @@ binds a `wear`-scoped `supabase-js` client to that token, so **RLS keys off the 
    audited read path, exit control, 30-min auto-expiry; inbox renders the new notification.
 4. Seed an idempotent demo (an admin sign-in-as of a seeded citizen) so the surface is walkable.
 
-### 7.6 Open questions for the Phase 1 build session
+### 7.6 Open questions — **RATIFIED 2026-07-17 (founder, AskUserQuestion, Phase-1 build session)**
 
-- Read path: dedicated per-view SECDEF reader fns (most faithful to "RLS is the wall", more code)
-  vs a single tightly-gated `service_role` read path (fewer moving parts, must be airtight)?
-  Decide against R3 at build time.
-- One active session per admin, per target, or both? (Recommend per-admin at least.)
-- Exact notification copy + whether it links to the audit summary the user may request.
-- Phase 2 (write-as-user) guardrails, esp. the admin-impersonating-admin lockout — its own session.
+- **(a) Read path → dedicated per-view SECDEF reader fns.** Each reader validates admin +
+  session ownership AND writes its audit row inside itself before returning data — an unaudited
+  privileged read is structurally impossible; Wear keeps its zero-`service_role` record (§3T).
+- **(b) Active-session uniqueness → BOTH.** At most one active session per admin AND per target
+  (two partial unique indexes; a second admin gets a fail-closed `target_under_review`).
+- **(c) Notification → the spec copy, no link yet.** _"An administrator accessed your account
+  for support on \<date\>."_ — the payload carries `sessionId`/`startedAt`/`endedAt` so a future
+  audit-summary surface can deep-link retroactively.
+- Phase 2 (write-as-user) guardrails, esp. the admin-impersonating-admin lockout — **still its
+  own future session** (unchanged).
+- Build-session addendum (not a §7.2 re-decision): **self-impersonation is blocked**
+  (CHECK + fn guard) — a read-only self-view adds no capability and muddies the audit trail;
+  the conversation LIST view returns **metadata only** (member handles + timestamps, no message
+  bodies) so the per-thread reason gate is the only door to DM content; the target's **stories
+  tray is deferred** from the Phase-1 view set (profile/feed/saves/notifications/DMs ship).

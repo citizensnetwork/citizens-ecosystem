@@ -742,33 +742,38 @@ begin
 end $$;
 
 -- ============================================================================
--- Post-apply checklist (fill in after apply, mig-162 style):
---  * get_advisors(security): expect 0 ERROR / 110 WARN / 3 INFO — the +8 WARNs
---    vs the head-162 baseline (0/102/3) are the INTENTIONAL SECDEF EXECUTE
+-- Post-apply record (APPLIED 2026-07-17, tag wear-pre-mig163 @8cd6314):
+--  * get_advisors(security) = 0 ERROR / 110 WARN / 3 INFO. The +8 WARNs vs the
+--    head-162 baseline (0/102/3) are EXACTLY the INTENTIONAL SECDEF EXECUTE
 --    grants to authenticated on: impersonation_start, impersonation_end, and
---    the six impersonation_view_* readers (mig-157 precedent: such grants are
---    the sanctioned R3.2/R3.3 privileged-read pattern; every fn self-guards on
+--    the six impersonation_view_* readers (verified by name — the only
+--    impersonation-related findings; mig-157 precedent: such grants are the
+--    sanctioned R3.2/R3.3 privileged-read pattern; every fn self-guards on
 --    wear.is_admin() + session ownership and writes its own audit row).
 --    impersonation_validate / impersonation_audit / impersonation_session_jsonb
 --    / impersonation_post_jsonb and the three trigger fns hold NO role grants
---    → no WARN surface.
---  * Rolled-back prod smokes:
---    (a) impersonation_start as non-admin            → 42501 forbidden;
---    (b) start(self)                                 → cannot_impersonate_self;
---    (c) start w/ short reason                       → reason_required;
---    (d) double-start                                → impersonation_active;
---    (e) second admin on same target                 → target_under_review;
---    (f) view_profile w/o session / other's session  → session_not_found;
---    (g) view_dm_thread w/o reason                   → dm_reason_required;
---    (h) every view_* writes exactly one actions row (dm carries reason);
---    (i) direct INSERT/UPDATE on either table as authenticated → denied
---        (no grant); UPDATE a closed session as service_role → immutable raise;
---    (j) end() flips ended_at once → close-notify row for the target with
---        actor NULL + sessionId payload; second end() → session_not_active;
---    (k) validate on an expires_at<=now() session    → session_expired.
---  * Structural QA: wear tables 38→40, enums 23→25 (+1 notification_type
---    value → 13), fns 34→49 (+15), policies 86→88 (+2 admin SELECT), +4
---    triggers, cron job 'impersonation-expiry-sweep' registered.
---  * SHARED_DB_CONTRACT §9 re-stamp (head 163, next # = 164); roles MD §7.5
+--    → no WARN surface. 0 unexpected findings.
+--  * Rolled-back prod smokes 18/18 PASS (single DO block, final RAISE = zero
+--    residue, verified 0 rows after):
+--    (a) start as non-admin → 42501 · (b) start(self) → cannot_impersonate_self
+--    (c) short reason → reason_required · (d) double-start → impersonation_active
+--    (e) second admin, same target → target_under_review
+--    (f) another admin's session id → session_not_found
+--    (g) dm thread w/ blank reason → dm_reason_required
+--    (h) 7 view calls = exactly 7 audit rows; dm row carries its reason
+--    (i0) role authenticated CAN execute a reader (the granted path works)
+--    (i1) direct INSERT as authenticated → 42501 (no grant)
+--    (i2) UPDATE open-session start facts as owner → 'only the close stamp' raise
+--    (i3) UPDATE an audit action as owner → 'append-only' raise
+--    (i4) UPDATE a CLOSED session as owner → 'immutable once closed' raise
+--    (j) end() → endCause=admin_exit + exactly one account_accessed_by_admin
+--        notification, actor NULL, data.sessionId = the session
+--    (j2) second end() → session_not_active
+--    (k) reader on an expired session → session_expired (no state change)
+--    (k2) end() of the expired session → endCause=expired + notify fired
+--  * Structural QA (verified live): wear tables 38→40, policies 86→88, fns
+--    34→49, enums 23→25 (notification_type → 13 values), 4 triggers on the two
+--    new tables, cron 'impersonation-expiry-sweep' (*/5) registered.
+--  * SHARED_DB_CONTRACT §9 re-stamped (head 163, next # = 164); roles MD §7.5
 --    item 1 marked shipped; RESUME_HERE §3AB at session end.
 -- ============================================================================
