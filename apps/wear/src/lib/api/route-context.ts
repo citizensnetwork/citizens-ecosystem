@@ -223,6 +223,16 @@ const STORE_ERROR_STATUS: Record<string, number> = {
   already_closed: 409,
   // Mig 161 — community engagement on Concepts
   status_not_found: 404,
+  // Mig 163 — impersonation Phase 1 (codes mirror the SECDEF raise messages)
+  user_not_found: 404,
+  cannot_impersonate_self: 400,
+  reason_required: 422,
+  dm_reason_required: 422,
+  impersonation_active: 409,
+  target_under_review: 409,
+  session_not_found: 404,
+  session_not_active: 409,
+  session_expired: 410,
   // Mig 162 — Become-a-Brand applications
   not_eligible: 403,
   application_pending: 409,

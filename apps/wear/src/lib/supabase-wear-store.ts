@@ -54,6 +54,17 @@ import {
   type FollowEdge,
   type FollowRepo,
   type HighlightRepo,
+  type ImpersonatedConversationsView,
+  type ImpersonatedDmThreadView,
+  type ImpersonatedFeedView,
+  type ImpersonatedNotificationsView,
+  type ImpersonatedProfileView,
+  type ImpersonatedSavesView,
+  type ImpersonationActionEntry,
+  type ImpersonationActionKind,
+  type ImpersonationEndCause,
+  type ImpersonationRepo,
+  type ImpersonationSession,
   type LikeEdge,
   type LikeRepo,
   type Message,
@@ -140,6 +151,7 @@ export class SupabaseWearStore implements WearStore {
   public readonly brandApplications: BrandApplicationRepo;
   public readonly roles: RoleRepo;
   public readonly notifications: NotificationRepo;
+  public readonly impersonation: ImpersonationRepo;
 
   private readonly db: SupabaseClient;
   private readonly now: () => Date;
@@ -175,6 +187,7 @@ export class SupabaseWearStore implements WearStore {
     this.brandApplications = this._brandApplications();
     this.roles = this._roles();
     this.notifications = this._notifications();
+    this.impersonation = this._impersonation();
   }
 
   // ── Identity mirror ───────────────────────────────────────────────────────
@@ -2397,6 +2410,83 @@ export class SupabaseWearStore implements WearStore {
     };
   }
 
+  // ── Impersonation Phase 1 (mig 163) ───────────────────────────────────────
+  // Lifecycle + every privileged read delegate to the SECDEF fns, which gate
+  // on wear.is_admin() + session ownership internally (auth.uid(), not the
+  // passed callerId) and write their own audit row before returning data —
+  // the read path IS the audit path. Reads of the audit tables themselves go
+  // through RLS (admin-only SELECT); no client write path exists at all.
+  private _impersonation(): ImpersonationRepo {
+    const sessionFromRpc = (data: unknown): ImpersonationSession => {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new WearStoreError('rpc_error', 'impersonation RPC returned no session.');
+      }
+      return data as ImpersonationSession;
+    };
+    return {
+      start: async (_callerId, targetUserId, reason) =>
+        sessionFromRpc(
+          await this._rpcRow('impersonation_start', {
+            p_target: targetUserId,
+            p_reason: reason,
+          }),
+        ),
+      end: async (_callerId, sessionId) =>
+        sessionFromRpc(await this._rpcRow('impersonation_end', { p_session_id: sessionId })),
+      getActive: async (callerId) => {
+        const row = await this._maybeSingle(
+          this.db
+            .from('impersonation_sessions')
+            .select(IMPERSONATION_SESSION_COLS)
+            .eq('admin_id', callerId)
+            .is('ended_at', null)
+            .gt('expires_at', this.now().toISOString()),
+        );
+        return row ? mapImpersonationSession(row as ImpersonationSessionRow) : null;
+      },
+      listActions: async (_callerId, sessionId) => {
+        const rows = await this._many(
+          this.db
+            .from('impersonation_actions')
+            .select(IMPERSONATION_ACTION_COLS)
+            .eq('session_id', sessionId)
+            .order('at', { ascending: true }),
+        );
+        return (rows as ImpersonationActionRow[]).map(mapImpersonationAction);
+      },
+      viewProfile: async (_callerId, sessionId) =>
+        (await this._rpcRow('impersonation_view_profile', {
+          p_session_id: sessionId,
+        })) as ImpersonatedProfileView,
+      viewFeed: async (_callerId, sessionId, opts) =>
+        (await this._rpcRow('impersonation_view_feed', {
+          p_session_id: sessionId,
+          p_mode: opts?.mode ?? 'for-you',
+          p_limit: opts?.limit ?? 20,
+          p_offset: opts?.offset ?? 0,
+        })) as ImpersonatedFeedView,
+      viewSaves: async (_callerId, sessionId) =>
+        (await this._rpcRow('impersonation_view_saves', {
+          p_session_id: sessionId,
+        })) as ImpersonatedSavesView,
+      viewNotifications: async (_callerId, sessionId, limit) =>
+        (await this._rpcRow('impersonation_view_notifications', {
+          p_session_id: sessionId,
+          p_limit: limit ?? 50,
+        })) as ImpersonatedNotificationsView,
+      viewConversations: async (_callerId, sessionId) =>
+        (await this._rpcRow('impersonation_view_conversations', {
+          p_session_id: sessionId,
+        })) as ImpersonatedConversationsView,
+      viewDmThread: async (_callerId, sessionId, conversationId, reason) =>
+        (await this._rpcRow('impersonation_view_dm_thread', {
+          p_session_id: sessionId,
+          p_conversation_id: conversationId,
+          p_reason: reason,
+        })) as ImpersonatedDmThreadView,
+    };
+  }
+
   // ── Notifications (mig 159) ───────────────────────────────────────────────
   // Read + mark-read only; rows are produced by the DB triggers. RLS scopes
   // every query to the caller's own rows, so the explicit `recipient_id` filters
@@ -2647,6 +2737,59 @@ const MEMBER_COLS = 'conversation_id,user_id,joined_at,last_read_at,muted_until,
 const MESSAGE_COLS = 'id,conversation_id,author_id,body,created_at,deleted_at';
 const REPORT_COLS =
   'id,reporter_id,subject_kind,subject_id,reason,note,status,handled_by,handled_at,created_at';
+const IMPERSONATION_SESSION_COLS =
+  'id,admin_id,target_user_id,reason,started_at,expires_at,ended_at,end_cause,created_at,updated_at';
+
+interface ImpersonationSessionRow {
+  id: string;
+  admin_id: string;
+  target_user_id: string;
+  reason: string;
+  started_at: string;
+  expires_at: string;
+  ended_at: string | null;
+  end_cause: ImpersonationEndCause | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapImpersonationSession(r: ImpersonationSessionRow): ImpersonationSession {
+  return {
+    id: r.id,
+    adminId: r.admin_id,
+    targetUserId: r.target_user_id,
+    reason: r.reason,
+    startedAt: r.started_at,
+    expiresAt: r.expires_at,
+    endedAt: r.ended_at,
+    endCause: r.end_cause,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+const IMPERSONATION_ACTION_COLS = 'id,session_id,at,action,detail,dm_reason';
+
+interface ImpersonationActionRow {
+  id: string;
+  session_id: string;
+  at: string;
+  action: ImpersonationActionKind;
+  detail: Record<string, unknown>;
+  dm_reason: string | null;
+}
+
+function mapImpersonationAction(r: ImpersonationActionRow): ImpersonationActionEntry {
+  return {
+    id: r.id,
+    sessionId: r.session_id,
+    at: r.at,
+    action: r.action,
+    detail: r.detail ?? {},
+    dmReason: r.dm_reason,
+  };
+}
+
 const NOTIFICATION_COLS =
   'id,recipient_id,type,actor_id,concept_id,brand_id,data,read_at,created_at';
 // Mig 157 — Concepts marketplace
@@ -3372,6 +3515,18 @@ function mapRpcError(error: PostgrestError): WearStoreError {
     'already_closed',
     'obligation_not_found',
     'proof_url_required',
+    // Mig 163 impersonation raise messages. `dm_reason_required` MUST precede
+    // `reason_required` (substring) so DM-gate errors keep their own code.
+    'dm_reason_required',
+    'reason_required',
+    'cannot_impersonate_self',
+    'user_not_found',
+    'impersonation_active',
+    'target_under_review',
+    'session_not_found',
+    'session_not_active',
+    'session_expired',
+    'conversation_not_found',
   ];
   const code = known.find((k) => msg.includes(k)) ?? error.code ?? 'rpc_error';
   return new WearStoreError(code, msg);
