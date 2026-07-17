@@ -1432,7 +1432,7 @@ Founder-started follow-up to §3Y's flagged CI debt. Ratified via AskUserQuestio
 
 ---
 
-## 3AA. OSV-Scanner baseline CLEARED — all 27 advisories fixed — PR #33 (green, awaiting merge) (2026-07-16)
+## 3AA. OSV-Scanner baseline CLEARED — all 27 advisories fixed — PR #33 MERGED ✅ (2026-07-16/17)
 
 Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-baseline-clearance.md`.
 
@@ -1461,9 +1461,9 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
 - **Deploy note for the founder:** you can still deploy manually via `npx vercel` (or a global
   install); the `.vercel` project links are untouched. Don't `pnpm add vercel` again — it re-injects
   the whole advisory tree. Prefer `npx vercel@latest` on demand.
-- **⏳ PENDING:** merge of **PR #33** — CI is fully green; the automated merge was blocked for the
-  agent, so the **founder needs to merge it** (or grant a merge permission rule). Once merged, main
-  is clean. Dependabot PRs (#9–#17, #24–#27) are unaffected (none bump these deps) — they'll just
+- **✅ MERGED to `main`** — **PR #33** merge commit `7754256` (2026-07-17). Post-merge CI on `main`
+  green; `main` dependency tree is now clean (OSV: 0 findings, empty baseline). Branch + `pre-osv-clear`
+  tag deleted. Dependabot PRs (#9–#17, #24–#27) are unaffected (none bump these deps) — they'll just
   auto-rebase their lockfiles against the new base.
 
 ---
@@ -1474,7 +1474,7 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
 > Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162), the merge
 > of all three to `main` + prod fix (§3Y), the CI OSV-Scanner audit gate (§3Z) AND the full
-> clearance of its 27-advisory baseline (§3AA, PR #33 — green, awaiting founder merge) are COMPLETE.**
+> clearance of its 27-advisory baseline (§3AA, PR #33 MERGED — `main` dep tree now clean) are COMPLETE.**
 > `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
 > (prod bundle fix) + **PR #31** (docs) + **PR #32** (CI audit gate). **⛔ Sessions must run in the
 > MONOREPO only** (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent
@@ -1487,9 +1487,10 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
 > **▶ RECOMMENDED next session — pick one:** (a) **Build impersonation Phase 1** — the ratified
 > design is in **roles MD §7** (read-only admin sign-in-as; mig 163 audit tables; admin-only;
 > DM-with-reason; notify-after; banner + 30-min time-box). Design-first work is DONE, so this is a
-> clean build session; or (b) **merge PR #33** (§3AA) — the OSV-Scanner baseline clearance is DONE
-> and CI-green; it only needs the founder to click merge (the agent's auto-merge was blocked), after
-> which the dependency-hygiene debt is fully closed; or (c) the **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
+> clean build session; or (b) **Vision monorepo sync + deploy-gate close-out** — `apps/vision` here
+> is BEHIND `citizens-vision` `main` @ `3c77959` (§3O/§3-NEXT-2); sync it, then Vision's founder
+> deploy gates (Exposed schemas → add `vision`; env; redirect URL) unblock a live Vision; or (c) the
+> **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
 > application from Admin → Applications (approving mints a real verified brand in prod), then verify
 > the Settings "Become a Brand" form as a citizen (now fixed & live). The founder also still owes
 > the platform its **Ts&Cs / Code of Conduct / fee-schedule documents** — the application form's
