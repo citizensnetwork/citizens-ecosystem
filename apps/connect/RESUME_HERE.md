@@ -1469,33 +1469,101 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
 
 ---
 
+## 3AB. Admin sign-in-as (impersonation) Phase 1 — SHIPPED ✅ (2026-07-17, mig 163 live, PR #36)
+
+The last big rung of the Wear progression epic (§3V-6). Design-first work (§3Y, roles MD §7) was
+already done, so this was a clean build session on branch `feat/impersonation-phase1`.
+Offload log: `.claude/sessions/wear-impersonation-phase1.md`. **Landed via
+[PR #36](https://github.com/citizensnetwork/citizens-ecosystem/pull/36)** (⛔ direct push to main
+blocked; precedent #28–#35). **Next migration # = 164.**
+
+### §7.6 open questions — RATIFIED by the founder (AskUserQuestion) this session
+- **(a) Read path → per-view SECDEF reader fns** (audit written INSIDE each reader before data
+  returns → an unaudited read is structurally impossible; keeps Wear's zero-`service_role` record).
+- **(b) Active-session uniqueness → BOTH** (one per admin AND one per target; two partial unique
+  indexes; a second admin gets a fail-closed `target_under_review`).
+- **(c) Notification → spec copy, no link yet** ("An administrator accessed your account for support
+  on <date>."; payload carries sessionId/startedAt/endedAt for a future audit-summary surface).
+
+### What shipped (4 gated increments, all pushed)
+- **mig 163** (`163_wear_impersonation_phase1.sql`) **APPLIED** (tag `wear-pre-mig163` @8cd6314).
+  `wear.impersonation_sessions` (reason required 5–500; 30-min box; append-only; immutable once
+  closed via a BEFORE-UPDATE guard — only the close stamp is ever writable; **two partial unique
+  indexes** = §7.6b "both") + `wear.impersonation_actions` (per-read log; `view_dm_thread` rows MUST
+  carry a `dm_reason`, CHECK-enforced) + `account_accessed_by_admin` notification value +
+  `impersonation_start`/`_end` + **6 audited SECDEF readers** (profile/feed/saves/notifications/
+  conversations[metadata-only]/dm-thread[reason-gated]) + close-notify trigger (institutional NULL
+  actor; mig-159 invariant) + **`impersonation-expiry-sweep` cron** (*/5 min — guarantees the
+  after-session notify even for abandoned sessions). **Advisors 0 ERROR / 110 WARN / 3 INFO** — the
+  +8 WARNs vs head-162 are EXACTLY the intentional SECDEF EXECUTE grants (start/end + 6 readers,
+  verified by name; R3.2/R3.3-sanctioned privileged-read pattern). **18/18 rolled-back prod smokes
+  PASS** (non-admin/self/short-reason/double-start/second-admin denials; foreign-session probe;
+  blank DM reason; 7 reads = 7 audit rows; granted-path works; direct writes denied; open-session
+  facts frozen; actions append-only; closed sessions immutable; end → admin_exit + 1 notify w/ NULL
+  actor + sessionId payload; expired session refuses reads then closes as expired + notifies).
+  wear tables 38→**40**, policies 86→**88**, fns 34→**49**, enums 23→**25**.
+- **Data plane:** `@citizens/db` `ImpersonationRepo` + typed view payloads (`IMPERSONATION_SESSION_TTL_MS`
+  30min, `_REASON_MIN/MAX` 5/500); `MemoryWearStore` semantic mirror (audit-inside-reads,
+  both-uniqueness, lazy expiry sweep in `start`, close-notify inline); `SupabaseWearStore` RPC
+  adapter (`mapRpcError` += 10 codes, `dm_reason_required` BEFORE its `reason_required` substring);
+  `route-context` STORE_ERROR_STATUS += 9 (session_expired→410); **8 admin-only routes** under
+  `apps/wear/src/app/api/admin/impersonation/` (+ shared `lib/api/impersonation.ts`).
+- **Frontend** (`apps/wear/src/frontend/`): persistent **danger banner** ("Viewing as @handle —
+  Exit", always-on-top, both layouts); NEW **`impersonate.jsx`** read-only view-as screen (5 tabs;
+  DMs behind a per-thread reason prompt; silent-exit on 410/expired); `profile.jsx` admin-only
+  "View as user" entry with required reason; `store.jsx` impersonation state + boot-restore + 30-min
+  client timer; `inbox.jsx` renders the new notification. **Registered in build appFileOrder AND
+  index.html** (§3Y guard — 19 screens; all 5 load-bearing strings verified in the built bundle;
+  built frontend boots with 0 console errors, `CWScreens.Impersonate` registered).
+- **Seed §14:** one **closed, fully-audited** demo sign-in-as of `@gracelethabo` (applied to prod,
+  idempotent no-op re-run verified, cascade-clean teardown). The founder sees the target's inbox
+  notification + a reviewable audit trail without a session occupying their live slot.
+
+### Gates (final, all green)
+`format:check` clean · lint 12/12 · typecheck 12/12 · build 8/8 · tests **Connect 637 · Wear 115
+(+9) · db 114 (+15) · utils 7 · Vision green**. Contract §9 stamped **head 163**; roles MD §7.5-1
+shipped + §7.6 ratified.
+
+### ⛔ Phase 2 (write-as-user) — deliberately NOT built; its own ratified design session
+A `service_role` backend minting a genuine short-lived `sub = target` token so the app literally
+becomes the target (RLS applies to reads AND writes). Full account takeover — needs its own
+guardrail + audit design, **especially the admin-impersonating-admin lockout** (harmless in
+read-only Phase 1, a privilege-escalation vector in Phase 2). See roles MD §7.1/§7.2-2.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
 > Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162), the merge
-> of all three to `main` + prod fix (§3Y), the CI OSV-Scanner audit gate (§3Z) AND the full
-> clearance of its 27-advisory baseline (§3AA, PR #33 MERGED — `main` dep tree now clean) are COMPLETE.**
+> of all three to `main` + prod fix (§3Y), the CI OSV-Scanner audit gate (§3Z), the full
+> clearance of its 27-advisory baseline (§3AA, PR #33 MERGED — `main` dep tree now clean) AND
+> **admin sign-in-as impersonation Phase 1 (§3AB, mig 163 live, PR #36)** are COMPLETE.**
 > `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
 > (prod bundle fix) + **PR #31** (docs) + **PR #32** (CI audit gate). **⛔ Sessions must run in the
 > MONOREPO only** (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent
-> #28–#32).** **Next migration # = 163.** **Advisor baseline @ head-162 = 0 ERROR / 102 WARN /
-> 3 INFO** (the 102nd WARN is the intentional `brand_eligibility` SECDEF grant — compare against
-> THIS, not 101). **CI note:** the Verify job now runs a **blocking OSV-Scanner** step; a new
-> dependency advisory not in `osv-scanner.toml` will red CI — fix the dep, don't just add to the
-> baseline. Run `pnpm format:check` locally before pushing (CI gate the turbo gates omit).
+> #28–#36).** **Next migration # = 164.** **Advisor baseline @ head-163 = 0 ERROR / 110 WARN /
+> 3 INFO** (vs head-162's 0/102/3: +8 are the intentional impersonation SECDEF EXECUTE grants —
+> start/end + 6 readers, §3AB; compare against THIS 110, not 102). **CI note:** the Verify job runs
+> a **blocking OSV-Scanner** step; a new dependency advisory not in `osv-scanner.toml` will red CI —
+> fix the dep, don't just add to the baseline. Run `pnpm format:check` locally before pushing (CI
+> gate the turbo gates omit).
 >
-> **▶ RECOMMENDED next session — pick one:** (a) **Build impersonation Phase 1** — the ratified
-> design is in **roles MD §7** (read-only admin sign-in-as; mig 163 audit tables; admin-only;
-> DM-with-reason; notify-after; banner + 30-min time-box). Design-first work is DONE, so this is a
-> clean build session; or (b) **Vision monorepo sync + deploy-gate close-out** — `apps/vision` here
-> is BEHIND `citizens-vision` `main` @ `3c77959` (§3O/§3-NEXT-2); sync it, then Vision's founder
-> deploy gates (Exposed schemas → add `vision`; env; redirect URL) unblock a live Vision; or (c) the
-> **Wear founder walk-through**: decide the live "Mustard Seed Supply" demo
-> application from Admin → Applications (approving mints a real verified brand in prod), then verify
-> the Settings "Become a Brand" form as a citizen (now fixed & live). The founder also still owes
-> the platform its **Ts&Cs / Code of Conduct / fee-schedule documents** — the application form's
-> checkboxes reference them nominally.
+> **▶ RECOMMENDED next session — pick one:** (a) **Merge PR #36** (impersonation Phase 1) once CI
+> is green + the founder has walked the live flow (see the walk-through below), then optionally
+> **design impersonation Phase 2** (write-as-user; **its own ratified design session** — the
+> `service_role` genuine-token-mint path, with the admin-impersonating-admin lockout as the load
+> bearing guardrail; roles MD §7.1/§7.2-2, §3AB); or (b) **Vision monorepo sync + deploy-gate
+> close-out** — `apps/vision` here is BEHIND `citizens-vision` `main` @ `3c77959` (§3O/§3-NEXT-2);
+> sync it, then Vision's remaining founder deploy gates (env + redirect URL — Exposed schemas is
+> DONE) unblock a live Vision; or (c) the **Wear founder walk-through**: (i) walk the new
+> impersonation flow — as the wear admin, open any profile → **"View as user (admin)"** → give a
+> reason → browse the read-only tabs → open a DM with its own reason → **Exit** → confirm the target
+> gets the "An administrator accessed your account…" inbox notice (the §14 seed already staged one
+> for `@gracelethabo`); (ii) decide the live "Mustard Seed Supply" demo application from Admin →
+> Applications; (iii) the founder still owes the platform its **Ts&Cs / Code of Conduct /
+> fee-schedule documents**.
 
 1. **Wear build track (current focus — §3P roadmap; marketplace core DONE §3R; auth + feed seed DONE §3S;
    media + notifications DONE §3T):**
@@ -1528,9 +1596,13 @@ Follow-up that discharges §3Z's open debt. Offload log: `.claude/sessions/osv-b
       Home stories, per-post Share, deep links, engagement notifications, seed §12.
    h. ~~**Become-a-Brand application.**~~ ✅ **DONE §3X (2026-07-16, mig 162 live)** —
       eligibility 20/10/0 RLS-hard, Settings panel + form, admin queue tab (default),
-      approve-mints-verified-brand, decision notifications, seed §13 demo card. Remaining
-      from the epic: **admin sign-in-as (impersonation, §3V-6)** + offload-logged
-      fast-follows + founder-supplied Ts&Cs/CoC/fee documents.
+      approve-mints-verified-brand, decision notifications, seed §13 demo card.
+   i. ~~**Admin sign-in-as (impersonation) Phase 1.**~~ ✅ **DONE §3AB (2026-07-17, mig 163 live,
+      PR #36)** — read-only audited act-as: per-view SECDEF readers (audit-inside-reads),
+      one-active-per-admin-AND-per-target, DM-with-reason, notify-after (cron-guaranteed),
+      persistent banner + 30-min box, seed §14 demo. **The progression epic is now COMPLETE.**
+      Remaining tails: **impersonation Phase 2 (write-as-user)** = its own ratified design session
+      (§3AB ⛔ block) + offload-logged fast-follows + founder-supplied Ts&Cs/CoC/fee documents.
    e. **Ecosystem lazy-profiles (founder ask, §3S) — own tested session:** stop Connect from
       auto-creating a `public.profiles` row for every auth user (drop/guard `on_auth_user_created`)
       and add an idempotent "ensure profile on first Connect sign-in" (mirror Wear's hydrate). Must
@@ -1587,6 +1659,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 
 ### Canonical docs (start here)
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **161** live; next # = **162**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **163** live; next # = **164**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).
