@@ -233,9 +233,9 @@ describe('ImpersonationRepo — the audited readers', () => {
     expect(await code(store.impersonation.viewDmThread('usr_a', s.id, 'cnv_1', ' '))).toBe(
       'dm_reason_required',
     );
-    expect(
-      await code(store.impersonation.viewDmThread('usr_a', s.id, 'cnv_ghost', REASON)),
-    ).toBe('conversation_not_found');
+    expect(await code(store.impersonation.viewDmThread('usr_a', s.id, 'cnv_ghost', REASON))).toBe(
+      'conversation_not_found',
+    );
     const thread = await store.impersonation.viewDmThread(
       'usr_a',
       s.id,
@@ -243,7 +243,11 @@ describe('ImpersonationRepo — the audited readers', () => {
       'DM check: abuse report on this thread',
     );
     expect(thread.messages).toHaveLength(2);
-    expect(thread.messages[0]).toMatchObject({ id: 'msg_1', body: 'private hello', deleted: false });
+    expect(thread.messages[0]).toMatchObject({
+      id: 'msg_1',
+      body: 'private hello',
+      deleted: false,
+    });
     expect(thread.messages[1]).toMatchObject({ id: 'msg_2', body: null, deleted: true });
     const dmAction = (await store.impersonation.listActions('usr_a', s.id)).find(
       (a) => a.action === 'view_dm_thread',

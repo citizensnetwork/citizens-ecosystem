@@ -1401,7 +1401,11 @@ export interface ImpersonationFeedOptions {
  * `session_expired`, `dm_reason_required`, `conversation_not_found`.
  */
 export interface ImpersonationRepo {
-  start(callerId: ConnectId, targetUserId: ConnectId, reason: string): Promise<ImpersonationSession>;
+  start(
+    callerId: ConnectId,
+    targetUserId: ConnectId,
+    reason: string,
+  ): Promise<ImpersonationSession>;
   end(callerId: ConnectId, sessionId: string): Promise<ImpersonationSession>;
   /** The caller's ACTIVE session or null (banner restore). Expired ⇒ null. */
   getActive(callerId: ConnectId): Promise<ImpersonationSession | null>;

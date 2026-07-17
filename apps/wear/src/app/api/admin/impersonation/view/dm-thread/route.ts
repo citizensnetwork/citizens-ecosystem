@@ -23,6 +23,11 @@ export const POST = handler(async (req, ctx) => {
     throw new ApiError(422, 'conversation_required', 'conversationId is required.');
   }
   const reason = bodyString(body, 'reason');
-  const view = await ctx.store.impersonation.viewDmThread(userId, sessionId, conversationId, reason);
+  const view = await ctx.store.impersonation.viewDmThread(
+    userId,
+    sessionId,
+    conversationId,
+    reason,
+  );
   return json(view);
 });

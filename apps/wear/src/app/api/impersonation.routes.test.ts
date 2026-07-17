@@ -11,7 +11,11 @@ import { __resetWearStoreForTests } from '@/lib/store';
 const mockSession = vi.fn();
 vi.mock('@/lib/session', () => ({ getSession: () => mockSession() }));
 
-import { DELETE as impersonationDELETE, GET as impersonationGET, POST as impersonationPOST } from './admin/impersonation/route';
+import {
+  DELETE as impersonationDELETE,
+  GET as impersonationGET,
+  POST as impersonationPOST,
+} from './admin/impersonation/route';
 import { GET as actionsGET } from './admin/impersonation/[id]/actions/route';
 import { GET as profileGET } from './admin/impersonation/view/profile/route';
 import { GET as feedGET } from './admin/impersonation/view/feed/route';

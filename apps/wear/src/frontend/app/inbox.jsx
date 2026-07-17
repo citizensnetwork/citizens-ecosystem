@@ -68,6 +68,14 @@
           title +
           ' — your design is travelling.'
         );
+      // Mig 163 — admin sign-in-as (institutional; no actor). The copy is the
+      // ratified §7.2-4 line; the audited detail lives with the admin bench.
+      case 'account_accessed_by_admin':
+        return (
+          'An administrator accessed your account for support on ' +
+          (d.date || 'a recent date') +
+          '.'
+        );
       // Mig 162 — the Become-a-Brand decision (institutional; no actor).
       case 'brand_application_approved':
         return (

@@ -1490,8 +1490,7 @@ export class MemoryWearStore implements WearStore {
               return { p, score: (following.has(p.authorId) ? 2 : 0) + freshness };
             })
             .sort(
-              (a, b) =>
-                b.score - a.score || Date.parse(b.p.createdAt) - Date.parse(a.p.createdAt),
+              (a, b) => b.score - a.score || Date.parse(b.p.createdAt) - Date.parse(a.p.createdAt),
             )
             .map((x) => x.p);
         }
@@ -1622,7 +1621,9 @@ export class MemoryWearStore implements WearStore {
         if (!conv) throw new WearStoreError('conversation_not_found', 'Conversation not found.');
         const messages = [...this._messages.values()]
           .filter((m) => m.conversationId === conversationId)
-          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id))
+          .sort(
+            (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id),
+          )
           .slice(-500)
           .map((m) => {
             const u = this._users.get(m.authorId) ?? null;

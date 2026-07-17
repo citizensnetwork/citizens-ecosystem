@@ -47,6 +47,13 @@
     // (a recovery link DOES sign the user in; this flag takes precedence).
     const [recovery, setRecovery] = useState(false);
 
+    // Admin sign-in-as (mig 163, read-only). `{ session, target }` while an
+    // impersonation session is live — drives the persistent banner + the
+    // read-only view-as screen. Restored on boot so a refresh keeps the
+    // banner; a 30-min client timer force-exits at the time-box.
+    const [impersonation, setImpersonation] = useState(null);
+    const impersonationTimerRef = useRef(null);
+
     // Navigation: a simple stack. Each entry {screen, params}. The last
     // entry is what shell.jsx renders; tab switches reset the stack.
     const [nav, setNav] = useState({ tab: 'home', stack: [] });
@@ -62,10 +69,20 @@
     const completeSignIn = useCallback(async () => {
       try {
         await window.CW_API.post('/api/me/hydrate');
-        await refreshMe();
+        const data = await refreshMe();
         setAuthStatus('signedIn');
         setAuthError(null);
         consumeDeepLink(setNav);
+        // Admins only: restore a live sign-in-as session so a refresh keeps
+        // the banner (best-effort — never blocks sign-in).
+        if (data && data.role === 'admin') {
+          try {
+            const active = await window.CW_API.get('/api/admin/impersonation');
+            if (active && active.session) setImpersonation(active);
+          } catch (e) {
+            /* no active session, or not reachable — ignore */
+          }
+        }
       } catch (e) {
         console.error('[CWStore] sign-in hydration failed', e);
         setAuthError(e.message || 'Could not load your Wear profile.');
@@ -99,6 +116,7 @@
         if (event === 'SIGNED_OUT') {
           setMe(null);
           setRecovery(false);
+          setImpersonation(null);
           setAuthStatus('signedOut');
           setNav({ tab: 'home', stack: [] });
         }
@@ -162,6 +180,62 @@
       await window.CW_AUTH.signOut();
     }, []);
 
+    // ── admin sign-in-as (mig 163, read-only) ──
+    // The banner + view-as screen read `impersonation`. Ending clears it and
+    // pops back to Home; expiry (server-side 30-min box) is enforced client
+    // side by a timer AND caught defensively when any view-as call 410s.
+    const clearImpersonationTimer = useCallback(() => {
+      if (impersonationTimerRef.current) {
+        clearTimeout(impersonationTimerRef.current);
+        impersonationTimerRef.current = null;
+      }
+    }, []);
+
+    const exitImpersonation = useCallback(
+      async (opts) => {
+        const silent = opts && opts.silent;
+        clearImpersonationTimer();
+        const session = impersonation && impersonation.session;
+        setImpersonation(null);
+        setNav({ tab: 'home', stack: [] });
+        if (session && !silent) {
+          try {
+            await window.CW_API.del('/api/admin/impersonation?sessionId=' + session.id);
+          } catch (e) {
+            /* already ended / expired — the local exit is what matters */
+          }
+        }
+      },
+      [impersonation, clearImpersonationTimer],
+    );
+
+    const startImpersonation = useCallback(async (targetUserId, reason) => {
+      const data = await window.CW_API.post('/api/admin/impersonation', {
+        targetUserId,
+        reason,
+      });
+      setImpersonation(data);
+      setNav({ tab: 'home', stack: [{ screen: 'impersonate', params: {} }] });
+      return data;
+    }, []);
+
+    // Arm/refresh the client-side auto-expiry whenever the active session
+    // changes; fire a silent local exit at the server time-box.
+    useEffect(() => {
+      clearImpersonationTimer();
+      if (!impersonation || !impersonation.session) return undefined;
+      const remaining = Date.parse(impersonation.session.expiresAt) - Date.now();
+      impersonationTimerRef.current = setTimeout(
+        () => {
+          // At the box the server has ended (or the cron will) → notify fires
+          // there; locally we just drop the banner + view.
+          exitImpersonation({ silent: true });
+        },
+        Math.max(0, remaining),
+      );
+      return clearImpersonationTimer;
+    }, [impersonation, clearImpersonationTimer, exitImpersonation]);
+
     // ── navigation ──
     const setTab = useCallback((tab) => setNav({ tab, stack: [] }), []);
     const push = useCallback(
@@ -186,6 +260,10 @@
       verifyEmailCode,
       signOut,
       refreshMe,
+      impersonation,
+      startImpersonation,
+      exitImpersonation,
+      openImpersonate: () => push('impersonate', {}),
       nav,
       setTab,
       push,

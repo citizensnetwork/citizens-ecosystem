@@ -282,7 +282,7 @@ binds a `wear`-scoped `supabase-js` client to that token, so **RLS keys off the 
    returning data — an unaudited read is structurally impossible). 18/18 rolled-back prod smokes
    PASS. Also: TWO partial unique indexes (one active per admin AND per target — §7.6b "both"),
    immutability triggers (open rows = only the close stamp writable; closed rows frozen; actions
-   append-only), and the `impersonation-expiry-sweep` cron (*/5 min) that guarantees the
+   append-only), and the `impersonation-expiry-sweep` cron (\*/5 min) that guarantees the
    after-session notification for abandoned sessions.
 2. **Store + API**: an admin-only `/api/admin/impersonation` surface (start w/ reason, read-as
    endpoints, DM-access-with-reason, end) + `is_admin()` gate + audit writes; contract + memory
