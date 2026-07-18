@@ -28,6 +28,8 @@
     reach: {
       title: "Reach {trendVerb} to {current}",
       body: "{current} people were reached this {period}, {deltaPct} vs {prev}. {topContributor} drove most of it.",
+      // Variant while per-event attribution (spec §3.4a breakdowns) is unbuilt.
+      bodyNoAttribution: "{current} people were reached this {period}, {deltaPct} vs {prev}, across {events} events.",
       neutral: "Reach is steady at {current} this {period}.",
       source: "reach_per_org + calendar_growth",
     },
@@ -40,6 +42,8 @@
     retention: {
       title: "{subject} retention is {state}",
       body: "{pct} of last {period}'s people returned ({ret}/{prev}); {churned} did not. Churn concentrates in {hotspot}.",
+      // Variant while per-Space churn hotspots (spec §3.4c + spaces) are unbuilt.
+      bodyNoHotspot: "{pct} of last {period}'s people returned ({ret}/{prev}); {churned} did not.",
       neutral: "{subject} retention is steady.",
       source: "retention_rate",
     },
@@ -70,8 +74,20 @@
     dormancy: {
       title: "{count} contributors have gone quiet",
       body: "{count} contributors haven't posted in {days}+ days — {names}.",
+      // Variant when the dormant contributors' public names can't be resolved
+      // (Connect directory unreachable) — the count + threshold still tell the
+      // honest story (authoring rule 4 — graceful degradation).
+      bodyNoNames: "{count} organisations your community engages with haven't posted in {days}+ days ({count} of {orbit} in your orbit).",
       neutral: "All contributors are active.",
       source: "dormancy early-warning (§4.5)",
+    },
+    // De-scattering the Body (§4.2) — the platform's most VISION-central signal:
+    // are your engaged citizens discovering organisations they'd never met before?
+    crossPollination: {
+      title: "{citizensDiscovering} citizens discovered new organisations",
+      body: "{citizensDiscovering} of {audienceSize} engaged citizens ({discoveryPct}) connected with an organisation they'd never engaged with before — {newConnections} new connections across {distinctNewOrgs} organisations in the last {windowDays} days.",
+      neutral: "No new-organisation discoveries recorded in the last {windowDays} days.",
+      source: "cross_pollination (§4.2)",
     },
   };
 
@@ -123,6 +139,19 @@
         { label: "Grow monthly donors", detail: "12% progress against a 40% expected pace" },
       ],
       chart: [70, 68, 64, 61, 59, 58],
+    },
+    {
+      id: "obs-5", type: "crossPollination", severity: "good",
+      data: {
+        citizensDiscovering: 45, audienceSize: 118, discoveryPct: "38% (45/118)",
+        newConnections: 62, distinctNewOrgs: 14, windowDays: 90,
+        avgPerCitizen: "0.53 orgs/citizen",
+      },
+      contributions: [
+        { label: "Community Food Drive", detail: "introduced 28 citizens to 9 other organisations" },
+        { label: "Youth Mentorship intro night", detail: "17 first-time cross-org connections" },
+      ],
+      chart: [7, 9, 11, 10, 13, 14],
     },
   ];
 

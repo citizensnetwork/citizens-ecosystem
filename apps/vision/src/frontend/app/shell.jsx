@@ -67,7 +67,7 @@
     visionStatements: "Vision statements", settings: "Settings",
   };
 
-  function Shell({ session, view, metric, filter, goView, theme, setTheme, navHidden, setNavHidden, depth, setDepth, onSignOut, children }) {
+  function Shell({ session, view, metric, filter, goView, theme, setTheme, navHidden, setNavHidden, depth, setDepth, onSignOut, dataMode, children }) {
     const [open, setOpen] = React.useState({ spaces: true, insights: true, goals: true, "spaces.directory": false, "insights.analytics": false });
     const [narrow, setNarrow] = React.useState(typeof window !== "undefined" && window.innerWidth < 1000);
     React.useEffect(() => {
@@ -157,6 +157,15 @@
               <div style={{ fontSize: 17, fontWeight: 800 }}>{TITLES[view] || "Citizens Vision"}</div>
               <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{window.CV_DATA.org.name}</div>
             </div>
+            {/* Live vs demo data badge (CV_LIVE overlay state) */}
+            {dataMode ? (
+              <span title={dataMode.reason} style={{
+                fontSize: 11, fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                borderRadius: 999, padding: "5px 11px",
+                color: dataMode.mode === "live" ? "var(--gold-800)" : "var(--text-secondary)",
+                background: dataMode.mode === "live" ? "var(--gold-100)" : "var(--surface-sunk)",
+              }}>{dataMode.mode === "live" ? "Live data" : "Demo data"}</span>
+            ) : null}
             {/* Basic / In-depth depth toggle */}
             <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
               {["basic", "indepth"].map((d) => (

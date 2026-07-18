@@ -84,6 +84,24 @@ export interface V1ContributorStats {
   followers: number;
 }
 
+/** Display-safe public identity for a single user by id (`/api/v1/profiles/{id}`). */
+export interface V1Profile {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface V1Category {
+  id: string;
+  name: string;
+  slug: string;
+  emoji: string | null;
+  color: string | null;
+  applies_to: string;
+  sort_order: number;
+  event_count: number;
+}
+
 /** Raised when the Connect API is misconfigured or returns a non-2xx response. */
 export class ConnectApiError extends Error {
   constructor(
@@ -165,4 +183,12 @@ export const connectApi = {
 
   getContributorStats: (slug: string) =>
     get<V1ContributorStats>(`/api/v1/contributors/${slug}/stats`),
+
+  /** Display-safe identity for one user by id — used to resolve dormant orbit
+   *  contributors' public names for the dormancy early-warning (mig 156). */
+  getProfile: (id: string) => get<V1Profile>(`/api/v1/profiles/${id}`),
+
+  listCategories: (
+    params: { applies_to?: "events" | "places" | "both" } = {},
+  ) => get<V1Category[]>("/api/v1/categories", params),
 };

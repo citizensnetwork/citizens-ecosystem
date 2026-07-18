@@ -36,17 +36,21 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid org ID" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("user_org_roles")
-    .select("*, departments(name)")
-    .eq("org_id", orgId)
-    .order("created_at");
+  // Read the roster through the SECURITY DEFINER vision.org_members(org) reader
+  // (migration 154). Unlike a raw user_org_roles select, it joins public.profiles
+  // for DISPLAY-SAFE member identity (full_name / avatar_url — never email/PII),
+  // so the Team screen renders named members instead of a nameless list. The
+  // reader is membership-gated: a non-member call raises 42501 → mapped to 403.
+  const { data, error } = await supabase.rpc("org_members", { p_org_id: orgId });
 
   if (error) {
+    if (error.code === "42501") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data });
+  return NextResponse.json({ data: data ?? [] });
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {

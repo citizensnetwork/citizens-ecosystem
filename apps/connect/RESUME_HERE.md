@@ -1532,14 +1532,96 @@ read-only Phase 1, a privilege-escalation vector in Phase 2). See roles MD §7.1
 
 ---
 
+## 3AC. Vision monorepo sync — apps/vision → citizens-vision @ 3c77959 (demo→live increments 1–7 absorbed) ✅ (2026-07-17, PR #37)
+
+Reconcile-first sync bringing the monorepo's `apps/vision` up to the standalone `citizens-vision`
+`main` @ **3c77959**, which had run AHEAD of the monorepo during the §3Q lineage-drift era: the
+STANDALONE checkouts shipped Vision **demo→live wiring increments 1–7** that the monorepo `apps/vision`
+never received. **App-code catch-up ONLY — NO migration** (migs 147–156 were already in the root
+lineage; §3Q). Landed via **[PR #37](https://github.com/citizensnetwork/citizens-ecosystem/pull/37)**
+(⛔ direct push to main blocked; precedent #28–#36). Offload log:
+`.claude/sessions/vision-monorepo-sync.md` (gitignored). **Next migration # unchanged = 164**
+(impersonation took 163 in §3AB; this sync adds none).
+
+### Reconcile inventory (produced BEFORE any file moved — RECONCILE FIRST, CODE SECOND)
+- Delta = 9 commits `3602a86..3c77959` = increments 1–7 → **27 files, ALL src/scripts, ZERO migrations**.
+- 3-way classification (A=`3602a86` baseline, B=`3c77959` target, C=monorepo): **17 new · 10 behind
+  (C==A exactly) · 0 divergent** — no monorepo-only change collided; cleanest possible case.
+- **Anti-fork VERIFIED (task gate 2):** root `supabase/migrations/147–156` are BYTE-IDENTICAL
+  (EOL-normalized sha256) to the standalone-connect source; standalone-vision's own
+  `supabase/migrations` holds only the archived OLD lineage (001–020…), NOT 147–156. No second
+  lineage — root `supabase/` remains THE single lineage for all 3 apps.
+- **Workspace wiring PRESERVED:** the 2 vendored-copy files (`scripts/sync-frontend-build.js`,
+  `src/__tests__/frontend-build-vendor.test.ts`) were deliberately NOT synced — `apps/vision`
+  consumes `@citizens/frontend-build` via `workspace:*` (`packages/frontend-build`), not a vendored
+  copy (monorepo commit c4e243a retired vendoring). `build-frontend.js`'s stale "vendored at
+  vendor/…" comment was corrected to the workspace reality (the ONLY intentional deviation from
+  3c77959-verbatim; all other 26 files byte-match B).
+
+### Increment ledger absorbed from standalone-connect RESUME §3Q–§3W (authoritative Vision history)
+Each increment = a gated DB migration (already in the root lineage) + its citizens-vision app wiring.
+Pattern throughout: RLS/membership-gated SECDEF readers (42501→403), num+den beside every %, the
+smallest org never renders worse than the demo (neutral variants + honest em-dashes, never fabricated):
+- **inc1 §3Q (migs 147+148):** `vision.spaces` + daily-snapshot cron (jobid 11) + the four org-level
+  RGRE readers (reach/engagement/calendar_growth/retention) → `GET /api/metrics/connect` + the
+  `live.jsx` CV_LIVE overlay (home Kingdom-pulse/observations, Analytics Reach/Growth/Retention/Engagement).
+- **inc2 §3R (migs 149+150):** advisory evaluation engine (cron `vision_advisory_eval`) +
+  `activity_funnel`/`broadcast_effectiveness` → advisory feed + home banner + dismiss, Funnel/Broadcast tabs.
+- **inc3 §3S (migs 151+152):** `reach_per_space`/`engagement_per_space` + `set_category_space` writer +
+  `get_category_spaces` reader → `/api/spaces` CRUD + Configure Spaces + category→space mapping UI.
+- **inc4 §3T (mig 153):** `activity_metrics` per-claimed-activity reader → Objectives/Projects/
+  Vision-statements/Activities live optimistic CRUD.
+- **inc5 §3U (mig 154):** `org_members(org)` display-safe roster reader (PII-free; names via a
+  `public.profiles` join) → Settings Team card live (role PATCH / remove DELETE; invite stays MVP stub).
+- **inc6 §3V (mig 155):** `cross_pollination(org,from,to)` — the de-scattering **INDEX** (§4.2: are
+  citizens discovering NEW orgs — Eph 2:19) → `GET /api/metrics/cross-pollination` + home observation.
+- **inc7 §3W (mig 156):** `dormancy_watch(org,threshold,lookback)` — the de-scattering **GUARDIAN**
+  (§4.5: which orbit contributors have gone quiet) → `GET /api/metrics/dormancy` (dormant orgs' public
+  names resolved app-side via `/api/v1/profiles/{id}`, never raw ids).
+
+### Security / contract (unchanged by this app-code sync — vibe-security re-audited)
+Every Vision reader is RLS/membership-gated (42501→403), reads only `vision.*` (contract R3) and
+Connect commons ONLY via `/api/v1` (R2, per the `src/lib/connect/api.ts` header); readers touching
+`public.profiles` are display-safe (no email/PII). The 14 vision authenticated-SECDEF readers are
+BY DESIGN — do NOT re-flag; this sync adds **no migration and no new advisor findings** (live
+absolute stays @ head-163 = 0 ERROR / 110 WARN / 3 INFO per §3AB). `SHARED_DB_CONTRACT` untouched.
+
+### Gates (all green)
+`pnpm format:check` ✅ · lint 12/12 ✅ · typecheck 12/12 ✅ · test 11/11 (**Connect 637 · Vision 734**
+— +73 from the increment tests; = standalone's 737 minus the 3 excluded vendor-drift-test cases — ·
+Wear 106 · db 99 · utils 7) · build 8/8 ✅. Vercel preview: Connect + Vision deploys passed.
+
+### Standalone checkouts → READ-ONLY history
+`apps/vision` (monorepo) is now the single source of truth for Vision app code, and this file has
+absorbed the standalone-connect Vision history (§3Q–§3W there). The standalone `citizens-vision` and
+`citizens-connect` checkouts are retired to **read-only** — do NOT commit into them; the fork must not
+recur (§3Q convergence rule).
+
+### Vision fast-follows still open (§3O "what 4c leaves open")
+1. **Timeline Map — live MapLibre: ⛔ BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`** (still
+   empty in the built config; §3V/§3W). `/api/map/activities` + `/api/timeline` exist; `views.jsx`
+   `TimelineMap()` is a placeholder guarded on the key (no key → placeholder, never a broken map).
+   Cannot be built/verified live in-session until the key lands.
+2. **Network graph (§4.3)** — the next codeable increment (its OWN PR + prod migration **164**):
+   "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
+   mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
+   `/api/metrics/cross-org` (both already exist).
+3. Then **Phase D** (exports / partnerships / scheduled reports).
+⛔ **Vision deploy gates STILL OWED (founder-only):** the env pattern (+ optional MAPTILER key) +
+Vision's redirect URL. Vision stays non-functional (demo mode by design) until both land.
+Exposed-schemas → `vision` ✅ done (§3O/founder 2026-07-17).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
 > Concepts surface (§3W, mig 161), the Become-a-Brand application (§3X, mig 162), the merge
 > of all three to `main` + prod fix (§3Y), the CI OSV-Scanner audit gate (§3Z), the full
-> clearance of its 27-advisory baseline (§3AA, PR #33 MERGED — `main` dep tree now clean) AND
-> **admin sign-in-as impersonation Phase 1 (§3AB, mig 163 live, PR #36)** are COMPLETE.**
+> clearance of its 27-advisory baseline (§3AA, PR #33 MERGED — `main` dep tree now clean),
+> **admin sign-in-as impersonation Phase 1 (§3AB, mig 163 live, PR #36 MERGED `efb251f`)** AND the
+> **Vision monorepo sync + demo→live increments 1–7 (§3AC, PR #37)** are COMPLETE.**
 > `step5-monorepo-lift` is **fully merged to `main`** via **PR #29** (§3V/§3W/§3X) + **PR #30**
 > (prod bundle fix) + **PR #31** (docs) + **PR #32** (CI audit gate). **⛔ Sessions must run in the
 > MONOREPO only** (§3Q). **⛔ Direct push to `main` is blocked — land changes via PR (precedent
@@ -1550,14 +1632,14 @@ read-only Phase 1, a privilege-escalation vector in Phase 2). See roles MD §7.1
 > fix the dep, don't just add to the baseline. Run `pnpm format:check` locally before pushing (CI
 > gate the turbo gates omit).
 >
-> **▶ RECOMMENDED next session — pick one:** (a) **Merge PR #36** (impersonation Phase 1) once CI
-> is green + the founder has walked the live flow (see the walk-through below), then optionally
-> **design impersonation Phase 2** (write-as-user; **its own ratified design session** — the
-> `service_role` genuine-token-mint path, with the admin-impersonating-admin lockout as the load
-> bearing guardrail; roles MD §7.1/§7.2-2, §3AB); or (b) **Vision monorepo sync + deploy-gate
-> close-out** — `apps/vision` here is BEHIND `citizens-vision` `main` @ `3c77959` (§3O/§3-NEXT-2);
-> sync it, then Vision's remaining founder deploy gates (env + redirect URL — Exposed schemas is
-> DONE) unblock a live Vision; or (c) the **Wear founder walk-through**: (i) walk the new
+> **▶ RECOMMENDED next session — pick one:** (a) **design impersonation Phase 2** (write-as-user;
+> **its own ratified design session** — the `service_role` genuine-token-mint path, with the
+> admin-impersonating-admin lockout as the load-bearing guardrail; roles MD §7.1/§7.2-2, §3AB;
+> PR #36 already MERGED `efb251f`); or (b) **Vision fast-follows** — the monorepo sync is ✅ DONE
+> (§3AC, PR #37); next is the **network graph §4.3** (its own PR + prod mig 164) then Phase D.
+> Timeline Map stays ⛔ BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`; Vision's remaining
+> deploy gates (env + redirect URL — Exposed-schemas ✅) are still owed to unblock a live Vision;
+> or (c) the **Wear founder walk-through**: (i) walk the new
 > impersonation flow — as the wear admin, open any profile → **"View as user (admin)"** → give a
 > reason → browse the read-only tabs → open a DM with its own reason → **Exit** → confirm the target
 > gets the "An administrator accessed your account…" inbox notice (the §14 seed already staged one
@@ -1609,14 +1691,22 @@ read-only Phase 1, a privilege-escalation vector in Phase 2). See roles MD §7.1
       land the lazy-ensure BEFORE removing the trigger or new Connect sign-ups break. Touches LIVE
       Connect auth → migration + Connect frontend + full regression. Not urgent; the §3S seed already
       achieves the no-footprint end-state on its own.
-2. **Vision (verify-then-continue):** migs 147–156 + demo→live wiring increments 1–7 shipped from
-   the STANDALONE checkouts (§3Q) — absorb the standalone `citizens-connect` RESUME §3Q–§3W into
-   this file, sync the monorepo's `apps/vision` tree to `citizens-vision` `main` @ `3c77959`
-   (currently BEHIND it), then continue Vision fast-follows (Timeline Map; remaining wiring).
+2. **Vision fast-follows (sync + absorb ✅ DONE §3AC 2026-07-17, PR #37):** ~~absorb the standalone
+   `citizens-connect` RESUME §3Q–§3W + sync `apps/vision` → `citizens-vision` @ `3c77959`~~ ✅ —
+   `apps/vision` now carries demo→live increments 1–7; the standalone Vision history is absorbed into
+   this file (§3AC); standalone checkouts retired to read-only. **Continue:**
+   a. **Network graph (§4.3)** — the next codeable increment (its OWN PR + prod migration **164**):
+      "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
+      mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
+      `/api/metrics/cross-org` (both exist). Then **Phase D** (exports / partnerships / scheduled reports).
+   b. **Timeline Map** live MapLibre — ⛔ **BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`**
+      (still empty; §3V/§3W). `views.jsx TimelineMap()` stays a placeholder guarded on the key until it lands.
 3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R, then §3T
-   via **PR #28**); commit-or-park the standalone `citizens-connect` dirty tree; retire the standalone checkouts
-   to read-only. Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their copies
-   are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
+   via **PR #28**); ~~retire the standalone checkouts to read-only~~ ✅ **in principle DONE §3AC** —
+   the standalone Vision history is now absorbed here and `apps/vision` is the single source of truth;
+   still owed (filesystem housekeeping): commit-or-park the standalone `citizens-connect` dirty tree so
+   the fork cannot recur (§3Q). Consolidate Connect + Vision onto `@citizens/utils` rate-limit (their
+   copies are byte-compatible on purpose — mechanical swap, workspace gates must stay green).
 4. **Founder-only, non-code (any time):**
    - ~~**Wear deploy gates**~~ ✅ **DONE §3T/§3U** — Wear live; env set; Supabase Redirect URLs now
      include the Vercel deploy-hash wildcard `https://citizens-ecosystem-wear-**-citizensecosystem-projects.vercel.app/**`

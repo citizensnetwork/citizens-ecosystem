@@ -139,11 +139,13 @@
 
   const tone = (t) => t === "good" ? "var(--success)" : t === "bad" ? "var(--danger)" : t === "warn" ? "var(--warning)" : "var(--info)";
 
-  const sevMeta = (severity) => severity === "warning"
-    ? { color: "var(--warning)", bg: "var(--warning-bg)", label: "Needs attention" }
-    : severity === "good"
-      ? { color: "var(--success)", bg: "var(--success-bg)", label: "Encouraging" }
-      : { color: "var(--info)", bg: "var(--surface-sunk)", label: "Observation" };
+  const sevMeta = (severity) => severity === "critical"
+    ? { color: "var(--danger)", bg: "var(--danger-bg)", label: "Urgent" }
+    : severity === "warning"
+      ? { color: "var(--warning)", bg: "var(--warning-bg)", label: "Needs attention" }
+      : severity === "good"
+        ? { color: "var(--success)", bg: "var(--success-bg)", label: "Encouraging" }
+        : { color: "var(--info)", bg: "var(--surface-sunk)", label: "Observation" };
 
   window.UI = { Icon, Crown, Card, SectionTitle, Pill, Btn, Ring, Spark, Toggle, tone, sevMeta };
 })();
