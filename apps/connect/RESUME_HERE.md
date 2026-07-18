@@ -1597,19 +1597,22 @@ absorbed the standalone-connect Vision history (§3Q–§3W there). The standalo
 `citizens-connect` checkouts are retired to **read-only** — do NOT commit into them; the fork must not
 recur (§3Q convergence rule).
 
-### Vision fast-follows still open (§3O "what 4c leaves open")
-1. **Timeline Map — live MapLibre: ⛔ BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`** (still
-   empty in the built config; §3V/§3W). `/api/map/activities` + `/api/timeline` exist; `views.jsx`
-   `TimelineMap()` is a placeholder guarded on the key (no key → placeholder, never a broken map).
-   Cannot be built/verified live in-session until the key lands.
-2. **Network graph (§4.3)** — the next codeable increment (its OWN PR + prod migration **164**):
+### Vision fast-follows (§3O "what 4c leaves open") — ✅ DEPLOY GATES NOW RESOLVED (founder, 2026-07-18)
+✅ **Vision deploy gates ALL IN (founder, 2026-07-18):** `NEXT_PUBLIC_SUPABASE_URL` + anon key,
+`NEXT_PUBLIC_MAPTILER_KEY`, `CONNECT_API_BASE_URL`, and the Supabase Auth **redirect URL** are all
+entered; Exposed-schemas → `vision` ✅. **Vision can now run in LIVE mode** (no longer demo-only) —
+the founder can walk the live app, and org admins can link a Connect contributor (`POST /api/connect/link`).
+1. **Timeline Map — live MapLibre: ✅ NOW UNBLOCKED — the TOP next Vision increment (NO migration,
+   purely frontend, live-verifiable).** The MapTiler key is in, so this is no longer a skip.
+   `/api/map/activities` + `/api/timeline` already exist; `views.jsx TimelineMap()` is a placeholder →
+   wire it to MapLibre GL (CDN UMD already loaded) with single-event reach rings + period playback +
+   range compare per the design handoff, still **guarding on the key** defensively (unset → keep the
+   placeholder, never a broken map). Verify in-browser against the live map.
+2. **Network graph (§4.3)** — the next DB-bearing increment (its OWN PR + prod migration **164**):
    "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
    mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
    `/api/metrics/cross-org` (both already exist).
 3. Then **Phase D** (exports / partnerships / scheduled reports).
-⛔ **Vision deploy gates STILL OWED (founder-only):** the env pattern (+ optional MAPTILER key) +
-Vision's redirect URL. Vision stays non-functional (demo mode by design) until both land.
-Exposed-schemas → `vision` ✅ done (§3O/founder 2026-07-17).
 
 ---
 
@@ -1636,10 +1639,11 @@ Exposed-schemas → `vision` ✅ done (§3O/founder 2026-07-17).
 > **its own ratified design session** — the `service_role` genuine-token-mint path, with the
 > admin-impersonating-admin lockout as the load-bearing guardrail; roles MD §7.1/§7.2-2, §3AB;
 > PR #36 already MERGED `efb251f`); or (b) **Vision fast-follows** — the monorepo sync is ✅ DONE
-> (§3AC, PR #37); next is the **network graph §4.3** (its own PR + prod mig 164) then Phase D.
-> Timeline Map stays ⛔ BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`; Vision's remaining
-> deploy gates (env + redirect URL — Exposed-schemas ✅) are still owed to unblock a live Vision;
-> or (c) the **Wear founder walk-through**: (i) walk the new
+> (§3AC, PR #37) AND the **deploy gates are ALL IN (founder 2026-07-18 — env + anon + MapTiler key +
+> `CONNECT_API_BASE_URL` + redirect URL; Exposed-schemas ✅), so Vision runs LIVE now.** The TOP next
+> increment is **Timeline Map — live MapLibre** (NOW UNBLOCKED — the MapTiler key is in; NO migration,
+> purely frontend, live-verifiable), THEN the **network graph §4.3** (its own PR + prod mig 164), then
+> Phase D; or (c) the **Wear founder walk-through**: (i) walk the new
 > impersonation flow — as the wear admin, open any profile → **"View as user (admin)"** → give a
 > reason → browse the read-only tabs → open a DM with its own reason → **Exit** → confirm the target
 > gets the "An administrator accessed your account…" inbox notice (the §14 seed already staged one
@@ -1694,13 +1698,17 @@ Exposed-schemas → `vision` ✅ done (§3O/founder 2026-07-17).
 2. **Vision fast-follows (sync + absorb ✅ DONE §3AC 2026-07-17, PR #37):** ~~absorb the standalone
    `citizens-connect` RESUME §3Q–§3W + sync `apps/vision` → `citizens-vision` @ `3c77959`~~ ✅ —
    `apps/vision` now carries demo→live increments 1–7; the standalone Vision history is absorbed into
-   this file (§3AC); standalone checkouts retired to read-only. **Continue:**
-   a. **Network graph (§4.3)** — the next codeable increment (its OWN PR + prod migration **164**):
+   this file (§3AC); standalone checkouts retired to read-only. **Deploy gates ✅ ALL IN (founder
+   2026-07-18) → Vision runs LIVE.** **Continue (Timeline Map first now that the key is in):**
+   a. **Timeline Map — live MapLibre** ✅ **NOW UNBLOCKED (the TOP next increment: NO migration,
+      purely frontend, live-verifiable).** `/api/map/activities` + `/api/timeline` exist; wire
+      `views.jsx TimelineMap()` (placeholder today) to MapLibre GL (CDN UMD loaded) — single-event
+      reach rings + period playback + range compare per the design handoff — still guarding on the key
+      defensively. Verify in-browser against the live map.
+   b. **Network graph (§4.3)** — the next DB-bearing increment (its OWN PR + prod migration **164**):
       "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
       mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
       `/api/metrics/cross-org` (both exist). Then **Phase D** (exports / partnerships / scheduled reports).
-   b. **Timeline Map** live MapLibre — ⛔ **BLOCKED on the founder's `NEXT_PUBLIC_MAPTILER_KEY`**
-      (still empty; §3V/§3W). `views.jsx TimelineMap()` stays a placeholder guarded on the key until it lands.
 3. **Monorepo hygiene:** ~~merge `step5-monorepo-lift` → `main`~~ ✅ done 2026-07-15 (§3R, then §3T
    via **PR #28**); ~~retire the standalone checkouts to read-only~~ ✅ **in principle DONE §3AC** —
    the standalone Vision history is now absorbed here and `apps/vision` is the single source of truth;
@@ -1717,10 +1725,10 @@ Exposed-schemas → `vision` ✅ done (§3O/founder 2026-07-17).
    - **§3U address hygiene (roadmap):** put Wear/Connect/Vision behind **stable custom domains** (e.g.
      `wear.citizenscentral.co.za`) + a **branded storage asset origin** so URLs stop leaking
      `*.vercel.app` deploy-hashes and `xyiajtrvhlxaeplsiajj.supabase.co`.
-   - **Vision deploy gates — PARTIALLY DONE** (§3F + §3O): ~~Supabase **Exposed schemas → add
-     `vision`**~~ ✅ **DONE (founder, confirmed 2026-07-17)**. ⛔ **STILL OWED:** the same env
-     pattern (+ optional `NEXT_PUBLIC_MAPTILER_KEY`) **+ Vision's redirect URL**. Vision stays
-     non-functional until those two land.
+   - ~~**Vision deploy gates**~~ ✅ **DONE (founder, 2026-07-18)** (§3F + §3O + §3AC): Exposed schemas →
+     `vision` ✅, `NEXT_PUBLIC_SUPABASE_URL` + anon key, `NEXT_PUBLIC_MAPTILER_KEY`,
+     `CONNECT_API_BASE_URL`, and Vision's **redirect URL** are all entered. **Vision now runs LIVE** —
+     Timeline Map is unblocked (NEXT STEPS 2a) and the founder can walk the live Vision app.
    - ~~First **Wear moderator/admin grants**~~ ✅ **DONE (§3P)** — founder is `wear` admin.
    - **Custom SMTP for auth emails** (§3P ⛔) — required before non-team users can receive
      sign-up confirmation / password-reset emails.
