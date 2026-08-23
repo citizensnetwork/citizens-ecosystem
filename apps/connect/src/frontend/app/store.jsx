@@ -202,6 +202,14 @@
       bio: r.bio || '',
       website: r.website_url || '',
       location: r.physical_address || '',
+      // Map presence: category sets pin colour/icon (window.DATA.getCategory);
+      // lat/lng comes from a forward-geocode of physical_address done at
+      // application time (see submitApplication). /api/v1/contributors
+      // returns these as physical_latitude/physical_longitude (unlike
+      // events/places, which are already renamed to latitude/longitude).
+      category: r.category || '',
+      lat: typeof r.physical_latitude === 'number' ? r.physical_latitude : null,
+      lng: typeof r.physical_longitude === 'number' ? r.physical_longitude : null,
       followerCount: 0,
       involvementLevel: 'Shepherd',
       dominantNiche: '',
@@ -461,46 +469,66 @@
       : baseUser;
 
     // ── actions ─────────────────────────────────────────────────────
-    const submitApplication = useCallback((form) => {
+    // v1 self-serve go-live (V1_SCOPE.md, migration 164): no admin wait —
+    // submitting IS approving. Mirrors createEvent/createPlace's
+    // geocode-then-write shape (same geocodeAddress helper) and their
+    // (form, done) signature so the wizard can show a submitting state
+    // instead of navigating before the write actually lands.
+    const submitApplication = useCallback((form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
-        bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
-        submittedAt: today(), reason: form.reason, location: form.location,
+        bio: form.bio, category: form.category, weeklyEvents: 1, status: 'approved',
+        submittedAt: today(), location: form.location,
         website: form.website, socials: form.socials || {}, applicantName: (realUser && realUser.name) || '', isMine: true,
       };
-      setMyApplication(app);
-      setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
-      toast('Application submitted — an admin will review it shortly.', 'gold');
-      go('home');
-      // Write to the database for real signed-in users (no-op in demo mode).
-      if (realUser) {
-        (async () => {
-          try {
-            const res = await authedFetch('/api/contributor/apply', {
-              method: 'POST',
-              body: JSON.stringify({
-                display_name: form.orgName,
-                contributor_kind: form.category,
-                bio: form.bio,
-                motivation_text: form.reason,
-                physical_address: form.location,
-                website_url: form.website || null,
-                instagram_handle: (form.socials && form.socials.instagram) || null,
-                facebook_url: (form.socials && form.socials.facebook) || null,
-                tiktok_handle: (form.socials && form.socials.tiktok) || null,
-                youtube_url: (form.socials && form.socials.youtube) || null,
-              }),
-            });
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              console.warn('[apply] API error', res.status, body);
-            }
-          } catch (e) {
-            console.warn('[apply] network error', e);
-            // Local state is already set — don't alarm the user over a background write failure.
-          }
-        })();
+      if (!realUser) {
+        setMyApplication(app);
+        setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
+        toast("You're live! Set up your contributor profile.", 'green');
+        go('onboarding');
+        finish(true);
+        return;
       }
+      (async () => {
+        try {
+          const geo = await geocodeAddress(form.location);
+          const res = await authedFetch('/api/contributor/apply', {
+            method: 'POST',
+            body: JSON.stringify({
+              display_name: form.orgName,
+              contributor_category: form.category,
+              bio: form.bio,
+              physical_address: form.location,
+              physical_latitude: geo ? geo.lat : null,
+              physical_longitude: geo ? geo.lng : null,
+              website_url: form.website || null,
+              instagram_handle: (form.socials && form.socials.instagram) || null,
+              facebook_url: (form.socials && form.socials.facebook) || null,
+              tiktok_handle: (form.socials && form.socials.tiktok) || null,
+              youtube_url: (form.socials && form.socials.youtube) || null,
+            }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            toast(body.error === 'already_pending' || body.error === 'already_approved'
+              ? 'You already have a contributor application on file.'
+              : 'Could not submit — please try again.', 'red');
+            finish(false);
+            return;
+          }
+          const approved = body.approved !== false;
+          setMyApplication({ ...app, status: approved ? 'approved' : 'pending' });
+          setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
+          toast(approved ? "You're live! Set up your contributor profile." : 'Application submitted — finishing setup shortly.', approved ? 'green' : 'gold');
+          go('onboarding');
+          finish(true);
+        } catch (e) {
+          console.warn('[apply] network error', e);
+          toast('Could not submit — please check your connection and try again.', 'red');
+          finish(false);
+        }
+      })();
     }, [realUser, toast, go]);
 
     const reviewApplication = useCallback((id, status, note) => {
@@ -729,12 +757,20 @@
         involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
       if (!realUser) {
-        setContributors((prev) => [...prev, localOrg]);
-        setMyContributor(localOrg);
-        setRole('contributor');
-        toast('Welcome aboard! Your contributor profile is live.', 'green');
-        go('dashboard');
-        finish(true);
+        // Demo mode still geocodes (same helper, same MapTiler key) so a
+        // demo contributor shows up on the map exactly like a real one —
+        // this is also what makes the flow deterministically e2e-testable
+        // without a live Supabase session.
+        (async () => {
+          const geo = await geocodeAddress(form.location);
+          const org = { ...localOrg, lat: geo ? geo.lat : null, lng: geo ? geo.lng : null };
+          setContributors((prev) => [...prev, org]);
+          setMyContributor(org);
+          setRole('contributor');
+          toast('Welcome aboard! Your contributor profile is live.', 'green');
+          go('dashboard');
+          finish(true);
+        })();
         return;
       }
       (async () => {

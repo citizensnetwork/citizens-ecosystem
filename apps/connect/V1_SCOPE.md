@@ -1,6 +1,12 @@
 # V1 Scope — Citizens Connect
 
 > Companion to `RESUME_HERE.md` and `VISION.md`. This document defines what ships as v1 of Citizens Connect's core discovery loop, separate from the ecosystem's fuller Contributor/Vision/Wear ambitions. Open items are tracked explicitly at the end, not resolved here.
+>
+> **2026-08-24 update (RESUME_HERE.md §3AE):** the core loop below shipped — self-serve
+> Contributor go-live (no admin wait), the list view renamed **Kingdom Discovery**
+> (`kingdom-discovery.jsx`), and Contributors now actually appear on the map (they never did
+> before, even once approved — see §3AE's root-cause note). Sections below are left as the
+> session-1 record; §7/§8 status columns are updated in place rather than rewritten.
 
 ---
 
@@ -31,13 +37,24 @@
 | Messaging, notifications, admin panel, contributor dashboard | `messages.jsx`, `admin.jsx`, `dashboard.jsx` |
 | Connect / Consider (event) and Follow (place) interaction states | `store.jsx`, surfaced in `home.jsx` |
 
-### Added this session
+### Added session 1 (scoping)
 | Feature | Where |
 |---|---|
-| Scrollable list view of Contributors, Places, and Events, with a type filter and search | `list.jsx` (new) |
+| Scrollable list view of Contributors, Places, and Events, with a type filter and search | `list.jsx` (renamed session 2, see below) |
 | Map ↔ List toggle button in the Discover top bar | `home.jsx` |
 | `list` page registered in the router | `shell.jsx` |
 | V1-scope markers on fields/sections to drop from the v1 required path | `apply.jsx`, `create.jsx` (comments only — no behavior changed) |
+
+### Added session 2 (2026-08-24 — RESUME_HERE.md §3AE)
+| Feature | Where |
+|---|---|
+| Self-serve Contributor go-live — submitting the Apply form approves it immediately, no admin wait | `store.jsx` (`submitApplication`), `/api/contributor/apply`, migration 164 (`self_approve_contributor_application`) |
+| `list.jsx` renamed to `kingdom-discovery.jsx` at every identifier level (file/component/route/nav) | `kingdom-discovery.jsx`, `home.jsx`, `shell.jsx`, `build-frontend.js`, `index.html` |
+| Contributors now render on the map (the actual root fix — they never did before) | `home.jsx` markers array, `store.jsx` `adaptContributor()`, migration 164 `contributor_category` column |
+| Contributor map category — fixed a real bug where the Apply wizard's category picker was silently discarded (sent to the wrong DB column) | migration 164, `/api/contributor/apply`, `/api/v1/contributors` |
+| Founder-only hide/flag moderation safety net (backend only — no admin.jsx UI yet) | migration 164 (`set_contributor_hidden`), `/api/admin/contributors/hide` |
+| Apply wizard trimmed from 4 steps to 3 per its own prior-session `DEFER TO V2` markers | `apply.jsx` |
+| Playwright e2e suite (the merge gate) | `playwright.config.ts`, `e2e/kingdom-discovery.spec.ts` |
 
 ## 3. Objectives and plans
 
@@ -85,17 +102,19 @@ v1's minimal scope serves this purpose directly: a Christian entity that cannot 
 | Scrollable list screen | Done this session | New `list.jsx`: `ListPage` renders Contributors, Places, and Events from the same `useApp()` state the map uses, with an All / Contributors / Places / Events filter row and a search box. Each card routes to the same profile screens the map's preview panel already opens (`go('event'/'place'/'profile', { id })`). |
 | Map ↔ List toggle | Done this session | One button added to the Discover top bar (`home.jsx`), next to the existing search and category-filter buttons, calling `go('list')`. A matching button on the list screen calls `go('home')`. A visible toggle was chosen over a swipe gesture for discoverability; a plain two-screen toggle was chosen over a draggable bottom sheet to keep the build simple, per the founder's direction to go simple first. |
 | Router wiring | Done this session | `case 'list'` added to the page switch in `shell.jsx`. |
-| V1-scope markers | Done this session | `DEFER TO V2` comments added directly above the relevant fields/sections in `apply.jsx` and `create.jsx`, plus a scope note at the top of each file. Comments only — no runtime behavior changed. Removing the approval gate touches `store.jsx`'s `submitApplication` / `completeOnboarding` functions and possibly admin-panel and notification code that has not yet been read in this pass, so it was not changed blind. |
-| Remove admin-approval gate | Not yet done | Requires reading `store.jsx`'s `submitApplication` and related admin-panel code before changing behavior, to confirm nothing downstream (notifications, admin queue counts, RLS policies) assumes a pending state. This is the next concrete build step. |
-| Individual Contributor kind | Not yet done | Add "Individual" to the Contributor kind alongside Ministry / Organisation / Business (`docs/feature-clarity/search-and-discovery.md` already anticipates this filter, just not this value); relax the "Organisation / ministry name" label in `apply.jsx` accordingly. |
+| V1-scope markers | Done session 1 | `DEFER TO V2` comments added directly above the relevant fields/sections in `apply.jsx` and `create.jsx`, plus a scope note at the top of each file. |
+| Remove admin-approval gate | **Done session 2** | `self_approve_contributor_application` RPC (migration 164, own-row-only) called immediately after the `contributor_applications` insert in `/api/contributor/apply`; `submitApplication` navigates straight to onboarding instead of waiting. Admin's `approve_contributor_application` RPC still exists, untouched, for edge cases. |
+| Contributors appear on the map | **Done session 2** | The actual blocking bug: `home.jsx` never included `contributors` in its marker list, `adaptContributor()` never mapped lat/lng, and there was no DB column for a Contributor's map category. All three fixed; verified via Playwright (a real `.maplibregl-marker` renders). |
+| Founder-only hide/flag | **Backend done session 2, no UI yet** | `set_contributor_hidden` RPC + `/api/admin/contributors/hide` exist and are tested; admin.jsx has no button wired to it yet — flagged as the next small addition in RESUME_HERE.md §3AE. |
+| Individual Contributor kind | Not yet done | Add "Individual" to the Contributor kind alongside Ministry / Organisation / Business (`docs/feature-clarity/search-and-discovery.md` already anticipates this filter, just not this value); relax the "Organisation / ministry name" label in `apply.jsx` accordingly. Note: `apply.jsx` currently collects no kind at all (pre-existing gap, unrelated to session 2's fixes). |
 | README fix | Not yet done | Rewrite `apps/connect/README.md` to describe Citizens Connect, not the unrelated "member data platform" text currently there. |
 
 ## 8. Priority goals to be accomplished
 
 The founder has not stated these explicitly. They follow from the friction points above and are offered here for confirmation or edit, matching this project's convention of tracking open items rather than deciding them unilaterally:
 
-1. Bypass or auto-approve the Contributor application for v1, after reading `store.jsx`'s approval-related functions.
-2. Add a lightweight, founder-only hide/flag control for a listing, as the moderation safety net that replaces pre-publish admin review.
+1. ~~Bypass or auto-approve the Contributor application for v1~~ **✅ Done session 2.**
+2. ~~Add a lightweight, founder-only hide/flag control for a listing~~ **✅ Backend done session 2 (no admin.jsx button yet).**
 3. Add "Individual" as a Contributor kind, and adjust onboarding copy to support a solo person.
 4. Correct `README.md`.
 5. Label `docs/feature-clarity/*` and `map-layering.md` clearly as deferred/not-in-v1 (a one-line status header on each is enough) so they stop reading as active scope.

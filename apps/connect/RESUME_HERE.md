@@ -1709,16 +1709,132 @@ already what an engagement layer would key off, so no rework is anticipated ther
 
 ---
 
+## 3AE. Connect v1 — self-serve go-live SHIPPED + Kingdom Discovery renamed ✅ (2026-08-24)
+
+Executed §3AD's plan end-to-end after a founder chat resolved the open questions (fully
+self-serve onboarding; leave map pin complexity as-is; build a minimal Playwright e2e suite as
+the merge gate; rename "list" to "Kingdom Discovery" at the internal-identifier level too).
+Branch **`feat/connect-v1-kingdom-discovery`**. **Migrations 164–166 applied to prod — next
+migration # = 167.** Advisors **0 ERROR / 112 WARN / 3 INFO** (+2 = the two new
+admin/self-gated RPCs, same accepted pattern as ~19 sibling RPCs from migration 140). Gates:
+**tsc 0 · eslint 0 · vitest 645/645 (+8 new) · `node scripts/build-frontend.js` OK · Playwright
+e2e 1/1 (stable across 2 repeat runs, parallel).**
+
+### The real bug found and fixed: Contributors never appeared on the map
+Verified by reading the code, not assumed: `home.jsx`'s marker array only ever pulled from
+`events` + `places` — `contributors` was never included, even once approved. Separately, the
+Apply wizard's "Primary category" step (already captioned "sets your colour & icon across the
+map") was being sent to the API as `contributor_kind`, which only accepts
+ministry/organization/business and silently dropped anything else — there was no real column
+for a Contributor's map category at all. And `adaptContributor()` in store.jsx never mapped
+lat/lng from the API response even where the DB already had it
+(`profiles.physical_latitude/longitude`, added migration 036, explicitly "phase-gated... when
+we add multi-pin support" — this was that later phase, just never finished). All three were
+required for a Contributor to ever visually appear on the map; none of them were about
+map.jsx itself, which was already correct (shows every marker, no clustering/zoom-tiering).
+
+### What shipped
+- **Migration 164** (`164_v1_self_serve_contributor.sql`) — `profiles.contributor_category`
+  (the map/pin category, distinct from `contributor_kind`) + `profiles.contributor_hidden`
+  (admin-only moderation flag); **`self_approve_contributor_application(_application_id)`** —
+  own-row-only, mirrors the admin `approve_contributor_application` RPC's exact field-copy;
+  **`set_contributor_hidden(_user_id, _hidden)`** — admin-only, the moderation safety net that
+  replaces pre-publish review; `protect_role_column()` trigger carve-out for the narrow
+  citizen→contributor / pending→approved self-transition (own row only); `directory_contributors`
+  gains `category`, filters `contributor_hidden`. **Migrations 165+166** are same-session
+  corrective fixes the advisor caught before merge: `CREATE OR REPLACE VIEW` silently drops
+  reloptions (the view briefly lost migration 065's `security_invoker=on`, a real regression
+  → ERROR, fixed); `CREATE OR REPLACE FUNCTION` on `protect_role_column`/
+  `approve_contributor_application` dropped their existing `search_path=''` hardening
+  (restored). Full detail: [SHARED_DB_CONTRACT.md §9](docs/SHARED_DB_CONTRACT.md).
+- **`/api/contributor/apply`** — now validates + stores `contributor_category` (against the
+  real EVENT_CATEGORIES ∪ PLACE_CATEGORIES slug set) and `physical_latitude/longitude`, and
+  calls `self_approve_contributor_application` immediately after insert. Returns
+  `{success, application_id, approved, slug}`. A failed self-approve is non-fatal (matches
+  this route's existing "background write, don't alarm the user" precedent) — the application
+  row still exists for the founder to act on manually if it ever happens.
+- **`/api/v1/contributors` + `[slug]`** — select `contributor_category` aliased to `category`;
+  filter `contributor_hidden = false`. Documented in `docs/api-v1.md`.
+- **NEW `/api/admin/contributors/hide`** — admin-only wrapper around `set_contributor_hidden`,
+  same `requireAdmin` + rate-limit + `logAdminAction` pattern as the existing admin review
+  route. **No UI button wired to it yet** — callable today via the API directly; an admin.jsx
+  toggle is the natural next small addition, flagged below, not blocking this merge.
+- **`store.jsx`**: `adaptContributor()` now maps `lat`/`lng` from `physical_latitude/longitude`
+  (note: this endpoint does NOT rename them to `latitude`/`longitude` the way events/places
+  do) and `category` from the API's `category` field. `submitApplication` now geocodes
+  `form.location` (same `geocodeAddress()` helper createEvent/createPlace already use) before
+  POSTing, sends `contributor_category` (fixing the kind/category field-name bug above),
+  awaits the response, and — since submitting now means live — navigates straight to
+  `go('onboarding')` instead of `go('home')` (the existing "You're approved!" sidebar CTA was
+  already built for this state, just never reached without a wait before). Demo-mode
+  (`!realUser`) branches of both `submitApplication` and `completeOnboarding` got the same
+  geocode treatment for consistency — this is also what makes the whole flow deterministically
+  e2e-testable without a live Supabase session (see below).
+- **`home.jsx`**: `contributors` added to the marker array (category, lat, lng — no
+  isLive/isBusy/broadcast; those stay event-only per the founder's "leave pin complexity
+  as-is" call). Map `onSelect` branches: a contributor pin navigates straight to
+  `go('profile', {id})` instead of opening `PreviewPanel` (which only ever handled
+  event/place/idea) — mirrors the exact target `kingdom-discovery.jsx`'s cards already use.
+- **`apply.jsx`**: acted on the prior session's own `DEFER TO V2` markers now that there's no
+  admin to gate on — 4 steps → 3 (dropped the "reason" field + its required validation and the
+  whole "Links & socials" step; Website folded into "Your story"; SocialInputs stays defined
+  and used by `OnboardingPage`, just not `ApplyPage`). Review & submit copy now says "goes live
+  immediately," not "an admin will review." `Wizard` gained an optional `busy` prop so the
+  submit button shows "Submitting…" and disables during the network round-trip (prevents
+  double-submit) — backward-compatible, `OnboardingPage` doesn't pass it.
+- **`auth.jsx`**: fixed a copy bug this session's own change surfaced — the sign-in screen's
+  contributor-intent note still said "an admin will review", now says "no admin wait."
+- **Renamed `list.jsx` → `kingdom-discovery.jsx`** at every identifier level per the founder's
+  explicit choice: `ListPage`→`KingdomDiscoveryPage`, `ListCard`→`DiscoveryCard`,
+  `window.ListPage`→`window.KingdomDiscoveryPage`, `go('list')`→`go('kingdom-discovery')`,
+  `data-screen` attr, `build-frontend.js` `appFileOrder`, `index.html` script tag. `?v=` cache
+  bust bumped on every touched file.
+- **NEW Playwright e2e suite** (`playwright.config.ts` + `e2e/kingdom-discovery.spec.ts`,
+  mirrors `apps/vision`'s existing setup) — the merge gate the founder asked for. Covers the
+  full golden path: apply → auto-approved instantly (no admin step) → onboard → appears in
+  Kingdom Discovery → appears on the map (a real `.maplibregl-marker` — the exact thing that
+  was broken) → click the pin → lands on the contributor's profile. **Auth note (read before
+  assuming this needs a real Supabase session):** Connect has no demo/guest sign-in reachable
+  through the UI and no separate test Supabase project (org is Free-tier, no branching) — real
+  Google OAuth can't be automated headlessly. The suite instead reaches the app's own
+  documented `authed && !realUser` fallback (auth-client.js: an empty `SUPABASE_ANON_KEY`
+  leaves `window.CC_AUTH` null, which store.jsx's session-bootstrap effect already treats as a
+  no-op) by seeding the exact same `cc_session_v1` localStorage flag the app itself persists on
+  sign-in, plus `page.route()` mocks for `config.js`, MapTiler geocoding + style, and the
+  `/api/v1/*` reads. **Zero writes to the real Supabase project; zero secrets needed.** Stable
+  across repeated + parallel runs.
+
+### Explicitly NOT done this round (honest checkpoint)
+- **Admin.jsx hide/unhide button** — the backend (`set_contributor_hidden` RPC +
+  `/api/admin/contributors/hide`) is live and tested; no UI surface for it yet. Next small
+  addition, not urgent (self-serve go-live doesn't strictly need it day one).
+- **"Individual" Contributor kind** (vs. ministry/organization/business) — still not added;
+  `apply.jsx` still has no field for choosing a kind at all (was already broken pre-session,
+  unrelated to this round's fixes). V1_SCOPE.md still flags this as open.
+- `README.md` still misdescribes the project; `docs/feature-clarity/*` still unlabeled as
+  deferred — cosmetic, not requested this round.
+- **The contributor self-service portal** (dashboard editing own listing, image upload,
+  events/places/news management) — explicitly the founder's NEXT phase, after this ships.
+  Nothing in this round blocks it; `myContributor`/`contributorDash` state already exists to
+  build on.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⚠️ 2026-08-23 — founder-directed priority change: Connect's own v1 discovery loop (§3AD,
-> [V1_SCOPE.md](V1_SCOPE.md)) is now the ACTIVE priority for Connect sessions.** The Wear/Vision
-> items below remain valid, accurate backlog — nothing here is wrong or abandoned — they are just
-> not the next session's focus. **Immediate next actions (Connect, see §3AD for full detail):**
-> (1) read `store.jsx`'s `submitApplication`/`completeOnboarding` and remove the admin-approval
-> gate for v1; (2) add an "Individual" Contributor kind + relax onboarding copy; (3) fix
-> `README.md`; (4) label `docs/feature-clarity/*` + `map-layering.md` as deferred; (5) founder to
-> locally verify the new List view (gates below + manual click-through) before it's trusted live.
+> **⚠️ 2026-08-24 — Connect v1's core loop is SHIPPED (§3AE):** self-serve Contributor go-live
+> (no admin wait), Kingdom Discovery (renamed from the plain list view), and — the actual root
+> fix — Contributors now visually appear on the map. Branch
+> `feat/connect-v1-kingdom-discovery`, migrations 164–166 live, Playwright e2e gate passing.
+> **Still open from §3AD/§3AE, in rough priority order:** (1) an admin.jsx hide/unhide button
+> for the new `set_contributor_hidden` moderation RPC (backend done, no UI yet); (2) add an
+> "Individual" Contributor kind + relax onboarding copy (still not started — `apply.jsx` has no
+> kind field at all yet); (3) fix `README.md`; (4) label `docs/feature-clarity/*` +
+> `map-layering.md` as deferred; (5) the founder's own next-phase ask — a contributor
+> self-service portal (dashboard editing, image upload, events/places/news management) — once
+> (1)-(4) or the founder's priority call says go. **Next migration # = 167** (164–166 consumed
+> by §3AE — any earlier mention of "mig 164" below this line, e.g. Vision's network graph note,
+> now means 167+, not literally 164).
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
@@ -1807,7 +1923,8 @@ already what an engagement layer would key off, so no rework is anticipated ther
       `views.jsx TimelineMap()` (placeholder today) to MapLibre GL (CDN UMD loaded) — single-event
       reach rings + period playback + range compare per the design handoff — still guarding on the key
       defensively. Verify in-browser against the live map.
-   b. **Network graph (§4.3)** — the next DB-bearing increment (its OWN PR + prod migration **164**):
+   b. **Network graph (§4.3)** — the next DB-bearing increment (its OWN PR + prod migration
+      **167** — 164–166 are now consumed by §3AE):
       "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
       mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
       `/api/metrics/cross-org` (both exist). Then **Phase D** (exports / partnerships / scheduled reports).
@@ -1839,9 +1956,11 @@ already what an engagement layer would key off, so no rework is anticipated ther
    - ~~**PAT rotation** (§3D)~~ ✅ **DONE (founder, confirmed 2026-07-17)** — §3D is fully closed.
    - F1 Firebase / F2 Apple push · Step 6 store compliance · Step 7 release still owed.
 
-> Optional Connect-side polish if a session wants a low-risk in-repo task: the accepted demo debt
-> in `src/frontend/app/store.jsx` (`if (!realUser)` graceful-degradation branches, §2M) — harmless,
-> unreachable in prod, strip only if desired. Not required for launch.
+> ⚠️ UPDATED §3AE: the `if (!realUser)` branches in `src/frontend/app/store.jsx` (§2M) are still
+> unreachable via the real UI (no demo/guest sign-in), but are now **load-bearing for the
+> Playwright e2e suite** (`e2e/kingdom-discovery.spec.ts` drives the app into exactly this state
+> via a seeded `cc_session_v1` + a null `CC_AUTH`). **Do not strip these branches** without also
+> rewriting the e2e auth strategy.
 
 ---
 
@@ -1854,12 +1973,12 @@ lean. §3A–§3I above carry the current-state summary; `git log` has full per-
 
 ### Verify locally (Connect)
 ```powershell
-npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-frontend.js
+npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-frontend.js; npx playwright test
 ```
 
 ### Canonical docs (start here)
-- [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope, current priority (§3AD, 2026-08-23).** Read this first for any Connect-focused session.
+- [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope (§3AD scoping → §3AE shipped, 2026-08-24).** Read this first for any Connect-focused session.
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **163** live; next # = **164**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **166** live; next # = **167**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

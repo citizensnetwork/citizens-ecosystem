@@ -166,7 +166,7 @@
 
             intent === 'contributor' && h('div', { className: 'flex items-start gap-2 mt-3 p-2.5 rounded-xl bg-accent/60 text-gold-dark fade-in' },
               h(Icon, { name: 'Info', size: 13, className: 'shrink-0 mt-0.5' }),
-              h('p', { className: 'text-[11px] leading-relaxed' }, 'You’ll sign in first, then set up your contributor application for an admin to review.')))
+              h('p', { className: 'text-[11px] leading-relaxed' }, 'You’ll sign in first, then a quick application takes you live on the map immediately — no admin wait.')))
 
         )));
   }

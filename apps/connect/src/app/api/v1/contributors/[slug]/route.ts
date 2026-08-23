@@ -51,6 +51,7 @@ export async function GET(
         "full_name",
         "role",
         "contributor_kind",
+        "category:contributor_category",
         "contributor_slug",
         "bio",
         "avatar_url",
@@ -70,6 +71,7 @@ export async function GET(
     .eq("contributor_slug", slug)
     .eq("role", "contributor")
     .eq("contributor_status", "approved")
+    .eq("contributor_hidden", false)
     .maybeSingle();
 
   if (!profile) {

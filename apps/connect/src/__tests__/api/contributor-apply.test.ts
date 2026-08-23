@@ -126,4 +126,104 @@ describe("POST /api/contributor/apply", () => {
     const insertedRow = insertSpy.mock.calls.at(-1)?.[0];
     expect(insertedRow?.contributor_kind).toBeNull();
   });
+
+  it("accepts a known contributor_category and coerces an unknown one to null", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: "id-3" },
+      error: null,
+    });
+    const insertSpy = mockClient._chain.insert as ReturnType<typeof vi.fn>;
+    await POST(
+      makeReq({
+        display_name: "Grace Hub",
+        contributor_category: "worship-prayer",
+        physical_latitude: -25.7479,
+        physical_longitude: 28.2293,
+      }),
+    );
+    const insertedRow = insertSpy.mock.calls.at(-1)?.[0];
+    expect(insertedRow?.contributor_category).toBe("worship-prayer");
+    expect(insertedRow?.physical_latitude).toBe(-25.7479);
+    expect(insertedRow?.physical_longitude).toBe(28.2293);
+
+    resetRateLimitStore();
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: "id-4" },
+      error: null,
+    });
+    await POST(
+      makeReq({
+        display_name: "Grace Hub Two",
+        contributor_category: "not-a-real-category",
+        physical_latitude: "not-a-number",
+      }),
+    );
+    const secondRow = insertSpy.mock.calls.at(-1)?.[0];
+    expect(secondRow?.contributor_category).toBeNull();
+    expect(secondRow?.physical_latitude).toBeNull();
+  });
+
+  it("v1 self-serve: calls self_approve_contributor_application after insert and surfaces the result", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: "new-app-id" },
+      error: null,
+    });
+    mockClient.rpc.mockResolvedValueOnce({
+      data: { success: true, action: "approved", slug: "grace-hub", user_id: USER_ID },
+      error: null,
+    });
+    const res = await POST(makeReq({ display_name: "Grace Hub" }));
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      "self_approve_contributor_application",
+      { _application_id: "new-app-id" },
+    );
+    const json = await res.json();
+    expect(json.approved).toBe(true);
+    expect(json.slug).toBe("grace-hub");
+  });
+
+  it("v1 self-serve: a failed self-approve RPC still returns 200 with approved:false (non-fatal, matches the applications-audit-trail precedent)", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: "new-app-id-2" },
+      error: null,
+    });
+    mockClient.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "boom" },
+    });
+    const res = await POST(makeReq({ display_name: "Grace Hub Two" }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.approved).toBe(false);
+    expect(json.slug).toBeNull();
+  });
 });

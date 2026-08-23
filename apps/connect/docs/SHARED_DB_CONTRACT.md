@@ -183,8 +183,28 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-07-17, project `xyiajtrvhlxaeplsiajj`, head = **mig 163**)
+## 9. Verification snapshot (updated 2026-08-24, project `xyiajtrvhlxaeplsiajj`, head = **mig 166**)
 
+> **2026-08-24: mig 164–166 (Connect v1 self-serve Contributor go-live) APPLIED** (pre-apply
+> tag `connect-v1-pre-mig164`). **Advisor: 0 ERROR / 112 WARN / 3 INFO — the +2 WARNs vs the
+> head-163 baseline are EXACTLY the intentional SECDEF EXECUTE grants to `authenticated` on
+> the two new functions (`self_approve_contributor_application`, `set_contributor_hidden`),
+> same accepted pattern as the ~19 sibling admin/self-gated RPCs from migration 140.** 164
+> adds `profiles.contributor_category` (the map/pin category — distinct from
+> `contributor_kind`) + `profiles.contributor_hidden` (admin-only moderation flag),
+> `self_approve_contributor_application(_application_id)` (own-row-only — a citizen may
+> approve ONLY their own pending application, mirrors the admin RPC's field-copy exactly),
+> `set_contributor_hidden(_user_id, _hidden)` (admin-only), and the matching
+> `protect_role_column()` trigger carve-out for the narrow citizen→contributor /
+> pending→approved self-transition. `directory_contributors` gains `category`, filters
+> `contributor_hidden`. 165+166 are same-session corrective fixes caught via the advisor
+> before merge: `CREATE OR REPLACE VIEW` silently drops reloptions (the view briefly lost
+> migration 065's `security_invoker=on`, surfacing as a real ERROR — fixed via `ALTER VIEW
+> ... SET (security_invoker = on)`), and `CREATE OR REPLACE FUNCTION` on
+> `protect_role_column`/`approve_contributor_application` dropped their existing
+> `search_path=''` hardening (restored). Design: V1_SCOPE.md + RESUME §3AD/§3AE.
+> **Next migration # = 167.**
+>
 > **2026-07-17: mig 163 (`wear` impersonation Phase 1 — admin read-only sign-in-as) APPLIED**
 > (pre-apply tag `wear-pre-mig163` @8cd6314). **Advisor: 0 ERROR / 110 WARN / 3 INFO — the +8
 > WARNs vs the head-162 baseline are EXACTLY the intentional SECDEF EXECUTE grants to

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — Discover (scrollable list) — v1 simple toggle
+//  Citizens Connect — Kingdom Discovery (scrollable list) — v1 simple toggle
 //  Companion screen to home.jsx (the map). Same underlying data
 //  (events / places / contributors), same categories, same navigation
 //  targets — this is a second view of one dataset, not a separate
@@ -29,7 +29,7 @@
     return type === 'contributor' ? 'profile' : type;
   }
 
-  function ListCard({ item }) {
+  function DiscoveryCard({ item }) {
     const { go, considering, followedPlaces, toggleConsider, togglePlaceFollow } = window.useApp();
     const cat = window.DATA.getCategory(item.category);
     const isEvent = item.type === 'event';
@@ -73,7 +73,7 @@
       h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground shrink-0' }));
   }
 
-  function ListPage() {
+  function KingdomDiscoveryPage() {
     const { events, places, contributors, go } = window.useApp();
     const [type, setType] = useState('all');
     const [query, setQuery] = useState('');
@@ -96,7 +96,7 @@
       return 0;
     });
 
-    return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'list' },
+    return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'kingdom-discovery' },
       h('div', { className: 'shrink-0 p-3 flex flex-col gap-3 border-b border-border', style: { paddingTop: 'max(0.75rem, env(safe-area-inset-top))' } },
         h('div', { className: 'flex items-center gap-2' },
           h('div', { className: 'flex-1 glass rounded-2xl shadow-xl border border-white/60 flex items-center gap-2 px-4 py-3' },
@@ -117,9 +117,9 @@
           }, t.label)))),
       h('div', { className: 'flex-1 overflow-y-auto p-3 space-y-2 pb-24 md:pb-3' },
         items.length
-          ? items.map((item) => h(ListCard, { key: item.type + '-' + item.id, item }))
+          ? items.map((item) => h(DiscoveryCard, { key: item.type + '-' + item.id, item }))
           : h(Empty, { icon: 'SearchX', title: 'Nothing here yet', sub: q ? 'Try a different search term.' : 'Nothing matches this filter yet.' })));
   }
 
-  window.ListPage = ListPage;
+  window.KingdomDiscoveryPage = KingdomDiscoveryPage;
 })();
