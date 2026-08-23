@@ -163,7 +163,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, ideas, user, role, dismissBubble, trackImpression } = app;
+    const { events, places, ideas, user, role, dismissBubble, trackImpression, go } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -200,6 +200,8 @@
               query && React.createElement('button', { onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 14, className: 'text-muted-foreground' })))),
           React.createElement('button', { onClick: () => setShowCats(true), className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/60') },
             React.createElement(Icon, { name: 'SlidersHorizontal', size: 16, className: filter ? 'text-gold' : 'text-foreground/60' })),
+          React.createElement('button', { onClick: () => go('list'), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 flex items-center justify-center shrink-0' },
+            React.createElement(Icon, { name: 'List', size: 16, className: 'text-foreground/60' })),
           React.createElement('div', { className: 'relative shrink-0' },
             React.createElement('button', { onClick: () => setShowProfile((s) => !s), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
               React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl' }),

@@ -1,6 +1,14 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Apply to become Contributor + Onboarding
 // ════════════════════════════════════════════════════════════════════
+//  V1 SCOPE NOTE (see V1_SCOPE.md at repo root):
+//  This whole apply → admin-approve → onboard sequence is the PRE-v1
+//  model. v1 replaces it with direct self-serve Contributor creation —
+//  no application, no approval wait. Kept in place and functional for
+//  now; not wired into the v1 nav path. Sections marked DEFER TO V2
+//  below are candidates to drop from the v1 required path, not to
+//  delete outright — the schema and logic stay untouched.
+// ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
@@ -92,6 +100,8 @@
           h(Field, { label: 'Area / location served', required: true }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'e.g. Eastside, Central District' })),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
+      // DEFER TO V2: admin-review framing (bio+reason gate). v1 keeps a short
+      // optional bio only — no reason-for-admin field, since there's no admin gate.
       {
         title: 'Your story', subtitle: 'Help admins and citizens understand your heart.',
         valid: () => f.bio.trim().length > 10 && f.reason.trim().length > 10,
@@ -99,6 +109,9 @@
           h(Field, { label: 'Short bio / about', required: true, hint: f.bio.length + '/240' }, h(Textarea, { value: f.bio, maxLength: 240, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
           h(Field, { label: 'Why do you want to contribute?', required: true, hint: 'Reviewed by an admin.' }, h(Textarea, { value: f.reason, rows: 4, onChange: (e) => up('reason', e.target.value), placeholder: 'We want our gatherings visible to seekers across the city…' }))),
       },
+      // DEFER TO V2 (light touch): already optional. v1's single form keeps
+      // Website as one plain external-link field; drop the multi-network
+      // SocialInputs block from the v1 required path.
       {
         title: 'Links & socials', subtitle: 'Optional, but it strengthens your application.',
         node: h(F, null,
@@ -117,6 +130,8 @@
             h(ReviewRow, { label: 'About', value: f.bio }),
             h(ReviewRow, { label: 'Why contribute', value: f.reason }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
+          // DEFER TO V2: this whole admin-review notice describes the pre-v1 gate.
+          // v1 copy should say the listing goes live immediately — no admin wait.
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
             h(Icon, { name: 'Info', size: 15, className: 'shrink-0 mt-0.5' }),
             h('p', { className: 'text-xs leading-relaxed' }, 'An admin will review your application. Once approved, you’ll set up your contributor profile and go live on the map.'))),
@@ -170,6 +185,8 @@
             h(Field, { label: 'Contact email' }, h(Input, { value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@…' }))),
           h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value) }))),
       },
+      // DEFER TO V2: team roster + socials are enrichment, not required for a
+      // v1 listing to exist and be findable.
       {
         title: 'Team & socials', subtitle: 'Add the people and channels behind your ministry.',
         node: h(F, null,

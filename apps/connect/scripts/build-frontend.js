@@ -41,7 +41,7 @@ buildFrontend({
   // `window.X` set by earlier ones).
   appFileOrder: [
     'icons.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'auth.jsx', 'map.jsx',
-    'home.jsx', 'apply.jsx', 'admin.jsx', 'dashboard.jsx', 'insights.jsx',
+    'home.jsx', 'list.jsx', 'apply.jsx', 'admin.jsx', 'dashboard.jsx', 'insights.jsx',
     'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],

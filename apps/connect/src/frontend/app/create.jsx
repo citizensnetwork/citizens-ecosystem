@@ -1,6 +1,12 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Create Event / Create Place
 // ════════════════════════════════════════════════════════════════════
+//  V1 SCOPE NOTE (see V1_SCOPE.md at repo root):
+//  v1 keeps: title/name, category, one cover photo, address, and — for
+//  events — date/time. Sections marked DEFER TO V2 below stay in the
+//  code and schema untouched; they're just not required or shown on
+//  the v1 single-step form.
+// ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
@@ -73,6 +79,7 @@
       h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
         h(Icon, { name: 'MapPin', size: 15, className: 'shrink-0 mt-0.5' }),
         h('p', { className: 'text-xs leading-relaxed' }, 'Your map pin is placed automatically from the address above.')),
+      // DEFER TO V2: recurring / upcoming dates.
       isEvent && h(Field, { label: 'Recurring / upcoming dates', hint: 'Optional — add future dates this repeats.' },
         h('div', { className: 'flex gap-2 mb-2' },
           h('input', { type: 'date', value: recur, onChange: (e) => setRecur(e.target.value), className: window.UI.inputCls }),
@@ -85,6 +92,7 @@
 
     const Media = h(F, null,
       h(Field, { label: 'Cover photo', required: true }, h(MediaPicker, { value: f.coverPhoto, onChange: (v) => up('coverPhoto', v), scope: isEvent ? 'event-cover' : 'place-cover' })),
+      // DEFER TO V2: gallery beyond the single required cover photo.
       h(Field, { label: 'Gallery', hint: 'Add photos & videos citizens will see on your profile.' },
         h('div', { className: 'grid grid-cols-4 gap-1.5 mb-2' },
           f.gallery.map((g, i) => h('div', { key: i, className: 'relative aspect-square rounded-lg overflow-hidden group' },
@@ -93,6 +101,8 @@
           f.gallery.length < 8 && h(GalleryAdd, { onAdd: galleryAdd }))),
       h(Field, { label: 'Social links' }, h(SocialRow, { socials: f.socials, onChange: ups })));
 
+    // DEFER TO V2: volunteering toggle + launch broadcast. This whole
+    // `Options` step (and its section entry below) drops from the v1 wizard.
     const Options = h(F, null,
       h('div', { className: 'p-3.5 rounded-xl bg-white/60 border border-border' },
         h(Toggle, { checked: f.volunteeringEnabled, onChange: (v) => up('volunteeringEnabled', v), label: 'Enable volunteer applications', desc: 'Let citizens apply to serve at this ' + (isEvent ? 'event' : 'place') + '.' })),

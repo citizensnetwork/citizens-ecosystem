@@ -32,6 +32,22 @@ with the standalone HTML/React app in `src/frontend/`, keeping Next.js as **API-
 
 ---
 
+## ⚠️ V1 SCOPE PIVOT (2026-08-23) — read this before the historical log below
+
+Everything from **§3A through §3AC is real, shipped work** — do not distrust it. But almost all
+of it is **Wear + Vision + cross-app infrastructure**, not Connect's own discovery loop. The
+founder has re-scoped Connect's v1 bar down to a minimal, repeatable loop (add a Contributor /
+Place / Event with essential fields → scrollable list → map, Pretoria-first) after finding the
+existing apply→approve→onboard→create pipeline too heavy to test end-to-end.
+
+- **Source of truth: [V1_SCOPE.md](V1_SCOPE.md)** (repo root) + **§3AD** below.
+- This does NOT undo any ecosystem/backend work below — RLS, migrations, the shared contract,
+  Wear, and Vision all stand. It changes what Connect session work should prioritize next.
+- Contributor / Place / Event are CONFIRMED as the right three-type model (§3AD) — no rename, no
+  collapse to one "entity" table, no second database.
+
+---
+
 ## 3A. Ecosystem Step 1 — shared-DB contract LOCKED ✅ (2026-06-17)
 
 First item of the reconciled ecosystem work plan
@@ -1616,7 +1632,93 @@ the founder can walk the live app, and org admins can link a Connect contributor
 
 ---
 
+## 3AD. Connect v1 scope pivot — minimal discovery loop scoped, List view shipped, Contributor/Place/Event terminology locked ✅ (2026-08-23)
+
+Chat-based scoping + prep session with the founder (no `.claude/sessions/*.md` log — this ran as
+a conversation, not a Claude Code session). Founder-initiated: reflection on a "vibe coding
+plateau" across multiple pivots led to re-scoping Connect's actual MVP bar down to a minimal,
+repeatable loop, rather than restarting a parallel "twin" build. **No migration, no schema/RLS
+change — next migration # still 164.**
+
+### The core finding
+Connect's add→approve→onboard→create pipeline (`apply.jsx`/`create.jsx`) already implements a far
+richer product than a v1 needs: admin-approval gate, separate Event/Place creation wizards,
+galleries, recurring dates, volunteering toggles, launch broadcasts. Recent sessions (§3G onward)
+concentrated on Wear + Vision; Connect's own discovery loop had not had a dedicated session in
+that period. The map (`map.jsx`) and category taxonomy (`CATEGORIES.md`) were already close to
+v1-ready — Pretoria-centered, category-colored pins — so the gap was narrower than it first
+appeared.
+
+### What shipped
+- **NEW [`V1_SCOPE.md`](V1_SCOPE.md)** (repo root, alongside this file and `VISION.md`) — the
+  normative v1 scope doc: current state, features (live vs. added this session), objectives,
+  the 219/Eph 2:19 project purpose, friction points, solutions, implementation status per
+  solution, priority goals (founder-unconfirmed, flagged as such), and open items. **Read this
+  before assuming the full Contributor/Event/Place feature set is the v1 target.**
+- **Terminology LOCKED (no code change — a naming/scope clarification):** Contributor = the
+  identity that adds to the platform, individual or formally established entity (already
+  `VISION.md`'s definition; already the cross-app identity `wear`/`vision` link back to via
+  `connect_contributor_id`). Place = physical location, may have zero Events. Event = time-bound,
+  attached to a Contributor, on the map only while scheduled. **"Entity" stays an informal
+  umbrella term (conversation/docs only) — it is NOT a fourth database concept.** Three-type
+  model confirmed correct; not collapsing to one table, not forking to a second database.
+- **NEW `src/frontend/app/list.jsx`** — scrollable Contributor/Place/Event list (`ListPage`),
+  reusing the exact `useApp()` state, `DATA.getCategory`, and `UI` components the map already
+  uses. All/Contributors/Places/Events filter row + search; cards route to the same
+  `go('event'|'place'|'profile', {id})` targets the map's preview panel already opens.
+- **Map ↔ List toggle:** new button in `home.jsx`'s top bar (`go('list')`) beside the existing
+  search/filter buttons; matching button back to map on the list screen. `case 'list'` added to
+  the page switch in `shell.jsx`. A visible toggle was chosen over a swipe gesture
+  (discoverability); a plain two-screen toggle was chosen over a draggable bottom sheet (founder:
+  keep it simple).
+- **`list.jsx` registered in BOTH `src/frontend/index.html` and `scripts/build-frontend.js`'s
+  `appFileOrder`** — the exact dev-works/prod-bundle-breaks gap logged in §3Y/PR #30 was checked
+  for and avoided. `?v=` cache-bust bumped to `20260823a` on every touched file (`home.jsx`,
+  `apply.jsx`, `create.jsx`, `shell.jsx`, `list.jsx`).
+- **`apply.jsx` + `create.jsx` marked up, NOT changed:** a v1-scope header comment on each file
+  plus inline `DEFER TO V2` comments over: apply's reason-for-admin field, the Links & socials
+  step, the onboarding Team & socials step, and the admin-review notice copy; create's
+  recurring/upcoming dates, the gallery beyond one cover photo, and the whole `Options` step
+  (volunteering toggle + launch broadcast). **Comments only — zero runtime behavior changed,
+  nothing deleted, schema untouched.**
+
+### Explicitly NOT done (honest checkpoint)
+- **Admin-approval gate is UNCHANGED.** A Contributor application still requires manual approval
+  before going live. Removing it requires reading `store.jsx`'s `submitApplication` /
+  `completeOnboarding` (large file, not yet read in full this session) to confirm nothing
+  downstream — admin queue counts, notifications, RLS assumptions — depends on the pending state.
+  **This is the top of the next-session queue.**
+- **Nothing in this session was run, built, or tested.** No local dev/build tooling access from
+  this side (file read/write only, no shell on the founder's machine). **Founder must verify
+  locally before trusting:** the repo's own `npx tsc --noEmit; npx vitest run; npx next lint --dir
+  src; node scripts/build-frontend.js`, plus a manual click-through of the new Map ↔ List toggle.
+- `README.md` still misdescribes the project (stale "member data platform" text) — flagged in
+  `V1_SCOPE.md`, not fixed.
+- `docs/feature-clarity/*` and `map-layering.md` still read as active, undecided scope — not yet
+  labeled deferred (would just need a one-line status header on each).
+- "Individual" Contributor kind (vs. Ministry/Organisation/Business) not yet added; `apply.jsx`'s
+  "Organisation / ministry name" framing still assumes a formal entity, not a solo person.
+
+### Noted for later (not v1, not started)
+Citizens Wear's planned Instagram-style apparel discovery feed (comments, share, bookmark, like)
+was discussed as a future-continuity target for Connect's list view. Recorded in `V1_SCOPE.md` §9:
+Connect's Consider (events) / Follow (places) states already substantively cover bookmark/like;
+comments' proposed future form is Contributor-authored "Author Broadcasts," not open public
+commenting; `list.jsx`'s item shape (`id`/`type`/`category` uniform across all three types) is
+already what an engagement layer would key off, so no rework is anticipated there. Not scheduled.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
+
+> **⚠️ 2026-08-23 — founder-directed priority change: Connect's own v1 discovery loop (§3AD,
+> [V1_SCOPE.md](V1_SCOPE.md)) is now the ACTIVE priority for Connect sessions.** The Wear/Vision
+> items below remain valid, accurate backlog — nothing here is wrong or abandoned — they are just
+> not the next session's focus. **Immediate next actions (Connect, see §3AD for full detail):**
+> (1) read `store.jsx`'s `submitApplication`/`completeOnboarding` and remove the admin-approval
+> gate for v1; (2) add an "Individual" Contributor kind + relax onboarding copy; (3) fix
+> `README.md`; (4) label `docs/feature-clarity/*` + `map-layering.md` as deferred; (5) founder to
+> locally verify the new List view (gates below + manual click-through) before it's trusted live.
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
@@ -1756,6 +1858,7 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 ```
 
 ### Canonical docs (start here)
+- [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope, current priority (§3AD, 2026-08-23).** Read this first for any Connect-focused session.
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
 - [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **163** live; next # = **164**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).

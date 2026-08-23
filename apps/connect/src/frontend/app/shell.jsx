@@ -232,6 +232,7 @@
     const p = nav.page;
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
+      case 'list': return React.createElement(window.ListPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
