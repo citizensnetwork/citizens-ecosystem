@@ -1,5 +1,13 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 
+// The app's own debug/test hook (store.jsx: `window.__cc = { go, ... }`) —
+// only the subset this suite drives.
+declare global {
+  interface Window {
+    __cc: { go: (page: string, params?: Record<string, unknown>) => void };
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Connect v1 golden path: self-serve Contributor go-live → appears in
 //  Kingdom Discovery → appears on the map → opens on click.
@@ -107,14 +115,14 @@ test.describe("Kingdom Discovery — v1 self-serve go-live", () => {
     await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 10_000 });
 
     // ── Kingdom Discovery — the new Contributor is listed ──
-    await page.evaluate(() => (window as any).__cc.go("kingdom-discovery"));
+    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
     const discoveryScreen = page.locator('[data-screen="kingdom-discovery"]');
     await expect(discoveryScreen).toBeVisible();
     await expect(discoveryScreen.getByText(orgName)).toBeVisible({ timeout: 10_000 });
 
     // ── Map — the new Contributor has a pin (this is the exact gap fixed:
     //     Contributors previously never appeared on the map at all) ──
-    await page.evaluate(() => (window as any).__cc.go("home"));
+    await page.evaluate(() => window.__cc.go("home"));
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
