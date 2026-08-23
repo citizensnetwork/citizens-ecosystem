@@ -243,13 +243,15 @@ end;
 $$;
 
 -- directory_contributors: add contributor_category, hide contributor_hidden rows.
+-- New column appended at the END of the SELECT list — CREATE OR REPLACE
+-- VIEW cannot insert a column mid-list without an explicit RENAME COLUMN
+-- (it maps by ordinal position), so `category` must not shift bio/website/etc.
 create or replace view public.directory_contributors as
   select
     id,
     contributor_slug as slug,
     full_name as name,
     contributor_kind as kind,
-    contributor_category as category,
     bio,
     website_url,
     instagram_handle,
@@ -262,7 +264,8 @@ create or replace view public.directory_contributors as
     avatar_url,
     logo_url,
     gallery_urls,
-    created_at
+    created_at,
+    contributor_category as category
   from public.profiles
   where role = 'contributor'
     and contributor_status = 'approved'
