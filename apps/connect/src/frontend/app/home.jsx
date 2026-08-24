@@ -163,7 +163,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, ideas, user, role, dismissBubble, trackImpression } = app;
+    const { events, places, contributors, ideas, user, role, dismissBubble, trackImpression, go } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -179,13 +179,28 @@
     const markers = [
       ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
       ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
+      // Contributors: same marker shape, minus the event-only isLive/isBusy/
+      // broadcast fields (a Contributor pin is just a plain coloured pin —
+      // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
+      // events only, contributors never had those states to begin with).
+      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, lat: c.lat, lng: c.lng })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
-        React.createElement(window.StylizedMap, { markers, filterCategory: filter, selectedId: selected, onSelect: (id, t) => { setSelected((p) => (p === id ? null : id)); setSelType(t); if (t === 'event') trackImpression(id); }, onDismissBubble: dismissBubble })),
+        React.createElement(window.StylizedMap, {
+          markers, filterCategory: filter, selectedId: selected,
+          // Contributor pins have no preview-panel treatment (PreviewPanel
+          // only knows event/place/idea) — go straight to their profile,
+          // same target list.jsx's Kingdom Discovery cards already use.
+          onSelect: (id, t) => {
+            if (t === 'contributor') { go('profile', { id }); return; }
+            setSelected((p) => (p === id ? null : id)); setSelType(t); if (t === 'event') trackImpression(id);
+          },
+          onDismissBubble: dismissBubble,
+        })),
 
       // broadcast bubbles + selected label — sibling overlay (paints over the map's heavy subtree)
       React.createElement(window.MapFloatersLayer, { markers, filterCategory: filter, selectedId: selected }),
@@ -200,6 +215,8 @@
               query && React.createElement('button', { onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 14, className: 'text-muted-foreground' })))),
           React.createElement('button', { onClick: () => setShowCats(true), className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/60') },
             React.createElement(Icon, { name: 'SlidersHorizontal', size: 16, className: filter ? 'text-gold' : 'text-foreground/60' })),
+          React.createElement('button', { onClick: () => go('kingdom-discovery'), 'aria-label': 'Kingdom Discovery', className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 flex items-center justify-center shrink-0' },
+            React.createElement(Icon, { name: 'List', size: 16, className: 'text-foreground/60' })),
           React.createElement('div', { className: 'relative shrink-0' },
             React.createElement('button', { onClick: () => setShowProfile((s) => !s), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
               React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl' }),

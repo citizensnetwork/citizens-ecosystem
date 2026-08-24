@@ -60,6 +60,12 @@ Directory of approved contributors.
 | `limit`  | integer | 50      | 1..100                                    |
 | `offset` | integer | 0       | 0..10000                                  |
 
+`category` (added migration 164) is the map/pin category — an
+EVENT_CATEGORIES or PLACE_CATEGORIES slug, distinct from `contributor_kind`
+(ministry/organization/business). `contributor_hidden` rows (an
+admin-only moderation flag, also migration 164) are always excluded —
+never exposed in this response.
+
 ### Example response
 
 ```json
@@ -70,6 +76,7 @@ Directory of approved contributors.
       "full_name": "Rooted Pretoria",
       "role": "contributor",
       "contributor_kind": "ministry",
+      "category": "worship-prayer",
       "contributor_slug": "rooted-pretoria",
       "bio": "…",
       "avatar_url": null,

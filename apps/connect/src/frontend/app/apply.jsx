@@ -1,6 +1,13 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Apply to become Contributor + Onboarding
 // ════════════════════════════════════════════════════════════════════
+//  V1 SCOPE NOTE (see V1_SCOPE.md at repo root): submitting IS approving
+//  as of migration 164 — no admin wait. The wizard below is the v1
+//  required path (3 steps: about / story / review); Links & socials and
+//  the admin-review "reason" field were dropped from it per the
+//  DEFER TO V2 markers a prior session left — SocialInputs stays defined
+//  below and IS still used by OnboardingPage, just not by ApplyPage.
+// ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
@@ -40,10 +47,10 @@
   }
 
   // ── Shared wizard shell ──
-  function Wizard({ hero, steps, step, setStep, onClose, onComplete, completeLabel }) {
+  function Wizard({ hero, steps, step, setStep, onClose, onComplete, completeLabel, busy }) {
     const cur = steps[step];
     const last = step === steps.length - 1;
-    const canNext = cur.valid ? cur.valid() : true;
+    const canNext = (cur.valid ? cur.valid() : true) && !(last && busy);
     return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'apply' },
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto' },
         h('div', { className: 'max-w-xl mx-auto px-4 sm:px-6 pt-5 pb-40 md:pb-8' },
@@ -70,9 +77,9 @@
   function ApplyPage() {
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
-    const [f, setF] = useState({ orgName: '', location: '', category: '', bio: '', reason: '', website: '', socials: {} });
+    const [submitting, setSubmitting] = useState(false);
+    const [f, setF] = useState({ orgName: '', location: '', category: '', bio: '', website: '', socials: {} });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
-    const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
 
     const hero = h('div', { className: 'rounded-2xl gold-gradient p-5 mb-5 relative overflow-hidden' },
       h('div', { className: 'absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/15' }),
@@ -92,18 +99,15 @@
           h(Field, { label: 'Area / location served', required: true }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'e.g. Eastside, Central District' })),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
+      // v1: short bio only (optional), plus Website folded in from the old
+      // "Links & socials" step. No "reason" field — there's no admin to
+      // read it — and no multi-network SocialInputs block; those stay
+      // available on OnboardingPage for after go-live.
       {
-        title: 'Your story', subtitle: 'Help admins and citizens understand your heart.',
-        valid: () => f.bio.trim().length > 10 && f.reason.trim().length > 10,
+        title: 'Your story', subtitle: 'A little about who you are.',
         node: h(F, null,
-          h(Field, { label: 'Short bio / about', required: true, hint: f.bio.length + '/240' }, h(Textarea, { value: f.bio, maxLength: 240, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
-          h(Field, { label: 'Why do you want to contribute?', required: true, hint: 'Reviewed by an admin.' }, h(Textarea, { value: f.reason, rows: 4, onChange: (e) => up('reason', e.target.value), placeholder: 'We want our gatherings visible to seekers across the city…' }))),
-      },
-      {
-        title: 'Links & socials', subtitle: 'Optional, but it strengthens your application.',
-        node: h(F, null,
-          h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
-          h(Field, { label: 'Social media' }, h(SocialInputs, { socials: f.socials, onChange: ups }))),
+          h(Field, { label: 'Short bio / about', hint: f.bio.length + '/240' }, h(Textarea, { value: f.bio, maxLength: 240, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
+          h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' }))),
       },
       {
         title: 'Review & submit', subtitle: 'Confirm everything looks right.',
@@ -115,15 +119,23 @@
                 h('p', { className: 'font-bold text-foreground' }, f.orgName || 'Your ministry'),
                 h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.location || 'Location')))),
             h(ReviewRow, { label: 'About', value: f.bio }),
-            h(ReviewRow, { label: 'Why contribute', value: f.reason }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
-            h(Icon, { name: 'Info', size: 15, className: 'shrink-0 mt-0.5' }),
-            h('p', { className: 'text-xs leading-relaxed' }, 'An admin will review your application. Once approved, you’ll set up your contributor profile and go live on the map.'))),
+            h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5' }),
+            h('p', { className: 'text-xs leading-relaxed' }, "You'll go live immediately — no admin wait. Next you'll add your logo & contact details to finish your profile."))),
       },
     ];
 
-    return h(Wizard, { hero, steps, step, setStep, onClose: () => go('home'), onComplete: () => submitApplication(f), completeLabel: 'Submit Application' });
+    const submit = () => {
+      if (submitting) return;
+      setSubmitting(true);
+      submitApplication(f, (ok) => { setSubmitting(false); });
+    };
+
+    return h(Wizard, {
+      hero, steps, step, setStep, onClose: () => go('home'), onComplete: submit,
+      completeLabel: submitting ? 'Submitting…' : 'Submit & Go Live', busy: submitting,
+    });
   }
   const ReviewRow = ({ label, value }) => value ? h('div', null,
     h('p', { className: 'text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-0.5' }, label),
@@ -170,6 +182,8 @@
             h(Field, { label: 'Contact email' }, h(Input, { value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@…' }))),
           h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value) }))),
       },
+      // DEFER TO V2: team roster + socials are enrichment, not required for a
+      // v1 listing to exist and be findable.
       {
         title: 'Team & socials', subtitle: 'Add the people and channels behind your ministry.',
         node: h(F, null,

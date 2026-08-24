@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         "full_name",
         "role",
         "contributor_kind",
+        "category:contributor_category",
         "contributor_slug",
         "bio",
         "avatar_url",
@@ -79,7 +80,8 @@ export async function GET(request: Request) {
       { count: "exact" },
     )
     .eq("role", "contributor")
-    .eq("contributor_status", "approved");
+    .eq("contributor_status", "approved")
+    .eq("contributor_hidden", false);
 
   if (kind) query = query.eq("contributor_kind", kind);
   if (q) {
