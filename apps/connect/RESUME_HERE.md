@@ -1811,12 +1811,40 @@ map.jsx itself, which was already correct (shows every marker, no clustering/zoo
 - **"Individual" Contributor kind** (vs. ministry/organization/business) — still not added;
   `apply.jsx` still has no field for choosing a kind at all (was already broken pre-session,
   unrelated to this round's fixes). V1_SCOPE.md still flags this as open.
-- `README.md` still misdescribes the project; `docs/feature-clarity/*` still unlabeled as
-  deferred — cosmetic, not requested this round.
+- `docs/feature-clarity/*` still unlabeled as deferred — cosmetic, not requested this round.
 - **The contributor self-service portal** (dashboard editing own listing, image upload,
   events/places/news management) — explicitly the founder's NEXT phase, after this ships.
   Nothing in this round blocks it; `myContributor`/`contributorDash` state already exists to
   build on.
+
+---
+
+## 3AF. Playwright e2e baked into CI as a default gate + README fixed (2026-08-24)
+
+Follow-up to §3AE, same day. Branch `chore/e2e-ci-gate-and-readme`.
+
+- **New CI job `e2e-connect`** in `.github/workflows/ci.yml` — installs Chromium and runs
+  `apps/connect/e2e/kingdom-discovery.spec.ts` on every push/PR to `main`, uploading the
+  HTML report as an artifact. Runs as its own job (parallel to `verify`), so an e2e failure
+  is clearly separated from lint/typecheck/test/build failures.
+- `turbo.json` + root `package.json` gain a `test:e2e` task/script — `pnpm test:e2e` (root)
+  or `pnpm --filter <app> test:e2e` now works from anywhere in the monorepo, for any app
+  that defines the script.
+- **Found in passing, NOT fixed:** `apps/vision` already has its own
+  `playwright.config.ts`/`e2e/` (pre-dating this session) that **crashes on boot** —
+  `next dev` throws "Your project's URL and Key are required to create a Supabase client"
+  without real `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` env vars. It was
+  never wired into CI and isn't now either — deliberately left out rather than silently
+  papered over. **Next session that touches Vision's e2e:** either give it the same
+  hermetic-mock treatment Connect's suite uses (mock the Supabase client construction, not
+  just API responses — Vision's proxy/middleware constructs the client eagerly on every
+  request, unlike Connect's client-side-only `auth-client.js`), or provide real test env
+  vars in CI. Tracked here so it doesn't get silently assumed "already CI-wired."
+- `CLAUDE.md` (monorepo root) gates line now calls out e2e as a default, per-app gate.
+- `apps/connect/README.md` rewritten — it was still describing an unrelated "member data
+  platform" / CSV batch-job tool (stale from before this app existed in its current form).
+  Now describes Citizens Connect for real: what it is, architecture, local dev, gates, key
+  paths.
 
 ---
 
