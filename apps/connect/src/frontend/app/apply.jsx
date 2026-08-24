@@ -78,8 +78,16 @@
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [f, setF] = useState({ orgName: '', location: '', category: '', bio: '', website: '', socials: {} });
+    const [f, setF] = useState({ orgName: '', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {} });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    // Merges a LocationPicker patch ({address?, lat?, lng?}) into the wizard
+    // form — the picker sends only whichever field(s) actually changed.
+    const setLoc = (patch) => setF((s) => ({
+      ...s,
+      location: patch.address !== undefined ? patch.address : s.location,
+      lat: patch.lat !== undefined ? patch.lat : s.lat,
+      lng: patch.lng !== undefined ? patch.lng : s.lng,
+    }));
 
     const hero = h('div', { className: 'rounded-2xl gold-gradient p-5 mb-5 relative overflow-hidden' },
       h('div', { className: 'absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/15' }),
@@ -96,7 +104,10 @@
         valid: () => f.orgName.trim() && f.category && f.location.trim(),
         node: h(F, null,
           h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
-          h(Field, { label: 'Area / location served', required: true }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'e.g. Eastside, Central District' })),
+          h(Field, { label: 'Area / location served', required: true, hint: 'Drag the map or use the pin button — the address fills in automatically.' },
+            h('div', { className: 'space-y-2' },
+              h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
+              h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }))),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
       // v1: short bio only (optional), plus Website folded in from the old
@@ -148,7 +159,7 @@
     const ma = myApplication || {};
     const [f, setF] = useState({
       name: ma.name || '', category: ma.category || 'church-services', bio: ma.bio || '',
-      location: ma.location || '', website: ma.website || '', contactEmail: '',
+      location: ma.location || '', lat: ma.lat ?? null, lng: ma.lng ?? null, website: ma.website || '', contactEmail: '',
       // No stock stand-ins: empty → MediaPicker offers upload, and the profile
       // falls back to honest initials/category tiles until real art is added.
       profilePhoto: '',
@@ -158,6 +169,12 @@
     const [member, setMember] = useState('');
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
+    const setLoc = (patch) => setF((s) => ({
+      ...s,
+      location: patch.address !== undefined ? patch.address : s.location,
+      lat: patch.lat !== undefined ? patch.lat : s.lat,
+      lng: patch.lng !== undefined ? patch.lng : s.lng,
+    }));
 
     const hero = h('div', { className: 'rounded-2xl bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/60 p-5 mb-5 flex items-center gap-3' },
       h('div', { className: 'w-11 h-11 rounded-2xl bg-[#16A34A] flex items-center justify-center shrink-0' }, h(Icon, { name: 'PartyPopper', size: 20, className: 'text-white' })),
@@ -177,10 +194,13 @@
         title: 'About & contact',
         node: h(F, null,
           h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value) })),
+          h(Field, { label: 'Location', hint: 'Drag the map or use the pin button — the address fills in automatically.' },
+            h('div', { className: 'space-y-2' },
+              h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }) }),
+              h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }))),
           h('div', { className: 'grid grid-cols-2 gap-3' },
-            h(Field, { label: 'Location' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value) })),
-            h(Field, { label: 'Contact email' }, h(Input, { value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@…' }))),
-          h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value) }))),
+            h(Field, { label: 'Contact email' }, h(Input, { value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@…' })),
+            h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value) })))),
       },
       // DEFER TO V2: team roster + socials are enrichment, not required for a
       // v1 listing to exist and be findable.

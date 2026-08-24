@@ -75,6 +75,16 @@ lineage — backfilled this session.
 | Entry point: existing in-app Dashboard nav link (sidebar + bottom-nav), already gated `if (isContributor)` | `shell.jsx` — no new UI needed; a real `citizenscentral.co.za/dashboard` URL was considered and deferred (the SPA has no URL-based routing today — no pushState/history — so this would be new routing work, not just a page) |
 | "Contributor Individual" clarified — confirmed to be the existing citizen community-event mechanic (`037_community_event_rate_limit.sql`: a Citizen posts one rate-limited public event, `role` never changes to `contributor`) | No code change — the dashboard's existing `isContributor` gate already correctly excludes these citizens from any dashboard access |
 
+### Added session 4 (2026-08-24 — guest landing + location picker + Vercel env fix, RESUME_HERE.md §3AH)
+
+| Feature | Where |
+|---|---|
+| Landing page: Google sign-in or Browse as Guest only — the manual "Citizen/Contributor" picker removed (role always resolved from `profiles.role` after sign-in, never chosen up front) | `auth.jsx` |
+| Guest browsing — read/discovery (map, Kingdom Discovery, profiles) without an account; write actions still require signing in, redirected via `go()` when a real guest reaches Apply/Onboarding | `store.jsx` (`guestMode`, `browseAsGuest`, `go()`), `shell.jsx` |
+| Location picker — real map pin-drop, bidirectional with the address text field (type → forward-geocode moves the pin; drag the map → reverse-geocode fills the address) | `map.jsx` (`window.LocationPicker`), wired into `apply.jsx`'s ApplyPage + OnboardingPage |
+| Root-cause fix for the map/DB not rendering in production: `turbo.json` had no declared env vars, so Vercel's Turborepo strict mode was stripping them from the build | `turbo.json` (`globalEnv`) |
+| Local-dev fix: `scripts/build-frontend.js` now loads `.env.local` itself (previously only `next dev`/`next build` did, never the plain-Node pre-build step) | `apps/connect/scripts/build-frontend.js` |
+
 ## 3. Objectives and plans
 
 - Ship a minimal, repeatable loop: add a Contributor, Place, or Event with only essential fields; see it in a scrollable list; see it on the map with correct category color; open it for contact details and external links.
