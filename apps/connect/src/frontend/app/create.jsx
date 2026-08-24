@@ -40,26 +40,50 @@
         h('input', { value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value), placeholder: s.key, className: 'flex-1 text-sm bg-transparent outline-none' }))));
   }
 
-  function CreateFlow({ kind }) {
+  function CreateFlow({ kind, editing }) {
     const app = window.useApp();
-    const { closeCreate, createEvent, createPlace, creationStyle, activeContributor } = app;
+    const { closeCreate, createEvent, createPlace, updateEvent, updatePlace, creationStyle, activeContributor } = app;
     const isEvent = kind === 'event';
+    const isEditing = !!editing;
     const [step, setStep] = useState(0);
-    const [f, setF] = useState(isEvent
-      ? { title: '', category: '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, upcomingDates: [], launchBroadcast: '' }
-      : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false });
+    // Editing pre-fills from the existing record. An event's location
+    // collapses to one field on edit — the DB only ever stored a single
+    // combined `location` string (see createEvent), so the original
+    // venue-name/address split isn't recoverable. Showing the true combined
+    // value beats guessing a fake split.
+    const [f, setF] = useState(() => {
+      if (isEditing && isEvent) return {
+        title: editing.title || '', category: editing.category || '', description: editing.description || '',
+        date: editing.date || '', time: editing.time24 || '', endTime: editing.endTime24 || '',
+        location: editing.location || '', address: '',
+        coverPhoto: editing.coverPhoto || '', gallery: editing.gallery || [],
+        socials: editing.socials || {}, volunteeringEnabled: !!editing.volunteeringEnabled,
+        upcomingDates: [], launchBroadcast: '',
+      };
+      if (isEditing) return {
+        name: editing.name || '', category: editing.category || '', description: editing.description || '',
+        address: editing.address || '', openHours: editing.openHours || '',
+        coverPhoto: editing.coverPhoto || '', gallery: editing.gallery || [],
+        socials: editing.socials || {}, volunteeringEnabled: !!editing.volunteeringEnabled,
+      };
+      return isEvent
+        ? { title: '', category: '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, upcomingDates: [], launchBroadcast: '' }
+        : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false };
+    });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
     const [recur, setRecur] = useState('');
     const [publishing, setPublishing] = useState(false);
 
-    // Publish is async for real users (geocode + DB write). The sheet only
-    // closes on success so a failed publish keeps the form intact.
+    // Publish/save is async for real users (geocode + DB write). The sheet
+    // only closes on success so a failure keeps the form intact. Editing
+    // stays put on close; a fresh create still jumps home to see the new pin.
     const submit = () => {
       if (publishing) return;
       setPublishing(true);
-      const done = (ok) => { setPublishing(false); if (ok) { closeCreate(); app.go('home'); } };
-      if (isEvent) createEvent(f, done); else createPlace(f, done);
+      const done = (ok) => { setPublishing(false); if (ok) { closeCreate(); if (!isEditing) app.go('home'); } };
+      if (isEditing) { if (isEvent) updateEvent(editing.id, f, done); else updatePlace(editing.id, f, done); }
+      else { if (isEvent) createEvent(f, done); else createPlace(f, done); }
     };
 
     // ── field sections ──
@@ -117,7 +141,7 @@
       : [{ title: 'The basics', node: Basics }, { title: 'Location', node: When }, { title: 'Media & links', node: Media }, { title: 'Options', node: Options }];
 
     const canSubmit = isEvent ? (f.title && f.category) : (f.name && f.category);
-    const title = (isEvent ? 'Create Event' : 'Add Place');
+    const title = isEditing ? (isEvent ? 'Edit Event' : 'Edit Place') : (isEvent ? 'Create Event' : 'Add Place');
     const variant = creationStyle === 'side' ? 'side' : creationStyle === 'modal' ? 'modal' : 'sheet';
 
     // WIZARD layout
@@ -136,7 +160,7 @@
             h('div', { className: 'space-y-4' }, cur.node)),
           h('div', { className: 'shrink-0 border-t border-border px-5 py-3 flex gap-3' },
             step > 0 && h(Button, { variant: 'outline', className: 'flex-1', onClick: () => setStep(step - 1) }, 'Back'),
-            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: (last && !canSubmit) || publishing, icon: last ? 'Rocket' : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? (publishing ? 'Publishing…' : 'Publish') : 'Continue'))));
+            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: (last && !canSubmit) || publishing, icon: last ? (isEditing ? 'Check' : 'Rocket') : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? (publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish')) : 'Continue'))));
     }
 
     // MODAL / SIDE layout (single scroll, sectioned)
@@ -151,7 +175,7 @@
             h('div', { className: 'space-y-4' }, s.node)))),
         h('div', { className: 'shrink-0 border-t border-border px-5 py-3 flex gap-3' },
           h(Button, { variant: 'outline', onClick: closeCreate }, 'Cancel'),
-          h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSubmit || publishing, icon: 'Rocket', onClick: submit }, publishing ? 'Publishing…' : 'Publish to map'))));
+          h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSubmit || publishing, icon: isEditing ? 'Check' : 'Rocket', onClick: submit }, publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish to map')))));
   }
 
   function GalleryAdd({ onAdd }) {

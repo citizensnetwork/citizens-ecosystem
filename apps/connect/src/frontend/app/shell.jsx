@@ -266,7 +266,7 @@
   }
 
   function Shell() {
-    const { createKind, authed } = window.useApp();
+    const { createKind, createEditing, authed } = window.useApp();
     if (!authed) return React.createElement(window.AuthScreen);
     return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
       React.createElement(Sidebar),
@@ -275,7 +275,7 @@
         React.createElement(CurrentPage)),
       React.createElement(BottomNav),
       React.createElement(CreateFab),
-      createKind && React.createElement(window.CreateFlow, { kind: createKind }),
+      createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),
       React.createElement(Toasts));
   }

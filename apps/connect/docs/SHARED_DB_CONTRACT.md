@@ -183,8 +183,22 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-24, project `xyiajtrvhlxaeplsiajj`, head = **mig 166**)
+## 9. Verification snapshot (updated 2026-08-24, project `xyiajtrvhlxaeplsiajj`, head = **mig 167**)
 
+> **2026-08-24: mig 167 (contributor self-service portal: place status/open_hours + news_posts)
+> APPLIED directly to prod in a separate session** (the migration file was applied via
+> `apply_migration` but never committed to `supabase/migrations/` at the time — backfilled into
+> the repo this session so the lineage matches prod; no new SQL run, no schema change made by
+> the backfill itself). **Advisor re-verified this session: 0 ERROR / 112 WARN / 3 INFO —
+> byte-identical to the head-166 baseline, 0 new findings** (confirmed via `list_migrations` +
+> direct column/table checks, not just the migration's own header comment). Adds `places.status`
+> (mirrors `events.status` — cancel/restore, reversible, no RLS change needed since SELECT was
+> already unconditional `true`), `places.open_hours` (fixes a pre-existing bug: Create Place
+> always captured this field in the UI but `createPlace()` never persisted it), and
+> `public.news_posts` (contributor-authored update/story feed on their own listing, public
+> SELECT + owner-or-admin write RLS, mirrors the places/events/broadcast_messages commons
+> pattern). **Next migration # = 168.**
+>
 > **2026-08-24: mig 164–166 (Connect v1 self-serve Contributor go-live) APPLIED** (pre-apply
 > tag `connect-v1-pre-mig164`). **Advisor: 0 ERROR / 112 WARN / 3 INFO — the +2 WARNs vs the
 > head-163 baseline are EXACTLY the intentional SECDEF EXECUTE grants to `authenticated` on
