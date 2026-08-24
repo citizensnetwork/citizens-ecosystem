@@ -65,3 +65,41 @@ jobs:
           echo "${OSV_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/osv-scanner"
           "$RUNNER_TEMP/osv-scanner" scan --config=osv-scanner.toml -L pnpm-lock.yaml
+
+  e2e-connect:
+    name: E2E (Connect — Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter citizens-connect exec playwright install --with-deps chromium
+
+      # Only Connect's suite is wired in here: it's hermetic (mocks its own
+      # auth + API + map tiles — see apps/connect/e2e/kingdom-discovery.spec.ts,
+      # zero live Supabase writes, zero secrets needed). Vision's existing
+      # playwright.config.ts/e2e/ predate this and currently crash on boot
+      # without real Supabase env vars configured — not wired into CI until
+      # that's fixed (tracked in apps/connect/RESUME_HERE.md).
+      - name: Run Connect e2e
+        run: pnpm --filter citizens-connect test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-connect
+          path: apps/connect/playwright-report/
+          retention-days: 7

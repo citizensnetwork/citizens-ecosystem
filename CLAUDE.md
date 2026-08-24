@@ -43,6 +43,14 @@ sessions opened inside that app dir); where they overlap, they are the same rule
   tables directly (contract R2).
 - **Gates are workspace-wide:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
   (turbo). A change in `packages/*` must leave every consumer green.
+- **Playwright e2e runs by default too, per app that defines it** (CI: `.github/
+  workflows/ci.yml`'s `e2e-connect` job; locally: `pnpm --filter <app> test:e2e`, or
+  `pnpm test:e2e` at the root to run it for every app that has it — currently only
+  Connect; Vision has a pre-existing suite that crashes without real Supabase env
+  vars and is NOT yet CI-wired, see `apps/connect/RESUME_HERE.md`). Any session
+  touching Connect's frontend/API should run this before calling work done — it
+  catches exactly the class of bug local unit tests can't (e.g. a whole entity type
+  silently never rendering on the map).
 
 ## Session Offloading Protocol (MANDATORY)
 
