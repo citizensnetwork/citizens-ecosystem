@@ -1848,21 +1848,163 @@ Follow-up to §3AE, same day. Branch `chore/e2e-ci-gate-and-readme`.
 
 ---
 
+## 3AG. Contributor self-service portal — edit/cancel, Profile, News — PR #42 OPEN (2026-08-24)
+
+Executed the item flagged in §3AE/§3AF as the founder's explicit next phase. Branch
+`feat/connect-contributor-portal` → **[PR #42](https://github.com/citizensnetwork/citizens-ecosystem/pull/42)
+— pushed, NOT yet merged** (direct push to `main` is blocked, precedent #28–#36; merge is a
+founder/reviewer action). Offload log: `.claude/sessions/contributor-portal-integration.md`
+(gitignored). **Migration 167 now has a repo file — next migration # = 168** (see below; this
+is only visible on `main` once #42 merges).
+
+### The starting situation (nothing was actually attached to the chat)
+The founder's message referenced an attached prototype; no file came through in the actual
+message. It was located instead in a **different, prior Claude Code session's scratchpad**
+(`contributor-portal/citizens-connect-portal-update/`, session UUID `0ba93b3d…`) — a README,
+a migration file, and drop-in replacements for 5 frontend files, apparently built and left
+uncommitted, never reviewed. Two things about it needed correcting before use, not just copying:
+
+1. **The migration was already live but missing from the repo.** Verified directly against
+   prod (`xyiajtrvhlxaeplsiajj`) rather than trusting the prototype's own README: `list_migrations`
+   showed it recorded (`20260824000419 / 167_place_status_open_hours_news_posts`), `places.status`/
+   `places.open_hours` columns and the `news_posts` table exist live, and the security advisor
+   came back **0 ERROR / 112 WARN / 3 INFO — byte-identical to the §3AE baseline, 0 new findings**.
+   A prior session had applied it directly via `apply_migration` and never committed the `.sql`
+   file into `supabase/migrations/` — a real gap against the "supabase/ is THE migration lineage"
+   rule. Backfilled as `167_place_status_open_hours_news_posts.sql`, `SHARED_DB_CONTRACT.md` §9
+   re-stamped to head 167.
+2. **The prototype's frontend was stale.** Its `store.jsx`/`create.jsx`/`shell.jsx` were built
+   against a base **before that same day's §3AE self-serve-go-live ship**; `dashboard.jsx`/
+   `profiles.jsx` were even older (timestamped 2026-07-15). Diffing (not just reading the README)
+   proved blindly overwriting would have **silently reverted**: the admin-approval-gate removal
+   (`submitApplication` would've gone back to `status:'pending'`), the `contributor_category`
+   vs `contributor_kind` field-name fix (map pins would've broken again), `adaptContributor`'s
+   `category`/`lat`/`lng` mapping (Contributors would've stopped rendering on the map — the
+   actual bug §3AE fixed), and the `kingdom-discovery`/`KingdomDiscoveryPage` rename (the
+   prototype's `shell.jsx` still said `case 'list'`/`ListPage`). **Every file was hand-reconciled
+   against the current codebase — net-new pieces taken, regressions left out** — not copied
+   wholesale per the prototype's own README instructions. `store.jsx` already had a **correctly
+   additive** partial hand-merge sitting uncommitted in the working tree at session start (28
+   insertions, verified to not touch any of the regression-risk areas) — continued that pattern
+   to completion rather than starting over.
+
+### Founder decisions (asked via AskUserQuestion, since the founder invited questions)
+1. **Entry point: the existing in-app Dashboard nav link** (sidebar + bottom-nav, already gated
+   `if (isContributor)`) — extended with new Profile/News tabs, no new UI surface. A real
+   `citizenscentral.co.za/dashboard` URL was discussed and **deferred as a later fast-follow** —
+   the SPA has no client-side routing today (no pushState/history), so that would be new routing
+   infrastructure, not just a page.
+2. **"Contributor Individual" confirmed** = the existing citizen community-event mechanic
+   (`037_community_event_rate_limit.sql`: a Citizen posts one rate-limited public event,
+   `community_contributor=true` tags the *event*, the citizen's `role` never changes). Backend-only,
+   no visible badge wanted. Since role never changes, the dashboard's existing `isContributor` gate
+   already correctly excludes these citizens from any dashboard access — **nothing to build** for
+   this rule; it was already structurally correct.
+3. **Rate-limit discrepancy noted, not changed:** live `app_settings.community_event_rate_limit`
+   is `{days:30, count:1}` (once per 30 days), not "once a week" as described — left as-is
+   (founder chose to leave at 30 days).
+
+### What shipped
+- **Dashboard — Edit + Cancel/Restore** on your own Events and Places (`EventManageCard`/new
+  `PlaceManageRow` in `dashboard.jsx`; `CreateFlow` in `create.jsx` gains an `editing` prop —
+  pre-fills from the record, including a 24h-time-input fix and collapsing an event's location
+  to one field since the DB only ever stored a combined string; `store.jsx` gains `updateEvent`/
+  `setEventStatus`/`updatePlace`/`setPlaceStatus` — cancel is a status flip, never a delete, a
+  cancelled row stays directly viewable). `shell.jsx` passes the new `createEditing` state
+  through to `CreateFlow`.
+- **Dashboard — Profile tab**: bio/website/physical address/socials/logo/gallery, editable any
+  time after onboarding (`ProfileTab`/`GalleryEditor` in `dashboard.jsx`; `store.jsx`
+  `updateContributorProfile` reuses `/api/contributor/profile`, verified by reading the route
+  source directly — it already allowlisted every field sent, role/status-gated, rate-limited,
+  URL/length/array-shape validated — it just had no UI calling it since the one-time onboarding
+  wizard).
+- **Dashboard — News tab** + **public listing News section**: a contributor-authored update/story
+  feed, distinct from the ephemeral 24h Broadcast bubble (`NewsPostForm`/`NewsPostRow` in
+  `dashboard.jsx`; new News section on `ContributorProfilePage` in `profiles.jsx`; `store.jsx`
+  gains `createNewsPost`/`updateNewsPost`/`deleteNewsPost` + a `news_posts` fetch effect reading
+  through the public-SELECT RLS client directly, same pattern as the map-bubbles read).
+- **Two bugs fixed beyond the prototype, found during integration:**
+  1. `updatePlace`'s `useCallback` was missing `realUser` from its deps array (a stale-closure
+     risk inconsistent with every sibling action in the file) — added.
+  2. The prototype's `updateContributorProfile` never re-geocoded on an address change (unlike
+     `updateEvent`/`updatePlace`'s established pattern), and its follow-up `SELECT` didn't even
+     fetch `physical_latitude`/`physical_longitude` — so editing an address via the new Profile
+     tab would have silently stranded the map pin at its old location. Fixed: geocodes only when
+     `fields.location` differs from `activeContributor.location` (same guard shape as the sibling
+     actions), added both columns to the `SELECT`.
+- `?v=` cache-bust bumped to `20260824b` on all 5 touched frontend files in `index.html`.
+- `V1_SCOPE.md` gains an "Added session 3" table documenting the shipped features + the
+  entry-point/Contributor-Individual decisions.
+
+### Gates (all green)
+`node --input-type=module --check` on each touched `.jsx` (individually, since Node doesn't
+resolve the `.jsx` extension directly) · `node scripts/build-frontend.js` — **20 screens compiled
+clean**, run twice (once after the geocoding fix too) · `npx tsc --noEmit` — **0** · `npx eslint`
+— **0** · `npx vitest run` — **645/645 (72 files)**, unaffected as expected (this layer's
+`.jsx` window-global files aren't imported by any existing vitest test — the project's own
+verification boundary for this layer is Playwright, confirmed by grepping `src/__tests__/` for
+any reference to `frontend/app/*` and finding none) · `npx playwright test` — **1/1**, the
+existing `kingdom-discovery.spec.ts` golden path unchanged, confirming no regression.
+
+### Manual browser verification (demo mode — zero writes to the real Supabase project)
+Local dev has no real Supabase env configured (`.env.local` carries only a `VERCEL_OIDC_TOKEN`,
+no `SUPABASE_*`), so `window.CC_AUTH` is null exactly like the Playwright suite's own fallback —
+reached the same `authed && !realUser` state by seeding `cc_session_v1` in `localStorage`
+(the app's own documented mechanism, not a backdoor) and driving the app's exposed
+`window.__cc` debug hook (`completeOnboarding`, `createEvent`, `go`) to get a real contributor
+into state without re-clicking the already-e2e-covered apply/onboarding wizard. Verified in
+the actual browser: Profile tab renders + gallery add/remove + Save (no crash, no new console
+errors); News post created on the Dashboard → appears in the Dashboard News list → **appears on
+the public `ContributorProfilePage`'s new News section**; Event **Edit** opens the wizard
+pre-filled ("Edit Event" heading, title pre-filled), steps through, **Save changes** persists
+the new title on the card; **Cancel** flips the card to a "CANCELLED" badge + "Restore" button,
+**Restore** flips it back. Only console errors throughout were the same 9 **pre-existing**
+`/api/v1/{events,places,contributors}` 500s (unconfigured local Supabase, unrelated to this
+change) — zero new errors at any step. Place Edit/Cancel not separately re-tested — it is the
+structurally identical, already-proven code path (`PlaceManageRow` mirrors `EventManageCard`;
+`updatePlace`/`setPlaceStatus` mirror `updateEvent`/`setEventStatus` exactly).
+
+### Explicitly NOT done this round (honest checkpoint)
+- **PR #42 is not yet merged.** Founder review/merge is the next action on this item.
+- No new automated test coverage was added for the new `store.jsx` actions or dashboard tabs —
+  this frontend layer has no existing unit-test harness (window-global IIFE modules, not ES
+  modules) and the project's established verification boundary for it is Playwright + manual
+  browser check, both done. Extending `kingdom-discovery.spec.ts` (or a new spec) to cover
+  edit/cancel/Profile/News would be a reasonable fast-follow if regressions here become a
+  recurring concern.
+- Real-user (non-demo) paths for every new action (`updateEvent`, `updatePlace`,
+  `updateContributorProfile`, the News CRUD trio) were read carefully against the existing
+  `createEvent`/`createPlace`/`completeOnboarding` patterns and against the live
+  `/api/contributor/profile` route source, but — same limitation as every prior session's
+  Playwright note — **could not be exercised with a real Google OAuth session** from this
+  environment. Founder should smoke-test as a real signed-in contributor once merged.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **⚠️ 2026-08-24 — Connect v1's core loop is SHIPPED (§3AE):** self-serve Contributor go-live
 > (no admin wait), Kingdom Discovery (renamed from the plain list view), and — the actual root
 > fix — Contributors now visually appear on the map. Branch
 > `feat/connect-v1-kingdom-discovery`, migrations 164–166 live, Playwright e2e gate passing.
-> **Still open from §3AD/§3AE, in rough priority order:** (1) an admin.jsx hide/unhide button
-> for the new `set_contributor_hidden` moderation RPC (backend done, no UI yet); (2) add an
-> "Individual" Contributor kind + relax onboarding copy (still not started — `apply.jsx` has no
-> kind field at all yet); (3) fix `README.md`; (4) label `docs/feature-clarity/*` +
-> `map-layering.md` as deferred; (5) the founder's own next-phase ask — a contributor
-> self-service portal (dashboard editing, image upload, events/places/news management) — once
-> (1)-(4) or the founder's priority call says go. **Next migration # = 167** (164–166 consumed
-> by §3AE — any earlier mention of "mig 164" below this line, e.g. Vision's network graph note,
-> now means 167+, not literally 164).
+>
+> **⚠️ Same day — the contributor self-service portal (§3AG) is BUILT but PR #42 is OPEN, NOT
+> YET MERGED.** Dashboard edit/cancel on Events+Places, a Profile tab, and a News tab (+ public
+> News section) are all implemented, gated green (tsc/eslint/vitest 645/645/build/Playwright
+> 1/1), and manually browser-verified in demo mode — **founder review + merge is the very next
+> action**, then a real-signed-in-contributor smoke test (§3AG's own honest checkpoint — every
+> new action's real-user path was read carefully but never exercised with a real Google session
+> from this environment). **Migration 167 has a repo file on this branch** (backfilled — it was
+> already live on prod from a prior session, this just closes the lineage gap); it will be on
+> `main` once #42 merges. **Still open from §3AD/§3AE, in rough priority order:** (1) an
+> admin.jsx hide/unhide button for the `set_contributor_hidden` moderation RPC (backend done, no
+> UI yet); (2) add an "Individual" Contributor kind + relax onboarding copy (still not started —
+> `apply.jsx` has no kind field at all yet); (3) fix `README.md` (✅ actually DONE §3AF — this
+> line is stale, left for the historical record); (4) label `docs/feature-clarity/*` +
+> `map-layering.md` as deferred. **Next migration # = 168** (167 is the contributor-portal
+> migration above, on `main` once #42 merges; 164–166 were consumed by §3AE — any earlier
+> mention of "mig 164" below this line, e.g. Vision's network graph note, now means 168+, not
+> literally 164).
 
 > **Steps 3, 4, 4b, 4c, 5, the Wear Concepts marketplace (§3R), auth+seed (§3S), media-upload +
 > notifications (§3T), the identity/content-permission model (§3V, mig 160), the community
@@ -1952,7 +2094,7 @@ Follow-up to §3AE, same day. Branch `chore/e2e-ci-gate-and-readme`.
       reach rings + period playback + range compare per the design handoff — still guarding on the key
       defensively. Verify in-browser against the live map.
    b. **Network graph (§4.3)** — the next DB-bearing increment (its OWN PR + prod migration
-      **167** — 164–166 are now consumed by §3AE):
+      **168** — 164–166 consumed by §3AE, 167 consumed by §3AG's contributor portal):
       "which orgs share your audience? who could you partner with?" — reuse `org_active_persons` + the
       mig-155/156 `inwin` orbit pattern + an overlap count; feeds `vision.org_partnerships` +
       `/api/metrics/cross-org` (both exist). Then **Phase D** (exports / partnerships / scheduled reports).
@@ -2005,8 +2147,8 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 ```
 
 ### Canonical docs (start here)
-- [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope (§3AD scoping → §3AE shipped, 2026-08-24).** Read this first for any Connect-focused session.
+- [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope (§3AD scoping → §3AE shipped → §3AG contributor portal, PR #42 open, 2026-08-24).** Read this first for any Connect-focused session.
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **166** live; next # = **167**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **167** live; a repo file for it exists on branch `feat/connect-contributor-portal`/PR #42, not yet on `main`; next # = **168**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).
