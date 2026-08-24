@@ -232,7 +232,7 @@
   // ── Contributor ──
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
-    const { contributors, events, places, followedOrgs, toggleFollow, go, startConversationWith, toast, user } = app;
+    const { contributors, events, places, newsPosts, followedOrgs, toggleFollow, go, startConversationWith, toast, user } = app;
     // Honest not-found rather than silently showing the first (wrong) org —
     // misrepresenting identity would violate the vision's integrity.
     const c = contributors.find((x) => x.id === id);
@@ -241,6 +241,7 @@
     const cat = window.DATA.getCategory(c.category);
     const cEvents = events.filter((e) => e.organizerId === c.id);
     const cPlaces = places.filter((p) => p.organizerId === c.id);
+    const cNews = (newsPosts || []).filter((n) => n.contributorId === c.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const collabs = (c.collaborators || []).map((cid) => contributors.find((x) => x.id === cid)).filter(Boolean);
     const TIER_PCT = { Shepherd: 33, Beacon: 66, Pillar: 100 }[c.involvementLevel] || 33;
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
@@ -286,6 +287,14 @@
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Places'),
               h('div', { className: 'space-y-2' }, cPlaces.map((p) => h('button', { key: p.id, onClick: () => go('place', { id: p.id }), className: 'w-full flex items-center gap-3 p-2.5 bg-card rounded-2xl border border-border text-left' },
                 h(Avatar, { src: p.coverPhoto, name: p.name, size: 44, rounded: 'xl' }), h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, p.name), h('p', { className: 'text-xs text-muted-foreground truncate' }, p.address)), h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground' }))))),
+            cNews.length > 0 && h('div', null,
+              h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'News'),
+              h('div', { className: 'space-y-3' }, cNews.map((n) => h('div', { key: n.id, className: 'bg-card rounded-2xl border border-border p-3' },
+                h('div', { className: 'flex items-start justify-between gap-2 mb-1' },
+                  h('p', { className: 'text-sm font-bold text-foreground' }, n.title),
+                  h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, n.date ? new Date(n.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
+                n.image && h('img', { src: n.image, className: 'w-full h-32 object-cover rounded-xl mb-2' }),
+                h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, n.body))))),
             c.members && c.members.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Team'),
               h('div', { className: 'flex flex-wrap gap-1.5' }, c.members.map((m, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-full bg-card border border-border text-xs font-semibold text-foreground' }, m)))),

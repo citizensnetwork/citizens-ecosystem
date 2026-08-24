@@ -110,6 +110,9 @@
   // SmartImage/Avatar then render an honest, category-tinted placeholder rather
   // than a generic stranger's photo masquerading as a real venue/person.
   const fmtTime = (d) => d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+  // Raw 24h "HH:MM" for native <input type="time"> — fmtTime above is
+  // 12h/AM-PM for display and cannot round-trip through a time input.
+  const to24 = (d) => d ? String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') : '';
   // Compact relative timestamp for list rows ("now", "5m", "3h", "2d", "4 Mar").
   const timeAgo = (iso) => {
     if (!iso) return '';
@@ -139,6 +142,8 @@
       description: r.description || '',
       date: validDt ? validDt.toISOString().slice(0, 10) : '',
       time: fmtTime(validDt), endTime: fmtTime(validEnd),
+      time24: to24(validDt), endTime24: to24(validEnd),
+      status: r.status || 'published',
       location: r.location || '', address: r.location || '',
       // organizerId = created_by (UUID). community_contributor is a BOOLEAN on
       // the live schema (community-posted flag) — only use it as a name if some
@@ -150,6 +155,11 @@
       volunteeringEnabled: !!r.volunteer_openings,
       coverPhoto: r.image_url || '',
       gallery: [], broadcast: null, website: r.website_url || '',
+      socials: {
+        ...(r.instagram_url ? { instagram: r.instagram_url } : {}),
+        ...(r.facebook_url ? { facebook: r.facebook_url } : {}),
+        ...(r.youtube_url ? { youtube: r.youtube_url } : {}),
+      },
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [], upcomingDates: [],
@@ -214,6 +224,7 @@
       involvementLevel: 'Shepherd',
       dominantNiche: '',
       socials,
+      gallery: r.gallery_urls || [],
       collaborators: [],
       members: [],
       verified: true,
@@ -235,7 +246,8 @@
       organizerName: '', organizerId: r.created_by || null,
       coverPhoto: r.image_url || '',
       gallery: [],
-      openHours: '',
+      openHours: r.open_hours || '',
+      status: r.status || 'published',
       website: r.website || '', phone: r.phone || '',
       volunteeringEnabled: !!r.volunteer_openings,
       followerCount: 0,
@@ -246,6 +258,20 @@
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [],
+    };
+  }
+
+  // DB news_posts row → app shape. A contributor-authored update/story shown
+  // on their own public listing — distinct from broadcast_messages (24h map
+  // bubble tied to one event/place). post_date is contributor-editable and is
+  // what the feed sorts by, separate from created_at.
+  function adaptNewsPost(r) {
+    return {
+      id: r.id, contributorId: r.contributor_id,
+      title: r.title || '', body: r.body || '',
+      image: r.image_url || '',
+      date: r.post_date || (r.created_at ? r.created_at.slice(0, 10) : ''),
+      createdAt: r.created_at || '',
     };
   }
 
@@ -384,6 +410,7 @@
     const [role, setRole] = useState(_saved && _saved.role ? _saved.role : 'citizen');
     const [nav, setNav] = useState({ page: 'home', params: {} });
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
+    const [createEditing, setCreateEditing] = useState(null); // null | the existing event/place object being edited
     const [creationStyle, setCreationStyle] = useState('sheet'); // sheet | modal | side  (tweakable)
     const [pinStyle, setPinStyle] = useState('teardrop'); // teardrop | dot | glass (tweakable)
     const [bubbleStyle, setBubbleStyle] = useState('speech'); // speech | tag | minimal (tweakable)
@@ -407,6 +434,7 @@
     const [adminStats, setAdminStats] = useState(null); // {totalUsers} for the real admin overview
     const [cityReach, setCityReach] = useState(null); // [{area, count}] from rsvps.location_snapshot (real contributors)
     const [myProfileMeta, setMyProfileMeta] = useState(null); // {bio, discoverable, notificationPrefs} — own profiles row
+    const [newsPosts, setNewsPosts] = useState([]); // contributor-authored update feed (real only — empty in demo mode)
 
     // citizen RSVP state (mock seeds for demo mode; replaced by the user's real
     // rows once a real Supabase session loads — see the seeding effect below).
@@ -428,8 +456,10 @@
       const main = document.getElementById('main-scroll');
       if (main) main.scrollTop = 0;
     }, []);
-    const openCreate = useCallback((kind) => setCreateKind(kind), []);
-    const closeCreate = useCallback(() => setCreateKind(null), []);
+    // openCreate(kind) opens a blank create sheet; openCreate(kind, record)
+    // opens the same sheet pre-filled to edit that record.
+    const openCreate = useCallback((kind, record) => { setCreateEditing(record || null); setCreateKind(kind); }, []);
+    const closeCreate = useCallback(() => { setCreateKind(null); setCreateEditing(null); }, []);
 
     // active org the contributor manages: their real org (signed-in
     // contributor), an assist-mode/freshly-onboarded org, else demo Grace City.
@@ -441,7 +471,7 @@
       (myContributor && myContributor.id === activeContributorId ? myContributor : null)
       || contributors.find((c) => c.id === activeContributorId)
       || contributors[0]
-      || { id: 'c1', name: 'My Ministry', profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '' };
+      || { id: 'c1', name: 'My Ministry', profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
 
     const baseUser =
       role === 'admin' ? ADMIN_BASE
@@ -691,6 +721,81 @@
       })();
     }, [activeContributor, activeContributorId, realUser, role, sendBroadcast, toast]);
 
+    // Update event: same field mapping as createEvent, targeted with .eq('id').
+    // RLS already grants UPDATE to the owner (or admin) — no server route needed.
+    // Re-geocodes only if the location/address text actually changed, so a plain
+    // "fix a typo in the description" edit doesn't cost a network round-trip.
+    const updateEvent = useCallback((id, form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) {
+        setEvents((prev) => prev.map((e) => (e.id === id ? {
+          ...e, title: form.title, category: form.category, description: form.description,
+          date: form.date, time: form.time, endTime: form.endTime, location: form.location, address: form.address,
+          coverPhoto: form.coverPhoto || e.coverPhoto, socials: form.socials || {},
+        } : e)));
+        toast('Event updated.', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          const start = form.date ? new Date(form.date + 'T' + (form.time || '09:00')) : null;
+          if (!start || isNaN(start.getTime())) { toast('Please pick a date and start time.', 'red'); finish(false); return; }
+          const end = form.endTime ? new Date(form.date + 'T' + form.endTime) : null;
+          const existing = events.find((e) => e.id === id);
+          const newLocation = [form.location, form.address].filter(Boolean).join(', ');
+          const locationChanged = !existing || newLocation !== existing.location;
+          const geo = locationChanged ? await geocodeAddress(form.address || form.location) : null;
+          const socials = form.socials || {};
+          const row = {
+            title: form.title,
+            description: form.description || '',
+            category: form.category || 'church-services',
+            date: start.toISOString(),
+            end_time: end && !isNaN(end.getTime()) ? end.toISOString() : null,
+            location: newLocation,
+            image_url: form.coverPhoto || null,
+            volunteer_openings: !!form.volunteeringEnabled,
+            instagram_url: socials.instagram || null,
+            facebook_url: socials.facebook || null,
+            youtube_url: socials.youtube || null,
+          };
+          if (locationChanged) { row.latitude = geo ? geo.lat : null; row.longitude = geo ? geo.lng : null; }
+          const { data, error } = await window.CC_SUPABASE.from('events').update(row).eq('id', id).select('*').single();
+          if (error) throw error;
+          setEvents((prev) => prev.map((e) => (e.id === id ? { ...adaptEvent(data), status: e.status } : e)));
+          toast('Event updated.', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[updateEvent]', e);
+          toast('Could not save changes — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [events, realUser, toast]);
+
+    // Cancel/restore: a status flip only, never a delete — a cancelled event
+    // stays in the DB and remains directly viewable (RLS explicitly allows
+    // status='cancelled' reads), it just drops off primary discovery surfaces.
+    const setEventStatus = useCallback((id, status, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+      if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.from('events').update({ status }).eq('id', id);
+          if (error) throw error;
+          toast(status === 'cancelled' ? 'Event cancelled.' : 'Event restored.', 'gold');
+          finish(true);
+        } catch (e) {
+          console.warn('[setEventStatus]', e);
+          setEvents((prev) => prev.map((ev) => (ev.id === id ? { ...ev, status: status === 'cancelled' ? 'published' : 'cancelled' } : ev)));
+          toast('Could not update the event — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast]);
+
     // Create place: places.latitude/longitude are NOT NULL, so a real place
     // needs a geocodable address — we refuse (with guidance) rather than
     // fabricate coordinates.
@@ -740,6 +845,71 @@
         }
       })();
     }, [activeContributor, activeContributorId, realUser, toast]);
+
+    // Update place: same field mapping as createPlace. Re-geocodes only when
+    // the address text actually changed. open_hours/status are new v1 columns
+    // (migration 167 — supabase/migrations/167_place_status_open_hours_news_posts.sql).
+    const updatePlace = useCallback((id, form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) {
+        setPlaces((prev) => prev.map((p) => (p.id === id ? {
+          ...p, name: form.name, category: form.category, description: form.description,
+          address: form.address, coverPhoto: form.coverPhoto || p.coverPhoto,
+          openHours: form.openHours || '', socials: form.socials || {},
+        } : p)));
+        toast('Place updated.', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          const existing = places.find((p) => p.id === id);
+          const addressChanged = !existing || form.address !== existing.address;
+          const geo = addressChanged ? await geocodeAddress(form.address) : null;
+          if (addressChanged && !geo) { toast('We couldn’t find that address — add a suburb and city, then try again.', 'red'); finish(false); return; }
+          const categoryId = await getCategoryId(form.category);
+          const row = {
+            name: form.name,
+            description: form.description || '',
+            address: form.address,
+            category_id: categoryId,
+            custom_category: categoryId ? null : (form.category || null),
+            image_url: form.coverPhoto || null,
+            open_hours: form.openHours || null,
+            volunteer_openings: !!form.volunteeringEnabled,
+          };
+          if (addressChanged) { row.latitude = geo.lat; row.longitude = geo.lng; }
+          const { data, error } = await window.CC_SUPABASE.from('places').update(row).eq('id', id).select('*').single();
+          if (error) throw error;
+          setPlaces((prev) => prev.map((p) => (p.id === id ? { ...adaptPlace(data), category: form.category || p.category, status: p.status } : p)));
+          toast('Place updated.', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[updatePlace]', e);
+          toast('Could not save changes — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [places, realUser, toast]);
+
+    const setPlaceStatus = useCallback((id, status, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+      if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.from('places').update({ status }).eq('id', id);
+          if (error) throw error;
+          toast(status === 'cancelled' ? 'Place cancelled.' : 'Place restored.', 'gold');
+          finish(true);
+        } catch (e) {
+          console.warn('[setPlaceStatus]', e);
+          setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, status: status === 'cancelled' ? 'published' : 'cancelled' } : p)));
+          toast('Could not update the place — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast]);
 
     // Onboarding: for a real (admin-approved) contributor this persists the
     // profile via /api/contributor/setup (+ the contributor-profile route for
@@ -828,6 +998,134 @@
         }
       })();
     }, [myApplication, realUser, toast, go]);
+
+    // Edit-later counterpart to completeOnboarding: /api/contributor/profile
+    // already existed and already allowlists exactly these fields server-side
+    // (bio, website, socials, address, logo, gallery) — it was just never
+    // called again after the one-time onboarding wizard. Same route, reused.
+    // Re-geocodes only when the address text actually changed (same guard
+    // shape as updateEvent/updatePlace) — otherwise an address edit here
+    // would silently leave the map pin at its old location.
+    const updateContributorProfile = useCallback((fields, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      const asUrl = (v) => (v && v.trim() ? (/^https?:\/\//i.test(v.trim()) ? v.trim() : 'https://' + v.trim()) : null);
+      const locationChanged = fields.location !== undefined && fields.location !== activeContributor.location;
+      const payload = {
+        bio: fields.bio ?? undefined,
+        website_url: fields.website !== undefined ? asUrl(fields.website) : undefined,
+        physical_address: fields.location ?? undefined,
+        logo_url: fields.profilePhoto && /^https:\/\//i.test(fields.profilePhoto) ? fields.profilePhoto : undefined,
+        instagram_handle: fields.socials ? (fields.socials.instagram || '') : undefined,
+        facebook_url: fields.socials && fields.socials.facebook !== undefined ? asUrl(fields.socials.facebook) : undefined,
+        tiktok_handle: fields.socials ? (fields.socials.tiktok || '') : undefined,
+        youtube_url: fields.socials && fields.socials.youtube !== undefined ? asUrl(fields.socials.youtube) : undefined,
+        gallery_urls: fields.gallery ?? undefined,
+      };
+      if (!realUser) {
+        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, location: fields.location, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
+        toast('Profile updated.', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          if (locationChanged) {
+            const geo = await geocodeAddress(fields.location);
+            payload.physical_latitude = geo ? geo.lat : null;
+            payload.physical_longitude = geo ? geo.lng : null;
+          }
+          const res = await authedFetch('/api/contributor/profile', { method: 'POST', body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            toast(body.error || 'Could not save your profile — please try again.', 'red');
+            finish(false);
+            return;
+          }
+          const { data: prof } = await window.CC_SUPABASE
+            .from('profiles')
+            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, instagram_handle, facebook_url, tiktok_handle, youtube_url, gallery_urls')
+            .eq('id', realUser.id)
+            .maybeSingle();
+          if (prof) {
+            const org = { ...adaptContributor(prof), isMine: true, gallery: prof.gallery_urls || [] };
+            setContributors((prev) => { const byId = new Map(prev.map((c) => [c.id, c])); byId.set(org.id, org); return [...byId.values()]; });
+            setMyContributor(org);
+          }
+          toast('Profile updated.', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[updateContributorProfile]', e);
+          toast('Could not save your profile — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [activeContributor, realUser, toast]);
+
+    // ── News posts ──  A contributor-authored update feed shown on their own
+    // listing page — separate from the ephemeral 24h Broadcast map bubble.
+    // Requires migration 167 (supabase/migrations/167_place_status_open_hours_news_posts.sql).
+    const createNewsPost = useCallback((form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser || !window.CC_SUPABASE) {
+        setNewsPosts((prev) => [{ id: uid('n'), contributorId: activeContributorId, title: form.title, body: form.body, image: form.image || '', date: form.date || today(), createdAt: new Date().toISOString() }, ...prev]);
+        toast('News post published.', 'green');
+        finish(true);
+        return;
+      }
+      (async () => {
+        try {
+          const row = { contributor_id: realUser.id, title: form.title, body: form.body, image_url: form.image || null, post_date: form.date || today() };
+          const { data, error } = await window.CC_SUPABASE.from('news_posts').insert(row).select('*').single();
+          if (error) throw error;
+          setNewsPosts((prev) => [adaptNewsPost(data), ...prev]);
+          toast('News post published.', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[createNewsPost]', e);
+          toast('Could not publish that post — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [activeContributorId, realUser, toast]);
+
+    const updateNewsPost = useCallback((id, form, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      setNewsPosts((prev) => prev.map((n) => (n.id === id ? { ...n, title: form.title, body: form.body, image: form.image || n.image, date: form.date || n.date } : n)));
+      if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
+      (async () => {
+        try {
+          const row = { title: form.title, body: form.body, image_url: form.image || null, post_date: form.date || today() };
+          const { error } = await window.CC_SUPABASE.from('news_posts').update(row).eq('id', id);
+          if (error) throw error;
+          toast('News post updated.', 'green');
+          finish(true);
+        } catch (e) {
+          console.warn('[updateNewsPost]', e);
+          toast('Could not save changes — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast]);
+
+    const deleteNewsPost = useCallback((id, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      const prevPosts = newsPosts;
+      setNewsPosts((prev) => prev.filter((n) => n.id !== id));
+      if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
+      (async () => {
+        try {
+          const { error } = await window.CC_SUPABASE.from('news_posts').delete().eq('id', id);
+          if (error) throw error;
+          toast('News post removed.', 'gold');
+          finish(true);
+        } catch (e) {
+          console.warn('[deleteNewsPost]', e);
+          setNewsPosts(prevPosts);
+          toast('Could not remove that post — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [newsPosts, realUser, toast]);
 
     // Send: optimistic append, then write through for real conversations. The
     // temp id is swapped for the DB id on success so realtime dedup works.
@@ -1636,6 +1934,23 @@
       return () => { active = false; };
     }, []);
 
+    // News posts: public SELECT RLS (like places/broadcasts), so a direct
+    // client read is consistent with the map-bubbles read just above — no
+    // dedicated API route needed. Requires migration 167.
+    useEffect(() => {
+      let active = true;
+      (async () => {
+        try {
+          const sb = window.CC_SUPABASE;
+          if (!sb) return;
+          const { data, error } = await sb.from('news_posts').select('*').order('post_date', { ascending: false }).limit(200);
+          if (error) throw error;
+          if (active && Array.isArray(data)) setNewsPosts(data.map(adaptNewsPost));
+        } catch (e) { /* table may not exist yet until migration 167 is applied — feed stays empty */ }
+      })();
+      return () => { active = false; };
+    }, []);
+
     const unreadNotifs = notifications.filter((n) => !n.read).length;
     const unreadMsgs = conversations.reduce((a, c) => a + c.unread, 0);
 
@@ -1714,7 +2029,9 @@
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       unreadNotifs, unreadMsgs, toasts, toast,
-      createKind, openCreate, closeCreate, updateAvatar,
+      createKind, createEditing, openCreate, closeCreate, updateAvatar,
+      updateEvent, setEventStatus, updatePlace, setPlaceStatus,
+      updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
       adminStats, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref,
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,

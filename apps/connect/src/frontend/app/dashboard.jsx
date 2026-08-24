@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState } = React;
-  const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
+  const { cx, Avatar, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea } = window.UI;
   const Icon = window.Icon;
 
   // Build the last-7-days series from the real analytics API response
@@ -62,14 +62,18 @@
       h('p', { className: 'text-[10px] text-muted-foreground leading-tight mt-0.5' }, label));
   }
 
-  function EventManageCard({ ev, onView, onBroadcast }) {
+  function EventManageCard({ ev, onView, onEdit, onBroadcast, onToggleStatus }) {
     const cat = window.DATA.getEventCategory(ev.category);
-    return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
+    const cancelled = ev.status === 'cancelled';
+    return h('div', { className: cx('bg-card rounded-2xl border border-border overflow-hidden', cancelled && 'opacity-60') },
       h('div', { className: 'relative h-28' },
         h(SmartImage, { src: ev.coverPhoto, cat, label: 'Event', alt: ev.title, className: 'w-full h-full' }),
         h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/65 to-transparent' }),
-        ev.isLive && h('div', { className: 'absolute top-2 left-2 flex items-center gap-1 bg-red-500 px-2 py-0.5 rounded-full' },
-          h('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }), h('span', { className: 'text-[9px] font-bold text-white' }, 'LIVE')),
+        cancelled
+          ? h('div', { className: 'absolute top-2 left-2 flex items-center gap-1 bg-neutral-800/90 px-2 py-0.5 rounded-full' },
+              h('span', { className: 'text-[9px] font-bold text-white tracking-wide' }, 'CANCELLED'))
+          : ev.isLive && h('div', { className: 'absolute top-2 left-2 flex items-center gap-1 bg-red-500 px-2 py-0.5 rounded-full' },
+              h('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }), h('span', { className: 'text-[9px] font-bold text-white' }, 'LIVE')),
         ev.broadcast && h('div', { className: 'absolute top-2 right-2 flex items-center gap-1 glass-strong px-2 py-0.5 rounded-full' },
           h(Icon, { name: 'Radio', size: 10, className: 'text-gold-dark' }), h('span', { className: 'text-[9px] font-bold text-gold-dark' }, 'Broadcasting')),
         h('div', { className: 'absolute bottom-2 left-3 right-3 flex items-end justify-between gap-2' },
@@ -80,12 +84,28 @@
           h(Stat, { icon: 'Users', text: ev.connectCount + ' connected' }),
           h(Stat, { icon: 'Star', text: ev.considerCount + ' considering' }),
           h(Stat, { icon: 'Calendar', text: new Date(ev.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) })),
-        h('div', { className: 'flex gap-2' },
+        h('div', { className: 'flex gap-2 flex-wrap' },
           h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Eye', onClick: onView }, 'View'),
-          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil' }, 'Edit'),
-          h(Button, { variant: 'soft', size: 'sm', className: 'flex-1', icon: 'Radio', onClick: onBroadcast }, 'Broadcast'))));
+          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
+          h(Button, { variant: 'soft', size: 'sm', className: 'flex-1', icon: 'Radio', onClick: onBroadcast }, 'Broadcast'),
+          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: cancelled ? 'RotateCcw' : 'Ban', onClick: onToggleStatus }, cancelled ? 'Restore' : 'Cancel'))));
   }
   const Stat = ({ icon, text }) => h('div', { className: 'flex items-center gap-1.5' }, h(Icon, { name: icon, size: 11, className: 'text-gold' }), h('span', null, text));
+
+  function PlaceManageRow({ p, onView, onEdit, onToggleStatus }) {
+    const cancelled = p.status === 'cancelled';
+    return h('div', { className: cx('flex items-center gap-3 p-3 bg-card rounded-2xl border border-border', cancelled && 'opacity-60') },
+      h(Avatar, { src: p.coverPhoto, name: p.name, size: 56, rounded: 'xl' }),
+      h('div', { className: 'flex-1 min-w-0' },
+        h('div', { className: 'flex items-center gap-1.5' },
+          h('p', { className: 'text-sm font-bold text-foreground truncate' }, p.name),
+          cancelled && h('span', { className: 'text-[9px] font-bold text-white bg-neutral-700 px-1.5 py-0.5 rounded shrink-0' }, 'CANCELLED')),
+        h('p', { className: 'text-xs text-muted-foreground truncate flex items-center gap-1' }, h(Icon, { name: 'MapPin', size: 10 }), p.address),
+        h('p', { className: 'text-xs text-gold-dark font-semibold' }, p.followerCount.toLocaleString() + ' followers')),
+      h('button', { onClick: onEdit, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: 'Edit' }, h(Icon, { name: 'Pencil', size: 14, className: 'text-muted-foreground' })),
+      h('button', { onClick: onToggleStatus, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: cancelled ? 'Restore' : 'Cancel' }, h(Icon, { name: cancelled ? 'RotateCcw' : 'Ban', size: 14, className: 'text-muted-foreground' })),
+      h('button', { onClick: onView, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: 'View' }, h(Icon, { name: 'ChevronRight', size: 14, className: 'text-muted-foreground' })));
+  }
 
   // ── Broadcast tool ──
   function BroadcastTool({ myEvents, myPlaces, preselect }) {
@@ -119,14 +139,107 @@
             h(Button, { variant: 'primary', className: 'w-full', disabled: !text || !target, icon: 'Send', onClick: send }, 'Send Broadcast')));
   }
 
+  // ── Gallery editor — up to `max` real uploads via the same signed-URL path
+  // used everywhere else (never a raw browser Storage write). One picker that
+  // always shows empty (never fed back as `value`) so it reads as "add
+  // another" rather than "replace the last one".
+  function GalleryEditor({ value, onChange, max = 6 }) {
+    const gallery = value || [];
+    return h('div', { className: 'space-y-2' },
+      gallery.length > 0 && h('div', { className: 'grid grid-cols-3 gap-2' },
+        gallery.map((g, i) => h('div', { key: i, className: 'relative aspect-square rounded-lg overflow-hidden group' },
+          h('img', { src: g, className: 'w-full h-full object-cover' }),
+          h('button', { type: 'button', onClick: () => onChange(gallery.filter((_, j) => j !== i)), className: 'absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/55 text-white flex items-center justify-center' }, h(Icon, { name: 'X', size: 10 }))))),
+      gallery.length < max
+        ? h(MediaPicker, { value: '', onChange: (url) => onChange([...gallery, url]), aspect: '3/1', label: 'a gallery photo', scope: 'event-cover' })
+        : h('p', { className: 'text-[11px] text-muted-foreground text-center py-2' }, 'Maximum ' + max + ' photos.'));
+  }
+
+  // ── Profile tab — the missing "edit later" surface. Every field here is
+  // already accepted and validated by POST /api/contributor/profile; that
+  // route just had no UI calling it after the one-time onboarding wizard.
+  function ProfileTab({ contributor, onSave }) {
+    const [f, setF] = useState({
+      profilePhoto: contributor.profilePhoto || '',
+      bio: contributor.bio || '',
+      website: contributor.website || '',
+      location: contributor.location || '',
+      socials: contributor.socials || {},
+      gallery: contributor.gallery || [],
+    });
+    const [saving, setSaving] = useState(false);
+    const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
+    const save = () => { if (saving) return; setSaving(true); onSave(f, () => setSaving(false)); };
+    return h('div', { className: 'space-y-4 fade-in' },
+      h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-4' },
+        h('div', { className: 'flex gap-4 items-start' },
+          h('div', { className: 'w-24 shrink-0' }, h(Field, { label: 'Logo' }, h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
+          h('div', { className: 'flex-1 space-y-1' },
+            h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
+        h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
+          h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
+          h(Field, { label: 'Physical address' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
+        h('div', { className: 'grid grid-cols-2 gap-3' },
+          h(Field, { label: 'Instagram' }, h(Input, { value: f.socials.instagram || '', onChange: (e) => ups('instagram', e.target.value), placeholder: '@handle' })),
+          h(Field, { label: 'Facebook' }, h(Input, { value: f.socials.facebook || '', onChange: (e) => ups('facebook', e.target.value), placeholder: 'facebook.com/…' })),
+          h(Field, { label: 'TikTok' }, h(Input, { value: f.socials.tiktok || '', onChange: (e) => ups('tiktok', e.target.value), placeholder: '@handle' })),
+          h(Field, { label: 'YouTube' }, h(Input, { value: f.socials.youtube || '', onChange: (e) => ups('youtube', e.target.value), placeholder: 'youtube.com/…' }))),
+        h(Field, { label: 'Gallery', hint: 'Shown on your public listing.' }, h(GalleryEditor, { value: f.gallery, onChange: (v) => up('gallery', v), max: 6 })),
+        h(Button, { variant: 'gold', icon: 'Check', disabled: saving, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save Profile')));
+  }
+
+  // ── News — a contributor-authored update feed on their own public listing.
+  // Distinct from the Broadcast tool above: broadcasts are a 24h map bubble
+  // tied to one event/place; news posts are persistent stories/updates on the
+  // contributor's own page, dated by the contributor (not just "now").
+  function NewsPostForm({ initial, onSave, onCancel }) {
+    const [f, setF] = useState({
+      title: (initial && initial.title) || '',
+      body: (initial && initial.body) || '',
+      date: (initial && initial.date) || new Date().toISOString().slice(0, 10),
+      image: (initial && initial.image) || '',
+    });
+    const [saving, setSaving] = useState(false);
+    const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const canSave = f.title.trim() && f.body.trim();
+    const save = () => { if (!canSave || saving) return; setSaving(true); onSave(f, () => setSaving(false)); };
+    return h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-3 fade-in' },
+      h(Field, { label: 'Title', required: true }, h(Input, { value: f.title, onChange: (e) => up('title', e.target.value), placeholder: 'e.g. Our new outreach van is here!' })),
+      h(Field, { label: 'Date', hint: 'Backdate a story or set it for later — this is what the feed sorts by.' }, h('input', { type: 'date', value: f.date, onChange: (e) => up('date', e.target.value), className: window.UI.inputCls })),
+      h(Field, { label: 'Photo (optional)' }, h(MediaPicker, { value: f.image, onChange: (v) => up('image', v), aspect: '16/9', label: 'photo', scope: 'event-cover' })),
+      h(Field, { label: 'Story', required: true }, h(Textarea, { value: f.body, rows: 4, onChange: (e) => up('body', e.target.value), placeholder: 'Share an update, a story, or what you’ve been up to…' })),
+      h('div', { className: 'flex gap-2' },
+        h(Button, { variant: 'outline', className: 'flex-1', onClick: onCancel }, 'Cancel'),
+        h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSave || saving, icon: 'Check', onClick: save }, saving ? 'Saving…' : 'Publish')));
+  }
+
+  function NewsPostRow({ post, onEdit, onDelete }) {
+    return h('div', { className: 'bg-card rounded-2xl border border-border p-4' },
+      h('div', { className: 'flex items-start justify-between gap-2 mb-1' },
+        h('p', { className: 'text-sm font-bold text-foreground' }, post.title),
+        h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, post.date ? new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '')),
+      post.image && h('img', { src: post.image, className: 'w-full h-32 object-cover rounded-xl my-2' }),
+      h('p', { className: 'text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-3' }, post.body),
+      h('div', { className: 'flex gap-2' },
+        h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
+        h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Trash2', onClick: onDelete }, 'Remove')));
+  }
+
   function DashboardPage() {
     const app = window.useApp();
-    const { activeContributor, activeContributorId, events, places, conversations, contributorDash, realUser, openCreate, go } = app;
+    const {
+      activeContributor, activeContributorId, events, places, conversations, contributorDash, realUser, openCreate, go,
+      setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
+    } = app;
     const [tab, setTab] = useState('overview');
     const [tool, setTool] = useState(null); // null | 'volunteer' | 'analytics'
     const [bcTarget, setBcTarget] = useState('');
+    const [newsComposing, setNewsComposing] = useState(false);
+    const [newsEditing, setNewsEditing] = useState(null);
     const myEvents = events.filter((e) => e.organizerId === activeContributorId);
     const myPlaces = places.filter((p) => p.organizerId === activeContributorId);
+    const myNews = newsPosts.filter((n) => n.contributorId === activeContributorId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const totalConnects = myEvents.reduce((a, e) => a + e.connectCount, 0);
     const totalConsider = myEvents.reduce((a, e) => a + e.considerCount, 0);
     // Real-mode signals (null/undefined in demo → the mock placeholders show).
@@ -154,7 +267,7 @@
           h(StatCard, { label: 'Events', value: myEvents.length, color: '#16A34A' }),
           h(StatCard, { label: 'Places', value: myPlaces.length, color: '#2563EB' })),
 
-        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'messages', 'tools'], value: tab, onChange: setTab })),
+        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'news', 'profile', 'messages', 'tools'], value: tab, onChange: setTab })),
 
         h('div', { className: 'px-4 sm:px-5' },
           tab === 'overview' && h('div', { className: 'space-y-4 fade-in' },
@@ -183,16 +296,37 @@
               h(Button, { variant: 'primary', icon: 'CalendarPlus', onClick: () => openCreate('event') }, 'Create Event'),
               h(Button, { variant: 'outline', icon: 'MapPin', onClick: () => openCreate('place') }, 'Add Place')),
             myEvents.length === 0 && h(Empty, { icon: 'Calendar', title: 'No events yet', sub: 'Create your first event to appear on the map.' }),
-            myEvents.map((ev) => h(EventManageCard, { key: ev.id, ev, onView: () => go('event', { id: ev.id }), onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); } })),
+            myEvents.map((ev) => h(EventManageCard, {
+              key: ev.id, ev, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
+              onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); },
+              onToggleStatus: () => setEventStatus(ev.id, ev.status === 'cancelled' ? 'published' : 'cancelled'),
+            })),
             myPlaces.length > 0 && h(F, null,
               h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Your Places'),
-              myPlaces.map((p) => h('div', { key: p.id, className: 'flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
-                h(Avatar, { src: p.coverPhoto, name: p.name, size: 56, rounded: 'xl' }),
-                h('div', { className: 'flex-1 min-w-0' },
-                  h('p', { className: 'text-sm font-bold text-foreground truncate' }, p.name),
-                  h('p', { className: 'text-xs text-muted-foreground truncate flex items-center gap-1' }, h(Icon, { name: 'MapPin', size: 10 }), p.address),
-                  h('p', { className: 'text-xs text-gold-dark font-semibold' }, p.followerCount.toLocaleString() + ' followers')),
-                h('button', { onClick: () => go('place', { id: p.id }), className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center' }, h(Icon, { name: 'ChevronRight', size: 14, className: 'text-muted-foreground' })))))),
+              myPlaces.map((p) => h(PlaceManageRow, {
+                key: p.id, p, onView: () => go('place', { id: p.id }), onEdit: () => openCreate('place', p),
+                onToggleStatus: () => setPlaceStatus(p.id, p.status === 'cancelled' ? 'published' : 'cancelled'),
+              })))),
+
+          tab === 'news' && h('div', { className: 'space-y-3 fade-in' },
+            newsComposing
+              ? h(NewsPostForm, {
+                  initial: newsEditing,
+                  onCancel: () => { setNewsComposing(false); setNewsEditing(null); },
+                  onSave: (form, cb) => {
+                    const done = (ok) => { cb(); if (ok) { setNewsComposing(false); setNewsEditing(null); } };
+                    if (newsEditing) updateNewsPost(newsEditing.id, form, done); else createNewsPost(form, done);
+                  },
+                })
+              : h(Button, { variant: 'primary', icon: 'PenSquare', className: 'w-full', onClick: () => { setNewsEditing(null); setNewsComposing(true); } }, '+ New post'),
+            !newsComposing && myNews.length === 0 && h(Empty, { icon: 'Newspaper', title: 'No news posts yet', sub: 'Share updates, projects and stories on your public listing.' }),
+            !newsComposing && myNews.map((post) => h(NewsPostRow, {
+              key: post.id, post,
+              onEdit: () => { setNewsEditing(post); setNewsComposing(true); },
+              onDelete: () => deleteNewsPost(post.id),
+            }))),
+
+          tab === 'profile' && h(ProfileTab, { contributor: activeContributor, onSave: (fields, cb) => updateContributorProfile(fields, cb) }),
 
           tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
             h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1' }, 'Recent Conversations'),

@@ -56,6 +56,25 @@
 | Apply wizard trimmed from 4 steps to 3 per its own prior-session `DEFER TO V2` markers | `apply.jsx` |
 | Playwright e2e suite (the merge gate) | `playwright.config.ts`, `e2e/kingdom-discovery.spec.ts` |
 
+### Added session 3 (2026-08-24 — contributor self-service portal)
+A prototype for this exact item (RESUME_HERE.md §3AE/§3AF: "explicitly the founder's NEXT
+phase") had already been built in a prior, separate session and left uncommitted in that
+session's scratchpad — never merged, never reviewed. This session verified it against V1_SCOPE
+priorities, found its frontend was stale (built before this same day's self-serve go-live ship —
+blind-copying would have reverted the admin-approval-gate removal, the `contributor_category`
+map-pin fix, and the Kingdom Discovery rename), and hand-reconciled only the net-new pieces in.
+Its migration (`167_place_status_open_hours_news_posts.sql`) had already been applied live and
+was verified clean (0 ERROR, 0 new advisor findings) but was missing from the repo's migration
+lineage — backfilled this session.
+
+| Feature | Where |
+|---|---|
+| Edit + Cancel/Restore on your own Events and Places (dashboard, not admin) | `dashboard.jsx` (`EventManageCard`, `PlaceManageRow`), `create.jsx` (`CreateFlow` `editing` prop), `store.jsx` (`updateEvent`, `setEventStatus`, `updatePlace`, `setPlaceStatus`), migration 167 (`places.status`, `places.open_hours`) |
+| Contributor Profile tab — bio/website/address/socials/logo/gallery, edit any time after onboarding | `dashboard.jsx` (`ProfileTab`), `store.jsx` (`updateContributorProfile`, reusing the already-validated `/api/contributor/profile`) |
+| News — a contributor-authored update/story feed, shown on the dashboard and on the public listing | `dashboard.jsx` (`NewsPostForm`/`NewsPostRow`), `profiles.jsx` (News section on `ContributorProfilePage`), `store.jsx` (`createNewsPost`/`updateNewsPost`/`deleteNewsPost`), migration 167 (`news_posts` table + RLS) |
+| Entry point: existing in-app Dashboard nav link (sidebar + bottom-nav), already gated `if (isContributor)` | `shell.jsx` — no new UI needed; a real `citizenscentral.co.za/dashboard` URL was considered and deferred (the SPA has no URL-based routing today — no pushState/history — so this would be new routing work, not just a page) |
+| "Contributor Individual" clarified — confirmed to be the existing citizen community-event mechanic (`037_community_event_rate_limit.sql`: a Citizen posts one rate-limited public event, `role` never changes to `contributor`) | No code change — the dashboard's existing `isContributor` gate already correctly excludes these citizens from any dashboard access |
+
 ## 3. Objectives and plans
 
 - Ship a minimal, repeatable loop: add a Contributor, Place, or Event with only essential fields; see it in a scrollable list; see it on the map with correct category color; open it for contact details and external links.
