@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -12,7 +12,15 @@ const FRONTEND_STYLE_CDN  = "https://unpkg.com https://fonts.googleapis.com";
 const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: __dirname,
+  // Must be the MONOREPO root, not this app's own directory — pnpm hoists
+  // Next's own compiled submodules (e.g. next/dist/compiled/source-map) up to
+  // the workspace root's node_modules. Scoping this to apps/connect makes
+  // Next's output-file-tracer miss them, so Vercel's serverless bundle for
+  // every /api/* route ships without them and the Lambda crashes on cold
+  // start with "Cannot find module 'next/dist/compiled/source-map'" — the
+  // actual cause of prod's blank map/DB (turbo.json env-var work was real but
+  // unrelated). Wear's next.config.js already uses this same pattern.
+  outputFileTracingRoot: join(__dirname, "../../"),
   poweredByHeader: false,
   images: {
     remotePatterns: [
