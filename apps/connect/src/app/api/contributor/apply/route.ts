@@ -23,7 +23,7 @@
  * silently lost. Inserting directly here is the durability fix.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
@@ -59,12 +59,8 @@ function finiteOrNull(v: unknown): number | null {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr || !user) {
+  const { supabase, user } = await getRouteAuth(request);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

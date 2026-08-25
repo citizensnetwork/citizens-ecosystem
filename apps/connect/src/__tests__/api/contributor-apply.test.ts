@@ -3,9 +3,14 @@ import { createMockSupabaseClient } from "../helpers/supabase-mock";
 import { resetRateLimitStore } from "@/lib/rate-limit";
 
 const mockClient = createMockSupabaseClient();
+const mockGetRouteAuth = vi.fn();
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn().mockResolvedValue(mockClient),
+// The real frontend authenticates via `Authorization: Bearer` (its Supabase
+// session lives in localStorage, not cookies), so the route resolves the
+// caller through `getRouteAuth` — mock that directly, matching every other
+// Bearer-aware route's test convention, not the old cookie-only `createClient`.
+vi.mock("@/lib/supabase/route", () => ({
+  getRouteAuth: (...args: unknown[]) => mockGetRouteAuth(...args),
 }));
 
 const { POST } = await import("@/app/api/contributor/apply/route");
@@ -20,6 +25,10 @@ function makeReq(body: Record<string, unknown>) {
   });
 }
 
+function mockUser(user: { id: string } | null) {
+  mockGetRouteAuth.mockResolvedValueOnce({ supabase: mockClient, user });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetRateLimitStore();
@@ -27,19 +36,13 @@ beforeEach(() => {
 
 describe("POST /api/contributor/apply", () => {
   it("returns 401 when unauthenticated", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: null },
-      error: null,
-    });
+    mockUser(null);
     const res = await POST(makeReq({ display_name: "Hope" }));
     expect(res.status).toBe(401);
   });
 
   it("returns 409 when already approved contributor", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     // first maybySingle → profile.contributor_status = "approved", role = "contributor"
     mockClient._chain.maybeSingle.mockResolvedValueOnce({
       data: { contributor_status: "approved", role: "contributor" },
@@ -52,10 +55,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("returns 409 when pending application already exists", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       // profiles.contributor_status
       .mockResolvedValueOnce({ data: { contributor_status: "pending" }, error: null })
@@ -68,10 +68,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("returns 400 when display_name is too short", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -80,10 +77,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("inserts and returns success on valid payload", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -105,10 +99,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("rejects invalid contributor_kind by coercing to null", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -128,10 +119,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("accepts a known contributor_category and coerces an unknown one to null", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -154,10 +142,7 @@ describe("POST /api/contributor/apply", () => {
     expect(insertedRow?.physical_longitude).toBe(28.2293);
 
     resetRateLimitStore();
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -178,10 +163,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("v1 self-serve: calls self_approve_contributor_application after insert and surfaces the result", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -204,10 +186,7 @@ describe("POST /api/contributor/apply", () => {
   });
 
   it("v1 self-serve: a failed self-approve RPC still returns 200 with approved:false (non-fatal, matches the applications-audit-trail precedent)", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
-      data: { user: { id: USER_ID } },
-      error: null,
-    });
+    mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: null });
