@@ -2290,16 +2290,99 @@ a true 56×56 circle.
 
 ---
 
+## 3AK. Production DB 500s — the ACTUAL root cause found + fixed + verified live, PR #48 MERGED ✅ (2026-08-25)
+
+Founder reported (again) that places/events show locally but not on production Vercel, even after
+§3AI's clean build-log verification and §3AJ's map-resize/sign-in fixes. Session offload:
+`.claude/sessions/connect-prod-api-500-outputfiletracing.md`. Branch
+`fix/connect-output-file-tracing-root`, commit `a6f36c6`, **PR #48 — ✅ MERGED** (merge commit
+`d1d7f6e`). `next.config.ts` only, no DB/migration change → next migration # still 168.
+
+### Root cause — found by driving the LIVE site directly, not by re-reading build logs
+Every prior session (§3AH, §3AI) diagnosed this from Vercel **build** logs and turbo.json — real
+fixes, but never the actual bug. This session instead opened `www.citizenscentral.co.za` live
+(Browser pane, guest) and pulled Vercel **runtime** logs for the actual production deployment.
+Every `/api/v1/*` call was hard-500ing with the Lambda crashing on cold start:
+```
+Cannot find module 'next/dist/compiled/source-map'
+Require stack: .../next-server/server.runtime.prod.js → /var/task/apps/connect/___next_launcher.cjs
+Node.js process exited with exit status: 1.
+```
+This is Next's own server bootstrap failing — not application code, and not env vars. Cause:
+`apps/connect/next.config.ts` set `outputFileTracingRoot: __dirname` (scoped to `apps/connect`
+only), added 2026-04-06 ("fix: add outputFileTracingRoot to fix Vercel routing") for an unrelated
+issue. In this pnpm workspace, Next's own compiled submodules are hoisted to the monorepo root's
+`node_modules` — scoping the trace root that narrowly makes Vercel's output-file-tracer miss them,
+so the serverless bundle for every API route ships broken. **`apps/wear/next.config.js` already
+had the correct monorepo-root pattern** (`path.join(__dirname, '../../')`) in this same repo/Vercel
+team, proven working — applied the same fix to Connect using its existing ESM `dirname`/
+`fileURLToPath` setup. This is why local dev always worked (no tracing involved) while prod
+silently 500'd on every DB read — **the map/DB symptom was never the turbo.json issue**; that fix
+(§3AI) was real but for a coexisting, separate problem.
+
+### Verified twice on live Vercel deployments, not just build logs
+1. **PR #48's preview deployment** (`dpl_5UqE26hhbBLzngYq7i8JGkXohRXX`) — bypassed Vercel SSO
+   protection via `get_access_to_vercel_url`, hit `/api/v1/{events,places,contributors}` directly
+   from the Browser pane, pulled runtime logs. The crash was **completely gone** (0 occurrences);
+   `/api/v1/*` now returns a clean, structured JSON 500 (`{"error":"Failed to list events"}`)
+   instead of a raw process crash — proof the Next server now boots successfully.
+2. **The resulting production deployment** (`dpl_6vuFHjgsPMWFSmUjKM1gVmkfRgJn`, aliased to
+   `www.citizenscentral.co.za`) — same test, same result: crash gone, only remaining error is
+   `TypeError: fetch failed... getaddrinfo ENOTFOUND placeholder.supabase.co`.
+
+### The remaining, SEPARATE, non-code blocker — founder action required
+`src/lib/supabase/server.ts` + `admin.ts` fall back to a fake `https://placeholder.supabase.co`
+when `NEXT_PUBLIC_SUPABASE_URL` is empty. Fetched prod's `/config.js` directly: `SUPABASE_URL: ""`
+while `SUPABASE_ANON_KEY` **is** correctly populated (byte-identical to Supabase's real anon key,
+confirmed via MCP `get_publishable_keys`) — so this is a genuinely missing Vercel env var, not a
+code bug (confirmed `scripts/build-frontend.js` reads the right variable name). **No tool in this
+session can write Vercel env vars**, and browser-based Vercel dashboard login was not attempted
+(would need founder credentials) — this is squarely a founder action:
+- Vercel → `citizens-ecosystem-connect` project → Settings → Environment Variables →
+  set **`NEXT_PUBLIC_SUPABASE_URL`** = `https://xyiajtrvhlxaeplsiajj.supabase.co` for **Production**
+  (and Preview, if wanted) → redeploy (or just wait for the next push).
+- This is a DIFFERENT variable from the Vercel↔Supabase native integration's own auto-injected
+  `SUPABASE_URL` (no `NEXT_PUBLIC_` prefix, §3AI) — the app code never reads that one.
+- Only this one var was confirmed blank. `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_MAPTILER_
+  KEY` / `_STYLE` are all confirmed correctly set. No visibility into `SUPABASE_SERVICE_ROLE_KEY` or
+  other server-only vars from this session (no exercised code path touches them) — flag if the DB
+  read still fails after the URL var is added.
+
+### Gates (all green)
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` 645/645 (72 files) ·
+`node scripts/build-frontend.js` clean · `npx next build` clean, **zero warnings** (specifically
+confirmed no "multiple lockfiles" regression — the original, unrelated reason the trace root was
+narrowed on 2026-04-06). CI: CodeQL/Analyze/E2E-Playwright/Verify(lint+typecheck+test+build) all
+green; Supabase Preview correctly skipped (Free tier, no branching).
+
+### Not done / owed
+- **Founder must set `NEXT_PUBLIC_SUPABASE_URL` in Vercel** (above) — until then, `/api/v1/*` will
+  keep 500ing with the placeholder-DNS error even though the crash is fixed. This is the ONE
+  remaining step before the map shows real DB markers on production.
+- Didn't attempt to enumerate every Vercel env var (no tool for a full listing) — only confirmed
+  blank/correct for the ones observable via `config.js` and triggered runtime errors.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⚠️ 2026-08-25 (latest) — landing page rebuilt to the founder's Design Spec + two real bugs
-> fixed, PR OPEN, not yet merged (§3AJ).** `fix/connect-landing-google-signin-map-resize` — the
-> stuck-forever "Connecting…" spinner on Google sign-in (`signIn()` now always returns/resolves
-> its promise) and the Discover map staying phone-cropped on desktop (MapLibre canvas now synced
-> to its container via `ResizeObserver` + `map.resize()`) are both fixed at the code level; the
-> map-resize fix specifically could not be visually confirmed on a live window resize in this
-> session's sandbox (compositing unavailable there) — **founder: please confirm both after this
-> PR deploys.** **PR #47 needs review/merge.**
+> **⚠️ 2026-08-25 (latest) — production DB 500s were a Next.js `outputFileTracingRoot`
+> misconfiguration, NOT env vars — fixed, verified live on prod, PR #48 MERGED (§3AK).** Every
+> `/api/*` route was crashing the Lambda on cold start (`Cannot find module
+> 'next/dist/compiled/source-map'`) because `next.config.ts` scoped the trace root to `apps/connect`
+> instead of the monorepo root — verified fixed on BOTH the PR's preview deployment and the
+> resulting production deployment via live runtime-log checks, not just build logs. **⏳ ONE founder
+> action remains:** set `NEXT_PUBLIC_SUPABASE_URL` = `https://xyiajtrvhlxaeplsiajj.supabase.co` in
+> Vercel → Production env vars (it's currently blank — confirmed via live `/config.js`, unrelated to
+> the native Supabase↔Vercel integration's own auto-injected vars). Once set, `/api/v1/*` should
+> return real data — the map/DB will actually work on production for the first time.
+>
+> **⚠️ 2026-08-25 — landing page rebuilt to the founder's Design Spec + two real bugs fixed, PR
+> #47 MERGED (§3AJ).** The stuck-forever "Connecting…" spinner on Google sign-in (`signIn()` now
+> always returns/resolves its promise) and the Discover map staying phone-cropped on desktop
+> (MapLibre canvas now synced to its container via `ResizeObserver` + `map.resize()`) are both
+> shipped. The map-resize fix specifically could not be visually confirmed on a live window resize
+> in that session's sandbox — **founder: please confirm on a real phone→desktop resize.**
 >
 > **⚠️ 2026-08-25 — turbo/Vercel build warnings actually fully fixed + verified on a
 > live Vercel build, PR MERGED (§3AI).** §3AH's `globalEnv` fix (PR #44, merged) was necessary
