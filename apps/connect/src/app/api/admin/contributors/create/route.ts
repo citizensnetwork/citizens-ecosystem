@@ -44,7 +44,12 @@ const ALLOWED_CATEGORIES = new Set<string>([
   ...PLACE_CATEGORIES.map((c) => c.value),
 ]);
 const MAX_GALLERY_URLS = 6;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL = 254;
+// Bounded quantifiers (not `+`) so this can't be driven into polynomial
+// backtracking on attacker-shaped input — the state space is capped by the
+// bounds themselves, not by input length. Length is also checked BEFORE
+// this regex ever runs (see below), as defense in depth.
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,189}\.[^\s@]{1,24}$/;
 
 function trimOrNull(v: unknown, max: number): string | null {
   if (typeof v !== "string") return null;
@@ -83,7 +88,9 @@ export async function POST(request: NextRequest) {
   }
 
   const claimEmail = typeof payload.claim_email === "string" ? payload.claim_email.trim().toLowerCase() : "";
-  if (!claimEmail || !EMAIL_RE.test(claimEmail) || claimEmail.length > 254) {
+  // Length checked BEFORE the regex ever runs — never hand an unbounded
+  // string to a pattern-match, even a ReDoS-safe one.
+  if (!claimEmail || claimEmail.length > MAX_EMAIL || !EMAIL_RE.test(claimEmail)) {
     return NextResponse.json({ error: "valid_claim_email_required" }, { status: 400 });
   }
 

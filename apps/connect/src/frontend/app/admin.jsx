@@ -134,8 +134,6 @@
       setSubmitting(false);
     };
 
-    const cat = window.DATA.getEventCategory(f.category);
-
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
         "Create a Contributor listing on their behalf — it goes live on the map and in Kingdom Discovery immediately. When the real person or org signs in with Google using the email below, they'll be able to claim it and manage it themselves from their own Contributor Portal."),

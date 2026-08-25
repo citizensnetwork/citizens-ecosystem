@@ -74,6 +74,18 @@ describe("POST /api/admin/contributors/create", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a pathological claim_email quickly (ReDoS guard)", async () => {
+    // Length is checked before the regex ever runs, and the regex itself
+    // uses bounded quantifiers — this must resolve in well under a second,
+    // not hang. See the CodeQL "polynomial regular expression" finding this
+    // guards against.
+    const evil = "a".repeat(50_000) + "@" + "a".repeat(50_000) + "!";
+    const start = Date.now();
+    const res = await POST(req({ ...validBody, claim_email: evil }));
+    expect(Date.now() - start).toBeLessThan(500);
+    expect(res.status).toBe(400);
+  });
+
   it("rejects an unknown contributor_category", async () => {
     const res = await POST(req({ ...validBody, contributor_category: "not-real" }));
     expect(res.status).toBe(400);
