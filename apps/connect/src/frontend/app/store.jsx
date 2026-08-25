@@ -1615,17 +1615,20 @@
       // session + role (from profiles.role) on return. Contributor access is
       // still only granted after apply -> admin-approval -> onboarding.
       if (window.CC_AUTH) {
-        window.CC_AUTH.signInWithGoogle(intent).catch((e) => {
+        // Returned so callers (e.g. the landing screen's button) can reset
+        // their own loading state in a .finally() \u2014 this never rejects, it
+        // always resolves once the redirect attempt is settled either way.
+        return window.CC_AUTH.signInWithGoogle(intent).catch((e) => {
           console.error('[signIn]', e);
           toast('Sign-in failed \u2014 please try again.', 'red');
         });
-        return;
       }
       // No Supabase configured \u2192 we CANNOT authenticate a real person. Never
       // fake a session (that previously dropped users into a fictitious persona).
       // Fail honestly so a misconfigured deploy is obvious and fixable.
       console.error('[signIn] CC_AUTH unavailable \u2014 Supabase env not configured (config.js).');
       toast('Sign-in is temporarily unavailable. Please try again shortly.', 'red');
+      return Promise.resolve();
     }, [toast]);
 
     const signOut = useCallback(() => {
