@@ -2330,23 +2330,18 @@ silently 500'd on every DB read — **the map/DB symptom was never the turbo.jso
    `www.citizenscentral.co.za`) — same test, same result: crash gone, only remaining error is
    `TypeError: fetch failed... getaddrinfo ENOTFOUND placeholder.supabase.co`.
 
-### The remaining, SEPARATE, non-code blocker — founder action required
+### The remaining, SEPARATE, non-code blocker — ✅ RESOLVED (founder, same day)
 `src/lib/supabase/server.ts` + `admin.ts` fall back to a fake `https://placeholder.supabase.co`
 when `NEXT_PUBLIC_SUPABASE_URL` is empty. Fetched prod's `/config.js` directly: `SUPABASE_URL: ""`
-while `SUPABASE_ANON_KEY` **is** correctly populated (byte-identical to Supabase's real anon key,
-confirmed via MCP `get_publishable_keys`) — so this is a genuinely missing Vercel env var, not a
-code bug (confirmed `scripts/build-frontend.js` reads the right variable name). **No tool in this
-session can write Vercel env vars**, and browser-based Vercel dashboard login was not attempted
-(would need founder credentials) — this is squarely a founder action:
-- Vercel → `citizens-ecosystem-connect` project → Settings → Environment Variables →
-  set **`NEXT_PUBLIC_SUPABASE_URL`** = `https://xyiajtrvhlxaeplsiajj.supabase.co` for **Production**
-  (and Preview, if wanted) → redeploy (or just wait for the next push).
-- This is a DIFFERENT variable from the Vercel↔Supabase native integration's own auto-injected
-  `SUPABASE_URL` (no `NEXT_PUBLIC_` prefix, §3AI) — the app code never reads that one.
-- Only this one var was confirmed blank. `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_MAPTILER_
-  KEY` / `_STYLE` are all confirmed correctly set. No visibility into `SUPABASE_SERVICE_ROLE_KEY` or
-  other server-only vars from this session (no exercised code path touches them) — flag if the DB
-  read still fails after the URL var is added.
+while `SUPABASE_ANON_KEY` **was** correctly populated (byte-identical to Supabase's real anon key,
+confirmed via MCP `get_publishable_keys`) — so this was a genuinely missing Vercel env var, not a
+code bug (confirmed `scripts/build-frontend.js` reads the right variable name), and a DIFFERENT
+variable from the Vercel↔Supabase native integration's own auto-injected `SUPABASE_URL` (no
+`NEXT_PUBLIC_` prefix, §3AI) — the app code never reads that one. **Founder set
+`NEXT_PUBLIC_SUPABASE_URL` = `https://xyiajtrvhlxaeplsiajj.supabase.co` in Vercel Production env
+vars.** Re-verified live: `/api/v1/events|places|contributors` all return **200 with real data**
+(Soweto Recovery House, Alexandra Kids Connect, CRC Cape Town, etc.) on `www.citizenscentral.co.za`.
+**The map/DB now genuinely works on production — this bug is fully closed, code + config both.**
 
 ### Gates (all green)
 `npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` 645/645 (72 files) ·
@@ -2356,26 +2351,26 @@ narrowed on 2026-04-06). CI: CodeQL/Analyze/E2E-Playwright/Verify(lint+typecheck
 green; Supabase Preview correctly skipped (Free tier, no branching).
 
 ### Not done / owed
-- **Founder must set `NEXT_PUBLIC_SUPABASE_URL` in Vercel** (above) — until then, `/api/v1/*` will
-  keep 500ing with the placeholder-DNS error even though the crash is fixed. This is the ONE
-  remaining step before the map shows real DB markers on production.
+- ~~Founder must set `NEXT_PUBLIC_SUPABASE_URL` in Vercel~~ ✅ **DONE (founder, same day)** — see
+  above. Nothing outstanding from this session.
 - Didn't attempt to enumerate every Vercel env var (no tool for a full listing) — only confirmed
-  blank/correct for the ones observable via `config.js` and triggered runtime errors.
+  blank/correct for the ones observable via `config.js` and triggered runtime errors. Not an issue
+  now that the specific bug is closed, but worth remembering as a session-tooling gap.
 
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⚠️ 2026-08-25 (latest) — production DB 500s were a Next.js `outputFileTracingRoot`
-> misconfiguration, NOT env vars — fixed, verified live on prod, PR #48 MERGED (§3AK).** Every
-> `/api/*` route was crashing the Lambda on cold start (`Cannot find module
-> 'next/dist/compiled/source-map'`) because `next.config.ts` scoped the trace root to `apps/connect`
-> instead of the monorepo root — verified fixed on BOTH the PR's preview deployment and the
-> resulting production deployment via live runtime-log checks, not just build logs. **⏳ ONE founder
-> action remains:** set `NEXT_PUBLIC_SUPABASE_URL` = `https://xyiajtrvhlxaeplsiajj.supabase.co` in
-> Vercel → Production env vars (it's currently blank — confirmed via live `/config.js`, unrelated to
-> the native Supabase↔Vercel integration's own auto-injected vars). Once set, `/api/v1/*` should
-> return real data — the map/DB will actually work on production for the first time.
+> **✅ 2026-08-25 (latest) — production DB 500s FULLY FIXED, code + config, verified live
+> (§3AK).** Every `/api/*` route was crashing the Lambda on cold start (`Cannot find module
+> 'next/dist/compiled/source-map'`) because `next.config.ts` scoped `outputFileTracingRoot` to
+> `apps/connect` instead of the monorepo root — fixed, PR #48 MERGED, verified clean on BOTH the
+> PR's preview deployment and the resulting production deployment via live runtime-log checks (not
+> just build logs, unlike prior sessions' diagnosis). The one remaining piece — `NEXT_PUBLIC_
+> SUPABASE_URL` was blank in Vercel Production env vars — **founder set it same day.** Re-verified
+> live: `/api/v1/events|places|contributors` all return 200 with real data on
+> `www.citizenscentral.co.za`. **No founder action remains — this is done end to end, map + DB both
+> genuinely work on production for the first time.**
 >
 > **⚠️ 2026-08-25 — landing page rebuilt to the founder's Design Spec + two real bugs fixed, PR
 > #47 MERGED (§3AJ).** The stuck-forever "Connecting…" spinner on Google sign-in (`signIn()` now
