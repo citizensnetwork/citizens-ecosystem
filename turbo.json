@@ -31,12 +31,44 @@
     "CONNECT_MODE",
     "PAYFAST_MERCHANT_ID",
     "PAYFAST_MERCHANT_KEY",
-    "PAYFAST_PASSPHRASE"
+    "PAYFAST_PASSPHRASE",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_JWT_SECRET",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "POSTGRES_USER",
+    "POSTGRES_HOST",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DATABASE"
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "public/**", "mobile-dist/**"]
+    },
+    "@citizens/frontend-build#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@citizens/db#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@citizens/ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@citizens/utils#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@citizens/connect-client#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
     },
     "dev": {
       "cache": false,
@@ -49,8 +81,7 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": ["^build"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],

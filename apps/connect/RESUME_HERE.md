@@ -2121,22 +2121,91 @@ typed address to a real pin with 0 console errors.
 - Vision's and Wear's own `scripts/build-frontend.js` have the exact same
   plain-Node-script-doesn't-load-`.env.local` shape as Connect's did — not touched this
   session (out of scope; flagged here so it isn't assumed already fixed).
-- PR not yet merged — founder review/merge is the next action.
+- PR not yet merged — founder review/merge is the next action. **✅ MERGED same day** — PR
+  #44, commit `14879a5`. See §3AI: the `globalEnv` fix this section shipped was necessary
+  but not sufficient — the warning recurred in production and needed a second round.
+
+---
+
+## 3AI. Turbo/Vercel build warnings — the REAL fix, verified on a live Vercel build ✅ (2026-08-25)
+
+Founder reported both §3AH warnings were **still recurring** in production after PR #44 merged
+(map/DB still not rendering, no env var readable). Session offload:
+`.claude/sessions/turbo-env-vars-config.md`. Branch **`claude/turbo-env-vars-config-bfjprl`**,
+commit **`724e399`**, pushed — **PR not opened this round (not requested)**. `turbo.json` only, no
+app code touched. No DB/migration change → next migration # still **168**.
+
+### Root cause — pulled from the real production build log, not guessed
+§3AH's `globalEnv` fix only covered vars Connect's own code reads. Pulled the actual production
+deploy's build log (`dpl_PQdBpZNwLHQQLsefZWmiowT1h9tf`, = PR #44 on `main`) via the Vercel MCP
+tools and the "environment variables… missing from turbo.json" warning was **still firing**, for
+12 vars nobody had declared: `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_URL`, `POSTGRES_PRISMA_URL`,
+`POSTGRES_URL_NON_POOLING`, `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_PASSWORD`,
+`POSTGRES_DATABASE` — the standard **Vercel↔Supabase native-integration** auto-injected set.
+Connect's code never reads these (it uses its own `NEXT_PUBLIC_SUPABASE_URL`/
+`SUPABASE_SERVICE_ROLE_KEY`, already declared), but Turborepo's strict env mode flags *any* var
+present on the Vercel project that isn't declared, whether a task reads it or not.
+
+Second warning ("no output files found for task @citizens/frontend-build#build") traced to the
+generic `build` task's `outputs` glob (`dist/**`/`.next/**`/`public/**`/`mobile-dist/**`) applying
+by default to **every** package — including 5 workspace packages whose build script is a bare
+type-check or syntax-check with zero emitted files: `@citizens/frontend-build`
+(`node --check index.js`), `@citizens/db`, `@citizens/ui`, `@citizens/utils`,
+`@citizens/connect-client` (all `tsc --noEmit`). Reproduced locally via `pnpm build` — confirmed
+all 5 warn. The founder only ever saw one because Vercel scopes each project's build to that app's
+real dependency graph (Connect → only `@citizens/frontend-build`); CI's root-level `pnpm build`
+(`.github/workflows/ci.yml`) builds every package unfiltered, so all 5 warn there regardless —
+`@citizens/ui` currently has **no app consumer at all** (orphaned pending future use), so its
+warning only ever showed on the unfiltered CI/local build, never on any individual Vercel project.
+
+Found + fixed the same bug's twin while in the file (not reported, but identical root cause, same
+file — CLAUDE.md's "don't leave broken code alone" applies): the `test` task declared
+`outputs: ["coverage/**"]`, which a plain `vitest run` never produces (only `test:coverage`,
+which CI actually uses, does) — warned on every local `pnpm test` for citizens-connect,
+citizens-vision, wear, db, utils, connect-client, frontend-build (7 packages).
+
+### Fix — `turbo.json` only
+- `globalEnv` += the 12 Supabase/Postgres platform vars.
+- 5 new `"@citizens/<pkg>#build": { "dependsOn": ["^build"], "outputs": [] }` overrides
+  (per-package task config fully replaces the generic entry in Turborepo — re-specified
+  `dependsOn` so the topological graph isn't silently dropped).
+- `test` task's stale `outputs: ["coverage/**"]` removed (`test:coverage` correctly keeps it).
+
+### Verified — locally AND on a real Vercel build (the founder's explicit ask)
+Local: full workspace gate chain `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — **0
+warnings** (down from 12 warning lines: 5 build + 7 test), 645 Connect + 734 Vision tests still
+green, same 8/12/11/12 task-success counts as before (topology intact).
+Live: pushed → Vercel's native GitHub integration (already wired, confirmed — nothing to "plug
+in" for CI, it auto-deploys every push) built preview **`dpl_FrTEsW1dcQ1gn6kwzWiQQkennJXy`**.
+Pulled its build log directly: completed in 27s, **zero warning lines of any kind** — no env-var
+block, no output-files line, straight from the task summary into the next build phase. First
+Connect Vercel build since the turbo migration with a fully clean log.
+
+### Not done / owed
+- No PR opened (founder didn't ask this round) — branch is pushed, green, ready to open/merge.
+- Didn't re-verify the map/DB-render fix end-to-end against a live browser on this preview URL —
+  §3AH already did that against the *app's own* env vars (untouched this session); this session's
+  gap was only the *unrelated* platform-integration vars. If map/DB are still blank after this
+  merges, that would be a different, new bug.
 
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⚠️ 2026-08-24 (latest) — guest landing + location picker + Vercel env-var fix (§3AH),
-> PR OPEN, NOT YET MERGED.** Branch `feat/connect-guest-landing-location-picker`. The
-> landing page is Google-sign-in-or-Browse-as-Guest only now (no role picker); the apply/
-> onboarding wizard has a real map pin-drop location picker; and — likely the actual
-> reason the map/DB weren't rendering on Vercel — `turbo.json` had no `globalEnv`, so
-> Vercel's Turborepo strict env mode was silently stripping `NEXT_PUBLIC_SUPABASE_URL`/
-> `NEXT_PUBLIC_MAPTILER_KEY`/etc. from the build. **Founder review + merge is the next
-> action**, then confirm on the live Vercel deploy that the map/DB now render (this was
-> fixed and verified locally; the actual Vercel build environment couldn't be exercised
-> from this session).
+> **⚠️ 2026-08-25 (latest) — turbo/Vercel build warnings actually fully fixed + verified on a
+> live Vercel build (§3AI).** §3AH's `globalEnv` fix (PR #44, merged) was necessary but NOT
+> sufficient — 12 Vercel↔Supabase native-integration platform vars were still undeclared, plus a
+> separate `outputs`-glob misconfiguration hit 5 packages' `build` task and 7 packages' `test`
+> task. Branch `claude/turbo-env-vars-config-bfjprl` (commit `724e399`) is pushed, gate-chain
+> green, **and confirmed clean on an actual Vercel preview build log** (not just locally) —
+> **founder: open/merge the PR whenever ready**, no further action needed to unblock it.
+>
+> **⚠️ 2026-08-24 — guest landing + location picker + Vercel env-var fix (§3AH). ✅ MERGED**
+> (PR #44, `14879a5`). The landing page is Google-sign-in-or-Browse-as-Guest only now (no role
+> picker); the apply/onboarding wizard has a real map pin-drop location picker; and the
+> `turbo.json` `globalEnv` fix this section shipped turned out to be incomplete — see §3AI above
+> for the actual full fix, verified live.
 >
 > **⚠️ 2026-08-24 — Connect v1's core loop is SHIPPED (§3AE):** self-serve Contributor go-live
 > (no admin wait), Kingdom Discovery (renamed from the plain list view), and — the actual root
