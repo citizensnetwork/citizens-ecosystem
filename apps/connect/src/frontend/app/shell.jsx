@@ -22,8 +22,9 @@
   // ── Profile / role-switch panel ──
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
-    const { user, role, go, isAdmin, isContributor, signOut, signIn, authed } = app;
+    const { user, role, go, isAdmin, isContributor, signOut, signIn, authed, toast, realUser } = app;
     const ref = useRef(null);
+    const [claiming, setClaiming] = useState(false);
     useEffect(() => {
       const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
       const t = setTimeout(() => document.addEventListener('mousedown', h), 0);
@@ -33,6 +34,33 @@
     const ROLES = [];
     const pos = anchor === 'top' ? 'right-0 top-full mt-2' : 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
+
+    // An admin may have manually created a listing for this person's email
+    // (see admin.jsx "Create Contributor") — offer a way to claim it. Only
+    // meaningful for a real, non-contributor citizen; the claim endpoint is
+    // a no-op ("nothing to claim") for anyone else, so this is harmless to
+    // show broadly, but keep it scoped to reduce menu clutter.
+    const claimListing = async () => {
+      if (claiming || !realUser) return;
+      setClaiming(true);
+      try {
+        const res = await window.authedFetch('/api/contributor/claim', { method: 'POST' });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast(body.error === 'nothing_to_claim'
+            ? 'No pending listing found for your email.'
+            : 'Could not claim a listing — please try again.', 'red');
+          setClaiming(false);
+          return;
+        }
+        toast("Listing claimed — welcome to your Contributor Portal!", 'green');
+        onClose();
+        window.location.href = '/dashboard';
+      } catch (e) {
+        toast('Could not claim a listing — please check your connection.', 'red');
+        setClaiming(false);
+      }
+    };
 
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
     // Always show a path to the Contributor portal — not only once already a
@@ -70,6 +98,13 @@
             React.createElement(Icon, { name: l.icon, size: 15, className: 'text-muted-foreground' }),
             React.createElement('span', null, l.label),
             React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'ml-auto text-muted-foreground' })))),
+
+        role === 'citizen' && realUser && React.createElement('button', {
+          onClick: claimListing, disabled: claiming,
+          className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-accent/60 transition-colors text-left disabled:opacity-60',
+        },
+          React.createElement(Icon, { name: 'Sparkles', size: 15, className: 'text-muted-foreground' }),
+          React.createElement('span', null, claiming ? 'Checking…' : 'Claim a Contributor listing')),
 
         React.createElement('div', { className: 'mt-3 border-t border-border pt-3' },
           authed
