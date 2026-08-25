@@ -183,8 +183,27 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-25, project `xyiajtrvhlxaeplsiajj`, head = **mig 168**)
+## 9. Verification snapshot (updated 2026-08-25, project `xyiajtrvhlxaeplsiajj`, head = **mig 170**)
 
+> **2026-08-25: mig 169+170 (admin-created, claimable Contributor listings) APPLIED to prod.**
+> Lets an admin manually create a Contributor listing that goes live on the map/Kingdom
+> Discovery immediately, tied to an email the real owner later claims. `profiles` gains
+> `contributor_claim_email` / `contributor_claimed_at` / `contributor_created_by_admin`. Two new
+> SECDEF RPCs: **`claim_admin_created_contributor()`** (mig 169 — caller-side, matches the
+> signed-in user's own verified email against an unclaimed placeholder, copies the listing's
+> fields onto the caller's own profile, hides the placeholder — never touches
+> `protect_role_column`'s restricted transitions on the placeholder since only non-role/status
+> columns change there) and **`admin_create_contributor_profile()`** (mig 170 — the create side,
+> must be called through the admin's OWN session, not `service_role`, since
+> `protect_role_column`'s only non-self-row bypass is `is_admin()`, itself keyed on `auth.uid()`,
+> which `service_role` doesn't have). The placeholder is a real `auth.users` row created via the
+> Admin Auth API from the API route (`service_role` — the only way to create one; `profiles.id`
+> has a hard FK to `auth.users`) — claiming does not depend on Supabase's cross-provider
+> account-linking behaviour, since the claim RPC copies data onto whichever profile the caller is
+> actually signed in as. **Advisors: 0 ERROR / 114 WARN / 3 INFO — +2 expected (the two new
+> `authenticated`-executable SECDEF RPCs, same accepted pattern as the ~19 sibling RPCs from
+> migration 140), 0 unexpected findings.**
+>
 > **2026-08-25: mig 168 (`contributor_no_fixed_location`) APPLIED to prod.** Adds
 > `profiles.contributor_no_fixed_location` + `contributor_applications.no_fixed_location`
 > (both `boolean not null default false`) so a Contributor who operates online, mobile, or

@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState } = React;
-  const { cx, Avatar, Button, Segmented, Empty, Input } = window.UI;
+  const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle } = window.UI;
   const Icon = window.Icon;
 
   const STATUS = {
@@ -68,6 +68,115 @@
   }
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const CONTRIBUTOR_KINDS = [
+    { value: 'ministry', label: 'Ministry' },
+    { value: 'organization', label: 'Organization' },
+    { value: 'business', label: 'Business' },
+  ];
+
+  // ── Admin: manually create a Contributor listing ──
+  // Goes live immediately (map + Kingdom Discovery), tied to an email the
+  // real owner later claims — POST /api/admin/contributors/create
+  // (migration 169/170). Single-page form, not a wizard: this is an admin
+  // quick-entry tool, not the citizen-facing apply flow.
+  function AdminCreateContributor() {
+    const { toast } = window.useApp();
+    const [f, setF] = useState({
+      orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '',
+      location: '', lat: null, lng: null, noFixedLocation: false,
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [result, setResult] = useState(null); // { slug, claimEmail } once created
+    const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const setLoc = (patch) => setF((s) => ({
+      ...s,
+      location: patch.address !== undefined ? patch.address : s.location,
+      lat: patch.lat !== undefined ? patch.lat : s.lat,
+      lng: patch.lng !== undefined ? patch.lng : s.lng,
+    }));
+    const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const canSubmit = f.orgName.trim() && EMAIL_RE.test(f.claimEmail.trim()) && f.category && (f.noFixedLocation || f.location.trim()) && !submitting;
+
+    const submit = async () => {
+      if (!canSubmit) return;
+      setSubmitting(true);
+      try {
+        const res = await window.authedFetch('/api/admin/contributors/create', {
+          method: 'POST',
+          body: JSON.stringify({
+            display_name: f.orgName.trim(),
+            claim_email: f.claimEmail.trim(),
+            contributor_kind: f.kind,
+            contributor_category: f.category,
+            bio: f.bio || null,
+            website_url: f.website || null,
+            no_fixed_location: f.noFixedLocation,
+            physical_address: f.noFixedLocation ? null : f.location,
+            physical_latitude: f.noFixedLocation ? null : f.lat,
+            physical_longitude: f.noFixedLocation ? null : f.lng,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast(body.error === 'email_already_registered'
+            ? 'That email already has an account on Citizens.'
+            : 'Could not create the listing — please try again.', 'red');
+          setSubmitting(false);
+          return;
+        }
+        setResult({ slug: body.slug, claimEmail: f.claimEmail.trim() });
+        toast('Contributor listing created — live on the map now.', 'green');
+        setF({ orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '', location: '', lat: null, lng: null, noFixedLocation: false });
+      } catch (e) {
+        toast('Could not create the listing — please check your connection.', 'red');
+      }
+      setSubmitting(false);
+    };
+
+    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl' },
+      h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+        "Create a Contributor listing on their behalf — it goes live on the map and in Kingdom Discovery immediately. When the real person or org signs in with Google using the email below, they'll be able to claim it and manage it themselves from their own Contributor Portal."),
+
+      result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2' },
+        h(Icon, { name: 'CheckCircle2', size: 15, className: 'text-[#16A34A] shrink-0 mt-0.5' }),
+        h('p', { className: 'text-xs text-[#15803d] leading-relaxed' },
+          h('strong', null, 'Live: '), '/' + result.slug + ' — claimable by ', h('strong', null, result.claimEmail))),
+
+      h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
+      h(Field, { label: "Owner's email", required: true, hint: 'The email they must sign in with (Google) to claim this listing.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
+
+      h('div', { className: 'grid grid-cols-2 gap-3' },
+        h(Field, { label: 'Type' }, h('select', { value: f.kind, onChange: (e) => up('kind', e.target.value), className: window.UI.inputCls },
+          CONTRIBUTOR_KINDS.map((k) => h('option', { key: k.value, value: k.value }, k.label)))),
+        h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' }))),
+
+      h(Field, { label: 'Area / location served', required: !f.noFixedLocation },
+        h('div', { className: 'space-y-2' },
+          !f.noFixedLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
+          !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }),
+          h(Toggle, {
+            checked: f.noFixedLocation, onChange: setNoFixedLocation,
+            label: "No fixed physical location",
+            desc: "Online, mobile, or no permanent office — no map pin.",
+          }))),
+
+      h(Field, { label: 'Primary category', required: true, hint: 'Sets the colour & icon across the map.' },
+        h('div', { className: 'grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-1 -mr-1' },
+          window.DATA.EVENT_CATEGORIES.map((c) => {
+            const sel = f.category === c.id;
+            return h('button', {
+              key: c.id, type: 'button', onClick: () => up('category', c.id),
+              className: cx('flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-left', sel ? 'border-transparent text-white' : 'border-border bg-white/60 hover:bg-white'),
+              style: sel ? { background: c.hex } : undefined,
+            }, h('span', { className: cx('text-xs font-semibold truncate', sel ? 'text-white' : 'text-foreground') }, c.name));
+          }))),
+
+      h(Field, { label: 'Short bio / about' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
+
+      h(Button, { variant: 'gold', icon: 'Plus', disabled: !canSubmit, onClick: submit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
+  }
+
   function AdminPage() {
     const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser } = window.useApp();
     const [tab, setTab] = useState('applications');
@@ -117,7 +226,7 @@
             .map(([l, v, c]) => h('div', { key: l, className: 'bg-card rounded-xl p-2.5 border border-border text-center' },
               h('p', { className: 'text-base font-bold', style: { color: c } }, v),
               h('p', { className: 'text-[9px] text-muted-foreground' }, l)))),
-        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
+        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'create', label: 'Create Contributor' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         tab === 'applications' && h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
@@ -131,6 +240,8 @@
             : filtered.map((a) => h(AppCard, { key: a.id, app: a, onReview: handleReview }))),
 
         tab === 'overview' && h(window.AdminOverview, { setTab }),
+
+        tab === 'create' && h(AdminCreateContributor),
 
         tab === 'reports' && h(window.AdminReports, null)));
   }
