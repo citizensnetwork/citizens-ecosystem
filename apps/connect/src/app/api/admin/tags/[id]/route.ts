@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -20,7 +20,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id: tagId } = await params;
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
 
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;

@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { isValidUUID } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -39,10 +39,7 @@ const MAX_BODY_LEN = 1000;
 const REPORT_RATE = { limit: 5, windowMs: 60 * 60 * 1000 };
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -151,11 +148,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ id: data?.id }, { status: 201 });
 }
 
-export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: NextRequest) {
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
@@ -41,15 +41,12 @@ export async function PATCH(
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

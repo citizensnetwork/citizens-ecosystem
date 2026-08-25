@@ -12,7 +12,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Event, Place, Profile } from "@/types/db";
 import { rankResults, type RankedResult } from "@/lib/aiSearch";
@@ -93,13 +93,10 @@ export async function POST(request: Request) {
   const userLocation =
     userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null;
 
-  const supabase = await createClient();
   // Resolve the user up-front so we can both (a) snapshot their preferences
   // for the rolling log and (b) decide whether to log at all (anonymous
   // visitors don't get logged — RLS would reject the insert anyway).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   // Second layer of rate-limiting keyed on user id when available — defeats
   // attackers who rotate IPs but share a single stolen session cookie.

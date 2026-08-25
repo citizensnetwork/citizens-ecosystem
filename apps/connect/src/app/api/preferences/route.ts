@@ -24,7 +24,7 @@
  *     `tags`) without losing earlier answers when a user re-runs a prompt.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { computeInterestPercentages } from "@/lib/personalization/percentages";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -47,10 +47,7 @@ function isPreferenceTag(x: unknown): x is PreferenceTagInput {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

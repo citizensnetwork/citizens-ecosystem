@@ -6,15 +6,15 @@
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { requireAdmin } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(request: Request) {
+  const { supabase } = await getRouteAuth(request);
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 

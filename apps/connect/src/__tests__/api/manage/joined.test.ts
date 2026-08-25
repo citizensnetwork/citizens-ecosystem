@@ -11,6 +11,10 @@ const { GET } = await import("@/app/api/manage/joined/route");
 
 const USER_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
+function makeReq() {
+  return new Request("http://localhost/api/manage/joined");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -21,7 +25,7 @@ describe("GET /api/manage/joined", () => {
       data: { user: null },
       error: null,
     });
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(401);
   });
 
@@ -55,7 +59,7 @@ describe("GET /api/manage/joined", () => {
         event: null,
       },
     ];
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.events).toHaveLength(1);
@@ -71,7 +75,7 @@ describe("GET /api/manage/joined", () => {
     });
     mockClient._chain._result.data = null;
     mockClient._chain._result.error = { message: "boom" };
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(500);
     // reset to avoid leaking between tests
     mockClient._chain._result.error = null;

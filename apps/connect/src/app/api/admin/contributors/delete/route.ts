@@ -12,7 +12,7 @@
  * is destructive and we don't want to expose it over signed URLs.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -22,7 +22,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
 
   let payload: { application_id?: string };
   try {

@@ -15,7 +15,7 @@
  * public bucket). Decision logged in DECISIONS.md.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -37,17 +37,14 @@ function sanitizeCaption(value: unknown): string | null {
 }
 
 type ActorOk = {
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: Awaited<ReturnType<typeof getRouteAuth>>["supabase"];
   user: { id: string };
   existing: CoverPhoto[];
 };
 type ActorErr = { error: NextResponse };
 
-async function loadActor(): Promise<ActorOk | ActorErr> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+async function loadActor(request: Request): Promise<ActorOk | ActorErr> {
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
@@ -71,7 +68,7 @@ async function loadActor(): Promise<ActorOk | ActorErr> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const actor = await loadActor();
+  const actor = await loadActor(request);
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 
@@ -169,7 +166,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const actor = await loadActor();
+  const actor = await loadActor(request);
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 
@@ -267,7 +264,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const actor = await loadActor();
+  const actor = await loadActor(request);
   if ("error" in actor) return actor.error;
   const { supabase, user, existing } = actor;
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
@@ -20,18 +20,18 @@ interface ProfileSearchRow {
 
 /** GET /api/contributor/[handle]/team */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ handle: string }> }
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
 
   const [membersResult, volunteersResult] = await Promise.all([
     supabase
@@ -72,16 +72,13 @@ export async function POST(
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rl = await checkRateLimit(`team:${user.id}`, RATE_LIMITS.mutation);
@@ -324,16 +321,13 @@ export async function PATCH(
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rl = await checkRateLimit(`team:${user.id}`, RATE_LIMITS.mutation);

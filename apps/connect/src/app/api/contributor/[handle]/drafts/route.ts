@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -15,13 +15,13 @@ export async function GET(
   const { handle } = await params;
   const { searchParams } = new URL(request.url);
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
+  const { supabase } = await getRouteAuth(request);
 
   let query = supabase
     .from("contributor_drafts")
@@ -50,16 +50,13 @@ export async function POST(
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rl = await checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
@@ -128,16 +125,13 @@ export async function PATCH(
 ) {
   const { handle } = await params;
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rl = await checkRateLimit(`drafts:${user.id}`, RATE_LIMITS.mutation);
@@ -202,16 +196,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid draft id" }, { status: 400 });
   }
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { error } = await supabase

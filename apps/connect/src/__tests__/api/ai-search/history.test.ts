@@ -11,6 +11,10 @@ const { GET } = await import("@/app/api/ai-search/history/route");
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 
+function makeReq() {
+  return new Request("http://localhost/api/ai-search/history");
+}
+
 describe("GET /api/ai-search/history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +31,7 @@ describe("GET /api/ai-search/history", () => {
       data: { user: null },
       error: null,
     });
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(401);
   });
 
@@ -42,7 +46,7 @@ describe("GET /api/ai-search/history", () => {
         created_at: "2026-04-19T00:00:00Z",
       },
     ];
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.history).toHaveLength(1);
@@ -54,7 +58,7 @@ describe("GET /api/ai-search/history", () => {
   it("returns 500 when the DB read fails", async () => {
     mockClient._chain._result.data = null;
     mockClient._chain._result.error = { message: "boom" };
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(500);
   });
 });

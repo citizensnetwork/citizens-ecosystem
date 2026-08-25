@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { isValidUUID } from "@/lib/validation";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -12,11 +12,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   // Only track views for authenticated users (prevents anonymous flood)
   if (!user) {
