@@ -180,6 +180,18 @@
       map.on('zoomstart', onUserMove);
       mapRef.current = map;
 
+      // MapLibre sizes its canvas once, from the container's dimensions at
+      // construction — it never re-measures on its own. Without this, a map
+      // built while the container was phone-sized (or mid-layout, before
+      // flex/grid settles) stays cropped to that size even after the window
+      // grows to desktop. A ResizeObserver keeps the canvas in sync with
+      // whatever the container actually measures, on every layout change.
+      let ro = null;
+      if (window.ResizeObserver) {
+        ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+        ro.observe(containerRef.current);
+      }
+
       // ── Default framing: user location FIRST, national data as fallback ──
       // Native shell (Capacitor): route through @capacitor/geolocation so the
       // proper native permission prompt fires (raw navigator.geolocation is
@@ -206,6 +218,7 @@
       }
 
       return () => {
+        if (ro) ro.disconnect();
         markerObjs.current.forEach((mk) => mk.remove());
         markerObjs.current.clear();
         map.remove();
@@ -324,7 +337,12 @@
         });
       });
       mapRef.current = map;
-      return () => { map.remove(); mapRef.current = null; };
+      let ro = null;
+      if (window.ResizeObserver) {
+        ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+        ro.observe(containerRef.current);
+      }
+      return () => { if (ro) ro.disconnect(); map.remove(); mapRef.current = null; };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
