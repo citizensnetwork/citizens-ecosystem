@@ -2132,8 +2132,9 @@ typed address to a real pin with 0 console errors.
 Founder reported both §3AH warnings were **still recurring** in production after PR #44 merged
 (map/DB still not rendering, no env var readable). Session offload:
 `.claude/sessions/turbo-env-vars-config.md`. Branch **`claude/turbo-env-vars-config-bfjprl`**,
-commit **`724e399`**, pushed — **PR not opened this round (not requested)**. `turbo.json` only, no
-app code touched. No DB/migration change → next migration # still **168**.
+commit **`724e399`** (+ docs commit `ea489ef`), shipped via **PR #45 — ✅ MERGED** (merge commit
+`e517f404`, same session). `turbo.json` only, no app code touched. No DB/migration change → next
+migration # still **168**.
 
 ### Root cause — pulled from the real production build log, not guessed
 §3AH's `globalEnv` fix only covered vars Connect's own code reads. Pulled the actual production
@@ -2182,24 +2183,32 @@ Pulled its build log directly: completed in 27s, **zero warning lines of any kin
 block, no output-files line, straight from the task summary into the next build phase. First
 Connect Vercel build since the turbo migration with a fully clean log.
 
+PR #45 opened, all 6 CI checks green (Verify/E2E-Playwright/CodeQL success; Supabase Preview
+correctly skipped — no branching on the Free tier), `pnpm format:check` run locally first (a
+past-session gotcha: CI reds on this if skipped), merged → merge commit `e517f404` on `main`.
+That merge auto-triggered Vercel's **production** deployment **`dpl_HYohLj7UbSM4Smo8fjQLKXrzoFg8`**
+(the real `citizens-ecosystem-connect.vercel.app` aliases) — pulled ITS build log too: same
+result, completed in 25s, **zero warning lines**. Both preview and production confirmed clean.
+
 ### Not done / owed
-- No PR opened (founder didn't ask this round) — branch is pushed, green, ready to open/merge.
-- Didn't re-verify the map/DB-render fix end-to-end against a live browser on this preview URL —
+- Didn't re-verify the map/DB-render fix end-to-end against a live browser on production —
   §3AH already did that against the *app's own* env vars (untouched this session); this session's
-  gap was only the *unrelated* platform-integration vars. If map/DB are still blank after this
-  merges, that would be a different, new bug.
+  gap was only the *unrelated* platform-integration vars, and the clean production build log is
+  strong indirect evidence nothing regressed. If map/DB are ever blank again, that would be a
+  different, new bug — not this one.
 
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **⚠️ 2026-08-25 (latest) — turbo/Vercel build warnings actually fully fixed + verified on a
-> live Vercel build (§3AI).** §3AH's `globalEnv` fix (PR #44, merged) was necessary but NOT
-> sufficient — 12 Vercel↔Supabase native-integration platform vars were still undeclared, plus a
-> separate `outputs`-glob misconfiguration hit 5 packages' `build` task and 7 packages' `test`
-> task. Branch `claude/turbo-env-vars-config-bfjprl` (commit `724e399`) is pushed, gate-chain
-> green, **and confirmed clean on an actual Vercel preview build log** (not just locally) —
-> **founder: open/merge the PR whenever ready**, no further action needed to unblock it.
+> live Vercel build, PR MERGED (§3AI).** §3AH's `globalEnv` fix (PR #44, merged) was necessary
+> but NOT sufficient — 12 Vercel↔Supabase native-integration platform vars were still undeclared,
+> plus a separate `outputs`-glob misconfiguration hit 5 packages' `build` task and 7 packages'
+> `test` task. **PR #45 merged** (merge commit `e517f404`) — all CI green, and BOTH the preview
+> build and the resulting production deployment (`citizens-ecosystem-connect.vercel.app`) had
+> their build logs pulled directly and confirmed fully clean. **No founder action needed** — this
+> is done end to end.
 >
 > **⚠️ 2026-08-24 — guest landing + location picker + Vercel env-var fix (§3AH). ✅ MERGED**
 > (PR #44, `14879a5`). The landing page is Google-sign-in-or-Browse-as-Guest only now (no role
@@ -2212,11 +2221,12 @@ Connect Vercel build since the turbo migration with a fully clean log.
 > fix — Contributors now visually appear on the map. Branch
 > `feat/connect-v1-kingdom-discovery`, migrations 164–166 live, Playwright e2e gate passing.
 >
-> **⚠️ Same day — the contributor self-service portal (§3AG) is BUILT but PR #42 is OPEN, NOT
-> YET MERGED.** Dashboard edit/cancel on Events+Places, a Profile tab, and a News tab (+ public
+> **⚠️ Same day — the contributor self-service portal (§3AG) is BUILT. ✅ MERGED** (PR #42,
+> `af71993` — stale as of §3AI: this note previously said "OPEN, NOT YET MERGED"). Dashboard
+> edit/cancel on Events+Places, a Profile tab, and a News tab (+ public
 > News section) are all implemented, gated green (tsc/eslint/vitest 645/645/build/Playwright
-> 1/1), and manually browser-verified in demo mode — **founder review + merge is the very next
-> action**, then a real-signed-in-contributor smoke test (§3AG's own honest checkpoint — every
+> 1/1), and manually browser-verified in demo mode — next up is a real-signed-in-contributor
+> smoke test (§3AG's own honest checkpoint — every
 > new action's real-user path was read carefully but never exercised with a real Google session
 > from this environment). **Migration 167 has a repo file on this branch** (backfilled — it was
 > already live on prod from a prior session, this just closes the lineage gap); it will be on
