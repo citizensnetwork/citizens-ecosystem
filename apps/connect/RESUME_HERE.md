@@ -2359,7 +2359,150 @@ green; Supabase Preview correctly skipped (Free tier, no branching).
 
 ---
 
+## 3AL. Contributor wizard 401 bug (the ACTUAL cause) + Bearer-auth swept across 44 routes + no-fixed-location + admin-created claimable listings — 5 PRs SHIPPED ✅ (2026-08-25)
+
+Founder-reported: the "Become a Contributor" wizard failed on submit with "Could not
+submit — please try again." Also asked for: a "no fixed location" option in the wizard;
+fix the contributor self-service portal (§3AG) being invisible; and a way for admins to
+manually create a Contributor. Branch-per-PR, all merged same session. **Migrations
+168–170 applied to prod — next migration # = 171.** Session offload:
+`.claude/sessions/contributor-wizard-and-admin-features.md` (gitignored).
+
+### PR #50 — the real root cause: `/api/contributor/apply` used cookie-only auth
+Every prior session diagnosing "map/DB blank on Vercel" (§3AH/§3AI/§3AK) was right about
+what it fixed, but none of those was **this** bug, and this bug is why the wizard itself
+kept failing even after §3AK's fix shipped. Connect's real frontend (`src/frontend/`) is a
+standalone SPA that keeps its Supabase session in `localStorage` and authenticates via
+`Authorization: Bearer <token>` (`store.jsx` `authedFetch`) — never cookies. But
+`/api/contributor/apply/route.ts` resolved the caller via the **cookie-only**
+`createClient()` (`lib/supabase/server.ts`) instead of the app's own Bearer-aware
+`getRouteAuth()` (`lib/supabase/route.ts`, already used correctly by 30 other routes) —
+so a real signed-in user always resolved to `user: null` → 401 on every submit. **Found
+by pulling live Vercel runtime logs**, not guessing: four consecutive `POST
+/api/contributor/apply 401` entries at the exact time window matching the founder's
+report. Swapped in `getRouteAuth`; test mocks updated to match. Merged, then **re-verified
+0 new runtime errors on the resulting production deployment.**
+
+### PR #53 — the SAME bug existed in 44 more route files
+Grepping the whole API surface for the cookie-only pattern found **44 more files** —
+including admin routes (`admin/categories`, `admin/api-keys`, `admin/pending-elevations`,
+etc. — `createClient()` passed into `requireAdmin(supabase)` instead of `getRouteAuth`'s
+client) and contributor-dashboard routes. Delegated to a background agent with a precise
+brief (exact before/after pattern, full file list, verification bar); **the agent also
+found and fixed a second, related bug**: several `contributor/[handle]/*` routes call
+`checkDashboardAccess(handle)` without passing `request` — that helper is Bearer-aware
+*only* when given the request object, silently falling back to cookie-only otherwise, so
+even a route with its own auth fixed would still 403 a valid Bearer-token owner/admin at
+the access-check layer. Fixed by threading `request` through in 8 files.
+**Reviewed the entire diff personally before opening the PR** — the agent's branch
+predated PR #50 merging, so a raw diff against current `main` made
+`contributor/apply/route.ts` look reverted; verified via an actual local 3-way merge
+(`git merge --no-commit`) that this was a diff artifact, not a real regression, before
+trusting it. 44/44 files fixed, 0 skipped, gates green on both the branch and the merged
+result.
+
+### PR #51 — Contributor portal given a real URL + always-visible entry
+Root cause of "I can't find the portal as admin or contributor": the Dashboard nav tab
+was `if (isContributor)`-gated, and until PR #50 landed **nobody could actually complete
+the apply wizard**, so nobody ever reached `role='contributor'` to see it — admin ≠
+contributor was correct by design, not a bug. Still built the founder's explicit ask for
+a clearer path: `next.config.ts` gained a **rewrite** (not redirect) for `/dashboard` →
+the SPA shell — a real, bookmarkable URL that keeps `/dashboard` in the address bar;
+`store.jsx` deep-links a `/dashboard` visit straight to the Dashboard for an existing
+contributor, or nudges a signed-in non-contributor to apply instead (guarded so a later
+auth event doesn't keep yanking the user back after they've navigated away).
+`shell.jsx`'s account menu now always shows a path to the portal — "Contributor Portal"
+once you are one, "Become a Contributor" before.
+
+### PR #52 — "no fixed physical location" option in the wizard
+Founder ask: a Contributor who's online-only, mobile, or has no permanent office
+shouldn't be forced through the address/pin step. **Migration 168**:
+`profiles.contributor_no_fixed_location` + `contributor_applications.no_fixed_location`
+(both boolean, default false); `directory_contributors` view and
+`self_approve_contributor_application()` updated to carry the flag through (both
+re-specify their existing hardening — `security_invoker=on` / `search_path=''` — since
+`CREATE OR REPLACE` silently drops it otherwise, a repeat of the 165/166 gotcha).
+`apply.jsx` gained a toggle in the wizard's location step (hides the address
+input/`LocationPicker`, drops the location requirement, review step shows "Online / no
+fixed location"), mirrored in the post-approval onboarding step and the Dashboard
+Profile tab. `store.jsx` threads the flag through every write path, skips geocoding, and
+forces address/lat/lng to null client- and server-side so they can never disagree. A
+contributor with no lat/lng was already excluded from map markers (`home.jsx`) — no
+map-layer change needed; that was the one deliberate fixed point the whole feature hangs
+off. **Advisors 0 ERROR / 112 WARN / 3 INFO, byte-identical to the head-167 baseline.**
+
+### PR #54 — admin can manually create a claimable Contributor listing
+Founder ask, with an explicit decision on the open design question (asked via
+AskUserQuestion): should an admin-created listing be **permanently admin-owned/unclaimed**,
+or **claimable by the real person later**? Founder chose claimable — bigger build, but the
+listing genuinely becomes the org's own once claimed. **Migrations 169+170**
+(`profiles.contributor_claim_email` / `contributor_claimed_at` /
+`contributor_created_by_admin`; RPCs `claim_admin_created_contributor()` and
+`admin_create_contributor_profile()`). `profiles.id` has a hard FK to `auth.users(id)` —
+no way to have a live, map-visible Contributor without a real auth user behind it, so
+`POST /api/admin/contributors/create` uses the Admin Auth API (`service_role`) to create
+one, immediately live on the map/Kingdom Discovery, tied to an email.
+**A real bug caught and fixed before shipping, not after**: the first draft filled in the
+Contributor fields via the `service_role` client directly — but `service_role` has no
+`auth.uid()`, and `protect_role_column()`'s *only* bypass for changing a role on someone
+else's row is `is_admin()`, itself keyed on `auth.uid()` — so that raw update would have
+been silently rejected by the trigger. Fixed by moving the profile-fill-in into
+`admin_create_contributor_profile()`, called through the **admin's own session**
+(`getRouteAuth`), not `service_role`, so the trigger's admin bypass fires correctly.
+Verified this by reading the actual trigger definitions on `profiles` (`\d+ profiles`
+equivalent via `pg_trigger`) before writing the RPC, not by trial and error. Claiming
+(`claim_admin_created_contributor()`) does not depend on Supabase's cross-provider
+account-linking behaviour (unverifiable from this environment either way) — it copies the
+listing's data onto whichever profile the caller is *actually* signed in as, matched on
+their own verified email, regardless of whether their later Google sign-in reuses the
+admin-created auth user or creates a separate one. **CodeQL caught a genuine ReDoS-vulnerable
+email regex** (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`, unbounded quantifiers either side of an
+unescaped-from-the-class `.`) on the create route before merge — fixed with bounded
+quantifiers + a length check *before* the regex ever runs, with a test asserting a
+100k-char pathological input resolves in <500ms. `admin.jsx` gained a "Create Contributor"
+tab (name/email/kind/category/location/bio/website); `shell.jsx` gained a "Claim a
+Contributor listing" action in the account menu. **Advisors 0 ERROR / 114 WARN / 3 INFO —
++2 expected (the two new `authenticated`-executable SECDEF RPCs, same accepted pattern as
+the ~19 sibling RPCs from migration 140), 0 unexpected findings.**
+
+### Also fixed in passing
+Accidentally killed a **different, concurrent session's** local dev server (wrong PID
+copied from an earlier `netstat` check) while verifying the portal-entry deep link —
+caught immediately and restarted it with the exact command from `.claude/launch.json`'s
+`connect-dev` config. No data lost; flagged here for transparency since it affected
+another active session, not because it changed anything in this repo.
+
+### Gates (all 5 PRs, every time)
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` 645 → 658/658 (+13
+new: 8 for the create route incl. the ReDoS regression test, 5 for the claim route) ·
+`node scripts/build-frontend.js` clean · `npx next build` clean · CI (Verify/E2E-Playwright
+/CodeQL/Analyze) green on every PR.
+
+### Explicitly NOT done this round (honest checkpoint)
+- **Not click-tested live end-to-end** with a real Google OAuth session — no real session
+  available in this environment, the same limitation every prior session touching
+  auth-gated flows in this repo has hit. The original 401 bug WAS confirmed via live
+  Vercel runtime logs (a real, unambiguous signal); the fix's correctness was verified via
+  full test coverage + careful code/trigger review, not a live click-through. **Founder:
+  please retry "Become a Contributor" now — it should go through cleanly** (and if you
+  want to test the admin-create/claim flow: Admin Panel → Create Contributor → sign in
+  with that email → Claim a Contributor listing from the account menu).
+- Drag-to-drop-pin location picker interaction still not click-tested (pre-existing gap
+  from §3AH, unrelated to this session).
+- Dashboard/Profile-tab no-fixed-location toggle not separately click-tested (identical
+  code path to the apply wizard's, already code-reviewed).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
+
+> **✅ 2026-08-25 (latest) — the contributor wizard's real bug (cookie-only auth, not any
+> of the earlier infra fixes) found + fixed + swept across 44 more routes; portal given a
+> real URL; "no fixed location" option shipped; admin can manually create a claimable
+> Contributor. 5 PRs (#50–#54), all merged (§3AL).** **No founder action required to use
+> any of it** — but please retry "Become a Contributor" once to confirm, since this
+> couldn't be click-tested live from this environment (see §3AL's honest checkpoint).
+> **Next migration # = 171.**
 
 > **✅ 2026-08-25 (latest) — production DB 500s FULLY FIXED, code + config, verified live
 > (§3AK).** Every `/api/*` route was crashing the Lambda on cold start (`Cannot find module
