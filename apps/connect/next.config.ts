@@ -42,6 +42,17 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  // Give the Contributor portal a real, bookmarkable/shareable URL. This is a
+  // REWRITE (not a redirect) — it serves the same SPA shell while keeping
+  // "/dashboard" in the address bar, so store.jsx's boot logic can read
+  // window.location.pathname and deep-link straight to the Dashboard screen.
+  async rewrites() {
+    return [
+      { source: "/dashboard", destination: "/index.html" },
+      { source: "/dashboard/:path*", destination: "/index.html" },
+    ];
+  },
+
   async headers() {
     return [
       {
