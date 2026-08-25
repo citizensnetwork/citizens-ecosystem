@@ -274,7 +274,9 @@
             h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
               c.website && h(InfoRow, { icon: 'Globe', label: 'Website', value: c.website }),
               c.contactEmail && h(InfoRow, { icon: 'Mail', label: 'Email', value: c.contactEmail }),
-              c.location && h(InfoRow, { icon: 'MapPin', label: 'Location', value: c.location })),
+              c.noFixedLocation
+                ? h(InfoRow, { icon: 'Globe', label: 'Location', value: 'Online — no fixed location' })
+                : c.location && h(InfoRow, { icon: 'MapPin', label: 'Location', value: c.location })),
             c.socials && Object.keys(c.socials).length > 0 && h('div', { className: 'flex gap-2' },
               Object.entries(c.socials).map(([k, v]) => h('span', { key: k, className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' },
                 h(Icon, { name: k === 'instagram' ? 'Instagram' : k === 'youtube' ? 'Youtube' : k === 'facebook' ? 'Facebook' : 'Music2', size: 13, className: 'text-gold-dark' }), v))),

@@ -137,6 +137,13 @@ export async function POST(request: Request) {
     ? rawCategory
     : null;
 
+  // A Contributor with no fixed physical location (online-only, mobile, or
+  // no permanent office) — force address/lat/lng to null regardless of what
+  // was sent, so we never persist a stale/inconsistent pin for them. The RPC
+  // that copies this row onto profiles on approval applies the same rule
+  // defensively.
+  const noFixedLocation = payload.no_fixed_location === true;
+
   const insertRow = {
     user_id: user.id,
     status: "pending" as const,
@@ -149,9 +156,10 @@ export async function POST(request: Request) {
     facebook_url: trimOrNull(payload.facebook_url, MAX_URL),
     tiktok_handle: trimOrNull(payload.tiktok_handle, MAX_HANDLE),
     youtube_url: trimOrNull(payload.youtube_url, MAX_URL),
-    physical_address: trimOrNull(payload.physical_address, MAX_ADDRESS),
-    physical_latitude: finiteOrNull(payload.physical_latitude),
-    physical_longitude: finiteOrNull(payload.physical_longitude),
+    no_fixed_location: noFixedLocation,
+    physical_address: noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS),
+    physical_latitude: noFixedLocation ? null : finiteOrNull(payload.physical_latitude),
+    physical_longitude: noFixedLocation ? null : finiteOrNull(payload.physical_longitude),
     motivation_text: trimOrNull(payload.motivation_text, MAX_MOTIVATION),
   };
 

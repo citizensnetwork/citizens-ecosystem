@@ -183,8 +183,21 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-24, project `xyiajtrvhlxaeplsiajj`, head = **mig 167**)
+## 9. Verification snapshot (updated 2026-08-25, project `xyiajtrvhlxaeplsiajj`, head = **mig 168**)
 
+> **2026-08-25: mig 168 (`contributor_no_fixed_location`) APPLIED to prod.** Adds
+> `profiles.contributor_no_fixed_location` + `contributor_applications.no_fixed_location`
+> (both `boolean not null default false`) so a Contributor who operates online, mobile, or
+> without a permanent office can skip the address/pin requirement in the apply wizard —
+> `physical_address`/`physical_latitude`/`physical_longitude` stay null for them by design,
+> which already, correctly, excludes them from map markers (`home.jsx` filters on
+> `lat/lng != null`) with no map-layer change needed. `directory_contributors` view and
+> `self_approve_contributor_application()` updated to carry the flag through (both re-specify
+> their existing hardening — `security_invoker=on` / `search_path=''` — since `CREATE OR
+> REPLACE` silently drops those unless restated, a repeat gotcha from migrations 165/166).
+> **Advisors: 0 ERROR / 112 WARN / 3 INFO — byte-identical to the head-167 baseline, 0 new
+> findings.**
+>
 > **2026-08-24: mig 167 (contributor self-service portal: place status/open_hours + news_posts)
 > APPLIED directly to prod in a separate session** (the migration file was applied via
 > `apply_migration` but never committed to `supabase/migrations/` at the time — backfilled into

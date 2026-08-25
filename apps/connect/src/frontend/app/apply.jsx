@@ -78,8 +78,9 @@
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [f, setF] = useState({ orgName: '', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {} });
+    const [f, setF] = useState({ orgName: '', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
     // Merges a LocationPicker patch ({address?, lat?, lng?}) into the wizard
     // form — the picker sends only whichever field(s) actually changed.
     const setLoc = (patch) => setF((s) => ({
@@ -101,13 +102,18 @@
     const steps = [
       {
         title: 'About your ministry', subtitle: 'Tell us who you are and where you serve.',
-        valid: () => f.orgName.trim() && f.category && f.location.trim(),
+        valid: () => f.orgName.trim() && f.category && (f.noFixedLocation || f.location.trim()),
         node: h(F, null,
           h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
-          h(Field, { label: 'Area / location served', required: true, hint: 'Drag the map or use the pin button — the address fills in automatically.' },
+          h(Field, { label: 'Area / location served', required: !f.noFixedLocation, hint: f.noFixedLocation ? undefined : 'Drag the map or use the pin button — the address fills in automatically.' },
             h('div', { className: 'space-y-2' },
-              h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
-              h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }))),
+              !f.noFixedLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
+              !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }),
+              h(Toggle, {
+                checked: f.noFixedLocation, onChange: setNoFixedLocation,
+                label: "I don't have a fixed physical location",
+                desc: "We're online, mobile, or serve without a permanent office — no map pin needed.",
+              }))),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
       // v1: short bio only (optional), plus Website folded in from the old
@@ -128,7 +134,7 @@
               cat && h('span', { className: 'w-10 h-10 rounded-xl flex items-center justify-center', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 18, className: 'text-white' })),
               h('div', null,
                 h('p', { className: 'font-bold text-foreground' }, f.orgName || 'Your ministry'),
-                h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.location || 'Location')))),
+                h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.noFixedLocation ? 'Online / no fixed location' : (f.location || 'Location'))))),
             h(ReviewRow, { label: 'About', value: f.bio }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
@@ -165,6 +171,7 @@
       profilePhoto: '',
       coverPhoto: '',
       members: [], socials: ma.socials || {},
+      noFixedLocation: !!ma.noFixedLocation,
     });
     const [member, setMember] = useState('');
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -175,6 +182,7 @@
       lat: patch.lat !== undefined ? patch.lat : s.lat,
       lng: patch.lng !== undefined ? patch.lng : s.lng,
     }));
+    const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
 
     const hero = h('div', { className: 'rounded-2xl bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/60 p-5 mb-5 flex items-center gap-3' },
       h('div', { className: 'w-11 h-11 rounded-2xl bg-[#16A34A] flex items-center justify-center shrink-0' }, h(Icon, { name: 'PartyPopper', size: 20, className: 'text-white' })),
@@ -194,10 +202,15 @@
         title: 'About & contact',
         node: h(F, null,
           h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value) })),
-          h(Field, { label: 'Location', hint: 'Drag the map or use the pin button — the address fills in automatically.' },
+          h(Field, { label: 'Location', hint: f.noFixedLocation ? undefined : 'Drag the map or use the pin button — the address fills in automatically.' },
             h('div', { className: 'space-y-2' },
-              h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }) }),
-              h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }))),
+              !f.noFixedLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }) }),
+              !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }),
+              h(Toggle, {
+                checked: f.noFixedLocation, onChange: setNoFixedLocation,
+                label: "I don't have a fixed physical location",
+                desc: "We're online, mobile, or serve without a permanent office — no map pin needed.",
+              }))),
           h('div', { className: 'grid grid-cols-2 gap-3' },
             h(Field, { label: 'Contact email' }, h(Input, { value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@…' })),
             h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value) })))),

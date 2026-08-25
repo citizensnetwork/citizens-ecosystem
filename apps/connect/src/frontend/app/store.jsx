@@ -238,6 +238,9 @@
       category: r.category || '',
       lat: typeof r.physical_latitude === 'number' ? r.physical_latitude : null,
       lng: typeof r.physical_longitude === 'number' ? r.physical_longitude : null,
+      // Online / mobile / no permanent office — intentionally no map pin
+      // (lat/lng stay null above, which home.jsx already filters out).
+      noFixedLocation: !!r.no_fixed_location,
       followerCount: 0,
       involvementLevel: 'Shepherd',
       dominantNiche: '',
@@ -560,7 +563,9 @@
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
         bio: form.bio, category: form.category, weeklyEvents: 1, status: 'approved',
-        submittedAt: today(), location: form.location,
+        submittedAt: today(), location: form.noFixedLocation ? '' : form.location,
+        lat: form.noFixedLocation ? null : form.lat, lng: form.noFixedLocation ? null : form.lng,
+        noFixedLocation: !!form.noFixedLocation,
         website: form.website, socials: form.socials || {}, applicantName: (realUser && realUser.name) || '', isMine: true,
       };
       if (!realUser) {
@@ -577,17 +582,22 @@
           // directly on the map) over a blind re-geocode of the typed
           // address — MapTiler often can't resolve informal Pretoria
           // addresses, and the picker is the manual-correction path for
-          // exactly that.
-          const geo = (typeof form.lat === 'number' && typeof form.lng === 'number')
-            ? { lat: form.lat, lng: form.lng }
-            : await geocodeAddress(form.location);
+          // exactly that. Skip geocoding entirely for a "no fixed location"
+          // contributor — there's no address to resolve, and the server
+          // nulls physical_* regardless of what's sent here.
+          const geo = form.noFixedLocation
+            ? null
+            : (typeof form.lat === 'number' && typeof form.lng === 'number')
+              ? { lat: form.lat, lng: form.lng }
+              : await geocodeAddress(form.location);
           const res = await authedFetch('/api/contributor/apply', {
             method: 'POST',
             body: JSON.stringify({
               display_name: form.orgName,
               contributor_category: form.category,
               bio: form.bio,
-              physical_address: form.location,
+              no_fixed_location: !!form.noFixedLocation,
+              physical_address: form.noFixedLocation ? null : form.location,
               physical_latitude: geo ? geo.lat : null,
               physical_longitude: geo ? geo.lng : null,
               website_url: form.website || null,
@@ -980,7 +990,8 @@
         role: 'contributor', kind: 'organization', slug: null,
         bio: form.bio, profilePhoto: form.profilePhoto || '', coverPhoto: form.coverPhoto || '',
         category: form.category, website: form.website, contactEmail: form.contactEmail || '',
-        location: form.location || '', members: form.members || [], followerCount: 0,
+        location: form.noFixedLocation ? '' : (form.location || ''), members: form.members || [], followerCount: 0,
+        noFixedLocation: !!form.noFixedLocation,
         dominantNiche: DATA.getEventCategory(form.category) ? DATA.getEventCategory(form.category).name : 'Community',
         involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
@@ -989,11 +1000,14 @@
         // demo contributor shows up on the map exactly like a real one —
         // this is also what makes the flow deterministically e2e-testable
         // without a live Supabase session. Prefers the location picker's own
-        // pin (see submitApplication) over a blind re-geocode.
+        // pin (see submitApplication) over a blind re-geocode. Skipped
+        // entirely for a "no fixed location" contributor — no pin by design.
         (async () => {
-          const geo = (typeof form.lat === 'number' && typeof form.lng === 'number')
-            ? { lat: form.lat, lng: form.lng }
-            : await geocodeAddress(form.location);
+          const geo = form.noFixedLocation
+            ? null
+            : (typeof form.lat === 'number' && typeof form.lng === 'number')
+              ? { lat: form.lat, lng: form.lng }
+              : await geocodeAddress(form.location);
           const org = { ...localOrg, lat: geo ? geo.lat : null, lng: geo ? geo.lng : null };
           setContributors((prev) => [...prev, org]);
           setMyContributor(org);
@@ -1028,18 +1042,21 @@
           // whatever apply.jsx wrote earlier — the route has always accepted
           // these two fields, this call just never sent them before.
           const socials = form.socials || {};
-          let onboardGeo = (typeof form.lat === 'number' && typeof form.lng === 'number')
-            ? { lat: form.lat, lng: form.lng }
-            : null;
-          if (!onboardGeo && form.location) onboardGeo = await geocodeAddress(form.location);
+          let onboardGeo = form.noFixedLocation
+            ? null
+            : (typeof form.lat === 'number' && typeof form.lng === 'number')
+              ? { lat: form.lat, lng: form.lng }
+              : null;
+          if (!form.noFixedLocation && !onboardGeo && form.location) onboardGeo = await geocodeAddress(form.location);
           await authedFetch('/api/contributor/profile', {
             method: 'POST',
             body: JSON.stringify({
               bio: form.bio || undefined,
               website_url: asUrl(form.website) || undefined,
-              physical_address: form.location || undefined,
-              physical_latitude: onboardGeo ? onboardGeo.lat : undefined,
-              physical_longitude: onboardGeo ? onboardGeo.lng : undefined,
+              contributor_no_fixed_location: !!form.noFixedLocation,
+              physical_address: form.noFixedLocation ? null : (form.location || undefined),
+              physical_latitude: form.noFixedLocation ? null : (onboardGeo ? onboardGeo.lat : undefined),
+              physical_longitude: form.noFixedLocation ? null : (onboardGeo ? onboardGeo.lng : undefined),
               logo_url: form.profilePhoto && /^https:\/\//i.test(form.profilePhoto) ? form.profilePhoto : undefined,
               instagram_handle: socials.instagram || undefined,
               tiktok_handle: socials.tiktok || undefined,
@@ -1048,7 +1065,7 @@
           // Refresh identity from the DB (slug included) so the dashboard is real.
           const { data: prof } = await window.CC_SUPABASE
             .from('profiles')
-            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, instagram_handle, facebook_url, tiktok_handle, youtube_url')
+            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url')
             .eq('id', realUser.id)
             .maybeSingle();
           const org = prof ? { ...adaptContributor(prof), isMine: true } : localOrg;
@@ -1084,7 +1101,8 @@
       const payload = {
         bio: fields.bio ?? undefined,
         website_url: fields.website !== undefined ? asUrl(fields.website) : undefined,
-        physical_address: fields.location ?? undefined,
+        contributor_no_fixed_location: fields.noFixedLocation !== undefined ? !!fields.noFixedLocation : undefined,
+        physical_address: fields.noFixedLocation ? null : (fields.location ?? undefined),
         logo_url: fields.profilePhoto && /^https:\/\//i.test(fields.profilePhoto) ? fields.profilePhoto : undefined,
         instagram_handle: fields.socials ? (fields.socials.instagram || '') : undefined,
         facebook_url: fields.socials && fields.socials.facebook !== undefined ? asUrl(fields.socials.facebook) : undefined,
@@ -1093,17 +1111,20 @@
         gallery_urls: fields.gallery ?? undefined,
       };
       if (!realUser) {
-        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, location: fields.location, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
+        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
         toast('Profile updated.', 'green');
         finish(true);
         return;
       }
       (async () => {
         try {
-          if (locationChanged) {
+          if (!fields.noFixedLocation && locationChanged) {
             const geo = await geocodeAddress(fields.location);
             payload.physical_latitude = geo ? geo.lat : null;
             payload.physical_longitude = geo ? geo.lng : null;
+          } else if (fields.noFixedLocation) {
+            payload.physical_latitude = null;
+            payload.physical_longitude = null;
           }
           const res = await authedFetch('/api/contributor/profile', { method: 'POST', body: JSON.stringify(payload) });
           if (!res.ok) {
@@ -1114,7 +1135,7 @@
           }
           const { data: prof } = await window.CC_SUPABASE
             .from('profiles')
-            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, instagram_handle, facebook_url, tiktok_handle, youtube_url, gallery_urls')
+            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url, gallery_urls')
             .eq('id', realUser.id)
             .maybeSingle();
           if (prof) {
