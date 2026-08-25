@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { resolveContributorSlug } from "@/lib/contributors/resolveSlug";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import type { AnalyticsPeriod } from "@/types/db";
@@ -33,10 +33,7 @@ export async function GET(
 
   // Per-IP-ish rate limit using user id when present, else handle.
   // Public endpoint — keep heavy bucket so anon scrape is bounded.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   const rlKey = `analytics-public:${user?.id ?? handle}`;
   const rl = await checkRateLimit(rlKey, RATE_LIMITS.read);
   if (!rl.success) {

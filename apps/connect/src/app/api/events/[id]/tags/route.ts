@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { isAdmin as profileIsAdmin } from "@/lib/profiles/capabilities";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -18,7 +18,7 @@ import { EVENT_TAG_LIMIT } from "@/types/db";
 type Params = { params: Promise<{ id: string }> };
 
 async function requireOwnerOrAdmin(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getRouteAuth>>["supabase"],
   userId: string,
   eventId: string,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
@@ -45,11 +45,7 @@ async function requireOwnerOrAdmin(
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { id: eventId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -135,11 +131,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id: eventId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

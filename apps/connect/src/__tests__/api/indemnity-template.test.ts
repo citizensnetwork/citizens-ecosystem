@@ -56,6 +56,7 @@ function req(url: string) {
 describe("GET /api/indemnity/template", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authGetUser.mockResolvedValue({ data: { user: null }, error: null });
     templateChain = makeChain({
       data: {
         id: TEMPLATE_ID,

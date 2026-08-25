@@ -140,7 +140,7 @@ describe("GET /api/reports", () => {
 
   it("returns 401 when unauthenticated", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: null });
-    const res = await GET();
+    const res = await GET(new NextRequest("http://localhost:3000/api/reports"));
     expect(res.status).toBe(401);
   });
 
@@ -148,7 +148,7 @@ describe("GET /api/reports", () => {
     mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
     mockClient._chain._result.data = [{ id: NEW_REPORT_ID, target_type: "event", target_id: VALID_TARGET, reason: "spam", status: "open", created_at: "2026-01-01T00:00:00Z", resolved_at: null }];
     mockClient._chain._result.error = null;
-    const res = await GET();
+    const res = await GET(new NextRequest("http://localhost:3000/api/reports"));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.reports).toHaveLength(1);

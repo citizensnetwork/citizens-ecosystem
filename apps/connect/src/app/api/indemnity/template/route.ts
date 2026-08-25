@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * modal to decide whether to show itself.
  */
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  const { supabase, user } = await getRouteAuth(request);
 
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get("slug");
@@ -30,10 +30,6 @@ export async function GET(request: Request) {
   if (error || !template) {
     return NextResponse.json({ error: "Template not found" }, { status: 404 });
   }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   let hasSigned = false;
   if (user) {

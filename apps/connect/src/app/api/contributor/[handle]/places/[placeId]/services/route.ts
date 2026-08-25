@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -58,16 +59,13 @@ export async function POST(
     return NextResponse.json({ error: "Invalid place id" }, { status: 400 });
   }
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Verify place ownership
@@ -155,16 +153,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid ids" }, { status: 400 });
   }
 
-  const access = await checkDashboardAccess(handle);
+  const access = await checkDashboardAccess(handle, request);
   if (!access.hasAccess) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { contributorId } = access;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Verify place ownership before deleting

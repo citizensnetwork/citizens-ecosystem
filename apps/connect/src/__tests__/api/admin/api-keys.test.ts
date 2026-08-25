@@ -45,7 +45,10 @@ describe("/api/admin/api-keys", () => {
   });
 
   it("POST rejects unauthenticated users", async () => {
-    mockClient.auth.getUser.mockResolvedValueOnce({
+    // getRouteAuth() resolves the caller, then requireAdmin() independently
+    // re-resolves via its own supabase.auth.getUser() call — use a
+    // persistent override (not *Once) so both calls see the null user.
+    mockClient.auth.getUser.mockResolvedValue({
       data: { user: null },
       error: null,
     });

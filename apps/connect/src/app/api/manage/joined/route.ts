@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +14,8 @@ export const dynamic = "force-dynamic";
  * Separate from `/api/manage/events` (which returns events the user
  * *created*) — the two feed distinct tabs under `/events/manage`.
  */
-export async function GET() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: Request) {
+  const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
