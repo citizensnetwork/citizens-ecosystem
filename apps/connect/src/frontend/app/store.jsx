@@ -1651,6 +1651,25 @@
     useEffect(() => {
       if (!window.CC_AUTH) return;
       let active = true;
+      // The Contributor portal has a real, bookmarkable URL — "/dashboard"
+      // (see next.config.ts rewrites). Handle it once per page load, right
+      // after the session/role resolves: a genuine contributor lands on
+      // their Dashboard directly; anyone else is nudged to apply instead of
+      // seeing a blank/inaccessible page. Guarded so a later auth event
+      // (e.g. a token refresh) doesn't keep yanking the user back here after
+      // they've navigated elsewhere in the SPA.
+      let deepLinkHandled = false;
+      const handleDashboardDeepLink = (resolvedRole) => {
+        if (deepLinkHandled) return;
+        if (!/^\/dashboard(\/|$)/.test(window.location.pathname)) return;
+        deepLinkHandled = true;
+        if (resolvedRole === 'contributor') {
+          setNav({ page: 'dashboard', params: {} });
+        } else {
+          setNav({ page: 'apply', params: {} });
+          toast('Become a Contributor to unlock your portal.', 'gold');
+        }
+      };
       const apply = async () => {
         const s = await window.CC_AUTH.loadSession();
         if (!active) return;
@@ -1659,6 +1678,7 @@
           setAuthed(true);
           setRole(s.role || 'citizen');
           if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); setNav({ page: 'apply', params: {} }); }
+          else handleDashboardDeepLink(s.role || 'citizen');
         } else {
           setRealUser(null);
           setAuthed(false);
