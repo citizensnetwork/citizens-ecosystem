@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState } = React;
-  const { cx, Avatar, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea } = window.UI;
+  const { cx, Avatar, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
   const Icon = window.Icon;
 
   // Build the last-7-days series from the real analytics API response
@@ -164,12 +164,14 @@
       bio: contributor.bio || '',
       website: contributor.website || '',
       location: contributor.location || '',
+      noFixedLocation: !!contributor.noFixedLocation,
       socials: contributor.socials || {},
       gallery: contributor.gallery || [],
     });
     const [saving, setSaving] = useState(false);
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
+    const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location }));
     const save = () => { if (saving) return; setSaving(true); onSave(f, () => setSaving(false)); };
     return h('div', { className: 'space-y-4 fade-in' },
       h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-4' },
@@ -179,7 +181,12 @@
             h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
-          h(Field, { label: 'Physical address' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
+          !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
+        h(Toggle, {
+          checked: f.noFixedLocation, onChange: setNoFixedLocation,
+          label: "No fixed physical location",
+          desc: "We're online, mobile, or serve without a permanent office — no map pin.",
+        }),
         h('div', { className: 'grid grid-cols-2 gap-3' },
           h(Field, { label: 'Instagram' }, h(Input, { value: f.socials.instagram || '', onChange: (e) => ups('instagram', e.target.value), placeholder: '@handle' })),
           h(Field, { label: 'Facebook' }, h(Input, { value: f.socials.facebook || '', onChange: (e) => ups('facebook', e.target.value), placeholder: 'facebook.com/…' })),

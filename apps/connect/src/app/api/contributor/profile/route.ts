@@ -26,6 +26,7 @@ const ALLOWED_KEYS = [
   "physical_address",
   "physical_latitude",
   "physical_longitude",
+  "contributor_no_fixed_location",
   "logo_url",
   "gallery_urls",
 ] as const;
@@ -162,6 +163,23 @@ export async function POST(request: Request) {
     if (update[key] != null && typeof update[key] === "string" && (update[key] as string).length > max) {
       return NextResponse.json({ error: `${key} exceeds maximum length of ${max}` }, { status: 400 });
     }
+  }
+
+  if (
+    update.contributor_no_fixed_location !== undefined &&
+    typeof update.contributor_no_fixed_location !== "boolean"
+  ) {
+    return NextResponse.json(
+      { error: "contributor_no_fixed_location must be a boolean" },
+      { status: 400 },
+    );
+  }
+  // Switching to "no fixed location" clears any stale address/pin so the
+  // two never disagree (mirrors the apply route's same rule).
+  if (update.contributor_no_fixed_location === true) {
+    update.physical_address = null;
+    update.physical_latitude = null;
+    update.physical_longitude = null;
   }
 
   const { error } = await supabase
