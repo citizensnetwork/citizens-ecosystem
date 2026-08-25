@@ -1981,8 +1981,163 @@ structurally identical, already-proven code path (`PlaceManageRow` mirrors `Even
 
 ---
 
+## 3AH. Guest landing + Google-only sign-in, wizard location picker, Vercel env-var root cause — PR OPEN (2026-08-24)
+
+Founder-requested session, four asks: (1) landing page — drop the manual "citizen/
+contributor" choice, single Google button + "Browse as Guest"; (2) restore the pre-Figma
+(Mar/Apr) landing style if findable; (3) the onboard wizard's location field is plain
+free-text with no way to see/correct where the pin lands — add a map; (4) the map/DB
+don't render on Vercel — find why and list every env var Vercel needs. Branch
+`feat/connect-guest-landing-location-picker`. Offload log:
+`.claude/sessions/connect-guest-landing-location-picker.md` (gitignored). **No DB/migration
+change — next migration # still 168.**
+
+### (2) Old landing style — found, and turns out already restored
+`apps/connect/src/components/ui/LandingPage.tsx` (deleted in commit `dbcd00a`, "strip old
+Next.js frontend") was the pre-Figma landing page. Diffed it against the CURRENT
+`auth.jsx`: the CITIZENS gold wordmark, Eph. 2:19–22 scripture eyebrow, and the rotating
+"Connecting ___" phrase carousel are **already the same design** — auth.jsx already
+carries it forward byte-for-byte in spirit. The one real difference: the OLD page's
+sign-in card had no role picker at all — just a Google button + a gray "Browse as Guest"
+button that promoted to gold "Connect" once signed in. That's the exact shape restored
+below.
+
+### (1) Landing page — role picker removed, Google + Guest only
+`auth.jsx`: deleted `RoleOption` and the "I'm joining as: Citizen / Contributor" grid.
+`AuthScreen` now renders one "Continue with Google" button (`signIn()`, no `intent` arg)
+and one "Browse as Guest" button beneath it. **Role was never actually chosen by that
+picker** — verified in `auth-client.js` `loadSession()`: `role: profile.role || "citizen"`
+always resolves from `public.profiles.role` after sign-in, defaulting to citizen; the
+`intent` param only ever set a "nudge new sign-ups toward the Apply wizard" flag
+(`routeToApply`), never a role grant. So removing the picker changes zero backend
+behavior — an account already marked contributor/admin in the DB still lands there
+automatically; a fresh Google sign-in is still a citizen by default, exactly as asked.
+
+**Guest browsing (`store.jsx`):** new `guestMode` state (sessionStorage-backed,
+independent of `authed` — the real-session bootstrap effect never touches it) +
+`browseAsGuest()`. `shell.jsx`'s gate becomes `if (!authed && !guestMode) return
+AuthScreen`. Read/discovery (map, Kingdom Discovery, profiles) needed zero extra
+plumbing — `/api/v1/{events,places,contributors}` were already fetched unconditionally
+regardless of auth state (a pre-existing "ALWAYS fetch" comment in store.jsx). **Scope
+decision, documented not silently done:** the app has a long-standing pattern where
+write actions on real ids with `!realUser` silently no-op after an optimistic local UI
+flip (Consider/Connect/Follow/etc.) — retrofitting toast-and-revert for a genuine guest
+across ~10 call sites was judged out of scope/risk for one session (unchanged, still
+true after this PR). The one path that WAS fixed: `submitApplication`/`completeOnboarding`'s
+`!realUser` branch is a SILENT LOCAL-ONLY fake-success built for the e2e/demo case
+(`window.CC_AUTH` entirely absent) — a real guest completing the whole 3-step wizard
+would have believed they went live and lost the work on refresh. Fixed by intercepting
+in `go()`: navigating to `apply`/`onboarding` while `!realUser && window.CC_AUTH` (a
+real, never-signed-in guest — not the demo state) redirects straight to `signIn()`
+instead. Verified live: clicking "Become a Contributor" as a guest lands on
+`accounts.google.com`. `ProfilePanel` (`shell.jsx`) relabels its bottom action
+Sign-in-with-Google vs Sign-Out based on `authed`. `signOut()` now also clears
+`guestMode`.
+
+### (3) Location picker — new `window.LocationPicker` (`map.jsx`)
+No location/map picker existed anywhere before this session — `apply.jsx`'s "Area /
+location served" (ApplyPage) and OnboardingPage's "Location" were plain text `Input`s,
+forward-geocoded blind via MapTiler with no way to see or correct the result. This is
+almost certainly the actual "I suspect it's the location picker" friction — MapTiler
+often can't resolve informal Pretoria addresses, and there was no manual-correction path.
+New `window.LocationPicker({ value: {address,lat,lng}, onChange, height })` in `map.jsx`:
+a small embedded MapLibre map with a FIXED center pin (Uber/Airbnb-style drop-pin — the
+map moves under it, not a draggable `maplibregl.Marker`, far more robust on touch);
+dragging the map reverse-geocodes the new center into the address field on `moveend`;
+typing an address (800ms debounce) forward-geocodes and flies the map there. A
+`lastResolvedRef` guard stops the type→geocode→reverse-geocode→refill feedback loop.
+`store.jsx` gained `reverseGeocode()` beside the existing `geocodeAddress()`, both now
+exposed on `window` so map.jsx can use them. Wired into **both** `ApplyPage` step 1 and
+`OnboardingPage`'s location step (`apply.jsx`). `submitApplication` and
+`completeOnboarding` now prefer the picker's own `lat`/`lng` over a blind re-geocode of
+the typed text. **Bug fixed in passing:** `completeOnboarding`'s real-user path POSTed
+`physical_address` to `/api/contributor/profile` but never sent `physical_latitude/
+longitude` (the route already allowlisted both) — if the onboarding step's address
+differed from the apply step's, the map pin went stale against the displayed address.
+Now sends both (picker value, or a geocode fallback). Verified live in-browser
+(demo-mode, same `window.__cc` debug-hook method prior sessions used): typing "Church
+Square, Pretoria" placed a real pin on a real MapTiler map within ~1s, no console errors.
+Drag-to-set-pin (the reverse path) is code-reviewed + lint/build-clean but not
+click-tested this session (screenshot/drag tooling wasn't available in this
+environment) — same "read carefully, not fully exercised" honesty standard as prior
+sessions' real-Google-session limitation.
+
+### (4) Root cause found — Vercel/Turborepo env var strict mode (`turbo.json`)
+Root `turbo.json` had **no `env`/`globalEnv` key at all**. Vercel's Turborepo zero-config
+build applies strict env-var filtering by default: an env var not declared in
+`turbo.json` is NOT passed into the build unless it's `NEXT_PUBLIC_*` and inferred by
+`next build` itself. Connect's `build` script is `node scripts/build-frontend.js && next
+build` — `build-frontend.js` is a **plain Node script that runs BEFORE `next build`**, so
+it reads `process.env.NEXT_PUBLIC_SUPABASE_URL` etc. directly — exactly the kind of read
+strict mode filters out without a declaration. This is the concrete, high-confidence
+explanation for "the map doesn't show, nor can we see DB items" in production: `config.js`
+(what the whole static frontend boots from) gets generated with every value blank at
+Vercel build time, even though the values ARE set correctly in the Vercel project's env
+var settings. **Fix:** added `globalEnv` to `turbo.json` listing every var used across
+Connect + Vision + Wear (confirmed by grepping `process.env\.` in all three apps' `src/`).
+
+**Second, separate, LOCAL-ONLY gap found and fixed while verifying:** even with real
+values in `.env.local`, running `node scripts/build-frontend.js` directly (or via `pnpm
+build`) produced a blank `config.js` locally too — `.env.local` loading is built into
+`next dev`/`next build`'s own CLI bootstrap and never reaches a plain sibling `node`
+script in the same npm-script line. `scripts/build-frontend.js` now loads `.env.local`/
+`.env` itself (a ~15-line hand-rolled `KEY=VALUE` parser, no new dependency — `@next/env`
+isn't directly resolvable under pnpm's strict `node_modules` without adding it as an
+explicit dep) — **real env vars already in `process.env` always win**, so this is a
+no-op on Vercel (no `.env.local` file exists in the deployed source — gitignored — env
+vars are injected directly by the platform). Verified: rebuilt locally, `config.js` went
+from all-blank to fully populated; reloaded the browser — real MapLibre tiles + real
+`/api/v1/*` markers rendered for the first time in this session's testing.
+
+### The full Vercel env var list (Connect's own README/`.env.example` didn't have this
+consolidated anywhere before — now also captured in `turbo.json`'s `globalEnv`)
+Required for map + DB: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`NEXT_PUBLIC_MAPTILER_KEY`. Strongly recommended: `NEXT_PUBLIC_MAPTILER_STYLE` (falls
+back to `streets-v2`), `SUPABASE_SERVICE_ROLE_KEY` (server-only admin routes),
+`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (rate limiting; falls back to
+in-memory without them — fine for one instance, not for scale). Optional: `NEXT_PUBLIC_
+API_BASE_URL`, `NEXT_PUBLIC_SITE_URL`, `ALLOWED_FRONTEND_ORIGIN`, `NEXT_PUBLIC_BETA_
+{AI_SEARCH,EASTER_EGGS,LIVE_LOCATION}`, `NEXT_PUBLIC_CONTRIBUTOR_THEME{,_ENABLED}`,
+`CC_ENABLE_EMBEDDINGS` + `OPENAI_API_KEY`, `CONNECT_API_BASE_URL`/`CONNECT_API_KEY`
+(Vision/Wear reading Connect's `/api/v1`, not Connect itself). Full list with source
+citations handed to the founder in the session's final chat report.
+
+### Gates (all green)
+`node scripts/build-frontend.js` (20 screens, config.js verified populated after the
+loader fix) · `npx tsc --noEmit` 0 · `npx eslint` 0 · `npx vitest run` 645/645 (72
+files, unaffected — this frontend layer has no unit-test harness, unchanged from prior
+sessions) · `npx playwright test` 1/1 (`kingdom-discovery.spec.ts`, unaffected — the
+LocationPicker mounts inside its mocked MapTiler style without breaking the golden
+path). Manual browser verification: landing page renders Google + Guest only (no role
+picker); guest browsing shows the real map with real markers; guest → "Become a
+Contributor" redirects to real `accounts.google.com`; LocationPicker forward-geocodes a
+typed address to a real pin with 0 console errors.
+
+### Explicitly NOT done this round (honest checkpoint)
+- Guest-mode toast-and-revert for Consider/Connect/Follow/Vote on real ids — documented
+  scope cut above, not a regression, matches a pre-existing app-wide pattern.
+- Drag-to-drop-pin (reverse geocode) not click-tested — screenshot/drag tooling
+  unavailable this session; forward-geocode (type→pin) WAS click-tested.
+- Vision's and Wear's own `scripts/build-frontend.js` have the exact same
+  plain-Node-script-doesn't-load-`.env.local` shape as Connect's did — not touched this
+  session (out of scope; flagged here so it isn't assumed already fixed).
+- PR not yet merged — founder review/merge is the next action.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
+> **⚠️ 2026-08-24 (latest) — guest landing + location picker + Vercel env-var fix (§3AH),
+> PR OPEN, NOT YET MERGED.** Branch `feat/connect-guest-landing-location-picker`. The
+> landing page is Google-sign-in-or-Browse-as-Guest only now (no role picker); the apply/
+> onboarding wizard has a real map pin-drop location picker; and — likely the actual
+> reason the map/DB weren't rendering on Vercel — `turbo.json` had no `globalEnv`, so
+> Vercel's Turborepo strict env mode was silently stripping `NEXT_PUBLIC_SUPABASE_URL`/
+> `NEXT_PUBLIC_MAPTILER_KEY`/etc. from the build. **Founder review + merge is the next
+> action**, then confirm on the live Vercel deploy that the map/DB now render (this was
+> fixed and verified locally; the actual Vercel build environment couldn't be exercised
+> from this session).
+>
 > **⚠️ 2026-08-24 — Connect v1's core loop is SHIPPED (§3AE):** self-serve Contributor go-live
 > (no admin wait), Kingdom Discovery (renamed from the plain list view), and — the actual root
 > fix — Contributors now visually appear on the map. Branch

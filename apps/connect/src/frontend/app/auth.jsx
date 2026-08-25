@@ -2,7 +2,10 @@
 //  Citizens Connect — Landing + Sign-in screen
 //  · Founding scripture (Eph. 2:19–22) → CITIZENS wordmark
 //  · "Connecting [carousel]" slogan
-//  · Continue with Google + Citizen / Contributor choice
+//  · Continue with Google, or Browse as Guest — no manual role picker.
+//    Every Google sign-in resolves its role from profiles.role (defaults
+//    to citizen; only an account already marked contributor/admin in the
+//    database gets that access — see auth-client.js loadSession()).
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -79,34 +82,15 @@
       h('div', { className: 'absolute inset-0', style: { background: 'radial-gradient(120% 90% at 50% 30%, rgba(247,244,238,0.35) 0%, rgba(247,244,238,0.78) 55%, rgba(247,244,238,0.95) 100%)' } }));
   }
 
-  // ── Role choice card ──
-  function RoleOption({ active, onClick, icon, title, desc }) {
-    return h('button', {
-      type: 'button', onClick,
-      className: cx('flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition-all',
-        active ? 'border-gold bg-accent/70 shadow-[0_4px_14px_rgba(201,168,76,0.18)]' : 'border-border bg-white/55 hover:bg-white/80'),
-    },
-      h('span', {
-        className: 'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-        style: active ? { background: '#C9A84C', color: '#fff' } : { background: 'rgba(201,168,76,0.14)', color: '#8B6914' },
-      }, h(Icon, { name: icon, size: 17, strokeWidth: 2.2 })),
-      h('span', { className: 'flex-1 min-w-0' },
-        h('span', { className: 'flex items-center gap-1.5' },
-          h('span', { className: 'block text-sm font-bold text-foreground' }, title),
-          active && h(Icon, { name: 'Check', size: 13, className: 'text-gold-dark' })),
-        h('span', { className: 'block text-[11px] text-muted-foreground leading-snug mt-0.5' }, desc)));
-  }
-
   // ── Main screen ──
   function AuthScreen() {
-    const { signIn } = window.useApp();
-    const [intent, setIntent] = useState('citizen');
+    const { signIn, browseAsGuest } = window.useApp();
     const [loading, setLoading] = useState(false);
 
     const onGoogle = () => {
       if (loading) return;
       setLoading(true);
-      signIn(intent);
+      signIn();
     };
 
     return h('div', { className: 'relative h-full w-full overflow-y-auto', 'data-screen-label': 'Sign in' },
@@ -138,23 +122,12 @@
           // ── sign-in card ──
           h('div', { className: 'w-full glass-strong border border-white/60 rounded-3xl shadow-2xl p-5 sm:p-6' },
             h('p', { className: 'text-center text-base font-bold text-foreground font-display mb-0.5' }, 'Join the city'),
-            h('p', { className: 'text-center text-xs text-muted-foreground mb-4' }, 'Sign in or create your account with Google.'),
+            h('p', { className: 'text-center text-xs text-muted-foreground mb-5' }, 'Sign in with Google — citizens and contributors alike.'),
 
-            // role choice
-            h('p', { className: 'text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-0.5' }, 'I’m joining as'),
-            h('div', { className: 'grid grid-cols-1 gap-2 mb-4' },
-              h(RoleOption, {
-                active: intent === 'citizen', onClick: () => setIntent('citizen'),
-                icon: 'User', title: 'A Citizen',
-                desc: 'Discover events & places, connect, message and vote on Kingdom Projects.',
-              }),
-              h(RoleOption, {
-                active: intent === 'contributor', onClick: () => setIntent('contributor'),
-                icon: 'Crown', title: 'A Contributor',
-                desc: 'Lead a ministry or organisation. We’ll guide you through a quick application after sign-in.',
-              })),
-
-            // Google button
+            // Google button — the only sign-in path. Role is never chosen here:
+            // it resolves from profiles.role after sign-in (citizen by default;
+            // an account already marked contributor/admin gets that access
+            // automatically — auth-client.js loadSession()).
             h('button', {
               onClick: onGoogle, disabled: loading,
               className: 'w-full flex items-center justify-center gap-3 py-3 rounded-2xl bg-white border border-border shadow-sm font-bold text-sm text-foreground hover:shadow-md hover:border-gold/40 transition-all disabled:opacity-60',
@@ -164,9 +137,17 @@
                 : h(GoogleMark),
               h('span', null, loading ? 'Connecting…' : 'Continue with Google')),
 
-            intent === 'contributor' && h('div', { className: 'flex items-start gap-2 mt-3 p-2.5 rounded-xl bg-accent/60 text-gold-dark fade-in' },
-              h(Icon, { name: 'Info', size: 13, className: 'shrink-0 mt-0.5' }),
-              h('p', { className: 'text-[11px] leading-relaxed' }, 'You’ll sign in first, then a quick application takes you live on the map immediately — no admin wait.')))
+            h('div', { className: 'flex items-start gap-2 mt-3 p-2.5 rounded-xl bg-accent/60 text-gold-dark' },
+              h(Icon, { name: 'Sparkles', size: 13, className: 'shrink-0 mt-0.5' }),
+              h('p', { className: 'text-[11px] leading-relaxed' }, 'New here? Sign in, then apply as a Contributor any time — you go live immediately, no admin wait.')),
+
+            // Guest — dismiss and explore the map/discovery without an
+            // account. Any action that needs one (applying, RSVPing,
+            // messaging…) prompts Google sign-in when you reach it.
+            h('button', {
+              type: 'button', onClick: browseAsGuest,
+              className: 'w-full mt-3 py-2.5 rounded-2xl border border-border/70 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-white/50 transition-all',
+            }, 'Browse as Guest'))
 
         )));
   }

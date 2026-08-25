@@ -22,7 +22,7 @@
   // ── Profile / role-switch panel ──
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
-    const { user, role, go, isAdmin, isContributor, signOut } = app;
+    const { user, role, go, isAdmin, isContributor, signOut, signIn, authed } = app;
     const ref = useRef(null);
     useEffect(() => {
       const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -67,9 +67,13 @@
             React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'ml-auto text-muted-foreground' })))),
 
         React.createElement('div', { className: 'mt-3 border-t border-border pt-3' },
-          React.createElement('button', { onClick: () => { onClose(); signOut(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors' },
-            React.createElement(Icon, { name: 'LogOut', size: 15 }),
-            React.createElement('span', null, 'Sign Out')))));
+          authed
+            ? React.createElement('button', { onClick: () => { onClose(); signOut(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors' },
+                React.createElement(Icon, { name: 'LogOut', size: 15 }),
+                React.createElement('span', null, 'Sign Out'))
+            : React.createElement('button', { onClick: () => { onClose(); signIn(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gold-dark hover:bg-accent/60 transition-colors' },
+                React.createElement(Icon, { name: 'LogIn', size: 15 }),
+                React.createElement('span', null, 'Sign in with Google')))));
   }
 
   // ── Desktop sidebar ──
@@ -266,8 +270,8 @@
   }
 
   function Shell() {
-    const { createKind, createEditing, authed } = window.useApp();
-    if (!authed) return React.createElement(window.AuthScreen);
+    const { createKind, createEditing, authed, guestMode } = window.useApp();
+    if (!authed && !guestMode) return React.createElement(window.AuthScreen);
     return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
       React.createElement(Sidebar),
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },

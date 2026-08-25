@@ -84,6 +84,24 @@
       return { lng: f.center[0], lat: f.center[1] };
     } catch (e) { return null; }
   }
+  window.geocodeAddress = geocodeAddress;
+
+  // Reverse-geocode a dropped pin back into a human-readable address (same
+  // MapTiler key/endpoint as geocodeAddress, just {lng,lat} instead of a
+  // query string). Powers the location-picker map — drag the pin, the
+  // address field fills in. Returns a string or null.
+  async function reverseGeocode(lat, lng) {
+    try {
+      const key = window.__CC_ENV && window.__CC_ENV.MAPTILER_KEY;
+      if (!key || typeof lat !== 'number' || typeof lng !== 'number') return null;
+      const res = await fetch('https://api.maptiler.com/geocoding/' + lng + ',' + lat + '.json?key=' + key + '&limit=1');
+      if (!res.ok) return null;
+      const json = await res.json();
+      const f = json && json.features && json.features[0];
+      return (f && f.place_name) || null;
+    } catch (e) { return null; }
+  }
+  window.reverseGeocode = reverseGeocode;
 
   // Lazy slug → category_id map (places.category_id is a uuid FK; the create
   // form works in slugs). Cached after the first lookup; fails open to null
@@ -390,6 +408,14 @@
   const SESSION_KEY = 'cc_session_v1';
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch (e) { return null; } };
 
+  // Guest browsing (landing screen "Browse as Guest") — deliberately separate
+  // from SESSION_KEY/authed: a guest never has a Supabase session, so the
+  // real-session bootstrap effect below must never see or touch this flag.
+  // sessionStorage (not localStorage) so guest mode doesn't outlive the tab —
+  // browsing as a guest is a per-visit choice, not a saved account state.
+  const GUEST_KEY = 'cc_guest_browse_v1';
+  const loadGuestFlag = () => { try { return sessionStorage.getItem(GUEST_KEY) === '1'; } catch (e) { return false; } };
+
   // Neutral identity scaffolds per role. The signed-in person's REAL identity
   // (name/photo/bio from their profiles row) is overlaid onto these — see the
   // `user` derivation below. They are never a fabricated persona: with no real
@@ -407,6 +433,7 @@
   function AppProvider({ children }) {
     const _saved = loadSession();
     const [authed, setAuthed] = useState(!!(_saved && _saved.authed));
+    const [guestMode, setGuestMode] = useState(loadGuestFlag);
     const [role, setRole] = useState(_saved && _saved.role ? _saved.role : 'citizen');
     const [nav, setNav] = useState({ page: 'home', params: {} });
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
@@ -451,10 +478,34 @@
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
     }, []);
 
+    // Pages that write real data on a real account — a genuine guest (browsing
+    // without ever signing in, Supabase IS configured) must not reach these:
+    // submitApplication/completeOnboarding's `!realUser` branch is a SILENT
+    // local-only fake-success built for the e2e/demo case (CC_AUTH entirely
+    // absent), not for "signed-out visitor" — a guest completing the wizard
+    // would believe they went live and lose the work on refresh. Redirect
+    // straight to Google sign-in instead. Demo mode (no CC_AUTH at all, incl.
+    // the Playwright fallback) is untouched — window.CC_AUTH is null there,
+    // so this guard never fires.
+    const AUTH_REQUIRED_PAGES = new Set(['apply', 'onboarding']);
     const go = useCallback((page, params = {}) => {
+      if (AUTH_REQUIRED_PAGES.has(page) && !realUser && window.CC_AUTH) {
+        signIn();
+        return;
+      }
       setNav({ page, params });
       const main = document.getElementById('main-scroll');
       if (main) main.scrollTop = 0;
+    }, [realUser]);
+
+    // "Browse as Guest" — dismiss the landing screen without signing in.
+    // Independent of `authed`: the real-session bootstrap effect only ever
+    // sets `authed`/`realUser`, never reads or clears this flag, so a guest
+    // who later taps "Continue with Google" from within the app transitions
+    // cleanly from guest → real session without a stale guest flag lingering.
+    const browseAsGuest = useCallback(() => {
+      try { sessionStorage.setItem(GUEST_KEY, '1'); } catch (e) {}
+      setGuestMode(true);
     }, []);
     // openCreate(kind) opens a blank create sheet; openCreate(kind, record)
     // opens the same sheet pre-filled to edit that record.
@@ -522,7 +573,14 @@
       }
       (async () => {
         try {
-          const geo = await geocodeAddress(form.location);
+          // Prefer the location picker's own pin (user placed/confirmed it
+          // directly on the map) over a blind re-geocode of the typed
+          // address — MapTiler often can't resolve informal Pretoria
+          // addresses, and the picker is the manual-correction path for
+          // exactly that.
+          const geo = (typeof form.lat === 'number' && typeof form.lng === 'number')
+            ? { lat: form.lat, lng: form.lng }
+            : await geocodeAddress(form.location);
           const res = await authedFetch('/api/contributor/apply', {
             method: 'POST',
             body: JSON.stringify({
@@ -930,9 +988,12 @@
         // Demo mode still geocodes (same helper, same MapTiler key) so a
         // demo contributor shows up on the map exactly like a real one —
         // this is also what makes the flow deterministically e2e-testable
-        // without a live Supabase session.
+        // without a live Supabase session. Prefers the location picker's own
+        // pin (see submitApplication) over a blind re-geocode.
         (async () => {
-          const geo = await geocodeAddress(form.location);
+          const geo = (typeof form.lat === 'number' && typeof form.lng === 'number')
+            ? { lat: form.lat, lng: form.lng }
+            : await geocodeAddress(form.location);
           const org = { ...localOrg, lat: geo ? geo.lat : null, lng: geo ? geo.lng : null };
           setContributors((prev) => [...prev, org]);
           setMyContributor(org);
@@ -962,13 +1023,23 @@
             return;
           }
           // Best-effort extras — profile route is additive and allowlisted.
+          // Geocode (or use the location picker's own pin) so this step's
+          // address doesn't leave physical_latitude/longitude stale against
+          // whatever apply.jsx wrote earlier — the route has always accepted
+          // these two fields, this call just never sent them before.
           const socials = form.socials || {};
+          let onboardGeo = (typeof form.lat === 'number' && typeof form.lng === 'number')
+            ? { lat: form.lat, lng: form.lng }
+            : null;
+          if (!onboardGeo && form.location) onboardGeo = await geocodeAddress(form.location);
           await authedFetch('/api/contributor/profile', {
             method: 'POST',
             body: JSON.stringify({
               bio: form.bio || undefined,
               website_url: asUrl(form.website) || undefined,
               physical_address: form.location || undefined,
+              physical_latitude: onboardGeo ? onboardGeo.lat : undefined,
+              physical_longitude: onboardGeo ? onboardGeo.lng : undefined,
               logo_url: form.profilePhoto && /^https:\/\//i.test(form.profilePhoto) ? form.profilePhoto : undefined,
               instagram_handle: socials.instagram || undefined,
               tiktok_handle: socials.tiktok || undefined,
@@ -1561,12 +1632,14 @@
       if (window.CC_AUTH) { window.CC_AUTH.signOut().catch(() => {}); }
       setRealUser(null);
       setAuthed(false);
+      setGuestMode(false);
       setRole('citizen');
       setMyContributor(null);
       setMyApplication(null);
       setAssistMode(false);
       setNav({ page: 'home', params: {} });
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+      try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
     }, []);
 
     // ── real Supabase session bootstrap (no-op in demo mode) ──
@@ -2017,6 +2090,7 @@
 
     const value = {
       authed, signIn, signOut,
+      guestMode, browseAsGuest,
       role, setRole, nav, go,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,

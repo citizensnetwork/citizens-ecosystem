@@ -27,9 +27,39 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const esbuild = require('esbuild');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildFrontend } = require('@citizens/frontend-build');
+
+// `next dev`/`next build` load .env.local themselves, but this script runs
+// as a PLAIN node process (a separate step before `next build` in the
+// package.json `build` script) — Next's own dotenv loading never reaches it.
+// On Vercel this is a harmless no-op: the platform injects configured
+// Environment Variables directly into process.env, and .env.local never
+// exists in the deployed source (gitignored). Locally, without this, running
+// `node scripts/build-frontend.js` (or `pnpm build`) produces a config.js
+// with every value blank even when .env.local is fully filled in — no
+// dependency added; .env.local's format is a plain KEY=VALUE list.
+function loadDotEnvLocal(rootDir) {
+  for (const name of ['.env.local', '.env']) {
+    const file = path.join(rootDir, name);
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+      if (!m) continue;
+      const key = m[1];
+      if (process.env[key] !== undefined) continue; // real env always wins
+      let value = m[2];
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    }
+  }
+}
+loadDotEnvLocal(path.join(__dirname, '..'));
 
 buildFrontend({
   esbuild,

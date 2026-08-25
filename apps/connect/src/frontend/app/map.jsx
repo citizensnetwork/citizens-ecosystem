@@ -279,6 +279,113 @@
   // sibling floaters overlay is a no-op. Kept exported so home.jsx is unchanged.
   function MapFloatersLayer() { return null; }
 
+  // ── LocationPicker — bidirectional address ↔ pin widget ─────────────
+  //  Small embedded MapLibre map with a FIXED center pin (Uber/Airbnb-style
+  //  drop pin, not a draggable maplibregl.Marker — dragging the map under a
+  //  fixed pin is far more robust on touch than marker-drag handling).
+  //  · Drag the map → moveend reverse-geocodes the new center into an address.
+  //  · Typed address (debounced) → forward-geocodes and flies the map there.
+  //  A `lastResolvedRef` guard against the type→geocode→reverse-geocode→
+  //  refill loop: we only re-geocode typed text that doesn't already match
+  //  the address we ourselves just resolved.
+  //  value: { address, lat, lng } — lat/lng may be null (no pin placed yet).
+  //  onChange(patch) receives only the field(s) that changed.
+  function LocationPicker({ value, onChange, height }) {
+    const h = React.createElement;
+    const { useRef, useEffect, useState } = React;
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const suppressMoveRef = useRef(false);
+    const lastResolvedRef = useRef('');
+    const [busy, setBusy] = useState(false); // false | 'geocode' | 'reverse' | 'locate'
+    const hasPin = typeof value.lat === 'number' && typeof value.lng === 'number';
+
+    useEffect(() => {
+      if (mapRef.current || !containerRef.current || !window.maplibregl) return;
+      const style = styleUrl();
+      if (!style) return;
+      const map = new window.maplibregl.Map({
+        container: containerRef.current, style,
+        center: hasPin ? [value.lng, value.lat] : PRETORIA,
+        zoom: hasPin ? 15 : 11,
+        attributionControl: false,
+      });
+      map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+      map.on('moveend', () => {
+        if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
+        const c = map.getCenter();
+        onChangeRef.current({ lat: c.lat, lng: c.lng });
+        setBusy('reverse');
+        window.reverseGeocode(c.lat, c.lng).then((addr) => {
+          setBusy(false);
+          if (addr) { lastResolvedRef.current = addr; onChangeRef.current({ lat: c.lat, lng: c.lng, address: addr }); }
+        });
+      });
+      mapRef.current = map;
+      return () => { map.remove(); mapRef.current = null; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // External lat/lng change (typed-address geocode below, or "use my
+    // location") flies the map there without re-triggering reverse-geocode.
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !hasPin) return;
+      const c = map.getCenter();
+      if (Math.abs(c.lat - value.lat) > 0.0002 || Math.abs(c.lng - value.lng) > 0.0002) {
+        suppressMoveRef.current = true;
+        map.flyTo({ center: [value.lng, value.lat], zoom: Math.max(map.getZoom(), 14), duration: 500 });
+      }
+    }, [value.lat, value.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Debounced forward-geocode while the address text is typed.
+    useEffect(() => {
+      const addr = (value.address || '').trim();
+      if (!addr || addr === lastResolvedRef.current) return;
+      const t = setTimeout(() => {
+        setBusy('geocode');
+        window.geocodeAddress(addr).then((geo) => {
+          setBusy(false);
+          if (geo) { lastResolvedRef.current = addr; onChangeRef.current({ lat: geo.lat, lng: geo.lng }); }
+        });
+      }, 800);
+      return () => clearTimeout(t);
+    }, [value.address]);
+
+    const useMyLocation = () => {
+      if (!navigator.geolocation) return;
+      setBusy('locate');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { setBusy(false); onChangeRef.current({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        () => setBusy(false),
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
+      );
+    };
+
+    return h('div', { className: 'rounded-2xl overflow-hidden border border-border relative', style: { height: height || 190 } },
+      h('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } }),
+      !styleUrl() && h('div', { className: 'absolute inset-0 flex items-center justify-center text-center text-[11px] text-muted-foreground bg-accent/30 px-4' }, 'Map unavailable — MapTiler key not configured.'),
+      // fixed center pin (the map moves under it, not the other way round)
+      h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
+        h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#C9A84C' }),
+          h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
+      h('button', {
+        type: 'button', onClick: useMyLocation, disabled: busy === 'locate',
+        className: 'absolute right-2 top-2 w-8 h-8 rounded-xl bg-white/90 shadow-md border border-border flex items-center justify-center hover:bg-white transition-colors disabled:opacity-60',
+        title: 'Use my current location',
+      }, busy === 'locate'
+        ? h('span', { className: 'w-3.5 h-3.5 rounded-full border-2 border-gold border-t-transparent spin' })
+        : h(window.Icon, { name: 'LocateFixed', size: 15, className: 'text-gold-dark' })),
+      (busy === 'geocode' || busy === 'reverse') && h('div', { className: 'absolute left-2 top-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5' },
+        h('span', { className: 'w-2.5 h-2.5 rounded-full border-2 border-gold border-t-transparent spin' }),
+        busy === 'geocode' ? 'Finding address…' : 'Reading location…'),
+      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
+  }
+
   window.StylizedMap = StylizedMap;
   window.MapFloatersLayer = MapFloatersLayer;
+  window.LocationPicker = LocationPicker;
 })();
