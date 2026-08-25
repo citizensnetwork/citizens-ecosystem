@@ -35,7 +35,12 @@
     const go2 = (p) => { go(p); onClose(); };
 
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
-    if (isContributor) links.push({ p: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
+    // Always show a path to the Contributor portal — not only once already a
+    // contributor. citizenscentral.co.za/dashboard is the same destination,
+    // bookmarkable directly (next.config.ts rewrite + store.jsx deep link).
+    links.push(isContributor
+      ? { p: 'dashboard', label: 'Contributor Portal', icon: 'LayoutDashboard' }
+      : { p: 'apply', label: 'Become a Contributor', icon: 'Crown' });
     if (isAdmin) links.push({ p: 'admin', label: 'Admin Panel', icon: 'Shield' });
     links.push({ p: 'settings', label: 'Settings', icon: 'Settings' });
 
