@@ -89,12 +89,19 @@ never exposed in this response.
       "physical_address": "…",
       "physical_latitude": -25.7479,
       "physical_longitude": 28.2293,
+      "no_fixed_location": false,
       "created_at": "2026-…"
     }
   ],
   "meta": { "count": 42, "limit": 50, "offset": 0 }
 }
 ```
+
+`no_fixed_location: true` means the contributor operates online, mobile, or
+without a permanent office — `physical_address`/`physical_latitude`/
+`physical_longitude` are intentionally `null` in that case, and the
+contributor is deliberately excluded from map markers (still listed here and
+in Kingdom Discovery).
 
 ---
 

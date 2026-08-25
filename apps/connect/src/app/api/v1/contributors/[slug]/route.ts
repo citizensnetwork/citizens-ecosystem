@@ -64,6 +64,7 @@ export async function GET(
         "physical_address",
         "physical_latitude",
         "physical_longitude",
+        "no_fixed_location:contributor_no_fixed_location",
         "gallery_urls",
         "created_at",
       ].join(","),
