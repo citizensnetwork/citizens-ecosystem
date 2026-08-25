@@ -2199,9 +2199,109 @@ result, completed in 25s, **zero warning lines**. Both preview and production co
 
 ---
 
+## 3AJ. Landing redesign to Design Spec + stuck Google sign-in + map resize-crop — PR #47 OPEN (2026-08-25)
+
+Founder-reported bugs (production): (1) "Continue with Google" just spins forever, sign-in never
+starts; (2) after visiting on a phone then on a PC, the Discover map stayed cropped to the phone's
+size. Founder also supplied the **Citizens Connect Design Spec** (Light + Noir PDFs) — the crown
+logo pack (`#D4AF37` gold, crown-with-cross line art) and full type/spacing spec — asking the
+landing page be rebuilt to it, "to start with." Branch
+`fix/connect-landing-google-signin-map-resize` (off `main` post-§3AI; the original session branch,
+`feat/connect-guest-landing-location-picker`, had already merged as PR #44 — cherry-picked the one
+commit onto a fresh branch rather than reopening a merged one). Offload:
+`.claude/sessions/connect-landing-google-signin-map-resize.md` (gitignored). **No DB/migration
+change — next migration # still 168.**
+
+### Bug 1 — stuck "Connecting…" spinner (`store.jsx` + `auth.jsx`)
+`signIn()` never returned its promise. `AuthScreen`'s `onGoogle()` set `loading=true` then called
+`signIn()` fire-and-forget with nothing to reset it — fine on the real-redirect success path (the
+page navigates away), but if `window.CC_AUTH` is null (Supabase env didn't reach the deployed
+build) or `signInWithGoogle` rejects, `store.jsx` only logged + toasted internally and the button
+stayed disabled with its spinner forever. Matches the reported symptom exactly. Fix: `signIn()`
+now always **returns** its promise (still catches internally to toast — callers never see a
+rejection) and `onGoogle()` does `Promise.resolve(signIn()).finally(() => setLoading(false))`.
+**Verified locally** with real `.env.local` Supabase creds: clicking the button correctly
+navigated the tab to `accounts.google.com` (backed out before completing a real login). Whether
+this was actually the production root cause (vs. a Supabase Auth redirect-URL allowlist gap, which
+is a founder-only dashboard setting, not code) wasn't independently confirmable from this
+environment — but the fix is correct and load-bearing regardless: the button can no longer get
+stuck no matter which of those it turns out to be.
+
+### Bug 2 — map stays phone-cropped on desktop (`map.jsx`)
+MapLibre sizes its canvas **once**, from the container's `getBoundingClientRect()` at
+construction, and never re-measures on its own — a well-known Mapbox-GL-family gotcha. A map
+mounted while its container was still phone-sized (or before the flex/grid layout had settled)
+keeps that canvas size forever, even after the window/container grows. Fixed in both MapLibre
+instances in the file — the Discover `StylizedMap` and the onboarding `LocationPicker` — by
+attaching a `ResizeObserver` to `containerRef.current` at mount that calls `map.resize()` on every
+layout change (`ResizeObserver` fires once immediately on `observe()` too, covering the
+not-yet-settled-at-construction case as well as later window resizes), disconnected in each
+effect's cleanup. **Verified mechanically, not fully live end-to-end:** confirmed the container
+itself correctly reports new dimensions on resize (`getBoundingClientRect`), and confirmed calling
+`map.resize()` manually correctly syncs a stale canvas to its container — but this session's
+sandboxed Browser pane never composites frames (`screenshot` errored on it every time), so
+`ResizeObserver`'s own live-firing on an actual window resize couldn't be visually verified in
+this environment specifically. The pattern (`ResizeObserver` + `map.resize()`) is the standard,
+widely-documented fix for exactly this symptom. **Founder: please confirm on a real resize
+(or phone→desktop revisit) after this deploys.**
+
+### Landing redesign (`auth.jsx` + `index.html`)
+Rebuilt to the founder's spec, layered onto the Design Spec PDFs' palette/type: brand crown
+(new inline SVG line-art crown-with-cross, `--gold-crown: #D4AF37`, single-weight stroke, never
+filled — matches the logo pack exactly) floats ~15% down from the top of the viewport (`paddingTop:
+14dvh`); italic Eph. 2:19 scripture below it (gap A); "Citizens" title below that in title case,
+Manrope, mid-sized (`clamp(34px,9vw,46px)`) — smaller gap above it than gap A, per the founder's
+"smaller spacing below scripture" ask; slogan carousel below the title at gap A again (equal
+rhythm either side of the title, as asked); carousel's anchor phrase changed from all-caps "THE
+KINGDOM" to title-case **"the Kingdom"** (founder was explicit on casing); circular icon-only
+Google button (56px, white, soft shadow, spinner swaps in while loading) + plain-text "Browse as
+Guest" link below. Removed: the busy procedurally-generated road/park SVG backdrop (replaced with
+a plain warm-paper radial wash), the "Citizens Connect" brand chip, the glass sign-in card, and the
+"New here?" hint box — all per the founder's "clean simplicity like Wear's loading screen" ask.
+Added a `Manrope` Google Fonts import + a `font-brand` Tailwind family, scoped in use to this
+screen only (did **not** swap the rest of the app off Playfair Display/Plus Jakarta Sans — out of
+scope for "to start with, our landing page"; the founder floated a possible future Noir/dark
+variant too, also not built this round — same reasoning). `--gold-crown` is a new, separate CSS
+var from the app-wide `--gold` (`#C9A84C`) used everywhere else — deliberately not touched, so
+existing chrome/buttons/pins are unaffected.
+
+### Gates (all green)
+`node scripts/build-frontend.js` (clean, deterministic bundle hash across two rebuilds) ·
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` 645/645 (72 files,
+unaffected) · `npx playwright test` 1/1 (`kingdom-discovery.spec.ts`, unaffected — no auth-screen
+DOM coupling) · `pnpm format:check` (root) clean. Manual in-browser verification (measured via
+`getBoundingClientRect`/computed-style, screenshots unavailable in this sandbox): crown sits ~15%
+from the viewport top; gap-A (crown→scripture, title→carousel) both measured 28px, gap-B
+(scripture→title) measured 12px — matches the "equal outer gaps, smaller inner gap" spec exactly;
+`font-brand` resolves to Manrope; the gold gradient resolves to `#D4AF37`-based; Google button is
+a true 56×56 circle.
+
+### Explicitly NOT done this round (honest checkpoint)
+- Root cause of the production Google-sign-in bug not independently confirmed (env-var gap vs.
+  Supabase Auth redirect-URL allowlist vs. something else) — the fix closes the stuck-spinner
+  symptom regardless, but if sign-in still fails outright (not just hangs) after this deploys,
+  check the Supabase Dashboard → Authentication → URL Configuration allowlist against Connect's
+  live domain next.
+- Map-resize fix not visually confirmed on a real live window resize (sandbox compositing
+  limitation, see above) — founder verification requested.
+- Dark/Noir landing variant from the Design Spec PDF — not built; founder floated it as optional
+  ("welcome to try"), left for a future round if wanted.
+- PR **not yet merged** — founder review/merge is the next action.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⚠️ 2026-08-25 (latest) — turbo/Vercel build warnings actually fully fixed + verified on a
+> **⚠️ 2026-08-25 (latest) — landing page rebuilt to the founder's Design Spec + two real bugs
+> fixed, PR OPEN, not yet merged (§3AJ).** `fix/connect-landing-google-signin-map-resize` — the
+> stuck-forever "Connecting…" spinner on Google sign-in (`signIn()` now always returns/resolves
+> its promise) and the Discover map staying phone-cropped on desktop (MapLibre canvas now synced
+> to its container via `ResizeObserver` + `map.resize()`) are both fixed at the code level; the
+> map-resize fix specifically could not be visually confirmed on a live window resize in this
+> session's sandbox (compositing unavailable there) — **founder: please confirm both after this
+> PR deploys.** **PR #47 needs review/merge.**
+>
+> **⚠️ 2026-08-25 — turbo/Vercel build warnings actually fully fixed + verified on a
 > live Vercel build, PR MERGED (§3AI).** §3AH's `globalEnv` fix (PR #44, merged) was necessary
 > but NOT sufficient — 12 Vercel↔Supabase native-integration platform vars were still undeclared,
 > plus a separate `outputs`-glob misconfiguration hit 5 packages' `build` task and 7 packages'
