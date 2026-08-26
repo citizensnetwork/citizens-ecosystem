@@ -106,9 +106,15 @@
     // opening a dead link. Contributors do carry one.
     const website = isContributor ? safeUrl(item.website) : '';
     const isConnected = isEvent && connected.has(item.id);
-    const primaryLabel = isEvent ? (isConnected ? 'Connected' : 'Connect') : 'Message';
-    const primaryIcon = isEvent ? (isConnected ? 'Check' : 'CalendarCheck') : 'MessageCircle';
     const messageTarget = isContributor ? item : org;
+    // The primary button is always the strongest action actually available.
+    // A Place whose organiser isn't in the directory has nobody to message —
+    // showing a permanently greyed-out "Message" would make most Place cards
+    // in the real directory look broken, so those lead with View instead
+    // (and then the small eye button would be a duplicate, so it goes).
+    const primaryIsView = !isEvent && !messageTarget;
+    const primaryLabel = isEvent ? (isConnected ? 'Connected' : 'Connect') : primaryIsView ? 'View' : 'Message';
+    const primaryIcon = isEvent ? (isConnected ? 'Check' : 'CalendarCheck') : primaryIsView ? 'Eye' : 'MessageCircle';
     const openMessage = (e) => {
       e.stopPropagation();
       if (!messageTarget) return;
@@ -116,6 +122,7 @@
     };
     const onPrimary = (e) => {
       if (isEvent) { e.stopPropagation(); toggleConnect(item.id); return; }
+      if (primaryIsView) { e.stopPropagation(); open(); return; }
       openMessage(e);
     };
     const open = () => go(navTarget(item.type), { id: item.id });
@@ -192,16 +199,15 @@
           meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 mt-2 text-[11px] text-muted-foreground flex-wrap' }, meta),
           h('div', { className: 'flex items-center gap-3 mt-1 text-[11px] text-foreground/70' }, statNode))),
       h('div', { className: 'flex items-center gap-1.5 px-3 pb-3 pt-1 mt-auto' },
-        iconBtn('Eye', 'View', (e) => { e.stopPropagation(); open(); }),
+        !primaryIsView && iconBtn('Eye', 'View', (e) => { e.stopPropagation(); open(); }),
         iconBtn('Heart', isEvent ? (saved ? 'Remove from considering' : 'Consider') : (saved ? 'Unfollow' : 'Follow'), onHeart, saved),
         website && iconBtn('Globe', 'Website', (e) => { e.stopPropagation(); window.open(website, '_blank', 'noopener,noreferrer'); }),
         isEvent && messageTarget && iconBtn('MessageCircle', 'Message the organiser', openMessage),
         iconBtn('Share2', 'Share', (e) => { e.stopPropagation(); toast('Share link copied', 'gold'); }),
         h('button', {
-          type: 'button', onClick: onPrimary, disabled: !isEvent && !messageTarget,
+          type: 'button', onClick: onPrimary,
           className: cx('flex-1 min-w-0 h-8 rounded-full text-[11px] font-bold flex items-center justify-center gap-1.5 px-2 transition-colors',
-            isConnected ? 'bg-accent text-gold-dark' : 'gold-gradient text-white',
-            !isEvent && !messageTarget && 'opacity-40 cursor-not-allowed'),
+            isConnected ? 'bg-accent text-gold-dark' : 'gold-gradient text-white'),
         }, h(Icon, { name: primaryIcon, size: 12 }), h('span', { className: 'truncate' }, primaryLabel))));
   }
 
