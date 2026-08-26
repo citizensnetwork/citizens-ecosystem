@@ -2647,9 +2647,6 @@ browser in a real network environment (`.github/workflows/ci.yml`'s `e2e-connect
 and is the real gate here — watched closely on the PR below.
 
 ### Explicitly NOT done this round (honest checkpoint)
-- Live-clicked nothing in a real browser in this session (sandbox limitation above) —
-  correctness rests on tsc/eslint/vitest/build (all green) + careful reading, same
-  standard as every prior session that hit this environment gap.
 - No new social platforms (WhatsApp/X/LinkedIn/etc.) — flagged as a founder option.
 - No "Individual" contributor kind — pre-existing, separately tracked V1_SCOPE.md item.
 - Cover-photo manager has no drag-to-reorder (the API supports it via PATCH; the UI only
@@ -2659,6 +2656,23 @@ and is the real gate here — watched closely on the PR below.
   (or a desktop browser with no location) simply never sees a distance line — by design,
   never a fake number.
 
+### ✅ SHIPPED — PR #56 MERGED (2026-08-26), CI's own live browser caught a real regression
+Merge commit `39d5532` on `main`; production deployment `dpl_2AGMq6…` verified `READY`
+for that exact commit. CI (real network, its own installed Playwright browser — the
+signal this session's sandbox couldn't produce) came back **red on the first push**:
+the Kingdom Discovery e2e spec's *only* path to the Apply wizard was the sidebar's
+"Apply Now" button — the exact element this session removed as part of the CTA
+de-emphasis. Every other check (Verify, CodeQL, Analyze) was green on that same commit,
+isolating the failure precisely. Fixed by rerouting the test through Settings (the
+`window.__cc.go('settings')` hook + "Apply to become a Contributor", the button's real
+current text) instead of restoring the removed sidebar button — a **test fix**, not a
+UX reversal, since the founder's ask was exactly to remove that button. Pushed
+(`de2515a`), full CI went green (Verify/E2E/CodeQL/Analyze all success, Supabase Preview
+skipped as always on the Free tier), merged. **Lesson for future sessions touching
+`shell.jsx` nav/CTA copy: `e2e/kingdom-discovery.spec.ts` drives the UI by visible
+button text, not test IDs — a copy or placement change there needs the same grep this
+session did (`Apply Now`) before assuming the e2e suite is unaffected.**
+
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
@@ -2666,12 +2680,15 @@ and is the real gate here — watched closely on the PR below.
 > **✅ 2026-08-26 (latest) — Kingdom Discovery card redesign, contributor profile-parity
 > fixes (cover photo + public contact email + gallery + social hyperlinks), Contributor
 > map-pin redesign (+ the category-colour bug fix), and "Become a Contributor"
-> de-emphasized to Settings-only (§3AM).** Branch
-> `claude/citizens-connect-improvements-b0yhxp`. **Migration 171 applied — next migration
-> # = 172.** All gates green incl. workspace-wide turbo (Vision unaffected). Playwright
-> couldn't complete live in this session's sandbox — confirmed via an A/B stash test to
-> be a pre-existing environment limitation, not a regression (§3AM) — **watch the PR's CI
-> e2e-connect job for the real signal.**
+> de-emphasized to Settings-only. ✅ MERGED** (PR #56, merge commit `39d5532`; production
+> deployment verified `READY` for that commit). §3AM. **Migration 171 applied — next
+> migration # = 172.** All gates green incl. workspace-wide turbo (Vision unaffected).
+> CI's own Playwright run (this session's sandbox couldn't produce a live-browser signal
+> at all — confirmed via an A/B stash test to be a pre-existing environment limitation,
+> not a regression) caught one real thing the sandbox couldn't: the e2e spec's only path
+> to Apply was the exact sidebar button this session removed. Fixed by rerouting the test
+> through Settings, not by restoring the button — see §3AM's honest checkpoint for the
+> lesson on `shell.jsx` nav changes and this suite. **No founder action required.**
 >
 > **✅ 2026-08-25 — the contributor wizard's real bug (cookie-only auth, not any
 > of the earlier infra fixes) found + fixed + swept across 44 more routes; portal given a
