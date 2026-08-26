@@ -123,10 +123,32 @@ describe("SOCIAL_PLATFORMS — one table for every surface", () => {
       ["linkedin", "ourchurch", "https://www.linkedin.com/company/ourchurch"],
       ["linkedin", "in/grace", "https://www.linkedin.com/in/grace"],
       ["whatsapp", "+27 82 000 0000", "https://wa.me/27820000000"],
+      // A pasted URL whose path ALREADY carries the platform's own prefix must
+      // not get a second one — "tiktok.com/@dam" became "tiktok.com/@@dam",
+      // a dead link. (stripHandle only removes a LEADING @, and the @ is no
+      // longer leading once the host comes off the front.)
+      ["tiktok", "tiktok.com/@ourchurch", "https://tiktok.com/@ourchurch"],
+      ["youtube", "www.youtube.com/@ourchurch", "https://youtube.com/@ourchurch"],
+      ["instagram", "www.instagram.com/ourchurch", "https://instagram.com/ourchurch"],
+      ["linkedin", "www.linkedin.com/company/ourchurch", "https://www.linkedin.com/company/ourchurch"],
     ];
     for (const [key, input, expected] of cases) {
       expect(DATA.getSocialPlatform(key).urlFor(input), `${key} ← ${input}`).toBe(expected);
     }
+  });
+
+  it("only strips a leading www. when the platform's own host really follows it", () => {
+    // The host prefix is stripped with plain string comparison, not a RegExp
+    // built by concatenation — escaping a host into a pattern means getting
+    // every metacharacter right, and the `.`-only escape it replaced was a
+    // blocking CodeQL alert (js/incomplete-sanitization). These cases pin the
+    // behaviour that rewrite had to preserve exactly.
+    const ig = DATA.getSocialPlatform("instagram");
+    expect(ig.urlFor("www.instagram.com/dam")).toBe("https://instagram.com/dam");
+    // "www." with someone ELSE's host after it is not ours to strip.
+    expect(ig.urlFor("www.example.com/dam")).toBe("https://instagram.com/www.example.com/dam");
+    // A value that merely starts with the letters "www" is untouched.
+    expect(ig.urlFor("wwwdam")).toBe("https://instagram.com/wwwdam");
   });
 
   it("passes an absolute URL through untouched and never invents a link from nothing", () => {

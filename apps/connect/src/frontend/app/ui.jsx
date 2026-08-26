@@ -186,6 +186,11 @@
       React.createElement('div', { className: 'flex gap-2 flex-wrap' },
         links.map(({ k, href, platform, text }) => React.createElement('a', {
           key: k, href, target: '_blank', rel: 'noopener noreferrer', title: platform.label,
+          // The brand mark is the ONLY thing naming the platform here, and a
+          // logo is purely visual — without this the link announced just
+          // "@ourchurch", which tells a screen-reader user nothing about
+          // where it goes. Name the platform first, then the handle.
+          'aria-label': text ? platform.label + ' — ' + text : platform.label,
           className: 'flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground hover:border-gold/40 transition-colors max-w-full',
         },
           React.createElement(Icon, { name: platform.icon, size: 13, style: { color: ink }, className: 'shrink-0' }),

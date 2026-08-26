@@ -287,12 +287,18 @@ test.describe("One card, both surfaces", () => {
     // And it opens the same screen a card does.
     await panel.getByRole("button", { name: "View Full Profile" }).click();
     await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 10_000 });
-    // The full profile lists every handle, with its brand mark.
-    await expect(page.getByRole("link", { name: "Instagram" })).toHaveAttribute(
+    // The full profile lists every handle, with its brand mark. The chip shows
+    // the handle as text, so its accessible name is "<Platform> — <handle>"
+    // (the compact row on a card is icon-only and is named by the platform
+    // alone) — a logo is not a label a screen reader can read.
+    await expect(page.getByRole("link", { name: /^Instagram/ })).toHaveAttribute(
       "href", "https://instagram.com/hatfieldsunday",
     );
-    await expect(page.getByRole("link", { name: "Facebook" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "YouTube" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Instagram/ })).toHaveAccessibleName(
+      "Instagram — @hatfieldsunday",
+    );
+    await expect(page.getByRole("link", { name: /^Facebook/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^YouTube/ })).toBeVisible();
   });
 });
 

@@ -58,13 +58,37 @@
   const isAbsolute = (v) => /^https?:\/\//i.test((v || '').trim());
   // Strip any leading "host/" (with or without www.) the user pasted in, so
   // "instagram.com/damcool" and "damcool" both resolve to the same link.
-  const stripHost = (v, host) => stripHandle(v).replace(
-    new RegExp('^(www\\.)?' + host.replace(/\./g, '\\.') + '\\/?', 'i'), '');
+  //
+  // Deliberately NOT a RegExp built by concatenation. Escaping a host into a
+  // pattern means getting EVERY regex metacharacter right, and the previous
+  // version escaped only `.` — which CodeQL correctly flagged as incomplete
+  // escaping (js/incomplete-sanitization, a blocking high-severity alert).
+  // The hosts here are our own literals, so it was not exploitable, but a
+  // prefix strip needs no regex at all: plain comparison has no escaping
+  // problem to get wrong, and it is faster besides.
+  const stripHost = (v, host) => {
+    const s = stripHandle(v);
+    const lower = s.toLowerCase();
+    const h = String(host).toLowerCase();
+    // The optional `www.` is only consumed when the host really follows it —
+    // otherwise a value that merely starts with "www." is left untouched,
+    // exactly as the anchored pattern behaved.
+    const afterWww = lower.startsWith('www.') ? 4 : 0;
+    if (!lower.startsWith(h, afterWww)) return s;
+    let end = afterWww + h.length;
+    if (s.charAt(end) === '/') end += 1;
+    return s.slice(end);
+  };
+  // stripHandle only removes a LEADING @, and once the host comes off the
+  // front the handle can start with one again ("tiktok.com/@dam" -> "@dam") —
+  // so re-strip before re-applying the platform's own prefix, or the link
+  // comes out as "tiktok.com/@@dam" and 404s.
+  const bareHandle = (v) => v.replace(/^@+/, '');
   const onHost = (host, prefix) => (v) => {
     const t = (v || '').trim();
     if (!t) return '';
     if (isAbsolute(t)) return t;
-    const handle = stripHost(t, host);
+    const handle = prefix ? bareHandle(stripHost(t, host)) : stripHost(t, host);
     return handle ? 'https://' + host + '/' + (prefix || '') + handle : '';
   };
   const SOCIAL_PLATFORMS = [
@@ -78,7 +102,7 @@
       // /channel/… . Keep an explicit path, prefix a bare handle with @.
       const h = stripHost(t, 'youtube.com');
       if (!h) return '';
-      return 'https://youtube.com/' + (/^(c|channel|user)\//i.test(h) ? h : '@' + h);
+      return 'https://youtube.com/' + (/^(c|channel|user)\//i.test(h) ? h : '@' + bareHandle(h));
     } },
     { key: 'tiktok', label: 'TikTok', icon: 'BrandTikTok', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('tiktok.com', '@') },
     { key: 'x', label: 'X', icon: 'BrandX', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('x.com') },
