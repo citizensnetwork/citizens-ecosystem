@@ -124,10 +124,10 @@ Capacitor `webDir` so it becomes the iOS and Android mobile app simultaneously.
   `window.MAP_ZOOM` so tests assert the same numbers the map enforces.
 - **Pin labels (2026-08-26):** a pin's name floats on a fuzzy white *mist*
   (`.cc-pin-label-mist`, a real `filter: blur()` blob) rather than sitting in a bordered
-  capsule, set in the app's own type at 12px/800. Shown from z 15.6 up (raised 3 zoom
-  levels from the original 12.6 — names were overlapping too much further out), plus
-  always for the selected pin. Styles live in `index.html` so the zoom gate toggles them
-  with one attribute (`.cc-map[data-cc-labels]`).
+  capsule, set in the app's own type at 12px/800. Shown from z 18 up (raised from the
+  original 12.6, via 15.6, after founder feedback that names were still overlapping too
+  much further out), plus always for the selected pin. Styles live in `index.html` so the
+  zoom gate toggles them with one attribute (`.cc-map[data-cc-labels]`).
 - **One card (2026-08-26):** the map's pin preview and the Kingdom Exploration list render
   the SAME component — `app/entity-card.jsx` → `window.EntityCard`, `layout='panel'` vs
   `layout='grid'`. Same fields, same order, same action set, same socials row. Adding a
