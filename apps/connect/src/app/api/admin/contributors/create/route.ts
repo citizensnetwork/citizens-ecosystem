@@ -29,6 +29,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { EVENT_CATEGORIES, PLACE_CATEGORIES } from "@/lib/categories";
+import { coercePublicUrl, hasUnsafeScheme } from "@/lib/publicUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,6 +142,32 @@ export async function POST(request: NextRequest) {
   //    service_role has no auth.uid(), so a raw service_role UPDATE here
   //    would be rejected by that trigger. Calling the RPC as the admin's own
   //    authenticated user is what makes the bypass fire correctly.
+  // Same rule as the self-serve apply route — an admin-created listing is
+  // rendered through the exact same public surfaces. Real URLs are coerced to
+  // http(s); social handles only have to not declare a dangerous scheme.
+  const adminLinks: Record<string, string | null> = {};
+  for (const key of ["website_url", "logo_url"] as const) {
+    const raw = trimOrNull(payload[key], MAX_URL);
+    const norm = raw === null ? null : coercePublicUrl(raw, MAX_URL);
+    if (raw !== null && norm === null) {
+      return NextResponse.json(
+        { error: `${key} must be a valid http(s) URL` },
+        { status: 400 },
+      );
+    }
+    adminLinks[key] = norm;
+  }
+  for (const key of ["facebook_url", "youtube_url"] as const) {
+    const raw = trimOrNull(payload[key], MAX_URL);
+    if (raw !== null && hasUnsafeScheme(raw)) {
+      return NextResponse.json(
+        { error: `${key} must be a valid http(s) URL` },
+        { status: 400 },
+      );
+    }
+    adminLinks[key] = raw;
+  }
+
   const { data: rpcData, error: rpcErr } = await supabase.rpc("admin_create_contributor_profile", {
     _target_id: newUserId,
     _display_name: displayName,
@@ -148,16 +175,16 @@ export async function POST(request: NextRequest) {
     _contributor_kind: contributorKind,
     _contributor_category: contributorCategory,
     _bio: trimOrNull(payload.bio, MAX_BIO),
-    _website_url: trimOrNull(payload.website_url, MAX_URL),
+    _website_url: adminLinks.website_url,
     _instagram_handle: trimOrNull(payload.instagram_handle, MAX_HANDLE),
-    _facebook_url: trimOrNull(payload.facebook_url, MAX_URL),
+    _facebook_url: adminLinks.facebook_url,
     _tiktok_handle: trimOrNull(payload.tiktok_handle, MAX_HANDLE),
-    _youtube_url: trimOrNull(payload.youtube_url, MAX_URL),
+    _youtube_url: adminLinks.youtube_url,
     _no_fixed_location: noFixedLocation,
     _physical_address: noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS),
     _physical_latitude: noFixedLocation ? null : finiteOrNull(payload.physical_latitude),
     _physical_longitude: noFixedLocation ? null : finiteOrNull(payload.physical_longitude),
-    _logo_url: trimOrNull(payload.logo_url, MAX_URL),
+    _logo_url: adminLinks.logo_url,
     _gallery_urls: galleryUrls,
   });
 

@@ -15,6 +15,7 @@
 import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { normalisePublicUrl } from "@/lib/publicUrl";
 
 const ALLOWED_KEYS = [
   "bio",
@@ -46,18 +47,6 @@ const MAX_EMAIL = 254;
 // same recipe as /api/admin/contributors/create).
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,189}\.[^\s@]{1,24}$/;
 
-function normalisePublicUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > MAX_URL_LENGTH) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(request: Request) {
   const { supabase, user } = await getRouteAuth(request);
@@ -112,7 +101,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const normalised = update.gallery_urls.map(normalisePublicUrl);
+    const normalised = update.gallery_urls.map((u) => normalisePublicUrl(u, MAX_URL_LENGTH));
     if (normalised.some((url) => url === null)) {
       return NextResponse.json(
         { error: "gallery_urls must contain valid public URLs" },
@@ -133,7 +122,7 @@ export async function POST(request: Request) {
   // rendered as stored XSS in SocialLinksRow.
   for (const urlKey of ["website_url", "facebook_url", "youtube_url"] as const) {
     if (update[urlKey] !== undefined && update[urlKey] !== null) {
-      const norm = normalisePublicUrl(update[urlKey] as string);
+      const norm = normalisePublicUrl(update[urlKey] as string, MAX_URL_LENGTH);
       if (norm === null) {
         return NextResponse.json(
           { error: `${urlKey} must be a valid https/http URL` },

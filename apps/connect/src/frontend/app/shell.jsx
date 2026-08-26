@@ -5,6 +5,7 @@
   const { useState, useEffect, useRef } = React;
   const { cx, Avatar, SmartImage, Toasts } = window.UI;
   const Icon = window.Icon;
+  const useBackGuard = window.useBackGuard || function () {};
 
   const BASE_TABS = [
     { page: 'home', label: 'Discover', icon: 'Map' },
@@ -22,6 +23,7 @@
   // ── Profile / role-switch panel ──
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
+    useBackGuard(true, onClose);
     const { user, role, go, isAdmin, isContributor, signOut, signIn, authed, toast, realUser } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);

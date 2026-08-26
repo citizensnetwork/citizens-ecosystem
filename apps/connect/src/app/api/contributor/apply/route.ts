@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
 import { EVENT_CATEGORIES, PLACE_CATEGORIES } from "@/lib/categories";
+import { coercePublicUrl, hasUnsafeScheme } from "@/lib/publicUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,6 +145,38 @@ export async function POST(request: Request) {
   // defensively.
   const noFixedLocation = payload.no_fixed_location === true;
 
+  // The website ends up rendered as a real link (profile page, and the
+  // Kingdom Discovery card's Website button), so it must be http(s) — a
+  // stored `javascript:` URL is stored XSS. The wizard's own placeholder is
+  // "yourministry.org", so a scheme-less value is coerced rather than
+  // rejected; only an explicitly dangerous scheme is refused.
+  const website = trimOrNull(payload.website_url, MAX_URL);
+  const websiteUrl = website === null ? null : coercePublicUrl(website, MAX_URL);
+  if (website !== null && websiteUrl === null) {
+    return NextResponse.json(
+      { error: "Website must be a valid web address (for example yourministry.org)." },
+      { status: 400 },
+    );
+  }
+
+  // Socials are HANDLES here, not URLs (the display layer builds the platform
+  // URL from them), so there is nothing to normalise — just refuse a value
+  // that declares a dangerous scheme.
+  const socialUrls: Record<string, string | null> = {};
+  for (const [key, label] of [
+    ["facebook_url", "Facebook"],
+    ["youtube_url", "YouTube"],
+  ] as const) {
+    const raw = trimOrNull(payload[key], MAX_URL);
+    if (raw !== null && hasUnsafeScheme(raw)) {
+      return NextResponse.json(
+        { error: `${label} must be a handle or a valid web address.` },
+        { status: 400 },
+      );
+    }
+    socialUrls[key] = raw;
+  }
+
   const insertRow = {
     user_id: user.id,
     status: "pending" as const,
@@ -151,11 +184,11 @@ export async function POST(request: Request) {
     contributor_kind: contributorKind,
     contributor_category: contributorCategory,
     bio: trimOrNull(payload.bio, MAX_BIO),
-    website_url: trimOrNull(payload.website_url, MAX_URL),
+    website_url: websiteUrl,
     instagram_handle: trimOrNull(payload.instagram_handle, MAX_HANDLE),
-    facebook_url: trimOrNull(payload.facebook_url, MAX_URL),
+    facebook_url: socialUrls.facebook_url,
     tiktok_handle: trimOrNull(payload.tiktok_handle, MAX_HANDLE),
-    youtube_url: trimOrNull(payload.youtube_url, MAX_URL),
+    youtube_url: socialUrls.youtube_url,
     no_fixed_location: noFixedLocation,
     physical_address: noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS),
     physical_latitude: noFixedLocation ? null : finiteOrNull(payload.physical_latitude),

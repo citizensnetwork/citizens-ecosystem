@@ -5,9 +5,23 @@
   const { useState, useEffect, useRef } = React;
   const Icon = window.Icon;
   const cx = (...a) => a.filter(Boolean).join(' ');
+  // store.jsx always loads before this file (see build-frontend appFileOrder),
+  // so bind its hook ONCE here rather than reading window.* per render — that
+  // keeps the call inside Overlay an unconditional hook call.
+  const useBackGuard = window.useBackGuard || function () {};
 
   // First-letters of up to two words → honest initials placeholder.
   const initials = (s) => !s ? '' : String(s).trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+
+  // Only ever hand an http(s) URL to window.open()/href. The write paths now
+  // validate the scheme (src/lib/publicUrl.ts), but rows stored before that
+  // validation existed must not become a `javascript:` sink just because a
+  // newer screen renders them. Returns '' for anything unsafe, so callers can
+  // simply hide the affected button.
+  const safeUrl = (u) => {
+    const t = String(u || '').trim();
+    return /^https?:\/\//i.test(t) ? t : '';
+  };
 
   // ── Avatar (graceful fallback) ──
   // A missing or broken src never shows a broken-image glyph: it degrades to the
@@ -139,6 +153,10 @@
       document.addEventListener('keydown', h);
       return () => document.removeEventListener('keydown', h);
     }, [onClose]);
+    // Escape's mobile equivalent: the device Back button closes the overlay
+    // instead of navigating the app (or the browser) away. Registered here
+    // once, so every modal / sheet / side panel in the app inherits it.
+    useBackGuard(true, onClose);
 
     const isSheet = variant === 'sheet', isSide = variant === 'side';
     const panelPos = isSheet
@@ -269,5 +287,5 @@
         }))));
   }
 
-  window.UI = { cx, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
+  window.UI = { cx, safeUrl, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
 })();

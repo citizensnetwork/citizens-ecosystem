@@ -113,7 +113,8 @@ Capacitor `webDir` so it becomes the iOS and Android mobile app simultaneously.
 - Use the real MapLibre GL + MapTiler map (not the SVG prototype)
 - Replace `app/map.jsx`'s `MapBackdrop` + `Marker` SVG components with the existing `EventMap.tsx` logic
 - Keep all home screen UI chrome (header, category pills, filter sheet, preview panel) from the design
-- Tweaks panel removed — use first/default option of each: `pinStyle = 'teardrop'`, `bubbleStyle = 'speech'`, `creationStyle = 'sheet'`
+- Tweaks panel removed — use first/default option of each: `bubbleStyle = 'speech'`, `creationStyle = 'sheet'`
+- **Superseded (2026-08-26):** the `pinStyle` variation (teardrop / dot / glass) is gone. Map pins are now one system — a floating SVG badge carrying the item's own category glyph in its own category colour, shaped by entity type (circle = Place, rounded rectangle with a nub = Event, ringed circle or its logo = Contributor). See `app/map.jsx`'s `pinSvg()`.
 
 ---
 

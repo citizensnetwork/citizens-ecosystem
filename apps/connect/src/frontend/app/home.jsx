@@ -5,10 +5,14 @@
   const { useState, useRef } = React;
   const { cx, Avatar, SmartImage, Button, CategoryBadge } = window.UI;
   const Icon = window.Icon;
+  const useBackGuard = window.useBackGuard || function () {};
 
   // ── Preview panel (on pin click) ──
   function PreviewPanel({ id, type, onClose }) {
     const app = window.useApp();
+    // A Back press dismisses the pin preview before it leaves the map —
+    // the same expectation a native map app sets.
+    useBackGuard(true, onClose);
     const { events, places, ideas, connected, considering, followedPlaces, toggleConnect, toggleConsider, togglePlaceFollow, toggleIdeaVote, go, startConversationWith, contributors, toast } = app;
     let item, cat, isEvent = type === 'event', isIdea = type === 'idea';
     if (isEvent) item = events.find((e) => e.id === id);
@@ -183,7 +187,7 @@
       // broadcast fields (a Contributor pin is just a plain coloured pin —
       // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
       // events only, contributors never had those states to begin with).
-      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
+      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
@@ -213,12 +217,12 @@
               React.createElement(Icon, { name: 'Search', size: 15, className: 'text-gold shrink-0' }),
               React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), onFocus: () => setFocus(true), onBlur: () => setFocus(false), placeholder: 'Search events, places, people…', className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground' }),
               query && React.createElement('button', { onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 14, className: 'text-muted-foreground' })))),
-          React.createElement('button', { onClick: () => setShowCats(true), className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/60') },
+          React.createElement('button', { onClick: () => setShowCats(true), 'aria-label': 'Filter by category', className: cx('w-12 h-12 glass rounded-2xl shadow-xl border flex items-center justify-center shrink-0', filter ? 'border-gold/60 bg-gold/10' : 'border-white/60') },
             React.createElement(Icon, { name: 'SlidersHorizontal', size: 16, className: filter ? 'text-gold' : 'text-foreground/60' })),
           React.createElement('button', { onClick: () => go('kingdom-discovery'), 'aria-label': 'Kingdom Discovery', className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 flex items-center justify-center shrink-0' },
             React.createElement(Icon, { name: 'List', size: 16, className: 'text-foreground/60' })),
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement('button', { onClick: () => setShowProfile((s) => !s), className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
+            React.createElement('button', { onClick: () => setShowProfile((s) => !s), 'aria-label': 'Your account', className: 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60 overflow-hidden relative' },
               React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 48, rounded: 'xl' }),
               role !== 'citizen' && React.createElement('span', { className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center' }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-white' }))),
             showProfile && React.createElement(window.ProfilePanel, { onClose: () => setShowProfile(false), anchor: 'top' }))),
