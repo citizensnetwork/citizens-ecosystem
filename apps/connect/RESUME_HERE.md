@@ -2981,15 +2981,14 @@ assumed broken saved a wasted cycle.
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **✅ 2026-08-26 (latest) — map pin name labels pushed further in again: 15.6 → 18.**
-> Founder feedback: still overlapping at 15.6. `map.jsx`'s `ZOOM_LABELS` is now
-> **12.6 → 15.6 → 18** (one constant, no other logic touched — the `.cc-pin-label`
-> mist/typography and the selected-pin-always-shows rule are unchanged). Note: z18 is
-> near street/building level with no `maxZoom` cap on the map, so at typical usage
-> zoom (11–15) names will now rarely appear except for the selected pin — worth
-> confirming this reads as intended live, not just "labels are gone". 
-> `docs/HTML_FRONTEND_WIRING_SPEC.md` updated to match. Full connect unit suite green
-> (704/704), lint clean. No migration, no e2e-relevant surface.
+> **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
+> tight — founder reported labels almost never showed at normal browsing zoom.
+> `map.jsx`'s `ZOOM_LABELS` has now been tuned **12.6 → 15.6 → 18 → 16.5** (one
+> constant, no other logic touched — the `.cc-pin-label` mist/typography and the
+> selected-pin-always-shows rule are unchanged). `docs/HTML_FRONTEND_WIRING_SPEC.md`
+> updated to match. Full connect unit suite green (704/704), lint clean. No migration,
+> no e2e-relevant surface. If 16.5 still isn't right, it's a one-line constant at
+> `apps/connect/src/frontend/app/map.jsx` line ~68.
 
 > **⏳ 2026-08-26 — social handles now appear EVERYWHERE a listing is viewed,
 > with real brand logos; the map preview and the Kingdom Exploration list are literally
