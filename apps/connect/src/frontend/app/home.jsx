@@ -183,7 +183,7 @@
       // broadcast fields (a Contributor pin is just a plain coloured pin —
       // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
       // events only, contributors never had those states to begin with).
-      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, lat: c.lat, lng: c.lng })),
+      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });

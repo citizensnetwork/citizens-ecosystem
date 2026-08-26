@@ -2494,9 +2494,186 @@ new: 8 for the create route incl. the ReDoS regression test, 5 for the claim rou
 
 ---
 
+## 3AM. Kingdom Discovery card redesign · contributor profile-parity fixes · map pin redesign · CTA de-emphasis (2026-08-26)
+
+Founder ask, acting "as project lead and expert designer": (1) redesign the Kingdom
+Discovery list cards; (2) audit Dashboard-editable contributor fields against what a
+citizen sees publicly and fix gaps, including real social-platform icons/hyperlinks;
+(3) fix the map pin not reflecting a Contributor's category colour, and redesign the
+pin itself; (4) stop advertising "Become a Contributor" everywhere — Settings only.
+Branch `claude/citizens-connect-improvements-b0yhxp`. Session offload:
+`.claude/sessions/connect-improvements-cards-profile-map-cta.md` (gitignored).
+**Migration 171 applied to prod — next migration # = 172.**
+
+### Root causes found (not guessed — read the actual data pipeline first)
+- **The map-pin-colour bug**: three ad-hoc `profiles` selects in `store.jsx`
+  (`completeOnboarding`, `updateContributorProfile`, and the sign-in identity-hydration
+  effect) each hand-copied a slightly different column subset and had all silently
+  drifted — none of them selected `contributor_category` (aliased `category`), unlike
+  the public `/api/v1/contributors` route, which already got this right. The hydration
+  effect (fires on every contributor sign-in) was the worst copy — it also dropped
+  lat/lng/no_fixed_location/gallery, and since its result gets merged over the existing
+  record, a contributor's map presence could be silently degraded to a generic gold pin
+  (or vanish from the map entirely) just by signing back in. **Fixed with one shared
+  `CONTRIBUTOR_SELECT` constant used at every call site** — this class of bug structurally
+  cannot recur now.
+- **Cover photo was a dead column**: `profiles.cover_photo_urls` already existed
+  (migration 100) with a fully built, tested, multipart-upload API
+  (`/api/contributor/cover-photos` — POST/PATCH/DELETE, captions, 5-photo cap,
+  TOCTOU-safe) but **zero consuming UI anywhere**, and `adaptContributor()` hardcoded
+  `coverPhoto: ''` regardless of what was stored. Every real contributor's public hero
+  image has been blank since that API shipped. Fixed both ends.
+- **Contact email was a dead end**: the onboarding wizard collects "Contact email" but
+  wired it into `/api/contributor/setup` → `profiles.notification_email` — a private,
+  pre-existing field for platform notifications, not a public one. `adaptContributor`
+  never read it back, so `ContributorProfilePage`'s `c.contactEmail && <InfoRow>` (code
+  that's been sitting there, presumably since the profile page was built) could never
+  fire for a real contributor, and there was no way to edit it later either. **New,
+  genuinely public column** `profiles.contributor_contact_email` (migration 171,
+  additive, distinct from `notification_email`) closes this end to end.
+- **Onboarding silently dropped Facebook/YouTube**: the wizard's "Team & socials" step
+  collects all 4 platforms via one shared `SocialInputs` component, but the onboarding
+  save only ever sent `instagram_handle`/`tiktok_handle` to the API — Facebook/YouTube
+  entered there vanished (recoverable only by re-editing later in the Dashboard, which
+  DID send all 4 correctly). Fixed to match.
+- **Gallery never rendered publicly** despite the Dashboard's own hint text promising
+  "Shown on your public listing" — the `Gallery` component already existed in
+  `profiles.jsx`, just wasn't called for `ContributorProfilePage`. Now is.
+- **Social icons**: any social key other than instagram/youtube/facebook silently fell
+  back to a hardcoded 'Music2' icon (only coincidentally correct for tiktok), and none
+  were hyperlinks — just plain text chips. New shared `window.DATA.SOCIAL_PLATFORMS`
+  table (icon + URL-builder per platform) in `data.jsx`, reused by both `apply.jsx`'s
+  input icons and the profile page's display, so the icon logic can't drift between the
+  two again. Each chip is now a real `<a target="_blank">`. Scoped to the 4 platforms
+  that already have DB columns — did **not** add new platforms (e.g. WhatsApp/X/LinkedIn
+  would each need their own migration + new form fields; flagged as a founder option,
+  not built).
+- **Kind never shown publicly**: `contributor_kind` (Ministry/Organization/Business,
+  already collected for admin-created listings) is now a small badge next to the
+  category chip. Did **not** add an "Individual" kind or a kind picker to the self-serve
+  `apply.jsx` wizard — that's V1_SCOPE.md's own separately-tracked, not-yet-done backlog
+  item (§7/§8), out of scope for this ask.
+- **Dead Website button**: `EventProfilePage`'s Website button had no field anywhere
+  upstream that ever populates `ev.website` (neither `create.jsx` nor any edit surface
+  collects one) — it would toast "Opening undefined" if ever clicked on real data. Now
+  hidden when empty, and upgraded from a fake "Opening…" toast to an actual
+  `window.open` (matches what the label already implied).
+
+### What shipped
+- **`store.jsx`** — `CONTRIBUTOR_SELECT` constant (fixes the 3 drifted selects above);
+  `adaptContributor()` gains `coverPhoto`/`coverPhotos` (from `cover_photo_urls`) and
+  `contactEmail`; `completeOnboarding`'s "extras" POST gains `facebook_url`/`youtube_url`/
+  `contributor_contact_email`; `updateContributorProfile` gains the contact-email field;
+  new `addCoverPhoto`/`deleteCoverPhoto`/`updateCoverPhotoCaption` actions (a small
+  non-JSON multipart-upload helper alongside the existing `uploadImage`, since the
+  cover-photos API takes `FormData`, not JSON).
+- **Migration 171** `171_contributor_public_contact_email.sql` — additive nullable
+  `profiles.contributor_contact_email` + length check. Pre-apply git tag
+  `connect-pre-mig171`. **Advisors 0 ERROR / 114 WARN / 3 INFO — byte-identical to the
+  head-170 baseline, 0 new findings.**
+- **`/api/contributor/profile/route.ts`** — `ALLOWED_KEYS` += `cover_photo_urls`,
+  `contributor_contact_email`; bounded-regex email validation (same
+  length-checked-before-regex recipe as the ReDoS fix in
+  `/api/admin/contributors/create`, §3AL). New test file
+  `src/__tests__/api/contributor-profile.test.ts` (this route had **no** test coverage
+  at all before this session) — 7 cases incl. the new validation and a disallowed-key
+  smuggling check.
+- **`/api/v1/contributors` + `/api/v1/contributors/[slug]`** — select lists gain
+  `cover_photo_urls` and `contact_email:contributor_contact_email`.
+- **`dashboard.jsx`** — new `CoverPhotoManager` (thumbnail row + inline caption + delete
+  + an upload tile, consuming the pre-existing tested API); `ProfileTab` gains "Cover
+  photos" and "Public contact email" fields.
+- **`profiles.jsx`** (`ContributorProfilePage`) — renders `Gallery`; kind badge; social
+  chips are real hyperlinks with correct per-platform icons; `EventProfilePage`'s Website
+  button hidden-when-empty + actually opens the link.
+- **`data.jsx`** — `SOCIAL_PLATFORMS` + `getSocialPlatform()`, the new shared table
+  described above; `apply.jsx` now imports its `SOCIALS` list from here instead of a
+  second hand-copied array.
+- **Map pin redesign** (`map.jsx` + `home.jsx`) — Contributors now always render as a
+  **circular pin**: their own logo photo ringed in the category colour when one exists,
+  else a colour-filled circle with the category's white Lucide icon centered (raw-DOM
+  SVG builder, mirroring `icons.jsx`'s `<Icon>` since map pins are vanilla DOM nodes, not
+  React) — with an `onerror` fallback from photo→icon if a logo URL 404s. This is
+  independent of the teardrop/dot/glass `pinStyle` tweak, which now only governs
+  event/place pins (fixed the marker `anchor` too — a circular pin's natural anchor is
+  always `center`, not the teardrop shape's `bottom`). Events/places are visually
+  untouched.
+- **Kingdom Discovery redesign** (`kingdom-discovery.jsx`, full rewrite of
+  `DiscoveryCard`) — medium cards in a responsive 1/2/3-column grid, each with: a thin
+  category-colour border; the cover photo (falls back to `profilePhoto` for
+  contributors) filling the top ~40%; a small circular logo badge in the photo's
+  bottom-left corner (the contributor's own logo, or — for an Event/Place card — its
+  **organiser's** logo, resolved the same way `EventProfilePage`/`PlaceProfilePage`
+  already do, so the card visually ties back to who's behind it); title, a 2-line
+  description snippet, location, event date, and a one-shot best-effort
+  distance-from-me (haversine, browser geolocation — honestly omitted, never faked, when
+  either coordinate is unavailable); each type's real counters (connected+considering
+  for events, followers for places/contributors — never invented ones); then a 4-button
+  action row: heart (Consider for events / Follow for places **and now contributors
+  too** — `toggleFollow`/`followedOrgs` already existed and are already used on
+  `ContributorProfilePage`; the old card's "no Contributor save state" comment was
+  stale), Website (hidden if empty), Share, and a primary CTA (Connect for events via
+  the existing `toggleConnect`; Message for places/contributors via
+  `startConversationWith` — there's no "Connect" verb for those two types in this data
+  model, so labelling it "Message" was the honest choice rather than inventing one).
+  Structured as a plain `<div>` wrapper with an inner `<button>` (photo+text, navigates
+  on click) and a sibling action row of real `<button>`s — never a `<button>` nested
+  inside a `<button>`.
+- **`shell.jsx`** — "Become a Contributor" removed from `ProfilePanel`'s account-menu
+  links (shown to every citizen on every page via the sidebar/bottom-nav avatar) and
+  from the Sidebar's always-visible promo card; the Sidebar still shows the "Application
+  under review" / "You're approved, complete setup" status blocks (those reflect a
+  citizen's own already-started action, not advertising). `pages.jsx`'s `SettingsPage`
+  already had an "Apply to become a Contributor" block under Profile management — that
+  is now the **only** place it lives, unchanged.
+- `index.html` script `?v=` cache-busters bumped for every touched `app/*.jsx` file.
+
+### Gates (all green)
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` **666/666** (75
+files, +7 new) · `node scripts/build-frontend.js` clean · `npx next build` clean, 0
+warnings · `pnpm format:check` clean · **workspace-wide** `pnpm typecheck`/`lint`/`test`/
+`build` via turbo — **12/12, 12/12, 11/11, 8/8 tasks green** (Vision 734/734 unaffected,
+confirming zero cross-app impact — this session touched `apps/connect` only).
+
+### Playwright — confirmed a pre-existing sandbox limitation, not a regression
+`e2e/kingdom-discovery.spec.ts` couldn't complete a live run in this session's sandbox:
+the app never boots past a blank page (the standalone frontend's CDN scripts —
+React/MapLibre/lucide from unpkg.com — appear unreachable from this environment's
+network). **Verified this is not caused by this session's changes**: `git stash`ed every
+change back to the unmodified baseline and re-ran the identical test — same failure,
+same blank screenshot. This matches this repo's own prior-session pattern of sandbox
+compositing/browser limitations (§3AJ, §3AK). CI installs its own matching Playwright
+browser in a real network environment (`.github/workflows/ci.yml`'s `e2e-connect` job)
+and is the real gate here — watched closely on the PR below.
+
+### Explicitly NOT done this round (honest checkpoint)
+- Live-clicked nothing in a real browser in this session (sandbox limitation above) —
+  correctness rests on tsc/eslint/vitest/build (all green) + careful reading, same
+  standard as every prior session that hit this environment gap.
+- No new social platforms (WhatsApp/X/LinkedIn/etc.) — flagged as a founder option.
+- No "Individual" contributor kind — pre-existing, separately tracked V1_SCOPE.md item.
+- Cover-photo manager has no drag-to-reorder (the API supports it via PATCH; the UI only
+  exposes upload/caption/delete) — kept deliberately simple per the founder's own
+  "aesthetically and simplicity minded" ask.
+- Distance-from-me needs the browser's geolocation permission; a citizen who denies it
+  (or a desktop browser with no location) simply never sees a distance line — by design,
+  never a fake number.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **✅ 2026-08-25 (latest) — the contributor wizard's real bug (cookie-only auth, not any
+> **✅ 2026-08-26 (latest) — Kingdom Discovery card redesign, contributor profile-parity
+> fixes (cover photo + public contact email + gallery + social hyperlinks), Contributor
+> map-pin redesign (+ the category-colour bug fix), and "Become a Contributor"
+> de-emphasized to Settings-only (§3AM).** Branch
+> `claude/citizens-connect-improvements-b0yhxp`. **Migration 171 applied — next migration
+> # = 172.** All gates green incl. workspace-wide turbo (Vision unaffected). Playwright
+> couldn't complete live in this session's sandbox — confirmed via an A/B stash test to
+> be a pre-existing environment limitation, not a regression (§3AM) — **watch the PR's CI
+> e2e-connect job for the real signal.**
+>
+> **✅ 2026-08-25 — the contributor wizard's real bug (cookie-only auth, not any
 > of the earlier infra fixes) found + fixed + swept across 44 more routes; portal given a
 > real URL; "no fixed location" option shipped; admin can manually create a claimable
 > Contributor. 5 PRs (#50–#54), all merged (§3AL).** **No founder action required to use
@@ -2704,6 +2881,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 ### Canonical docs (start here)
 - [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope (§3AD scoping → §3AE shipped → §3AG contributor portal, PR #42 open, 2026-08-24).** Read this first for any Connect-focused session.
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **167** live; a repo file for it exists on branch `feat/connect-contributor-portal`/PR #42, not yet on `main`; next # = **168**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **171** live; next # = **172**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).

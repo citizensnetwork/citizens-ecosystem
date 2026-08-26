@@ -29,6 +29,7 @@ const ALLOWED_KEYS = [
   "contributor_no_fixed_location",
   "logo_url",
   "gallery_urls",
+  "contributor_contact_email",
 ] as const;
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];
@@ -38,6 +39,12 @@ const MAX_URL_LENGTH = 2_000;
 const MAX_BIO = 2_000;
 const MAX_HANDLE = 80;
 const MAX_ADDRESS = 500;
+const MAX_EMAIL = 254;
+// Bounded quantifiers only — every segment has a fixed upper bound, so the
+// state space is capped by the bounds themselves, not by input length.
+// Length is also checked BEFORE this regex ever runs (defense in depth,
+// same recipe as /api/admin/contributors/create).
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,189}\.[^\s@]{1,24}$/;
 
 function normalisePublicUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -163,6 +170,19 @@ export async function POST(request: Request) {
     if (update[key] != null && typeof update[key] === "string" && (update[key] as string).length > max) {
       return NextResponse.json({ error: `${key} exceeds maximum length of ${max}` }, { status: 400 });
     }
+  }
+
+  // Public contact email: length checked BEFORE the regex ever runs (never
+  // hand an unbounded string to a pattern-match, even a ReDoS-safe one).
+  if (update.contributor_contact_email != null) {
+    const email = (update.contributor_contact_email as string).trim().toLowerCase();
+    if (email.length > MAX_EMAIL || !EMAIL_RE.test(email)) {
+      return NextResponse.json(
+        { error: "contributor_contact_email must be a valid email address" },
+        { status: 400 },
+      );
+    }
+    update.contributor_contact_email = email;
   }
 
   if (

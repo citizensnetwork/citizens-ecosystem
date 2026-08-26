@@ -44,6 +44,27 @@
   const getPlaceCategory = (id) => PLACE_CATEGORIES.find((c) => c.id === id);
   const getCategory = (id) => getEventCategory(id) || getPlaceCategory(id);
 
+  // ── Social platforms a Contributor can add a handle for (apply/onboarding
+  // inputs + the public profile's icon+hyperlink chips both key off this one
+  // table, so a platform's icon/link logic only ever lives in one place). ──
+  const stripHandle = (v) => (v || '').trim().replace(/^@/, '').replace(/\/+$/, '');
+  const asHref = (v, host) => {
+    const t = (v || '').trim();
+    if (!t) return '';
+    if (/^https?:\/\//i.test(t)) return t;
+    return 'https://' + host + '/' + stripHandle(t).replace(new RegExp('^(www\\.)?' + host.replace('.', '\\.') + '/'), '');
+  };
+  const SOCIAL_PLATFORMS = [
+    { key: 'instagram', label: 'Instagram', icon: 'Instagram', prefix: '@', urlFor: (v) => 'https://instagram.com/' + stripHandle(v).replace(/^https?:\/\/(www\.)?instagram\.com\//i, '') },
+    { key: 'youtube', label: 'YouTube', icon: 'Youtube', prefix: '/', urlFor: (v) => asHref(v, 'youtube.com') },
+    { key: 'facebook', label: 'Facebook', icon: 'Facebook', prefix: '/', urlFor: (v) => asHref(v, 'facebook.com') },
+    { key: 'tiktok', label: 'TikTok', icon: 'Music2', prefix: '@', urlFor: (v) => 'https://www.tiktok.com/@' + stripHandle(v).replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, '') },
+  ];
+  // Any future/unrecognised social key still gets a safe, clickable link —
+  // just with a generic icon instead of a mis-guessed brand one.
+  const genericUrl = (v) => { const t = (v || '').trim(); return t && !/^https?:\/\//i.test(t) ? 'https://' + t : t; };
+  const getSocialPlatform = (key) => SOCIAL_PLATFORMS.find((s) => s.key === key) || { key, label: key, icon: 'Link', urlFor: genericUrl };
+
   // ── Contributor involvement tiers ──
   const TIERS = [
     { id: 'seed',     name: 'Seed',     min: 0,  desc: 'Newly approved contributor' },
@@ -59,6 +80,8 @@
     getEventCategory,
     getPlaceCategory,
     getCategory,
+    SOCIAL_PLATFORMS,
+    getSocialPlatform,
     // Live entity arrays — populated from Supabase in store.jsx
     contributors: [],
     events: [],

@@ -146,7 +146,7 @@
             h('div', { className: 'flex flex-wrap gap-2' }, ev.upcomingDates.map((d, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' }, new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))))),
           h('div', { className: 'grid grid-cols-3 gap-2' },
             h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || ev.organizerId) }, 'Message'),
-            h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => toast('Opening ' + ev.website) }, 'Website'),
+            ev.website && h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => window.open(ev.website, '_blank', 'noopener,noreferrer') }, 'Website'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') }, 'Share')))));
   }
 
@@ -257,6 +257,7 @@
               h('h1', { className: 'text-xl text-foreground font-display' }, c.name), h(Icon, { name: 'BadgeCheck', size: 16, className: 'text-gold' })),
             h('div', { className: 'flex items-center gap-2 mt-1 flex-wrap' },
               cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.name),
+              c.kind && h('span', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap' }, c.kind),
               h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, c.followerCount.toLocaleString() + ' followers'))),
           h('div', { className: 'flex gap-2 mb-4' },
             h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
@@ -277,9 +278,16 @@
               c.noFixedLocation
                 ? h(InfoRow, { icon: 'Globe', label: 'Location', value: 'Online — no fixed location' })
                 : c.location && h(InfoRow, { icon: 'MapPin', label: 'Location', value: c.location })),
-            c.socials && Object.keys(c.socials).length > 0 && h('div', { className: 'flex gap-2' },
-              Object.entries(c.socials).map(([k, v]) => h('span', { key: k, className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' },
-                h(Icon, { name: k === 'instagram' ? 'Instagram' : k === 'youtube' ? 'Youtube' : k === 'facebook' ? 'Facebook' : 'Music2', size: 13, className: 'text-gold-dark' }), v))),
+            c.socials && Object.keys(c.socials).length > 0 && h('div', { className: 'flex gap-2 flex-wrap' },
+              Object.entries(c.socials).filter(([, v]) => v).map(([k, v]) => {
+                const platform = window.DATA.getSocialPlatform(k);
+                const href = platform.urlFor(v);
+                return h('a', {
+                  key: k, href, target: '_blank', rel: 'noopener noreferrer', title: platform.label,
+                  className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground hover:border-gold/40 transition-colors',
+                }, h(Icon, { name: platform.icon, size: 13, className: 'text-gold-dark' }), v);
+              })),
+            h(Gallery, { imgs: c.gallery }),
             cEvents.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events (' + cEvents.length + ')'),
               h('div', { className: 'grid grid-cols-2 gap-2' }, cEvents.map((e) => h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'rounded-2xl overflow-hidden border border-border bg-card text-left' },

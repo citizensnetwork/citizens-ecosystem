@@ -183,8 +183,21 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-25, project `xyiajtrvhlxaeplsiajj`, head = **mig 170**)
+## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 171**)
 
+> **2026-08-26: mig 171 (`contributor_contact_email`) APPLIED to prod.** Adds
+> `profiles.contributor_contact_email text` (nullable, `char_length <= 254`) — a genuinely
+> PUBLIC contact address a Contributor chooses to display on their listing, distinct from
+> the pre-existing private `notification_email` (platform-only, `/api/contributor/setup`)
+> and from the auth account email. Additive column only — no RLS change (`profiles`'
+> existing public-SELECT / self-UPDATE policies already cover it); no new table, no new
+> function. Self-service via `/api/contributor/profile` (bounded-regex email validation,
+> same length-checked-before-regex recipe as the mig-169/170 ReDoS fix), surfaced on
+> `/api/v1/contributors` + `/api/v1/contributors/{slug}` (aliased `contact_email`) and the
+> public `ContributorProfilePage`. **Advisors: 0 ERROR / 114 WARN / 3 INFO — byte-identical
+> to the head-170 baseline, 0 new findings** (a plain nullable column + check constraint
+> introduces no new advisory-flagged surface).
+>
 > **2026-08-25: mig 169+170 (admin-created, claimable Contributor listings) APPLIED to prod.**
 > Lets an admin manually create a Contributor listing that goes live on the map/Kingdom
 > Discovery immediately, tied to an email the real owner later claims. `profiles` gains

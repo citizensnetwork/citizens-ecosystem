@@ -4,7 +4,7 @@
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { useState } = React;
+  const { useState, useEffect } = React;
   const { cx, Avatar, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
   const Icon = window.Icon;
 
@@ -155,6 +155,45 @@
         : h('p', { className: 'text-[11px] text-muted-foreground text-center py-2' }, 'Maximum ' + max + ' photos.'));
   }
 
+  // ── Cover photo manager — /api/contributor/cover-photos already existed,
+  // fully built and tested (upload, caption, reorder, delete, 5-photo cap);
+  // it just had no dashboard UI calling it. Saves eagerly on each action
+  // (its own API, distinct from the batched "Save Profile" button below) so
+  // there's nothing to lose by navigating away mid-edit.
+  function CoverPhotoManager({ photos }) {
+    const { addCoverPhoto, deleteCoverPhoto, updateCoverPhotoCaption } = window.useApp();
+    const list = photos || [];
+    const [uploading, setUploading] = useState(false);
+    const [captions, setCaptions] = useState(() => list.map((p) => p.caption || ''));
+    useEffect(() => setCaptions(list.map((p) => p.caption || '')), [photos]);
+    const onFile = (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      setUploading(true);
+      addCoverPhoto(file, '', () => setUploading(false));
+    };
+    return h('div', { className: 'space-y-2' },
+      h('div', { className: 'flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1' },
+        list.map((p, i) => h('div', { key: p.url + i, className: 'shrink-0 w-32' },
+          h('div', { className: 'relative w-32 h-20 rounded-xl overflow-hidden border border-border bg-muted' },
+            h('img', { src: p.url, className: 'w-full h-full object-cover' }),
+            i === 0 && h('span', { className: 'absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md bg-black/55 text-white text-[8px] font-bold' }, 'COVER'),
+            h('button', { type: 'button', onClick: () => deleteCoverPhoto(i), className: 'absolute top-1 right-1 w-5 h-5 rounded-full bg-black/55 text-white flex items-center justify-center' }, h(Icon, { name: 'X', size: 10 }))),
+          h('input', {
+            value: captions[i] || '', placeholder: 'Caption…',
+            onChange: (e) => setCaptions((c) => c.map((v, j) => (j === i ? e.target.value : v))),
+            onBlur: (e) => { if (e.target.value !== (p.caption || '')) updateCoverPhotoCaption(i, e.target.value); },
+            className: 'mt-1 w-full text-[10px] bg-transparent outline-none text-muted-foreground placeholder:text-muted-foreground/60 border-b border-transparent focus:border-gold/40',
+          }))),
+        list.length < 5 && h('label', { className: cx('shrink-0 w-32 h-20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-gold/40 transition-colors', uploading && 'opacity-60 pointer-events-none') },
+          h('input', { type: 'file', accept: 'image/*', className: 'hidden', onChange: onFile, disabled: uploading }),
+          uploading
+            ? h('span', { className: 'w-5 h-5 rounded-full border-2 border-gold border-t-transparent spin' })
+            : h(F, null, h(Icon, { name: 'ImagePlus', size: 16, className: 'text-gold-dark' }), h('span', { className: 'text-[10px] font-bold text-muted-foreground' }, 'Add photo')))),
+      h('p', { className: 'text-[11px] text-muted-foreground' }, 'The first photo is your public cover image. Up to 5.'));
+  }
+
   // ── Profile tab — the missing "edit later" surface. Every field here is
   // already accepted and validated by POST /api/contributor/profile; that
   // route just had no UI calling it after the one-time onboarding wizard.
@@ -163,6 +202,7 @@
       profilePhoto: contributor.profilePhoto || '',
       bio: contributor.bio || '',
       website: contributor.website || '',
+      contactEmail: contributor.contactEmail || '',
       location: contributor.location || '',
       noFixedLocation: !!contributor.noFixedLocation,
       socials: contributor.socials || {},
@@ -179,8 +219,12 @@
           h('div', { className: 'w-24 shrink-0' }, h(Field, { label: 'Logo' }, h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
           h('div', { className: 'flex-1 space-y-1' },
             h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
+        h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on Kingdom Discovery cards.' },
+          h(CoverPhotoManager, { photos: contributor.coverPhotos })),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
+          h(Field, { label: 'Public contact email', hint: 'Shown to citizens — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
+        h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
         h(Toggle, {
           checked: f.noFixedLocation, onChange: setNoFixedLocation,

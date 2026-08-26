@@ -88,8 +88,11 @@ test.describe("Kingdom Discovery — v1 self-serve go-live", () => {
     // authed is seeded and CC_AUTH is null (no session bootstrap to fight it).
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // ── Apply ──
-    await page.getByRole("button", { name: "Apply Now" }).click();
+    // ── Apply — reached via Settings. "Become a Contributor" was moved out
+    //     of the always-visible sidebar/account-menu and now lives only
+    //     under a citizen's own profile management (Settings). ──
+    await page.evaluate(() => window.__cc.go("settings"));
+    await page.getByRole("button", { name: "Apply to become a Contributor" }).click();
     await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
 
     const orgName = "Grace Test Ministry";

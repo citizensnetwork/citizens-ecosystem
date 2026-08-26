@@ -85,6 +85,17 @@ lineage — backfilled this session.
 | Root-cause fix for the map/DB not rendering in production: `turbo.json` had no declared env vars, so Vercel's Turborepo strict mode was stripping them from the build | `turbo.json` (`globalEnv`) |
 | Local-dev fix: `scripts/build-frontend.js` now loads `.env.local` itself (previously only `next dev`/`next build` did, never the plain-Node pre-build step) | `apps/connect/scripts/build-frontend.js` |
 
+### Added session 5 (2026-08-26 — Kingdom Discovery redesign, contributor profile parity, map pin redesign, RESUME_HERE.md §3AM)
+
+| Feature | Where |
+|---|---|
+| Kingdom Discovery cards redesigned: medium card, category-colour border, cover photo + organiser/own logo badge, description/location/date/distance/counters, heart+website+share+primary-CTA action row | `kingdom-discovery.jsx` |
+| Contributor map pin: circular logo (ringed in category colour) or category-colour icon pin, replacing the generic gold pin the category-select bug had been silently forcing | `map.jsx`, `home.jsx` |
+| Contributor data pipeline hardened against the category/lat-lng drift bug (one shared select constant) | `store.jsx` (`CONTRIBUTOR_SELECT`) |
+| Cover photo (existing, unused API) and a new public contact email wired end-to-end: Dashboard editor → API → public profile/API | `dashboard.jsx`, `/api/contributor/profile`, `/api/v1/contributors*`, migration 171 |
+| Public profile parity fixes: gallery now renders, kind badge, real per-platform social hyperlinks (shared `data.jsx` `SOCIAL_PLATFORMS` table) | `profiles.jsx`, `data.jsx`, `apply.jsx` |
+| "Become a Contributor" de-emphasized to Settings-only (removed from the account-menu and the always-visible sidebar promo card) | `shell.jsx` |
+
 ## 3. Objectives and plans
 
 - Ship a minimal, repeatable loop: add a Contributor, Place, or Event with only essential fields; see it in a scrollable list; see it on the map with correct category color; open it for contact details and external links.
