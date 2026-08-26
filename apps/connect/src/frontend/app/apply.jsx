@@ -15,12 +15,9 @@
   const { cx, Field, Input, Textarea, Button, Toggle, MediaPicker, Stepper, Avatar } = window.UI;
   const Icon = window.Icon;
 
-  const SOCIALS = [
-    { key: 'instagram', label: 'Instagram', icon: 'Instagram', prefix: '@' },
-    { key: 'youtube', label: 'YouTube', icon: 'Youtube', prefix: '/' },
-    { key: 'facebook', label: 'Facebook', icon: 'Facebook', prefix: '/' },
-    { key: 'tiktok', label: 'TikTok', icon: 'Music2', prefix: '@' },
-  ];
+  // Canonical platform list (icon + URL-builder) lives in data.jsx — reused
+  // here for input icons and by profiles.jsx for the public display links.
+  const SOCIALS = window.DATA.SOCIAL_PLATFORMS;
 
   // single-select category grid
   function CategoryGrid({ value, onChange }) {

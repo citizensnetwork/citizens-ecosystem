@@ -90,6 +90,8 @@ never exposed in this response.
       "physical_latitude": -25.7479,
       "physical_longitude": 28.2293,
       "no_fixed_location": false,
+      "cover_photo_urls": [ { "url": "https://…", "caption": "Sunday service" } ],
+      "contact_email": "hello@rootedpretoria.org",
       "created_at": "2026-…"
     }
   ],
@@ -102,6 +104,15 @@ without a permanent office — `physical_address`/`physical_latitude`/
 `physical_longitude` are intentionally `null` in that case, and the
 contributor is deliberately excluded from map markers (still listed here and
 in Kingdom Discovery).
+
+`cover_photo_urls` (added migration 100, exposed here from migration 171
+onward) is an ordered array managed via `/api/contributor/cover-photos`
+(upload/caption/reorder/delete, up to 5) — the first entry is the
+contributor's public hero image. `contact_email` (added migration 171,
+column `contributor_contact_email`) is a public-facing address the
+contributor chooses to display — `null` until they set one via
+`/api/contributor/profile`, and distinct from any private/notification
+email the platform holds for them.
 
 ---
 

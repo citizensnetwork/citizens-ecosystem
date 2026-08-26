@@ -57,6 +57,18 @@
       return (await res.json()).avatar_url;
     }
 
+    if (scope === 'contributor-cover') {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (opts.caption) fd.append('caption', opts.caption);
+      // NB: do NOT set Content-Type — the browser adds the multipart boundary itself.
+      const res = await fetch(base + '/api/contributor/cover-photos', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd,
+      });
+      if (!res.ok) throw await readErr(res, 'Could not upload your cover photo. Please try again.');
+      return (await res.json()).photos;
+    }
+
     // Cover scopes: mint a signed upload URL, then push the bytes to Storage directly.
     const signRes = await authedFetch('/api/media/upload', {
       method: 'POST',
@@ -226,9 +238,18 @@
       kind: r.contributor_kind || 'organization',
       slug: r.contributor_slug || null,
       profilePhoto: r.logo_url || r.avatar_url || '',
-      coverPhoto: '',
+      // cover_photo_urls is an ordered [{url, caption}] array (POST/PATCH/
+      // DELETE /api/contributor/cover-photos) — the first entry is the
+      // public hero image; the full array is kept as coverPhotos for the
+      // dashboard's cover-photo manager.
+      coverPhoto: (Array.isArray(r.cover_photo_urls) && r.cover_photo_urls[0] && r.cover_photo_urls[0].url) || '',
+      coverPhotos: Array.isArray(r.cover_photo_urls) ? r.cover_photo_urls : [],
       bio: r.bio || '',
       website: r.website_url || '',
+      // Public-facing contact email a contributor chooses to display —
+      // distinct from the private notification_email (see /api/contributor/
+      // profile). Honestly blank until they set one; never fabricated.
+      contactEmail: r.contact_email || '',
       location: r.physical_address || '',
       // Map presence: category sets pin colour/icon (window.DATA.getCategory);
       // lat/lng comes from a forward-geocode of physical_address done at
@@ -251,6 +272,17 @@
       verified: true,
     };
   }
+
+  // Every direct `profiles` select that feeds adaptContributor() MUST use
+  // this exact column list. Three call sites each hand-copied a subset in
+  // the past and drifted (missing category broke map-pin colours; missing
+  // lat/lng on the sign-in hydration effect could wipe a contributor's map
+  // presence entirely on re-hydration since it's merged over the existing
+  // record). One constant, used everywhere, so that can't happen again.
+  const CONTRIBUTOR_SELECT = 'id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, ' +
+    'website_url, category:contributor_category, physical_address, physical_latitude, physical_longitude, ' +
+    'no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url, ' +
+    'gallery_urls, cover_photo_urls, contact_email:contributor_contact_email';
 
   // API place row (public /api/v1/places) → app place shape. Places carry real
   // lat/lng (NOT NULL in the DB) so they anchor on the map directly. The public
@@ -1059,13 +1091,16 @@
               physical_longitude: form.noFixedLocation ? null : (onboardGeo ? onboardGeo.lng : undefined),
               logo_url: form.profilePhoto && /^https:\/\//i.test(form.profilePhoto) ? form.profilePhoto : undefined,
               instagram_handle: socials.instagram || undefined,
+              facebook_url: asUrl(socials.facebook) || undefined,
               tiktok_handle: socials.tiktok || undefined,
+              youtube_url: asUrl(socials.youtube) || undefined,
+              contributor_contact_email: form.contactEmail || undefined,
             }),
           }).catch(() => {});
           // Refresh identity from the DB (slug included) so the dashboard is real.
           const { data: prof } = await window.CC_SUPABASE
             .from('profiles')
-            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url')
+            .select(CONTRIBUTOR_SELECT)
             .eq('id', realUser.id)
             .maybeSingle();
           const org = prof ? { ...adaptContributor(prof), isMine: true } : localOrg;
@@ -1109,9 +1144,10 @@
         tiktok_handle: fields.socials ? (fields.socials.tiktok || '') : undefined,
         youtube_url: fields.socials && fields.socials.youtube !== undefined ? asUrl(fields.socials.youtube) : undefined,
         gallery_urls: fields.gallery ?? undefined,
+        contributor_contact_email: fields.contactEmail !== undefined ? (fields.contactEmail || null) : undefined,
       };
       if (!realUser) {
-        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
+        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, contactEmail: fields.contactEmail !== undefined ? fields.contactEmail : prev.contactEmail, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
         toast('Profile updated.', 'green');
         finish(true);
         return;
@@ -1135,11 +1171,11 @@
           }
           const { data: prof } = await window.CC_SUPABASE
             .from('profiles')
-            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, physical_latitude, physical_longitude, no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url, gallery_urls')
+            .select(CONTRIBUTOR_SELECT)
             .eq('id', realUser.id)
             .maybeSingle();
           if (prof) {
-            const org = { ...adaptContributor(prof), isMine: true, gallery: prof.gallery_urls || [] };
+            const org = { ...adaptContributor(prof), isMine: true };
             setContributors((prev) => { const byId = new Map(prev.map((c) => [c.id, c])); byId.set(org.id, org); return [...byId.values()]; });
             setMyContributor(org);
           }
@@ -1152,6 +1188,67 @@
         }
       })();
     }, [activeContributor, realUser, toast]);
+
+    // ── Cover photos ── consumes the already-built, tested multi-photo store
+    // (/api/contributor/cover-photos: POST upload+append, PATCH reorder/
+    // caption, DELETE by index; up to 5, first = the public hero image). This
+    // had no dashboard UI at all until now.
+    const applyCoverPhotos = useCallback((photos) => {
+      const patch = { coverPhotos: photos, coverPhoto: (photos[0] && photos[0].url) || '' };
+      setMyContributor((prev) => (prev ? { ...prev, ...patch } : prev));
+      setContributors((prev) => prev.map((c) => (c.id === activeContributorId ? { ...c, ...patch } : c)));
+    }, [activeContributorId]);
+
+    const addCoverPhoto = useCallback((file, caption, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser) { toast('Sign in with Google to upload a cover photo.', 'gold'); finish(false); return; }
+      (async () => {
+        try {
+          const photos = await uploadImage(file, { scope: 'contributor-cover', caption });
+          applyCoverPhotos(photos);
+          toast('Cover photo added.', 'green');
+          finish(true);
+        } catch (e) {
+          toast((e && e.message) || 'Could not upload your cover photo.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast, applyCoverPhotos]);
+
+    const deleteCoverPhoto = useCallback((index, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser) { finish(false); return; }
+      (async () => {
+        try {
+          const res = await authedFetch('/api/contributor/cover-photos?index=' + index, { method: 'DELETE' });
+          if (!res.ok) { toast('Could not remove that photo — please try again.', 'red'); finish(false); return; }
+          const { photos } = await res.json();
+          applyCoverPhotos(photos);
+          finish(true);
+        } catch (e) {
+          toast('Could not remove that photo — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast, applyCoverPhotos]);
+
+    const updateCoverPhotoCaption = useCallback((index, caption, done) => {
+      const finish = (ok) => { if (done) done(ok); };
+      if (!realUser) { finish(false); return; }
+      const current = (activeContributor.coverPhotos || []).map((p, i) => (i === index ? { ...p, caption } : p));
+      (async () => {
+        try {
+          const res = await authedFetch('/api/contributor/cover-photos', { method: 'PATCH', body: JSON.stringify({ photos: current }) });
+          if (!res.ok) { toast('Could not save that caption — please try again.', 'red'); finish(false); return; }
+          const { photos } = await res.json();
+          applyCoverPhotos(photos);
+          finish(true);
+        } catch (e) {
+          toast('Could not save that caption — please try again.', 'red');
+          finish(false);
+        }
+      })();
+    }, [realUser, toast, applyCoverPhotos, activeContributor]);
 
     // ── News posts ──  A contributor-authored update feed shown on their own
     // listing page — separate from the ephemeral 24h Broadcast map bubble.
@@ -1816,7 +1913,7 @@
         try {
           const { data } = await sb
             .from('profiles')
-            .select('id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, website_url, physical_address, instagram_handle, facebook_url, tiktok_handle, youtube_url')
+            .select(CONTRIBUTOR_SELECT)
             .eq('id', realUser.id)
             .maybeSingle();
           if (!active || !data) return;
@@ -2149,7 +2246,8 @@
       unreadNotifs, unreadMsgs, toasts, toast,
       createKind, createEditing, openCreate, closeCreate, updateAvatar,
       updateEvent, setEventStatus, updatePlace, setPlaceStatus,
-      updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
+      updateContributorProfile, addCoverPhoto, deleteCoverPhoto, updateCoverPhotoCaption,
+      newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
       adminStats, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref,
       creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,

@@ -45,6 +45,24 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
+  // Raw-DOM Lucide icon builder — mirrors icons.jsx's <Icon>, but map pins
+  // are plain DOM nodes (MapLibre markers), not React, so it can't reuse
+  // that component. Reads the same window.lucide UMD data, so any name the
+  // rest of the app already uses is safe to pass here.
+  function lucideSvgString(name, opts) {
+    const size = (opts && opts.size) || 16;
+    const color = (opts && opts.color) || '#fff';
+    const lib = window.lucide && window.lucide.icons;
+    const node = lib && lib[name];
+    if (!node) return '';
+    const inner = node.map(([tag, attrs]) => {
+      const attrStr = Object.keys(attrs).map((k) => k + '="' + attrs[k] + '"').join(' ');
+      return '<' + tag + ' ' + attrStr + '></' + tag + '>';
+    }).join('');
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color +
+      '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+
   // ── Pin content builder ─────────────────────────────────────────────
   //  Returns the INNER node (a position:relative wrapper holding the pulse
   //  ring, the pin shape, the broadcast bubble and the selected label).
@@ -75,7 +93,28 @@
     }
 
     const pin = document.createElement('span');
-    if (pinStyle === 'dot') {
+    if (m.type === 'contributor') {
+      // Contributors always render as a circular floating pin — a logo photo
+      // ringed in the category colour when one exists, else a colour-filled
+      // category glyph — regardless of the global teardrop/dot/glass pinStyle
+      // tweak (that setting is about events/places, which have no logo).
+      const d = selected ? 46 : 36;
+      pin.style.cssText = 'display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
+        'px;border-radius:50%;background:' + fill + ';box-shadow:0 3px 8px rgba(0,0,0,.3);transition:all .15s;';
+      const glyph = () => { pin.innerHTML = lucideSvgString(cat ? cat.icon : 'Building2', { size: Math.round(d * 0.45), color: '#fff' }); };
+      if (m.profilePhoto) {
+        const img = document.createElement('img');
+        img.src = m.profilePhoto;
+        img.alt = '';
+        img.style.cssText = 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;';
+        // A broken/missing photo falls back to the category glyph rather
+        // than an empty ring — never a dead image icon on the map.
+        img.onerror = glyph;
+        pin.appendChild(img);
+      } else {
+        glyph();
+      }
+    } else if (pinStyle === 'dot') {
       const d = selected ? 22 : 16;
       pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
         'px;border:2.5px solid #fff;border-radius:50%;background:' + fill +
@@ -244,7 +283,10 @@
         const cat = window.DATA.getCategory(m.category);
         const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
         const selected = selectedId === m.id;
-        const anchor = pinStyle === 'teardrop' ? 'bottom' : 'center';
+        // Contributor pins are always circular (see buildPinInner), so their
+        // natural anchor is always 'center' — the teardrop pinStyle's
+        // 'bottom' anchor is only correct for the pointed teardrop shape.
+        const anchor = (m.type !== 'contributor' && pinStyle === 'teardrop') ? 'bottom' : 'center';
         const inner = buildPinInner(m, cat, { selected, pinStyle, onDismissBubble: onDismissBubbleRef.current });
         const existing = markerObjs.current.get(m.id);
         // Reuse the marker (and its MapLibre-owned outer element) whenever the

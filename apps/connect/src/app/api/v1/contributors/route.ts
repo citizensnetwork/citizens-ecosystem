@@ -76,6 +76,8 @@ export async function GET(request: Request) {
         "physical_latitude",
         "physical_longitude",
         "no_fixed_location:contributor_no_fixed_location",
+        "cover_photo_urls",
+        "contact_email:contributor_contact_email",
         "created_at",
       ].join(","),
       { count: "exact" },
