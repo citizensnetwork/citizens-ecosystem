@@ -61,11 +61,11 @@
     return false;
   }
   // Titles only earn their space once you are close enough to read a
-  // neighbourhood; below that they'd overlap into mush. Raised from 12.6 →
-  // 15.6 → 18 (2026-08-26) — names were still overlapping at 15.6, so pushed
-  // further in. The selected pin keeps its label at every zoom (CSS
-  // `.cc-pin-label.is-selected`).
-  const ZOOM_LABELS = 18;
+  // neighbourhood; below that they'd overlap into mush. Tuned 12.6 → 15.6 →
+  // 18 → 16.5 (2026-08-26) — 18 was too tight (labels almost never showed at
+  // normal browsing zoom), so pulled back in. The selected pin keeps its
+  // label at every zoom (CSS `.cc-pin-label.is-selected`).
+  const ZOOM_LABELS = 16.5;
 
   function coordsFor(m) {
     if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
