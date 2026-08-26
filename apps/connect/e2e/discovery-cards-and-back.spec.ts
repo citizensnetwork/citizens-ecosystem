@@ -38,7 +38,16 @@ const EVENT = {
   location: "1186 Burnett Street, Hatfield, Pretoria",
   category: "church-services",
   image_url: null,
-  website_url: null,
+  website_url: "https://example.org/event",
+  // A handle, a scheme-less link and a full URL — the three shapes a real
+  // contributor actually types, all of which must become working links.
+  instagram_url: "@hatfieldsunday",
+  facebook_url: "facebook.com/hatfieldsunday",
+  tiktok_url: null,
+  youtube_url: "https://youtube.com/@hatfieldsunday",
+  x_url: null,
+  linkedin_url: null,
+  whatsapp_url: null,
   latitude: PRETORIA.lat,
   longitude: PRETORIA.lng,
   created_by: ORG_ID,
@@ -58,6 +67,13 @@ const PLACE = {
   phone: "",
   website: "",
   open_hours: "Mon-Fri 08:00-17:00",
+  instagram_url: "@brooklynanchor",
+  facebook_url: null,
+  tiktok_url: null,
+  youtube_url: null,
+  x_url: null,
+  linkedin_url: null,
+  whatsapp_url: null,
   latitude: PRETORIA.lat + 0.02,
   longitude: PRETORIA.lng + 0.02,
   created_by: ORG_ID,
@@ -141,8 +157,11 @@ test.describe("Kingdom Discovery cards render at full size", () => {
     const screen = page.locator('[data-screen="kingdom-discovery"]');
     await expect(screen).toBeVisible();
 
-    const card = screen.getByRole("button", { name: /Hatfield Sunday Celebration/ }).first();
-    await expect(card).toBeVisible({ timeout: 15_000 });
+    // Tapping the card opens it, so band + title are one <button>; the card
+    // itself is the [data-entity-card] box, which is what must have height.
+    const tapTarget = screen.getByRole("button", { name: /Hatfield Sunday Celebration/ }).first();
+    await expect(tapTarget).toBeVisible({ timeout: 15_000 });
+    const card = screen.locator('[data-entity-card="event"]').first();
 
     // THE regression guard: the collapsed state measured ~2px tall.
     const box = await card.boundingBox();
@@ -155,9 +174,26 @@ test.describe("Kingdom Discovery cards render at full size", () => {
     await expect(screen.getByText("1186 Burnett Street, Hatfield, Pretoria")).toBeVisible();
     await expect(screen.getByText(/connected/)).toBeVisible();
     await expect(screen.getByText(/considering/)).toBeVisible();
-    await expect(screen.getByRole("button", { name: "View" }).first()).toBeVisible();
+    await expect(screen.getByRole("button", { name: "View Full Profile" }).first()).toBeVisible();
     await expect(screen.getByRole("button", { name: /Consider|Remove from considering/ }).first()).toBeVisible();
     await expect(screen.getByRole("button", { name: "Share" }).first()).toBeVisible();
+
+    // Socials on the card itself — one link per handle the row carries, each
+    // pointing at the real platform URL whether the value was stored as a
+    // handle, a scheme-less link or a full URL.
+    const eventCard = card;
+    await expect(eventCard.getByRole("link", { name: "Instagram" })).toHaveAttribute(
+      "href", "https://instagram.com/hatfieldsunday",
+    );
+    await expect(eventCard.getByRole("link", { name: "Facebook" })).toHaveAttribute(
+      "href", "https://facebook.com/hatfieldsunday",
+    );
+    await expect(eventCard.getByRole("link", { name: "YouTube" })).toHaveAttribute(
+      "href", "https://youtube.com/@hatfieldsunday",
+    );
+    // …and a brand mark beside each, not the empty <svg> lucide 1.x leaves
+    // behind for a name it no longer ships.
+    await expect(eventCard.getByRole("link", { name: "Instagram" }).locator("svg path")).toHaveCount(1);
 
     // An uncategorised Contributor still says what kind of organisation it is.
     await page.getByRole("button", { name: "Contributors", exact: true }).click();
@@ -210,15 +246,164 @@ test.describe("Device Back button", () => {
     await page.goBack();
     await expect.poll(() => screenName(page)).toBe("discover");
 
-    // An open overlay is dismissed BEFORE the screen changes.
-    await page.getByRole("button", { name: "Filter by category" }).click();
-    await expect(page.getByRole("heading", { name: "Browse Categories" })).toBeVisible();
+    // An open overlay is dismissed BEFORE the screen changes. (The category
+    // sheet this used to open no longer exists — it duplicated the pill row —
+    // so the account panel, the app's one profile entry point, stands in.)
+    await page.getByRole("button", { name: "Your account" }).click();
+    await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("heading", { name: "Browse Categories" })).toBeHidden();
+    await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
     await expect.poll(() => screenName(page)).toBe("discover");
 
     // At the root with nothing open, Back really does leave — never a trap.
     await page.goBack();
     await expect.poll(() => page.url()).toContain("manifest.json");
+  });
+});
+
+test.describe("One card, both surfaces", () => {
+  test("a map pin's preview and the Kingdom Exploration card are the same component with the same socials", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+
+    // Open the pin preview. It renders window.EntityCard at layout='panel' —
+    // the SAME component the list renders at layout='grid'.
+    await page.locator('[data-cc-pin="event"]').first().click();
+    const panel = page.locator('[data-entity-card="event"]');
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+
+    // Everything the founder asked to see on a listing, on the MAP side too:
+    // the socials (which the preview never had), a real website control (it
+    // used to be a toast that opened nothing) and the route to the profile.
+    await expect(panel.getByRole("link", { name: "Instagram" })).toHaveAttribute(
+      "href", "https://instagram.com/hatfieldsunday",
+    );
+    await expect(panel.getByRole("link", { name: "YouTube" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "View Full Profile" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Website" })).toBeVisible();
+    await expect(panel.getByText("Hatfield Sunday Celebration")).toBeVisible();
+
+    // And it opens the same screen a card does.
+    await panel.getByRole("button", { name: "View Full Profile" }).click();
+    await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 10_000 });
+    // The full profile lists every handle, with its brand mark. The chip shows
+    // the handle as text, so its accessible name is "<Platform> — <handle>"
+    // (the compact row on a card is icon-only and is named by the platform
+    // alone) — a logo is not a label a screen reader can read.
+    await expect(page.getByRole("link", { name: /^Instagram/ })).toHaveAttribute(
+      "href", "https://instagram.com/hatfieldsunday",
+    );
+    await expect(page.getByRole("link", { name: /^Instagram/ })).toHaveAccessibleName(
+      "Instagram — @hatfieldsunday",
+    );
+    await expect(page.getByRole("link", { name: /^Facebook/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^YouTube/ })).toBeVisible();
+  });
+});
+
+test.describe("Map density gates and pin labels", () => {
+  test("places drop out at provincial zoom, events at national, contributors never", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+
+    const pin = (shape: string) =>
+      page.locator(`.maplibregl-marker:has([data-cc-pin="${shape}"])`).first();
+    // City zoom (the default framing): everything is on the map.
+    await expect(pin("place")).toBeVisible();
+    await expect(pin("event")).toBeVisible();
+    await expect(pin("contributor")).toBeVisible();
+
+    // Zoom out to provincial scale — MapLibre's own wheel/keyboard zoom, so
+    // the gate is exercised through the same path a real user takes.
+    await page.locator(".cc-map").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Shift+Minus");
+    await page.waitForTimeout(1200);
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Minus");
+      await page.waitForTimeout(250);
+    }
+    await expect(pin("place")).toBeHidden({ timeout: 10_000 });
+    await expect(pin("contributor")).toBeVisible();
+    await expect(page.locator("[data-zoom-hint]")).toBeVisible();
+  });
+
+  test("pin names float on a mist, with no capsule around them", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+
+    // Selecting a pin names it at ANY zoom.
+    await page.locator('[data-cc-pin="place"]').first().click();
+    const label = page.locator(".cc-pin-label.is-selected").first();
+    await expect(label).toBeVisible();
+    await expect(label.locator(".cc-pin-label-text")).toHaveText("Brooklyn Anchor Campus");
+
+    const style = await label.locator(".cc-pin-label-mist").evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { filter: cs.filter, background: cs.backgroundColor };
+    });
+    // The mist is a real blur, not a bordered white pill.
+    expect(style.filter).toContain("blur");
+
+    const text = await label.locator(".cc-pin-label-text").evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { weight: cs.fontWeight, size: parseFloat(cs.fontSize), shadow: cs.textShadow };
+    });
+    expect(Number(text.weight)).toBeGreaterThanOrEqual(700);
+    expect(text.size).toBeGreaterThanOrEqual(12);
+    expect(text.shadow).not.toBe("none");
+  });
+});
+
+test.describe("One profile entry point", () => {
+  test("the account control is top-right on every screen and the bottom bar has no profile tab", async ({ page }) => {
+    await mockNetwork(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+
+    // The bottom bar's fifth slot is Kingdom Exploration now, not "You" —
+    // whose panel opened past the bottom edge of the screen and was unusable.
+    const bottomNav = page.locator("nav.md\\:hidden");
+    await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
+    await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
+
+    // Exactly one account control, and its panel opens inside the viewport.
+    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
+    await page.getByRole("button", { name: "Your account" }).click();
+    const panel = page.getByRole("button", { name: /View Profile/ });
+    await expect(panel).toBeVisible();
+    const box = await panel.boundingBox();
+    const vp = page.viewportSize()!;
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
+    await page.keyboard.press("Escape");
+
+    // Same control, same corner, on the list screen.
+    await bottomNav.getByRole("button", { name: "Explore" }).click();
+    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
+  });
+
+  test("the map's top bar is search + account only, and categories are one scrollable row", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    const screen = page.locator('[data-screen="discover"]');
+    await expect(screen).toBeVisible({ timeout: 15_000 });
+
+    // The duplicate controls are gone: no category sheet trigger, no list button.
+    await expect(page.getByRole("button", { name: "Filter by category" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Kingdom Discovery" })).toHaveCount(0);
+
+    // One row, starting with All, carrying BOTH category sets (the only thing
+    // the removed sheet offered that the row did not).
+    await expect(page.getByRole("button", { name: "All categories" })).toBeVisible();
+    await expect(screen.getByRole("button", { name: /Church$/ }).first()).toBeVisible();
+    await expect(screen.getByRole("button", { name: /Cafés/ }).first()).toBeAttached();
   });
 });

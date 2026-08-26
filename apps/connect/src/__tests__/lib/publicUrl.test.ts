@@ -3,6 +3,7 @@ import {
   normalisePublicUrl,
   coercePublicUrl,
   hasUnsafeScheme,
+  normaliseSocialValue,
   MAX_PUBLIC_URL_LENGTH,
 } from "@/lib/publicUrl";
 
@@ -93,5 +94,50 @@ describe("coercePublicUrl", () => {
     expect(coercePublicUrl("")).toBeNull();
     expect(coercePublicUrl("   ")).toBeNull();
     expect(coercePublicUrl(null)).toBeNull();
+  });
+});
+
+describe("normaliseSocialValue", () => {
+  it("keeps a bare handle exactly as typed", () => {
+    // The bug this exists to prevent: a person types "@ourchurch" into the
+    // Facebook box (a column the schema happens to call facebook_URL) and the
+    // route, which rejects on the FIRST bad field, 400s the whole profile save
+    // — losing every OTHER handle they filled in at the same time.
+    for (const handle of ["@ourchurch", "ourchurch", "dam_cool_bois", "@dam.cool"]) {
+      expect(normaliseSocialValue(handle)).toBe(handle);
+    }
+  });
+
+  it("normalises a URL-shaped value the same way coercePublicUrl does", () => {
+    expect(normaliseSocialValue("facebook.com/ourchurch")).toBe(
+      "https://facebook.com/ourchurch",
+    );
+    expect(normaliseSocialValue("https://instagram.com/ourchurch")).toBe(
+      "https://instagram.com/ourchurch",
+    );
+  });
+
+  it("treats absent and empty as 'no value', never as a rejection", () => {
+    expect(normaliseSocialValue(undefined)).toBeNull();
+    expect(normaliseSocialValue(null)).toBeNull();
+    expect(normaliseSocialValue("")).toBeNull();
+    expect(normaliseSocialValue("   ")).toBeNull();
+  });
+
+  it("still refuses a dangerous scheme, handle-shaped or not", () => {
+    for (const bad of [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+    ]) {
+      expect(normaliseSocialValue(bad)).toBeUndefined();
+    }
+  });
+
+  it("rejects a non-string and anything over the length bound", () => {
+    expect(normaliseSocialValue(42)).toBeUndefined();
+    expect(normaliseSocialValue({})).toBeUndefined();
+    expect(normaliseSocialValue("a".repeat(MAX_PUBLIC_URL_LENGTH + 1))).toBeUndefined();
   });
 });

@@ -75,3 +75,50 @@ export function coercePublicUrl(
   const candidate = EXPLICIT_SCHEME_RE.test(trimmed) ? trimmed : `https://${trimmed}`;
   return normalisePublicUrl(candidate, maxLength + "https://".length);
 }
+
+/**
+ * A social field's value, which may legitimately be EITHER a URL or a bare
+ * handle — and until now was not.
+ *
+ * Half the social columns are URL-shaped (`facebook_url`, `youtube_url`,
+ * `linkedin_url`) and half are handle-shaped (`instagram_handle`,
+ * `tiktok_handle`, `x_handle`), but a person filling in a form does not know
+ * or care which. Typing `@ourchurch` into the Facebook box used to fail
+ * `normalisePublicUrl`, and because the profile route rejects on the FIRST bad
+ * field, that one keystroke took the WHOLE profile save down with it — which
+ * is why a real contributor ended up with one social handle stored out of the
+ * several they filled in.
+ *
+ * The rule, for every platform and every column:
+ *   · empty            → null (an explicit clear)
+ *   · dangerous scheme → rejected, always ("javascript:" is not a typo)
+ *   · URL-shaped       → coerced + validated exactly as before
+ *   · anything else    → kept verbatim as a handle
+ *
+ * A stored handle is never rendered raw: the client turns it into a platform
+ * URL through `window.DATA.SOCIAL_PLATFORMS[].urlFor()`, and every render site
+ * still passes the result through `UI.safeUrl()`. So "keep it verbatim" adds
+ * no XSS surface — it just stops a handle being mistaken for a broken link.
+ *
+ * Returns `undefined` — and ONLY then — when the caller should reject the
+ * request. An absent field (`undefined` in, because the client simply did not
+ * send that platform) is not a rejection: it reads as "no value", i.e. `null`.
+ */
+export function normaliseSocialValue(
+  value: unknown,
+  maxLength: number = MAX_PUBLIC_URL_LENGTH,
+): string | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > maxLength) return undefined;
+  if (hasUnsafeScheme(trimmed)) return undefined;
+  // URL-shaped: an explicit http(s) scheme, or a dotted host before any path
+  // ("facebook.com/us"). A bare "@handle" or "ourchurch" has neither.
+  const beforePath = trimmed.split(/[/?#]/, 1)[0];
+  const looksLikeUrl = EXPLICIT_SCHEME_RE.test(trimmed) || /^[^\s@]+\.[a-z]{2,}$/i.test(beforePath);
+  if (!looksLikeUrl) return trimmed;
+  const coerced = coercePublicUrl(trimmed, maxLength);
+  return coerced === null ? undefined : coerced;
+}

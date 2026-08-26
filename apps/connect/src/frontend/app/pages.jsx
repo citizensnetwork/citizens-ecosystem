@@ -8,11 +8,15 @@
   const { cx, Avatar, Button, Field, Input, Textarea, Toggle, Segmented, MediaPicker, Empty } = window.UI;
   const Icon = window.Icon;
 
+  // Every Header-based screen carries the SAME top-right account control the
+  // map and Kingdom Exploration do — one profile entry point, one corner, no
+  // duplicate in the bottom bar (where its panel used to open off-screen).
   function Header({ icon, title, sub, right }) {
     return h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0 flex items-center gap-3' },
-      icon && h('div', { className: 'w-10 h-10 rounded-2xl bg-accent flex items-center justify-center' }, h(Icon, { name: icon, size: 18, className: 'text-gold-dark' })),
-      h('div', { className: 'flex-1' }, h('h2', { className: 'text-xl text-foreground leading-none' }, title), sub && h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, sub)),
-      right);
+      icon && h('div', { className: 'w-10 h-10 rounded-2xl bg-accent flex items-center justify-center shrink-0' }, h(Icon, { name: icon, size: 18, className: 'text-gold-dark' })),
+      h('div', { className: 'flex-1 min-w-0' }, h('h2', { className: 'text-xl text-foreground leading-none truncate' }, title), sub && h('p', { className: 'text-xs text-muted-foreground mt-0.5 truncate' }, sub)),
+      right,
+      h(window.AccountButton, { variant: 'inline' }));
   }
 
   // ── Kingdom Projects ──

@@ -181,6 +181,14 @@ Cached `s-maxage=60, stale-while-revalidate=120`.
 
 Paginated feed of published public events.
 
+Each row carries the event's own social handles — `instagram_url`,
+`facebook_url`, `tiktok_url`, `youtube_url`, `x_url`, `linkedin_url`,
+`whatsapp_url` (the last three added by migration 172). They were stored from
+the day the create form shipped but were never SELECTed here, so no consumer
+could show them; they are part of the response now. Each accepts **either a
+handle or a URL** — build the platform link from the value rather than assuming
+a scheme.
+
 ### Query parameters
 
 | Param         | Type    | Default | Notes                                           |
@@ -256,9 +264,10 @@ Full public view of a single event with aggregated stats.
 ## GET /api/v1/places
 
 Public, read-only directory of places (venues, churches, creative
-spaces…). Places have no draft/private lifecycle like events — the
-`places` RLS policy permits public SELECT, so every place is
-intentionally public here.
+spaces…). Only `status = 'published'` rows are returned: `places` RLS
+permits public SELECT on every row, so the visibility rule lives in this
+route, exactly as it does for `/api/v1/events`. A place a contributor has
+cancelled (migration 167's reversible cancel) is therefore never public.
 
 ### Query parameters
 
@@ -286,6 +295,15 @@ second round-trip. `category` is `null` for places using a free-text
       "image_url": "https://…",
       "phone": "…",
       "website": "https://…",
+      "open_hours": "Mon–Fri 08:00–17:00",
+      "status": "published",
+      "instagram_url": "@rootedhouse",
+      "facebook_url": "https://facebook.com/rootedhouse",
+      "tiktok_url": null,
+      "youtube_url": null,
+      "x_url": null,
+      "linkedin_url": null,
+      "whatsapp_url": "+27 12 000 0000",
       "latitude": -25.7479,
       "longitude": 28.2293,
       "created_by": "…uuid…",
@@ -299,6 +317,11 @@ second round-trip. `category` is `null` for places using a free-text
   "meta": { "count": 40, "limit": 50, "offset": 0 }
 }
 ```
+
+Social fields accept **either a handle or a URL** (migration 172 gave places
+the same seven social columns events and contributors carry). Consumers should
+not assume a scheme: build the platform link from the value, or render it as
+text. Connect does this in one place — `window.DATA.SOCIAL_PLATFORMS`.
 
 Cached `s-maxage=60, stale-while-revalidate=120`.
 

@@ -2824,9 +2824,178 @@ real directory — so those cards now lead with **View** and drop the duplicate 
 
 ---
 
+## 3AO. Social parity everywhere · ONE listing card · map pin labels, sizes & zoom gates · one profile entry point (2026-08-26)
+
+Founder follow-up to §3AN, again "as project lead and expert UI designer". Branch
+`claude/event-location-map-ui-kib8od`. Session offload:
+`.claude/sessions/map-ui-social-parity.md` (gitignored).
+**Migration 172 APPLIED to prod → next migration # is 173.**
+
+### The founder's report, and what was actually wrong underneath it
+1. *"Ensure all social media handles can be shown when seeing Full Profile on an event…
+   what does show, I'm not sure which platform it is, there isn't any social media logo
+   next to it."* — **three separate faults stacked on top of each other:**
+   - **lucide 1.34.0 ships NO brand icons.** Verified against the pinned UMD bundle:
+     `Instagram` / `Facebook` / `Youtube` / `Twitter` / `Linkedin` are all absent from its
+     2 031 icons, and §3AN's `<Icon>` hardening degrades an unknown name to an *empty but
+     valid* `<svg>` — so every social chip in the app rendered a handle next to a blank
+     box. (TikTok used `Music2`, a generic music note.)
+   - **EventProfilePage and PlaceProfilePage rendered no socials at all** — only the
+     Contributor page ever had a social row.
+   - **`/api/v1/events` never SELECTed the social columns** (they have existed since mig
+     098 and the create form wrote them), and **`adaptEvent` silently dropped tiktok_url**.
+     So there was nothing to render even if a surface had tried.
+2. *"a lot more social media handles were added than what can be seen"* — **`public.places`
+   had no social columns at all.** The create-Place form has collected handles since v1
+   and the insert dropped every one of them. Separately, `/api/contributor/profile`
+   rejects on the FIRST invalid field, and a handle typed into a URL-shaped box
+   (`facebook_url`) failed URL validation — **taking the entire profile save down with
+   it**, which is why the live "Dam Cool" row has exactly one handle stored
+   (`instagram_handle`) out of the several the founder filled in.
+3. *"the bottom right seems not to work, it opens up out of the screen"* — BottomNav's
+   "You" tab wrapped `ProfilePanel` in an `absolute bottom-full` box and then positioned
+   the panel `top-full mt-2` **below** that box, i.e. past the bottom edge. Genuinely
+   unusable, and a second profile entry point besides the map's top-right one.
+4. *"the Category filter… is scrollable and there's a button for the same thing"* — the
+   pill row already had an "All" chip; the `SlidersHorizontal` button opened a
+   "Browse Categories" sheet that duplicated it (its only unique content was the PLACE
+   categories, which the pill row didn't list).
+
+### What shipped
+- **Migration 172 `entity_social_links_parity`** — 13 additive nullable text columns +
+  a `char_length <= 500` check each. `places` gains all seven social columns; `events`
+  and `profiles` gain X / LinkedIn / WhatsApp. No backfill, no RLS change (grants are
+  table-wide, so new columns inherit the same policies). Naming follows each table's own
+  convention. Advisors **0 ERROR / 114 WARN / 3 INFO — byte-identical to the head-171
+  baseline**. Pre-apply point = **`c555d02`** (the §3AN merge, already on `main`) — the
+  local tag `pre-mig-172-entity-socials` marks it, but **this environment's git proxy
+  refuses tag pushes** (three attempts, `send-pack: unexpected disconnect` every time,
+  while the branch push succeeded), so the commit SHA above is the durable record. Push
+  the tag from a machine with normal git access if you want it on the remote.
+- **Brand marks shipped in-house** (`icons.jsx`) — the official single-colour marks from
+  simple-icons (CC0-1.0), plus a hand-drawn LinkedIn (simple-icons removed it at the
+  trademark holder's request). Every key is **`Brand…`-prefixed and that is load-bearing**:
+  the brand table is consulted before lucide, and lucide's close icon is literally called
+  `X` — an unprefixed X brand mark turned every close button in the app into the X logo
+  (caught in the browser harness, now guarded by a test).
+- **`window.DATA.SOCIAL_PLATFORMS` is the one table** — 7 platforms, each with its icon,
+  placeholder and `urlFor()`. Every platform accepts a **handle OR a URL**. The apply
+  wizard, onboarding, the portal, the create-listing form, the public chips, the cards and
+  the map preview all key off it; `SOCIAL_COLUMNS` / `socialsFromRow` / `socialsToRow` map
+  it to each table's column names, so a hand-written literal can never drift again.
+- **`normaliseSocialValue`** (`src/lib/publicUrl.ts`) — empty → null, dangerous scheme →
+  rejected, URL-shaped → coerced+validated, anything else kept verbatim as a handle. Wired
+  into `/api/contributor/profile` and `/api/contributor/apply`. A typed handle can no
+  longer 400 a whole save.
+- **`window.UI.SocialLinks`** — the one social row, `chips` on full profiles and `compact`
+  on cards, always in platform-table order, every href through `safeUrl()`.
+- **NEW `app/entity-card.jsx` → `window.EntityCard`** — ONE card for a listing, rendered at
+  two densities: `layout='grid'` (Kingdom Exploration) and `layout='panel'` (the map's pin
+  preview). Same band/title/description/meta/stats/organiser/socials/actions, in the same
+  order, with the same category-adaptive palette. The map preview gained socials, a
+  distance-free organiser line and a **working** Website button (it was a `toast()` that
+  opened nothing); the list card gained the organiser's name and socials.
+- **Map pins** — Events read very slightly larger than Places (40×32 badge vs a 30px
+  circle; Contributors stay largest at 38). Labels are now a **bolder, larger name floating
+  on a fuzzy white mist** — a real `filter: blur()` blob, no capsule, no border — shown from
+  z 12.6 up plus always for the selected pin.
+- **Zoom density gates** — `ZOOM_GATES = { place: 9.5, event: 7.5 }`. Places drop out at
+  provincial zoom, Events at national; Contributors and Ideas never. Implemented as a
+  `display` flip on markers MapLibre already owns (no marker churn per zoom frame), with
+  the band reported upward so the map shows a quiet "Zoom in to see places" hint instead of
+  pins vanishing mysteriously. Exported as `window.MAP_ZOOM` so tests use the same numbers.
+- **One profile entry point** — new `window.AccountButton` (shell.jsx), top-right on the
+  map, on Kingdom Exploration and on every `Header`-based screen. The bottom bar's broken
+  "You" tab is replaced by **Explore** (Kingdom Exploration), which also joins the desktop
+  sidebar — so the two views no longer move the controls around you.
+- **One category control** — the "Browse Categories" sheet is deleted; the pill row now
+  carries All + all 17 event categories + all 10 place categories + the Ideas toggle. The
+  map's top-right is Search + account only.
+- **Two adjacent bugs fixed on the way past** (CLAUDE.md rule 3):
+  `/api/v1/places` never filtered on `status`, so a **cancelled place stayed public**
+  (mig 167 assumed "the app filters/badges them"; the app was never sent the column). It
+  now filters `status='published'` exactly like `/api/v1/events`. And `open_hours` was
+  stored but never selected, so every place read "hours not specified".
+- **`.cc-map { position:absolute; inset:0 }`** added to `index.html` — `maplibre-gl.css`
+  sets `.maplibregl-map { position: relative }` at equal specificity, so today the map only
+  has height because the Tailwind **Play CDN** injects its rules last. Compiling Tailwind
+  into `<head>` (the follow-up §3AN recommended) collapses the container to height 0 and
+  the map disappears. Reproduced exactly that way in the harness; this rule settles it.
+- `MapFloatersLayer` (a no-op export kept only so home.jsx didn't have to change) removed.
+
+### A real browser harness, rebuilt and worth keeping
+§3AN's recipe was rebuilt in the scratchpad and it earned its keep three times over — it
+caught the X-logo-as-close-button collision, the stylesheet-order map collapse, and
+confirmed all seven social links resolve correctly. Recipe: `npm pack` react / react-dom /
+maplibre-gl / lucide (registry.npmjs.org IS reachable; unpkg and cdn.tailwindcss.com are
+NOT), `npm i tailwindcss@3` for a local compile of the same inline config, rewrite the
+built `public/index.html`'s CDN tags to those local copies, serve `public/` from a tiny
+node server that fakes `/api/v1/*`, and drive `/opt/pw-browsers/chromium` with Playwright.
+To exercise the map, patch `maplibregl.Map` in an init script to capture the instance —
+and do a real drag first, or the app's auto-fit re-frames every programmatic `setZoom`.
+
+### Gates (all green)
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` **700/700** (77 files,
++18) · `node scripts/build-frontend.js` clean · `npx next build` clean, 0 warnings ·
+`prettier --check` clean · workspace turbo **build 8/8 · typecheck+lint+test 27/27**.
+(Run `turbo build` before `turbo typecheck` — running them together lets the build wipe
+`.next/types` mid-typecheck and produces spurious TS6053s.)
+
+### What CI caught (first run, commit `c37f489`) — all three fixed in `f61f1ee`
+The e2e specs could not run in the sandbox (Playwright serves the real `public/`, which
+pulls React/lucide/Tailwind/MapLibre from CDNs this environment cannot reach), so CI was
+their first real execution. **8 of 9 passed.** Worth recording that the three failures
+predicted beforehand — pin clicks being pointer-intercepted, the zoom-gate test being
+flaky — did **not** happen; waiting for CI's real output instead of "fixing" tests
+assumed broken saved a wasted cycle.
+- **CodeQL, 1 high, blocking — `js/incomplete-sanitization` at `data.jsx:62`.** `stripHost`
+  built a RegExp by concatenating a host into a pattern and escaped only `.`, not
+  backslashes or any other metacharacter. Not exploitable (the hosts are our own
+  literals) but exactly the shape that becomes exploitable the day a host goes dynamic.
+  Rewritten as plain string comparison — a prefix strip needs no regex, so there is no
+  escaping to get wrong. Behaviour preserved exactly, including that a leading `www.` is
+  consumed only when the platform's own host really follows it; pinned by tests.
+- **Found while verifying that rewrite: a doubled `@` produced dead links.**
+  `tiktok.com/@dam` became `tiktok.com/@@dam` (and the same for YouTube's `@handle`
+  form) because `stripHandle` only removes a LEADING `@`, and the `@` stops being
+  leading once the host comes off the front. Fixed and pinned.
+- **The one e2e failure was a real accessibility gap.** A social chip on a full profile
+  announced only its handle — `@ourchurch` — because the brand mark is purely visual and
+  `title` is not an accessible name when the link has content. Chips now announce
+  `Instagram — @ourchurch`; the icon-only compact row on a card keeps the platform name
+  alone. `getByRole("link", { name: /^Instagram/ })` is the assertion that pins it.
+
+### Honest checkpoint
+- A **cancelled event still disappears from its owner's dashboard on reload** —
+  `/api/v1/events` has always filtered `status='published'` and there is no owner-scoped
+  fetch, so Restore only works within the session that cancelled it. Places now behave
+  identically. Pre-existing, out of this batch's scope, worth a small owner-scoped fetch.
+- `contributor_applications` deliberately stays on four social columns — the v1 apply
+  wizard doesn't ask for socials, so widening the audit table would store nothing.
+- The Tailwind Play CDN is still the Play CDN (§3AN's recommendation stands, and the
+  `.cc-map` rule above is what makes acting on it safe).
+- WhatsApp numbers and X handles on a Contributor listing are **public by design** — the
+  portal now says so on the field. Same posture as `contributor_contact_email` (mig 171).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **✅ 2026-08-26 (latest) — the Kingdom Discovery list was rendering as coloured
+> **⏳ 2026-08-26 (latest) — social handles now appear EVERYWHERE a listing is viewed,
+> with real brand logos; the map preview and the Kingdom Exploration list are literally
+> one card component; map pins gained size hierarchy, floating "mist" labels and
+> zoom-based density gates; and the app has exactly ONE profile entry point and ONE
+> category control. §3AO. Branch `claude/event-location-map-ui-kib8od`. **Migration 172
+> APPLIED to prod — next migration # is 173.** All local gates green (700/700 unit tests,
+> workspace turbo 27/27 + build 8/8, advisors 0 ERROR and byte-identical to baseline).
+> **Founder action:** (1) re-open "Dam Cool" in the Contributor Portal and re-enter the
+> handles that were lost — the save that dropped them is fixed, and there are seven
+> platforms now (Instagram, Facebook, YouTube, TikTok, X, LinkedIn, WhatsApp);
+> (2) on the map, check the pin labels and zoom out to Gauteng and then to the whole
+> country to see the density gates. Note the honest checkpoint in §3AO — the new e2e
+> specs get their first real run in CI, not here.
+>
+> **✅ 2026-08-26 — the Kingdom Discovery list was rendering as coloured
 > hairlines (a Chromium grid/scroll-container interaction — one element was both the
 > scroller and the grid); cards rebuilt to the founder's brief; events + places finally
 > got the category-coloured floating SVG pins (circle = Place, rounded badge = Event,

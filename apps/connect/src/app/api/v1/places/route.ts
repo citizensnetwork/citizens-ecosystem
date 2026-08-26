@@ -3,9 +3,15 @@
  * ----------------------------------------------------------------
  * Public, read-only directory of places (venues, churches, creative
  * spaces…) for Citizens ecosystem consumers and the map-first
- * frontend. Places are directory entries — they have no draft/private
- * lifecycle like events; the `places` RLS policy already permits public
- * SELECT, so every place is intentionally public here.
+ * frontend. The `places` RLS policy permits public SELECT on every row,
+ * so the visibility rule has to live here: only `status = 'published'`
+ * is served, exactly as /api/v1/events does.
+ *
+ * That filter was missing. Migration 167 gave a contributor a reversible
+ * "cancel" for a place ("the app filters/badges them"), but this route
+ * never selected `status`, let alone filtered on it — so a cancelled place
+ * kept being published to the whole city, and the frontend had no way to
+ * even know. (No live row is affected today: all 40 are published.)
  *
  * Query params (all optional):
  *   created_by  - UUID of the owning contributor (places.created_by)
@@ -64,6 +70,17 @@ export async function GET(request: Request) {
         "image_url",
         "phone",
         "website",
+        // Places gained social columns in migration 172 — before it, the
+        // create form collected handles and the insert dropped them.
+        "instagram_url",
+        "facebook_url",
+        "tiktok_url",
+        "youtube_url",
+        "x_url",
+        "linkedin_url",
+        "whatsapp_url",
+        "open_hours",
+        "status",
         "latitude",
         "longitude",
         "created_by",
@@ -75,7 +92,8 @@ export async function GET(request: Request) {
         "categories(slug,emoji,color)",
       ].join(","),
       { count: "exact" },
-    );
+    )
+    .eq("status", "published");
 
   if (createdBy) query = query.eq("created_by", createdBy);
   if (q) {

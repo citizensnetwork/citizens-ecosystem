@@ -115,6 +115,28 @@ Capacitor `webDir` so it becomes the iOS and Android mobile app simultaneously.
 - Keep all home screen UI chrome (header, category pills, filter sheet, preview panel) from the design
 - Tweaks panel removed — use first/default option of each: `bubbleStyle = 'speech'`, `creationStyle = 'sheet'`
 - **Superseded (2026-08-26):** the `pinStyle` variation (teardrop / dot / glass) is gone. Map pins are now one system — a floating SVG badge carrying the item's own category glyph in its own category colour, shaped by entity type (circle = Place, rounded rectangle with a nub = Event, ringed circle or its logo = Contributor). See `app/map.jsx`'s `pinSvg()`.
+- **Density gates (2026-08-26):** pins are now zoom-gated — `map.jsx`'s `ZOOM_GATES`
+  hides Places below z 9.5 (provincial) and Events below z 7.5 (national); Contributors
+  and Ideas are never gated. The gate is a `display` flip on markers MapLibre already
+  owns, driven by the map's `zoom` event, so zooming never rebuilds a marker. The map
+  reports its band upward via `onZoomBandChange` so the Discover screen can say *why*
+  pins went away instead of leaving it a mystery. Thresholds are exported as
+  `window.MAP_ZOOM` so tests assert the same numbers the map enforces.
+- **Pin labels (2026-08-26):** a pin's name floats on a fuzzy white *mist*
+  (`.cc-pin-label-mist`, a real `filter: blur()` blob) rather than sitting in a bordered
+  capsule, set in the app's own type at 12px/800. Shown from z 12.6 up, plus always for
+  the selected pin. Styles live in `index.html` so the zoom gate toggles them with one
+  attribute (`.cc-map[data-cc-labels]`).
+- **One card (2026-08-26):** the map's pin preview and the Kingdom Exploration list render
+  the SAME component — `app/entity-card.jsx` → `window.EntityCard`, `layout='panel'` vs
+  `layout='grid'`. Same fields, same order, same action set, same socials row. Adding a
+  field to a listing means editing that one file.
+- **`.cc-map { position: absolute; inset: 0 }`** is a *load-bearing* rule in `index.html`,
+  not decoration: `maplibre-gl.css` sets `.maplibregl-map { position: relative }` at equal
+  specificity, so whichever stylesheet comes last wins. The Tailwind Play CDN injects at
+  runtime (last), which is the only reason the map has height today — swap it for a
+  compiled stylesheet in `<head>` and the container collapses to 0 and the map vanishes.
+  Verified against a compiled build in the local browser harness.
 
 ---
 
