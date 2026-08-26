@@ -2981,7 +2981,14 @@ assumed broken saved a wasted cycle.
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **⏳ 2026-08-26 (latest) — social handles now appear EVERYWHERE a listing is viewed,
+> **✅ 2026-08-26 (latest) — map pin name labels now wait 3 zoom levels longer to
+> appear.** Founder feedback: names were overlapping too much. `map.jsx`'s
+> `ZOOM_LABELS` raised **12.6 → 15.6** (one constant, no other logic touched — the
+> `.cc-pin-label` mist/typography and the selected-pin-always-shows rule are
+> unchanged). `docs/HTML_FRONTEND_WIRING_SPEC.md` updated to match. Full connect
+> unit suite green (704/704), lint clean. No migration, no e2e-relevant surface.
+
+> **⏳ 2026-08-26 — social handles now appear EVERYWHERE a listing is viewed,
 > with real brand logos; the map preview and the Kingdom Exploration list are literally
 > one card component; map pins gained size hierarchy, floating "mist" labels and
 > zoom-based density gates; and the app has exactly ONE profile entry point and ONE
