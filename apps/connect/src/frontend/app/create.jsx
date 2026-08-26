@@ -14,11 +14,11 @@
   const { cx, Field, Input, Textarea, Button, Toggle, MediaPicker, Stepper, Overlay } = window.UI;
   const Icon = window.Icon;
 
-  const SOCIALS = [
-    { key: 'instagram', icon: 'Instagram', prefix: '@' },
-    { key: 'youtube', icon: 'Youtube', prefix: '/' },
-    { key: 'facebook', icon: 'Facebook', prefix: '/' },
-  ];
+  // ONE platform table (window.DATA.SOCIAL_PLATFORMS) — this used to be a
+  // separate literal that offered three platforms where the Contributor form
+  // offered four, so a listing could never carry the same channels its
+  // organisation did. Places, meanwhile, had nowhere to store any of them
+  // until migration 172; the form collected them and the insert dropped them.
 
   function CatGrid({ list, value, onChange }) {
     return h('div', { className: 'grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 -mr-1' },
@@ -34,10 +34,13 @@
 
   function SocialRow({ socials, onChange }) {
     return h('div', { className: 'space-y-2' },
-      SOCIALS.map((s) => h('div', { key: s.key, className: 'flex items-center gap-2 px-3 py-2 bg-white/70 border border-border rounded-xl' },
+      window.DATA.SOCIAL_PLATFORMS.map((s) => h('div', { key: s.key, className: 'flex items-center gap-2 px-3 py-2 bg-white/70 border border-border rounded-xl' },
         h('span', { className: 'w-6 h-6 rounded-md bg-accent flex items-center justify-center shrink-0' }, h(Icon, { name: s.icon, size: 12, className: 'text-gold-dark' })),
-        h('span', { className: 'text-sm text-muted-foreground' }, s.prefix),
-        h('input', { value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value), placeholder: s.key, className: 'flex-1 text-sm bg-transparent outline-none' }))));
+        h('input', {
+          value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value),
+          placeholder: s.placeholder || s.label, 'aria-label': s.label,
+          className: 'flex-1 text-sm bg-transparent outline-none',
+        }))));
   }
 
   function CreateFlow({ kind, editing }) {
@@ -123,7 +126,8 @@
             h('img', { src: g, className: 'w-full h-full object-cover' }),
             h('button', { onClick: () => up('gallery', f.gallery.filter((_, j) => j !== i)), className: 'absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/55 text-white flex items-center justify-center opacity-0 group-hover:opacity-100' }, h(Icon, { name: 'X', size: 10 })))),
           f.gallery.length < 8 && h(GalleryAdd, { onAdd: galleryAdd }))),
-      h(Field, { label: 'Social links' }, h(SocialRow, { socials: f.socials, onChange: ups })));
+      h(Field, { label: 'Social links', hint: 'A link or just the handle — either works. Shown publicly on this listing.' },
+        h(SocialRow, { socials: f.socials, onChange: ups })));
 
     // DEFER TO V2: volunteering toggle + launch broadcast. This whole
     // `Options` step (and its section entry below) drops from the v1 wizard.

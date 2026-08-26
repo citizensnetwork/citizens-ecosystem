@@ -135,6 +135,63 @@
   }
 
   // ── Category dot / chip ──
+  // ── SocialLinks — the ONE social row, used everywhere ────────────────
+  //  Every surface that shows a listing (Kingdom Discovery card, map preview
+  //  panel, Event / Place / Contributor full profile) renders THIS. Before it
+  //  existed, only the Contributor profile had a social row at all, and it
+  //  drew its icons from lucide — which no longer ships brand marks, so each
+  //  chip was a handle with a blank square beside it and no way to tell which
+  //  platform it belonged to.
+  //
+  //  variant 'chips'  → brand mark + the handle, wrapped (full profiles)
+  //  variant 'compact'→ brand mark only, one row (cards and the map preview)
+  //
+  //  Order always follows window.DATA.SOCIAL_PLATFORMS, so the same listing
+  //  reads the same way on every screen. A stored value whose link can't be
+  //  made safe is dropped rather than rendered as dead or dangerous text.
+  function SocialLinks({ socials, variant = 'chips', accent, className, label }) {
+    const D = window.DATA;
+    if (!socials || !D) return null;
+    const order = D.SOCIAL_PLATFORMS.map((p) => p.key);
+    const keys = Object.keys(socials)
+      .filter((k) => socials[k] && String(socials[k]).trim())
+      // Known platforms first, in table order; anything unrecognised after.
+      .sort((a, b) => {
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+    const links = keys.map((k) => {
+      const platform = D.getSocialPlatform(k);
+      // urlFor() https-prefixes a bare handle, but never render an unvalidated
+      // href — a row stored before the write paths validated schemes must not
+      // become a javascript: link now that this is a real <a>.
+      const href = safeUrl(platform.urlFor(socials[k]));
+      return href ? { k, href, platform, text: D.socialDisplay(k, socials[k]) } : null;
+    }).filter(Boolean);
+    if (!links.length) return null;
+
+    const ink = accent || '#8B6914';
+    if (variant === 'compact') {
+      return React.createElement('div', { className: cx('flex items-center gap-1.5 flex-wrap', className) },
+        links.map(({ k, href, platform }) => React.createElement('a', {
+          key: k, href, target: '_blank', rel: 'noopener noreferrer',
+          'aria-label': platform.label, title: platform.label,
+          onClick: (e) => e.stopPropagation(),
+          className: 'w-7 h-7 rounded-full border flex items-center justify-center shrink-0 transition-colors hover:bg-black/[0.04]',
+          style: { borderColor: ink + '38', color: ink },
+        }, React.createElement(Icon, { name: platform.icon, size: 13 }))));
+    }
+    return React.createElement('div', { className: cx('space-y-2', className) },
+      label && React.createElement('p', { className: 'text-sm font-bold text-foreground' }, label),
+      React.createElement('div', { className: 'flex gap-2 flex-wrap' },
+        links.map(({ k, href, platform, text }) => React.createElement('a', {
+          key: k, href, target: '_blank', rel: 'noopener noreferrer', title: platform.label,
+          className: 'flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground hover:border-gold/40 transition-colors max-w-full',
+        },
+          React.createElement(Icon, { name: platform.icon, size: 13, style: { color: ink }, className: 'shrink-0' }),
+          React.createElement('span', { className: 'truncate' }, text || platform.label)))));
+  }
+
   function CategoryBadge({ cat, active, onClick, showIcon = true }) {
     if (!cat) return null;
     return React.createElement('button', {
@@ -287,5 +344,5 @@
         }))));
   }
 
-  window.UI = { cx, safeUrl, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
+  window.UI = { cx, safeUrl, SocialLinks, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
 })();

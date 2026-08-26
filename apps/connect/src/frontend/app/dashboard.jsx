@@ -231,11 +231,24 @@
           label: "No fixed physical location",
           desc: "We're online, mobile, or serve without a permanent office — no map pin.",
         }),
-        h('div', { className: 'grid grid-cols-2 gap-3' },
-          h(Field, { label: 'Instagram' }, h(Input, { value: f.socials.instagram || '', onChange: (e) => ups('instagram', e.target.value), placeholder: '@handle' })),
-          h(Field, { label: 'Facebook' }, h(Input, { value: f.socials.facebook || '', onChange: (e) => ups('facebook', e.target.value), placeholder: 'facebook.com/…' })),
-          h(Field, { label: 'TikTok' }, h(Input, { value: f.socials.tiktok || '', onChange: (e) => ups('tiktok', e.target.value), placeholder: '@handle' })),
-          h(Field, { label: 'YouTube' }, h(Input, { value: f.socials.youtube || '', onChange: (e) => ups('youtube', e.target.value), placeholder: 'youtube.com/…' }))),
+        // Driven by window.DATA.SOCIAL_PLATFORMS so this form, the apply
+        // wizard, the create-listing form and the public chips can never again
+        // disagree about which channels exist. Each field takes a handle OR a
+        // link — the server accepts both now, so typing "@ourchurch" into a
+        // "…_url" column no longer 400s and takes the whole save with it.
+        h(Field, { label: 'Social media', hint: 'A link or just the handle — either works. Shown publicly on your listing.' },
+          h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' },
+            window.DATA.SOCIAL_PLATFORMS.map((p) => h('div', {
+              key: p.key,
+              className: 'flex items-center gap-2 px-3 py-2 bg-white/70 border border-border rounded-xl focus-within:border-gold/60',
+            },
+              h('span', { className: 'w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0' },
+                h(Icon, { name: p.icon, size: 14, className: 'text-gold-dark' })),
+              h('input', {
+                value: f.socials[p.key] || '', onChange: (e) => ups(p.key, e.target.value),
+                placeholder: p.placeholder || p.label, 'aria-label': p.label,
+                className: 'flex-1 min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/70',
+              }))))),
         h(Field, { label: 'Gallery', hint: 'Shown on your public listing.' }, h(GalleryEditor, { value: f.gallery, onChange: (v) => up('gallery', v), max: 6 })),
         h(Button, { variant: 'gold', icon: 'Check', disabled: saving, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save Profile')));
   }

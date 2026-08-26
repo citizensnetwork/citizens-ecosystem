@@ -171,6 +171,54 @@ describe("/api/v1/places", () => {
     expect(j.data[0].category_color).toBe("#abc");
     expect(j.data[0]).not.toHaveProperty("categories");
   });
+
+  it("serves only published places — a cancelled one is never public", async () => {
+    // Migration 167 gave contributors a reversible "cancel" for a place and
+    // said "the app filters/badges them" — but this route never selected
+    // `status`, let alone filtered on it, so a cancelled place kept being
+    // published to the whole city. Same rule as /api/v1/events now.
+    await placesMod.GET(new Request("http://localhost/api/v1/places"));
+    expect(mockClient._chain.eq).toHaveBeenCalledWith("status", "published");
+  });
+
+  it("selects the social columns and open_hours, so a place can show them", async () => {
+    // Places gained social columns in migration 172; before it the create
+    // form collected handles and the insert dropped them. `open_hours` was
+    // stored (167) but likewise never selected, so every place read as
+    // "hours not specified".
+    vi.clearAllMocks();
+    await placesMod.GET(new Request("http://localhost/api/v1/places"));
+    const selected = (mockClient._chain.select as unknown as { mock: { calls: unknown[][] } })
+      .mock.calls[0][0] as string;
+    for (const col of [
+      "instagram_url", "facebook_url", "tiktok_url", "youtube_url",
+      "x_url", "linkedin_url", "whatsapp_url", "open_hours",
+    ]) {
+      expect(selected, col).toContain(col);
+    }
+  });
+});
+
+describe("/api/v1/events", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient._chain._result = { data: [], error: null, count: 0 };
+  });
+
+  it("selects every social column, so an event can actually show its handles", async () => {
+    // The columns existed from migration 098 and the create form wrote them,
+    // but this SELECT never asked for them — so no consumer (map preview,
+    // Kingdom Exploration card, full profile) could show a single one.
+    await eventsMod.GET(new Request("http://localhost/api/v1/events"));
+    const selected = (mockClient._chain.select as unknown as { mock: { calls: unknown[][] } })
+      .mock.calls[0][0] as string;
+    for (const col of [
+      "instagram_url", "facebook_url", "tiktok_url", "youtube_url",
+      "x_url", "linkedin_url", "whatsapp_url",
+    ]) {
+      expect(selected, col).toContain(col);
+    }
+  });
 });
 
 describe("/api/v1/profiles/[id]", () => {

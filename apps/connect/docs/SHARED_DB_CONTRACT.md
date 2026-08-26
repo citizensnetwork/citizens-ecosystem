@@ -183,7 +183,25 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 171**)
+## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 172**)
+
+> **2026-08-26: mig 172 (`entity_social_links_parity`) APPLIED to prod.** Makes the set of
+> social channels IDENTICAL across the three entity types and widens it to seven. Before
+> it, `public.places` had **no social columns at all** even though Connect's create-Place
+> form had collected handles since v1 — every one was silently discarded on insert/update
+> (a real data-loss bug, not a gap). `places` gains `instagram_url` / `facebook_url` /
+> `tiktok_url` / `youtube_url` / `x_url` / `linkedin_url` / `whatsapp_url`; `events` gains
+> the last three (098 shipped the first four); `profiles` gains `x_handle` /
+> `linkedin_url` / `whatsapp_number`. **13 additive nullable text columns + one
+> `char_length <= 500` check each — no backfill, no rewrite, no RLS change** (grants on all
+> three tables are table-wide, so the new columns inherit the same policies). Column naming
+> follows each table's OWN existing convention rather than inventing a third: events/places
+> are `<platform>_url` (098), profiles keeps handle-vs-link per platform (021/036); the
+> client tolerates either shape for every platform, so the name describes the usual value,
+> not a constraint. `contributor_applications` deliberately stays on its original four —
+> the v1 apply wizard does not ask for socials (they are captured at onboarding, on the
+> profile itself), so widening the audit table would store nothing. **Advisors: 0 ERROR /
+> 114 WARN / 3 INFO — byte-identical to the head-171 baseline, 0 new findings.**
 
 > **2026-08-26: mig 171 (`contributor_contact_email`) APPLIED to prod.** Adds
 > `profiles.contributor_contact_email text` (nullable, `char_length <= 254`) — a genuinely

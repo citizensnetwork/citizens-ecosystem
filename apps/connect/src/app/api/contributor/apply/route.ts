@@ -28,7 +28,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
 import { EVENT_CATEGORIES, PLACE_CATEGORIES } from "@/lib/categories";
-import { coercePublicUrl, hasUnsafeScheme } from "@/lib/publicUrl";
+import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +38,6 @@ const MAX_BIO = 1_000;
 const MAX_MOTIVATION = 2_000;
 const MAX_URL = 500;
 const MAX_ADDRESS = 300;
-const MAX_HANDLE = 80;
 const ALLOWED_KINDS = new Set(["ministry", "organization", "business"]);
 // The map/pin category — same slug space list.jsx's category picker and
 // map.jsx's window.DATA.getCategory() use (EVENT_CATEGORIES ∪
@@ -159,22 +158,30 @@ export async function POST(request: Request) {
     );
   }
 
-  // Socials are HANDLES here, not URLs (the display layer builds the platform
-  // URL from them), so there is nothing to normalise — just refuse a value
-  // that declares a dangerous scheme.
+  // A social value may be a handle OR a link, whatever the column is called —
+  // same rule as /api/contributor/profile (normaliseSocialValue): a dangerous
+  // scheme is refused, a URL-shaped value is normalised, and a plain handle is
+  // kept verbatim for the display layer to turn into a platform URL.
+  //
+  // NOTE: `contributor_applications` carries only these four social columns.
+  // X / LinkedIn / WhatsApp (migration 172) exist on `profiles` and are
+  // collected in onboarding + the portal, not in this wizard — v1's apply path
+  // deliberately asks for the minimum (V1_SCOPE.md).
   const socialUrls: Record<string, string | null> = {};
   for (const [key, label] of [
+    ["instagram_handle", "Instagram"],
     ["facebook_url", "Facebook"],
+    ["tiktok_handle", "TikTok"],
     ["youtube_url", "YouTube"],
   ] as const) {
-    const raw = trimOrNull(payload[key], MAX_URL);
-    if (raw !== null && hasUnsafeScheme(raw)) {
+    const norm = normaliseSocialValue(payload[key], MAX_URL);
+    if (norm === undefined) {
       return NextResponse.json(
         { error: `${label} must be a handle or a valid web address.` },
         { status: 400 },
       );
     }
-    socialUrls[key] = raw;
+    socialUrls[key] = norm;
   }
 
   const insertRow = {
@@ -185,9 +192,9 @@ export async function POST(request: Request) {
     contributor_category: contributorCategory,
     bio: trimOrNull(payload.bio, MAX_BIO),
     website_url: websiteUrl,
-    instagram_handle: trimOrNull(payload.instagram_handle, MAX_HANDLE),
+    instagram_handle: socialUrls.instagram_handle,
     facebook_url: socialUrls.facebook_url,
-    tiktok_handle: trimOrNull(payload.tiktok_handle, MAX_HANDLE),
+    tiktok_handle: socialUrls.tiktok_handle,
     youtube_url: socialUrls.youtube_url,
     no_fixed_location: noFixedLocation,
     physical_address: noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS),

@@ -15,7 +15,7 @@
 import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { normalisePublicUrl } from "@/lib/publicUrl";
+import { normalisePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
 
 const ALLOWED_KEYS = [
   "bio",
@@ -24,6 +24,9 @@ const ALLOWED_KEYS = [
   "facebook_url",
   "tiktok_handle",
   "youtube_url",
+  "x_handle",
+  "linkedin_url",
+  "whatsapp_number",
   "physical_address",
   "physical_latitude",
   "physical_longitude",
@@ -38,7 +41,6 @@ type AllowedKey = (typeof ALLOWED_KEYS)[number];
 const MAX_GALLERY_URLS = 6;
 const MAX_URL_LENGTH = 2_000;
 const MAX_BIO = 2_000;
-const MAX_HANDLE = 80;
 const MAX_ADDRESS = 500;
 const MAX_EMAIL = 254;
 // Bounded quantifiers only — every segment has a fixed upper bound, so the
@@ -46,6 +48,22 @@ const MAX_EMAIL = 254;
 // Length is also checked BEFORE this regex ever runs (defense in depth,
 // same recipe as /api/admin/contributors/create).
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,189}\.[^\s@]{1,24}$/;
+
+// Every social column, whatever its name suggests about its shape. The
+// contributor typing into the form does not know which of these the schema
+// calls a "_url" and which it calls a "_handle" — and they should not have to.
+const SOCIAL_KEYS = [
+  "instagram_handle",
+  "facebook_url",
+  "tiktok_handle",
+  "youtube_url",
+  "x_handle",
+  "linkedin_url",
+  "whatsapp_number",
+] as const;
+// The DB caps these at 500 chars (migration 172 for the new ones); handles are
+// short, but a pasted profile URL is legitimately long, so use the URL bound.
+const MAX_SOCIAL = 500;
 
 
 export async function POST(request: Request) {
@@ -118,19 +136,34 @@ export async function POST(request: Request) {
     update.gallery_urls = unique;
   }
 
-  // Reject javascript: / data: / other non-https URLs so they cannot be
-  // rendered as stored XSS in SocialLinksRow.
-  for (const urlKey of ["website_url", "facebook_url", "youtube_url"] as const) {
-    if (update[urlKey] !== undefined && update[urlKey] !== null) {
-      const norm = normalisePublicUrl(update[urlKey] as string, MAX_URL_LENGTH);
-      if (norm === null) {
-        return NextResponse.json(
-          { error: `${urlKey} must be a valid https/http URL` },
-          { status: 400 },
-        );
-      }
-      update[urlKey] = norm;
+  // The website really must be a URL — it is rendered as one and labelled as
+  // one, and there is no handle that could stand in for it.
+  if (update.website_url !== undefined && update.website_url !== null) {
+    const norm = normalisePublicUrl(update.website_url as string, MAX_URL_LENGTH);
+    if (norm === null) {
+      return NextResponse.json(
+        { error: "website_url must be a valid https/http URL" },
+        { status: 400 },
+      );
     }
+    update.website_url = norm;
+  }
+
+  // Socials accept a handle OR a URL — see normaliseSocialValue. Before this,
+  // an @handle typed into the Facebook box failed URL validation and, because
+  // this route rejects on the first bad field, took the entire profile save
+  // down with it: the reason a real contributor ended up with one handle
+  // stored out of the several they had filled in.
+  for (const key of SOCIAL_KEYS) {
+    if (update[key] === undefined) continue;
+    const norm = normaliseSocialValue(update[key], MAX_SOCIAL);
+    if (norm === undefined) {
+      return NextResponse.json(
+        { error: `${key} must be a handle or a valid https/http link` },
+        { status: 400 },
+      );
+    }
+    update[key] = norm;
   }
 
   if (
@@ -155,7 +188,7 @@ export async function POST(request: Request) {
   }
 
   // String length guards for free-text fields.
-  for (const [key, max] of [["bio", MAX_BIO], ["physical_address", MAX_ADDRESS], ["instagram_handle", MAX_HANDLE], ["tiktok_handle", MAX_HANDLE]] as const) {
+  for (const [key, max] of [["bio", MAX_BIO], ["physical_address", MAX_ADDRESS]] as const) {
     if (update[key] != null && typeof update[key] === "string" && (update[key] as string).length > max) {
       return NextResponse.json({ error: `${key} exceeds maximum length of ${max}` }, { status: 400 });
     }

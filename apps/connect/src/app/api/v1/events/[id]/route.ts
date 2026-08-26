@@ -46,6 +46,13 @@ export async function GET(
         "category",
         "image_url",
         "website_url",
+        "instagram_url",
+        "facebook_url",
+        "tiktok_url",
+        "youtube_url",
+        "x_url",
+        "linkedin_url",
+        "whatsapp_url",
         // `contact_email` and `contact_phone` are intentionally omitted
         // from the public v1 surface to prevent PII harvesting by
         // scrapers. Viewers who open the event page in the app can see

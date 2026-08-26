@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, safeUrl, Avatar, SmartImage, Button, Empty } = window.UI;
+  const { cx, safeUrl, Avatar, SmartImage, Button, Empty, SocialLinks } = window.UI;
   const catOf = (x) => window.DATA.getCategory(x && x.category);
   const Icon = window.Icon;
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -136,6 +136,10 @@
             h(InfoRow, { icon: ev.isMobile ? 'Route' : 'MapPin', label: ev.isMobile ? 'Route' : 'Location', value: ev.location }),
             h(InfoRow, { icon: 'Navigation', label: 'Address', value: ev.address })),
           h('div', null, h('p', { className: 'text-sm font-bold text-foreground mb-1.5' }, 'About this event'), h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, ev.description)),
+          // EVERY social handle this event carries — the full profile showed
+          // none at all before, and /api/v1/events did not even select the
+          // columns, so there was nothing to show even if it had.
+          h(SocialLinks, { socials: ev.socials, label: 'Follow this event' }),
           ev.volunteeringEnabled && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/40 border border-[#16A34A]/20' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'HandHeart', size: 16, className: 'text-[#16A34A]' }), h('p', { className: 'text-sm font-bold text-[#15803d]' }, 'Volunteers needed')),
             h('p', { className: 'text-xs text-[#15803d]/80 mb-3' }, 'This event is looking for people to serve. Put your hand up!'),
@@ -174,12 +178,14 @@
           h('div', { className: 'flex gap-2' },
             h(Button, { variant: isFollowingPlace ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => togglePlaceFollow(id, pl.name) }, isFollowingPlace ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
+            safeUrl(pl.website) && h(Button, { variant: 'outline', icon: 'Globe', onClick: () => window.open(safeUrl(pl.website), '_blank', 'noopener,noreferrer') }),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') })),
           h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
             h(InfoRow, { icon: 'Clock', label: 'Opening hours', value: pl.openHours || 'Not specified' })),
           h('div', null, h('p', { className: 'text-sm font-bold text-foreground mb-1.5' }, 'About'), h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, pl.description)),
+          h(SocialLinks, { socials: pl.socials, label: 'Follow this place' }),
           pl.volunteeringEnabled && h(Button, { variant: 'success', className: 'w-full', icon: 'HandHeart', onClick: () => app.applyToVolunteer('place', id, org && org.slug) }, 'Apply to Volunteer Here'),
           assoc.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events here'),
@@ -278,20 +284,10 @@
               c.noFixedLocation
                 ? h(InfoRow, { icon: 'Globe', label: 'Location', value: 'Online — no fixed location' })
                 : c.location && h(InfoRow, { icon: 'MapPin', label: 'Location', value: c.location })),
-            c.socials && Object.keys(c.socials).length > 0 && h('div', { className: 'flex gap-2 flex-wrap' },
-              Object.entries(c.socials).filter(([, v]) => v).map(([k, v]) => {
-                const platform = window.DATA.getSocialPlatform(k);
-                // urlFor() already https-prefixes a bare handle, but never render
-                // an unvalidated href — a row stored before the write paths
-                // validated schemes must not become a javascript: link now that
-                // this chip is a real <a>.
-                const href = safeUrl(platform.urlFor(v));
-                if (!href) return null;
-                return h('a', {
-                  key: k, href, target: '_blank', rel: 'noopener noreferrer', title: platform.label,
-                  className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground hover:border-gold/40 transition-colors',
-                }, h(Icon, { name: platform.icon, size: 13, className: 'text-gold-dark' }), v);
-              })),
+            // Same component, same order, same brand marks as the Event and
+            // Place profiles and both card surfaces — one social row for the
+            // whole app (window.UI.SocialLinks).
+            h(SocialLinks, { socials: c.socials, label: 'Find them online' }),
             h(Gallery, { imgs: c.gallery }),
             cEvents.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events (' + cEvents.length + ')'),

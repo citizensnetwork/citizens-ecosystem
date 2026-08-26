@@ -140,6 +140,17 @@ export async function GET(request: Request) {
         "category",
         "image_url",
         "website_url",
+        // Socials were collected on the create form and stored on the row, but
+        // never selected here — so no consumer of this API (the map preview,
+        // the Kingdom Exploration card, the full profile) could ever show a
+        // single one of them. See migration 172.
+        "instagram_url",
+        "facebook_url",
+        "tiktok_url",
+        "youtube_url",
+        "x_url",
+        "linkedin_url",
+        "whatsapp_url",
         "latitude",
         "longitude",
         "created_by",

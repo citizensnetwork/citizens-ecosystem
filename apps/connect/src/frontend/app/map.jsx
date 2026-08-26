@@ -3,8 +3,10 @@
 //  ------------------------------------------------------------------
 //  Phase 2: replaces the decorative SVG prototype with a real geographic
 //  map. Keeps the same public interface the home screen consumes:
-//    window.StylizedMap({ markers, routes, filterCategory, selectedId, onSelect })
-//    window.MapFloatersLayer(...)  → now a no-op (bubbles ride the markers).
+//    window.StylizedMap({ markers, filterCategory, selectedId, onSelect,
+//                         onDismissBubble, onZoomBandChange })
+//  (the old no-op MapFloatersLayer export is gone — bubbles and labels have
+//   ridden the markers themselves since the pin redesign.)
 //  Markers are native MapLibre markers: one floating SVG badge per item,
 //  carrying that item's own category glyph in its own category colour, on a
 //  shape that encodes the entity type — circle for a Place, rounded rectangle
@@ -14,10 +16,12 @@
 //  greater-Pretoria bounding box so they still place sensibly during the
 //  mock→real data migration.
 //
-//  Visibility: EVERY item with coordinates is shown — no clustering and no
-//  zoom-based layering (both were tried and both ended up hiding events).
-//  MapLibre repositions DOM markers itself as the user zooms/pans, so the
-//  marker set only re-renders when the data / filter / selection changes.
+//  Visibility: DENSITY-GATED BY ZOOM (founder ask). A place is a street-level
+//  fact and an event is a city-level one, so past a certain distance they stop
+//  being useful and start being noise — see ZOOM_GATES below. Contributors are
+//  never gated: an organisation is the one thing worth seeing at national
+//  scale. There is still no clustering, and gating is pure CSS `display` on
+//  markers MapLibre already owns — no marker churn on zoom.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useRef, useEffect } = React;
@@ -27,6 +31,39 @@
   const PRETORIA = [28.2293, -25.7479];           // [lng, lat] — Church Square
   // Greater-Pretoria bbox used only to project legacy % coords (mock items).
   const BBOX = { west: 28.10, east: 28.36, south: -25.86, north: -25.66 };
+
+  // ── Zoom gates ─────────────────────────────────────────────────────
+  //  Web-Mercator zoom, calibrated against South Africa on a phone viewport:
+  //    z≈5–6   the whole country          ("national")
+  //    z≈8–9   one province, e.g. Gauteng ("provincial")
+  //    z≈10–11 one metro, e.g. Pretoria
+  //    z≈13+   suburb / street
+  //  Founder's rule: places drop out at provincial scale, and events drop out
+  //  with them at national scale.
+  const ZOOM_GATES = { place: 9.5, event: 7.5 };
+  //  What the current zoom is showing — reported upward so the map screen can
+  //  say WHY pins vanished instead of leaving it a mystery.
+  //    'all'          everything with coordinates
+  //    'places'       places gated out (provincial)
+  //    'contributors' events gated out too (national) — contributors remain
+  function zoomBandFor(z) {
+    if (z >= ZOOM_GATES.place) return 'all';
+    if (z >= ZOOM_GATES.event) return 'places';
+    return 'contributors';
+  }
+  // A pin is hidden only when its own type is gated out. The SELECTED pin is
+  // always drawn: its preview panel is open, and a preview pointing at nothing
+  // would be worse than one extra marker.
+  function markerHidden(type, z, selected) {
+    if (selected) return false;
+    if (type === 'place') return z < ZOOM_GATES.place;
+    if (type === 'event') return z < ZOOM_GATES.event;
+    return false;
+  }
+  // Titles only earn their space once you are close enough to read a
+  // neighbourhood; below that they'd overlap into mush. The selected pin keeps
+  // its label at every zoom (CSS `.cc-pin-label.is-selected`).
+  const ZOOM_LABELS = 12.6;
 
   function coordsFor(m) {
     if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
@@ -127,8 +164,12 @@
     let w, h, body, gx, gy, gsize;
 
     if (shape === 'event') {
-      w = selected ? 44 : 36;
-      h = selected ? 34 : 28;
+      // Events read very slightly LARGER than places (founder ask): an event is
+      // a moment you can still turn up to, so it should carry marginally more
+      // weight than the venue it happens in. 40x32 against a place's 30px
+      // circle — noticeable side by side, never shouty.
+      w = selected ? 48 : 40;
+      h = selected ? 38 : 32;
       const nub = 7, r = 9, cx = w / 2, pad = 2;      // pad leaves room for the stroke
       const W = w + pad * 2, H = h + nub + pad * 2;
       const x0 = pad, y0 = pad, x1 = pad + w, y1 = pad + h, ncx = pad + cx;
@@ -144,7 +185,10 @@
       gy = pad + h / 2 - gsize / 2;
       w = W; h = H;
     } else {
-      const d = shape === 'contributor' ? (selected ? 46 : 38) : (selected ? 40 : 32);
+      // Contributor > event > place, by design: an organisation is a permanent
+      // anchor (and the only pin that survives to national zoom), an event is
+      // time-bound, a place is the smallest unit.
+      const d = shape === 'contributor' ? (selected ? 46 : 38) : (selected ? 38 : 30);
       const pad = shape === 'contributor' ? 3 : 2;
       const W = d + pad * 2, c = pad + d / 2;
       body = '';
@@ -260,14 +304,27 @@
       inner.appendChild(b);
     }
 
-    // selected title label (below the pin)
-    if (selected && m.title) {
+    // ── title label (below the pin) ──────────────────────────────────
+    //  Was a tiny 10px pill in a hard white capsule with a gold border — the
+    //  founder's words: "the font is odd, and the white labeling around it is
+    //  extremely compact and odd". It is now a bolder, larger, properly-spaced
+    //  name FLOATING on a fuzzy white mist: a blurred white blob sits behind
+    //  the text (`.cc-pin-label-mist`, an actual `filter: blur()`, not a box)
+    //  so the label separates from whatever the basemap is doing underneath
+    //  without drawing a border around itself. Styles live in index.html so
+    //  the zoom gate can toggle them with one attribute instead of touching
+    //  every marker. Labels appear from ZOOM_LABELS up; the selected pin keeps
+    //  its own at any zoom.
+    if (m.title) {
       const l = document.createElement('div');
-      l.style.cssText = 'position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;' +
-        'max-width:200px;background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:999px;padding:3px 9px;' +
-        'font-size:10px;font-weight:700;color:#0A0908;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
-        'box-shadow:0 3px 10px rgba(0,0,0,.18);';
-      l.textContent = m.title;
+      l.className = 'cc-pin-label' + (selected ? ' is-selected' : '');
+      const mist = document.createElement('span');
+      mist.className = 'cc-pin-label-mist';
+      const txt = document.createElement('span');
+      txt.className = 'cc-pin-label-text';
+      txt.textContent = m.title;
+      l.appendChild(mist);
+      l.appendChild(txt);
       inner.appendChild(l);
     }
 
@@ -275,7 +332,7 @@
   }
 
   // ── The map component ──────────────────────────────────────────────
-  function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble }) {
+  function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
@@ -284,6 +341,34 @@
     onSelectRef.current = onSelect;
     const onDismissBubbleRef = useRef(onDismissBubble);
     onDismissBubbleRef.current = onDismissBubble;
+    const onZoomBandChangeRef = useRef(onZoomBandChange);
+    onZoomBandChangeRef.current = onZoomBandChange;
+    const bandRef = useRef('all');           // last band reported upward
+    const selectedRef = useRef(selectedId);
+    selectedRef.current = selectedId;
+
+    // Applies the zoom gates to markers already on the map. Runs on every zoom
+    // frame, so it does nothing but flip a `display` (and one attribute for the
+    // labels) — no marker is created, destroyed or re-anchored by zooming, and
+    // the parent is only re-rendered when the BAND changes, not per frame.
+    const applyZoomGates = React.useCallback(() => {
+      const mp = mapRef.current;
+      if (!mp) return;
+      const z = mp.getZoom();
+      const el = containerRef.current;
+      if (el) el.setAttribute('data-cc-labels', z >= ZOOM_LABELS ? '1' : '0');
+      markerObjs.current.forEach((mk) => {
+        const w = mk.getElement();
+        if (!w) return;
+        const hidden = markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
+        w.style.display = hidden ? 'none' : '';
+      });
+      const band = zoomBandFor(z);
+      if (band !== bandRef.current) {
+        bandRef.current = band;
+        if (onZoomBandChangeRef.current) onZoomBandChangeRef.current(band);
+      }
+    }, []);
 
     // init the map once
     useEffect(() => {
@@ -307,6 +392,11 @@
       map.on('dragstart', onUserMove);
       map.on('zoomstart', onUserMove);
       mapRef.current = map;
+      // Density gates follow the zoom, including the programmatic flyTo /
+      // fitBounds below, so the first frame is already correct.
+      map.on('zoom', applyZoomGates);
+      map.on('load', applyZoomGates);
+      applyZoomGates();
 
       // MapLibre sizes its canvas once, from the container's dimensions at
       // construction — it never re-measures on its own. Without this, a map
@@ -347,12 +437,14 @@
 
       return () => {
         if (ro) ro.disconnect();
+        map.off('zoom', applyZoomGates);
+        map.off('load', applyZoomGates);
         markerObjs.current.forEach((mk) => mk.remove());
         markerObjs.current.clear();
         map.remove();
         mapRef.current = null;
       };
-    }, []);
+    }, [applyZoomGates]);
 
     // (re)render pins whenever inputs change. Visibility is no longer
     // zoom-dependent, so this only needs to run on data/filter/selection/style
@@ -401,6 +493,10 @@
           mk._ccAnchor = anchor;
           markerObjs.current.set(m.id, mk);
         }
+        const mk = markerObjs.current.get(m.id);
+        // Remembered on the Marker (not read back out of the DOM) so the
+        // per-zoom-frame gate is a plain property read.
+        if (mk) { mk._ccType = m.type; mk._ccId = m.id; }
       });
       // drop markers whose item is gone
       markerObjs.current.forEach((mk, id) => {
@@ -413,14 +509,16 @@
         items.forEach(({ coords }) => b.extend(coords));
         mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
       }
-    }, [markers, filterCategory, selectedId]);
+      // New/rebuilt markers start un-gated; bring them in line with the zoom
+      // they were actually added at.
+      applyZoomGates();
+    }, [markers, filterCategory, selectedId, applyZoomGates]);
 
-    return React.createElement('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } });
+    return React.createElement('div', {
+      ref: containerRef, className: 'absolute inset-0 cc-map',
+      style: { background: 'var(--map-bg)' },
+    });
   }
-
-  // Bubbles + selected labels now ride the markers themselves, so the old
-  // sibling floaters overlay is a no-op. Kept exported so home.jsx is unchanged.
-  function MapFloatersLayer() { return null; }
 
   // ── LocationPicker — bidirectional address ↔ pin widget ─────────────
   //  Small embedded MapLibre map with a FIXED center pin (Uber/Airbnb-style
@@ -533,7 +631,9 @@
       !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
   }
 
+  // Exported so tests (and any future surface) assert against the SAME
+  // thresholds the map enforces, instead of re-declaring them.
+  window.MAP_ZOOM = { GATES: ZOOM_GATES, LABELS: ZOOM_LABELS, bandFor: zoomBandFor, hidden: markerHidden };
   window.StylizedMap = StylizedMap;
-  window.MapFloatersLayer = MapFloatersLayer;
   window.LocationPicker = LocationPicker;
 })();

@@ -185,11 +185,11 @@
       volunteeringEnabled: !!r.volunteer_openings,
       coverPhoto: r.image_url || '',
       gallery: [], broadcast: null, website: r.website_url || '',
-      socials: {
-        ...(r.instagram_url ? { instagram: r.instagram_url } : {}),
-        ...(r.facebook_url ? { facebook: r.facebook_url } : {}),
-        ...(r.youtube_url ? { youtube: r.youtube_url } : {}),
-      },
+      // One table, one mapping — window.DATA.SOCIAL_COLUMNS. This used to be
+      // a hand-written literal that quietly dropped tiktok_url (a column the
+      // events table has had since migration 098), which is exactly the class
+      // of drift the shared map exists to stop.
+      socials: window.DATA.socialsFromRow(r, window.DATA.SOCIAL_COLUMNS.event),
       lat: typeof r.latitude === 'number' ? r.latitude : null,
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [], upcomingDates: [],
@@ -224,11 +224,7 @@
   // expose (follower counts, involvement tier, niche) gets honest, crash-safe
   // defaults — never fabricated numbers (VISION: honour the small honestly).
   function adaptContributor(r) {
-    const socials = {};
-    if (r.instagram_handle) socials.instagram = r.instagram_handle;
-    if (r.facebook_url) socials.facebook = r.facebook_url;
-    if (r.tiktok_handle) socials.tiktok = r.tiktok_handle;
-    if (r.youtube_url) socials.youtube = r.youtube_url;
+    const socials = window.DATA.socialsFromRow(r, window.DATA.SOCIAL_COLUMNS.contributor);
     return {
       id: r.id,
       name: r.full_name || (r.contributor_slug
@@ -273,6 +269,25 @@
     };
   }
 
+  // socials {platformKey: value} → the /api/contributor/* payload fields, keyed
+  // by the profiles column names in window.DATA.SOCIAL_COLUMNS.contributor.
+  // Values are sent RAW (handle or URL) — the server normalises both shapes
+  // now (normaliseSocialValue), so a handle typed into a URL-shaped box no
+  // longer fails validation and take the whole save with it.
+  //   mode 'create' → blanks are omitted (nothing to clear yet)
+  //   mode 'update' → blanks are sent as '' so a removed handle really clears
+  const contributorSocialPayload = (socials, mode) => {
+    const cols = window.DATA.SOCIAL_COLUMNS.contributor;
+    const out = {};
+    Object.keys(cols).forEach((k) => {
+      const raw = socials && socials[k];
+      const v = typeof raw === 'string' ? raw.trim() : '';
+      if (v) out[cols[k]] = v;
+      else if (mode === 'update') out[cols[k]] = '';
+    });
+    return out;
+  };
+
   // Every direct `profiles` select that feeds adaptContributor() MUST use
   // this exact column list. Three call sites each hand-copied a subset in
   // the past and drifted (missing category broke map-pin colours; missing
@@ -282,6 +297,7 @@
   const CONTRIBUTOR_SELECT = 'id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, ' +
     'website_url, category:contributor_category, physical_address, physical_latitude, physical_longitude, ' +
     'no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url, ' +
+    'x_handle, linkedin_url, whatsapp_number, ' +
     'gallery_urls, cover_photo_urls, contact_email:contributor_contact_email';
 
   // API place row (public /api/v1/places) → app place shape. Places carry real
@@ -302,6 +318,10 @@
       openHours: r.open_hours || '',
       status: r.status || 'published',
       website: r.website || '', phone: r.phone || '',
+      // Places could not store a single social handle before migration 172 —
+      // the create/edit form collected them and the insert silently dropped
+      // them on the floor. Same seven columns as an event now.
+      socials: window.DATA.socialsFromRow(r, window.DATA.SOCIAL_COLUMNS.place),
       volunteeringEnabled: !!r.volunteer_openings,
       followerCount: 0,
       verified: !!r.verified,
@@ -699,10 +719,11 @@
               physical_latitude: geo ? geo.lat : null,
               physical_longitude: geo ? geo.lng : null,
               website_url: form.website || null,
-              instagram_handle: (form.socials && form.socials.instagram) || null,
-              facebook_url: (form.socials && form.socials.facebook) || null,
-              tiktok_handle: (form.socials && form.socials.tiktok) || null,
-              youtube_url: (form.socials && form.socials.youtube) || null,
+              // The applications table carries only the original four social
+              // columns; the route reads exactly the keys it stores, so the
+              // extra platforms in this payload are simply ignored there and
+              // are captured on the profile itself during onboarding.
+              ...contributorSocialPayload(form.socials || {}, 'create'),
             }),
           });
           const body = await res.json().catch(() => ({}));
@@ -873,9 +894,7 @@
             volunteer_openings: !!form.volunteeringEnabled,
             latitude: geo ? geo.lat : null,
             longitude: geo ? geo.lng : null,
-            instagram_url: socials.instagram || null,
-            facebook_url: socials.facebook || null,
-            youtube_url: socials.youtube || null,
+            ...window.DATA.socialsToRow(socials, 'event'),
           };
           const { data, error } = await window.CC_SUPABASE.from('events').insert(row).select('*').single();
           if (error) throw error;
@@ -926,9 +945,7 @@
             location: newLocation,
             image_url: form.coverPhoto || null,
             volunteer_openings: !!form.volunteeringEnabled,
-            instagram_url: socials.instagram || null,
-            facebook_url: socials.facebook || null,
-            youtube_url: socials.youtube || null,
+            ...window.DATA.socialsToRow(socials, 'event'),
           };
           if (locationChanged) { row.latitude = geo ? geo.lat : null; row.longitude = geo ? geo.lng : null; }
           const { data, error } = await window.CC_SUPABASE.from('events').update(row).eq('id', id).select('*').single();
@@ -1001,6 +1018,7 @@
             longitude: geo.lng,
             created_by: realUser.id,
             volunteer_openings: !!form.volunteeringEnabled,
+            ...window.DATA.socialsToRow(form.socials || {}, 'place'),
           };
           const { data, error } = await window.CC_SUPABASE.from('places').insert(row).select('*').single();
           if (error) throw error;
@@ -1047,6 +1065,7 @@
             image_url: form.coverPhoto || null,
             open_hours: form.openHours || null,
             volunteer_openings: !!form.volunteeringEnabled,
+            ...window.DATA.socialsToRow(form.socials || {}, 'place'),
           };
           if (addressChanged) { row.latitude = geo.lat; row.longitude = geo.lng; }
           const { data, error } = await window.CC_SUPABASE.from('places').update(row).eq('id', id).select('*').single();
@@ -1160,10 +1179,7 @@
               physical_latitude: form.noFixedLocation ? null : (onboardGeo ? onboardGeo.lat : undefined),
               physical_longitude: form.noFixedLocation ? null : (onboardGeo ? onboardGeo.lng : undefined),
               logo_url: form.profilePhoto && /^https:\/\//i.test(form.profilePhoto) ? form.profilePhoto : undefined,
-              instagram_handle: socials.instagram || undefined,
-              facebook_url: asUrl(socials.facebook) || undefined,
-              tiktok_handle: socials.tiktok || undefined,
-              youtube_url: asUrl(socials.youtube) || undefined,
+              ...contributorSocialPayload(socials, 'create'),
               contributor_contact_email: form.contactEmail || undefined,
             }),
           }).catch(() => {});
@@ -1209,10 +1225,7 @@
         contributor_no_fixed_location: fields.noFixedLocation !== undefined ? !!fields.noFixedLocation : undefined,
         physical_address: fields.noFixedLocation ? null : (fields.location ?? undefined),
         logo_url: fields.profilePhoto && /^https:\/\//i.test(fields.profilePhoto) ? fields.profilePhoto : undefined,
-        instagram_handle: fields.socials ? (fields.socials.instagram || '') : undefined,
-        facebook_url: fields.socials && fields.socials.facebook !== undefined ? asUrl(fields.socials.facebook) : undefined,
-        tiktok_handle: fields.socials ? (fields.socials.tiktok || '') : undefined,
-        youtube_url: fields.socials && fields.socials.youtube !== undefined ? asUrl(fields.socials.youtube) : undefined,
+        ...(fields.socials ? contributorSocialPayload(fields.socials, 'update') : {}),
         gallery_urls: fields.gallery ?? undefined,
         contributor_contact_email: fields.contactEmail !== undefined ? (fields.contactEmail || null) : undefined,
       };

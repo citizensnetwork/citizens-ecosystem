@@ -39,8 +39,7 @@
     return h('div', { className: 'space-y-2' },
       SOCIALS.map((s) => h('div', { key: s.key, className: 'flex items-center gap-2 px-3 py-2 bg-white/70 border border-border rounded-xl focus-within:border-gold/60' },
         h('span', { className: 'w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0' }, h(Icon, { name: s.icon, size: 14, className: 'text-gold-dark' })),
-        h('span', { className: 'text-sm text-muted-foreground' }, s.prefix),
-        h('input', { value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value), placeholder: s.label, className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/70' }))));
+        h('input', { value: socials[s.key] || '', onChange: (e) => onChange(s.key, e.target.value), placeholder: s.placeholder || s.label, 'aria-label': s.label, className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/70' }))));
   }
 
   // ── Shared wizard shell ──

@@ -43,7 +43,12 @@
           h('p', { className: 'text-xs text-foreground leading-relaxed' }, app.reason)),
         h('div', { className: 'flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap' },
           app.website && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Globe', size: 11, className: 'text-gold' }), app.website),
-          app.socials && Object.values(app.socials)[0] && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Instagram', size: 11, className: 'text-gold' }), Object.values(app.socials)[0])),
+          // Was: the first social value with an Instagram icon hard-coded
+          // beside it, whatever platform it actually belonged to. Now every
+          // handle they submitted, each with its own brand mark.
+          app.socials && Object.entries(app.socials).filter(([, v]) => v).map(([k, v]) =>
+            h('span', { key: k, className: 'flex items-center gap-1' },
+              h(Icon, { name: window.DATA.getSocialPlatform(k).icon, size: 11, className: 'text-gold' }), v))),
         app.reviewNote && h('div', { className: 'mt-3 p-3 bg-card border border-border rounded-xl' },
           h('p', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1' }, 'Admin note'),
           h('p', { className: 'text-xs text-foreground' }, app.reviewNote))),

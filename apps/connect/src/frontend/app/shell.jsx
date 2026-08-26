@@ -9,6 +9,10 @@
 
   const BASE_TABS = [
     { page: 'home', label: 'Discover', icon: 'Map' },
+    // Kingdom Exploration is a real destination, not a button hidden in the
+    // map's top-right corner — it now lives in the nav on both breakpoints, so
+    // moving between the map and the list never moves the controls around you.
+    { page: 'kingdom-discovery', label: 'Kingdom Exploration', icon: 'LayoutGrid' },
     { page: 'community', label: 'Kingdom Projects', icon: 'Lightbulb' },
     { page: 'messages', label: 'Messages', icon: 'MessageCircle' },
     { page: 'notifications', label: 'Notifications', icon: 'Bell' },
@@ -118,6 +122,38 @@
                 React.createElement('span', null, 'Sign in with Google')))));
   }
 
+  // ── AccountButton — THE profile entry point, top-right, everywhere ────
+  //  There used to be two: this one on the map, and a "You" tab in the mobile
+  //  bottom bar whose panel opened off the bottom of the screen (it wrapped
+  //  ProfilePanel in an `absolute bottom-full` box and then positioned the
+  //  panel `top-full` BELOW that box — so it rendered past the viewport edge
+  //  and could not be used). The bottom-bar copy is gone; this is the only
+  //  one, and it sits in the same corner on the map, on Kingdom Exploration
+  //  and on every `Header`-based screen.
+  //
+  //  variant 'floating' — glass tile, for sitting over the map
+  //  variant 'inline'   — plain avatar, for sitting inside a solid header
+  function AccountButton({ variant = 'floating' }) {
+    const { user, role } = window.useApp();
+    const [open, setOpen] = useState(false);
+    const floating = variant === 'floating';
+    const size = floating ? 48 : 36;
+    return React.createElement('div', { className: 'relative shrink-0' },
+      React.createElement('button', {
+        onClick: () => setOpen((s) => !s),
+        'aria-label': 'Your account',
+        'aria-expanded': open,
+        className: cx('overflow-hidden relative block',
+          floating ? 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60'
+                   : 'w-9 h-9 rounded-xl ring-1 ring-border'),
+      },
+        React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size, rounded: 'xl' }),
+        role !== 'citizen' && React.createElement('span', {
+          className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center',
+        }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-white' }))),
+      open && React.createElement(ProfilePanel, { onClose: () => setOpen(false), anchor: 'top' }));
+  }
+
   // ── Desktop sidebar ──
   function Sidebar() {
     const app = window.useApp();
@@ -214,12 +250,17 @@
   }
 
   // ── Mobile bottom nav ──
+  //  Five pure DESTINATIONS. The old fifth slot was a "You" tab whose profile
+  //  panel opened off the bottom of the screen; account access now lives in
+  //  exactly one place — AccountButton, top-right, on every screen — and this
+  //  slot carries Kingdom Exploration instead, which was previously reachable
+  //  only from a button in the map's top-right corner.
   function BottomNav() {
     const app = window.useApp();
-    const { nav, go, user, role, unreadNotifs, unreadMsgs } = app;
-    const [showProfile, setShowProfile] = useState(false);
+    const { nav, go, unreadNotifs, unreadMsgs } = app;
     const tabs = [
       { page: 'home', label: 'Discover', icon: 'Map' },
+      { page: 'kingdom-discovery', label: 'Explore', icon: 'LayoutGrid' },
       { page: 'community', label: 'Projects', icon: 'Lightbulb' },
       { page: 'messages', label: 'Messages', icon: 'MessageCircle' },
       { page: 'notifications', label: 'Alerts', icon: 'Bell' },
@@ -238,19 +279,7 @@
               React.createElement(Icon, { name: t.icon, size: 21, strokeWidth: a ? 2.4 : 1.9 }),
               b > 0 && React.createElement('span', { className: 'absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-0.5 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
             React.createElement('span', { className: 'text-[9px] font-semibold' }, t.label));
-        }),
-        React.createElement('div', { className: 'relative flex-1 flex items-center justify-center' },
-          React.createElement('button', {
-            onClick: () => setShowProfile((s) => !s),
-            className: cx('flex flex-col items-center justify-center gap-0.5 transition-colors'),
-          },
-            React.createElement('div', { className: 'relative' },
-              React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 24, ring: showProfile ? '#C9A84C' : 'rgba(201,168,76,0.3)' }),
-              role !== 'citizen' && React.createElement('span', { className: 'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-gold border border-white flex items-center justify-center' },
-                React.createElement(Icon, { name: 'Crown', size: 6, className: 'text-white' }))),
-            React.createElement('span', { className: cx('text-[9px] font-semibold', showProfile ? 'text-gold-dark' : 'text-foreground/45') }, 'You')),
-          showProfile && React.createElement('div', { className: 'absolute bottom-full right-0 mb-2' },
-            React.createElement(ProfilePanel, { onClose: () => setShowProfile(false), anchor: 'top' })))));
+        })));
   }
 
   // ── Floating create FAB (contributors) ──
@@ -327,4 +356,5 @@
 
   window.Shell = Shell;
   window.ProfilePanel = ProfilePanel;
+  window.AccountButton = AccountButton;
 })();
