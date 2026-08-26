@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, Avatar, SmartImage, Button, Empty } = window.UI;
+  const { cx, safeUrl, Avatar, SmartImage, Button, Empty } = window.UI;
   const catOf = (x) => window.DATA.getCategory(x && x.category);
   const Icon = window.Icon;
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -146,7 +146,7 @@
             h('div', { className: 'flex flex-wrap gap-2' }, ev.upcomingDates.map((d, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground' }, new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))))),
           h('div', { className: 'grid grid-cols-3 gap-2' },
             h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || ev.organizerId) }, 'Message'),
-            ev.website && h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => window.open(ev.website, '_blank', 'noopener,noreferrer') }, 'Website'),
+            safeUrl(ev.website) && h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => window.open(safeUrl(ev.website), '_blank', 'noopener,noreferrer') }, 'Website'),
             h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') }, 'Share')))));
   }
 
@@ -281,7 +281,12 @@
             c.socials && Object.keys(c.socials).length > 0 && h('div', { className: 'flex gap-2 flex-wrap' },
               Object.entries(c.socials).filter(([, v]) => v).map(([k, v]) => {
                 const platform = window.DATA.getSocialPlatform(k);
-                const href = platform.urlFor(v);
+                // urlFor() already https-prefixes a bare handle, but never render
+                // an unvalidated href — a row stored before the write paths
+                // validated schemes must not become a javascript: link now that
+                // this chip is a real <a>.
+                const href = safeUrl(platform.urlFor(v));
+                if (!href) return null;
                 return h('a', {
                   key: k, href, target: '_blank', rel: 'noopener noreferrer', title: platform.label,
                   className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-semibold text-foreground hover:border-gold/40 transition-colors',

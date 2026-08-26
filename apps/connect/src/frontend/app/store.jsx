@@ -474,7 +474,6 @@
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
     const [createEditing, setCreateEditing] = useState(null); // null | the existing event/place object being edited
     const [creationStyle, setCreationStyle] = useState('sheet'); // sheet | modal | side  (tweakable)
-    const [pinStyle, setPinStyle] = useState('teardrop'); // teardrop | dot | glass (tweakable)
     const [bubbleStyle, setBubbleStyle] = useState('speech'); // speech | tag | minimal (tweakable)
 
     const [events, setEvents] = useState(() => DATA.events.map((e) => ({ ...e })));
@@ -523,15 +522,82 @@
     // the Playwright fallback) is untouched — window.CC_AUTH is null there,
     // so this guard never fires.
     const AUTH_REQUIRED_PAGES = new Set(['apply', 'onboarding']);
-    const go = useCallback((page, params = {}) => {
+
+    // ── In-app back stack (hardware / browser Back) ──────────────────
+    //  Connect lives on ONE URL, so with no history of its own an Android
+    //  Back press pops the *browser's* entry and leaves the app entirely
+    //  (founder report). We keep our own stack of {page,params} plus a LIFO
+    //  registry of "back guards" (whatever overlay is currently open), and
+    //  translate one Back press into: close the topmost overlay → else pop
+    //  one screen → else genuinely leave. Capped so a long session can't
+    //  grow it without bound.
+    const NAV_STACK_MAX = 40;
+    const navStack = useRef([{ page: 'home', params: {} }]);
+    const backGuards = useRef([]);
+    const sameNav = (a, b) => {
+      if (!a || a.page !== b.page) return false;
+      const ka = Object.keys(a.params || {}), kb = Object.keys(b.params || {});
+      return ka.length === kb.length && ka.every((k) => a.params[k] === b.params[k]);
+    };
+
+    // An open overlay registers here so Back dismisses it before it moves
+    // the app off the current screen. Returns its own unregister function —
+    // an overlay closed by its × / backdrop simply unregisters, no history
+    // bookkeeping needed (the web trap below re-arms on every press).
+    const registerBackGuard = useCallback((close) => {
+      const entry = { close };
+      backGuards.current.push(entry);
+      return () => { backGuards.current = backGuards.current.filter((g) => g !== entry); };
+    }, []);
+
+    const scrollTop = () => {
+      const main = document.getElementById('main-scroll');
+      if (main) main.scrollTop = 0;
+    };
+
+    const go = useCallback((page, params = {}, opts) => {
       if (AUTH_REQUIRED_PAGES.has(page) && !realUser && window.CC_AUTH) {
         signIn();
         return;
       }
-      setNav({ page, params });
-      const main = document.getElementById('main-scroll');
-      if (main) main.scrollTop = 0;
+      const st = navStack.current;
+      const next = { page, params };
+      if (opts && opts.replace) st[st.length - 1] = next;
+      else if (!sameNav(st[st.length - 1], next)) {
+        st.push(next);
+        if (st.length > NAV_STACK_MAX) st.shift();
+      }
+      setNav(next);
+      scrollTop();
     }, [realUser]);
+
+    // Hard reset of the stack — for transitions where "back" must NOT lead
+    // into the previous session's screens (sign-out, post-auth routing, a
+    // /dashboard deep link landing).
+    const resetNav = useCallback((page, params = {}) => {
+      navStack.current = [{ page, params }];
+      setNav({ page, params });
+      scrollTop();
+    }, []);
+
+    // One Back press. Returns false only when there is genuinely nothing
+    // left to dismiss — the caller then lets the platform leave the app.
+    const handleBack = useCallback(() => {
+      const guards = backGuards.current;
+      if (guards.length) {
+        const g = guards[guards.length - 1];
+        backGuards.current = guards.slice(0, -1);
+        try { g.close(); } catch (e) { /* a closed overlay is still handled */ }
+        return true;
+      }
+      const st = navStack.current;
+      if (st.length < 2) return false;
+      st.pop();
+      const prev = st[st.length - 1];
+      setNav({ page: prev.page, params: prev.params });
+      scrollTop();
+      return true;
+    }, []);
 
     // "Browse as Guest" — dismiss the landing screen without signing in.
     // Independent of `authed`: the real-session bootstrap effect only ever
@@ -641,9 +707,13 @@
           });
           const body = await res.json().catch(() => ({}));
           if (!res.ok) {
+            // A 400 from this route is always a field-level message written
+            // for the applicant (see /api/contributor/apply) — showing it
+            // beats "please try again" when the fix is one field away.
             toast(body.error === 'already_pending' || body.error === 'already_approved'
               ? 'You already have a contributor application on file.'
-              : 'Could not submit — please try again.', 'red');
+              : (res.status === 400 && typeof body.error === 'string' && body.error)
+                || 'Could not submit — please try again.', 'red');
             finish(false);
             return;
           }
@@ -1758,10 +1828,10 @@
       setMyContributor(null);
       setMyApplication(null);
       setAssistMode(false);
-      setNav({ page: 'home', params: {} });
+      resetNav('home');
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
       try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
-    }, []);
+    }, [resetNav]);
 
     // ── real Supabase session bootstrap (no-op in demo mode) ──
     //  Source of truth when CC_AUTH is present: resolves the session + role on
@@ -1782,9 +1852,9 @@
         if (!/^\/dashboard(\/|$)/.test(window.location.pathname)) return;
         deepLinkHandled = true;
         if (resolvedRole === 'contributor') {
-          setNav({ page: 'dashboard', params: {} });
+          resetNav('dashboard');
         } else {
-          setNav({ page: 'apply', params: {} });
+          resetNav('apply');
           toast('Become a Contributor to unlock your portal.', 'gold');
         }
       };
@@ -1795,7 +1865,7 @@
           setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email });
           setAuthed(true);
           setRole(s.role || 'citizen');
-          if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); setNav({ page: 'apply', params: {} }); }
+          if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
           else handleDashboardDeepLink(s.role || 'citizen');
         } else {
           setRealUser(null);
@@ -2227,12 +2297,60 @@
       })();
     }, [realUser, toast]);
 
+    // ── Platform Back button → handleBack() ─────────────────────────
+    //  Native (Capacitor/Android): registering a 'backButton' listener
+    //  overrides Capacitor's default (history.back(), else exit), so the
+    //  whole decision is ours — including exitApp() when nothing is left.
+    //  Web (incl. Chrome on Android, which is where the founder hit this):
+    //  keep exactly ONE spare history entry armed. A Back press pops that
+    //  entry instead of the page; we act in-app and immediately re-arm.
+    //  Only when handleBack() reports nothing left do we stand down and let
+    //  the browser really navigate away.
+    useEffect(() => {
+      const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+      if (isNative && window.CapApp && window.CapApp.addListener) {
+        let handle = null, cancelled = false;
+        Promise.resolve(window.CapApp.addListener('backButton', () => {
+          if (handleBack()) return;
+          if (window.CapApp.exitApp) window.CapApp.exitApp();
+        })).then((hnd) => {
+          if (cancelled) { if (hnd && hnd.remove) hnd.remove(); } else handle = hnd;
+        }).catch(() => {});
+        return () => { cancelled = true; if (handle && handle.remove) handle.remove(); };
+      }
+      if (!window.history || !window.history.pushState) return undefined;
+      let armed = false, standingDown = false;
+      const arm = () => {
+        if (armed) return;
+        try { window.history.pushState({ ccBack: 1 }, ''); armed = true; } catch (e) { /* rate-limited */ }
+      };
+      const onPop = () => {
+        armed = false;
+        if (handleBack()) { arm(); return; }
+        // Nothing left in-app: consume our own listener and repeat the Back
+        // for real. If Connect was the first entry in this tab, back() is a
+        // no-op and we are still here — re-arm so Back keeps working.
+        standingDown = true;
+        window.removeEventListener('popstate', onPop);
+        window.history.back();
+        setTimeout(() => {
+          if (!standingDown) return;
+          standingDown = false;
+          window.addEventListener('popstate', onPop);
+          arm();
+        }, 500);
+      };
+      window.addEventListener('popstate', onPop);
+      arm();
+      return () => { window.removeEventListener('popstate', onPop); };
+    }, [handleBack]);
+
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
     const value = {
       authed, signIn, signOut,
       guestMode, browseAsGuest,
-      role, setRole, nav, go,
+      role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,
       ideas, toggleIdeaVote, submitIdea, scheduleKingdomProject, confirmIdea,
@@ -2249,7 +2367,7 @@
       updateContributorProfile, addCoverPhoto, deleteCoverPhoto, updateCoverPhotoCaption,
       newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
       adminStats, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref,
-      creationStyle, setCreationStyle, pinStyle, setPinStyle, bubbleStyle, setBubbleStyle,
+      creationStyle, setCreationStyle, bubbleStyle, setBubbleStyle,
       submitApplication, reviewApplication, completeOnboarding,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
       acceptRequest, rejectRequest, muteConversation, unmuteConversation, blockUser,
@@ -2265,8 +2383,25 @@
     return ctx;
   }
 
+  // ── useBackGuard(active, onBack) ──────────────────────────────────
+  //  Declares "while I am open, a Back press should close me, not navigate".
+  //  Guards are consumed LIFO, so nested overlays unwind in the order a user
+  //  expects. Deliberately reads the context directly instead of useApp() so
+  //  a component rendered outside the provider degrades to a no-op.
+  function useBackGuard(active, onBack) {
+    const ctx = useContext(AppCtx);
+    const cb = useRef(onBack);
+    cb.current = onBack;
+    const register = ctx && ctx.registerBackGuard;
+    useEffect(() => {
+      if (!active || !register) return undefined;
+      return register(() => { if (cb.current) cb.current(); });
+    }, [active, register]);
+  }
+
   window.AppProvider = AppProvider;
   window.useApp = useApp;
+  window.useBackGuard = useBackGuard;
   window.authedFetch = authedFetch;
   window.uploadImage = uploadImage;
 })();

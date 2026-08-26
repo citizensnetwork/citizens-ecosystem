@@ -5,8 +5,10 @@
 //  map. Keeps the same public interface the home screen consumes:
 //    window.StylizedMap({ markers, routes, filterCategory, selectedId, onSelect })
 //    window.MapFloatersLayer(...)  → now a no-op (bubbles ride the markers).
-//  Markers are native MapLibre markers built as small DOM pins that mirror
-//  the teardrop / dot / glass styles from the prototype (+ live pulse +
+//  Markers are native MapLibre markers: one floating SVG badge per item,
+//  carrying that item's own category glyph in its own category colour, on a
+//  shape that encodes the entity type — circle for a Place, rounded rectangle
+//  for an Event, ringed circle (or its logo) for a Contributor (+ live pulse +
 //  broadcast bubble + selected label). Coordinates use real lat/lng when an
 //  item has them; legacy mock items (only mapX/mapY) are projected into a
 //  greater-Pretoria bounding box so they still place sensibly during the
@@ -47,18 +49,37 @@
 
   // Raw-DOM Lucide icon builder — mirrors icons.jsx's <Icon>, but map pins
   // are plain DOM nodes (MapLibre markers), not React, so it can't reuse
-  // that component. Reads the same window.lucide UMD data, so any name the
-  // rest of the app already uses is safe to pass here.
+  // that component. Reads the same window.lucide UMD data.
+  //
+  // Shape-tolerant on purpose: lucide's UMD has shipped its icon nodes both
+  // as a flat child list ([[tag, attrs], …], the current 1.x form) and as a
+  // full element triple (['svg', attrs, children]) in the 0.44x line. Reading
+  // only one of those turns every icon into a hard error, so normalise first.
+  function lucideChildren(name) {
+    const lib = window.lucide && window.lucide.icons;
+    let node = lib && lib[name];
+    if (!node || !Array.isArray(node)) return null;
+    if (typeof node[0] === 'string') node = Array.isArray(node[2]) ? node[2] : [];
+    return node.filter((c) => Array.isArray(c) && typeof c[0] === 'string');
+  }
+
+  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+  // Inner markup of a lucide glyph, ready to drop inside a <g> of a bigger SVG.
+  function lucideInner(name) {
+    const kids = lucideChildren(name);
+    if (!kids || !kids.length) return '';
+    return kids.map(([tag, attrs]) => {
+      const a = Object.keys(attrs || {}).map((k) => k + '="' + esc(attrs[k]) + '"').join(' ');
+      return '<' + tag + (a ? ' ' + a : '') + '></' + tag + '>';
+    }).join('');
+  }
+
   function lucideSvgString(name, opts) {
     const size = (opts && opts.size) || 16;
     const color = (opts && opts.color) || '#fff';
-    const lib = window.lucide && window.lucide.icons;
-    const node = lib && lib[name];
-    if (!node) return '';
-    const inner = node.map(([tag, attrs]) => {
-      const attrStr = Object.keys(attrs).map((k) => k + '="' + attrs[k] + '"').join(' ');
-      return '<' + tag + ' ' + attrStr + '></' + tag + '>';
-    }).join('');
+    const inner = lucideInner(name);
+    if (!inner) return '';
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color +
       '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
   }
@@ -73,10 +94,93 @@
   //  pin to its lng/lat with a transform. Replacing that element on every
   //  re-render dropped the class → the pin fell to `position:static` and
   //  drifted on zoom/pan. So on reuse we swap only this inner content.
+  // Default glyph per entity type, for the (common) rows that carry no
+  // category yet — honest and type-specific rather than a generic drop pin.
+  const FALLBACK_ICON = Object.assign(Object.create(null),
+    { event: 'CalendarDays', place: 'Landmark', contributor: 'Building2', idea: 'Lightbulb' });
+  // Most Contributors have not picked a category yet, but nearly all have a
+  // kind — so an uncategorised org still gets a glyph that says something true
+  // about it rather than one generic building for the whole directory.
+  const KIND_ICON = Object.assign(Object.create(null),
+    { ministry: 'Church', organization: 'Building2', business: 'Store' });
+
+  function pinIcon(m, cat) {
+    if (m.type === 'idea') return 'Lightbulb';
+    if (cat && cat.icon) return cat.icon;
+    if (m.type === 'contributor' && KIND_ICON[m.kind]) return KIND_ICON[m.kind];
+    return FALLBACK_ICON[m.type] || 'MapPin';
+  }
+
+  // One floating SVG badge: the category's own glyph, in the category's own
+  // colour, on the shape that says what kind of thing this is —
+  //   place       → circle
+  //   event       → rounded rectangle with a locating nub
+  //   contributor → circle with a second, category-coloured halo ring
+  //   idea        → circle (gold)
+  // Drawn as a real <svg> (not stacked divs) so the white outline traces the
+  // whole silhouette and the drop-shadow follows its alpha — that shadow is
+  // what makes it read as floating above the map rather than printed on it.
+  function pinSvg({ shape, hex, icon, selected }) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const glyph = lucideInner(icon);
+    let w, h, body, gx, gy, gsize;
+
+    if (shape === 'event') {
+      w = selected ? 44 : 36;
+      h = selected ? 34 : 28;
+      const nub = 7, r = 9, cx = w / 2, pad = 2;      // pad leaves room for the stroke
+      const W = w + pad * 2, H = h + nub + pad * 2;
+      const x0 = pad, y0 = pad, x1 = pad + w, y1 = pad + h, ncx = pad + cx;
+      body = '<path d="M' + (x0 + r) + ' ' + y0 + ' H' + (x1 - r) +
+        ' A' + r + ' ' + r + ' 0 0 1 ' + x1 + ' ' + (y0 + r) +
+        ' V' + (y1 - r) + ' A' + r + ' ' + r + ' 0 0 1 ' + (x1 - r) + ' ' + y1 +
+        ' H' + (ncx + 5) + ' L' + ncx + ' ' + (y1 + nub) + ' L' + (ncx - 5) + ' ' + y1 +
+        ' H' + (x0 + r) + ' A' + r + ' ' + r + ' 0 0 1 ' + x0 + ' ' + (y1 - r) +
+        ' V' + (y0 + r) + ' A' + r + ' ' + r + ' 0 0 1 ' + (x0 + r) + ' ' + y0 + ' Z"' +
+        ' fill="' + hex + '" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>';
+      gsize = Math.round(h * 0.58);
+      gx = pad + cx - gsize / 2;
+      gy = pad + h / 2 - gsize / 2;
+      w = W; h = H;
+    } else {
+      const d = shape === 'contributor' ? (selected ? 46 : 38) : (selected ? 40 : 32);
+      const pad = shape === 'contributor' ? 3 : 2;
+      const W = d + pad * 2, c = pad + d / 2;
+      body = '';
+      if (shape === 'contributor') {
+        // outer halo ring — the one visual difference from a Place circle,
+        // so the two never read as the same thing at a glance.
+        body += '<circle cx="' + c + '" cy="' + c + '" r="' + (d / 2 + 1.25) + '" fill="none" stroke="' + hex + '" stroke-opacity="0.45" stroke-width="2"/>';
+      }
+      body += '<circle cx="' + c + '" cy="' + c + '" r="' + (d / 2 - 1.25) + '" fill="' + hex + '" stroke="#ffffff" stroke-width="2.5"/>';
+      gsize = Math.round(d * 0.46);
+      gx = c - gsize / 2;
+      gy = c - gsize / 2;
+      w = W; h = W;
+    }
+
+    // Stable hook for tests/inspection: which pin shape a marker actually got.
+    // Cheap, and it makes "did every entity type render on the map?" assertable
+    // instead of eyeballed.
+    svg.setAttribute('data-cc-pin', shape);
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'display:block;overflow:visible;filter:drop-shadow(0 3px 5px rgba(0,0,0,.32));transition:all .15s;';
+    svg.innerHTML = body + (glyph
+      ? '<g transform="translate(' + gx + ' ' + gy + ') scale(' + (gsize / 24) + ')" fill="none" stroke="#ffffff"' +
+        ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + glyph + '</g>'
+      : '');
+    return svg;
+  }
+
   function buildPinInner(m, cat, opts) {
-    const selected = opts.selected, pinStyle = opts.pinStyle;
+    const selected = opts.selected;
     const isIdea = m.type === 'idea';
     const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
+    const icon = pinIcon(m, cat);
 
     const inner = document.createElement('div');
     inner.style.cssText = 'position:relative;line-height:0;';
@@ -92,46 +196,32 @@
       inner.appendChild(ring);
     }
 
-    const pin = document.createElement('span');
-    if (m.type === 'contributor') {
-      // Contributors always render as a circular floating pin — a logo photo
-      // ringed in the category colour when one exists, else a colour-filled
-      // category glyph — regardless of the global teardrop/dot/glass pinStyle
-      // tweak (that setting is about events/places, which have no logo).
-      const d = selected ? 46 : 36;
+    let pin;
+    if (m.type === 'contributor' && m.profilePhoto) {
+      // The one case a flat SVG can't carry: a Contributor's own logo. Same
+      // circular silhouette as the SVG badge, drawn as DOM so the photo keeps
+      // its onerror fallback — a broken logo URL degrades to the category
+      // glyph rather than leaving a dead image on the map.
+      const d = selected ? 46 : 38;
+      pin = document.createElement('span');
+      pin.setAttribute('data-cc-pin', 'contributor-logo');
       pin.style.cssText = 'display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
-        'px;border-radius:50%;background:' + fill + ';box-shadow:0 3px 8px rgba(0,0,0,.3);transition:all .15s;';
-      const glyph = () => { pin.innerHTML = lucideSvgString(cat ? cat.icon : 'Building2', { size: Math.round(d * 0.45), color: '#fff' }); };
-      if (m.profilePhoto) {
-        const img = document.createElement('img');
-        img.src = m.profilePhoto;
-        img.alt = '';
-        img.style.cssText = 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;';
-        // A broken/missing photo falls back to the category glyph rather
-        // than an empty ring — never a dead image icon on the map.
-        img.onerror = glyph;
-        pin.appendChild(img);
-      } else {
-        glyph();
-      }
-    } else if (pinStyle === 'dot') {
-      const d = selected ? 22 : 16;
-      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
-        'px;border:2.5px solid #fff;border-radius:50%;background:' + fill +
-        ';box-shadow:0 3px 8px rgba(0,0,0,.28);transition:all .15s;';
-    } else if (pinStyle === 'glass') {
-      const d = selected ? 40 : 32;
-      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
-        'px;border:1.5px solid rgba(255,255,255,.7);border-radius:16px;background:' + fill +
-        'E6;box-shadow:0 4px 10px rgba(0,0,0,.22);transition:all .15s;';
-    } else { // teardrop
-      const d = selected ? 38 : 30;
-      pin.style.cssText = 'display:block;width:' + d + 'px;height:' + d +
-        'px;border:2.5px solid #fff;background:' + fill +
-        ';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 10px rgba(0,0,0,.24);transition:all .15s;';
-      const dot = document.createElement('span');
-      dot.style.cssText = 'position:absolute;left:50%;top:42%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.9);';
-      pin.appendChild(dot);
+        'px;border-radius:50%;background:' + fill + ';box-shadow:0 0 0 2px ' + fill + '73, 0 3px 5px rgba(0,0,0,.32);transition:all .15s;';
+      const img = document.createElement('img');
+      img.src = m.profilePhoto;
+      img.alt = '';
+      img.style.cssText = 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;';
+      img.onerror = () => {
+        pin.style.boxShadow = 'none';
+        pin.style.background = 'transparent';
+        pin.replaceChildren(pinSvg({ shape: 'contributor', hex: fill, icon, selected }));
+      };
+      pin.appendChild(img);
+    } else {
+      pin = pinSvg({
+        shape: isIdea ? 'idea' : m.type === 'event' ? 'event' : m.type === 'contributor' ? 'contributor' : 'place',
+        hex: fill, icon, selected,
+      });
     }
     inner.appendChild(pin);
 
@@ -186,7 +276,6 @@
 
   // ── The map component ──────────────────────────────────────────────
   function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble }) {
-    const { pinStyle } = window.useApp();
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
@@ -283,17 +372,16 @@
         const cat = window.DATA.getCategory(m.category);
         const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
         const selected = selectedId === m.id;
-        // Contributor pins are always circular (see buildPinInner), so their
-        // natural anchor is always 'center' — the teardrop pinStyle's
-        // 'bottom' anchor is only correct for the pointed teardrop shape.
-        const anchor = (m.type !== 'contributor' && pinStyle === 'teardrop') ? 'bottom' : 'center';
-        const inner = buildPinInner(m, cat, { selected, pinStyle, onDismissBubble: onDismissBubbleRef.current });
+        // Event badges carry a locating nub, so they hang from their point
+        // ('bottom'); every other pin is a symmetric badge centred on it.
+        const anchor = m.type === 'event' ? 'bottom' : 'center';
+        const inner = buildPinInner(m, cat, { selected, onDismissBubble: onDismissBubbleRef.current });
         const existing = markerObjs.current.get(m.id);
         // Reuse the marker (and its MapLibre-owned outer element) whenever the
         // anchor is unchanged — swap ONLY the inner content so the
         // `maplibregl-marker` class + absolute positioning survive. The anchor
-        // is fixed at construction, so a pinStyle switch (teardrop↔center)
-        // forces a rebuild or the pin would render off its coordinate.
+        // is fixed at construction, so an anchor change forces a rebuild or
+        // the pin would render off its coordinate.
         if (existing && existing._ccAnchor === anchor) {
           const wrap = existing.getElement();
           wrap.style.opacity = dim ? '0.3' : '';
@@ -325,7 +413,7 @@
         items.forEach(({ coords }) => b.extend(coords));
         mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
       }
-    }, [markers, filterCategory, selectedId, pinStyle]);
+    }, [markers, filterCategory, selectedId]);
 
     return React.createElement('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } });
   }

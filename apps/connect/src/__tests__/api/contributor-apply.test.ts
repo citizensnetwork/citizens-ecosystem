@@ -76,6 +76,76 @@ describe("POST /api/contributor/apply", () => {
     expect(res.status).toBe(400);
   });
 
+  it.each([
+    ["website_url", "Website"],
+    ["facebook_url", "Facebook"],
+    ["youtube_url", "YouTube"],
+  ])("returns 400 when %s carries a dangerous scheme (stored-XSS guard)", async (key, label) => {
+    mockUser({ id: USER_ID });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    const res = await POST(
+      makeReq({ display_name: "Hope Ministries", [key]: "javascript:alert(1)" }),
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain(label);
+  });
+
+  it("accepts the wizard's own scheme-less website placeholder and stores it as https", async () => {
+    mockUser({ id: USER_ID });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({ data: { id: "app-new" }, error: null });
+    // apply.jsx's Website field literally placeholders "yourministry.org" —
+    // rejecting that would fail a legitimate application.
+    const res = await POST(
+      makeReq({ display_name: "Hope Ministries", website_url: "yourministry.org" }),
+    );
+    expect(res.status).not.toBe(400);
+    const inserted = mockClient._chain.insert.mock.calls.at(-1)?.[0] as
+      | { website_url?: string }
+      | undefined;
+    expect(inserted?.website_url).toBe("https://yourministry.org/");
+  });
+
+  it("keeps a social handle as typed (the display layer builds the platform URL)", async () => {
+    mockUser({ id: USER_ID });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({ data: { id: "app-new" }, error: null });
+    const res = await POST(
+      makeReq({ display_name: "Hope Ministries", facebook_url: "hopeministries" }),
+    );
+    expect(res.status).not.toBe(400);
+    const inserted = mockClient._chain.insert.mock.calls.at(-1)?.[0] as
+      | { facebook_url?: string }
+      | undefined;
+    expect(inserted?.facebook_url).toBe("hopeministries");
+  });
+
+  it("normalises a valid website_url instead of rejecting it", async () => {
+    mockUser({ id: USER_ID });
+    mockClient._chain.maybeSingle
+      .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { id: "app-new" },
+      error: null,
+    });
+    const res = await POST(
+      makeReq({ display_name: "Hope Ministries", website_url: "  https://hope.org  " }),
+    );
+    expect(res.status).not.toBe(400);
+    const inserted = mockClient._chain.insert.mock.calls.at(-1)?.[0] as
+      | { website_url?: string }
+      | undefined;
+    expect(inserted?.website_url).toBe("https://hope.org/");
+  });
+
   it("inserts and returns success on valid payload", async () => {
     mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
