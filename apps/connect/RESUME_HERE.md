@@ -2810,6 +2810,18 @@ warnings** · `pnpm format:check` clean · workspace-wide turbo **typecheck 12/1
 - The retired `pinStyle` tweak means there is no in-app way to preview a different pin
   shape. Deliberate (one design, no drift) — trivially reversible if you want variants.
 
+### ✅ SHIPPED — PR #58 MERGED (2026-08-26), every check green first time
+Merge commit `7c440cd` on `main`; production deployment `dpl_7B1rekFY…` verified
+**READY** for that exact commit (aliased to www.citizenscentral.co.za). CI on the head
+commit: **Verify · E2E (Connect — Playwright) · CodeQL · Analyze · Vercel Preview all
+success**, Supabase Preview skipped as always on the Free tier. Unlike §3AM, CI found
+nothing this session's own checks had missed — the new
+`e2e/discovery-cards-and-back.spec.ts` ran green in CI's real browser (4/4 with the
+pre-existing golden-path spec), which is the signal the sandbox could not produce for the
+map. One late refinement went in after the first push: a Place with no resolvable
+organiser had a permanently disabled "Message" primary button — the majority shape of the
+real directory — so those cards now lead with **View** and drop the duplicate eye icon.
+
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
@@ -2820,8 +2832,9 @@ warnings** · `pnpm format:check` clean · workspace-wide turbo **typecheck 12/1
 > got the category-coloured floating SVG pins (circle = Place, rounded badge = Event,
 > ringed circle = Contributor); the device Back button now walks back inside Connect
 > instead of leaving the site; and a live stored-XSS hole on contributor links was
-> closed. PR #58, §3AN. No migration — next migration # is still 172.** All gates green
-> incl. workspace-wide turbo, and CI's own Playwright run went green on the new
+> closed. **✅ MERGED** (PR #58, merge commit `7c440cd`; production deployment verified
+> READY for that commit). §3AN. No migration — next migration # is still 172.** All gates
+> green incl. workspace-wide turbo, and CI's own Playwright run went green on the new
 > `e2e/discovery-cards-and-back.spec.ts` (4/4). **Founder action: none required** — but
 > please re-open Kingdom Discovery and the map on your Android device to confirm the
 > cards, the pins and the Back button behave as expected in the real thing; and note the
