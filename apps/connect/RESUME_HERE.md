@@ -2941,12 +2941,31 @@ and do a real drag first, or the app's auto-fit re-frames every programmatic `se
 (Run `turbo build` before `turbo typecheck` — running them together lets the build wipe
 `.next/types` mid-typecheck and produces spurious TS6053s.)
 
+### What CI caught (first run, commit `c37f489`) — all three fixed in `f61f1ee`
+The e2e specs could not run in the sandbox (Playwright serves the real `public/`, which
+pulls React/lucide/Tailwind/MapLibre from CDNs this environment cannot reach), so CI was
+their first real execution. **8 of 9 passed.** Worth recording that the three failures
+predicted beforehand — pin clicks being pointer-intercepted, the zoom-gate test being
+flaky — did **not** happen; waiting for CI's real output instead of "fixing" tests
+assumed broken saved a wasted cycle.
+- **CodeQL, 1 high, blocking — `js/incomplete-sanitization` at `data.jsx:62`.** `stripHost`
+  built a RegExp by concatenating a host into a pattern and escaped only `.`, not
+  backslashes or any other metacharacter. Not exploitable (the hosts are our own
+  literals) but exactly the shape that becomes exploitable the day a host goes dynamic.
+  Rewritten as plain string comparison — a prefix strip needs no regex, so there is no
+  escaping to get wrong. Behaviour preserved exactly, including that a leading `www.` is
+  consumed only when the platform's own host really follows it; pinned by tests.
+- **Found while verifying that rewrite: a doubled `@` produced dead links.**
+  `tiktok.com/@dam` became `tiktok.com/@@dam` (and the same for YouTube's `@handle`
+  form) because `stripHandle` only removes a LEADING `@`, and the `@` stops being
+  leading once the host comes off the front. Fixed and pinned.
+- **The one e2e failure was a real accessibility gap.** A social chip on a full profile
+  announced only its handle — `@ourchurch` — because the brand mark is purely visual and
+  `title` is not an accessible name when the link has content. Chips now announce
+  `Instagram — @ourchurch`; the icon-only compact row on a card keeps the platform name
+  alone. `getByRole("link", { name: /^Instagram/ })` is the assertion that pins it.
+
 ### Honest checkpoint
-- **e2e could not run locally** — Playwright's webserver serves the real `public/`, which
-  pulls React/lucide/Tailwind/MapLibre from CDNs this sandbox cannot reach. The new specs
-  (socials on a card and on the panel, the zoom gates, the mist label, the single account
-  control, the category row) are written against real DOM hooks and verified by hand in
-  the harness, but **CI's Playwright run is their first real execution.**
 - A **cancelled event still disappears from its owner's dashboard on reload** —
   `/api/v1/events` has always filtered `status='published'` and there is no owner-scoped
   fetch, so Restore only works within the session that cancelled it. Places now behave
