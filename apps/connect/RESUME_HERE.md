@@ -2881,6 +2881,6 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 ### Canonical docs (start here)
 - [V1_SCOPE.md](V1_SCOPE.md) — **Connect's v1 scope (§3AD scoping → §3AE shipped → §3AG contributor portal, PR #42 open, 2026-08-24).** Read this first for any Connect-focused session.
 - [VISION.md](VISION.md) · [.github/MASTER_DIRECTION.md](.github/MASTER_DIRECTION.md) — north star + locked technical direction.
-- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **167** live; a repo file for it exists on branch `feat/connect-contributor-portal`/PR #42, not yet on `main`; next # = **168**; `public`/`vision`/`wear`).
+- [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **171** live; next # = **172**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).
