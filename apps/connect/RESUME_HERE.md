@@ -2675,9 +2675,160 @@ session did (`Apply Now`) before assuming the e2e suite is unaffected.**
 
 ---
 
+## 3AN. Kingdom Discovery cards un-collapsed · category SVG map pins · device Back navigation · contributor-link XSS closed (2026-08-26)
+
+Founder follow-up to §3AM, "as project lead and senior designer": (1) the Kingdom
+Discovery list showed nothing — the All tab was just thin lines of category colour, the
+Contributors tab tiny empty cards; (2) map markers were still the old location pins;
+(3) Android's Back button left the whole browser page instead of navigating back inside
+Connect. Branch `claude/connect-listing-navigation-fixes-iv03a1`, **PR #58**. Session
+offload: `.claude/sessions/connect-listing-navigation-fixes.md` (gitignored).
+**No migration this session — next migration # is still 172.**
+
+### A live-browser harness finally exists (this is the big unlock)
+Every recent session (§3AJ, §3AK, §3AM) hit the same wall: the sandbox can't reach
+unpkg/cdn.tailwindcss.com, so the standalone frontend never boots and no visual bug can
+be reproduced locally. **registry.npmjs.org IS reachable**, so this session built one in
+the scratchpad: run the real `scripts/build-frontend.js`, swap the CDN tags for
+npm-sourced UMD copies (react, react-dom, lucide, maplibre-gl), compile Tailwind locally
+from the same inline config, and serve `public/` from a tiny node server that also fakes
+`/api/v1/*` with production-shaped fixtures. Chromium is at `/opt/pw-browsers/chromium`.
+**Bug #1 was reproduced pixel-for-pixel on the first run.** Recipe is written up in the
+session offload file — worth rebuilding in any future session that needs to *see* the app.
+
+### Root causes (measured, not guessed)
+- **The card collapse.** `kingdom-discovery.jsx` made ONE element both the flex-sized
+  scroll container and the grid (`flex-1 overflow-y-auto … grid …`). Chromium sizes a
+  grid container's implicit `auto` rows against its own box when that container is itself
+  a scroll container **with a definite height** — the live `grid-template-rows` measured
+  `2px 2px 2px …`. Each card was stretched to a 2px row, then clipped by its own
+  `overflow-hidden` down to the 1.5px category border. A property matrix
+  (`minrepro2/3/4.html`) isolated the trigger to `overflow-y:auto` + a definite height —
+  `align-content`, `flex` and the inner `<button>` are all irrelevant, and **`max-height`
+  grids are NOT affected**, so the three category pickers (admin/apply/create) were fine
+  and this was the only affected surface. Fix: the scroller wraps the grid.
+- **Why the cards looked empty even when sized.** Production has almost no imagery —
+  events 193 rows / 2 images, places 40 / **0**, contributors 11 / 1 logo. The §3AM card
+  reserved 144px of every card for a cover photo that does not exist, so most of the card
+  was an empty tinted block. The band is now adaptive.
+- **Why pins looked generic.** §3AM's redesign only ever reached Contributors; events and
+  places still fell through to the teardrop/dot/glass `pinStyle`. And contributors look
+  identical to each other because **only 1 of 11 has a category** (10 of 11 DO have a
+  `contributor_kind` — that is now the fallback).
+- **Back button.** `store.jsx` held nav as a single `{page, params}`: no stack, no
+  `popstate` listener, no Capacitor `backButton` listener. The SPA never touched
+  `window.history`, so the OS Back press popped the browser's entry.
+- **Stored XSS (found in the vibe-security pass, not reported).** `website_url` /
+  `facebook_url` / `youtube_url` / `logo_url` were stored **unvalidated** by
+  `/api/contributor/apply` (self-serve — any signed-in user) and
+  `/api/admin/contributors/create`; only `/api/contributor/profile` checked the scheme.
+  §3AM had just turned social chips into real `<a href>`, and this session adds a Website
+  button to every discovery card, so a stored `javascript:` URL was a genuine sink.
+- **`lucide@latest` was unpinned.** `icons.jsx` expects `lucide.icons[name] ===
+  [[tag, attrs], …]`; lucide 0.446.x shipped `['svg', attrs, children]` instead, which
+  throws in every `<Icon>` and unmounts the entire React root (verified: blank page).
+  Today's `latest` (1.34.0) happens to have the expected shape, so prod was fine — but one
+  upstream release could have white-screened the app with no deploy of ours.
+
+### What shipped
+- **`kingdom-discovery.jsx`** — scroller/grid split (the fix), plus the card rebuilt to the
+  founder's brief: thin category outline; cover photo as the top band when one exists,
+  otherwise a slim category ribbon with a large low-contrast category glyph; round
+  organisation badge bottom-left (logo → initials → category glyph, and **never** initials
+  taken from the listing's own title, which would invent an organisation); title,
+  2-line description, location, date, distance-from-me, real counters; action row =
+  View · Consider/Follow · Website · Message-organiser (events with a resolvable
+  organiser) · Share · primary Connect/Message. Uncategorised Contributors show their
+  KIND badge (Ministry / Organisation / Business).
+- **`map.jsx`** — new `pinSvg()`: ONE floating SVG badge per marker, carrying that item's
+  own category glyph in its own category colour, white outline + drop shadow, shaped by
+  entity type — **circle = Place, rounded rectangle with a locating nub = Event, ringed
+  circle (or the logo) = Contributor, gold circle = Idea**. Category-less contributors fall
+  back to a kind glyph. Every badge carries `data-cc-pin="<shape>"` as a stable test hook.
+  The teardrop/dot/glass `pinStyle` variation is **retired** (removed from `store.jsx` and
+  the tweaks panel; `docs/HTML_FRONTEND_WIRING_SPEC.md` §Map notes the supersession) —
+  one pin system, no route back to the rejected look.
+- **Back navigation** (`store.jsx` + `ui.jsx` + `home.jsx` + `shell.jsx`) — `navStack`
+  (capped at 40, dedupes repeats), `resetNav()` for sign-out / post-auth routing /
+  `/dashboard` deep-link landing, and a LIFO `registerBackGuard` registry. One Back press:
+  close the topmost overlay → else pop one screen → else genuinely leave. Web keeps ONE
+  armed `history.pushState` sentinel and re-arms after each press (and re-arms if there was
+  no previous entry, so it can never trap the user); native registers Capacitor's
+  `backButton` and calls `exitApp()` when nothing is left. Guards are registered inside
+  `UI.Overlay` — so every modal/sheet/side panel in the app inherits it, including
+  CreateFlow and the category sheet — plus the map's `PreviewPanel` and `ProfilePanel`.
+  New `window.useBackGuard(active, onBack)` is the public hook for any future overlay.
+- **NEW `src/lib/publicUrl.ts`** — `normalisePublicUrl` (strict), `coercePublicUrl`
+  (scheme-less `yourministry.org` → `https://yourministry.org/`, because that is literally
+  the apply wizard's placeholder and rejecting it would fail real applications), and
+  `hasUnsafeScheme` (for social **handles**, which are not URLs). Wired into
+  `/api/contributor/apply`, `/api/admin/contributors/create` and `/api/contributor/profile`.
+  400s are written for the applicant ("Website must be a valid web address (for example
+  yourministry.org).") and `submitApplication` now surfaces a 400's message instead of a
+  blanket "please try again". `UI.safeUrl()` guards every render / `window.open` site as
+  defence in depth (discovery card, `EventProfilePage`, the social chips).
+- **`icons.jsx` + `index.html`** — `Icon` normalises **both** lucide icon-node shapes and
+  degrades to an empty (valid) `<svg>` for an unknown name instead of throwing;
+  `lucide@latest` **pinned to 1.34.0**. `map.jsx`'s raw-DOM builder got the same treatment.
+- Lookup tables keyed by database values (`KIND_ICON`, `FALLBACK_ICON`, `KINDS`,
+  `TYPE_ICON`) switched to null-prototype objects.
+- `aria-label`s on the map's filter and account buttons (they had none — also what makes
+  the new e2e stable).
+- `index.html` `?v=` cache-busters bumped for every touched `app/*.jsx`.
+
+### Tests
+- **NEW `e2e/discovery-cards-and-back.spec.ts`** — three things unit tests structurally
+  cannot see: a card's **rendered height** (>120px; the collapse measured 2px) plus its
+  details and action buttons; one pin of each `data-cc-pin` shape with the place badge's
+  real category colour; and the full Back contract (walks screens, closes an overlay
+  first, and still lets you leave at the root).
+- 16 new unit tests (`src/__tests__/lib/publicUrl.test.ts`, plus apply-route cases for the
+  dangerous-scheme rejection, the scheme-less placeholder, and handle pass-through).
+
+### Gates (all green)
+`npx tsc --noEmit` 0 · `npx next lint --dir src` 0 · `npx vitest run` **682/682** (76
+files, +16) · `node scripts/build-frontend.js` clean · `npx next build` clean, **0
+warnings** · `pnpm format:check` clean · workspace-wide turbo **typecheck 12/12 · lint
+12/12 · test 11/11 · build 8/8** (Vision + Wear untouched and unaffected).
+
+### Honest checkpoint
+- The MapLibre subtree still does **not** rasterize in this sandbox's screenshots (same
+  pre-existing limitation as §3AJ/§3AK — DOM, geometry and generated SVG all verified
+  instead, and the real generated pin markup was rendered standalone in a gallery page).
+  CI's own Playwright run is the real visual gate for the map.
+- `cdn.tailwindcss.com` is still the **Play CDN**, which is a runtime JIT explicitly not
+  intended for production. It works, but it costs a compile on every page load and is
+  another unpinned third-party dependency. **Recommended follow-up:** compile a static
+  `tailwind.css` in `scripts/build-frontend.js` (the same content-glob compile this
+  session used for its local harness) and drop the CDN tag.
+- No SRI hash was added to the pinned lucide tag — the sandbox can't reach unpkg to verify
+  the served bytes, and a wrong hash would break the app. Worth adding from a machine that
+  can fetch it.
+- Back-in-a-wizard is screen-level, not step-level: Back inside the Create sheet or the
+  Apply wizard closes/leaves it rather than stepping back one question. Same as Escape
+  does today. Say the word if step-level Back is wanted.
+- The retired `pinStyle` tweak means there is no in-app way to preview a different pin
+  shape. Deliberate (one design, no drift) — trivially reversible if you want variants.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-> **✅ 2026-08-26 (latest) — Kingdom Discovery card redesign, contributor profile-parity
+> **✅ 2026-08-26 (latest) — the Kingdom Discovery list was rendering as coloured
+> hairlines (a Chromium grid/scroll-container interaction — one element was both the
+> scroller and the grid); cards rebuilt to the founder's brief; events + places finally
+> got the category-coloured floating SVG pins (circle = Place, rounded badge = Event,
+> ringed circle = Contributor); the device Back button now walks back inside Connect
+> instead of leaving the site; and a live stored-XSS hole on contributor links was
+> closed. PR #58, §3AN. No migration — next migration # is still 172.** All gates green
+> incl. workspace-wide turbo, and CI's own Playwright run went green on the new
+> `e2e/discovery-cards-and-back.spec.ts` (4/4). **Founder action: none required** — but
+> please re-open Kingdom Discovery and the map on your Android device to confirm the
+> cards, the pins and the Back button behave as expected in the real thing; and note the
+> two recommended follow-ups in §3AN's honest checkpoint (static Tailwind build instead
+> of the Play CDN, and an SRI hash for the pinned lucide tag).
+>
+> **✅ 2026-08-26 — Kingdom Discovery card redesign, contributor profile-parity
 > fixes (cover photo + public contact email + gallery + social hyperlinks), Contributor
 > map-pin redesign (+ the category-colour bug fix), and "Become a Contributor"
 > de-emphasized to Settings-only. ✅ MERGED** (PR #56, merge commit `39d5532`; production
