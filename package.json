@@ -19,7 +19,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\""
   },
   "devDependencies": {
-    "@types/node": "20.19.0",
+    "@types/node": "26.4.0",
     "prettier": "3.3.3",
     "turbo": "2.9.14",
     "typescript": "5.5.4"
