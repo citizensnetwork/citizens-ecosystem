@@ -2979,6 +2979,31 @@ assumed broken saved a wasted cycle.
 
 ---
 
+## 3AP. Contributor application Google Form (outreach intake) (2026-09-23)
+
+Founder asked for a Google Form that applicants fill in to be enrolled as Contributors.
+Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration, no app code change.**
+
+- **Drive doc "Citizens Connect — Contributor Application Form (Field Spec)"** (founder's Drive):
+  every Contributor field, required or optional, with Form wording, the DB column it fills and
+  the limits the API enforces. Also covers the automation roadmap (Stage 0 manual → Stage 1
+  Apps Script `onFormSubmit` → HMAC-signed intake endpoint → admin-only staging table → admin
+  "Publish" via the existing `/api/admin/contributors/create` + claim flow; Stage 2 auto-publish
+  for low-risk cases only).
+- **NEW `tools/google-forms/create-contributor-application-form.gs`** (also in Drive): an Apps
+  Script that builds the whole Form (7 sections, validation mirroring the admin create route,
+  fixed-location branching, faith + POPIA consent) and a linked responses Sheet. The founder
+  runs it once at script.google.com. The Drive connector can't create Forms directly.
+  **Apps Script can't create File-upload questions, so logo/cover/gallery are added by hand**
+  (the script logs the steps). Dry-run against a FormApp mock only; the real run has not been
+  observed.
+- **Gaps before automating (not done):** admin create route/RPC doesn't accept `x_handle`,
+  `linkedin_url`, `whatsapp_number`, `contributor_contact_email` or `cover_photo_urls`; no
+  "Individual" `contributor_kind`; team invites only possible after claim; 409
+  `email_already_registered` needs a route back to in-app Apply.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 > **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
