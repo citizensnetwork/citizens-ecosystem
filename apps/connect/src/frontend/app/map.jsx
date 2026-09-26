@@ -86,6 +86,23 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
+  // window.maplibregl now comes from a <script type="module"> in index.html
+  // (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump — see that
+  // file for why). Module scripts are deferred relative to the classic
+  // scripts that boot this app, so `window.maplibregl` is NOT guaranteed to
+  // exist yet the first time a map component's mount effect runs — unlike
+  // the old synchronous UMD <script>, which always finished before any later
+  // tag. `cb` fires once maplibregl is ready, immediately if it already is;
+  // the returned function cancels a pending wait (call it from cleanup if the
+  // component unmounts before maplibregl loads).
+  function whenMaplibreReady(cb) {
+    if (window.maplibregl) { cb(); return () => {}; }
+    const id = setInterval(() => {
+      if (window.maplibregl) { clearInterval(id); cb(); }
+    }, 30);
+    return () => clearInterval(id);
+  }
+
   // Raw-DOM Lucide icon builder — mirrors icons.jsx's <Icon>, but map pins
   // are plain DOM nodes (MapLibre markers), not React, so it can't reuse
   // that component. Reads the same window.lucide UMD data.
@@ -337,6 +354,11 @@
   function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
+    // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
+    // effect below — this state flip is what does, the one time init()
+    // finishes (immediately on mount if maplibregl was already loaded, or
+    // whenever whenMaplibreReady's wait resolves).
+    const [mapReady, setMapReady] = React.useState(false);
     const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
     const userMovedRef = useRef(false);      // stop auto-framing once the user takes control
     const onSelectRef = useRef(onSelect);
@@ -372,79 +394,93 @@
       }
     }, []);
 
-    // init the map once
+    // init the map once — deferred until window.maplibregl is actually ready
+    // (see whenMaplibreReady above); everything from here down is unchanged
+    // from the old synchronous-load version, just wrapped in `init()` so it
+    // can run immediately or after a short wait.
     useEffect(() => {
       if (mapRef.current || !containerRef.current) return;
-      if (!window.maplibregl) { console.error('[map] maplibre-gl not loaded'); return; }
-      const style = styleUrl();
-      if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
-      const map = new window.maplibregl.Map({
-        container: containerRef.current,
-        style,
-        center: PRETORIA,
-        zoom: 11,
-        attributionControl: { compact: true },
-      });
-      map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.addControl(new window.maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
-      }), 'bottom-right');
-      // Once the user pans/zooms by hand, stop auto-framing the data.
-      const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
-      map.on('dragstart', onUserMove);
-      map.on('zoomstart', onUserMove);
-      mapRef.current = map;
-      // Density gates follow the zoom, including the programmatic flyTo /
-      // fitBounds below, so the first frame is already correct.
-      map.on('zoom', applyZoomGates);
-      map.on('load', applyZoomGates);
-      applyZoomGates();
+      let cleanupInner = null;
 
-      // MapLibre sizes its canvas once, from the container's dimensions at
-      // construction — it never re-measures on its own. Without this, a map
-      // built while the container was phone-sized (or mid-layout, before
-      // flex/grid settles) stays cropped to that size even after the window
-      // grows to desktop. A ResizeObserver keeps the canvas in sync with
-      // whatever the container actually measures, on every layout change.
-      let ro = null;
-      if (window.ResizeObserver) {
-        ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
-        ro.observe(containerRef.current);
+      function init() {
+        if (mapRef.current || !containerRef.current) return; // unmounted/remounted while waiting
+        const style = styleUrl();
+        if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
+        const map = new window.maplibregl.Map({
+          container: containerRef.current,
+          style,
+          center: PRETORIA,
+          zoom: 11,
+          attributionControl: { compact: true },
+        });
+        map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        map.addControl(new window.maplibregl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
+        }), 'bottom-right');
+        // Once the user pans/zooms by hand, stop auto-framing the data.
+        const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
+        map.on('dragstart', onUserMove);
+        map.on('zoomstart', onUserMove);
+        mapRef.current = map;
+        setMapReady(true);
+        // Density gates follow the zoom, including the programmatic flyTo /
+        // fitBounds below, so the first frame is already correct.
+        map.on('zoom', applyZoomGates);
+        map.on('load', applyZoomGates);
+        applyZoomGates();
+
+        // MapLibre sizes its canvas once, from the container's dimensions at
+        // construction — it never re-measures on its own. Without this, a map
+        // built while the container was phone-sized (or mid-layout, before
+        // flex/grid settles) stays cropped to that size even after the window
+        // grows to desktop. A ResizeObserver keeps the canvas in sync with
+        // whatever the container actually measures, on every layout change.
+        let ro = null;
+        if (window.ResizeObserver) {
+          ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+          ro.observe(containerRef.current);
+        }
+
+        // ── Default framing: user location FIRST, national data as fallback ──
+        // Native shell (Capacitor): route through @capacitor/geolocation so the
+        // proper native permission prompt fires (raw navigator.geolocation is
+        // unreliable in a WKWebView/Android WebView without it — runbook Step 4).
+        // Web: unchanged browser Geolocation API. Either way this only fires once
+        // the map itself has mounted (first map view), never at app boot.
+        const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+        const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
+        const onLocated = (coords) => {
+          if (mapRef.current !== map || userMovedRef.current) return;
+          userMovedRef.current = true;
+          map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
+        };
+        if (isNativeMap && window.CapGeolocation) {
+          window.CapGeolocation.getCurrentPosition(positionOpts)
+            .then((pos) => onLocated(pos.coords))
+            .catch(() => { /* denied / unavailable → keep the national fallback */ });
+        } else if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => onLocated(pos.coords),
+            () => { /* denied / unavailable → keep the national fallback */ },
+            positionOpts,
+          );
+        }
+
+        cleanupInner = () => {
+          if (ro) ro.disconnect();
+          map.off('zoom', applyZoomGates);
+          map.off('load', applyZoomGates);
+          markerObjs.current.forEach((mk) => mk.remove());
+          markerObjs.current.clear();
+          map.remove();
+          mapRef.current = null;
+        };
       }
 
-      // ── Default framing: user location FIRST, national data as fallback ──
-      // Native shell (Capacitor): route through @capacitor/geolocation so the
-      // proper native permission prompt fires (raw navigator.geolocation is
-      // unreliable in a WKWebView/Android WebView without it — runbook Step 4).
-      // Web: unchanged browser Geolocation API. Either way this only fires once
-      // the map itself has mounted (first map view), never at app boot.
-      const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
-      const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
-      const onLocated = (coords) => {
-        if (mapRef.current !== map || userMovedRef.current) return;
-        userMovedRef.current = true;
-        map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
-      };
-      if (isNativeMap && window.CapGeolocation) {
-        window.CapGeolocation.getCurrentPosition(positionOpts)
-          .then((pos) => onLocated(pos.coords))
-          .catch(() => { /* denied / unavailable → keep the national fallback */ });
-      } else if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => onLocated(pos.coords),
-          () => { /* denied / unavailable → keep the national fallback */ },
-          positionOpts,
-        );
-      }
-
+      const stopWaiting = whenMaplibreReady(init);
       return () => {
-        if (ro) ro.disconnect();
-        map.off('zoom', applyZoomGates);
-        map.off('load', applyZoomGates);
-        markerObjs.current.forEach((mk) => mk.remove());
-        markerObjs.current.clear();
-        map.remove();
-        mapRef.current = null;
+        stopWaiting();
+        if (cleanupInner) cleanupInner();
       };
     }, [applyZoomGates]);
 
@@ -514,7 +550,7 @@
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.
       applyZoomGates();
-    }, [markers, filterCategory, selectedId, applyZoomGates]);
+    }, [markers, filterCategory, selectedId, applyZoomGates, mapReady]);
 
     return React.createElement('div', {
       ref: containerRef, className: 'absolute inset-0 cc-map',
@@ -546,33 +582,46 @@
     const hasPin = typeof value.lat === 'number' && typeof value.lng === 'number';
 
     useEffect(() => {
-      if (mapRef.current || !containerRef.current || !window.maplibregl) return;
-      const style = styleUrl();
-      if (!style) return;
-      const map = new window.maplibregl.Map({
-        container: containerRef.current, style,
-        center: hasPin ? [value.lng, value.lat] : PRETORIA,
-        zoom: hasPin ? 15 : 11,
-        attributionControl: false,
-      });
-      map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.on('moveend', () => {
-        if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
-        const c = map.getCenter();
-        onChangeRef.current({ lat: c.lat, lng: c.lng });
-        setBusy('reverse');
-        window.reverseGeocode(c.lat, c.lng).then((addr) => {
-          setBusy(false);
-          if (addr) { lastResolvedRef.current = addr; onChangeRef.current({ lat: c.lat, lng: c.lng, address: addr }); }
+      if (mapRef.current || !containerRef.current) return;
+      let cleanupInner = null;
+
+      // See whenMaplibreReady in this file: window.maplibregl loads via a
+      // deferred <script type="module">, so it may not exist yet on mount.
+      function init() {
+        if (mapRef.current || !containerRef.current) return;
+        const style = styleUrl();
+        if (!style) return;
+        const map = new window.maplibregl.Map({
+          container: containerRef.current, style,
+          center: hasPin ? [value.lng, value.lat] : PRETORIA,
+          zoom: hasPin ? 15 : 11,
+          attributionControl: false,
         });
-      });
-      mapRef.current = map;
-      let ro = null;
-      if (window.ResizeObserver) {
-        ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
-        ro.observe(containerRef.current);
+        map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        map.on('moveend', () => {
+          if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
+          const c = map.getCenter();
+          onChangeRef.current({ lat: c.lat, lng: c.lng });
+          setBusy('reverse');
+          window.reverseGeocode(c.lat, c.lng).then((addr) => {
+            setBusy(false);
+            if (addr) { lastResolvedRef.current = addr; onChangeRef.current({ lat: c.lat, lng: c.lng, address: addr }); }
+          });
+        });
+        mapRef.current = map;
+        let ro = null;
+        if (window.ResizeObserver) {
+          ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+          ro.observe(containerRef.current);
+        }
+        cleanupInner = () => { if (ro) ro.disconnect(); map.remove(); mapRef.current = null; };
       }
-      return () => { if (ro) ro.disconnect(); map.remove(); mapRef.current = null; };
+
+      const stopWaiting = whenMaplibreReady(init);
+      return () => {
+        stopWaiting();
+        if (cleanupInner) cleanupInner();
+      };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
