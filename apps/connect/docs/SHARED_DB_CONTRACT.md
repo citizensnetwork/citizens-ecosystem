@@ -183,11 +183,20 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 172**)
+## 9. Verification snapshot (updated 2026-09-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 173**)
 
-> **2026-09-26: mig 173 (`contributor_form_intake`) WRITTEN; NOT yet applied**
-> (pre-apply tag `connect-pre-mig173-form-intake` pushed). The session's `apply_migration` call
-> was blocked pending the founder's explicit go-ahead. What it does:
+> **2026-09-26: mig 173 (`contributor_form_intake`) APPLIED to prod** (version `20260926182924`)
+> with the founder's go-ahead. Pre-apply tag: `connect-pre-mig173-form-intake`. Verified live after
+> apply:
+> - All four functions are SECDEF with `search_path=""`.
+> - `intake_create_contributor_profile` is EXECUTE for service_role only.
+> - `mark_own_listing_claimed` is EXECUTE for authenticated only, not anon.
+> - Only `protect_role_on_update` remains on profiles.
+> - The three kind CHECKs include `individual`.
+>
+> **Advisors: 0 ERROR / 115 WARN / 3 INFO.** The only new finding vs the 0/114/3 baseline is the
+> intentional authenticated EXECUTE on `mark_own_listing_claimed`. **Next migration # = 174.** What it
+> does:
 >
 > 1. Adds `'individual'` to the three kind CHECKs (profiles, contributor_applications,
 >    contributor_type_change_requests).
@@ -199,10 +208,6 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 > 4. Extends `claim_admin_created_contributor()` to copy contact email, X, LinkedIn, WhatsApp and
 >    cover photos.
 > 5. Adds `mark_own_listing_claimed()`: SECDEF, own row only, EXECUTE for authenticated.
->
-> Expected advisors: **0 ERROR / 115 WARN / 3 INFO**. The one new WARN is the intentional
-> authenticated EXECUTE on `mark_own_listing_claimed`. Baseline before apply = 0 / 114 / 3.
-> **Next migration # = 173 until it is applied, then 174.**
 
 > **2026-08-26: mig 172 (`entity_social_links_parity`) APPLIED to prod.** Makes the set of
 > social channels IDENTICAL across the three entity types and widens it to seven. Before

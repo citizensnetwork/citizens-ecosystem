@@ -2979,7 +2979,7 @@ assumed broken saved a wasted cycle.
 
 ---
 
-## 3AP. Google Form → map: Contributor intake pipeline — BUILT (phases 1–5), awaiting mig-173 apply + founder setup + live test (2026-09-26)
+## 3AP. Google Form → map: Contributor intake pipeline — BUILT (phases 1–5), mig 173 APPLIED, merging to main → live test (2026-09-26)
 
 > **▶ Full build brief: [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md). It supersedes any conflicting detail below.** Founder chose gate B, delegated colours/icons, and asked for the simplified build. (2026-09-23 → 09-26)
 
@@ -3000,15 +3000,15 @@ Branch `claude/citizens-connect-applicant-form-o4kvt3`.
 
 Playwright's Chromium had to be installed on this machine first (`npx playwright install chromium`, PW 1.61.1).
 
-- **⛔ Migration 173 is WRITTEN, not applied.** The file is `supabase/migrations/173_contributor_form_intake.sql`.
-  The pre-apply tag `connect-pre-mig173-form-intake` is **pushed**. The session's `apply_migration` call was
-  blocked by the tool-permission classifier, so it needs the founder's explicit go-ahead: either they allow
-  the MCP apply, or they paste it into the SQL editor themselves.
-  - Advisor baseline before: 0 ERROR / 114 WARN / 3 INFO.
-  - Expected after: 0 / **115** / 3. The +1 is the intentional authenticated EXECUTE on
-    `mark_own_listing_claimed`.
-  - Afterwards, verify with `list_migrations` and the advisors, then stamp SHARED_DB_CONTRACT §9 (it
-    currently says "written, not applied").
+- **✅ Migration 173 APPLIED to prod** (founder go-ahead, version `20260926182924`; pre-apply tag
+  `connect-pre-mig173-form-intake`). Verified live (grants, `search_path`, trigger, CHECKs). Advisors went
+  0/114/3 → **0 ERROR / 115 WARN / 3 INFO**; the only new finding is the intentional authenticated EXECUTE
+  on `mark_own_listing_claimed`. SHARED_DB_CONTRACT §9 is stamped. **Next migration # = 174.**
+- **Why the founder's `testConnection` got a 404:** production runs `main`, and the intake route only existed
+  on the branch. Preview URLs sit behind Vercel SSO (`all_except_custom_domains`), so Apps Script can reach
+  only `www.citizenscentral.co.za`. The founder approved merging to `main` via a PR.
+  `INTAKE_WEBHOOK_SECRET` is set for Production and Preview. Founder setup steps 1–7 are done (the
+  header-matching fix `f9a2724` resolved `Processed At`).
 - **Founder decisions made this session:**
   - The 3 Sheet rows at 16:19Z were **hand-typed samples**, not Form submissions. Tells: no seconds in the
     timestamps, text in the upload columns, and no files in Drive.
@@ -3061,8 +3061,9 @@ Playwright's Chromium had to be installed on this machine first (`npx playwright
   - The Drive field-spec Doc still lists the 17 event categories.
 
 ### NEXT (in order)
-1. Founder OKs → **apply mig 173** (MCP), advisors 0 ERROR / expected +1 WARN, stamp SHARED_DB_CONTRACT §9.
-2. **Founder setup** (tools/google-forms/README.md steps 1–8). The founder generates `INTAKE_WEBHOOK_SECRET` themselves.
+1. ✅ Mig 173 applied. **Merge the PR to `main`** (founder approved: merge once CI is green) → Vercel
+   production deploy.
+2. The founder re-runs **`testConnection`**. It should say "Connected ✓". Setup steps 1–7 are already done.
 3. **Phase 6 live test together:**
    1. Submit a real Form response with a test Google account.
    2. Tick Approve. Check the pin, Kingdom Discovery, and the email.
@@ -3192,7 +3193,7 @@ and dashboard.
 
 - **Contributor Google Form → map intake:** phases 1–5 are **BUILT and pushed** (`32edec6`, branch
   `claude/citizens-connect-applicant-form-o4kvt3`, no PR). Next:
-  1. The founder's go-ahead to **apply mig 173** (written, tagged, not applied).
+  1. Mig 173 is ✅ applied; the PR merge to `main` is in progress (founder-approved).
   2. The founder's setup (`tools/google-forms/README.md`).
   3. **Phase 6 live test together.**
 
