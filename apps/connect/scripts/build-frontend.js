@@ -61,6 +61,31 @@ function loadDotEnvLocal(rootDir) {
 }
 loadDotEnvLocal(path.join(__dirname, '..'));
 
+/**
+ * The maplibre-gl runtime is vendored into src/frontend/vendor/ instead of
+ * loaded from a CDN (see the comment in src/frontend/index.html — it's a
+ * patch for a critical XSS that shipped in older builds). OSV-Scanner only
+ * scans pnpm-lock.yaml, so nothing else would catch this copy silently going
+ * stale the next time someone bumps the maplibre-gl npm dependency without
+ * re-copying it — which would quietly bring the vulnerability right back.
+ * Fails the build instead of shipping a drifted copy.
+ */
+function assertMaplibreVendorInSync(rootDir) {
+  const installed = path.join(rootDir, 'node_modules', 'maplibre-gl', 'dist', 'maplibre-gl.mjs');
+  if (!fs.existsSync(installed)) return;
+  const vendored = path.join(rootDir, 'src', 'frontend', 'vendor', 'maplibre-gl', 'maplibre-gl.mjs');
+  if (!fs.readFileSync(vendored).equals(fs.readFileSync(installed))) {
+    throw new Error(
+      '[build-frontend] src/frontend/vendor/maplibre-gl/ is out of sync with the installed ' +
+        'maplibre-gl npm package. Re-copy maplibre-gl.mjs, maplibre-gl-worker.mjs, ' +
+        'maplibre-gl-shared.mjs and maplibre-gl.css from node_modules/maplibre-gl/dist/ into ' +
+        'src/frontend/vendor/maplibre-gl/ (see the comment above the <link>/<script> tags in ' +
+        'src/frontend/index.html).',
+    );
+  }
+}
+assertMaplibreVendorInSync(path.join(__dirname, '..'));
+
 buildFrontend({
   esbuild,
   rootDir: path.join(__dirname, '..'),
