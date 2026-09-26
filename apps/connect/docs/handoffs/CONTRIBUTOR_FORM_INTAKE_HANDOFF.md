@@ -262,7 +262,7 @@ Contents:
 
 ### 4.6 Gates before every push (monorepo root CLAUDE.md)
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
-- `pnpm --filter connect test:e2e` (check the package name in `apps/connect/package.json`)
+- `pnpm --filter citizens-connect test:e2e`
 - `node scripts/build-frontend.js`
 - security review of the HMAC route + migration (RLS/grants)
 - Supabase advisors after the migration
