@@ -2979,11 +2979,100 @@ assumed broken saved a wasted cycle.
 
 ---
 
-## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, ready to build (2026-09-26)
+## 3AP. Google Form → map: Contributor intake pipeline — BUILT (phases 1–5), awaiting mig-173 apply + founder setup + live test (2026-09-26)
 
 > **▶ Full build brief: [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md). It supersedes any conflicting detail below.** Founder chose gate B, delegated colours/icons, and asked for the simplified build. (2026-09-23 → 09-26)
 
-Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration or app code shipped yet** (next migration # = **173**).
+### ✅ Build session 2026-09-26: phases 1–5 built, all gates green, pushed (`32edec6`, no PR)
+Branch `claude/citizens-connect-applicant-form-o4kvt3`.
+
+**Gates (all green):**
+
+| Gate | Result |
+|---|---|
+| lint | 12/12 |
+| typecheck | 12/12 |
+| test | 11/11 tasks. Connect 759, Vision 734, Wear 115, db 114, connect-client 21 |
+| build | 8/8; forced rebuilds of Connect and Wear show no warnings |
+| format:check | clean |
+| Connect e2e | **13/13**, incl. 4 new |
+| `node scripts/build-frontend.js` | ok |
+
+Playwright's Chromium had to be installed on this machine first (`npx playwright install chromium`, PW 1.61.1).
+
+- **⛔ Migration 173 is WRITTEN, not applied.** The file is `supabase/migrations/173_contributor_form_intake.sql`.
+  The pre-apply tag `connect-pre-mig173-form-intake` is **pushed**. The session's `apply_migration` call was
+  blocked by the tool-permission classifier, so it needs the founder's explicit go-ahead: either they allow
+  the MCP apply, or they paste it into the SQL editor themselves.
+  - Advisor baseline before: 0 ERROR / 114 WARN / 3 INFO.
+  - Expected after: 0 / **115** / 3. The +1 is the intentional authenticated EXECUTE on
+    `mark_own_listing_claimed`.
+  - Afterwards, verify with `list_migrations` and the advisors, then stamp SHARED_DB_CONTRACT §9 (it
+    currently says "written, not applied").
+- **Founder decisions made this session:**
+  - The 3 Sheet rows at 16:19Z were **hand-typed samples**, not Form submissions. Tells: no seconds in the
+    timestamps, text in the upload columns, and no files in Drive.
+  - Live Q2.2 labels: `Church`→ministry · `Christian Nonprofit / Ministry`→organization ·
+    `Christian Business`→business · `Individual`→individual.
+  - Q2.3 = the brief's 12 labels exactly.
+  - Add a shareable **`/c/<slug>`** listing link.
+- **What shipped:**
+  - **Migration 173:**
+    - `individual` on all 3 kind CHECKs.
+    - A `protect_role_column` service_role carve-out, plus dropping the duplicate `protect_role_trigger`
+      (025 and 036 both ran the same check).
+    - `intake_create_contributor_profile` (service_role only, with a fresh-target guard).
+    - `claim_admin_created_contributor` now copies the mig-171/172 fields and the cover photos. Before,
+      the different-account claim silently dropped them.
+    - `mark_own_listing_claimed`.
+  - **Taxonomy:**
+    - `CONTRIBUTOR_TYPES` in `src/lib/categories.ts` and `data.jsx`, pinned together by
+      `__tests__/lib/contributorTypes.test.ts`.
+    - `getItemCategory` makes contributors resolve their own type first; `FILTER_CATEGORIES` adds the
+      3 new pills.
+    - Apply and Admin Create pick from the 12 types.
+    - `CONTRIBUTOR_KINDS` / `isContributorKind` in `types/db.ts`, used by 6 routes.
+    - `CONNECT_CONTRIBUTOR_KINDS` in `@citizens/connect-client`; the Wear proxy route uses it too.
+  - **Intake route** `src/app/api/intake/google-form/route.ts`, with helpers in `src/lib/intake/googleForm.ts`
+    and the shared validator `src/lib/contributorFields.ts`.
+    - The shared validator also fixed a **real bug**: admin Create validated URLs *after* `createUser`,
+      so a bad URL left an orphaned auth user behind.
+    - `INTAKE_WEBHOOK_SECRET` is declared in turbo.json `globalEnv` and documented in `.env.example`.
+  - **Apps Script** `tools/google-forms/intake.gs` plus `README.md`, the founder's setup guide. Its signing
+    is unit-tested against the server verifier (`__tests__/tools/intakeScript.test.ts`).
+  - **`/c/<slug>`** is a REDIRECT to `/index.html?c=<slug>`, not a rewrite: index.html loads its scripts
+    by relative path. It opens the profile, with guest mode for signed-out visitors.
+  - **Sign-in landing** (`store.jsx` `landOwnListing`, once per session): a contributor gets the stamp RPC
+    and the dashboard; a not_applied citizen gets a silent `/api/contributor/claim`.
+  - **New e2e** `e2e/contributor-intake-landing.spec.ts`: a real-mode session against the fake project
+    `e2eproj.supabase.test`. It needs `bypassCSP`, because the app's CSP allows only the real project host.
+- **Production domain** for `INTAKE_URL` and the email links: `https://www.citizenscentral.co.za`. It is
+  verified; the apex is NOT a Vercel domain.
+- **⚠ Found in passing, flagged as its own task (not fixed here):** `public.profiles` has
+  `SELECT USING (true)` and no column restrictions. **Anyone holding the public anon key can read every
+  user's `email` / `notification_email` / `contributor_claim_email`.** This is POPIA-relevant and needs a
+  cross-app audit before revoking any columns.
+- **Other open gaps:**
+  - `handle_new_user()` still filters signup-metadata kind to 3 values. Nothing passes kind in metadata,
+    so it was left alone.
+  - The Admin Create form/RPC still lacks X / LinkedIn / WhatsApp / contact email / cover.
+  - There is no admin-UI hide button yet.
+  - `apply.jsx` collects no kind.
+  - The Drive field-spec Doc still lists the 17 event categories.
+
+### NEXT (in order)
+1. Founder OKs → **apply mig 173** (MCP), advisors 0 ERROR / expected +1 WARN, stamp SHARED_DB_CONTRACT §9.
+2. **Founder setup** (tools/google-forms/README.md steps 1–8). The founder generates `INTAKE_WEBHOOK_SECRET` themselves.
+3. **Phase 6 live test together:**
+   1. Submit a real Form response with a test Google account.
+   2. Tick Approve. Check the pin, Kingdom Discovery, and the email.
+   3. Sign in with the same Google account and confirm it lands on the dashboard.
+   4. Remove the test listing afterwards by deleting that test auth user, with the founder's OK.
+4. Open a PR only when the founder asks.
+
+*(Planning notes from before the build follow. The brief and the section above supersede them.)*
+
+Branch `claude/citizens-connect-applicant-form-o4kvt3`.
 
 ### Already done
 - Drive doc **"Citizens Connect — Contributor Application Form (Field Spec)"**: every Contributor field
@@ -3101,7 +3190,13 @@ and dashboard.
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-- **Contributor Google Form → map intake:** build per [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md) on branch `claude/citizens-connect-applicant-form-o4kvt3` (Phase 0: get the form option labels first).
+- **Contributor Google Form → map intake:** phases 1–5 are **BUILT and pushed** (`32edec6`, branch
+  `claude/citizens-connect-applicant-form-o4kvt3`, no PR). Next:
+  1. The founder's go-ahead to **apply mig 173** (written, tagged, not applied).
+  2. The founder's setup (`tools/google-forms/README.md`).
+  3. **Phase 6 live test together.**
+
+  See §3AP's "NEXT". Also flagged separately: the `profiles` email PII exposure to anon.
 
 > **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
 > tight — founder reported labels almost never showed at normal browsing zoom.

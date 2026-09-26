@@ -1,8 +1,16 @@
 # HANDOFF — Google Form → Map: Contributor Intake Pipeline
 
-> **Status (2026-09-26):** planning complete, founder decisions in, **no app code or migration shipped yet**.
-> The next session builds it. This file is the complete brief; it supersedes any conflicting detail in the
-> earlier planning notes. `RESUME_HERE.md` §3AP points here.
+> **Status (2026-09-26, later):** **phases 1–5 BUILT and pushed** (`32edec6`). Migration 173 is written
+> and tagged but **not applied** (it awaits the founder's go-ahead). Phase 6 (the live test) is next.
+> See `RESUME_HERE.md` §3AP for what shipped and the decisions made while building. Decisions that
+> superseded this brief:
+> - Q2.2 labels are **Church / Christian Nonprofit / Ministry / Christian Business / Individual**.
+> - The listing URL is **`/c/<slug>`** (a redirect).
+> - Images are capped at **1.5 MB** each, not 2 MB (Vercel body limit). The script resizes larger photos.
+> - `cover_photo_urls` holds `[{url, caption}]`.
+> - Image paths follow the repo convention `<userId>/intake/…`.
+>
+> This file remains the original complete brief. `RESUME_HERE.md` §3AP points here.
 >
 > Branch: **`claude/citizens-connect-applicant-form-o4kvt3`** (up to date with `main` @ `f306435` + 5 docs/tool
 > commits). Supabase project: **`xyiajtrvhlxaeplsiajj`**. Next migration number: **173** (head in repo = `172_entity_social_links_parity.sql`;
