@@ -3189,17 +3189,80 @@ and dashboard.
 
 ---
 
+## 3AQ. Production Vercel build broke after PR #63 merge — root cause found (tsc incremental + stale build cache), fixed, PR #64 (2026-09-26)
+
+**Trigger:** the founder reported this straight from Vercel right after PR #63 (§3AP, the Google
+Form → map Contributor intake pipeline) merged to `main` (merge commit `52700cf`). The pasted error
+was only Turbo's summary line — `citizens-connect#build ... exited (1)` — with no error text visible.
+
+### Diagnosis (pulled the real build log via the Vercel MCP tools, not guessed)
+- `git diff` confirmed `52700cf`'s tree is byte-identical to this branch's HEAD (`2e991a2`) — a clean
+  merge, no conflict-resolution drift.
+- Local `pnpm run build` on that exact tree **succeeded**. Every preview deployment Vercel built for
+  this branch during the PR **succeeded** too (confirmed via `list_deployments` — all `READY`).
+- Pulled the actual failed-build log (`list_deployment_events` on `dpl_TBGyW9zaRcGxijR6NhQfAhUQRoGD`,
+  the production deployment for `52700cf`). The real error, never shown in the pasted snippet:
+  `./src/lib/contributors/resolveSlug.ts:12:10 — Type error: Module "react" has no exported member
+  'cache'.` That file is untouched by #63 (last changed in `b3f6d93`, months earlier) and its
+  `import { cache } from "react"` is a completely standard, valid Next.js App Router pattern.
+- `git diff <last-good-prod-sha>..<this-sha> -- pnpm-lock.yaml` was **empty** — no dependency changed
+  either, ruling out a version conflict.
+- The line right before the failure in the log: `Restored build cache from previous deployment
+  (93RAVP5pdeuWEY9iJScenaAStB9v)` — production's **last successful build**, many commits behind this
+  merge. `apps/connect/tsconfig.json` had `"incremental": true` (the `create-next-app` default),
+  which makes `tsc` persist a `.tsbuildinfo` inside `.next/cache`. Vercel's per-project build cache
+  restores exactly that directory from the previous deployment **on the same lane**. With production's
+  cache many generations behind the code being built, `tsc` trusted stale incremental state instead of
+  doing a full recheck and threw a phantom diagnostic on unrelated, unchanged, valid code. Preview
+  builds never hit this because each one's cache came from the immediately-prior *preview* build in
+  the same dependency generation — self-consistent the whole way through the PR.
+
+### Fix — PR #64 (`claude/fix-connect-build-cache-flake-tsc9k1`)
+- `apps/connect/tsconfig.json`: `"incremental": false`. Vercel's build containers are ephemeral per
+  build regardless — incremental compilation bought nothing here, only this fragility.
+- Verified clean: `tsc --noEmit` (0 errors), `next lint` (0 warnings), `vitest run` (759/759), and a
+  **from-scratch** `rm -rf .next && pnpm run build` (confirmed no `tsbuildinfo` gets written now, vs.
+  the stale one left over from before the fix). Config-only, zero behavior change — full Playwright
+  e2e was judged unnecessary for this change; run it before the next real feature PR regardless.
+- **Status at end of this session: PR #64 OPEN, CI running, not yet merged.**
+- **No live regression at any point** — Vercel never cuts production over until a new build is
+  `READY`, so `www.citizenscentral.co.za` kept serving the pre-#63 build throughout. The only cost
+  was the Google Form intake feature (§3AP) not actually going live yet.
+- **Flagged, not fixed:** `apps/vision/tsconfig.json` and `apps/wear/tsconfig.json` carry the same
+  `"incremental": true` default and are exposed to the identical failure mode under the right
+  (cache-generation-jump) conditions. Out of scope here (Connect-only incident); same one-line fix
+  as a fast-follow if it's ever seen there.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-- **Contributor Google Form → map intake:** phases 1–5 are **BUILT and pushed** (`32edec6`, branch
-  `claude/citizens-connect-applicant-form-o4kvt3`, no PR). Next:
-  1. Mig 173 is ✅ applied; the PR merge to `main` is in progress (founder-approved).
-  2. The founder's setup (`tools/google-forms/README.md`).
-  3. **Phase 6 live test together.**
+- **Contributor Google Form → map intake:** phases 1–5 **MERGED to `main`** via PR #63, but the
+  resulting **production Vercel build FAILED** — root-caused + fixed, PR #64 open (§3AQ). Next:
+  1. **Merge PR #64** (fixes the prod build; confirm CI is green first — it was still running as of
+     this session's end).
+  2. Confirm the resulting production deployment reaches `READY` on Vercel.
+  3. The founder re-runs **`testConnection`**. It should say "Connected ✓".
+  4. **Phase 6 live test together** (submit a real Form response → Approve → check pin/Discovery/
+     email → sign in with the same Google account → confirm dashboard landing → clean up the test
+     listing).
 
-  See §3AP's "NEXT". Also flagged separately: the `profiles` email PII exposure to anon.
+  See §3AP's "NEXT" + §3AQ. Also still flagged separately: the `profiles` email PII exposure to anon.
 
-> **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
+> **⚠️ 2026-09-26 (latest) — production build broke after PR #63 merged; root-caused + fixed,
+> PR #64 OPEN (not yet merged as of this session's end — CI was still running).** The Vercel prod
+> build failed with a phantom `Module "react" has no exported member 'cache'` on `resolveSlug.ts` —
+> code untouched by #63, clean on every preview build of the identical tree and locally. Cause:
+> `apps/connect/tsconfig.json`'s `"incremental": true` let `tsc` trust a stale `.tsbuildinfo` that
+> Vercel restored from production's *previous* (much older) deployment, instead of doing a full
+> recheck. Fix: `"incremental": false` — Vercel's containers are ephemeral per build anyway, so the
+> cache had no upside, only this fragility. **No data or user-facing regression** — production kept
+> serving the pre-#63 build throughout; the Google Form intake feature simply never went live until
+> #64 merges. §3AQ. **Founder/next-session action: merge PR #64 once CI is green, then confirm the
+> production deployment is `READY` before starting the Phase 6 live test.** Flagged, not fixed:
+> `vision` and `wear` share the same `incremental: true` default and could hit the identical flake.
+>
+> **✅ 2026-08-26 — map pin name label zoom pulled back to 16.5.** 18 was too
 > tight — founder reported labels almost never showed at normal browsing zoom.
 > `map.jsx`'s `ZOOM_LABELS` has now been tuned **12.6 → 15.6 → 18 → 16.5** (one
 > constant, no other logic touched — the `.cc-pin-label` mist/typography and the
