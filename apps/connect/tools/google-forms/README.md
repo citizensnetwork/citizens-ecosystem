@@ -35,8 +35,9 @@ Owner signs in with Google (same email) → lands on their dashboard
    > Thank you! We'll email you at the owner address you gave us when your listing is live. Then just
    > sign in to Citizens Connect with that Google account to manage your profile.
 2. **Sheet columns.** In the **Form Responses 1** tab, to the right of the last question column
-   (`Question 7.5: Permission to publish`), add these five headers in row 1, spelled exactly:
-   `Approve` · `Status` · `Listing URL` · `Processed at` · `Notes`.
+   (`Question 7.5: Permission to publish`), add these five headers in row 1:
+   `Approve` · `Status` · `Listing URL` · `Processed at` · `Notes`. Capitals and extra spaces don't
+   matter.
    Then select the `Approve` column below the header and choose **Insert → Checkbox**.
 3. **Make the shared secret yourself.** Run `openssl rand -hex 32` (or have a password manager
    generate 64 random characters). Keep it in your password manager. Never paste it into a chat, an

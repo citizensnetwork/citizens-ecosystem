@@ -341,24 +341,26 @@ function getSheet_() {
   return sheet;
 }
 
-/** {header or "Question N.N:" prefix → 1-based column}. Throws naming anything missing. */
+/**
+ * {header or "Question N.N:" prefix → 1-based column}. Throws naming anything missing.
+ * Matching ignores capitals and extra spaces ("Processed At" = "Processed at").
+ */
 function columns_(sheet) {
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (h) {
-    return String(h).trim();
-  });
+  var norm = function (s) { return String(s).replace(/\s+/g, ' ').trim().toLowerCase(); };
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(norm);
   var cols = {};
   var missing = [];
   MANUAL_HEADERS.forEach(function (name) {
-    var i = headers.indexOf(name);
+    var i = headers.indexOf(norm(name));
     if (i === -1) missing.push(name); else cols[name] = i + 1;
   });
   Object.keys(Q).forEach(function (key) {
-    var prefix = Q[key];
+    var prefix = norm(Q[key]);
     var i = -1;
     for (var c = 0; c < headers.length; c++) {
       if (headers[c].indexOf(prefix) === 0) { i = c; break; }
     }
-    if (i === -1) missing.push(prefix); else cols[prefix] = i + 1;
+    if (i === -1) missing.push(Q[key]); else cols[Q[key]] = i + 1;
   });
   if (missing.length) throw new Error('Missing column header(s): ' + missing.join(', '));
   return cols;

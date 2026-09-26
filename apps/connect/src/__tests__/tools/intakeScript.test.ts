@@ -125,6 +125,13 @@ describe("intake.gs row handling", () => {
     expect(cols["Question 2.3:"]).toBeGreaterThan(1);
     expect(cols.Approve).toBe(questionHeaders.length + 2);
     expect(() => script.columns_(sheetWith(["Timestamp", ...questionHeaders]))).toThrow(/Approve/);
+
+    // The founder's real Sheet says "Processed At" — capitals/spacing must not matter.
+    const relaxed = script.columns_(
+      sheetWith(["Timestamp", ...questionHeaders, " approve ", "STATUS", "Listing  URL", "Processed At", "notes"]),
+    );
+    expect(relaxed["Processed at"]).toBe(questionHeaders.length + 5);
+    expect(relaxed.Approve).toBe(questionHeaders.length + 2);
   });
 
   it("builds the payload from raw answers: consents as booleans, first Drive file, geocode hint", () => {
