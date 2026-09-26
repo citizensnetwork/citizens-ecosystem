@@ -2979,28 +2979,98 @@ assumed broken saved a wasted cycle.
 
 ---
 
-## 3AP. Contributor application Google Form (outreach intake) (2026-09-23)
+## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, Phase 0 waiting on founder decisions (2026-09-23 → 09-26)
 
-Founder asked for a Google Form that applicants fill in to be enrolled as Contributors.
-Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration, no app code change.**
+Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration or app code shipped yet** (next migration # = **173**).
 
-- **Drive doc "Citizens Connect — Contributor Application Form (Field Spec)"** (founder's Drive):
-  every Contributor field, required or optional, with Form wording, the DB column it fills and
-  the limits the API enforces. Also covers the automation roadmap (Stage 0 manual → Stage 1
-  Apps Script `onFormSubmit` → HMAC-signed intake endpoint → admin-only staging table → admin
-  "Publish" via the existing `/api/admin/contributors/create` + claim flow; Stage 2 auto-publish
-  for low-risk cases only).
-- **NEW `tools/google-forms/create-contributor-application-form.gs`** (also in Drive): an Apps
-  Script that builds the whole Form (7 sections, validation mirroring the admin create route,
-  fixed-location branching, faith + POPIA consent) and a linked responses Sheet. The founder
-  runs it once at script.google.com. The Drive connector can't create Forms directly.
-  **Apps Script can't create File-upload questions, so logo/cover/gallery are added by hand**
-  (the script logs the steps). Dry-run against a FormApp mock only; the real run has not been
-  observed.
-- **Gaps before automating (not done):** admin create route/RPC doesn't accept `x_handle`,
-  `linkedin_url`, `whatsapp_number`, `contributor_contact_email` or `cover_photo_urls`; no
-  "Individual" `contributor_kind`; team invites only possible after claim; 409
-  `email_already_registered` needs a route back to in-app Apply.
+### Already done
+- Drive doc **"Citizens Connect — Contributor Application Form (Field Spec)"**: every Contributor field
+  → DB column + the API limits.
+- `tools/google-forms/create-contributor-application-form.gs`: Apps Script form builder (superseded;
+  the founder built the live form by hand instead).
+- **Live form:** "New 219-Connect Contributor", https://forms.gle/RtV1p7eWDGydGmZY6 (Drive id
+  `1Wa8YiBSQtZaeqN502RAWKqYamDZhs08kOGnJPtLZD2Q`). The Drive connector **cannot read Form questions**,
+  and on 09-26 **no responses Sheet was linked** yet. File uploads land in the Drive folder
+  "New 219-Connect Contributor (File responses)", with sub-folders for Q6.1 logo, 6.2 cover and 6.3 gallery.
+
+### Target flow (founder's, 2026-09-26)
+Form → confirmation says "watch your inbox" → responses Sheet → system publishes listing to map +
+Kingdom Discovery → automatic "sign in" email → owner signs in with Google → lands on their own profile
+and dashboard.
+
+### Architecture (recommended; confirm in Phase 0)
+- **"The system" is push, not poll.** A Google Apps Script bound to the responses Sheet (it runs inside
+  the founder's Google account, free) POSTs each row to a new Connect endpoint on Vercel, which writes to
+  Supabase. Connect never reads the Sheet, so there are no Google credentials in Vercel and no cron.
+- **Endpoint** `POST /api/intake/google-form`: HMAC-SHA256 over the raw body using a shared secret
+  (`INTAKE_WEBHOOK_SECRET` in Vercel env + Apps Script Script Properties), with a timestamp replay window.
+  - Reuse the admin-create validation (lengths, bounded-regex email, `coercePublicUrl`/`hasUnsafeScheme`),
+    turned into ONE shared validator module instead of a copy.
+  - Convert labels to slugs, geocode (server-side MapTiler, or parse the Maps link), and upload image blobs
+    to Supabase Storage.
+  - Idempotent on the Google Form response id (staging table `contributor_intake`: RLS on,
+    service_role-only, stores raw payload + status + resulting slug/error).
+- **Creating the listing without an admin session:** the existing `admin_create_contributor_profile` RPC
+  requires `is_admin()` (keyed on `auth.uid()`), and `protect_role_column()` blocks service_role role
+  changes (§3AL PR #54 lesson). Needs a NEW SECDEF RPC `intake_create_contributor_profile(...)`:
+  EXECUTE granted to service_role only, with the full field set (+ x/linkedin/whatsapp, contact email,
+  cover photos) and a narrow `protect_role_column()` carve-out for `auth.role() = 'service_role'`.
+  Auth user via `admin.auth.admin.createUser({email, email_confirm:true})`, rollback on failure
+  (same as the create route).
+- **Publish gate (DECISION):** (A) publish instantly on submit; (B, recommended) an "Approve" tick-box
+  column in the Sheet, and ticking it triggers the push; (C) prepare on submit, go live on the map
+  only when the owner signs in (proves email ownership). A public form + instant publish = anyone can
+  put a fake/impersonated church on the map under someone else's email.
+- **Welcome email:** Apps Script `MailApp` from the founder's Gmail after a 200 response (zero setup,
+  ~100/day on consumer Gmail). The alternative is Resend (`supabase/functions/_shared/email.ts` exists;
+  whether `RESEND_API_KEY` is set is unverified). The Script writes status/slug/error back to Sheet columns.
+- **Sign-in landing:** the listing's auth user already has the owner's email. On Google sign-in Supabase
+  normally auto-links to that user, so the owner signs in AS the contributor (the claim RPC would say
+  `not_eligible`; that's fine). If linking does NOT happen, a separate citizen user is created and needs
+  `claim_admin_created_contributor()`. Build for both: on session bootstrap (`store.jsx`), if
+  role=contributor with `contributor_claimed_at IS NULL` → stamp claimed + route to dashboard; if
+  citizen → call `/api/contributor/claim` silently → on success route to dashboard. Today claiming is
+  only a manual account-menu button (`shell.jsx` `claimListing`). **Must be verified with a real
+  Google sign-in.**
+
+### Taxonomy decisions (founder input 2026-09-26)
+- Founder replaced the 17 event categories with **12 Contributor types**: Church, Outreach / Mission,
+  Market / Expo, Business, Sport & Recreation, Social Gathering, Arts & Culture, Media,
+  Retreat / Healing, Clinic, Education / Equipping, Rehab / Development.
+- Proposed slug map (reuse existing slugs where the meaning is identical, so current pins/filters keep
+  working; 3 new):
+  - church → `churches-ministries`
+  - outreach → `outreach-missions`
+  - market → `markets-expos`
+  - business → `christian-businesses`
+  - sport → `sport-recreation`
+  - social → `social-gatherings`
+  - arts → `arts-culture`
+  - media → `media-broadcasting`
+  - education → `education-equipping`
+  - **NEW** `retreat-healing`, `clinic`, `rehab-development`
+
+  New slugs need entries in `src/lib/categories.ts` + `src/frontend/app/data.jsx` (hex + icon) and in
+  every category validation set. The in-app Apply wizard + admin Create should switch to the same 12.
+  Old slugs stay valid for existing listings.
+- Founder added **"Individual"** to kind. DB check `profiles_contributor_kind_check` (mig 036) only
+  allows ministry/organization/business. Migration to add `individual`, plus `KINDS`
+  (entity-card.jsx), `KIND_ICON` (map.jsx), admin.jsx select and API `ALLOWED_KINDS`.
+
+### Phases
+0. **Founder decisions + setup:** publish gate A/B/C; confirm slug map + pick icons/colours for the
+   3 new types; keep/rename kinds; link the Form to a Sheet (Responses → Link to Sheets); send the
+   exact question titles (the connector can't read the Form); set the Form confirmation message.
+1. **Migration 173:** `individual` kind; `contributor_intake` staging table; service_role-only
+   `intake_create_contributor_profile` RPC + trigger carve-out. Pre-apply git tag + advisors
+   0 ERROR / 0 new.
+2. **Taxonomy in code:** CONTRIBUTOR_TYPES (12) in categories.ts/data.jsx; Apply wizard + admin Create
+   use it; validators accept the new slugs.
+3. **Intake endpoint** + unit tests (HMAC, replay, idempotency, validation, rollback) + shared validator.
+4. **Apps Script intake** (`tools/google-forms/intake.gs`): approve trigger → push (with images) →
+   write back → MailApp welcome email. Setup README for the founder.
+5. **Sign-in landing:** auto-claim / redirect to dashboard; verify with a real Google account.
+6. **End-to-end test** with a real test submission; e2e for the landing; update RESUME_HERE.
 
 ---
 
