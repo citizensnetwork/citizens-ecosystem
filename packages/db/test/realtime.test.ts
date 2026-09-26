@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRealtimeBus, type RealtimeEvent } from '../src/realtime';
 
-function typingEvent(overrides: Partial<Extract<RealtimeEvent, { kind: 'conversation.typing' }>> = {}) {
+function typingEvent(
+  overrides: Partial<Extract<RealtimeEvent, { kind: 'conversation.typing' }>> = {},
+) {
   return {
     kind: 'conversation.typing' as const,
     conversationId: 'cnv_001',
