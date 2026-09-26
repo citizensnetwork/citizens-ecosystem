@@ -3065,7 +3065,7 @@ and dashboard.
   "Question 1.1: …" to "Question 7.5: …" (1.3 Owner's email = E; 2.2 Organisation Type = H;
   2.3 Primary category = I; 6.1–6.3 file uploads = X–Z). Key columns by the "Question N.N" prefix,
   not full titles.
-- **Taxonomy:** the claude picks colours/icons for the 3 new types. Event categories are NOT touched.
+- **Taxonomy:** Claude picks colours/icons for the 3 new types. Event categories are NOT touched.
   Contributors get their own 12-type list. Live data check: only 5 contributors, and 1 has a category
   (`sport-recreation`, which is kept), so switching is safe.
 - **Simplified build (proposed to the founder, awaiting go-ahead):**
