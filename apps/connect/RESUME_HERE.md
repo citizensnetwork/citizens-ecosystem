@@ -2979,7 +2979,9 @@ assumed broken saved a wasted cycle.
 
 ---
 
-## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, decisions in, awaiting go-ahead on simplified build (2026-09-23 → 09-26)
+## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, ready to build (2026-09-26)
+
+> **▶ Full build brief: [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md). It supersedes any conflicting detail below.** Founder chose gate B, delegated colours/icons, and asked for the simplified build. (2026-09-23 → 09-26)
 
 Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration or app code shipped yet** (next migration # = **173**).
 
@@ -3098,6 +3100,8 @@ and dashboard.
 ---
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
+
+- **Contributor Google Form → map intake:** build per [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md) on branch `claude/citizens-connect-applicant-form-o4kvt3` (Phase 0: get the form option labels first).
 
 > **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
 > tight — founder reported labels almost never showed at normal browsing zoom.
