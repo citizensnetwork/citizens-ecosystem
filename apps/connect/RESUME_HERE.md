@@ -2979,7 +2979,7 @@ assumed broken saved a wasted cycle.
 
 ---
 
-## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, Phase 0 waiting on founder decisions (2026-09-23 → 09-26)
+## 3AP. Google Form → map: Contributor intake pipeline — PLANNED, decisions in, awaiting go-ahead on simplified build (2026-09-23 → 09-26)
 
 Branch `claude/citizens-connect-applicant-form-o4kvt3`. **No migration or app code shipped yet** (next migration # = **173**).
 
@@ -3056,6 +3056,29 @@ and dashboard.
 - Founder added **"Individual"** to kind. DB check `profiles_contributor_kind_check` (mig 036) only
   allows ministry/organization/business. Migration to add `individual`, plus `KINDS`
   (entity-card.jsx), `KIND_ICON` (map.jsx), admin.jsx select and API `ALLOWED_KINDS`.
+
+### Founder decisions 2026-09-26 (supersede the options above)
+- **Publish gate = B** (an "Approve" tick box in the Sheet triggers the push).
+- **Responses Sheet:** "New 219-Connect Contributor (Responses)", id
+  `1go7ALiP1_0W4IeWH8IBbnevoS7ZQalxjkFcsaR6XclM`, tab "Form Responses 1", columns A–AE. A Timestamp,
+  B Email Address (the respondent's verified Google email, collected by the Form), then
+  "Question 1.1: …" to "Question 7.5: …" (1.3 Owner's email = E; 2.2 Organisation Type = H;
+  2.3 Primary category = I; 6.1–6.3 file uploads = X–Z). Key columns by the "Question N.N" prefix,
+  not full titles.
+- **Taxonomy:** the claude picks colours/icons for the 3 new types. Event categories are NOT touched.
+  Contributors get their own 12-type list. Live data check: only 5 contributors, and 1 has a category
+  (`sport-recreation`, which is kept), so switching is safe.
+- **Simplified build (proposed to the founder, awaiting go-ahead):**
+  - Drop the `contributor_intake` staging table; the Sheet is the queue and log (status/slug columns).
+  - Idempotent via `email_already_registered` + a status column.
+  - Email via Gmail `MailApp`, not Resend.
+  - Images: logo + cover in v1, gallery later.
+  - Remaining work: 1 migration (individual kind + service_role-only intake RPC + trigger carve-out),
+    1 route, 1 Apps Script, the taxonomy switch, and a small sign-in landing tweak.
+- **Identity linking evidence:** live `auth.identities` shows a contributor with both `email` and `google`
+  identities on ONE user, so Supabase auto-links a Google sign-in to an existing same-email account in this
+  project. The listing account created from the form becomes the owner's account when they sign in with
+  Google. Keep the claim fallback for a different Google address.
 
 ### Phases
 0. **Founder decisions + setup:** publish gate A/B/C; confirm slug map + pick icons/colours for the
