@@ -141,7 +141,7 @@
   // kind — so an uncategorised org still gets a glyph that says something true
   // about it rather than one generic building for the whole directory.
   const KIND_ICON = Object.assign(Object.create(null),
-    { ministry: 'Church', organization: 'Building2', business: 'Store' });
+    { ministry: 'Church', organization: 'Building2', business: 'Store', individual: 'User' });
 
   function pinIcon(m, cat) {
     if (m.type === 'idea') return 'Lightbulb';
@@ -463,7 +463,7 @@
       const seenPins = new Set();
       items.forEach(({ m, coords }) => {
         seenPins.add(m.id);
-        const cat = window.DATA.getCategory(m.category);
+        const cat = window.DATA.getItemCategory(m);
         const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
         const selected = selectedId === m.id;
         // Event badges carry a locating nub, so they hang from their point

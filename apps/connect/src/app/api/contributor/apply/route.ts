@@ -27,32 +27,15 @@ import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
-import { EVENT_CATEGORIES, PLACE_CATEGORIES } from "@/lib/categories";
+import { isContributorType } from "@/lib/categories";
 import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
+import { MAX_ADDRESS, MAX_BIO, MAX_DISPLAY_NAME, MAX_URL, trimOrNull } from "@/lib/contributorFields";
+import { isContributorKind } from "@/types/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_DISPLAY_NAME = 120;
-const MAX_BIO = 1_000;
 const MAX_MOTIVATION = 2_000;
-const MAX_URL = 500;
-const MAX_ADDRESS = 300;
-const ALLOWED_KINDS = new Set(["ministry", "organization", "business"]);
-// The map/pin category — same slug space list.jsx's category picker and
-// map.jsx's window.DATA.getCategory() use (EVENT_CATEGORIES ∪
-// PLACE_CATEGORIES). Distinct from contributor_kind above.
-const ALLOWED_CATEGORIES = new Set<string>([
-  ...EVENT_CATEGORIES.map((c) => c.value),
-  ...PLACE_CATEGORIES.map((c) => c.value),
-]);
-
-function trimOrNull(v: unknown, max: number): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim();
-  if (!t) return null;
-  return t.slice(0, max);
-}
 
 function finiteOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -121,20 +104,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const rawKind =
-    typeof payload.contributor_kind === "string"
-      ? payload.contributor_kind
-      : "";
-  const contributorKind = ALLOWED_KINDS.has(rawKind)
-    ? (rawKind as "ministry" | "organization" | "business")
+  const contributorKind = isContributorKind(payload.contributor_kind)
+    ? payload.contributor_kind
     : null;
 
-  const rawCategory =
-    typeof payload.contributor_category === "string"
-      ? payload.contributor_category
-      : "";
-  const contributorCategory = ALLOWED_CATEGORIES.has(rawCategory)
-    ? rawCategory
+  // The map/pin category — one of the 12 Contributor types (the wizard's
+  // picker, window.DATA.CONTRIBUTOR_TYPES). Distinct from contributor_kind.
+  const contributorCategory = isContributorType(payload.contributor_category)
+    ? payload.contributor_category
     : null;
 
   // A Contributor with no fixed physical location (online-only, mobile, or

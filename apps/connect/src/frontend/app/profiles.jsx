@@ -244,7 +244,7 @@
     const c = contributors.find((x) => x.id === id);
     if (!c) return h(Empty, { icon: 'UserX', title: 'Contributor not found' });
     const isFollowing = followedOrgs.has(id);
-    const cat = window.DATA.getCategory(c.category);
+    const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
     const cEvents = events.filter((e) => e.organizerId === c.id);
     const cPlaces = places.filter((p) => p.organizerId === c.id);
     const cNews = (newsPosts || []).filter((n) => n.contributorId === c.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));

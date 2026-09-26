@@ -2,7 +2,7 @@
  * POST /api/contributor/type-change
  *
  * Allows an approved contributor to submit a request to change their
- * contributor_kind (ministry / organization / business).  The request
+ * contributor_kind (ministry / organization / business / individual).  The request
  * is stored in contributor_type_change_requests and an admin
  * notification is raised so admins can review it.
  *
@@ -14,9 +14,8 @@ import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { CONTRIBUTOR_KIND_LABELS, type ContributorKind } from "@/types/db";
+import { CONTRIBUTOR_KIND_LABELS, isContributorKind, type ContributorKind } from "@/types/db";
 
-const VALID_KINDS: ContributorKind[] = ["ministry", "organization", "business"];
 const MAX_REASON_LENGTH = 1000;
 
 export async function POST(request: Request) {
@@ -50,22 +49,23 @@ export async function POST(request: Request) {
   }
 
   // 4. Parse body
-  let requested_kind: ContributorKind;
+  let rawKind: unknown;
   let reason: string;
   try {
     const body = await request.json();
-    requested_kind = body.requested_kind;
+    rawKind = body.requested_kind;
     reason = typeof body.reason === "string" ? body.reason.trim() : "";
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!VALID_KINDS.includes(requested_kind)) {
+  if (!isContributorKind(rawKind)) {
     return NextResponse.json(
       { error: "Invalid contributor type." },
       { status: 400 }
     );
   }
+  const requested_kind: ContributorKind = rawKind;
   if (requested_kind === profile.contributor_kind) {
     return NextResponse.json(
       { error: "You already have this contributor type." },

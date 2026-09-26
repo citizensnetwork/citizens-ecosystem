@@ -40,9 +40,43 @@
     { id: 'safe-spaces',         name: 'Safe Spaces',           short: 'Safe',       hex: '#B59CD9', icon: 'Heart' },
   ];
 
+  // ── Contributor types (12) — what a Contributor DOES (founder, 2026-09-26) ──
+  //  Their own list, separate from event categories. Slugs are reused where
+  //  the meaning is identical so existing pins, filters and rows keep working;
+  //  3 are new. Mirrors CONTRIBUTOR_TYPES in src/lib/categories.ts (server
+  //  validation) — change both together.
+  const CONTRIBUTOR_TYPES = [
+    { id: 'churches-ministries', name: 'Church',                short: 'Church',    hex: '#D4AF37', icon: 'Church' },
+    { id: 'outreach-missions',   name: 'Outreach / Mission',    short: 'Outreach',  hex: '#1ABC9C', icon: 'Globe' },
+    { id: 'markets-expos',       name: 'Market / Expo',         short: 'Market',    hex: '#F39C12', icon: 'Store' },
+    { id: 'christian-businesses',name: 'Business',              short: 'Business',  hex: '#A67C00', icon: 'Store' },
+    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',     hex: '#2ECC71', icon: 'CircleDot' },
+    { id: 'social-gatherings',   name: 'Social Gathering',      short: 'Social',    hex: '#E91E63', icon: 'Wine' },
+    { id: 'arts-culture',        name: 'Arts & Culture',        short: 'Arts',      hex: '#FF6B35', icon: 'Palette' },
+    { id: 'media-broadcasting',  name: 'Media',                 short: 'Media',     hex: '#9B59B6', icon: 'Radio' },
+    { id: 'retreat-healing',     name: 'Retreat / Healing',     short: 'Retreat',   hex: '#6FA89A', icon: 'Leaf' },
+    { id: 'clinic',              name: 'Clinic',                short: 'Clinic',    hex: '#C0392B', icon: 'Stethoscope' },
+    { id: 'education-equipping', name: 'Education / Equipping', short: 'Education', hex: '#3498DB', icon: 'GraduationCap' },
+    { id: 'rehab-development',   name: 'Rehab / Development',   short: 'Rehab',     hex: '#5B2C6F', icon: 'HandHeart' },
+  ];
+
   const getEventCategory = (id) => EVENT_CATEGORIES.find((c) => c.id === id);
   const getPlaceCategory = (id) => PLACE_CATEGORIES.find((c) => c.id === id);
-  const getCategory = (id) => getEventCategory(id) || getPlaceCategory(id);
+  const getContributorType = (id) => CONTRIBUTOR_TYPES.find((c) => c.id === id);
+  const getCategory = (id) => getEventCategory(id) || getPlaceCategory(id) || getContributorType(id);
+  // Entity-aware lookup: a Contributor resolves its OWN type list first, so a
+  // reused slug shows the contributor label/icon (churches-ministries →
+  // "Church" + Church glyph) while events and places are unchanged.
+  const getItemCategory = (item) => {
+    const id = item && item.category;
+    return (item && item.type === 'contributor' && getContributorType(id)) || getCategory(id);
+  };
+  // The map's single category pill row: events + places + the contributor
+  // types no event/place already covers (reused slugs would duplicate a pill).
+  const FILTER_CATEGORIES = EVENT_CATEGORIES.concat(
+    PLACE_CATEGORIES,
+    CONTRIBUTOR_TYPES.filter((t) => !getEventCategory(t.id) && !getPlaceCategory(t.id)),
+  );
 
   // ── Social platforms an Event / Place / Contributor can publish ──────
   //  ONE table. The apply + onboarding + portal + create-listing inputs, the
@@ -190,10 +224,14 @@
   window.DATA = {
     EVENT_CATEGORIES,
     PLACE_CATEGORIES,
+    CONTRIBUTOR_TYPES,
+    FILTER_CATEGORIES,
     TIERS,
     getEventCategory,
     getPlaceCategory,
+    getContributorType,
     getCategory,
+    getItemCategory,
     SOCIAL_PLATFORMS,
     SOCIAL_COLUMNS,
     getSocialPlatform,

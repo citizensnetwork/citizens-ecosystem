@@ -7,7 +7,7 @@
  *
  * Query params (all optional):
  *   q         free-text query (max 100 chars)
- *   kinds     comma-separated subset of ministry|organization|business
+ *   kinds     comma-separated subset of ministry|organization|business|individual
  *   location  ILIKE substring on physical_address (max 100 chars)
  *   category  EventCategory slug — filters to orgs that have run at least one event in that category
  *   sort      "auto" | "followers" | "similarity"  (default auto)
@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isContributorKind, type ContributorKind } from "@/types/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,9 +54,6 @@ function getAnonClient(): SupabaseClient {
   return anonClient;
 }
 
-const ALLOWED_KINDS = ["ministry", "organization", "business"] as const;
-type Kind = (typeof ALLOWED_KINDS)[number];
-
 const ALLOWED_SORTS = ["auto", "followers", "similarity"] as const;
 type Sort = (typeof ALLOWED_SORTS)[number];
 
@@ -71,14 +69,12 @@ function clampLimit(raw: string | null): number {
   return Math.min(MAX_LIMIT, Math.max(1, n));
 }
 
-function parseKinds(raw: string | null): Kind[] | null {
+function parseKinds(raw: string | null): ContributorKind[] | null {
   if (!raw) return null;
-  const out: Kind[] = [];
+  const out: ContributorKind[] = [];
   for (const part of raw.split(",")) {
     const trimmed = part.trim();
-    if ((ALLOWED_KINDS as readonly string[]).includes(trimmed)) {
-      out.push(trimmed as Kind);
-    }
+    if (isContributorKind(trimmed)) out.push(trimmed);
   }
   return out.length === 0 ? null : out;
 }

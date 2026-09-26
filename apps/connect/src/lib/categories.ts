@@ -177,6 +177,58 @@ export const PLACE_CATEGORIES: { value: PlaceCategory; label: string }[] = [
   { value: "safe-spaces", label: "Safe Spaces" },
 ];
 
+/* ── Contributor types ────────────────────────────────── */
+
+/**
+ * What a Contributor DOES — the 12 types the founder set on 2026-09-26, kept
+ * separate from event categories (those stay exactly as they are). Slugs are
+ * reused where the meaning is identical so existing pins, filters and rows
+ * keep working; `retreat-healing`, `clinic` and `rehab-development` are new.
+ * Every NEW write of `profiles.contributor_category` (apply, admin Create,
+ * Google Form intake) must be one of these; older event/place slugs already
+ * stored on a row stay readable. Mirrors `CONTRIBUTOR_TYPES` in
+ * `src/frontend/app/data.jsx` — change both together.
+ */
+export type ContributorType =
+  | "churches-ministries"
+  | "outreach-missions"
+  | "markets-expos"
+  | "christian-businesses"
+  | "sport-recreation"
+  | "social-gatherings"
+  | "arts-culture"
+  | "media-broadcasting"
+  | "retreat-healing"
+  | "clinic"
+  | "education-equipping"
+  | "rehab-development";
+
+export const CONTRIBUTOR_TYPES: readonly {
+  value: ContributorType;
+  label: string;
+  hex: string;
+  icon: string;
+}[] = [
+  { value: "churches-ministries", label: "Church", hex: "#D4AF37", icon: "Church" },
+  { value: "outreach-missions", label: "Outreach / Mission", hex: "#1ABC9C", icon: "Globe" },
+  { value: "markets-expos", label: "Market / Expo", hex: "#F39C12", icon: "Store" },
+  { value: "christian-businesses", label: "Business", hex: "#A67C00", icon: "Store" },
+  { value: "sport-recreation", label: "Sport & Recreation", hex: "#2ECC71", icon: "CircleDot" },
+  { value: "social-gatherings", label: "Social Gathering", hex: "#E91E63", icon: "Wine" },
+  { value: "arts-culture", label: "Arts & Culture", hex: "#FF6B35", icon: "Palette" },
+  { value: "media-broadcasting", label: "Media", hex: "#9B59B6", icon: "Radio" },
+  { value: "retreat-healing", label: "Retreat / Healing", hex: "#6FA89A", icon: "Leaf" },
+  { value: "clinic", label: "Clinic", hex: "#C0392B", icon: "Stethoscope" },
+  { value: "education-equipping", label: "Education / Equipping", hex: "#3498DB", icon: "GraduationCap" },
+  { value: "rehab-development", label: "Rehab / Development", hex: "#5B2C6F", icon: "HandHeart" },
+];
+
+const CONTRIBUTOR_TYPE_SLUGS: ReadonlySet<string> = new Set(CONTRIBUTOR_TYPES.map((t) => t.value));
+
+export function isContributorType(value: unknown): value is ContributorType {
+  return typeof value === "string" && CONTRIBUTOR_TYPE_SLUGS.has(value);
+}
+
 /**
  * Map place category slugs to keywords matched against place name, description,
  * address, and DB category name for client-side filtering.

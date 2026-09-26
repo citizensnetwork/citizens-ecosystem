@@ -19,10 +19,10 @@
   // here for input icons and by profiles.jsx for the public display links.
   const SOCIALS = window.DATA.SOCIAL_PLATFORMS;
 
-  // single-select category grid
+  // single-select Contributor-type grid (the 12 types, not event categories)
   function CategoryGrid({ value, onChange }) {
     return h('div', { className: 'grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[280px] overflow-y-auto pr-1 -mr-1' },
-      window.DATA.EVENT_CATEGORIES.map((c) => {
+      window.DATA.CONTRIBUTOR_TYPES.map((c) => {
         const sel = value === c.id;
         return h('button', {
           key: c.id, type: 'button', onClick: () => onChange(c.id),
@@ -160,7 +160,7 @@
     const [step, setStep] = useState(0);
     const ma = myApplication || {};
     const [f, setF] = useState({
-      name: ma.name || '', category: ma.category || 'church-services', bio: ma.bio || '',
+      name: ma.name || '', category: ma.category || 'churches-ministries', bio: ma.bio || '',
       location: ma.location || '', lat: ma.lat ?? null, lng: ma.lng ?? null, website: ma.website || '', contactEmail: '',
       // No stock stand-ins: empty → MediaPicker offers upload, and the profile
       // falls back to honest initials/category tiles until real art is added.

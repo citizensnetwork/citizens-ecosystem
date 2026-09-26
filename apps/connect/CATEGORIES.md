@@ -45,6 +45,43 @@ Complete listing of all place and event categories used in the Citizens Connect 
 
 ---
 
+## Contributor Types (12) — founder, 2026-09-26
+
+What a Contributor **does**. This is a separate list from the event categories above, which are
+unchanged. Slugs are reused where the meaning is identical, so existing pins, filters and rows keep
+working; three are new (★).
+
+Every **new** write of `profiles.contributor_category` must use one of these: the Apply wizard, Admin
+Create, and the Google Form intake. Older event/place slugs already stored on a row still render.
+Source of truth: `CONTRIBUTOR_TYPES` in `src/lib/categories.ts` (server) and in `src/frontend/app/data.jsx`
+(UI). A test pins the two together (`src/__tests__/lib/contributorTypes.test.ts`).
+
+| ID | Name (= Google Form label) | Short | Hex Color | Icon |
+|---|---|---|---|---|
+| `churches-ministries` | Church | Church | `#D4AF37` | `Church` |
+| `outreach-missions` | Outreach / Mission | Outreach | `#1ABC9C` | `Globe` |
+| `markets-expos` | Market / Expo | Market | `#F39C12` | `Store` |
+| `christian-businesses` | Business | Business | `#A67C00` | `Store` |
+| `sport-recreation` | Sport & Recreation | Sport | `#2ECC71` | `CircleDot` |
+| `social-gatherings` | Social Gathering | Social | `#E91E63` | `Wine` |
+| `arts-culture` | Arts & Culture | Arts | `#FF6B35` | `Palette` |
+| `media-broadcasting` | Media | Media | `#9B59B6` | `Radio` |
+| `retreat-healing` ★ | Retreat / Healing | Retreat | `#6FA89A` | `Leaf` |
+| `clinic` ★ | Clinic | Clinic | `#C0392B` | `Stethoscope` |
+| `education-equipping` | Education / Equipping | Education | `#3498DB` | `GraduationCap` |
+| `rehab-development` ★ | Rehab / Development | Rehab | `#5B2C6F` | `HandHeart` |
+
+**Resolution:** on a Contributor (map pin, card, profile), `window.DATA.getItemCategory()` looks up the
+Contributor type **first**. So `churches-ministries` shows "Church" with the Church glyph on a
+Contributor, and "Churches & Ministries" with Building2 on a Place. The map's single pill row
+(`FILTER_CATEGORIES`) = events + places + the three ★ types.
+
+**Contributor kind** (how you're set up, not what you do; `profiles.contributor_kind`): `ministry` ·
+`organization` · `business` · `individual` (mig 173). Individual means a person serving in their own
+capacity. Source: `CONTRIBUTOR_KINDS` in `src/types/db.ts`.
+
+---
+
 ## Icon Library
 
 All icons are from **Lucide React** (https://lucide.dev). The icons used across all categories are:

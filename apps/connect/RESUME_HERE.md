@@ -2979,7 +2979,225 @@ assumed broken saved a wasted cycle.
 
 ---
 
+## 3AP. Google Form → map: Contributor intake pipeline — BUILT (phases 1–5), mig 173 APPLIED, merging to main → live test (2026-09-26)
+
+> **▶ Full build brief: [docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md](docs/handoffs/CONTRIBUTOR_FORM_INTAKE_HANDOFF.md). It supersedes any conflicting detail below.** Founder chose gate B, delegated colours/icons, and asked for the simplified build. (2026-09-23 → 09-26)
+
+### ✅ Build session 2026-09-26: phases 1–5 built, all gates green, pushed (`32edec6`, no PR)
+Branch `claude/citizens-connect-applicant-form-o4kvt3`.
+
+**Gates (all green):**
+
+| Gate | Result |
+|---|---|
+| lint | 12/12 |
+| typecheck | 12/12 |
+| test | 11/11 tasks. Connect 759, Vision 734, Wear 115, db 114, connect-client 21 |
+| build | 8/8; forced rebuilds of Connect and Wear show no warnings |
+| format:check | clean |
+| Connect e2e | **13/13**, incl. 4 new |
+| `node scripts/build-frontend.js` | ok |
+
+Playwright's Chromium had to be installed on this machine first (`npx playwright install chromium`, PW 1.61.1).
+
+- **✅ Migration 173 APPLIED to prod** (founder go-ahead, version `20260926182924`; pre-apply tag
+  `connect-pre-mig173-form-intake`). Verified live (grants, `search_path`, trigger, CHECKs). Advisors went
+  0/114/3 → **0 ERROR / 115 WARN / 3 INFO**; the only new finding is the intentional authenticated EXECUTE
+  on `mark_own_listing_claimed`. SHARED_DB_CONTRACT §9 is stamped. **Next migration # = 174.**
+- **Why the founder's `testConnection` got a 404:** production runs `main`, and the intake route only existed
+  on the branch. Preview URLs sit behind Vercel SSO (`all_except_custom_domains`), so Apps Script can reach
+  only `www.citizenscentral.co.za`. The founder approved merging to `main` via a PR.
+  `INTAKE_WEBHOOK_SECRET` is set for Production and Preview. Founder setup steps 1–7 are done (the
+  header-matching fix `f9a2724` resolved `Processed At`).
+- **Founder decisions made this session:**
+  - The 3 Sheet rows at 16:19Z were **hand-typed samples**, not Form submissions. Tells: no seconds in the
+    timestamps, text in the upload columns, and no files in Drive.
+  - Live Q2.2 labels: `Church`→ministry · `Christian Nonprofit / Ministry`→organization ·
+    `Christian Business`→business · `Individual`→individual.
+  - Q2.3 = the brief's 12 labels exactly.
+  - Add a shareable **`/c/<slug>`** listing link.
+- **What shipped:**
+  - **Migration 173:**
+    - `individual` on all 3 kind CHECKs.
+    - A `protect_role_column` service_role carve-out, plus dropping the duplicate `protect_role_trigger`
+      (025 and 036 both ran the same check).
+    - `intake_create_contributor_profile` (service_role only, with a fresh-target guard).
+    - `claim_admin_created_contributor` now copies the mig-171/172 fields and the cover photos. Before,
+      the different-account claim silently dropped them.
+    - `mark_own_listing_claimed`.
+  - **Taxonomy:**
+    - `CONTRIBUTOR_TYPES` in `src/lib/categories.ts` and `data.jsx`, pinned together by
+      `__tests__/lib/contributorTypes.test.ts`.
+    - `getItemCategory` makes contributors resolve their own type first; `FILTER_CATEGORIES` adds the
+      3 new pills.
+    - Apply and Admin Create pick from the 12 types.
+    - `CONTRIBUTOR_KINDS` / `isContributorKind` in `types/db.ts`, used by 6 routes.
+    - `CONNECT_CONTRIBUTOR_KINDS` in `@citizens/connect-client`; the Wear proxy route uses it too.
+  - **Intake route** `src/app/api/intake/google-form/route.ts`, with helpers in `src/lib/intake/googleForm.ts`
+    and the shared validator `src/lib/contributorFields.ts`.
+    - The shared validator also fixed a **real bug**: admin Create validated URLs *after* `createUser`,
+      so a bad URL left an orphaned auth user behind.
+    - `INTAKE_WEBHOOK_SECRET` is declared in turbo.json `globalEnv` and documented in `.env.example`.
+  - **Apps Script** `tools/google-forms/intake.gs` plus `README.md`, the founder's setup guide. Its signing
+    is unit-tested against the server verifier (`__tests__/tools/intakeScript.test.ts`).
+  - **`/c/<slug>`** is a REDIRECT to `/index.html?c=<slug>`, not a rewrite: index.html loads its scripts
+    by relative path. It opens the profile, with guest mode for signed-out visitors.
+  - **Sign-in landing** (`store.jsx` `landOwnListing`, once per session): a contributor gets the stamp RPC
+    and the dashboard; a not_applied citizen gets a silent `/api/contributor/claim`.
+  - **New e2e** `e2e/contributor-intake-landing.spec.ts`: a real-mode session against the fake project
+    `e2eproj.supabase.test`. It needs `bypassCSP`, because the app's CSP allows only the real project host.
+- **Production domain** for `INTAKE_URL` and the email links: `https://www.citizenscentral.co.za`. It is
+  verified; the apex is NOT a Vercel domain.
+- **⚠ Found in passing, flagged as its own task (not fixed here):** `public.profiles` has
+  `SELECT USING (true)` and no column restrictions. **Anyone holding the public anon key can read every
+  user's `email` / `notification_email` / `contributor_claim_email`.** This is POPIA-relevant and needs a
+  cross-app audit before revoking any columns.
+- **Other open gaps:**
+  - `handle_new_user()` still filters signup-metadata kind to 3 values. Nothing passes kind in metadata,
+    so it was left alone.
+  - The Admin Create form/RPC still lacks X / LinkedIn / WhatsApp / contact email / cover.
+  - There is no admin-UI hide button yet.
+  - `apply.jsx` collects no kind.
+  - The Drive field-spec Doc still lists the 17 event categories.
+
+### NEXT (in order)
+1. ✅ Mig 173 applied. **Merge the PR to `main`** (founder approved: merge once CI is green) → Vercel
+   production deploy.
+2. The founder re-runs **`testConnection`**. It should say "Connected ✓". Setup steps 1–7 are already done.
+3. **Phase 6 live test together:**
+   1. Submit a real Form response with a test Google account.
+   2. Tick Approve. Check the pin, Kingdom Discovery, and the email.
+   3. Sign in with the same Google account and confirm it lands on the dashboard.
+   4. Remove the test listing afterwards by deleting that test auth user, with the founder's OK.
+4. Open a PR only when the founder asks.
+
+*(Planning notes from before the build follow. The brief and the section above supersede them.)*
+
+Branch `claude/citizens-connect-applicant-form-o4kvt3`.
+
+### Already done
+- Drive doc **"Citizens Connect — Contributor Application Form (Field Spec)"**: every Contributor field
+  → DB column + the API limits.
+- `tools/google-forms/create-contributor-application-form.gs`: Apps Script form builder (superseded;
+  the founder built the live form by hand instead).
+- **Live form:** "New 219-Connect Contributor", https://forms.gle/RtV1p7eWDGydGmZY6 (Drive id
+  `1Wa8YiBSQtZaeqN502RAWKqYamDZhs08kOGnJPtLZD2Q`). The Drive connector **cannot read Form questions**,
+  and on 09-26 **no responses Sheet was linked** yet. File uploads land in the Drive folder
+  "New 219-Connect Contributor (File responses)", with sub-folders for Q6.1 logo, 6.2 cover and 6.3 gallery.
+
+### Target flow (founder's, 2026-09-26)
+Form → confirmation says "watch your inbox" → responses Sheet → system publishes listing to map +
+Kingdom Discovery → automatic "sign in" email → owner signs in with Google → lands on their own profile
+and dashboard.
+
+### Architecture (recommended; confirm in Phase 0)
+- **"The system" is push, not poll.** A Google Apps Script bound to the responses Sheet (it runs inside
+  the founder's Google account, free) POSTs each row to a new Connect endpoint on Vercel, which writes to
+  Supabase. Connect never reads the Sheet, so there are no Google credentials in Vercel and no cron.
+- **Endpoint** `POST /api/intake/google-form`: HMAC-SHA256 over the raw body using a shared secret
+  (`INTAKE_WEBHOOK_SECRET` in Vercel env + Apps Script Script Properties), with a timestamp replay window.
+  - Reuse the admin-create validation (lengths, bounded-regex email, `coercePublicUrl`/`hasUnsafeScheme`),
+    turned into ONE shared validator module instead of a copy.
+  - Convert labels to slugs, geocode (server-side MapTiler, or parse the Maps link), and upload image blobs
+    to Supabase Storage.
+  - Idempotent on the Google Form response id (staging table `contributor_intake`: RLS on,
+    service_role-only, stores raw payload + status + resulting slug/error).
+- **Creating the listing without an admin session:** the existing `admin_create_contributor_profile` RPC
+  requires `is_admin()` (keyed on `auth.uid()`), and `protect_role_column()` blocks service_role role
+  changes (§3AL PR #54 lesson). Needs a NEW SECDEF RPC `intake_create_contributor_profile(...)`:
+  EXECUTE granted to service_role only, with the full field set (+ x/linkedin/whatsapp, contact email,
+  cover photos) and a narrow `protect_role_column()` carve-out for `auth.role() = 'service_role'`.
+  Auth user via `admin.auth.admin.createUser({email, email_confirm:true})`, rollback on failure
+  (same as the create route).
+- **Publish gate (DECISION):** (A) publish instantly on submit; (B, recommended) an "Approve" tick-box
+  column in the Sheet, and ticking it triggers the push; (C) prepare on submit, go live on the map
+  only when the owner signs in (proves email ownership). A public form + instant publish = anyone can
+  put a fake/impersonated church on the map under someone else's email.
+- **Welcome email:** Apps Script `MailApp` from the founder's Gmail after a 200 response (zero setup,
+  ~100/day on consumer Gmail). The alternative is Resend (`supabase/functions/_shared/email.ts` exists;
+  whether `RESEND_API_KEY` is set is unverified). The Script writes status/slug/error back to Sheet columns.
+- **Sign-in landing:** the listing's auth user already has the owner's email. On Google sign-in Supabase
+  normally auto-links to that user, so the owner signs in AS the contributor (the claim RPC would say
+  `not_eligible`; that's fine). If linking does NOT happen, a separate citizen user is created and needs
+  `claim_admin_created_contributor()`. Build for both: on session bootstrap (`store.jsx`), if
+  role=contributor with `contributor_claimed_at IS NULL` → stamp claimed + route to dashboard; if
+  citizen → call `/api/contributor/claim` silently → on success route to dashboard. Today claiming is
+  only a manual account-menu button (`shell.jsx` `claimListing`). **Must be verified with a real
+  Google sign-in.**
+
+### Taxonomy decisions (founder input 2026-09-26)
+- Founder replaced the 17 event categories with **12 Contributor types**: Church, Outreach / Mission,
+  Market / Expo, Business, Sport & Recreation, Social Gathering, Arts & Culture, Media,
+  Retreat / Healing, Clinic, Education / Equipping, Rehab / Development.
+- Proposed slug map (reuse existing slugs where the meaning is identical, so current pins/filters keep
+  working; 3 new):
+  - church → `churches-ministries`
+  - outreach → `outreach-missions`
+  - market → `markets-expos`
+  - business → `christian-businesses`
+  - sport → `sport-recreation`
+  - social → `social-gatherings`
+  - arts → `arts-culture`
+  - media → `media-broadcasting`
+  - education → `education-equipping`
+  - **NEW** `retreat-healing`, `clinic`, `rehab-development`
+
+  New slugs need entries in `src/lib/categories.ts` + `src/frontend/app/data.jsx` (hex + icon) and in
+  every category validation set. The in-app Apply wizard + admin Create should switch to the same 12.
+  Old slugs stay valid for existing listings.
+- Founder added **"Individual"** to kind. DB check `profiles_contributor_kind_check` (mig 036) only
+  allows ministry/organization/business. Migration to add `individual`, plus `KINDS`
+  (entity-card.jsx), `KIND_ICON` (map.jsx), admin.jsx select and API `ALLOWED_KINDS`.
+
+### Founder decisions 2026-09-26 (supersede the options above)
+- **Publish gate = B** (an "Approve" tick box in the Sheet triggers the push).
+- **Responses Sheet:** "New 219-Connect Contributor (Responses)", id
+  `1go7ALiP1_0W4IeWH8IBbnevoS7ZQalxjkFcsaR6XclM`, tab "Form Responses 1", columns A–AE. A Timestamp,
+  B Email Address (the respondent's verified Google email, collected by the Form), then
+  "Question 1.1: …" to "Question 7.5: …" (1.3 Owner's email = E; 2.2 Organisation Type = H;
+  2.3 Primary category = I; 6.1–6.3 file uploads = X–Z). Key columns by the "Question N.N" prefix,
+  not full titles.
+- **Taxonomy:** Claude picks colours/icons for the 3 new types. Event categories are NOT touched.
+  Contributors get their own 12-type list. Live data check: only 5 contributors, and 1 has a category
+  (`sport-recreation`, which is kept), so switching is safe.
+- **Simplified build (proposed to the founder, awaiting go-ahead):**
+  - Drop the `contributor_intake` staging table; the Sheet is the queue and log (status/slug columns).
+  - Idempotent via `email_already_registered` + a status column.
+  - Email via Gmail `MailApp`, not Resend.
+  - Images: logo + cover in v1, gallery later.
+  - Remaining work: 1 migration (individual kind + service_role-only intake RPC + trigger carve-out),
+    1 route, 1 Apps Script, the taxonomy switch, and a small sign-in landing tweak.
+- **Identity linking evidence:** live `auth.identities` shows a contributor with both `email` and `google`
+  identities on ONE user, so Supabase auto-links a Google sign-in to an existing same-email account in this
+  project. The listing account created from the form becomes the owner's account when they sign in with
+  Google. Keep the claim fallback for a different Google address.
+
+### Phases
+0. **Founder decisions + setup:** publish gate A/B/C; confirm slug map + pick icons/colours for the
+   3 new types; keep/rename kinds; link the Form to a Sheet (Responses → Link to Sheets); send the
+   exact question titles (the connector can't read the Form); set the Form confirmation message.
+1. **Migration 173:** `individual` kind; `contributor_intake` staging table; service_role-only
+   `intake_create_contributor_profile` RPC + trigger carve-out. Pre-apply git tag + advisors
+   0 ERROR / 0 new.
+2. **Taxonomy in code:** CONTRIBUTOR_TYPES (12) in categories.ts/data.jsx; Apply wizard + admin Create
+   use it; validators accept the new slugs.
+3. **Intake endpoint** + unit tests (HMAC, replay, idempotency, validation, rollback) + shared validator.
+4. **Apps Script intake** (`tools/google-forms/intake.gs`): approve trigger → push (with images) →
+   write back → MailApp welcome email. Setup README for the founder.
+5. **Sign-in landing:** auto-claim / redirect to dashboard; verify with a real Google account.
+6. **End-to-end test** with a real test submission; e2e for the landing; update RESUME_HERE.
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
+
+- **Contributor Google Form → map intake:** phases 1–5 are **BUILT and pushed** (`32edec6`, branch
+  `claude/citizens-connect-applicant-form-o4kvt3`, no PR). Next:
+  1. Mig 173 is ✅ applied; the PR merge to `main` is in progress (founder-approved).
+  2. The founder's setup (`tools/google-forms/README.md`).
+  3. **Phase 6 live test together.**
+
+  See §3AP's "NEXT". Also flagged separately: the `profiles` email PII exposure to anon.
 
 > **✅ 2026-08-26 (latest) — map pin name label zoom pulled back to 16.5.** 18 was too
 > tight — founder reported labels almost never showed at normal browsing zoom.

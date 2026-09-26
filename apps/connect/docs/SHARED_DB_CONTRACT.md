@@ -183,7 +183,31 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 172**)
+## 9. Verification snapshot (updated 2026-09-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 173**)
+
+> **2026-09-26: mig 173 (`contributor_form_intake`) APPLIED to prod** (version `20260926182924`)
+> with the founder's go-ahead. Pre-apply tag: `connect-pre-mig173-form-intake`. Verified live after
+> apply:
+> - All four functions are SECDEF with `search_path=""`.
+> - `intake_create_contributor_profile` is EXECUTE for service_role only.
+> - `mark_own_listing_claimed` is EXECUTE for authenticated only, not anon.
+> - Only `protect_role_on_update` remains on profiles.
+> - The three kind CHECKs include `individual`.
+>
+> **Advisors: 0 ERROR / 115 WARN / 3 INFO.** The only new finding vs the 0/114/3 baseline is the
+> intentional authenticated EXECUTE on `mark_own_listing_claimed`. **Next migration # = 174.** What it
+> does:
+>
+> 1. Adds `'individual'` to the three kind CHECKs (profiles, contributor_applications,
+>    contributor_type_change_requests).
+> 2. Adds a `protect_role_column()` carve-out for `auth.role() = 'service_role'`, and drops the
+>    duplicate `protect_role_trigger` (025) that re-ran the same check alongside 036's
+>    `protect_role_on_update`.
+> 3. Adds `intake_create_contributor_profile(...)`: SECDEF, `search_path=''`, EXECUTE for
+>    **service_role only**, and a fresh-target guard (citizen / not_applied / no slug).
+> 4. Extends `claim_admin_created_contributor()` to copy contact email, X, LinkedIn, WhatsApp and
+>    cover photos.
+> 5. Adds `mark_own_listing_claimed()`: SECDEF, own row only, EXECUTE for authenticated.
 
 > **2026-08-26: mig 172 (`entity_social_links_parity`) APPLIED to prod.** Makes the set of
 > social channels IDENTICAL across the three entity types and widens it to seven. Before

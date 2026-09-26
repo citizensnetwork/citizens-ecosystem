@@ -188,7 +188,7 @@ describe("POST /api/contributor/apply", () => {
     expect(insertedRow?.contributor_kind).toBeNull();
   });
 
-  it("accepts a known contributor_category and coerces an unknown one to null", async () => {
+  it("accepts a Contributor type and coerces anything else (incl. event-only slugs) to null", async () => {
     mockUser({ id: USER_ID });
     mockClient._chain.maybeSingle
       .mockResolvedValueOnce({ data: { contributor_status: null }, error: null })
@@ -201,13 +201,15 @@ describe("POST /api/contributor/apply", () => {
     await POST(
       makeReq({
         display_name: "Grace Hub",
-        contributor_category: "worship-prayer",
+        contributor_category: "retreat-healing",
+        contributor_kind: "individual",
         physical_latitude: -25.7479,
         physical_longitude: 28.2293,
       }),
     );
     const insertedRow = insertSpy.mock.calls.at(-1)?.[0];
-    expect(insertedRow?.contributor_category).toBe("worship-prayer");
+    expect(insertedRow?.contributor_category).toBe("retreat-healing");
+    expect(insertedRow?.contributor_kind).toBe("individual");
     expect(insertedRow?.physical_latitude).toBe(-25.7479);
     expect(insertedRow?.physical_longitude).toBe(28.2293);
 
@@ -223,7 +225,8 @@ describe("POST /api/contributor/apply", () => {
     await POST(
       makeReq({
         display_name: "Grace Hub Two",
-        contributor_category: "not-a-real-category",
+        // An event category, not one of the 12 Contributor types.
+        contributor_category: "worship-prayer",
         physical_latitude: "not-a-number",
       }),
     );

@@ -94,8 +94,9 @@
     // ONE category control. There used to be two — a scrollable pill row AND a
     // "Browse Categories" sheet behind a slider button — showing the same
     // thing. The sheet is gone; the pill row is now the whole set (events AND
-    // places, which is what the sheet uniquely offered) behind a leading "All".
-    const CATEGORY_PILLS = window.DATA.EVENT_CATEGORIES.concat(window.DATA.PLACE_CATEGORIES);
+    // places, which is what the sheet uniquely offered) behind a leading "All",
+    // plus the Contributor types no event/place category already covers.
+    const CATEGORY_PILLS = window.DATA.FILTER_CATEGORIES;
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
