@@ -1113,7 +1113,7 @@
         category: form.category, website: form.website, contactEmail: form.contactEmail || '',
         location: form.noFixedLocation ? '' : (form.location || ''), members: form.members || [], followerCount: 0,
         noFixedLocation: !!form.noFixedLocation,
-        dominantNiche: DATA.getEventCategory(form.category) ? DATA.getEventCategory(form.category).name : 'Community',
+        dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: form.category }) || { name: 'Community' }).name,
         involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
       if (!realUser) {
@@ -1871,6 +1871,35 @@
           toast('Become a Contributor to unlock your portal.', 'gold');
         }
       };
+      // Owners of a listing made FOR them (Google Form intake, or admin
+      // Create) land on their own dashboard the first time they sign in —
+      // once per browser session, best-effort (the account menu's "Claim a
+      // Contributor listing" stays as the manual fallback):
+      //  (a) Supabase linked their same-email Google sign-in to the listing
+      //      account, so they ARE the contributor: stamp the claim
+      //      (mark_own_listing_claimed, mig 173 — a no-op for anyone else).
+      //  (b) a separate citizen account with the listing's email: claim it
+      //      (copies the listing onto this account), then reload into the
+      //      dashboard so the new role is picked up everywhere.
+      let landingTried = false;
+      const landOwnListing = async (s) => {
+        if (landingTried) return;
+        landingTried = true;
+        const key = 'cc_listing_landing_v1:' + s.user.id;
+        try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) { /* still try once */ }
+        try {
+          if (s.role === 'contributor') {
+            const { data } = await window.CC_AUTH.supabase.rpc('mark_own_listing_claimed');
+            if (active && data && data.success) {
+              resetNav('dashboard');
+              toast('Welcome to Citizens Connect! Your listing is live — manage it here.', 'green');
+            }
+          } else if (s.role === 'citizen' && s.contributorStatus === 'not_applied') {
+            const res = await authedFetch('/api/contributor/claim', { method: 'POST' });
+            if (active && res.ok) window.location.href = '/dashboard';
+          }
+        } catch (e) { /* best-effort */ }
+      };
       const apply = async () => {
         const s = await window.CC_AUTH.loadSession();
         if (!active) return;
@@ -1880,6 +1909,7 @@
           setRole(s.role || 'citizen');
           if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
           else handleDashboardDeepLink(s.role || 'citizen');
+          landOwnListing(s);
         } else {
           setRealUser(null);
           setAuthed(false);
@@ -2228,6 +2258,36 @@
         } catch (e) { /* bubbles are optional */ }
       })();
 
+      return () => { active = false; };
+    }, []);
+
+    // ── Public listing link: /c/<slug> ──────────────────────────────
+    //  The shareable Contributor URL (the Google Form intake's welcome email
+    //  and the Sheet's "Listing URL"). next.config.ts redirects /c/:slug to
+    //  /index.html?c=<slug>; the slug is resolved directly (so it works
+    //  beyond the directory's first page) and its profile opens with
+    //  Discover beneath it, so Back stays inside Connect. Someone following a
+    //  shared link sees the listing as a guest instead of the sign-in screen.
+    useEffect(() => {
+      let slug = null;
+      try { slug = new URLSearchParams(window.location.search).get('c'); } catch (e) { /* no listing link */ }
+      if (!slug || !/^[a-z0-9-]{1,120}$/.test(slug)) return undefined;
+      let active = true;
+      (async () => {
+        let listing = null;
+        try {
+          const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+          const res = await fetch(base + '/api/v1/contributors/' + slug);
+          const json = res.ok ? await res.json() : null;
+          if (json && json.data && json.data.profile) listing = adaptContributor(json.data.profile);
+        } catch (e) { /* reported below */ }
+        if (!active) return;
+        if (!listing) { toast('That Contributor listing could not be found.', 'red'); return; }
+        setContributors((prev) => [...prev.filter((c) => c.id !== listing.id), listing]);
+        if (!authed) browseAsGuest();
+        resetNav('home');
+        go('profile', { id: listing.id });
+      })();
       return () => { active = false; };
     }, []);
 

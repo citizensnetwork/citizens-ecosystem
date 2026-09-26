@@ -34,13 +34,27 @@ export interface PageParams {
 
 /**
  * A Kingdom Contributor — Connect's real first-class organisation record
- * (ministry / organization / business), served by `GET /api/v1/contributors`.
+ * (ministry / organization / business / individual), served by
+ * `GET /api/v1/contributors`.
  *
  * Wire mapping (Connect snake_case → Wear camelCase):
  *   full_name→name · contributor_slug→slug · contributor_kind→kind ·
  *   logo_url→logoUrl · avatar_url→avatarUrl · etc.
  */
-export type ConnectContributorKind = 'ministry' | 'organization' | 'business';
+export const CONNECT_CONTRIBUTOR_KINDS = [
+  'ministry',
+  'organization',
+  'business',
+  'individual',
+] as const;
+export type ConnectContributorKind = (typeof CONNECT_CONTRIBUTOR_KINDS)[number];
+
+/** Narrow an untrusted wire/query value to a known kind. */
+export function isConnectContributorKind(value: unknown): value is ConnectContributorKind {
+  return (
+    typeof value === 'string' && (CONNECT_CONTRIBUTOR_KINDS as readonly string[]).includes(value)
+  );
+}
 
 export interface ConnectContributor {
   readonly id: ConnectId;

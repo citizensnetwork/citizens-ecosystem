@@ -35,6 +35,7 @@
     ministry: { label: 'Ministry', icon: 'Church' },
     organization: { label: 'Organisation', icon: 'Building2' },
     business: { label: 'Business', icon: 'Store' },
+    individual: { label: 'Individual', icon: 'User' },
   });
   const TYPE_ICON = Object.assign(Object.create(null),
     { event: 'CalendarDays', place: 'Landmark', contributor: 'Building2' });
@@ -71,7 +72,7 @@
     const isPlace = item.type === 'place';
     const isContributor = item.type === 'contributor';
 
-    const cat = window.DATA.getCategory(item.category);
+    const cat = window.DATA.getItemCategory(item);
     const hex = cat ? cat.hex : '#C9A84C';
     // Category-adaptive palette. `color-mix` keeps every derived tone in the
     // listing's own colour instead of hard-coding a second palette per state.

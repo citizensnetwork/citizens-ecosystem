@@ -1,4 +1,10 @@
 /**
+ * ⚠️ SUPERSEDED (2026-09-26) — do not run. The founder built the live Form
+ * ("New 219-Connect Contributor") by hand, with different option labels and
+ * the 12 Contributor types instead of the event categories below. The live
+ * pipeline is intake.gs (Sheet → Connect) — see README.md in this folder.
+ * Kept for history only.
+ *
  * Citizens Connect: Contributor Application Form builder (Google Apps Script)
  *
  * Builds the Google Form that onboards a new Contributor, plus a linked

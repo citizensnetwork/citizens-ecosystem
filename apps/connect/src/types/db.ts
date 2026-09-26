@@ -157,7 +157,7 @@ export type ConsiderJoin = {
  *   - "contributor" — anyone who creates events, manages places, or hosts gatherings
  *   - "admin"       — operations / moderation
  *
- * The old "kind of contributor" (ministry / organization / business) is preserved
+ * The old "kind of contributor" (ministry / organization / business; + individual, mig 173) is preserved
  * on the profile via {@link ContributorKind} so we don't lose affiliation data.
  */
 export type UserRole = "citizen" | "contributor" | "admin";
@@ -166,8 +166,16 @@ export type UserRole = "citizen" | "contributor" | "admin";
  * Sub-type of contributor.  Only meaningful when {@link UserRole} is "contributor";
  * always null for citizens and admins.  Used purely for display ("Contributor —
  * Ministry") and downstream personalisation; carries no extra permissions.
+ * `individual` (mig 173) = a person serving in their own capacity (freelancer,
+ * counsellor, speaker, photographer, artist). Every kind CHECK in the DB and
+ * every route validates against this one list.
  */
-export type ContributorKind = "ministry" | "organization" | "business";
+export const CONTRIBUTOR_KINDS = ["ministry", "organization", "business", "individual"] as const;
+export type ContributorKind = (typeof CONTRIBUTOR_KINDS)[number];
+
+export function isContributorKind(value: unknown): value is ContributorKind {
+  return typeof value === "string" && (CONTRIBUTOR_KINDS as readonly string[]).includes(value);
+}
 
 /** Roles that can create & manage events / places.  Single source of truth. */
 export const CONTRIBUTOR_ROLES: UserRole[] = ["contributor", "admin"];
@@ -194,6 +202,7 @@ export const CONTRIBUTOR_KIND_LABELS: Record<ContributorKind, string> = {
   ministry: "Ministry",
   organization: "Organization",
   business: "Business",
+  individual: "Individual",
 };
 
 /**

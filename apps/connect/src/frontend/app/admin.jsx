@@ -77,6 +77,7 @@
     { value: 'ministry', label: 'Ministry' },
     { value: 'organization', label: 'Organization' },
     { value: 'business', label: 'Business' },
+    { value: 'individual', label: 'Individual' },
   ];
 
   // ── Admin: manually create a Contributor listing ──
@@ -168,7 +169,7 @@
 
       h(Field, { label: 'Primary category', required: true, hint: 'Sets the colour & icon across the map.' },
         h('div', { className: 'grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-1 -mr-1' },
-          window.DATA.EVENT_CATEGORIES.map((c) => {
+          window.DATA.CONTRIBUTOR_TYPES.map((c) => {
             const sel = f.category === c.id;
             return h('button', {
               key: c.id, type: 'button', onClick: () => up('category', c.id),

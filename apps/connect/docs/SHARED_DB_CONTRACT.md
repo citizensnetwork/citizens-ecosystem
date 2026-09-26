@@ -185,6 +185,25 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ## 9. Verification snapshot (updated 2026-08-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 172**)
 
+> **2026-09-26: mig 173 (`contributor_form_intake`) WRITTEN; NOT yet applied**
+> (pre-apply tag `connect-pre-mig173-form-intake` pushed). The session's `apply_migration` call
+> was blocked pending the founder's explicit go-ahead. What it does:
+>
+> 1. Adds `'individual'` to the three kind CHECKs (profiles, contributor_applications,
+>    contributor_type_change_requests).
+> 2. Adds a `protect_role_column()` carve-out for `auth.role() = 'service_role'`, and drops the
+>    duplicate `protect_role_trigger` (025) that re-ran the same check alongside 036's
+>    `protect_role_on_update`.
+> 3. Adds `intake_create_contributor_profile(...)`: SECDEF, `search_path=''`, EXECUTE for
+>    **service_role only**, and a fresh-target guard (citizen / not_applied / no slug).
+> 4. Extends `claim_admin_created_contributor()` to copy contact email, X, LinkedIn, WhatsApp and
+>    cover photos.
+> 5. Adds `mark_own_listing_claimed()`: SECDEF, own row only, EXECUTE for authenticated.
+>
+> Expected advisors: **0 ERROR / 115 WARN / 3 INFO**. The one new WARN is the intentional
+> authenticated EXECUTE on `mark_own_listing_claimed`. Baseline before apply = 0 / 114 / 3.
+> **Next migration # = 173 until it is applied, then 174.**
+
 > **2026-08-26: mig 172 (`entity_social_links_parity`) APPLIED to prod.** Makes the set of
 > social channels IDENTICAL across the three entity types and widens it to seven. Before
 > it, `public.places` had **no social columns at all** even though Connect's create-Place

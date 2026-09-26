@@ -99,6 +99,24 @@ describe('HttpConnectClient', () => {
     });
   });
 
+  it('keeps the individual kind (Connect mig 173) and nulls kinds it does not know', async () => {
+    const client = new HttpConnectClient({
+      baseUrl: 'https://connect.example',
+      fetch: makeFetch([
+        () =>
+          jsonResponse(200, {
+            data: [
+              { ...wireContributor, contributor_kind: 'individual' },
+              { ...wireContributor, id: 'uuid-9', contributor_kind: 'cooperative' },
+            ],
+            meta: { count: 2, limit: 50, offset: 0 },
+          }),
+      ]),
+    });
+    const page = await client.contributors.list();
+    expect(page.items.map((c) => c.kind)).toEqual(['individual', null]);
+  });
+
   it('resolves contributor profiles from /api/v1/contributors/{slug} with counts, 404 → null', async () => {
     const client = new HttpConnectClient({
       baseUrl: 'https://connect.example',

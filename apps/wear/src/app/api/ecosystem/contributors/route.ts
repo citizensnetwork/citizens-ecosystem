@@ -1,4 +1,4 @@
-import { ConnectError, type ConnectContributorKind } from '@citizens/connect-client';
+import { ConnectError, isConnectContributorKind } from '@citizens/connect-client';
 import { handler, json } from '@/lib/api/route-context';
 import { getConnectClient } from '@/lib/connect';
 
@@ -13,10 +13,7 @@ export const dynamic = 'force-dynamic';
 export const GET = handler(async (req) => {
   const url = new URL(req.url);
   const kindRaw = url.searchParams.get('kind');
-  const kind: ConnectContributorKind | undefined =
-    kindRaw === 'ministry' || kindRaw === 'organization' || kindRaw === 'business'
-      ? kindRaw
-      : undefined;
+  const kind = isConnectContributorKind(kindRaw) ? kindRaw : undefined;
   const query = url.searchParams.get('q')?.trim() || undefined;
   const cursor = url.searchParams.get('cursor') ?? undefined;
   const limitRaw = Number(url.searchParams.get('limit'));

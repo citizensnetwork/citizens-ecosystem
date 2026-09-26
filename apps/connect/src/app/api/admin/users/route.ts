@@ -18,6 +18,7 @@ import { getRouteAuth } from "@/lib/supabase/route";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
+import { isContributorKind } from "@/types/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,6 @@ const ALLOWED_CONTRIB_STATUS = [
   "approved",
   "rejected",
 ] as const;
-const ALLOWED_CONTRIB_KINDS = ["ministry", "organization", "business"] as const;
 const PAGE_SIZE = 20;
 
 export async function GET(request: NextRequest) {
@@ -269,12 +269,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (body.contributor_kind !== undefined) {
-    if (
-      body.contributor_kind !== null &&
-      !ALLOWED_CONTRIB_KINDS.includes(
-        body.contributor_kind as (typeof ALLOWED_CONTRIB_KINDS)[number],
-      )
-    ) {
+    if (body.contributor_kind !== null && !isContributorKind(body.contributor_kind)) {
       return NextResponse.json(
         { error: "Invalid contributor_kind" },
         { status: 400 },

@@ -7,7 +7,7 @@
  * this endpoint to populate their own directories.
  *
  * Query params (all optional):
- *   kind     - filter by contributor_kind (ministry|organization|business)
+ *   kind     - filter by contributor_kind (ministry|organization|business|individual)
  *   q        - case-insensitive substring match on full_name / bio
  *   limit    - 1..100, default 50
  *   offset   - default 0
@@ -22,6 +22,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
+import { isContributorKind } from "@/types/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,12 +43,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const kindParam = url.searchParams.get("kind");
-  const kind =
-    kindParam === "ministry" ||
-    kindParam === "organization" ||
-    kindParam === "business"
-      ? kindParam
-      : null;
+  const kind = isContributorKind(kindParam) ? kindParam : null;
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const limit = clampInt(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = clampInt(url.searchParams.get("offset"), 0, 0, 10_000);

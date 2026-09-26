@@ -10,7 +10,7 @@ import type {
   ContributorDirectory,
   Page,
 } from '../contract';
-import { ConnectError } from '../contract';
+import { ConnectError, isConnectContributorKind } from '../contract';
 
 /**
  * HTTP implementation of the Citizens Connect contract against Connect's
@@ -75,7 +75,7 @@ interface WireCategory {
 }
 
 function mapContributorKind(kind: string | null): ConnectContributorKind | null {
-  return kind === 'ministry' || kind === 'organization' || kind === 'business' ? kind : null;
+  return isConnectContributorKind(kind) ? kind : null;
 }
 
 function mapContributor(wire: WireContributor): ConnectContributor {

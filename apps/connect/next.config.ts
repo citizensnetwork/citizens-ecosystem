@@ -36,9 +36,14 @@ const nextConfig: NextConfig = {
     webpackBuildWorker: false,
   },
   // Redirect the bare root to the static HTML frontend (copied into public/ at build time).
+  // "/c/<slug>" is a Contributor's shareable public listing (the link the
+  // Google Form intake emails to new owners). It REDIRECTS rather than
+  // rewrites: index.html loads its scripts by relative path, which would
+  // resolve under /c/ — store.jsx opens the listing from the `c` param.
   async redirects() {
     return [
       { source: "/", destination: "/index.html", permanent: false },
+      { source: "/c/:slug", destination: "/index.html?c=:slug", permanent: false },
     ];
   },
 

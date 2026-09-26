@@ -55,14 +55,15 @@ Directory of approved contributors.
 
 | Param    | Type    | Default | Notes                                     |
 | -------- | ------- | ------- | ----------------------------------------- |
-| `kind`   | enum    | —       | `ministry` \| `organization` \| `business` |
+| `kind`   | enum    | —       | `ministry` \| `organization` \| `business` \| `individual` (mig 173) |
 | `q`      | string  | —       | Case-insensitive match on name / bio      |
 | `limit`  | integer | 50      | 1..100                                    |
 | `offset` | integer | 0       | 0..10000                                  |
 
-`category` (added migration 164) is the map/pin category — an
-EVENT_CATEGORIES or PLACE_CATEGORIES slug, distinct from `contributor_kind`
-(ministry/organization/business). `contributor_hidden` rows (an
+`category` (added migration 164) is the map/pin category. It is one of the 12 Contributor types for new
+listings (`CONTRIBUTOR_TYPES`, CATEGORIES.md); older rows may still carry an EVENT_CATEGORIES or
+PLACE_CATEGORIES slug. It is distinct from `contributor_kind`
+(ministry/organization/business/individual). `contributor_hidden` rows (an
 admin-only moderation flag, also migration 164) are always excluded —
 never exposed in this response.
 

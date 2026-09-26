@@ -98,7 +98,9 @@ test.describe("Kingdom Discovery — v1 self-serve go-live", () => {
     const orgName = "Grace Test Ministry";
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(orgName);
     await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
-    await page.getByRole("button", { name: "Worship & Prayer" }).click();
+    // One of the 12 Contributor types (not an event category) — a NEW slug,
+    // so the whole go-live path below runs on it.
+    await page.getByRole("button", { name: "Retreat / Healing" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
 
     // "Your story" step — bio/website are optional, skip straight through.
