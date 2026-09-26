@@ -44,19 +44,34 @@ Owner signs in with Google (same email) → lands on their dashboard
 4. **Vercel.** citizens-ecosystem-connect → Settings → Environment Variables → add
    `INTAKE_WEBHOOK_SECRET` = *the secret*, for **Production** (and Preview if you like). Then
    **redeploy production**, because env vars only apply to new deployments.
-5. **Paste the script.** In the Sheet, go to Extensions → Apps Script. Delete the placeholder code,
-   paste all of `intake.gs`, and click Save.
+5. **Paste the script.** Open the Apps Script editor **from inside the Sheet** (Extensions → Apps
+   Script). Opening it this way connects it to the Sheet; a project made at script.google.com won't
+   work.
+   - Click into the code area and select everything (Ctrl+A), including the placeholder
+     `function myFunction() { … }`, then delete it.
+   - Paste the **entire contents** of `intake.gs`: all ~370 lines, from the opening `/**` comment to
+     the last `}`. `intake.gs` is the name of the file whose code you paste in. You don't type it
+     anywhere. The file's name in the left sidebar doesn't matter.
+   - Save with Ctrl+S or the disk icon.
 6. **Script properties.** In the Apps Script editor, go to Project Settings (gear) → Script
    properties → Add:
    - `INTAKE_URL` = `https://www.citizenscentral.co.za/api/intake/google-form`. Use it exactly, with
      `www`: the bare domain redirects and a redirect breaks the signed request.
    - `INTAKE_SECRET` = the same secret as in Vercel.
-7. **Run `setup`.** In the editor, choose `setup` in the function dropdown and click **Run**, then
-   approve the permissions. The script needs to see and edit this spreadsheet, read the uploaded files
-   in Drive, connect to an external service, send email as you, and use Google Maps. If Google warns
-   that it "hasn't verified this app": it's your own script, so choose Advanced → Go to … (unsafe).
-8. **Run `testConnection`.** The Sheet should show *"Connected ✓ — the secret matches."* Nothing is
-   created. Any other message says what to fix.
+7. **Run `setup`.** This needs step 2's headers in the Sheet first; `setup` checks them.
+   - In the toolbar above the code, next to **Run** and **Debug**, there's a dropdown. It said
+     `myFunction` before the paste; after saving it lists the script's functions. Pick **`setup`**, then
+     click **Run**.
+   - The first run asks for permission: **Review permissions** → pick your Google account. The script
+     needs to see and edit this spreadsheet, read the uploaded files in Drive, connect to an external
+     service, send email as you, and use Google Maps.
+   - If Google warns that it "hasn't verified this app", that's expected for your own script:
+     **Advanced** → **Go to … (unsafe)** → **Allow**.
+   - Done when the Execution log shows *"Execution completed"* and the Sheet shows a toast, *"Intake is
+     ready."*
+8. **Run `testConnection`** the same way: pick it in the dropdown, then click **Run**. The Sheet should
+   show *"Connected ✓ — the secret matches."* Nothing is created. Any other message says what to fix.
+   This needs `INTAKE_WEBHOOK_SECRET` in Vercel **and a redeploy** (step 4).
 
 ---
 
