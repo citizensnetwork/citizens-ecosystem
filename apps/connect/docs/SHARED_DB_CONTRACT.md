@@ -221,8 +221,8 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 > **2026-09-27: migs 174 / 175 / 176 APPLIED to prod — `public.profiles` PII lockdown.** (177 was
 > then applied after the deploy — entry above.) Pre-apply snapshot:
-> `origin/main` @ `dca4411` (local tag `connect-pre-mig174-profiles-privacy`; the session's git
-> proxy refused tag pushes).
+> `origin/main` @ `dca4411` (tag `connect-pre-mig174-profiles-privacy`; the applying session's git
+> proxy refused the tag push, so it was re-created and pushed on 2026-09-27).
 >
 > **The finding.** "Profiles are viewable by everyone" (`FOR SELECT USING (true)`) + Supabase's
 > default table-level SELECT meant the public anon key could `GET
