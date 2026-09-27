@@ -14,4 +14,9 @@
 // Reproduced locally by re-pointing that hoisted link to 18.3.3 / 19.2.17.
 // Referencing it from here resolves via apps/connect/node_modules, so the
 // augmentation always lands on the copy Connect's own imports use.
+//
+// Since the React-types alignment (RESUME_HERE.md §3AU), root package.json
+// `pnpm.packageExtensions` gives `next` optional peers on @types/react(-dom),
+// so Next's own references resolve to each app's copy too. This file is now
+// belt-and-braces: it keeps Connect's canary types explicit.
 /// <reference types="react/canary" />
