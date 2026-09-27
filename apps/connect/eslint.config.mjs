@@ -18,7 +18,7 @@ const eslintConfig = [
     // frontend (gitignored build output) — same reasoning applies. .claude/** is
     // gitignored session scratch (offload notes, design-reference uploads) —
     // never product code.
-    ignores: [".next/**", "out/**", "build/**", "android/**", "ios/**", "src/frontend/**", "public/**", "mobile-dist/**", ".claude/**", "next-env.d.ts"],
+    ignores: [".next/**", "out/**", "build/**", "android/**", "ios/**", "src/frontend/**", "public/**", "mobile-dist/**", "coverage/**", ".claude/**", "next-env.d.ts"],
   },
 ];
 
