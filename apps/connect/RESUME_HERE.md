@@ -3311,7 +3311,7 @@ that the summary omitted entirely. Working log: `.claude/sessions/osv-scan-26-vu
 
 ---
 
-## 3AS. `public.profiles` PII lockdown — anon could read every user's email; migs 174–176 APPLIED, 177 staged (2026-09-26 → 09-27)
+## 3AS. `public.profiles` PII lockdown — anon could read every user's email; migs 174–177 APPLIED, PR #67 MERGED ✅ (2026-09-26 → 09-27)
 
 Branch `claude/gifted-pasteur-c5jjoh` (restarted from `main` @ `dca4411` after #63/#64 merged).
 Session offload: `.claude/sessions/profiles-pii-column-lockdown.md`. (§3AR = PR #65's OSV/XSS
@@ -3350,7 +3350,7 @@ record, merged mid-session.)
 | 174 | `get_my_profile_private()` (own-row reader), `update_notification_prefs` → SECDEF, `mark_my_terms_accepted()` | ✅ |
 | 175 | `trg_guard_profile_server_columns` (invoker; server-owned cols + DB slug cooldown); INSERT revoked from anon+auth | ✅ |
 | 176 | revoke table SELECT; grant 33 public + **5 transitional** flags the old prod code still reads | ✅ |
-| 177 | revoke the 5 transitional flags | ❌ **apply only after this branch's code is live in prod** |
+| 177 | revoke the 5 transitional flags | ✅ (after PR #67's prod deploy was READY) |
 
 Advisors after: **0 ERROR** / 118 WARN / 3 INFO — only new findings are the 3 intended caller-row
 SECDEF RPC WARNs. (After apply, 176's and 177's header comments were corrected in the repo from "27"
@@ -3370,6 +3370,17 @@ public.profiles;`.
 - `contributor/[handle]/team`: no email in member list or search results; partial email → 400; exact
   match on the service-role client.
 
+### Shipped (founder: "open the PR and complete all the work")
+- **PR #67 MERGED** (merge `6836180`). CI on the final head `c40ab2b`: Verify (format, lint,
+  typecheck, coverage tests, build, OSV) ✅ · **E2E Playwright 13/13** ✅ · CodeQL ✅ · Vercel preview ✅.
+  CodeQL's first run caught **2 high `js/redos` alerts in this PR's own test scanner** (a regex
+  alternation over whitespace / `//…` / `/*…*/` could backtrack exponentially) — replaced by a
+  linear index walk (`selectCallAfter`), mutation checks re-run, alerts auto-closed.
+- Production deploy `dpl_CY4ZnD47wBMXqpAUrUburp1tQnfb` READY on `www.citizenscentral.co.za`
+  (bundle hash = the PR build), `/api/v1/contributors` + `/{slug}` 200, **0 runtime errors**.
+- **Mig 177 then applied**: anon = authenticated = exactly 33 public columns, 28 private denied;
+  advisors unchanged (0 ERROR / 118 / 3). Follow-up PR empties `TRANSITIONAL_UNTIL_177` + these docs.
+
 ### Gates
 lint 12/12 · typecheck 12/12 · test 11/11 (Connect **775 pass / 27 skipped** = the live probe) ·
 build 8/8 · `build-frontend.js` ✅. New tests: `__tests__/security/profiles-column-privacy.test.ts`
@@ -3387,16 +3398,13 @@ Settings-meta read in `store.jsx` (best-effort, in try/catch).
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
-- **`profiles` PII lockdown (§3AS) — the leak is CLOSED live; one step remains.**
-  1. Founder: say the word and a PR is opened for `claude/gifted-pasteur-c5jjoh` (CI + Playwright
-     e2e run on it), then merge.
-  2. Once that production deployment is `READY`, **apply mig 177** (the 5 transitional flags) and
-     empty `TRANSITIONAL_UNTIL_177` in `profiles-column-privacy.live.test.ts`; re-run advisors.
-  3. Until the merge, pre-174 prod code degrades on admin-only / non-critical paths: admin screens
-     that show other users' emails, api-key owner-by-email, the personalization quiz save, and
-     contributors in AI-search results. Sign-in, setup, terms and live location are unaffected.
-  4. Optional: push the local tag `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a
-     machine with tag-push rights.
+- **`profiles` PII lockdown (§3AS) — ✅ DONE.** Migs 174–177 live, PR #67 merged + deployed,
+  follow-up docs PR merged. Only optional leftovers: push the local tag
+  `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a machine with tag-push rights; delete
+  the unused `lib/contributors/pendingApplications.ts` (it embeds `email` and must only ever get a
+  service-role client). **Rule for every future migration (contract R3.5):** a new `profiles`
+  column is PRIVATE until granted — add it to 176-style `grant select (…)` + `profileColumns.ts`
+  if it must be public; a new server-owned column goes into `guard_profile_server_columns()`.
 
 - **Contributor Google Form → map intake:** phases 1–5 **LIVE** — PR #63's broken prod build was
   fixed by PR #64, which is **MERGED** (`dca4411`) with production **READY** on all three apps
