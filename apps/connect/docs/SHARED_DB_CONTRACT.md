@@ -206,10 +206,21 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-09-27, project `xyiajtrvhlxaeplsiajj`, head = **mig 176**; 177 staged)
+## 9. Verification snapshot (updated 2026-09-27, project `xyiajtrvhlxaeplsiajj`, head = **mig 177**)
 
-> **2026-09-27: migs 174 / 175 / 176 APPLIED to prod — `public.profiles` PII lockdown.** 177 is
-> written and **deliberately NOT applied** (contract step — see below). Pre-apply snapshot:
+> **2026-09-27: mig 177 (`profiles_column_privacy_finalize`) APPLIED — the lockdown is complete.**
+> Applied only after PR #67 (merge `6836180`) was deployed to production (`dpl_CY4ZnD47…`, READY on
+> `www.citizenscentral.co.za`, bundle hash matching the PR build, 0 runtime errors, `/api/v1/
+> contributors[/{slug}]` 200). Verified live: anon = authenticated = **exactly the 33 PUBLIC
+> columns**, all **28 private** denied (the 5 former transitional flags included), service_role
+> keeps all 61; the new-code paths (middleware / location / Settings via
+> `get_my_profile_private()`, `mark_my_terms_accepted()`, `update_notification_prefs()`) OK; the
+> old direct-read / `IS NULL`-WHERE shapes now 42501. **Advisors: 0 ERROR / 118 WARN / 3 INFO —
+> identical to post-176.** `TRANSITIONAL_UNTIL_177` in the live probe is now empty.
+> **Next migration # = 178.**
+
+> **2026-09-27: migs 174 / 175 / 176 APPLIED to prod — `public.profiles` PII lockdown.** (177 was
+> then applied after the deploy — entry above.) Pre-apply snapshot:
 > `origin/main` @ `dca4411` (local tag `connect-pre-mig174-profiles-privacy`; the session's git
 > proxy refused tag pushes).
 >
@@ -234,10 +245,9 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 >    **33 PUBLIC** columns + **5 TRANSITIONAL** private flags (`force_reauth_at`,
 >    `bio_setup_required`, `terms_accepted_at`, `location_sharing`, `notification_prefs`) that the
 >    pre-174 production code reads on critical paths (middleware, setup, terms, location).
-> 4. **177 (NOT applied)**: revokes the 5 transitional columns. **Apply only after the matching app
->    code is deployed to production** — otherwise middleware fails closed and signs every
->    cookie-session user out. Then empty `TRANSITIONAL_UNTIL_177` in
->    `profiles-column-privacy.live.test.ts`.
+> 4. **177**: revokes the 5 transitional columns — applied after the app code deployed (entry
+>    above); applying it earlier would have made middleware fail closed and sign every
+>    cookie-session user out.
 >
 > **Verified live** (role-switched probes inside DO blocks that always raise, so nothing
 > persisted; row counts re-checked after):
@@ -259,7 +269,6 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 > **Advisors: 0 ERROR / 118 WARN / 3 INFO.** The only new findings vs the 0/115/3 baseline are the
 > three intentional `authenticated_security_definer_function_executable` WARNs for the caller-row
 > RPCs (`get_my_profile_private`, `mark_my_terms_accepted`, `update_notification_prefs`).
-> **Next migration # = 178** (177 is staged in the repo, not applied).
 
 > **2026-09-26: mig 173 (`contributor_form_intake`) APPLIED to prod** (version `20260926182924`)
 > with the founder's go-ahead. Pre-apply tag: `connect-pre-mig173-form-intake`. Verified live after
