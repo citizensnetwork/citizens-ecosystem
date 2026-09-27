@@ -47,10 +47,10 @@ const HASHED_SINGLE_RE = /^(auth-client|capacitor-bridge)\.[0-9a-f]{10}\.js$/;
 const HASHED_BUNDLE_RE = /^bundle\.[0-9a-f]{10}\.js$/;
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-/** Opening <script> tags (attributes only — bodies are never inspected). */
-const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/g;
+/** Opening <script> tags, any case (attributes only — bodies are never inspected). */
+const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/gi;
 /** A whole external <script …></script> element that declares a production twin. */
-const PROD_TWIN_TAG_RE = /<script\b([^>]*\bdata-prod-[^>]*)><\/script>/g;
+const PROD_TWIN_TAG_RE = /<script\b([^>]*\bdata-prod-[^>]*)>\s*<\/script\s*>/gi;
 /** HTML attributes as the frontends write them: bare booleans or double-quoted values. */
 const ATTR_RE = /([^\s="]+)(?:\s*=\s*"([^"]*)")?/g;
 /** unpkg / jsDelivr npm URLs → package name (scoped or not), version, file path. */
@@ -79,11 +79,29 @@ function attrValue(attrs, name) {
   return found ? found[1] : undefined;
 }
 
-/** Nearest node_modules/<name> walking up from `fromDir` (Node's lookup, minus `exports`). */
-function resolvePackageDir(fromDir, name) {
+/**
+ * Read a file in ONE step (no exists/stat check first — that is a
+ * check-then-use race). Returns null only when there is no regular file at
+ * that path; any other failure (permissions, I/O) is rethrown.
+ */
+function readFileOrNull(file, encoding) {
+  try {
+    return fs.readFileSync(file, encoding);
+  } catch (err) {
+    if (['ENOENT', 'EISDIR', 'ENOTDIR'].includes(err.code)) return null;
+    throw err;
+  }
+}
+
+/**
+ * Nearest node_modules/<name> walking up from `fromDir` (Node's lookup, minus
+ * `exports`) → { dir, version } of the installed package, or null.
+ */
+function resolveInstalledPackage(fromDir, name) {
   for (let dir = fromDir; ; dir = path.dirname(dir)) {
-    const candidate = path.join(dir, 'node_modules', ...name.split('/'));
-    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    const pkgDir = path.join(dir, 'node_modules', ...name.split('/'));
+    const manifest = readFileOrNull(path.join(pkgDir, 'package.json'), 'utf8');
+    if (manifest !== null) return { dir: pkgDir, version: JSON.parse(manifest).version };
     if (path.dirname(dir) === dir) return null;
   }
 }
@@ -129,26 +147,23 @@ function verifyCdnIntegrity(html, { rootDir, packages }) {
       if (!filePath || filePath.endsWith('/')) {
         fail('name an explicit file path — a bare package URL lets the CDN pick the file');
       }
-      const pkgDir = resolvePackageDir(rootDir, name);
-      if (!pkgDir) {
+      const pkg = resolveInstalledPackage(rootDir, name);
+      if (!pkg) {
         fail(
           `${name} is not installed — add it as a dependency so its lockfile-pinned bytes vouch for the hash`,
         );
       }
-      const installed = JSON.parse(
-        fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'),
-      ).version;
-      if (version !== installed) {
+      if (version !== pkg.version) {
         fail(
-          `pins ${name}@${version} but the lockfile installs ${installed} — move the URL to @${installed} and update ${integrityAttr}`,
+          `pins ${name}@${version} but the lockfile installs ${pkg.version} — move the URL to @${pkg.version} and update ${integrityAttr}`,
         );
       }
-      const file = path.join(pkgDir, ...filePath.split('/'));
-      const stat = fs.statSync(file, { throwIfNoEntry: false });
-      if (!file.startsWith(pkgDir + path.sep) || !stat || !stat.isFile()) {
-        fail(`${filePath} does not exist in the installed ${name}@${installed}`);
+      const file = path.join(pkg.dir, ...filePath.split('/'));
+      const bytes = file.startsWith(pkg.dir + path.sep) ? readFileOrNull(file) : null;
+      if (bytes === null) {
+        fail(`${filePath} does not exist in the installed ${name}@${pkg.version}`);
       }
-      const expected = sriOf(fs.readFileSync(file));
+      const expected = sriOf(bytes);
       const actual = attrValue(attrs, integrityAttr);
       if (actual !== expected) {
         fail(

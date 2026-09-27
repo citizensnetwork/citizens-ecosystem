@@ -455,6 +455,31 @@ describe('verifyCdnIntegrity', () => {
     expect(() => verify(html, ['react-dom'])).toThrow(/react-dom is not installed/);
   });
 
+  it('checks tags written in any case (no <SCRIPT> bypass)', () => {
+    const upper = `<SCRIPT SRC="${SUPA_URL}" INTEGRITY="${sri('tampered')}" CROSSORIGIN="anonymous"></SCRIPT>`;
+    expect(() => verify(upper, ['@supabase/supabase-js'])).toThrow(/does not match/);
+    const ok = `<SCRIPT SRC="${SUPA_URL}" INTEGRITY="${sri(SUPA_UMD)}" CROSSORIGIN="anonymous"></SCRIPT>`;
+    expect(verify(ok, ['@supabase/supabase-js'])).toHaveLength(1);
+  });
+
+  it('rethrows read failures other than "no such file" instead of masking them', () => {
+    const realRead = fs.readFileSync;
+    const spy = vi.spyOn(fs, 'readFileSync').mockImplementation(((
+      file: fs.PathOrFileDescriptor,
+      ...rest: unknown[]
+    ) => {
+      if (String(file).endsWith('supabase.js')) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      }
+      return (realRead as (...a: unknown[]) => unknown)(file, ...rest);
+    }) as typeof fs.readFileSync);
+    try {
+      expect(() => verify(supaTag(), ['@supabase/supabase-js'])).toThrow(/EACCES/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('rejects a listed package that index.html never loads', () => {
     expect(() => verify(supaTag())).toThrow(/sriPackages lists "react" but index\.html has no/);
   });
@@ -474,6 +499,13 @@ describe('rewriteIndexHtml — production twins', () => {
     );
     expect(html).not.toContain('react.development.js');
     expect(html).not.toContain('data-prod-');
+  });
+
+  it('swaps upper-case tags and a spaced closing tag too', () => {
+    const tag = `<SCRIPT SRC="${REACT_DEV_URL}" DATA-PROD-SRC="${REACT_PROD_URL}" DATA-PROD-INTEGRITY="${sri(REACT_PROD)}"></script >`;
+    expect(rewriteIndexHtml(tag, files)).toBe(
+      `<script src="${REACT_PROD_URL}" integrity="${sri(REACT_PROD)}" crossorigin="anonymous"></script>`,
+    );
   });
 
   it('forces crossorigin="anonymous" on the twin even when the dev tag omitted it', () => {
@@ -534,6 +566,11 @@ describe('buildFrontend — CDN scripts', () => {
       buildFrontend(makeOptions(rootDir, { sriPackages: ['@supabase/supabase-js'] })),
     ).toThrow(/does not match the installed package bytes/);
     expect(fs.existsSync(path.join(rootDir, 'public'))).toBe(false);
+  });
+
+  it('refuses an upper-case development tag too', () => {
+    withCdnTags(`<SCRIPT SRC="${REACT_DEV_URL}"></SCRIPT>`);
+    expect(() => buildFrontend(makeOptions(rootDir))).toThrow(/still loads a development build/);
   });
 
   it('refuses to ship a development build that declares no production twin', () => {
