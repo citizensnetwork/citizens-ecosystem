@@ -17,8 +17,13 @@
  *   3. minify + hash auth-client.js; bundle + hash capacitor-bridge.js
  *      (the one real-ESM file — it imports @capacitor/* packages)
  *   4. rewrite index.html onto the hashed outputs (Babel CDN tag dropped,
- *      Capacitor bridge loaded BEFORE auth-client so window.Cap* exists)
+ *      Capacitor bridge loaded BEFORE auth-client so window.Cap* exists,
+ *      development CDN builds swapped for their declared production twins)
  *   5. generate config.js from env vars (credentials never enter git)
+ *
+ * Before any of that, the CDN <script> tags of the host's `sriPackages` are
+ * checked against the lockfile-installed npm packages (exact version + SRI
+ * hash), so the browser can never run different bytes than CI scanned.
  *
  * DESIGN CONSTRAINT — the host injects its own esbuild instance
  * (`options.esbuild`). Connect pins esbuild 0.28.x, Wear 0.25.x; injection
@@ -42,9 +47,175 @@ const HASHED_SINGLE_RE = /^(auth-client|capacitor-bridge)\.[0-9a-f]{10}\.js$/;
 const HASHED_BUNDLE_RE = /^bundle\.[0-9a-f]{10}\.js$/;
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
+/** Opening <script> tags (attributes only — bodies are never inspected). */
+const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/g;
+/** A whole external <script …></script> element that declares a production twin. */
+const PROD_TWIN_TAG_RE = /<script\b([^>]*\bdata-prod-[^>]*)><\/script>/g;
+/** HTML attributes as the frontends write them: bare booleans or double-quoted values. */
+const ATTR_RE = /([^\s="]+)(?:\s*=\s*"([^"]*)")?/g;
+/** unpkg / jsDelivr npm URLs → package name (scoped or not), version, file path. */
+const NPM_CDN_URL_RE =
+  /^https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net\/npm)\/((?:@[^/@]+\/)?[^/@]+)(?:@([^/]*))?(\/[^?#]*)?$/;
+const EXACT_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const DEVELOPMENT_BUILD_RE = /\.development\.(?:min\.)?js(?:[?#]|$)/;
+
 /** First 10 hex chars of the content's SHA-256 — the content-hash used in filenames. */
 function hashOf(content) {
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 10);
+}
+
+/** Subresource Integrity value (sha384, base64) of a file's exact bytes. */
+function sriOf(content) {
+  return `sha384-${crypto.createHash('sha384').update(content).digest('base64')}`;
+}
+
+/** Parse an attribute string into ordered [name, value] pairs (value undefined for booleans). */
+function parseAttrs(attrText) {
+  return Array.from(attrText.matchAll(ATTR_RE), (m) => [m[1].toLowerCase(), m[2]]);
+}
+
+function attrValue(attrs, name) {
+  const found = attrs.find(([n]) => n === name);
+  return found ? found[1] : undefined;
+}
+
+/** Nearest node_modules/<name> walking up from `fromDir` (Node's lookup, minus `exports`). */
+function resolvePackageDir(fromDir, name) {
+  for (let dir = fromDir; ; dir = path.dirname(dir)) {
+    const candidate = path.join(dir, 'node_modules', ...name.split('/'));
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    if (path.dirname(dir) === dir) return null;
+  }
+}
+
+/**
+ * Check every unpkg/jsDelivr <script> URL (`src` and `data-prod-src`) of the
+ * listed npm packages against the copy the lockfile installed:
+ *   - the URL pins an EXACT version equal to the installed version — a
+ *     floating range (`@2`) can serve code the lockfile never saw, which
+ *     OSV-Scanner therefore never scanned;
+ *   - it names an explicit file, and that file exists in the installed package;
+ *   - its integrity hash equals sha384 of that installed file — pnpm verified
+ *     those bytes against the lockfile's sha512, so a mistyped or stale hash
+ *     fails the BUILD instead of blanking the app in users' browsers;
+ *   - a `src` tag carries crossorigin="anonymous" (without CORS mode the
+ *     browser cannot check SRI on a cross-origin script and blocks it).
+ * Every listed package must appear at least once, so a reworded tag can't
+ * silently turn the check into a no-op. Returns what was verified.
+ */
+function verifyCdnIntegrity(html, { rootDir, packages }) {
+  const wanted = new Set(packages);
+  const seen = new Set();
+  const verified = [];
+  for (const [, attrText] of html.matchAll(SCRIPT_OPEN_TAG_RE)) {
+    const attrs = parseAttrs(attrText);
+    for (const [srcAttr, integrityAttr] of [
+      ['src', 'integrity'],
+      ['data-prod-src', 'data-prod-integrity'],
+    ]) {
+      const url = attrValue(attrs, srcAttr);
+      const match = url && NPM_CDN_URL_RE.exec(url);
+      if (!match || !wanted.has(match[1])) continue;
+      const [, name, version, filePath] = match;
+      seen.add(name);
+      const fail = (reason) => {
+        throw new Error(`[frontend-build] index.html ${srcAttr}="${url}": ${reason}`);
+      };
+      if (!version || !EXACT_VERSION_RE.test(version)) {
+        fail(
+          `pin an exact version (${name}@x.y.z) — a floating range can serve code the lockfile never saw`,
+        );
+      }
+      if (!filePath || filePath.endsWith('/')) {
+        fail('name an explicit file path — a bare package URL lets the CDN pick the file');
+      }
+      const pkgDir = resolvePackageDir(rootDir, name);
+      if (!pkgDir) {
+        fail(
+          `${name} is not installed — add it as a dependency so its lockfile-pinned bytes vouch for the hash`,
+        );
+      }
+      const installed = JSON.parse(
+        fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'),
+      ).version;
+      if (version !== installed) {
+        fail(
+          `pins ${name}@${version} but the lockfile installs ${installed} — move the URL to @${installed} and update ${integrityAttr}`,
+        );
+      }
+      const file = path.join(pkgDir, ...filePath.split('/'));
+      const stat = fs.statSync(file, { throwIfNoEntry: false });
+      if (!file.startsWith(pkgDir + path.sep) || !stat || !stat.isFile()) {
+        fail(`${filePath} does not exist in the installed ${name}@${installed}`);
+      }
+      const expected = sriOf(fs.readFileSync(file));
+      const actual = attrValue(attrs, integrityAttr);
+      if (actual !== expected) {
+        fail(
+          `${integrityAttr}="${actual || ''}" does not match the installed package bytes — expected ${integrityAttr}="${expected}"`,
+        );
+      }
+      if (srcAttr === 'src' && attrValue(attrs, 'crossorigin') !== 'anonymous') {
+        fail(
+          'add crossorigin="anonymous" — the browser blocks a cross-origin script whose SRI it cannot check',
+        );
+      }
+      verified.push({ name, version, file: filePath });
+    }
+  }
+  for (const name of wanted) {
+    if (!seen.has(name)) {
+      throw new Error(
+        `[frontend-build] sriPackages lists "${name}" but index.html has no unpkg/jsDelivr <script> for it`,
+      );
+    }
+  }
+  return verified;
+}
+
+/**
+ * Swap each development CDN tag for its declared production twin (pure):
+ *   <script src="…/react.development.js" integrity="sha384-A" crossorigin="anonymous"
+ *           data-prod-src="…/react.production.min.js" data-prod-integrity="sha384-B"></script>
+ * becomes <script src="…/react.production.min.js" integrity="sha384-B" crossorigin="anonymous">.
+ * Local no-build dev (raw src/frontend) keeps the development build and its
+ * warnings; only the built output changes — the same split as the Babel strip.
+ */
+function swapProductionTwins(html) {
+  return html.replace(PROD_TWIN_TAG_RE, (tag, attrText) => {
+    const attrs = parseAttrs(attrText);
+    const prodSrc = attrValue(attrs, 'data-prod-src');
+    const prodIntegrity = attrValue(attrs, 'data-prod-integrity');
+    if (!prodSrc || !prodIntegrity) {
+      throw new Error(
+        `[frontend-build] ${tag} — data-prod-src and data-prod-integrity must be declared together (a production CDN script needs its own SRI hash)`,
+      );
+    }
+    const replaced = new Set([
+      'src',
+      'integrity',
+      'crossorigin',
+      'data-prod-src',
+      'data-prod-integrity',
+    ]);
+    const rest = attrs
+      .filter(([name]) => !replaced.has(name))
+      .map(([name, value]) => (value === undefined ? ` ${name}` : ` ${name}="${value}"`))
+      .join('');
+    return `<script src="${prodSrc}" integrity="${prodIntegrity}" crossorigin="anonymous"${rest}></script>`;
+  });
+}
+
+/** Built output must never ship a `*.development.js` script (e.g. React's dev UMD build). */
+function assertNoDevelopmentScripts(html) {
+  for (const [, attrText] of html.matchAll(SCRIPT_OPEN_TAG_RE)) {
+    const src = attrValue(parseAttrs(attrText), 'src');
+    if (src && DEVELOPMENT_BUILD_RE.test(src)) {
+      throw new Error(
+        `[frontend-build] built index.html still loads a development build: ${src} — declare its production twin with data-prod-src + data-prod-integrity`,
+      );
+    }
+  }
 }
 
 /**
@@ -174,10 +345,15 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  * Rewrite index.html (pure): drop the Babel-standalone CDN script + the
  * `type="text/babel" ... ?v=` tags + the `?v=`-suffixed auth-client tag,
  * replace with plain hashed <script> tags (bridge first — window.Cap* must
- * exist before auth-client.js runs).
+ * exist before auth-client.js runs), and swap development CDN builds for
+ * their declared production twins. A raw capacitor-bridge.js tag (kept in
+ * the source for no-build dev) is dropped: the raw file is never copied to
+ * the output, so it would only 404 next to the hashed bridge.
  */
 function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }) {
   html = html.replace(/^\s*<script src="https:\/\/unpkg\.com\/@babel\/standalone[^\n]*\n/m, '');
+  html = html.replace(/^\s*<script src="capacitor-bridge\.js(?:\?v=[^"]*)?"><\/script>\n?/gm, '');
+  html = swapProductionTwins(html);
 
   html = html.replace(
     /<script src="auth-client\.js\?v=[^"]*"><\/script>/,
@@ -256,6 +432,16 @@ function assertOptions(options) {
   if (!Array.isArray(configVars) || configVars.length === 0) {
     throw new TypeError('[frontend-build] options.configVars must be a non-empty array');
   }
+  const { sriPackages } = options;
+  if (
+    sriPackages !== undefined &&
+    (!Array.isArray(sriPackages) ||
+      sriPackages.some((p) => typeof p !== 'string' || p.length === 0))
+  ) {
+    throw new TypeError(
+      '[frontend-build] options.sriPackages must be an array of npm package names (e.g. ["react", "@supabase/supabase-js"])',
+    );
+  }
 }
 
 /**
@@ -277,6 +463,7 @@ function buildFrontend(options) {
     extraSpecialFiles = [],
     mobileRequiredKeys = [],
     mobileMissingLabel = 'required',
+    sriPackages = [],
     env = process.env,
     log = console.log,
     warn = console.warn,
@@ -286,18 +473,28 @@ function buildFrontend(options) {
   const special = new Set([...DEFAULT_SPECIAL_FILES, ...extraSpecialFiles]);
   const srcLabel = path.relative(rootDir, srcDir).split(path.sep).join('/');
 
+  // Fail fast, before anything is written: CDN pins/hashes vs the lockfile,
+  // and no development build may survive the production-twin swap.
+  const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
+  const sriVerified = verifyCdnIntegrity(html, { rootDir, packages: sriPackages });
+  assertNoDevelopmentScripts(swapProductionTwins(html));
+
   cleanHashedOutputs(dest);
   copyDir(srcDir, dest, special);
   const bundleFile = buildAppBundle({ esbuild, srcDir, dest, appFileOrder, warn });
   const authClientFile = buildAuthClient({ esbuild, srcDir, dest });
   const capacitorBridgeFile = buildCapacitorBridge({ esbuild, srcDir, dest });
 
-  const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
   fs.writeFileSync(
     path.join(dest, 'index.html'),
     rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }),
   );
 
+  if (sriVerified.length > 0) {
+    const pinned = [...new Set(sriVerified.map((v) => `${v.name}@${v.version}`))].join(', ');
+    const count = `${sriVerified.length} CDN SRI hash${sriVerified.length === 1 ? '' : 'es'}`;
+    log(`[build-frontend] Verified ${count} against installed ${pinned}`);
+  }
   log(`[build-frontend] Copied ${srcLabel}/ → ${path.basename(dest)}/`);
   log(`[build-frontend] Compiled ${appFileOrder.length} screens → app/${bundleFile}`);
   log(`[build-frontend] Compiled auth-client.js → ${authClientFile}`);
@@ -319,7 +516,7 @@ function buildFrontend(options) {
     `[build-frontend] Generated ${path.basename(dest)}/config.js (API_BASE_URL=${config.API_BASE_URL || "'' (same-origin)"})`,
   );
 
-  return { dest, bundleFile, authClientFile, capacitorBridgeFile, config };
+  return { dest, bundleFile, authClientFile, capacitorBridgeFile, config, sriVerified };
 }
 
 module.exports = {
@@ -329,4 +526,6 @@ module.exports = {
   renderConfigJs,
   resolveConfigValues,
   rewriteIndexHtml,
+  sriOf,
+  verifyCdnIntegrity,
 };
