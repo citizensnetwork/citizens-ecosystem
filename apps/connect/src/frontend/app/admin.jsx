@@ -194,6 +194,11 @@
     const name = row.full_name || 'this listing';
     const kind = CONTRIBUTOR_KINDS.find((k) => k.value === row.contributor_kind);
     const awaitingOwner = row.contributor_claim_email && !row.contributor_claimed_at;
+    // A listing claimed from a DIFFERENT account (claim_admin_created_contributor)
+    // was copied onto the owner and this placeholder hidden with its slug
+    // cleared — the live listing is the owner's row. Unhiding it would publish
+    // a slug-less duplicate, so it gets no toggle.
+    const movedToOwner = hidden && !row.contributor_slug && !!row.contributor_claimed_at;
     return h('div', { className: 'bg-card rounded-2xl border border-border p-3', 'data-listing': row.contributor_slug || row.id },
       h('div', { className: 'flex items-center gap-3' },
         h(Avatar, { src: row.avatar_url, name: row.full_name, size: 40, rounded: 'xl' }),
@@ -208,8 +213,10 @@
             kind && h('span', null, kind.label),
             row.contributor_slug && h('a', { href: '/c/' + row.contributor_slug, target: '_blank', rel: 'noopener noreferrer', className: 'text-gold-dark hover:underline' }, '/c/' + row.contributor_slug),
             awaitingOwner && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Clock', size: 9 }), 'Awaiting owner sign-in · ' + row.contributor_claim_email),
-            row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
-        !confirming && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide')),
+            movedToOwner
+              ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))
+              : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
+        !confirming && !movedToOwner && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide')),
       confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
         h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
           ? 'Put ' + name + ' back on the map and in Kingdom Discovery?'

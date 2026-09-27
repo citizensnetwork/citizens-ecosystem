@@ -39,6 +39,22 @@ const HIDDEN_LISTING = {
   created_at: "2026-09-19T08:00:00Z",
 };
 
+// Claimed from a different account: the listing now lives on the owner's row;
+// this hidden, slug-less placeholder must not be unhidden into a duplicate.
+const MOVED_PLACEHOLDER = {
+  id: "88888888-8888-4888-8888-888888888888",
+  full_name: "Hope Harvest Outreach",
+  avatar_url: null,
+  role: "contributor",
+  contributor_kind: "organization",
+  contributor_status: "approved",
+  contributor_slug: null,
+  contributor_hidden: true,
+  contributor_claim_email: null,
+  contributor_claimed_at: "2026-09-21T09:00:00Z",
+  created_at: "2026-09-18T08:00:00Z",
+};
+
 test.describe("Admin → Listings", () => {
   test.use({ bypassCSP: true });
 
@@ -59,7 +75,7 @@ test.describe("Admin → Listings", () => {
       }
       listQueries.push(params);
       return route.fulfill({
-        json: { data: [FORM_LISTING, HIDDEN_LISTING], meta: { page: 1, pageSize: 20, total: 2 } },
+        json: { data: [FORM_LISTING, HIDDEN_LISTING, MOVED_PLACEHOLDER], meta: { page: 1, pageSize: 20, total: 3 } },
       });
     });
     await page.route("**/api/admin/contributors/hide", (route: Route) => {
@@ -85,6 +101,9 @@ test.describe("Admin → Listings", () => {
     await expect(hidden.getByText("HIDDEN", { exact: true })).toBeVisible();
     await expect(hidden.getByText(/Owner signed in/)).toBeVisible();
     expect(listQueries[0]?.get("page")).toBe("1");
+    const moved = page.locator(`[data-listing="${MOVED_PLACEHOLDER.id}"]`);
+    await expect(moved.getByText(/Moved to its owner's account/)).toBeVisible();
+    await expect(moved.getByRole("button")).toHaveCount(0);
 
     // Hide is two-step: nothing is sent until it's confirmed.
     await form.getByRole("button", { name: "Hide" }).click();
