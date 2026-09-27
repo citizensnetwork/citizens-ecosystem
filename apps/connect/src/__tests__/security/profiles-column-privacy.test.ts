@@ -159,8 +159,6 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/admin/pending-elevations/route.ts": ["email"],
   // `admin` = createAdminClient(); fan-out mute filter for broadcast pushes
   "app/api/contributor/[handle]/broadcasts/route.ts": ["muted_source_ids"],
-  // Unused helper whose caller must pass the service-role client.
-  "lib/contributors/pendingApplications.ts": ["email"],
 };
 
 /**

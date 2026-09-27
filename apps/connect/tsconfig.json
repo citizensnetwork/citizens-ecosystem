@@ -16,12 +16,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    // false, not the create-next-app default: Vercel restores .next/cache (incl.
-    // tsbuildinfo) from the *previous* deployment on this lane. When prod's last
-    // cache is many commits behind the build being deployed, tsc trusted stale
-    // incremental state and threw a phantom "no exported member" on unchanged,
-    // valid code (2026-09-26 prod build of PR #63 — passed on every preview build
-    // of the identical tree, and locally, because those caches stayed self-consistent).
+    // false (not the create-next-app default): Vercel builds are ephemeral, so an
+    // incremental tsbuildinfo buys nothing. NOTE: this was first blamed for the
+    // phantom "Module 'react' has no exported member 'cache'" build failures
+    // (§3AQ) — the real cause was pnpm hoisting a different @types/react for
+    // Next's shared install; fixed by src/types/react-canary.d.ts (§3AS).
     "incremental": false,
     "plugins": [
       {

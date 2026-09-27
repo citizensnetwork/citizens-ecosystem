@@ -16,17 +16,12 @@ const URL_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
- * Still granted by mig 176 so pre-174 production code keeps working; mig 177
- * revokes them once the new code is deployed. EMPTY THIS LIST in the change
- * that applies 177 — from then on they must be denied like the rest.
+ * Private columns temporarily still granted during a rollout (mig 176 kept
+ * five while pre-174 code was live). Empty since mig 177 (2026-09-27): every
+ * private column must be denied. Only ever non-empty between an expand and
+ * its contract migration.
  */
-const TRANSITIONAL_UNTIL_177 = new Set<string>([
-  "force_reauth_at",
-  "bio_setup_required",
-  "terms_accepted_at",
-  "location_sharing",
-  "notification_prefs",
-]);
+const TRANSITIONAL_UNTIL_177 = new Set<string>([]);
 
 async function anonGet(path: string): Promise<{ status: number; code?: string }> {
   const res = await fetch(`${URL_BASE}/rest/v1/${path}`, {
