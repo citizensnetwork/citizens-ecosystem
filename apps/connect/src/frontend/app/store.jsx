@@ -1972,12 +1972,14 @@
       let active = true;
       (async () => {
         try {
-          const { data } = await sb
-            .from('profiles')
-            .select('bio, discoverable, notification_prefs')
-            .eq('id', realUser.id)
-            .maybeSingle();
-          if (active && data) setMyProfileMeta({ bio: data.bio || '', discoverable: data.discoverable !== false, notificationPrefs: data.notification_prefs || {} });
+          // notification_prefs is a private column (migs 176/177): it comes
+          // from the caller-row RPC; bio/discoverable are public.
+          const [pub, priv] = await Promise.all([
+            sb.from('profiles').select('bio, discoverable').eq('id', realUser.id).maybeSingle(),
+            sb.rpc('get_my_profile_private').select('notification_prefs').maybeSingle(),
+          ]);
+          const data = pub.data;
+          if (active && data) setMyProfileMeta({ bio: data.bio || '', discoverable: data.discoverable !== false, notificationPrefs: (priv.data && priv.data.notification_prefs) || {} });
         } catch (e) { /* meta is best-effort */ }
       })();
       return () => { active = false; };

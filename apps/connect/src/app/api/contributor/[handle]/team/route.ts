@@ -11,11 +11,12 @@ type ValidRole = (typeof VALID_ROLES)[number];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Deliberately no `email`: it is a private profiles column (mig 176) and a
+// search result must never disclose another user's address.
 interface ProfileSearchRow {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
-  email: string | null;
 }
 
 /** GET /api/contributor/[handle]/team */
@@ -37,7 +38,7 @@ export async function GET(
     supabase
       .from("team_memberships")
       .select(
-        "id, member_id, role, status, created_at, member:profiles!team_memberships_member_id_fkey(full_name, avatar_url, email)"
+        "id, member_id, role, status, created_at, member:profiles!team_memberships_member_id_fkey(full_name, avatar_url)"
       )
       .eq("contributor_id", contributorId)
       .in("status", ["active", "pending"])
@@ -101,8 +102,12 @@ export async function POST(
     const nameQuery = typeof raw.name === "string"
       ? sanitiseLike(raw.name).slice(0, 100)
       : "";
+    // Exact address only (no partial match): the lookup must not become a
+    // way to enumerate other users' emails. Not run through sanitiseLike —
+    // that strips `_`, which is legal in an address. Length-capped before
+    // the regex.
     const emailQuery = typeof raw.email === "string"
-      ? sanitiseLike(raw.email.toLowerCase()).slice(0, 200)
+      ? raw.email.trim().toLowerCase().slice(0, 254)
       : "";
     const idQuery = typeof raw.user_id === "string" ? raw.user_id.trim() : "";
 
@@ -117,9 +122,11 @@ export async function POST(
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
 
-    if (emailQuery && !EMAIL_RE.test(emailQuery) && emailQuery.length < 3) {
-      // Allow short partial substrings (>=3 chars) but reject 1-2 char noise.
-      return NextResponse.json({ error: "Email search too short" }, { status: 400 });
+    if (emailQuery && !EMAIL_RE.test(emailQuery)) {
+      return NextResponse.json(
+        { error: "Enter the person's full email address" },
+        { status: 400 }
+      );
     }
 
     // Fire each scoped query in parallel; PostgREST `or()` here would force a
@@ -130,7 +137,7 @@ export async function POST(
       queries.push(
         supabase
           .from("profiles")
-          .select("id, full_name, avatar_url, email")
+          .select("id, full_name, avatar_url")
           .eq("id", idQuery)
           .neq("id", contributorId)
           .limit(1)
@@ -139,12 +146,16 @@ export async function POST(
     }
     if (emailQuery) {
       queries.push(
-        supabase
+        // Filtering on `email` needs SELECT on it (private, mig 176):
+        // checkDashboardAccess() above is the authorisation; the
+        // service-role client only runs this exact-match lookup and the
+        // select never returns the address.
+        createAdminClient()
           .from("profiles")
-          .select("id, full_name, avatar_url, email")
-          .ilike("email", `%${emailQuery}%`)
+          .select("id, full_name, avatar_url")
+          .eq("email", emailQuery)
           .neq("id", contributorId)
-          .limit(10)
+          .limit(1)
           .returns<ProfileSearchRow[]>()
       );
     }
@@ -152,7 +163,7 @@ export async function POST(
       queries.push(
         supabase
           .from("profiles")
-          .select("id, full_name, avatar_url, email")
+          .select("id, full_name, avatar_url")
           .ilike("full_name", `%${nameQuery}%`)
           .neq("id", contributorId)
           .limit(10)

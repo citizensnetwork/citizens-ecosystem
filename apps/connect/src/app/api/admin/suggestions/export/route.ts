@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { sanitiseExportFilename } from "@/lib/analytics/csv";
 import { buildXlsx, type XlsxCell } from "@/lib/analytics/xlsx";
@@ -68,7 +69,10 @@ export async function GET(request: NextRequest) {
     ? (formatRaw as ValidFormat)
     : "csv";
 
-  let query = supabase
+  // The submitter embed includes `email`, a private profiles column (mig
+  // 176). The admin role check above is the authorisation; the service-role
+  // client only performs this admin-gated read.
+  let query = createAdminClient()
     .from("suggestions")
     .select(
       "id, created_at, status, title, body, page_url, user_id, admin_response, resolved_at, resolved_by, user:profiles!suggestions_user_id_fkey(full_name, email)",

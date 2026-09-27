@@ -9,6 +9,7 @@
  */
 
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/adminGuard";
 
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
   const guard = await requireAdmin(supabase);
   if (!guard.ok) return guard.deny;
 
-  const { data, error } = await supabase
+  // The applicant embed includes `email`, a private profiles column (mig
+  // 176). requireAdmin() above is the authorisation; the service-role
+  // client only performs this admin-gated read.
+  const { data, error } = await createAdminClient()
     .from("contributor_applications")
     .select(
       "id, user_id, display_name, contributor_kind, bio, website_url, instagram_handle, facebook_url, tiktok_handle, youtube_url, physical_address, logo_url, motivation_text, submitted_at, status, profiles:contributor_applications_user_id_fkey(email, full_name, avatar_url)",

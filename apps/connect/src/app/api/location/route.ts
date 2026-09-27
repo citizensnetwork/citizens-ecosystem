@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user has location sharing enabled
+    // location_sharing is a private column (migs 176/177): caller-row RPC.
     const { data: profile } = await supabase
-      .from("profiles")
+      .rpc("get_my_profile_private")
       .select("location_sharing")
-      .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile?.location_sharing) {
       return NextResponse.json(
