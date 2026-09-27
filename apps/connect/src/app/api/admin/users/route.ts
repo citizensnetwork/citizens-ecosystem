@@ -1,5 +1,5 @@
 /**
- * GET   /api/admin/users?q=&page=&status=    — paginated user list (admin-only)
+ * GET   /api/admin/users?q=&page=&status=&role= — paginated user list (admin-only)
  * PATCH /api/admin/users                     — update role + contributor_status
  *
  * Guards:
@@ -62,15 +62,18 @@ export async function GET(request: NextRequest) {
   const pageRaw = parseInt(url.searchParams.get("page") ?? "1", 10);
   const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(pageRaw, 500)) : 1;
   const status = url.searchParams.get("status");
+  const role = url.searchParams.get("role");
 
   const offset = (page - 1) * PAGE_SIZE;
-  // `email` is a private profiles column (mig 176) — not readable by the
-  // caller's own client. requireAdmin() above is the authorisation; the
-  // service-role client only performs this admin-gated read.
+  // `email` and the claim columns are private profiles columns (mig 176) —
+  // not readable by the caller's own client. requireAdmin() above is the
+  // authorisation; the service-role client only performs this admin-gated
+  // read. The hidden/claim columns feed the admin Listings tab (hide a
+  // listing, see whether its owner has signed in yet).
   let query = createAdminClient()
     .from("profiles")
     .select(
-      "id, email, full_name, avatar_url, role, contributor_kind, contributor_status, contributor_slug, created_at",
+      "id, email, full_name, avatar_url, role, contributor_kind, contributor_status, contributor_slug, contributor_hidden, contributor_claim_email, contributor_claimed_at, created_at",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -84,6 +87,9 @@ export async function GET(request: NextRequest) {
   }
   if (status === "pending" || status === "approved" || status === "rejected") {
     query = query.eq("contributor_status", status);
+  }
+  if (ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])) {
+    query = query.eq("role", role as (typeof ALLOWED_ROLES)[number]);
   }
 
   const { data, error, count } = await query;
