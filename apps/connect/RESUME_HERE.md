@@ -3425,6 +3425,18 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
   guard) → now case-insensitive; and stat/exists-then-read was a TOCTOU race → single-step
   `readFileOrNull` (only ENOENT/EISDIR/ENOTDIR = absent; other I/O errors rethrown). +4 tests (55).
   Founder turned on Auto-fix + asked to merge once green.
+- **CI then went red on Connect typecheck — `resolveSlug.ts: Module "react" has no exported member
+  'cache'` — the SAME "phantom" as §3AQ, on untouched code. REAL ROOT CAUSE found (corrects §3AQ):**
+  with @types/react 18, `cache` only exists once `react/canary`/`experimental` is loaded; Next's types
+  reference `react/experimental`, and tsc resolves that from inside the pnpm store via pnpm's **hidden
+  hoist** (`node_modules/.pnpm/node_modules/@types/react`), which holds whichever ONE of the repo's
+  three @types/react (Connect 18.3.31, Wear 18.3.3, Vision 19.2.17) pnpm hoisted — so identical code
+  flipped green/red between installs. **Reproduced locally** by re-pointing that hoist at 18.3.3 and
+  at 19.2.17 (exact CI error both times). **Fix:** `apps/connect/src/types/react-canary.d.ts` →
+  `/// <reference types="react/canary" />`, which resolves through `apps/connect/node_modules`
+  (Connect's own pinned copy). Proven: connect/wear/vision `tsc` green under **all 3** hoists. §3AQ's
+  stale-tsbuildinfo diagnosis was most likely coincidental (`incremental: false` is harmless; kept).
+- Merged `main` (PR #67 landed meanwhile — its RESUME section also took §3AS, hence this is §3AT).
 
 ### Gates + verification (final tree)
 - Root `format:check` · `lint` 12/12 · `typecheck` 12/12 · `test` 11/11 (Connect 759, Vision 734, Wear 115,
