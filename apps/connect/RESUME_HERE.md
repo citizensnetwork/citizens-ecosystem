@@ -3399,8 +3399,10 @@ same commit built locally and in GitHub CI. §3AQ blamed a stale `tsc` increment
 - **Fix:** `apps/connect/src/types/react-canary.d.ts` = `/// <reference types="react/canary" />`,
   resolved from Connect's own node_modules. Verified: tsc 0 errors under all three hoists, and
   `next build` exit 0 under the adverse 19.2.17 hoist. `tsconfig.json`'s incremental comment corrected.
-- Lasting option (not done — cross-app): align `@types/react` across wear/ui/connect or give `next`
-  a per-app peer on it (`pnpm.packageExtensions`), so no app depends on hoisting luck.
+- Lasting fix (founder-approved 2026-09-27, not yet done): align `@types/react` across wear/ui/connect
+  **and** give `next` a per-app peer on it (`pnpm.packageExtensions`), so no app depends on hoisting
+  luck. Validated end-to-end and reverted; brief:
+  `docs/handoffs/REACT_TYPES_ALIGNMENT_AND_TAG_HANDOFF.md`.
 
 ### Gates
 lint 12/12 · typecheck 12/12 · test 11/11 (Connect **775 pass / 27 skipped** = the live probe) ·
@@ -3517,9 +3519,13 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
 
 - **`profiles` PII lockdown (§3AS) — ✅ DONE.** Migs 174–177 live, PR #67 merged + deployed,
   follow-up PR #68 merged (it also deleted the dead `lib/contributors/pendingApplications.ts` +
-  `types/contributors.ts` — no importers; the helper embedded `email`). Only optional leftover: push
-  the local tag `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a machine with tag-push
-  rights. **Rule for every future migration (contract R3.5):** a new `profiles`
+  `types/contributors.ts` — no importers; the helper embedded `email`). **Founder-approved follow-ups
+  (2026-09-27), not started — full stateless brief:
+  [`docs/handoffs/REACT_TYPES_ALIGNMENT_AND_TAG_HANDOFF.md`](docs/handoffs/REACT_TYPES_ALIGNMENT_AND_TAG_HANDOFF.md):**
+  (A) one `@types/react` per React line (wear/ui → 18.3.31) + `pnpm.packageExtensions` giving `next`
+  optional `@types/react(-dom)` peers, so no app's types depend on pnpm hoisting (change validated
+  end-to-end, then reverted); (B) push the tag `connect-pre-mig174-profiles-privacy` (→ `dca4411`),
+  which the authoring session's git proxy refused. **Rule for every future migration (contract R3.5):** a new `profiles`
   column is PRIVATE until granted — add it to 176-style `grant select (…)` + `profileColumns.ts`
   if it must be public; a new server-owned column goes into `guard_profile_server_columns()`.
 
