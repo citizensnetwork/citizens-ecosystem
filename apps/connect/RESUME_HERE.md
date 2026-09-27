@@ -3345,6 +3345,11 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration — ne
   `rewriteIndexHtml` now drops raw bridge tags.
 - Connect ESLint ignores generated `coverage/` (like Vision/root). Stale "vendored copy" docs fixed
   (package README consumers table, Connect wrapper comment — all apps are `workspace:*`).
+- **CI's CodeQL caught 2 high alerts in the new verifier → fixed (`2863a81`):** the `<script>` regexes
+  were case-sensitive (an upper-case `<SCRIPT>` dev tag would have bypassed the SRI check + dev-build
+  guard) → now case-insensitive; and stat/exists-then-read was a TOCTOU race → single-step
+  `readFileOrNull` (only ENOENT/EISDIR/ENOTDIR = absent; other I/O errors rethrown). +4 tests (55).
+  Founder turned on Auto-fix + asked to merge once green.
 
 ### Gates + verification (final tree)
 - Root `format:check` · `lint` 12/12 · `typecheck` 12/12 · `test` 11/11 (Connect 759, Vision 734, Wear 115,
