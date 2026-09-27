@@ -49,11 +49,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Eligibility check: user must currently be a contributor with bio
-  // setup required. We fetch role+flag in one query and short-circuit.
+  // Eligibility check: user must currently be a contributor. Only `role` is
+  // read — bio_setup_required is a private column (migs 176/177) and the
+  // gate never needed it.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, bio_setup_required")
+    .select("role")
     .eq("id", user.id)
     .maybeSingle();
   if (!profile || profile.role !== "contributor") {

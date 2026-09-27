@@ -9,6 +9,13 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue(mockClient),
 }));
 
+// The export's submitter embed reads `email`, a private profiles column
+// (mig 176), so that one admin-gated query runs on the service-role client.
+const createAdminClient = vi.fn(() => mockClient);
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => createAdminClient(),
+}));
+
 const { POST, GET } = await import("@/app/api/suggestions/route");
 const { PATCH } = await import("@/app/api/suggestions/[id]/route");
 const { GET: EXPORT_GET } = await import(
@@ -327,6 +334,8 @@ describe("GET /api/admin/suggestions/export", () => {
       new NextRequest("http://localhost/api/admin/suggestions/export"),
     );
     expect(res.status).toBe(403);
+    // The service-role client is never reached for a non-admin.
+    expect(createAdminClient).not.toHaveBeenCalled();
   });
 
   it("neutralises CSV formula injection in user-supplied fields", async () => {
@@ -361,6 +370,7 @@ describe("GET /api/admin/suggestions/export", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     // Must prefix `=` and `@` with single-quote to disarm Excel formulas
+    expect(createAdminClient).toHaveBeenCalledTimes(1);
     expect(body).toContain("'=cmd");
     expect(body).toContain("'@SUM");
     mockClient._chain._result.data = null;

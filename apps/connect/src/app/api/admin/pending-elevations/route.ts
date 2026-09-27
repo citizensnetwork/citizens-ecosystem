@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -32,7 +33,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await supabase
+  // The target / requester embeds include `email`, a private profiles
+  // column (mig 176). requireAdmin() above is the authorisation; the
+  // service-role client only performs this admin-gated read.
+  const { data, error } = await createAdminClient()
     .from("pending_admin_elevations")
     .select(
       `id, target_user_id, requested_by, requested_at, expires_at, status,

@@ -87,6 +87,26 @@ mistake = cross-app/cross-tenant exposure. Therefore:
 - **R3.4** A user-scoped or realtime feature **MAY** read the shared DB directly under RLS
   (same `auth.users`, RLS enforces per-user access regardless of which app calls) — this is the
   sanctioned exception to Rule 2 for that data class (addendum §A1/§A3).
+- **R3.5** *(migs 174–177)* RLS filters **rows**, not **columns**. A table whose rows are
+  world-readable (`public.profiles`: "Profiles are viewable by everyone") protects its private
+  columns with **column-level grants**: anon + authenticated hold **no table-level SELECT**, only
+  `GRANT SELECT (<allowlist>)`. A column-level `REVOKE` under a table-level `GRANT` is a
+  **silent no-op** (mig 082 tried exactly that and billing stayed readable for months) — the only
+  working shape is revoke-the-table-then-grant-the-allowlist. Consequences for every migration:
+  a **new `profiles` column is PRIVATE by default** and must be added to the grant list (and to
+  `apps/connect/src/__tests__/security/profileColumns.ts`) in the same migration if it is meant to
+  be public; never `grant select on public.profiles` (table-wide) to anon/authenticated. A user's
+  own private columns are read through `public.get_my_profile_private()` (SECDEF, `auth.uid()`
+  row only); writes that must *read* a private column in the same statement go through a
+  caller-row SECDEF function (`update_notification_prefs`, `mark_my_terms_accepted`).
+  `apps/connect/src/__tests__/security/profiles-column-privacy.test.ts` replays the lineage and
+  scans Connect's source to enforce this in CI.
+- **R3.6** *(mig 175)* Server-owned `profiles` columns (billing, moderation, claim, reauth,
+  score, email, kind, created/deleted timestamps) are guarded by
+  `trg_guard_profile_server_columns`: a raw anon/authenticated non-admin UPDATE that changes one
+  is rejected (42501). service_role, SECURITY DEFINER bodies and admins pass. Handle
+  (`contributor_slug`) changes get a DB-enforced format check + 30-day cooldown and a server-stamped
+  `handle_changed_at`. Adding a server-owned column means adding it to that function's list.
 
 ---
 
@@ -131,6 +151,9 @@ to fill another app's columns.
 
 **R5.1** New per-app profile fields follow this pattern: nullable, app-prefixed, documented here.
 A migration MUST NOT make another app's profile column `NOT NULL` or required for Connect users.
+Since mig 176 they are also **private by default** (R3.5): of the columns above only
+`wear_wardrobe_visibility` is granted to anon/authenticated; the rest are read by their owner via
+`get_my_profile_private()` or by the owning app's service_role backend.
 
 ### 5.2 Content labels (`public.content_labels`)
 Cross-app tagging substrate. Connect itself does not read these; siblings consume them.
@@ -183,7 +206,60 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-09-26, project `xyiajtrvhlxaeplsiajj`, head = **mig 173**)
+## 9. Verification snapshot (updated 2026-09-27, project `xyiajtrvhlxaeplsiajj`, head = **mig 176**; 177 staged)
+
+> **2026-09-27: migs 174 / 175 / 176 APPLIED to prod — `public.profiles` PII lockdown.** 177 is
+> written and **deliberately NOT applied** (contract step — see below). Pre-apply snapshot:
+> `origin/main` @ `dca4411` (local tag `connect-pre-mig174-profiles-privacy`; the session's git
+> proxy refused tag pushes).
+>
+> **The finding.** "Profiles are viewable by everyone" (`FOR SELECT USING (true)`) + Supabase's
+> default table-level SELECT meant the public anon key could `GET
+> /rest/v1/profiles?select=email,notification_email,contributor_claim_email` and harvest every
+> user's email, home coordinates, demographics, billing tier and preferences (15 live profiles,
+> POPIA). Mig 082's column-level revoke of the billing columns had been a no-op all along (R3.5).
+> Companion finding: authenticated users could self-UPDATE server-owned columns on their own row
+> (billing_tier, contributor_hidden, force_reauth_at, score, claim columns, kind, slug with no
+> cooldown) because `protect_role_column()` only guards role/status (R3.6).
+>
+> **What shipped (expand / contract):**
+> 1. **174** (additive): `get_my_profile_private()` (SECDEF, `search_path=''`, `auth.uid()` row,
+>    EXECUTE authenticated only), `update_notification_prefs` → SECDEF, new
+>    `mark_my_terms_accepted()`.
+> 2. **175**: `trg_guard_profile_server_columns` (SECURITY INVOKER — it needs the caller's
+>    `current_user`; sorts after `protect_role_on_update`, before the side-effect/stamp triggers);
+>    INSERT revoked from anon + authenticated (rows come from `handle_new_user()` only), UPDATE /
+>    DELETE revoked from anon, dead "Users can insert own profile" policy dropped.
+> 3. **176**: table-level SELECT revoked from anon + authenticated; `GRANT SELECT` on the
+>    **33 PUBLIC** columns + **5 TRANSITIONAL** private flags (`force_reauth_at`,
+>    `bio_setup_required`, `terms_accepted_at`, `location_sharing`, `notification_prefs`) that the
+>    pre-174 production code reads on critical paths (middleware, setup, terms, location).
+> 4. **177 (NOT applied)**: revokes the 5 transitional columns. **Apply only after the matching app
+>    code is deployed to production** — otherwise middleware fails closed and signs every
+>    cookie-session user out. Then empty `TRANSITIONAL_UNTIL_177` in
+>    `profiles-column-privacy.live.test.ts`.
+>
+> **Verified live** (role-switched probes inside DO blocks that always raise, so nothing
+> persisted; row counts re-checked after):
+> - anon: `email`, `notification_email`, `contributor_claim_email`, `home_latitude`,
+>   `billing_tier`, `gender`, `select *`, and `WHERE email ILIKE …` → **42501**; the `/api/v1`
+>   contributor column set, `directory_contributors` and `search_contributors()` → OK.
+> - authenticated: other users' `email` → 42501, own `email` direct → 42501 (via RPC only);
+>   `get_my_profile_private()` → exactly 1 row (own); pre-174 code paths (loadSession,
+>   middleware, settings meta, terms `IS NULL` update, location) → OK; PostgREST PATCH shape and
+>   literal own-row updates of private columns → OK.
+> - 175: citizen → billing / hidden / force_reauth / handle_changed_at / slug / INSERT all 42501,
+>   own `bio` OK, other row 0 rows; contributor → bad slug 22023, valid slug OK with
+>   `handle_changed_at = now()`, second change P0001 (cooldown), `contributor_kind` 42501;
+>   admin + service_role OK; anon UPDATE 42501; SECDEF body OK; self-serve citizen→contributor
+>   flip OK and the later triggers still stamp `force_reauth_at` / `bio_setup_required` / trial.
+> - Column grants: anon = authenticated = 38 readable (33 + 5 transitional), 23 private revoked;
+>   service_role keeps all 61.
+>
+> **Advisors: 0 ERROR / 118 WARN / 3 INFO.** The only new findings vs the 0/115/3 baseline are the
+> three intentional `authenticated_security_definer_function_executable` WARNs for the caller-row
+> RPCs (`get_my_profile_private`, `mark_my_terms_accepted`, `update_notification_prefs`).
+> **Next migration # = 178** (177 is staged in the repo, not applied).
 
 > **2026-09-26: mig 173 (`contributor_form_intake`) APPLIED to prod** (version `20260926182924`)
 > with the founder's go-ahead. Pre-apply tag: `connect-pre-mig173-form-intake`. Verified live after

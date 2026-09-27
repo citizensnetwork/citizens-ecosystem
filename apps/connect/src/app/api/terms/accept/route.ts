@@ -88,12 +88,10 @@ export async function POST(request: Request) {
   }
 
   // Race-free: only set terms_accepted_at when still NULL — preserves the
-  // original acceptance timestamp on concurrent idempotent calls.
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({ terms_accepted_at: new Date().toISOString() })
-    .eq("id", user.id)
-    .is("terms_accepted_at", null);
+  // original acceptance timestamp on concurrent idempotent calls. The
+  // column is private (migs 176/177), so the `IS NULL` guard lives in the
+  // caller-row-only RPC (mig 174).
+  const { error: profileError } = await supabase.rpc("mark_my_terms_accepted");
 
   if (profileError) {
     return NextResponse.json({ error: profileError.message }, { status: 500 });

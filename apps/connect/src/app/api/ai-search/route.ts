@@ -132,11 +132,17 @@ export async function POST(request: Request) {
       .from("places")
       .select("*, categories(*)")
       .limit(MAX_CANDIDATES),
+    // Exactly the public columns scoreContributor() reads — profiles is
+    // column-allowlisted (mig 176), so `*` would be denied. Hidden
+    // (moderated) contributors are excluded like every other listing.
     supabase
       .from("profiles")
-      .select("*")
+      .select(
+        "id, full_name, bio, physical_address, contributor_kind, physical_latitude, physical_longitude",
+      )
       .eq("role", "contributor")
       .eq("contributor_status", "approved")
+      .eq("contributor_hidden", false)
       .limit(MAX_CANDIDATES),
   ]);
 
@@ -184,10 +190,9 @@ export async function POST(request: Request) {
     void (async () => {
       try {
         const { data: profile } = await supabase
-          .from("profiles")
+          .rpc("get_my_profile_private")
           .select("preferences")
-          .eq("id", user.id)
-          .single();
+          .maybeSingle();
         const prefs = (profile?.preferences ?? {}) as Record<string, unknown>;
         const snapshot = {
           percentages: prefs.percentages ?? null,

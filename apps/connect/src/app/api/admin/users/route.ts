@@ -15,6 +15,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -63,7 +64,10 @@ export async function GET(request: NextRequest) {
   const status = url.searchParams.get("status");
 
   const offset = (page - 1) * PAGE_SIZE;
-  let query = supabase
+  // `email` is a private profiles column (mig 176) — not readable by the
+  // caller's own client. requireAdmin() above is the authorisation; the
+  // service-role client only performs this admin-gated read.
+  let query = createAdminClient()
     .from("profiles")
     .select(
       "id, email, full_name, avatar_url, role, contributor_kind, contributor_status, contributor_slug, created_at",

@@ -8,6 +8,9 @@ type MockChain = {
   upsert: ReturnType<typeof vi.fn>;
   eq: ReturnType<typeof vi.fn>;
   neq: ReturnType<typeof vi.fn>;
+  ilike: ReturnType<typeof vi.fn>;
+  or: ReturnType<typeof vi.fn>;
+  range: ReturnType<typeof vi.fn>;
   in: ReturnType<typeof vi.fn>;
   lt: ReturnType<typeof vi.fn>;
   gt: ReturnType<typeof vi.fn>;
@@ -31,6 +34,9 @@ function createQueryChain(result?: Partial<MockChain["_result"]>): MockChain {
     upsert: vi.fn(),
     eq: vi.fn(),
     neq: vi.fn(),
+    ilike: vi.fn(),
+    or: vi.fn(),
+    range: vi.fn(),
     in: vi.fn(),
     lt: vi.fn(),
     gt: vi.fn(),
@@ -67,6 +73,11 @@ export function createMockSupabaseClient(overrides?: {
 }) {
   const user = overrides?.user ?? null;
   const chain = createQueryChain(overrides?.queryResult);
+  // Separate chain for `.rpc()` so table results never leak into RPC
+  // results. Awaitable directly (resolves { data: null, error: null } by
+  // default, like before) and chainable for table-returning functions:
+  // `.rpc("get_my_profile_private").select("…").maybeSingle()`.
+  const rpcChain = createQueryChain();
 
   return {
     auth: {
@@ -80,7 +91,7 @@ export function createMockSupabaseClient(overrides?: {
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
     from: vi.fn().mockReturnValue(chain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn().mockReturnValue(rpcChain),
     storage: {
       from: vi.fn().mockReturnValue({
         upload: vi.fn().mockResolvedValue({ error: null }),
@@ -88,5 +99,6 @@ export function createMockSupabaseClient(overrides?: {
       }),
     },
     _chain: chain,
+    _rpcChain: rpcChain,
   };
 }
