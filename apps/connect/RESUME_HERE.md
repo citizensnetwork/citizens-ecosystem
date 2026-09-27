@@ -3417,7 +3417,7 @@ Settings-meta read in `store.jsx` (best-effort, in try/catch).
 
 ---
 
-## 3AT. CDN tags hardened on all 3 apps — supabase-js pinned + SRI, React production builds, build-enforced — PR #66 OPEN (2026-09-27)
+## 3AT. CDN tags hardened on all 3 apps — supabase-js pinned + SRI, React production builds, build-enforced — PR #66 MERGED ✅ (`8b72d7d`), production READY ×3 (2026-09-27)
 
 **Trigger:** §3AR's honest checkpoint. **Founder decision (AskUserQuestion):** fix **all three apps** in
 one PR — Connect, Wear and Vision had byte-identical tags. Branch `claude/pin-cdn-sri-react-prod`
@@ -3474,14 +3474,23 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
   this is §3AT).
 
 ### Gates + verification (final tree)
-- Root `format:check` · `lint` 12/12 · `typecheck` 12/12 · `test` 11/11 (Connect 759, Vision 734, Wear 115,
-  db 127, frontend-build **51**, 100% lines) · `build` 8/8 (logs "Verified 5/5/1 CDN SRI hashes");
-  Connect **e2e 13/13**. Guard proven vs real packages: floating `@2`, tampered hash, version drift,
+- Root `format:check` · `lint` 12/12 · `typecheck` 12/12 · `test` 11/11 (Connect 775 + 32 live-only
+  skipped, Vision 734, Wear 115, db 127, frontend-build **55**, 100% lines) · `build` 8/8 (logs "Verified
+  5/5/1 CDN SRI hashes"); Connect **e2e 13/13**. CI **9/9 green** on `dbf7977` (CodeQL included). Guard proven vs real packages: floating `@2`, tampered hash, version drift,
   stale twin hash — all caught.
 - Browser, `next start` (real CSP): **Connect** 44 markers, maplibre 6.11.2, guest browse + Kingdom
   Exploration, Google handoff → Supabase authorize → Google (stopped, no creds), 0 errors/CSP/SRI
   violations. **Wear** prod React + SRI, sign-in form, handoff OK, 0 errors. **Vision** prod React + SRI,
   handoff OK, 0 console messages after the bridge fix. No-build dev: dev React + SRI OK.
+- **Merged 2026-09-27 19:11 UTC** (`8b72d7d`, merge commit, branch kept). Production READY: connect
+  `dpl_9CknzVCDPXs4v7HNiVoae7YN4b7a`, vision `dpl_ABe1Jeqfu1gadn5afZ8TnhCS82bh`, wear
+  `dpl_6sUNkRLNgHzATP7mY1HFuhnF9gKK`. **Live on `www.citizenscentral.co.za`:** React 18.3.1
+  *production* + supabase-js 2.110.0, all SRI + `crossorigin`; maplibre 6.11.2; guest browse 44 markers,
+  MapTiler tiles 200; 0 console errors / CSP / SRI violations (only the 2 known warnings: Tailwind Play
+  CDN, no geolocation in the test browser).
+- At the founder's request, **mig 177 re-verified live** (`20260927184421`): `anon` + `authenticated` read
+  33 `profiles` columns, 28 denied, `email` denied, no table-level SELECT; advisors **0 ERROR / 118 WARN
+  / 3 INFO** (= post-177 baseline), none mention `profiles`.
 
 ### ⚠️ Know this going forward
 - **Dependabot (weekly npm) bumps of supabase-js / react / react-dom will go red on Build** until
@@ -3494,7 +3503,9 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
 
 ### Honest checkpoint — flagged, not fixed
 - **Wear serves NO Content-Security-Policy at all** (no headers in next.config, no middleware CSP).
-  Connect and Vision both have one. Worth its own careful PR (Wear uses inline scripts + CDNs).
+  Connect and Vision both have one (its next.config.js comment *claims* a CSP — there is none). Wear's
+  index.html has **no inline `<script>` blocks**, so a strict `script-src` without `'unsafe-inline'` may be
+  achievable. **Recommended next work** — local hand-off: `%TEMP%citizens-handoff-2026-09-27-post-pr66.md`.
 - Still open: Tailwind Play CDN + lucide without SRI (§3AN); `incremental: true` in vision/wear (§3AQ);
   `packages/db` branch floor 64 → 70 (§3AR).
 - The full OAuth round-trip (land signed-in after Google) needs a real login — **founder to confirm on
@@ -3521,17 +3532,18 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
      listing).
 
   See §3AP's "NEXT". (The `profiles` email PII exposure flagged here is FIXED — §3AS.)
-- **PR #66 (§3AT) — review + merge**, then confirm production `READY` on all three apps and sign in
-  with Google on `www.citizenscentral.co.za` once (full OAuth round-trip). It pins supabase-js 2.110.0
-  + SRI and ships React production builds on Connect/Wear/Vision, build-enforced. After merge,
-  **Dependabot bumps of supabase-js/react go red on Build until `index.html` follows** (by design, §3AT).
-- **Security/perf fast-follows** (pre-existing, none urgent-broken): **Wear has no CSP at all** (§3AT),
-  Tailwind Play CDN → static compile, SRI on lucide, `incremental: false` for vision/wear, and
+- **PR #66 (§3AT) — ✅ MERGED + deployed + verified live.** Founder: sign in with Google once on
+  `www.citizenscentral.co.za` (the full OAuth round-trip is the one thing not machine-verified).
+  **Dependabot bumps of supabase-js/react now go red on Build until `index.html` follows** (by design).
+- **Recommended next work: give Wear a CSP** (it has none — §3AT honest checkpoint; local hand-off
+  `%TEMP%citizens-handoff-2026-09-27-post-pr66.md`). Other fast-follows (pre-existing, none
+  urgent-broken): Tailwind Play CDN → static compile, SRI on lucide, `incremental: false` for vision/wear, and
   `packages/db` `src/memory.ts` tests to lift the branch floor 64 → 70.
 - **Bumping `maplibre-gl`** now requires re-copying the 4 vendored files into
   `src/frontend/vendor/maplibre-gl/` — the build fails loudly if you forget (§3AR).
 
-> **⏳ 2026-09-27 (latest) — PR #66 OPEN: CDN tags hardened on all three apps.** supabase-js was
+> **✅ 2026-09-27 (latest) — PR #66 MERGED (`8b72d7d`), production READY on all three apps and verified
+> live: CDN tags hardened.** supabase-js was
 > `@2` (floating, no SRI) on the pages holding auth sessions → now exact lockfile `2.110.0` + SRI;
 > production shipped React **dev** builds → built output now ships `*.production.min.js` (−82% React
 > bytes over the wire), while local no-build dev keeps dev builds. `@citizens/frontend-build` 0.2.0
@@ -3539,7 +3551,9 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in thi
 > the installed file's sha384, and if any `*.development.js` would ship. Also fixed: Vision's 404 +
 > MIME console error on every load (stale raw bridge tag). All gates + Connect e2e 13/13 green;
 > browser-verified on all three apps under their real CSP. No migration (next # is 178 — PR #67 took 174–177). §3AT.
-> **Founder action:** merge #66, then sign in with Google on prod once. Flagged: **Wear has no CSP.**
+> CI also surfaced 2 CodeQL alerts in the new verifier (fixed) and the pnpm-hoist root cause of the
+> recurring "phantom `cache`" type error (same fix as PR #68). Mig 177 re-verified live at the founder's
+> request. **Founder action:** sign in with Google on prod once. **Next:** Wear CSP (it has none).
 >
 > **✅ 2026-09-27 — PR #64 MERGED (`dca4411`); production READY on connect/vision/wear;
 > a LIVE critical map XSS is patched.** CI's OSV-Scanner found **26 advisories (5 Critical, 14 High)**
