@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — Admin panel (contributor application review)
+//  Citizens Connect — Admin panel (applications, listings, create, reports)
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { useState } = React;
+  const { useState, useEffect } = React;
   const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle } = window.UI;
   const Icon = window.Icon;
 
@@ -183,6 +183,136 @@
       h(Button, { variant: 'gold', icon: 'Plus', disabled: !canSubmit, onClick: submit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
   }
 
+  // ── Admin: every Contributor listing — hide / unhide ──
+  // The moderation safety net for listings that go live without a review
+  // step (Google Form intake, admin Create, self-serve apply): Hide takes a
+  // listing off the map and Kingdom Discovery for everyone, reversibly —
+  // POST /api/admin/contributors/hide (set_contributor_hidden, mig 164). Also
+  // shows whether a form/admin-created listing's owner has signed in yet.
+  function ListingRow({ row, confirming, busy, onAsk, onCancel, onConfirm }) {
+    const hidden = !!row.contributor_hidden;
+    const name = row.full_name || 'this listing';
+    const kind = CONTRIBUTOR_KINDS.find((k) => k.value === row.contributor_kind);
+    const awaitingOwner = row.contributor_claim_email && !row.contributor_claimed_at;
+    // A listing claimed from a DIFFERENT account (claim_admin_created_contributor)
+    // was copied onto the owner and this placeholder hidden with its slug
+    // cleared — the live listing is the owner's row. Unhiding it would publish
+    // a slug-less duplicate, so it gets no toggle.
+    const movedToOwner = hidden && !row.contributor_slug && !!row.contributor_claimed_at;
+    return h('div', { className: 'bg-card rounded-2xl border border-border p-3', 'data-listing': row.contributor_slug || row.id },
+      h('div', { className: 'flex items-center gap-3' },
+        h(Avatar, { src: row.avatar_url, name: row.full_name, size: 40, rounded: 'xl' }),
+        h('div', { className: 'flex-1 min-w-0' },
+          h('div', { className: 'flex items-center gap-2 flex-wrap' },
+            h('p', { className: 'text-sm font-bold text-foreground truncate' }, row.full_name || 'Unnamed listing'),
+            h('span', {
+              className: 'px-2 py-0.5 rounded-full text-[9px] font-bold',
+              style: hidden ? { background: '#FEE2E2', color: '#DC2626' } : { background: '#DCFCE7', color: '#16A34A' },
+            }, hidden ? 'HIDDEN' : 'LIVE')),
+          h('div', { className: 'flex items-center gap-x-3 gap-y-0.5 mt-0.5 flex-wrap text-[10px] text-muted-foreground' },
+            kind && h('span', null, kind.label),
+            row.contributor_slug && h('a', { href: '/c/' + row.contributor_slug, target: '_blank', rel: 'noopener noreferrer', className: 'text-gold-dark hover:underline' }, '/c/' + row.contributor_slug),
+            awaitingOwner && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Clock', size: 9 }), 'Awaiting owner sign-in · ' + row.contributor_claim_email),
+            movedToOwner
+              ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))
+              : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
+        !confirming && !movedToOwner && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide')),
+      confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
+        h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
+          ? 'Put ' + name + ' back on the map and in Kingdom Discovery?'
+          : 'Hide ' + name + ' from the map and Kingdom Discovery? Nothing is deleted — you can unhide it any time.'),
+        h('div', { className: 'flex gap-2' },
+          h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', className: 'flex-1', disabled: busy, onClick: onConfirm },
+            busy ? 'Saving…' : hidden ? 'Confirm unhide' : 'Confirm hide'),
+          h(Button, { size: 'sm', variant: 'outline', disabled: busy, onClick: onCancel }, 'Cancel'))));
+  }
+
+  function AdminListings() {
+    const { toast, realUser, syncListingVisibility } = window.useApp();
+    const [q, setQ] = useState('');
+    const [page, setPage] = useState(1);
+    const [rows, setRows] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [confirmId, setConfirmId] = useState(null);
+    const [busyId, setBusyId] = useState(null);
+
+    // GET /api/admin/users?role=contributor (admin-gated, service-role read —
+    // it carries the claim columns). Page 1 replaces, later pages append;
+    // typing is debounced and a stale response is dropped.
+    useEffect(() => {
+      if (!realUser) return undefined;
+      let active = true;
+      const term = q.trim();
+      const timer = setTimeout(async () => {
+        setLoading(true);
+        setFailed(false);
+        try {
+          const res = await window.authedFetch('/api/admin/users?role=contributor&page=' + page + (term ? '&q=' + encodeURIComponent(term) : ''));
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const json = await res.json();
+          if (!active) return;
+          const data = Array.isArray(json.data) ? json.data : [];
+          setRows((prev) => (page === 1 ? data : [...prev, ...data]));
+          setTotal((json.meta && json.meta.total) || 0);
+        } catch (e) {
+          if (active) setFailed(true);
+        }
+        if (active) setLoading(false);
+      }, term ? 300 : 0);
+      return () => { active = false; clearTimeout(timer); };
+    }, [realUser, q, page]);
+
+    const setHidden = async (row, hidden) => {
+      setBusyId(row.id);
+      try {
+        const res = await window.authedFetch('/api/admin/contributors/hide', {
+          method: 'POST',
+          body: JSON.stringify({ user_id: row.id, hidden }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, contributor_hidden: hidden } : r)));
+        syncListingVisibility({ id: row.id, slug: row.contributor_slug, hidden });
+        toast(hidden
+          ? (row.full_name || 'Listing') + ' is hidden — off the map and Kingdom Discovery.'
+          : (row.full_name || 'Listing') + ' is live again.', 'green');
+      } catch (e) {
+        toast('Could not update that listing — please try again.', 'red');
+      }
+      setBusyId(null);
+      setConfirmId(null);
+    };
+
+    if (!realUser) {
+      return h(Empty, { icon: 'Store', title: 'Sign in as an admin to manage live listings' });
+    }
+
+    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-listings': '' },
+      h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+        'Every Contributor listing. Hide takes one off the map and Kingdom Discovery for everyone — nothing is deleted, and Unhide puts it straight back.'),
+      h('div', { className: 'flex items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl' },
+        h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
+        h('input', {
+          value: q, onChange: (e) => { setQ(e.target.value); setPage(1); },
+          placeholder: 'Search listings by name or email…', 'aria-label': 'Search listings',
+          className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
+        })),
+      failed
+        ? h(Empty, { icon: 'WifiOff', title: 'Could not load listings', sub: 'Check your connection, then reopen this tab.' })
+        : rows.length === 0 && !loading
+          ? h(Empty, { icon: 'Store', title: q.trim() ? 'No listings match your search' : 'No Contributor listings yet' })
+          : rows.map((r) => h(ListingRow, {
+              key: r.id, row: r,
+              confirming: confirmId === r.id, busy: busyId === r.id,
+              onAsk: () => setConfirmId(r.id),
+              onCancel: () => setConfirmId(null),
+              onConfirm: () => setHidden(r, !r.contributor_hidden),
+            })),
+      loading && h('p', { className: 'text-xs text-muted-foreground text-center py-2' }, 'Loading…'),
+      !loading && !failed && rows.length < total && h(Button, { variant: 'outline', className: 'w-full', onClick: () => setPage((n) => n + 1) }, 'Load more'));
+  }
+
   function AdminPage() {
     const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser } = window.useApp();
     const [tab, setTab] = useState('applications');
@@ -232,7 +362,7 @@
             .map(([l, v, c]) => h('div', { key: l, className: 'bg-card rounded-xl p-2.5 border border-border text-center' },
               h('p', { className: 'text-base font-bold', style: { color: c } }, v),
               h('p', { className: 'text-[9px] text-muted-foreground' }, l)))),
-        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'create', label: 'Create Contributor' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
+        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'listings', label: 'Listings' }, { value: 'create', label: 'Create Contributor' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         tab === 'applications' && h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
@@ -246,6 +376,8 @@
             : filtered.map((a) => h(AppCard, { key: a.id, app: a, onReview: handleReview }))),
 
         tab === 'overview' && h(window.AdminOverview, { setTab }),
+
+        tab === 'listings' && h(AdminListings),
 
         tab === 'create' && h(AdminCreateContributor),
 

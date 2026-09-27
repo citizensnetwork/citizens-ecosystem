@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-project";
 
 // ════════════════════════════════════════════════════════════════════
 //  Google Form → map Contributor intake, the parts a browser sees
@@ -12,10 +13,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 //
 //  Hermetic like the other specs: every backend call is mocked with
 //  page.route(), nothing touches the real Supabase project. (2) needs a
-//  REAL-mode session, so instead of the "no Supabase configured" fallback
-//  it points the app at a fake project URL (CSP bypassed for it), seeds a
-//  supabase-js session in localStorage, and mocks that project's REST/RPC
-//  endpoints and realtime websocket.
+//  REAL-mode session against a fake project (e2e/support/fake-project.ts).
 // ════════════════════════════════════════════════════════════════════
 
 const OWNER_ID = "44444444-4444-4444-8444-444444444444";
@@ -50,27 +48,7 @@ const LISTING = {
 };
 
 async function mockApp(page: Page, env: { supabaseUrl: string; anonKey: string }) {
-  await page.route("**/config.js", (route: Route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `window.__CC_ENV = ${JSON.stringify({
-        SUPABASE_URL: env.supabaseUrl,
-        SUPABASE_ANON_KEY: env.anonKey,
-        API_BASE_URL: "",
-        MAPTILER_KEY: "e2e-test-key",
-        MAPTILER_STYLE: "streets-v2",
-      })};`,
-    }),
-  );
-  await page.route("**/api.maptiler.com/**", (route: Route) =>
-    route.fulfill({ json: { version: 8, sources: {}, layers: [], features: [] } }),
-  );
-  // Registered first = matched LAST: a catch-all for the app's own API so
-  // incidental dashboard/notification reads never reach a real backend.
-  await page.route("**/api/**", (route: Route) => route.fulfill({ json: { data: [] } }));
-  await page.route("**/api/v1/events**", (route: Route) => route.fulfill({ json: { data: [] } }));
-  await page.route("**/api/v1/places**", (route: Route) => route.fulfill({ json: { data: [] } }));
-  await page.route(/\/api\/v1\/contributors(\?|$)/, (route: Route) => route.fulfill({ json: { data: [] } }));
+  await mockAppShell(page, env);
   await page.route(`**/api/v1/contributors/${SLUG}`, (route: Route) =>
     route.fulfill({ json: { data: { profile: LISTING, upcoming_events: [], past_events: [], places: [] } } }),
   );
@@ -111,77 +89,18 @@ test.describe("Listing link /c/<slug>", () => {
 
 // ── Real-mode session against a fake Supabase project ─────────────────
 
-// A reserved .test host: never resolvable, so nothing can leak to a real
-// project. supabase-js keys its stored session on the first label.
-const FAKE_PROJECT = "https://e2eproj.supabase.test";
-
-function fakeSession() {
-  const now = Math.floor(Date.now() / 1000);
-  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
-  const user = {
-    id: OWNER_ID,
-    aud: "authenticated",
-    role: "authenticated",
-    email: "daniel@gracepointchurch.org.za",
-    app_metadata: { provider: "google", providers: ["email", "google"] },
-    user_metadata: { full_name: "Grace Point Community Church" },
-    created_at: new Date().toISOString(),
-  };
-  const accessToken = [
-    b64({ alg: "HS256", typ: "JWT" }),
-    b64({ sub: OWNER_ID, email: user.email, role: "authenticated", aud: "authenticated", iat: now, exp: now + 3600 }),
-    "e2e-signature",
-  ].join(".");
-  return {
-    access_token: accessToken,
-    token_type: "bearer",
-    expires_in: 3600,
-    expires_at: now + 3600,
-    refresh_token: "e2e-refresh-token",
-    user,
-  };
-}
-
 async function signedInAs(page: Page, profile: { role: string; contributor_status: string }) {
-  const rpcCalls: string[] = [];
   const claimCalls: number[] = [];
   await mockApp(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
-
-  const session = fakeSession();
-  await page.addInitScript((s) => {
-    localStorage.setItem("sb-e2eproj-auth-token", JSON.stringify(s));
-  }, session);
-  // Realtime: accept the socket locally and never connect it anywhere.
-  await page.routeWebSocket(/e2eproj\.supabase\.test/, () => {});
-
-  // The app calls this "project" cross-origin, and a fulfilled response is
-  // still CORS-checked by the browser — so answer preflights and allow it.
-  const cors = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Access-Control-Expose-Headers": "Content-Range",
-  };
-  await page.route(`${FAKE_PROJECT}/**`, async (route: Route) => {
-    const request = route.request();
-    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-    const reply = (json: unknown) => route.fulfill({ json, headers: cors });
-    const url = new URL(request.url());
-    const wantsObject = (request.headers().accept ?? "").includes("vnd.pgrst.object");
-    if (url.pathname.startsWith("/auth/v1/user")) return reply(session.user);
-    if (url.pathname.startsWith("/auth/v1/token")) return reply(session);
-    if (url.pathname.startsWith("/rest/v1/rpc/")) {
-      const fn = url.pathname.slice("/rest/v1/rpc/".length);
-      rpcCalls.push(fn);
-      if (fn === "mark_own_listing_claimed") {
-        return reply(profile.role === "contributor" ? { success: true, slug: SLUG } : { success: false, reason: "nothing_to_mark" });
-      }
-      return reply([]);
-    }
-    if (url.pathname === "/rest/v1/profiles" && wantsObject) {
-      return reply({ role: profile.role, full_name: LISTING.full_name, avatar_url: null, contributor_status: profile.contributor_status });
-    }
-    return reply(wantsObject ? {} : []);
+  const rpcCalls = await signInToFakeProject(page, {
+    user: { id: OWNER_ID, email: "daniel@gracepointchurch.org.za", fullName: LISTING.full_name },
+    profile,
+    rpc: (fn) =>
+      fn !== "mark_own_listing_claimed"
+        ? []
+        : profile.role === "contributor"
+          ? { success: true, slug: SLUG }
+          : { success: false, reason: "nothing_to_mark" },
   });
   // Registered after the /api/** catch-all, so it wins for this path.
   await page.route("**/api/contributor/claim", (route: Route) => {

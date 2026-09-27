@@ -2293,6 +2293,22 @@
       return () => { active = false; };
     }, []);
 
+    // Admin Listings tab: reflect a hide/unhide on this admin's own map and
+    // Kingdom Discovery straight away (everyone else's next
+    // /api/v1/contributors read already excludes hidden listings).
+    const syncListingVisibility = async ({ id, slug, hidden }) => {
+      if (hidden) { setContributors((prev) => prev.filter((c) => c.id !== id)); return; }
+      if (!slug) return;
+      try {
+        const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+        const res = await fetch(base + '/api/v1/contributors/' + encodeURIComponent(slug));
+        const json = res.ok ? await res.json() : null;
+        if (!json || !json.data || !json.data.profile) return;
+        const listing = adaptContributor(json.data.profile);
+        setContributors((prev) => [...prev.filter((c) => c.id !== listing.id), listing]);
+      } catch (e) { /* it shows on the next load */ }
+    };
+
     // News posts: public SELECT RLS (like places/broadcasts), so a direct
     // client read is consistent with the map-bubbles read just above — no
     // dedicated API route needed. Requires migration 167.
@@ -2443,7 +2459,7 @@
       newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
       adminStats, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref,
       creationStyle, setCreationStyle, bubbleStyle, setBubbleStyle,
-      submitApplication, reviewApplication, completeOnboarding,
+      submitApplication, reviewApplication, completeOnboarding, syncListingVisibility,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
       acceptRequest, rejectRequest, muteConversation, unmuteConversation, blockUser,
       toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,

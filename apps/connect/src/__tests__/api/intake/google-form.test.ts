@@ -10,9 +10,16 @@ const storageBucket = {
   getPublicUrl: vi.fn((path: string) => ({ data: { publicUrl: `https://cdn.test/${path}` } })),
   remove: vi.fn().mockResolvedValue({ data: [], error: null }),
 };
+// The 409 path looks the existing account up: from("profiles").select().eq().maybeSingle().
+const profileLookup = {
+  select: vi.fn(() => profileLookup),
+  eq: vi.fn(() => profileLookup),
+  maybeSingle: vi.fn(),
+};
 const mockAdmin = {
   auth: { admin: { createUser: vi.fn(), deleteUser: vi.fn().mockResolvedValue({ error: null }) } },
   storage: { from: vi.fn(() => storageBucket) },
+  from: vi.fn(() => profileLookup),
   rpc: vi.fn(),
 };
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => mockAdmin) }));
@@ -62,6 +69,7 @@ beforeEach(() => {
   mockAdmin.auth.admin.createUser.mockResolvedValue({ data: { user: { id: NEW_USER_ID } }, error: null });
   mockAdmin.rpc.mockResolvedValue({ data: { success: true, slug: "grace-point-community-church" }, error: null });
   storageBucket.upload.mockResolvedValue({ data: {}, error: null });
+  profileLookup.maybeSingle.mockResolvedValue({ data: null, error: null });
 });
 
 afterEach(() => {
@@ -234,15 +242,60 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(rpcArgs()._logo_url).toBeNull();
   });
 
-  it("returns 409 when the owner email is already registered (idempotent re-approval)", async () => {
-    mockAdmin.auth.admin.createUser.mockResolvedValueOnce({
-      data: { user: null },
-      error: { message: "A user with this email address has already been registered" },
+  const emailTaken = (error: { message: string; code?: string }) =>
+    mockAdmin.auth.admin.createUser.mockResolvedValueOnce({ data: { user: null }, error });
+
+  it("409 listing_exists with the live listing's URL on a re-approval (idempotent)", async () => {
+    emailTaken({ message: "A user with this email address has already been registered", code: "email_exists" });
+    profileLookup.maybeSingle.mockResolvedValueOnce({
+      data: { role: "contributor", contributor_slug: "grace-point-community-church", contributor_hidden: false },
+      error: null,
     });
     const res = await POST(signedReq(row));
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe("email_already_registered");
+    const json = await res.json();
+    expect(json.error).toBe("listing_exists");
+    expect(json.url).toBe("http://localhost/c/grace-point-community-church");
+    expect(json.message).toContain("http://localhost/c/grace-point-community-church");
+    expect(json.message).not.toContain("hidden");
+    expect(mockAdmin.from).toHaveBeenCalledWith("profiles");
+    expect(profileLookup.eq).toHaveBeenCalledWith("email", row.owner_email);
     expect(mockAdmin.rpc).not.toHaveBeenCalled();
+    expect(mockAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("409 listing_exists says so when that listing is hidden", async () => {
+    emailTaken({ message: "", code: "email_exists" });
+    profileLookup.maybeSingle.mockResolvedValueOnce({
+      data: { role: "contributor", contributor_slug: "grace-point", contributor_hidden: true },
+      error: null,
+    });
+    const json = await (await POST(signedReq(row))).json();
+    expect(json.error).toBe("listing_exists");
+    expect(json.message).toContain("(currently hidden)");
+  });
+
+  it("409 email_already_registered with what to do, when the email is an ordinary account", async () => {
+    emailTaken({ message: "A user with this email address has already been registered" });
+    profileLookup.maybeSingle.mockResolvedValueOnce({
+      data: { role: "citizen", contributor_slug: null, contributor_hidden: false },
+      error: null,
+    });
+    const res = await POST(signedReq(row));
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe("email_already_registered");
+    expect(json.message).toMatch(/Become a Contributor/);
+    expect(json.message).toContain(row.owner_email);
+    expect(mockAdmin.rpc).not.toHaveBeenCalled();
+  });
+
+  it("409 email_already_registered even when the account lookup itself fails", async () => {
+    emailTaken({ message: "A user with this email address has already been registered" });
+    profileLookup.maybeSingle.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    const res = await POST(signedReq(row));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("email_already_registered");
   });
 
   it("rolls back the auth user and uploaded images when the profile RPC fails", async () => {

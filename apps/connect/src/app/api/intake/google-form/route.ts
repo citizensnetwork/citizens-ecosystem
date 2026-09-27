@@ -16,8 +16,10 @@
  * Any failure → 401 with no detail. No secret configured → 503 (fail closed).
  *
  * Idempotency: a second approval of the same row finds the owner's email
- * already registered → 409 `email_already_registered`; the script also skips
- * rows whose Status is already set.
+ * already registered → 409 `listing_exists` (with the live listing's URL);
+ * an email that belongs to an ordinary account → 409
+ * `email_already_registered`. Both carry a `message` saying what to do. The
+ * script also skips rows whose Status is already set.
  *
  * Body (raw Form labels — every label → slug decision is made here):
  *   { owner_email, organisation_name, organisation_type, primary_category,
@@ -69,6 +71,39 @@ const IMAGE_REFUSED: Record<Exclude<ImageResult, { ok: true }>["reason"], string
   unsupported_type: "isn't a JPEG, PNG or WebP image",
   invalid: "couldn't be read",
 };
+
+/**
+ * The owner email already has an account, so nothing was created. Say which
+ * case it is and what to do (the script writes `message` to the row's Notes)
+ * instead of a bare 409. Service-role lookup (email is a private profiles
+ * column) — reachable only past the HMAC check.
+ */
+async function existingAccountConflict(admin: ReturnType<typeof createAdminClient>, email: string, origin: string) {
+  const { data } = await admin
+    .from("profiles")
+    .select("role, contributor_slug, contributor_hidden")
+    .eq("email", email)
+    .maybeSingle();
+  const existing = data as { role?: string; contributor_slug?: string | null; contributor_hidden?: boolean } | null;
+  if (existing?.role === "contributor" && existing.contributor_slug) {
+    const url = `${origin}/c/${existing.contributor_slug}`;
+    const hidden = existing.contributor_hidden ? " (currently hidden)" : "";
+    return NextResponse.json(
+      {
+        error: "listing_exists",
+        message: `${email} already has a Contributor listing${hidden}: ${url} — nothing was changed.`,
+        url,
+      },
+      { status: 409 },
+    );
+  }
+  return fail(
+    409,
+    "email_already_registered",
+    `${email} already has a Citizens Connect account, so no listing was created. Ask the owner to sign in and choose ` +
+      "Settings → Become a Contributor, or change the owner's email on this row and tick Approve again.",
+  );
+}
 
 export async function POST(request: Request) {
   const secret = process.env.INTAKE_WEBHOOK_SECRET ?? "";
@@ -191,8 +226,8 @@ export async function POST(request: Request) {
     user_metadata: { full_name: fields.displayName, created_via: "google_form" },
   });
   if (createErr || !created?.user) {
-    if (createErr?.message?.toLowerCase().includes("already been registered")) {
-      return fail(409, "email_already_registered", "That owner email already has a Citizens Connect account.");
+    if (createErr?.code === "email_exists" || createErr?.message?.toLowerCase().includes("already been registered")) {
+      return existingAccountConflict(admin, fields.claimEmail, origin);
     }
     console.error("[/api/intake/google-form] createUser", createErr);
     return fail(500, "create_user_failed");

@@ -153,7 +153,9 @@ describe("profiles column privacy — migration lineage", () => {
  */
 const SERVICE_ROLE_READS: Record<string, string[]> = {
   // createAdminClient() after requireAdmin()
-  "app/api/admin/users/route.ts": ["email"],
+  // + the claim columns: the admin Listings tab shows whether an admin- or
+  // form-created listing's owner has signed in yet.
+  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at"],
   "app/api/admin/suggestions/export/route.ts": ["email"],
   "app/api/admin/contributor-applications/route.ts": ["email"],
   "app/api/admin/pending-elevations/route.ts": ["email"],

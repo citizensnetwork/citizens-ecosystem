@@ -84,6 +84,8 @@ Before you tick **Approve**, check:
   owner's email the listing will belong to. If they differ, the submitter may not control that inbox.
   Confirm with them first: anyone can fill in a public Form.
 - The name and category look right, and the Contributor isn't already on Citizens Connect.
+- It's a real Form submission. Approving a hand-typed sample row publishes a real listing and
+  emails whoever's address is in column E, so delete sample rows instead.
 
 Tick **Approve**. Within about 10–20 seconds:
 
@@ -107,7 +109,8 @@ Notes point to, then tick **Approve** again.
 | `display_name_required` / `valid_claim_email_required` | Q2.1 name / Q1.3 owner's email missing or invalid | Fix the cell |
 | `invalid_website_url`, `invalid_contact_email`, `invalid_<social>` | That answer can't be used as-is (or is a dangerous link) | Fix or clear that cell |
 | `Faith alignment and permission to publish must both be given.` | Q7.4 is empty, or Q7.5 is empty/"No" | Can't publish without consent |
-| `That owner email already has a Citizens Connect account.` | Already processed, or the person already signed up in the app | They can go live themselves from the app: Settings → Become a Contributor |
+| `… already has a Contributor listing: …/c/<name> — nothing was changed.` | This owner is already live (e.g. the row was approved before, or they applied in the app). Says `(currently hidden)` if you hid it | Nothing to do, or unhide it in Admin → Listings |
+| `… already has a Citizens Connect account, so no listing was created. …` | The owner email belongs to someone who already signed in to the app as a citizen | They can go live themselves: Settings → Become a Contributor. Or change the owner's email on the row and tick again |
 | `unauthorized` | The two secrets differ | Re-copy the same value into Vercel and the Script property, then redeploy |
 | `intake_not_configured` | Vercel has no `INTAKE_WEBHOOK_SECRET` | Add it (step 4) and redeploy |
 | `INTAKE_URL redirects …` | `INTAKE_URL` isn't the exact `www` address | Fix the Script property (step 6) |
@@ -183,9 +186,11 @@ with it if they picked the wrong account.
 
 ## Removing a listing
 
-Moderation hides a Contributor; it doesn't delete them. The `/api/admin/contributors/hide` endpoint
-exists, but there is no Admin-panel button for it yet. For the Phase 6 test listing, the dev session
-removes it with you.
+Sign in to Citizens Connect as an admin → **Admin Panel → Listings**. Every Contributor listing is
+there, with whether it's live or hidden and whether its owner has signed in yet ("Awaiting owner
+sign-in"). **Hide** (then **Confirm hide**) takes a listing off the map and Kingdom Discovery for
+everyone; nothing is deleted, and **Unhide** puts it straight back. Use it for an approval you
+regret, or for the Phase 6 test listing once you've checked it.
 
 ## Privacy (POPIA)
 
