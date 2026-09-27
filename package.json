@@ -48,6 +48,22 @@
       "@xmldom/xmldom@0.9.10": ">=0.9.12",
       "browserslist@4.28.4": ">=4.28.7",
       "baseline-browser-mapping@2.10.41": ">=2.11.0"
+    },
+    "packageExtensions": {
+      "next": {
+        "peerDependencies": {
+          "@types/react": "*",
+          "@types/react-dom": "*"
+        },
+        "peerDependenciesMeta": {
+          "@types/react": {
+            "optional": true
+          },
+          "@types/react-dom": {
+            "optional": true
+          }
+        }
+      }
     }
   }
 }
