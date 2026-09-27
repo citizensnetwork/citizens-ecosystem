@@ -206,6 +206,29 @@ function selectArg(src: string, from: number): string | null {
   return null;
 }
 
+/**
+ * If the call chain at `i` continues with `.select(` — possibly after
+ * whitespace and comments (v1/profiles/[id] has one) — the index just past
+ * it, else -1. A linear scan on purpose: a regex alternation over
+ * whitespace / `//…` / `/*…*\/` backtracks exponentially (CodeQL
+ * js/redos).
+ */
+function selectCallAfter(src: string, i: number): number {
+  for (;;) {
+    while (i < src.length && /\s/.test(src[i])) i += 1;
+    if (src.startsWith("//", i)) {
+      const eol = src.indexOf("\n", i);
+      i = eol === -1 ? src.length : eol;
+    } else if (src.startsWith("/*", i)) {
+      const end = src.indexOf("*/", i + 2);
+      if (end === -1) return -1;
+      i = end + 2;
+    } else {
+      return src.startsWith(".select(", i) ? i + ".select(".length : -1;
+    }
+  }
+}
+
 type Finding = { file: string; column: string };
 
 function scanProfileReads(): { found: number; violations: Finding[] } {
@@ -219,10 +242,9 @@ function scanProfileReads(): { found: number; violations: Finding[] } {
     const src = readFileSync(full, "utf8");
     const allowed = new Set(SERVICE_ROLE_READS[file] ?? []);
     const lists: string[] = [];
-    // Comments may sit between the calls (v1/profiles/[id] has one).
-    const fromSelect = /\.from\(\s*["'`]profiles["'`]\s*\)(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*\.select\(/g;
-    for (const m of src.matchAll(fromSelect)) {
-      const arg = selectArg(src, m.index! + m[0].length);
+    for (const m of src.matchAll(/\.from\(\s*["'`]profiles["'`]\s*\)/g)) {
+      const at = selectCallAfter(src, m.index! + m[0].length);
+      const arg = at === -1 ? null : selectArg(src, at);
       if (arg !== null) lists.push(arg);
     }
     for (const m of src.matchAll(/\bprofiles(?:![a-z_]+|:[a-z_]+)?\(([^()]*)\)/g)) lists.push(m[1]);
