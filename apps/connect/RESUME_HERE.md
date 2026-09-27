@@ -3399,10 +3399,10 @@ Settings-meta read in `store.jsx` (best-effort, in try/catch).
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 - **`profiles` PII lockdown (§3AS) — ✅ DONE.** Migs 174–177 live, PR #67 merged + deployed,
-  follow-up docs PR merged. Only optional leftovers: push the local tag
-  `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a machine with tag-push rights; delete
-  the unused `lib/contributors/pendingApplications.ts` (it embeds `email` and must only ever get a
-  service-role client). **Rule for every future migration (contract R3.5):** a new `profiles`
+  follow-up PR #68 merged (it also deleted the dead `lib/contributors/pendingApplications.ts` +
+  `types/contributors.ts` — no importers; the helper embedded `email`). Only optional leftover: push
+  the local tag `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a machine with tag-push
+  rights. **Rule for every future migration (contract R3.5):** a new `profiles`
   column is PRIVATE until granted — add it to 176-style `grant select (…)` + `profileColumns.ts`
   if it must be public; a new server-owned column goes into `guard_profile_server_columns()`.
 
