@@ -3381,6 +3381,26 @@ public.profiles;`.
 - **Mig 177 then applied**: anon = authenticated = exactly 33 public columns, 28 private denied;
   advisors unchanged (0 ERROR / 118 / 3). Follow-up PR empties `TRANSITIONAL_UNTIL_177` + these docs.
 
+### The recurring "`react` has no exported member `cache`" Vercel build failure — REAL root cause (§3AQ corrected)
+PR #68's preview (`c27cf22`) failed exactly like PR #63's prod build did (§3AQ):
+`resolveSlug.ts:12 — Module '"react"' has no exported member 'cache'` on untouched code, while the
+same commit built locally and in GitHub CI. §3AQ blamed a stale `tsc` incremental cache — **wrong**
+(`incremental` was already `false`). Real cause, reproduced locally both ways:
+- With @types/react 18.3, `cache`'s type exists only in `react/canary`, which Connect gets via Next's
+  `/// <reference types="react/experimental" />` in `next/dist/types.d.ts`.
+- `next` is ONE shared pnpm install, so that reference resolves through
+  `node_modules/.pnpm/node_modules/@types/react` — whichever version pnpm hoisted. The monorepo has
+  three (18.3.3 wear/ui, 18.3.31 connect, 19.2.17 vision). A restored Vercel build cache can hoist a
+  different one; the canary augmentation then lands on a copy Connect's own `import … from "react"`
+  never sees.
+- Re-pointing that hoisted link to 18.3.3 or 19.2.17 reproduces the exact error in `tsc` and in
+  `next build` (exit 1 at `resolveSlug.ts:12:10`).
+- **Fix:** `apps/connect/src/types/react-canary.d.ts` = `/// <reference types="react/canary" />`,
+  resolved from Connect's own node_modules. Verified: tsc 0 errors under all three hoists, and
+  `next build` exit 0 under the adverse 19.2.17 hoist. `tsconfig.json`'s incremental comment corrected.
+- Lasting option (not done — cross-app): align `@types/react` across wear/ui/connect or give `next`
+  a per-app peer on it (`pnpm.packageExtensions`), so no app depends on hoisting luck.
+
 ### Gates
 lint 12/12 · typecheck 12/12 · test 11/11 (Connect **775 pass / 27 skipped** = the live probe) ·
 build 8/8 · `build-frontend.js` ✅. New tests: `__tests__/security/profiles-column-privacy.test.ts`
