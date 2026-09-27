@@ -3308,16 +3308,91 @@ that the summary omitted entirely. Working log: `.claude/sessions/osv-scan-26-vu
   exact version + SRI, or vendor it the way maplibre now is.
 - Still open from earlier: Tailwind **Play CDN** in production (§3AN), no SRI on the lucide tag (§3AN),
   `incremental: true` in `apps/vision` / `apps/wear` tsconfigs (§3AQ).
-- → The first two bullets are **FIXED in §3AS** (PR #66), on all three apps.
+- → The first two bullets are **FIXED in §3AT** (PR #66), on all three apps.
 
 ---
 
-## 3AS. CDN tags hardened on all 3 apps — supabase-js pinned + SRI, React production builds, build-enforced — PR #66 OPEN (2026-09-27)
+## 3AS. `public.profiles` PII lockdown — anon could read every user's email; migs 174–176 APPLIED, 177 staged (2026-09-26 → 09-27)
+
+Branch `claude/gifted-pasteur-c5jjoh` (restarted from `main` @ `dca4411` after #63/#64 merged).
+Session offload: `.claude/sessions/profiles-pii-column-lockdown.md`. (§3AR = PR #65's OSV/XSS
+record, merged mid-session.)
+
+### The finding (verified live)
+- RLS "Profiles are viewable by everyone" is `FOR SELECT USING (true)` and anon/authenticated held
+  Supabase's default **table-level** SELECT, so the public anon key (in every frontend bundle) could
+  `GET /rest/v1/profiles?select=email,notification_email,contributor_claim_email` — plus home
+  lat/lng, demographics, billing and preferences — for all 15 live users. POPIA-relevant.
+- **Mig 082 had already "revoked" the billing columns — a silent no-op**: a column-level REVOKE does
+  nothing while a table-level GRANT stands. The only working shape is revoke-table + grant-allowlist.
+- Companion: authenticated users could self-UPDATE server-owned columns on their own row
+  (`billing_tier`, `contributor_hidden` = undo moderation, `force_reauth_at`, score, claim columns,
+  `contributor_kind`, and `contributor_slug` with no cooldown) — `protect_role_column()` only guards
+  role/status.
+- Also found + fixed in passing: `/api/ai-search` did `select('*')` on contributors and did not
+  filter `contributor_hidden` (moderated contributors could surface in AI search). Its JSON only ever
+  returned ids/scores, so it was **not** a second leak (an early in-session note said otherwise —
+  corrected). The contributor team route searched `ILIKE %email%` over every profile and returned
+  full addresses to any contributor — now exact-match only, no address returned.
+
+### Founder decisions (2026-09-26)
+- **Allowlist**: 33 PUBLIC columns (identity + listing fields + `wear_wardrobe_visibility`); **28
+  PRIVATE** (emails, home location/province, 5 demographics, billing ×2, preferences, notification
+  prefs/radius/digest, muted sources, learn enrolments, wear style, location_sharing, timezone,
+  terms/force_reauth/bio_setup, needs_re_review, claim internals). New columns are private by
+  default (contract R3.5).
+- **Fix the UPDATE hole now** (mig 175). **Numbering + rollout delegated**: 173 was claimed by the
+  intake (applied mid-session), so this work is 174–177, shipped expand/contract to close the leak
+  immediately without breaking the pre-174 production code.
+
+### Migrations (full detail + live probe results: `docs/SHARED_DB_CONTRACT.md` §9, R3.5, R3.6)
+| # | What | Live? |
+|---|---|---|
+| 174 | `get_my_profile_private()` (own-row reader), `update_notification_prefs` → SECDEF, `mark_my_terms_accepted()` | ✅ |
+| 175 | `trg_guard_profile_server_columns` (invoker; server-owned cols + DB slug cooldown); INSERT revoked from anon+auth | ✅ |
+| 176 | revoke table SELECT; grant 33 public + **5 transitional** flags the old prod code still reads | ✅ |
+| 177 | revoke the 5 transitional flags | ❌ **apply only after this branch's code is live in prod** |
+
+Advisors after: **0 ERROR** / 118 WARN / 3 INFO — only new findings are the 3 intended caller-row
+SECDEF RPC WARNs. (After apply, 176's and 177's header comments were corrected in the repo from "27"
+to "28" private columns — comment-only; the SQL is identical to what was applied.) Pre-apply snapshot `dca4411` (tag `connect-pre-mig174-profiles-privacy` exists
+locally only — the git proxy refused tag pushes). Rollback if ever needed: `grant select on
+public.profiles to anon, authenticated;` + `drop trigger trg_guard_profile_server_columns on
+public.profiles;`.
+
+### App code (Connect only — Vision/Wear/packages/edge functions verified unaffected)
+- Own-row private reads → `.rpc("get_my_profile_private").select(…)`: `middleware.ts`,
+  `/api/location`, `/api/preferences`, `/api/ai-search` (history log), `store.jsx` Settings meta.
+- `/api/terms/accept` → `rpc("mark_my_terms_accepted")`; `/api/contributor/setup` selects `role` only.
+- Admin reads of other users' email → `createAdminClient()` **after** `requireAdmin`:
+  `admin/users`, `admin/suggestions/export`, `admin/contributor-applications`,
+  `admin/pending-elevations`, `admin/api-keys` (owner-by-email).
+- `/api/ai-search`: explicit public column list + `contributor_hidden = false`.
+- `contributor/[handle]/team`: no email in member list or search results; partial email → 400; exact
+  match on the service-role client.
+
+### Gates
+lint 12/12 · typecheck 12/12 · test 11/11 (Connect **775 pass / 27 skipped** = the live probe) ·
+build 8/8 · `build-frontend.js` ✅. New tests: `__tests__/security/profiles-column-privacy.test.ts`
+(replays every GRANT/REVOKE on profiles across the lineage + scans Connect source for any user-client
+profiles select/embed naming a private column or `*`; mutation-tested), the `.live` twin (anon
+denied per column; runs when `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY` are exported, skipped in CI; logic
+validated against a fake PostgREST 27/27), `api/contributor-team.test.ts`.
+**Honest checkpoint:** Playwright e2e could **not** run here — the sandbox egress policy blocks
+unpkg/jsdelivr/Tailwind CDN (403), so React never loads (all 13 specs fail identically on the first
+`[data-screen="discover"]` wait, independent of this change). CI's `e2e-connect` job only runs on PRs
+to `main`, so the browser signal arrives when a PR is opened. The only frontend change is the
+Settings-meta read in `store.jsx` (best-effort, in try/catch).
+
+---
+
+## 3AT. CDN tags hardened on all 3 apps — supabase-js pinned + SRI, React production builds, build-enforced — PR #66 OPEN (2026-09-27)
 
 **Trigger:** §3AR's honest checkpoint. **Founder decision (AskUserQuestion):** fix **all three apps** in
 one PR — Connect, Wear and Vision had byte-identical tags. Branch `claude/pin-cdn-sri-react-prod`
 (from `main` b1e57db), commits `8763339` (fix) + `6176c6b` (eslint chore) + this RESUME commit.
-Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration — next migration # is still 174.**
+Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in this PR — next migration # is
+178** (PR #67, merged to `main` first, took 174–177 — see §3AS).
 
 ### What shipped
 - **supabase-js pinned:** `@supabase/supabase-js@2` (floating, no SRI) →
@@ -3382,6 +3457,17 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration — ne
 
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
+- **`profiles` PII lockdown (§3AS) — the leak is CLOSED live; one step remains.**
+  1. Founder: say the word and a PR is opened for `claude/gifted-pasteur-c5jjoh` (CI + Playwright
+     e2e run on it), then merge.
+  2. Once that production deployment is `READY`, **apply mig 177** (the 5 transitional flags) and
+     empty `TRANSITIONAL_UNTIL_177` in `profiles-column-privacy.live.test.ts`; re-run advisors.
+  3. Until the merge, pre-174 prod code degrades on admin-only / non-critical paths: admin screens
+     that show other users' emails, api-key owner-by-email, the personalization quiz save, and
+     contributors in AI-search results. Sign-in, setup, terms and live location are unaffected.
+  4. Optional: push the local tag `connect-pre-mig174-profiles-privacy` (→ `dca4411`) from a
+     machine with tag-push rights.
+
 - **Contributor Google Form → map intake:** phases 1–5 **LIVE** — PR #63's broken prod build was
   fixed by PR #64, which is **MERGED** (`dca4411`) with production **READY** on all three apps
   (§3AQ, §3AR). Next:
@@ -3390,12 +3476,12 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration — ne
      email → sign in with the same Google account → confirm dashboard landing → clean up the test
      listing).
 
-  See §3AP's "NEXT". Also still flagged separately: the `profiles` email PII exposure to anon.
-- **PR #66 (§3AS) — review + merge**, then confirm production `READY` on all three apps and sign in
+  See §3AP's "NEXT". (The `profiles` email PII exposure flagged here is FIXED — §3AS.)
+- **PR #66 (§3AT) — review + merge**, then confirm production `READY` on all three apps and sign in
   with Google on `www.citizenscentral.co.za` once (full OAuth round-trip). It pins supabase-js 2.110.0
   + SRI and ships React production builds on Connect/Wear/Vision, build-enforced. After merge,
-  **Dependabot bumps of supabase-js/react go red on Build until `index.html` follows** (by design, §3AS).
-- **Security/perf fast-follows** (pre-existing, none urgent-broken): **Wear has no CSP at all** (§3AS),
+  **Dependabot bumps of supabase-js/react go red on Build until `index.html` follows** (by design, §3AT).
+- **Security/perf fast-follows** (pre-existing, none urgent-broken): **Wear has no CSP at all** (§3AT),
   Tailwind Play CDN → static compile, SRI on lucide, `incremental: false` for vision/wear, and
   `packages/db` `src/memory.ts` tests to lift the branch floor 64 → 70.
 - **Bumping `maplibre-gl`** now requires re-copying the 4 vendored files into
@@ -3408,7 +3494,7 @@ Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration — ne
 > now **fails the build** unless every such tag pins the installed version with an SRI hash equal to
 > the installed file's sha384, and if any `*.development.js` would ship. Also fixed: Vision's 404 +
 > MIME console error on every load (stale raw bridge tag). All gates + Connect e2e 13/13 green;
-> browser-verified on all three apps under their real CSP. No migration (next # still 174). §3AS.
+> browser-verified on all three apps under their real CSP. No migration (next # is 178 — PR #67 took 174–177). §3AT.
 > **Founder action:** merge #66, then sign in with Google on prod once. Flagged: **Wear has no CSP.**
 >
 > **✅ 2026-09-27 — PR #64 MERGED (`dca4411`); production READY on connect/vision/wear;

@@ -104,13 +104,13 @@ export async function POST(request: Request) {
   }
 
   // Read existing preferences + demographic columns so we can deep-merge and
-  // recompute the cached percentages in a single round-trip.
+  // recompute the cached percentages in a single round-trip. All six are
+  // private profile columns (mig 176): caller-row RPC.
   const { data: existing, error: readError } = await supabase
-    .from("profiles")
+    .rpc("get_my_profile_private")
     .select(
       "preferences, gender, age_range, relationship_status, stage_of_life, energy_level",
     )
-    .eq("id", user.id)
     .maybeSingle();
   if (readError) {
     console.error("[API preferences] read", readError);

@@ -9,6 +9,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -134,7 +135,10 @@ export async function POST(request: NextRequest) {
     );
   }
   if (!ownerId && body.owner_email) {
-    const { data: owner } = await supabase
+    // Filtering on `email` needs SELECT on it — a private profiles column
+    // (mig 176). requireAdmin() above is the authorisation; the service-role
+    // client only performs this admin-gated exact-match lookup.
+    const { data: owner } = await createAdminClient()
       .from("profiles")
       .select("id")
       .eq("email", body.owner_email.trim().toLowerCase())

@@ -112,10 +112,11 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith("/api/auth") &&
     !pathname.startsWith("/auth")
   ) {
+    // force_reauth_at / bio_setup_required are private profile columns
+    // (migs 176/177) — read through the caller-row-only RPC.
     const { data: profile, error: profileErr } = await supabase
-      .from("profiles")
+      .rpc("get_my_profile_private")
       .select("force_reauth_at, bio_setup_required, role")
-      .eq("id", user.id)
       .maybeSingle();
 
     // Fail-closed on transient DB error: we cannot prove the session

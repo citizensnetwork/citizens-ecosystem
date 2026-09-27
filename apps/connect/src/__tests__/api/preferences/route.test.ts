@@ -26,9 +26,21 @@ describe("POST /api/preferences", () => {
       data: { user: { id: USER_ID } },
       error: null,
     });
-    // Default: existing preferences are empty.
+    // Default: existing preferences are empty. The read goes through the
+    // caller-row RPC (private columns, mig 176) and the write through
+    // from("profiles").update() — both resolve the shared chain here.
     mockClient._chain._result.data = { preferences: {} };
     mockClient._chain._result.error = null;
+    mockClient.rpc.mockReturnValue(mockClient._chain);
+  });
+
+  it("reads preferences + demographics via get_my_profile_private, not the table", async () => {
+    const res = await POST(makeRequest({ wyr: { crowd_size: "left" } }));
+    expect(res.status).toBe(200);
+    expect(mockClient.rpc).toHaveBeenCalledWith("get_my_profile_private");
+    expect(mockClient._chain.select).toHaveBeenCalledWith(
+      "preferences, gender, age_range, relationship_status, stage_of_life, energy_level",
+    );
   });
 
   it("returns 401 when user is not signed in", async () => {

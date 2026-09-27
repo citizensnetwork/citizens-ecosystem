@@ -38,18 +38,21 @@ const TEMPLATE_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 // Chains per table, reset in beforeEach
 let templateChain: ReturnType<typeof makeChain>;
 let signatureChain: ReturnType<typeof makeChain>;
-let profileUpdateChain: ReturnType<typeof makeChain>;
 
 const authGetUser = vi.fn();
+// terms_accepted_at is a private profiles column (migs 176/177): the stamp
+// goes through the caller-row RPC, never a direct profiles UPDATE.
+const rpc = vi.fn();
 
 const mockClient = {
   auth: { getUser: authGetUser },
   from: vi.fn((table: string) => {
     if (table === "indemnity_templates") return templateChain;
     if (table === "indemnity_signatures") return signatureChain;
-    if (table === "profiles") return profileUpdateChain;
+    if (table === "profiles") throw new Error("terms/accept must not touch public.profiles directly");
     return makeChain();
   }),
+  rpc,
 };
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -75,7 +78,7 @@ describe("POST /api/terms/accept", () => {
       error: null,
     });
     signatureChain = makeChain({ data: null, error: null });
-    profileUpdateChain = makeChain({ data: null, error: null });
+    rpc.mockResolvedValue({ data: null, error: null });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -121,7 +124,8 @@ describe("POST /api/terms/accept", () => {
     expect(insertPayload.event_id).toBeNull();
     expect(insertPayload.place_id).toBeNull();
     expect(insertPayload.ip_address).toBe("1.2.3.4");
-    expect(profileUpdateChain.update).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("mark_my_terms_accepted");
   });
 
   it("is idempotent: returns 'Already accepted' when signature already exists", async () => {
@@ -140,9 +144,9 @@ describe("POST /api/terms/accept", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.message).toBe("Already accepted");
-    // Race-free profile update still dispatched — DB-level .is() filter
-    // no-ops when terms_accepted_at already set, preserving original timestamp.
-    expect(profileUpdateChain.update).toHaveBeenCalledTimes(1);
+    // Race-free stamp still dispatched — the RPC's `terms_accepted_at IS
+    // NULL` guard no-ops when already set, preserving the original timestamp.
+    expect(rpc).toHaveBeenCalledWith("mark_my_terms_accepted");
   });
 
   it("rate-limits after repeated calls", async () => {

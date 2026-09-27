@@ -7,17 +7,28 @@ const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: nul
 const mockGetSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
 const mockSignOut = vi.fn().mockResolvedValue({ error: null });
 const mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+const mockRpc = vi.fn();
+const mockRpcSelect = vi.fn();
 
+// The profile gate reads force_reauth_at / bio_setup_required — private
+// profiles columns (migs 176/177) — through the caller-row RPC, never
+// `from("profiles")`. `from` throws so a regression to a direct table read
+// fails loudly here instead of 42501-ing in production.
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: { getUser: mockGetUser, getSession: mockGetSession, signOut: mockSignOut },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: mockMaybeSingle,
-        }),
-      }),
-    }),
+    from: () => {
+      throw new Error("middleware must not read public.profiles directly");
+    },
+    rpc: (...args: unknown[]) => {
+      mockRpc(...args);
+      return {
+        select: (...cols: unknown[]) => {
+          mockRpcSelect(...cols);
+          return { maybeSingle: mockMaybeSingle };
+        },
+      };
+    },
   })),
 }));
 
@@ -128,6 +139,8 @@ describe("middleware", () => {
     const { middleware } = await import("@/middleware");
     const response = await middleware(makeRequest("/events") as never);
     expect(response).toBe(mockNextResponse);
+    expect(mockRpc).toHaveBeenCalledWith("get_my_profile_private");
+    expect(mockRpcSelect).toHaveBeenCalledWith("force_reauth_at, bio_setup_required, role");
   });
 
   it("exports a config with matcher", async () => {
