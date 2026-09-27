@@ -49,4 +49,11 @@ buildFrontend({
     { key: 'API_BASE_URL', env: 'NEXT_PUBLIC_API_BASE_URL' },
     { key: 'MAPTILER_KEY', env: 'NEXT_PUBLIC_MAPTILER_KEY' },
   ],
+
+  // index.html loads supabase-js from jsDelivr, where OSV-Scanner can't see
+  // it. The build fails unless the tag pins the exact lockfile version with an
+  // SRI hash matching the installed package's bytes. React/ReactDOM can't be
+  // listed: Vision's npm React is 19 (no UMD build) while the page loads the
+  // 18.3.1 UMD from unpkg — their hashes are hand-verified (see index.html).
+  sriPackages: ['@supabase/supabase-js'],
 });

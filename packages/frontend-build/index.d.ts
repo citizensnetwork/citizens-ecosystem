@@ -62,6 +62,13 @@ export interface BuildFrontendOptions {
   mobileRequiredKeys?: string[];
   /** Human label for the mobile warning, e.g. "Supabase/MapTiler". */
   mobileMissingLabel?: string;
+  /**
+   * npm packages whose unpkg/jsDelivr `<script>` tags in index.html must pin
+   * the exact installed version and carry an SRI hash equal to the installed
+   * file's sha384 — checked before anything is built (see verifyCdnIntegrity).
+   * Default: [] (no check).
+   */
+  sriPackages?: string[];
   /** Env source. Default: process.env. */
   env?: Record<string, string | undefined>;
   /** Default: console.log */
@@ -81,6 +88,18 @@ export interface BuildFrontendResult {
   capacitorBridgeFile: string;
   /** The resolved config object written to dest/config.js. */
   config: Record<string, string>;
+  /** Every CDN script URL whose pin + SRI hash was checked against node_modules. */
+  sriVerified: VerifiedCdnScript[];
+}
+
+/** One CDN script URL checked by verifyCdnIntegrity. */
+export interface VerifiedCdnScript {
+  /** npm package name, e.g. "@supabase/supabase-js". */
+  name: string;
+  /** Exact pinned version, equal to the installed one. */
+  version: string;
+  /** File path inside the package, e.g. "/dist/umd/supabase.js". */
+  file: string;
 }
 
 /** Files the pipeline compiles/generates itself — excluded from the generic copy. */
@@ -103,8 +122,27 @@ export declare function resolveConfigValues(args: {
   local: Record<string, string | undefined>;
 }): Record<string, string>;
 
-/** Rewrite index.html onto the hashed outputs (pure). */
+/**
+ * Rewrite index.html onto the hashed outputs (pure). Also swaps every
+ * `<script data-prod-src data-prod-integrity>` development tag for its
+ * production twin; throws if only one of the two attributes is declared.
+ */
 export declare function rewriteIndexHtml(
   html: string,
   files: { bundleFile: string; authClientFile: string; capacitorBridgeFile: string },
 ): string;
+
+/** Subresource Integrity value ("sha384-<base64>") of the exact bytes given. */
+export declare function sriOf(content: string | Uint8Array): string;
+
+/**
+ * Check the unpkg/jsDelivr `<script>` URLs (`src` and `data-prod-src`) of the
+ * listed packages against their installed copies (resolved from `rootDir`
+ * upward): exact version = installed version, explicit existing file, SRI =
+ * sha384 of that file, `crossorigin="anonymous"` on `src` tags, and every
+ * listed package present at least once. Throws on the first violation.
+ */
+export declare function verifyCdnIntegrity(
+  html: string,
+  options: { rootDir: string; packages: string[] },
+): VerifiedCdnScript[];

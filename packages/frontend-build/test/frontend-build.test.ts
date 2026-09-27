@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as esbuild from 'esbuild';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +11,8 @@ import {
   renderConfigJs,
   resolveConfigValues,
   rewriteIndexHtml,
+  sriOf,
+  verifyCdnIntegrity,
 } from '../index.js';
 import type { BuildFrontendOptions, ConfigVar } from '../index.js';
 
@@ -291,6 +294,31 @@ describe('pure helpers', () => {
     expect(html).not.toContain('auth-client.js?v=');
   });
 
+  it('rewriteIndexHtml drops a raw capacitor-bridge tag — only the hashed bridge ships', () => {
+    const src = INDEX_HTML.replace(
+      '<script src="auth-client.js?v=42"></script>',
+      '<script src="capacitor-bridge.js?v=1"></script>\n  <script src="auth-client.js?v=42"></script>',
+    );
+    const html = rewriteIndexHtml(src, {
+      bundleFile: 'bundle.0123456789.js',
+      authClientFile: 'auth-client.0123456789.js',
+      capacitorBridgeFile: 'capacitor-bridge.0123456789.js',
+    });
+    expect(html).not.toContain('capacitor-bridge.js');
+    expect(html.match(/capacitor-bridge\.0123456789\.js/g)).toHaveLength(1);
+    expect(html.indexOf('capacitor-bridge.0123456789.js')).toBeLessThan(
+      html.indexOf('auth-client.0123456789.js'),
+    );
+  });
+
+  it('sriOf emits the standard sha384 SRI form', () => {
+    // Well-known SRI of the empty string.
+    expect(sriOf('')).toBe(
+      'sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb',
+    );
+    expect(sriOf(Buffer.from('x'))).toBe(sriOf('x'));
+  });
+
   it('DEFAULT_SPECIAL_FILES matches the historical set', () => {
     expect([...DEFAULT_SPECIAL_FILES]).toEqual([
       'app',
@@ -299,5 +327,284 @@ describe('pure helpers', () => {
       'index.html',
       'capacitor-bridge.js',
     ]);
+  });
+});
+
+// ── CDN pinning, SRI verification, production twins ─────────────────────────
+
+const REACT_DEV = '/* react dev build */ window.React = {};\n';
+const REACT_PROD = '/* react prod build */ window.React={};\n';
+const SUPA_UMD = '/* supabase umd */ window.supabase = {};\n';
+
+/** Independent oracle — deliberately not sriOf(). */
+function sri(content: string): string {
+  return `sha384-${crypto.createHash('sha384').update(content).digest('base64')}`;
+}
+
+/** Fake an installed npm package: <dir>/node_modules/<name>/{package.json, …files}. */
+function installPackage(
+  dir: string,
+  name: string,
+  version: string,
+  files: Record<string, string>,
+): void {
+  const pkgDir = path.join(dir, 'node_modules', ...name.split('/'));
+  fs.mkdirSync(pkgDir, { recursive: true });
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name, version }));
+  for (const [rel, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(pkgDir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, rel), content);
+  }
+}
+
+const REACT_DEV_URL = 'https://unpkg.com/react@18.3.1/umd/react.development.js';
+const REACT_PROD_URL = 'https://unpkg.com/react@18.3.1/umd/react.production.min.js';
+const SUPA_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js';
+
+const reactTag = (extra = '') =>
+  `<script src="${REACT_DEV_URL}" integrity="${sri(REACT_DEV)}" crossorigin="anonymous" data-prod-src="${REACT_PROD_URL}" data-prod-integrity="${sri(REACT_PROD)}"${extra}></script>`;
+const supaTag = (url = SUPA_URL, attrs = `integrity="${sri(SUPA_UMD)}" crossorigin="anonymous"`) =>
+  `<script src="${url}" ${attrs}></script>`;
+
+function installCdnPackages(dir: string): void {
+  installPackage(dir, 'react', '18.3.1', {
+    'umd/react.development.js': REACT_DEV,
+    'umd/react.production.min.js': REACT_PROD,
+  });
+  installPackage(dir, '@supabase/supabase-js', '2.110.0', { 'dist/umd/supabase.js': SUPA_UMD });
+}
+
+const SRI_PACKAGES = ['react', '@supabase/supabase-js'];
+
+describe('verifyCdnIntegrity', () => {
+  beforeEach(() => installCdnPackages(rootDir));
+
+  const verify = (html: string, packages: string[] = SRI_PACKAGES) =>
+    verifyCdnIntegrity(html, { rootDir, packages });
+
+  it('accepts exact pins whose hashes match the installed bytes (src + data-prod-src)', () => {
+    expect(verify(`${reactTag()}\n${supaTag()}`)).toEqual([
+      { name: 'react', version: '18.3.1', file: '/umd/react.development.js' },
+      { name: 'react', version: '18.3.1', file: '/umd/react.production.min.js' },
+      { name: '@supabase/supabase-js', version: '2.110.0', file: '/dist/umd/supabase.js' },
+    ]);
+  });
+
+  it('resolves packages from a parent node_modules (monorepo hoisting)', () => {
+    const child = path.join(rootDir, 'apps', 'child');
+    fs.mkdirSync(child, { recursive: true });
+    expect(
+      verifyCdnIntegrity(supaTag(), { rootDir: child, packages: ['@supabase/supabase-js'] }),
+    ).toHaveLength(1);
+  });
+
+  it('is a no-op without packages, and ignores unlisted packages + non-npm URLs', () => {
+    const html = `${supaTag('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')}\n<script src="https://cdn.tailwindcss.com"></script>`;
+    expect(verify(html, [])).toEqual([]);
+    expect(verify(`${reactTag()}\n${html}`, ['react'])).toHaveLength(2);
+  });
+
+  const SUPA_BASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js';
+  it.each([
+    ['a floating major', `${SUPA_BASE}@2`, /pin an exact version/],
+    ['a range', `${SUPA_BASE}@^2.110.0/dist/umd/supabase.js`, /pin an exact version/],
+    [
+      'no version',
+      'https://unpkg.com/@supabase/supabase-js/dist/umd/supabase.js',
+      /pin an exact version/,
+    ],
+    ['no file path', `${SUPA_BASE}@2.110.0`, /explicit file path/],
+    ['a directory path', `${SUPA_BASE}@2.110.0/dist/`, /explicit file path/],
+    ['version drift', `${SUPA_BASE}@2.117.2/dist/umd/supabase.js`, /lockfile installs 2\.110\.0/],
+    ['a file absent from the package', `${SUPA_BASE}@2.110.0/dist/umd/nope.js`, /does not exist/],
+    [
+      'a path escaping the package',
+      `${SUPA_BASE}@2.110.0/../../react/package.json`,
+      /does not exist/,
+    ],
+    ['a directory inside the package', `${SUPA_BASE}@2.110.0/dist/umd`, /does not exist/],
+  ])('rejects %s', (_label, url, message) => {
+    expect(() => verify(supaTag(url), ['@supabase/supabase-js'])).toThrow(message);
+  });
+
+  it('rejects a wrong hash and names the expected one', () => {
+    const html = supaTag(SUPA_URL, `integrity="${sri('tampered')}" crossorigin="anonymous"`);
+    expect(() => verify(html, ['@supabase/supabase-js'])).toThrow(
+      `expected integrity="${sri(SUPA_UMD)}"`,
+    );
+  });
+
+  it('rejects a missing hash', () => {
+    const html = supaTag(SUPA_URL, 'crossorigin="anonymous"');
+    expect(() => verify(html, ['@supabase/supabase-js'])).toThrow(/integrity="" does not match/);
+  });
+
+  it('rejects a wrong production-twin hash', () => {
+    const html = reactTag().replace(sri(REACT_PROD), sri('stale'));
+    expect(() => verify(html, ['react'])).toThrow(/data-prod-integrity=".*" does not match/);
+  });
+
+  it('rejects a src tag without crossorigin="anonymous"', () => {
+    const html = supaTag(SUPA_URL, `integrity="${sri(SUPA_UMD)}"`);
+    expect(() => verify(html, ['@supabase/supabase-js'])).toThrow(/crossorigin="anonymous"/);
+  });
+
+  it('rejects a listed package that is not installed', () => {
+    const html =
+      '<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>';
+    expect(() => verify(html, ['react-dom'])).toThrow(/react-dom is not installed/);
+  });
+
+  it('checks tags written in any case (no <SCRIPT> bypass)', () => {
+    const upper = `<SCRIPT SRC="${SUPA_URL}" INTEGRITY="${sri('tampered')}" CROSSORIGIN="anonymous"></SCRIPT>`;
+    expect(() => verify(upper, ['@supabase/supabase-js'])).toThrow(/does not match/);
+    const ok = `<SCRIPT SRC="${SUPA_URL}" INTEGRITY="${sri(SUPA_UMD)}" CROSSORIGIN="anonymous"></SCRIPT>`;
+    expect(verify(ok, ['@supabase/supabase-js'])).toHaveLength(1);
+  });
+
+  it('rethrows read failures other than "no such file" instead of masking them', () => {
+    const realRead = fs.readFileSync;
+    const spy = vi.spyOn(fs, 'readFileSync').mockImplementation(((
+      file: fs.PathOrFileDescriptor,
+      ...rest: unknown[]
+    ) => {
+      if (String(file).endsWith('supabase.js')) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      }
+      return (realRead as (...a: unknown[]) => unknown)(file, ...rest);
+    }) as typeof fs.readFileSync);
+    try {
+      expect(() => verify(supaTag(), ['@supabase/supabase-js'])).toThrow(/EACCES/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('rejects a listed package that index.html never loads', () => {
+    expect(() => verify(supaTag())).toThrow(/sriPackages lists "react" but index\.html has no/);
+  });
+});
+
+describe('rewriteIndexHtml — production twins', () => {
+  const files = {
+    bundleFile: 'bundle.0123456789.js',
+    authClientFile: 'auth-client.0123456789.js',
+    capacitorBridgeFile: 'capacitor-bridge.0123456789.js',
+  };
+
+  it('swaps the development tag for its production twin, keeping other attributes', () => {
+    const html = rewriteIndexHtml(`${reactTag(' defer id="react"')}\n${INDEX_HTML}`, files);
+    expect(html).toContain(
+      `<script src="${REACT_PROD_URL}" integrity="${sri(REACT_PROD)}" crossorigin="anonymous" defer id="react"></script>`,
+    );
+    expect(html).not.toContain('react.development.js');
+    expect(html).not.toContain('data-prod-');
+  });
+
+  it('swaps upper-case tags and a spaced closing tag too', () => {
+    const tag = `<SCRIPT SRC="${REACT_DEV_URL}" DATA-PROD-SRC="${REACT_PROD_URL}" DATA-PROD-INTEGRITY="${sri(REACT_PROD)}"></script >`;
+    expect(rewriteIndexHtml(tag, files)).toBe(
+      `<script src="${REACT_PROD_URL}" integrity="${sri(REACT_PROD)}" crossorigin="anonymous"></script>`,
+    );
+  });
+
+  it('forces crossorigin="anonymous" on the twin even when the dev tag omitted it', () => {
+    const tag = `<script src="${REACT_DEV_URL}" data-prod-src="${REACT_PROD_URL}" data-prod-integrity="${sri(REACT_PROD)}"></script>`;
+    expect(rewriteIndexHtml(tag, files)).toBe(
+      `<script src="${REACT_PROD_URL}" integrity="${sri(REACT_PROD)}" crossorigin="anonymous"></script>`,
+    );
+  });
+
+  it('leaves tags without a twin untouched', () => {
+    expect(rewriteIndexHtml(supaTag(), files)).toBe(supaTag());
+  });
+
+  it.each([
+    [
+      'data-prod-src alone',
+      `<script src="${REACT_DEV_URL}" data-prod-src="${REACT_PROD_URL}"></script>`,
+    ],
+    [
+      'data-prod-integrity alone',
+      `<script src="${REACT_DEV_URL}" data-prod-integrity="${sri(REACT_PROD)}"></script>`,
+    ],
+  ])('rejects %s', (_label, tag) => {
+    expect(() => rewriteIndexHtml(tag, files)).toThrow(/must be declared together/);
+  });
+});
+
+describe('buildFrontend — CDN scripts', () => {
+  const srcIndex = () => path.join(rootDir, 'src', 'frontend', 'index.html');
+  const withCdnTags = (tags: string) =>
+    fs.writeFileSync(
+      srcIndex(),
+      INDEX_HTML.replace('<div id="root"></div>', `<div id="root"></div>\n  ${tags}`),
+    );
+
+  beforeEach(() => installCdnPackages(rootDir));
+
+  it('verifies pins, ships the production twin, and logs what it checked', () => {
+    withCdnTags(`${reactTag()}\n  ${supaTag()}`);
+    const log = vi.fn();
+    const result = buildFrontend(makeOptions(rootDir, { sriPackages: SRI_PACKAGES, log }));
+
+    expect(result.sriVerified).toHaveLength(3);
+    const html = fs.readFileSync(path.join(result.dest, 'index.html'), 'utf8');
+    expect(html).toContain(`src="${REACT_PROD_URL}" integrity="${sri(REACT_PROD)}"`);
+    expect(html).toContain(supaTag());
+    expect(html).not.toContain('.development.js');
+    expect(log).toHaveBeenCalledWith(
+      '[build-frontend] Verified 3 CDN SRI hashes against installed react@18.3.1, @supabase/supabase-js@2.110.0',
+    );
+    // The source keeps the development build for local no-build dev.
+    expect(fs.readFileSync(srcIndex(), 'utf8')).toContain(REACT_DEV_URL);
+  });
+
+  it('fails fast — nothing is written when a hash is wrong', () => {
+    withCdnTags(supaTag(SUPA_URL, `integrity="${sri('tampered')}" crossorigin="anonymous"`));
+    expect(() =>
+      buildFrontend(makeOptions(rootDir, { sriPackages: ['@supabase/supabase-js'] })),
+    ).toThrow(/does not match the installed package bytes/);
+    expect(fs.existsSync(path.join(rootDir, 'public'))).toBe(false);
+  });
+
+  it('refuses an upper-case development tag too', () => {
+    withCdnTags(`<SCRIPT SRC="${REACT_DEV_URL}"></SCRIPT>`);
+    expect(() => buildFrontend(makeOptions(rootDir))).toThrow(/still loads a development build/);
+  });
+
+  it('refuses to ship a development build that declares no production twin', () => {
+    withCdnTags(
+      `<script src="${REACT_DEV_URL}" integrity="${sri(REACT_DEV)}" crossorigin="anonymous"></script>`,
+    );
+    expect(() => buildFrontend(makeOptions(rootDir))).toThrow(
+      /built index\.html still loads a development build/,
+    );
+    expect(fs.existsSync(path.join(rootDir, 'public'))).toBe(false);
+  });
+
+  it('uses the singular for a single verified hash', () => {
+    withCdnTags(supaTag());
+    const log = vi.fn();
+    buildFrontend(makeOptions(rootDir, { sriPackages: ['@supabase/supabase-js'], log }));
+    expect(log).toHaveBeenCalledWith(
+      '[build-frontend] Verified 1 CDN SRI hash against installed @supabase/supabase-js@2.110.0',
+    );
+  });
+
+  it('logs nothing about SRI when no packages are listed', () => {
+    const log = vi.fn();
+    const result = buildFrontend(makeOptions(rootDir, { log }));
+    expect(result.sriVerified).toEqual([]);
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining('SRI'));
+  });
+
+  it.each([
+    ['a non-array', 'react'],
+    ['an empty name', ['react', '']],
+  ])('rejects sriPackages given as %s', (_label, sriPackages) => {
+    expect(() =>
+      buildFrontend(makeOptions(rootDir, { sriPackages: sriPackages as unknown as string[] })),
+    ).toThrow(/options\.sriPackages/);
   });
 });

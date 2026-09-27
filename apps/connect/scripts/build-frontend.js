@@ -6,11 +6,11 @@
  * config.js from env vars.
  *
  * The pipeline itself lives in @citizens/frontend-build (ecosystem Step 4),
- * vendored at vendor/citizens-frontend-build — canonical source is
- * citizens-wear/packages/frontend-build, see vendor/README.md. This file only
- * supplies Connect's configuration: screen load order, env-var mapping, and
- * the mobile API base. esbuild is passed in from HERE so the output is built
- * with this app's own pinned esbuild version.
+ * consumed as a workspace package (workspace:* → packages/frontend-build, see
+ * its README). This file only supplies Connect's configuration: screen load
+ * order, env-var mapping, the mobile API base, and which CDN scripts must match
+ * the lockfile. esbuild is passed in from HERE so the output is built with this
+ * app's own pinned esbuild version.
  *
  * Run automatically before `next build` via the package.json build script.
  * The generated config.js is gitignored — it must be re-generated on every
@@ -119,4 +119,10 @@ buildFrontend({
   ],
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MAPTILER_KEY'],
   mobileMissingLabel: 'Supabase/MapTiler',
+
+  // index.html loads these from unpkg/jsDelivr, where OSV-Scanner can't see
+  // them. The build fails unless each tag pins the exact lockfile version with
+  // an SRI hash matching the installed package's bytes — the same job
+  // assertMaplibreVendorInSync does for the vendored map runtime.
+  sriPackages: ['react', 'react-dom', '@supabase/supabase-js'],
 });

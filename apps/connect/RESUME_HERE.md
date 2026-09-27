@@ -3308,6 +3308,7 @@ that the summary omitted entirely. Working log: `.claude/sessions/osv-scan-26-vu
   exact version + SRI, or vendor it the way maplibre now is.
 - Still open from earlier: Tailwind **Play CDN** in production (§3AN), no SRI on the lucide tag (§3AN),
   `incremental: true` in `apps/vision` / `apps/wear` tsconfigs (§3AQ).
+- → The first two bullets are **FIXED in §3AT** (PR #66), on all three apps.
 
 ---
 
@@ -3416,6 +3417,91 @@ Settings-meta read in `store.jsx` (best-effort, in try/catch).
 
 ---
 
+## 3AT. CDN tags hardened on all 3 apps — supabase-js pinned + SRI, React production builds, build-enforced — PR #66 OPEN (2026-09-27)
+
+**Trigger:** §3AR's honest checkpoint. **Founder decision (AskUserQuestion):** fix **all three apps** in
+one PR — Connect, Wear and Vision had byte-identical tags. Branch `claude/pin-cdn-sri-react-prod`
+(from `main` b1e57db), commits `8763339` (fix) + `6176c6b` (eslint chore) + this RESUME commit.
+Working log: `.claude/sessions/cdn-sri-pin-react-prod.md`. **No migration in this PR — next migration # is
+178** (PR #67, merged to `main` first, took 174–177 — see §3AS).
+
+### What shipped
+- **supabase-js pinned:** `@supabase/supabase-js@2` (floating, no SRI) →
+  `@2.110.0/dist/umd/supabase.js` + `integrity="sha384-3wY11…"` + `crossorigin="anonymous"`. 2.110.0 =
+  the lockfile's only version (all apps), so browser and server stay in step and OSV-Scanner's lockfile
+  scan now covers the browser copy. **Note:** jsDelivr's `@2` was serving **2.117.2**, so browsers step
+  *back* 7 minors — deliberate. OSV: no advisories on supabase-js/auth-js at either version. auth-js diff:
+  **stored session shape identical** (signed-in users keep sessions); only the PKCE verifier key became
+  flow-scoped in 2.117.2 → a user mid-Google-sign-in at the deploy instant may need to click again.
+- **React production builds in built output only:** each dev tag in `src/frontend/index.html` carries
+  `data-prod-src` + `data-prod-integrity`; the shared pipeline swaps them in `public/` / `mobile-dist/`
+  (same split as the Babel strip). Local no-build dev (`:3001`) keeps dev builds + full warnings.
+  React payload **1.19 MB → 142 KB raw, 262 → 47 KB gzip**.
+- **Every hash computed from TWO sources** (live CDN bytes + lockfile-verified `node_modules` bytes) —
+  all 5 matched, incl. confirming the 2 existing dev hashes. CSP **unchanged** (same hosts).
+- **`@citizens/frontend-build` 0.1.0 → 0.2.0 — the build now enforces it.** New `sriPackages` option:
+  before writing anything, every unpkg/jsDelivr `<script>` (`src` + `data-prod-src`) of a listed package
+  must pin the **exact installed version**, name an existing file, have SRI == sha384 of the installed
+  file, and (`src`) `crossorigin="anonymous"`; each listed package must appear. Error prints the expected
+  hash. Plus: build fails if any `*.development.js` script would ship. Connect/Wear list `react`,
+  `react-dom`, `@supabase/supabase-js`; **Vision only supabase-js** (its npm React is 19 — no UMD to
+  compare; its React hashes are hand-verified, commented in its index.html). README documents it.
+- **Found + fixed (pre-existing):** Vision's built `index.html` kept a raw `capacitor-bridge.js?v=1` tag
+  next to the hashed bridge → **404 + strict-MIME console error on every production load**.
+  `rewriteIndexHtml` now drops raw bridge tags.
+- Connect ESLint ignores generated `coverage/` (like Vision/root). Stale "vendored copy" docs fixed
+  (package README consumers table, Connect wrapper comment — all apps are `workspace:*`).
+- **CI's CodeQL caught 2 high alerts in the new verifier → fixed (`2863a81`):** the `<script>` regexes
+  were case-sensitive (an upper-case `<SCRIPT>` dev tag would have bypassed the SRI check + dev-build
+  guard) → now case-insensitive; and stat/exists-then-read was a TOCTOU race → single-step
+  `readFileOrNull` (only ENOENT/EISDIR/ENOTDIR = absent; other I/O errors rethrown). +4 tests (55).
+  Founder turned on Auto-fix + asked to merge once green.
+- **CI then went red on Connect typecheck — `resolveSlug.ts: Module "react" has no exported member
+  'cache'` — the SAME "phantom" as §3AQ, on untouched code. REAL ROOT CAUSE found (corrects §3AQ):**
+  with @types/react 18, `cache` only exists once `react/canary`/`experimental` is loaded; Next's types
+  reference `react/experimental`, and tsc resolves that from inside the pnpm store via pnpm's **hidden
+  hoist** (`node_modules/.pnpm/node_modules/@types/react`), which holds whichever ONE of the repo's
+  three @types/react (Connect 18.3.31, Wear 18.3.3, Vision 19.2.17) pnpm hoisted — so identical code
+  flipped green/red between installs. **Reproduced locally** by re-pointing that hoist at 18.3.3 and
+  at 19.2.17 (exact CI error both times). **Fix:** `apps/connect/src/types/react-canary.d.ts` →
+  `/// <reference types="react/canary" />`, which resolves through `apps/connect/node_modules`
+  (Connect's own pinned copy). Proven: connect/wear/vision `tsc` green under **all 3** hoists. §3AQ's
+  stale-tsbuildinfo diagnosis was most likely coincidental (`incremental: false` is harmless; kept).
+  **Independently confirmed:** a parallel session hit the same error on PR #68's preview and landed the
+  *identical* fix on `main` first (`10753c9`, also verified `next build`, and corrected the tsconfig
+  comment) — this branch adopted `main`'s copy of the file when merging.
+- Merged `main` twice (PR #67, then #68 landed meanwhile — #67's RESUME section also took §3AS, hence
+  this is §3AT).
+
+### Gates + verification (final tree)
+- Root `format:check` · `lint` 12/12 · `typecheck` 12/12 · `test` 11/11 (Connect 759, Vision 734, Wear 115,
+  db 127, frontend-build **51**, 100% lines) · `build` 8/8 (logs "Verified 5/5/1 CDN SRI hashes");
+  Connect **e2e 13/13**. Guard proven vs real packages: floating `@2`, tampered hash, version drift,
+  stale twin hash — all caught.
+- Browser, `next start` (real CSP): **Connect** 44 markers, maplibre 6.11.2, guest browse + Kingdom
+  Exploration, Google handoff → Supabase authorize → Google (stopped, no creds), 0 errors/CSP/SRI
+  violations. **Wear** prod React + SRI, sign-in form, handoff OK, 0 errors. **Vision** prod React + SRI,
+  handoff OK, 0 console messages after the bridge fix. No-build dev: dev React + SRI OK.
+
+### ⚠️ Know this going forward
+- **Dependabot (weekly npm) bumps of supabase-js / react / react-dom will go red on Build** until
+  `index.html` follows — the guard working. Fix: move the URL to the new version, paste the hash the
+  error prints, sanity-check with `curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A`.
+- Local-verification gaps (pre-existing, Vercel unaffected): Wear's and Vision's `.env.local` hold no
+  Supabase vars (Wear: only `VERCEL_OIDC_TOKEN`) → local builds get a blank `config.js`, and **Vision's
+  `next start` 500s on every request** (its proxy needs the URL + anon key). Workaround used: inject the
+  shared project's two public `NEXT_PUBLIC_SUPABASE_*` values from Connect's `.env.local`.
+
+### Honest checkpoint — flagged, not fixed
+- **Wear serves NO Content-Security-Policy at all** (no headers in next.config, no middleware CSP).
+  Connect and Vision both have one. Worth its own careful PR (Wear uses inline scripts + CDNs).
+- Still open: Tailwind Play CDN + lucide without SRI (§3AN); `incremental: true` in vision/wear (§3AQ);
+  `packages/db` branch floor 64 → 70 (§3AR).
+- The full OAuth round-trip (land signed-in after Google) needs a real login — **founder to confirm on
+  prod after merge** (handoff itself verified on all three apps).
+
+---
+
 ## ▶▶ NEXT STEPS (start here in a fresh chat)
 
 - **`profiles` PII lockdown (§3AS) — ✅ DONE.** Migs 174–177 live, PR #67 merged + deployed,
@@ -3435,14 +3521,27 @@ Settings-meta read in `store.jsx` (best-effort, in try/catch).
      listing).
 
   See §3AP's "NEXT". (The `profiles` email PII exposure flagged here is FIXED — §3AS.)
-- **Security/perf fast-follows from §3AR's honest checkpoint** (pre-existing, none urgent-broken):
-  pin + SRI `@supabase/supabase-js` (currently `@2`, no SRI), React dev → production builds,
+- **PR #66 (§3AT) — review + merge**, then confirm production `READY` on all three apps and sign in
+  with Google on `www.citizenscentral.co.za` once (full OAuth round-trip). It pins supabase-js 2.110.0
+  + SRI and ships React production builds on Connect/Wear/Vision, build-enforced. After merge,
+  **Dependabot bumps of supabase-js/react go red on Build until `index.html` follows** (by design, §3AT).
+- **Security/perf fast-follows** (pre-existing, none urgent-broken): **Wear has no CSP at all** (§3AT),
   Tailwind Play CDN → static compile, SRI on lucide, `incremental: false` for vision/wear, and
   `packages/db` `src/memory.ts` tests to lift the branch floor 64 → 70.
 - **Bumping `maplibre-gl`** now requires re-copying the 4 vendored files into
   `src/frontend/vendor/maplibre-gl/` — the build fails loudly if you forget (§3AR).
 
-> **✅ 2026-09-27 (latest) — PR #64 MERGED (`dca4411`); production READY on connect/vision/wear;
+> **⏳ 2026-09-27 (latest) — PR #66 OPEN: CDN tags hardened on all three apps.** supabase-js was
+> `@2` (floating, no SRI) on the pages holding auth sessions → now exact lockfile `2.110.0` + SRI;
+> production shipped React **dev** builds → built output now ships `*.production.min.js` (−82% React
+> bytes over the wire), while local no-build dev keeps dev builds. `@citizens/frontend-build` 0.2.0
+> now **fails the build** unless every such tag pins the installed version with an SRI hash equal to
+> the installed file's sha384, and if any `*.development.js` would ship. Also fixed: Vision's 404 +
+> MIME console error on every load (stale raw bridge tag). All gates + Connect e2e 13/13 green;
+> browser-verified on all three apps under their real CSP. No migration (next # is 178 — PR #67 took 174–177). §3AT.
+> **Founder action:** merge #66, then sign in with Google on prod once. Flagged: **Wear has no CSP.**
+>
+> **✅ 2026-09-27 — PR #64 MERGED (`dca4411`); production READY on connect/vision/wear;
 > a LIVE critical map XSS is patched.** CI's OSV-Scanner found **26 advisories (5 Critical, 14 High)**
 > — not the 3 a pasted third-party summary claimed — all fixed via `pnpm.overrides` + direct bumps.
 > The real find: the production homepage loaded **MapLibre v4.7.1 from unpkg**, exposed to a

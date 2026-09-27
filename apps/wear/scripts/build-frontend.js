@@ -73,4 +73,9 @@ buildFrontend({
   ],
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'],
   mobileMissingLabel: 'Supabase',
+
+  // index.html loads these from unpkg/jsDelivr, where OSV-Scanner can't see
+  // them. The build fails unless each tag pins the exact lockfile version with
+  // an SRI hash matching the installed package's bytes.
+  sriPackages: ['react', 'react-dom', '@supabase/supabase-js'],
 });
