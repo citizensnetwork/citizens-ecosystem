@@ -144,6 +144,12 @@ Priority: **P1** = do next · **P2** = soon · **P3** = when convenient · **Par
 an account or money. Size: **S** = under a session · **M** = one session · **L** = several sessions, or a
 design session first.
 
+> **Founder triage (2026-09-27):** the founder marks each item below Work on / Re-prioritise / Discard on the
+> private triage page https://claude.ai/artifact/TdWoi7nAjPFg35zrh7zWpR. Before planning work, read those
+> decisions with the `ArtifactData` tool (`action: "list"`, `collection: "decisions"`; one document per item
+> ID with `decision`, `priority`, `note`), apply them to this section, and then treat this section as the source
+> of truth again.
+
 ### A. Founder actions (no code needed)
 | ID | Item | Pri |
 |---|---|---|
