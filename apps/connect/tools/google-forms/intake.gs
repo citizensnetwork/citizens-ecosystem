@@ -6,7 +6,8 @@
  * row to Connect (HMAC-signed), Connect puts the Contributor live on the map
  * and in Kingdom Discovery, this script writes Status / Listing URL /
  * Processed at / Notes back to the row, then emails the owner a welcome
- * asking them to sign in with Google using their owner email.
+ * asking them to sign in with their owner email (a 6-digit emailed code, or
+ * Google if that address is a Google account).
  *
  * Setup: see README.md in this folder (run setup() once).
  * Server side: apps/connect/src/app/api/intake/google-form/route.ts.
@@ -302,20 +303,30 @@ function sendWelcome_(ownerEmail, orgName, listingUrl) {
     '<p>Thank you for joining the Body on Citizens Connect — you\'re now on the map and in Kingdom Discovery, ' +
     'where citizens across the city can find, follow and connect with you.</p>' +
     '<p><a href="' + safeListingUrl + '" style="color:#A67C00">View your listing</a></p>' +
-    '<p><strong>To manage your profile</strong>, sign in with <strong>Google</strong> using exactly ' +
-    '<strong>' + safeEmail + '</strong>:</p>' +
+    '<p><strong>To manage your profile</strong>, sign in with <strong>' + safeEmail + '</strong>. ' +
+    'You don\'t need a Google account:</p>' +
+    '<ol style="padding-left:20px;margin:0 0 14px">' +
+    '<li>Open <a href="' + signInUrl + '" style="color:#A67C00">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>' +
+    '<li>Enter <strong>' + safeEmail + '</strong>. We\'ll email you a 6-digit code (check your junk folder too).</li>' +
+    '<li>Type the code in. You\'ll land on your Contributor dashboard.</li>' +
+    '</ol>' +
     '<p><a href="' + signInUrl + '" style="display:inline-block;background:#A67C00;color:#fff;padding:12px 20px;' +
     'border-radius:10px;text-decoration:none;font-weight:bold">Sign in to your Contributor Portal</a></p>' +
-    '<p style="font-size:13px;color:#555">Signed in with a different Google account by mistake? Sign out, then sign in ' +
-    'again with ' + safeEmail + ' — your listing belongs to that address.</p>' +
+    '<p style="font-size:13px;color:#555">Is ' + safeEmail + ' a Google account? You can tap the Google button instead. ' +
+    'Signed in with a different address by mistake? Sign out, then sign in again with ' + safeEmail +
+    ' — your listing belongs to that address.</p>' +
     '<p>Connecting the Kingdom — one citizen, one contributor, one need at a time.<br>The Citizens Connect team</p>' +
     '</div>';
 
   var text =
     orgName + ' is live on Citizens Connect.\n\n' +
     'View your listing: ' + listingUrl + '\n\n' +
-    'To manage your profile, sign in with Google using exactly ' + ownerEmail + ':\n' + appUrl + '/dashboard\n\n' +
-    'Signed in with a different Google account? Sign out, then sign in again with ' + ownerEmail + '.\n\n' +
+    'To manage your profile, sign in with ' + ownerEmail + '. You don\'t need a Google account:\n' +
+    '1. Open ' + appUrl + '/dashboard and tap "Continue with email".\n' +
+    '2. Enter ' + ownerEmail + '. We\'ll email you a 6-digit code (check your junk folder too).\n' +
+    '3. Type the code in. You\'ll land on your Contributor dashboard.\n\n' +
+    'Is ' + ownerEmail + ' a Google account? You can tap the Google button instead.\n' +
+    'Signed in with a different address by mistake? Sign out, then sign in again with ' + ownerEmail + '.\n\n' +
     'The Citizens Connect team';
 
   MailApp.sendEmail({

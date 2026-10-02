@@ -37,9 +37,9 @@
   async function uploadImage(file, opts) {
     opts = opts || {};
     const scope = opts.scope || 'event-cover';
-    if (!window.CC_AUTH) throw new Error('Sign in with Google to upload your own photo.');
+    if (!window.CC_AUTH) throw new Error('Sign in to upload your own photo.');
     const token = await window.CC_AUTH.getAccessToken();
-    if (!token) throw new Error('Sign in with Google to upload your own photo.');
+    if (!token) throw new Error('Sign in to upload your own photo.');
     const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
     const readErr = async (res, fallback) => {
       const body = await res.json().catch(() => ({}));
@@ -537,10 +537,10 @@
     // submitApplication/completeOnboarding's `!realUser` branch is a SILENT
     // local-only fake-success built for the e2e/demo case (CC_AUTH entirely
     // absent), not for "signed-out visitor" — a guest completing the wizard
-    // would believe they went live and lose the work on refresh. Redirect
-    // straight to Google sign-in instead. Demo mode (no CC_AUTH at all, incl.
-    // the Playwright fallback) is untouched — window.CC_AUTH is null there,
-    // so this guard never fires.
+    // would believe they went live and lose the work on refresh. Send them to
+    // the sign-in screen instead (showSignIn — Google or an emailed code). Demo
+    // mode (no CC_AUTH at all, incl. the Playwright fallback) is untouched —
+    // window.CC_AUTH is null there, so this guard never fires.
     const AUTH_REQUIRED_PAGES = new Set(['apply', 'onboarding']);
 
     // ── In-app back stack (hardware / browser Back) ──────────────────
@@ -577,7 +577,7 @@
 
     const go = useCallback((page, params = {}, opts) => {
       if (AUTH_REQUIRED_PAGES.has(page) && !realUser && window.CC_AUTH) {
-        signIn();
+        showSignIn();
         return;
       }
       const st = navStack.current;
@@ -627,6 +627,14 @@
     const browseAsGuest = useCallback(() => {
       try { sessionStorage.setItem(GUEST_KEY, '1'); } catch (e) {}
       setGuestMode(true);
+    }, []);
+    // The way back: leave guest browsing and show the landing screen, where
+    // every way in lives (Google, emailed code). In-app "sign in" prompts use
+    // this rather than jumping straight to Google, so a person without a Google
+    // account (e.g. an owner on Outlook mail) is never dead-ended.
+    const showSignIn = useCallback(() => {
+      try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
+      setGuestMode(false);
     }, []);
     // openCreate(kind) opens a blank create sheet; openCreate(kind, record)
     // opens the same sheet pre-filled to edit that record.
@@ -1284,7 +1292,7 @@
 
     const addCoverPhoto = useCallback((file, caption, done) => {
       const finish = (ok) => { if (done) done(ok); };
-      if (!realUser) { toast('Sign in with Google to upload a cover photo.', 'gold'); finish(false); return; }
+      if (!realUser) { toast('Sign in to upload a cover photo.', 'gold'); finish(false); return; }
       (async () => {
         try {
           const photos = await uploadImage(file, { scope: 'contributor-cover', caption });
@@ -1673,7 +1681,7 @@
         setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: !i.votedByMe, votes: i.votes + (i.votedByMe ? -1 : 1) } : i)));
         return;
       }
-      if (!realUser) { toast('Sign in with Google to vote on ideas.', 'gold'); return; }
+      if (!realUser) { toast('Sign in to vote on ideas.', 'gold'); return; }
       const was = idea.votedByMe;
       setIdeas((prev) => prev.map((i) => (i.id === ideaId ? { ...i, votedByMe: !was, votes: i.votes + (was ? -1 : 1) } : i)));
       (async () => {
@@ -1738,7 +1746,7 @@
     const scheduleKingdomProject = useCallback((ideaId, dateIso, endIso, location, done) => {
       const finish = (ok) => { if (done) done(ok); };
       if (!realUser || !isRealId(ideaId) || !window.CC_SUPABASE) {
-        toast('Sign in with Google to schedule this project.', 'gold');
+        toast('Sign in to schedule this project.', 'gold');
         finish(false);
         return;
       }
@@ -1832,6 +1840,17 @@
       return Promise.resolve();
     }, [toast]);
 
+    // Email-code sign-in. The landing screen maps a rejection to a plain-language
+    // message, so these just hand the promise through. Success needs no follow-up
+    // here: supabase-js fires SIGNED_IN and the bootstrap effect below resolves
+    // the profile + role (and an owner's listing landing), exactly as for Google.
+    const sendEmailCode = useCallback((email) => (
+      window.CC_AUTH ? window.CC_AUTH.sendEmailCode(email) : Promise.reject(new Error('Sign-in is not configured.'))
+    ), []);
+    const verifyEmailCode = useCallback((email, token) => (
+      window.CC_AUTH ? window.CC_AUTH.verifyEmailCode(email, token) : Promise.reject(new Error('Sign-in is not configured.'))
+    ), []);
+
     const signOut = useCallback(() => {
       if (window.CC_AUTH) { window.CC_AUTH.signOut().catch(() => {}); }
       setRealUser(null);
@@ -1904,7 +1923,7 @@
         const s = await window.CC_AUTH.loadSession();
         if (!active) return;
         if (s) {
-          setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email });
+          setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email, nameIsFallback: !!s.nameIsFallback });
           setAuthed(true);
           setRole(s.role || 'citizen');
           if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
@@ -2344,12 +2363,17 @@
       if (!realUser || !window.CC_SUPABASE) { toast('Profile saved', 'green'); finish(true); return; }
       (async () => {
         try {
+          // A blank name leaves full_name alone: an email-code sign-up has none
+          // yet, and the readable stand-in the UI shows (displayNameFor) must
+          // never be saved by accident.
+          const patch = { bio: fields.bio };
+          if (fields.name) patch.full_name = fields.name;
           const { error } = await window.CC_SUPABASE
             .from('profiles')
-            .update({ full_name: fields.name, bio: fields.bio })
+            .update(patch)
             .eq('id', realUser.id);
           if (error) throw error;
-          setRealUser((prev) => (prev ? { ...prev, name: fields.name } : prev));
+          setRealUser((prev) => (prev ? { ...prev, ...(fields.name ? { name: fields.name, nameIsFallback: false } : {}) } : prev));
           setMyProfileMeta((prev) => ({ ...(prev || {}), bio: fields.bio }));
           toast('Profile saved', 'green');
           finish(true);
@@ -2439,8 +2463,8 @@
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
     const value = {
-      authed, signIn, signOut,
-      guestMode, browseAsGuest,
+      authed, signIn, signOut, sendEmailCode, verifyEmailCode,
+      guestMode, browseAsGuest, showSignIn,
       role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,

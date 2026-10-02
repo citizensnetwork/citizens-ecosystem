@@ -43,7 +43,7 @@
     }, [eventId]);
     if (!bc) return null;
     const react = (emoji) => {
-      if (!realUser) { toast('Sign in with Google to react.', 'gold'); return; }
+      if (!realUser) { toast('Sign in to react.', 'gold'); return; }
       if (tapped[emoji]) return; // one optimistic tap per emoji per visit
       setTapped((t) => ({ ...t, [emoji]: true }));
       setCounts((c) => ({ ...c, [emoji]: (c[emoji] || 0) + 1 }));

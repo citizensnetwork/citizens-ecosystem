@@ -195,14 +195,18 @@
     const app = window.useApp();
     const { user, role, go, toast, isCitizen, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
     const { useEffect } = React;
-    const [name, setName] = useState(user.name);
+    // An email-code sign-up has no name yet (user.name is only a readable
+    // stand-in, never stored): leave the field empty with the stand-in as its
+    // placeholder, and say what other people see until they add one.
+    const noName = !!(realUser && realUser.nameIsFallback);
+    const [name, setName] = useState(noName ? '' : user.name);
     const [bio, setBio] = useState(user.bio);
     const [profilePhoto, setProfilePhoto] = useState(user.profilePhoto);
     const [coverPhoto, setCoverPhoto] = useState(user.coverPhoto);
     const [saving, setSaving] = useState(false);
     const [localNotif, setLocalNotif] = useState({});
     // Re-seed once the real profile meta arrives (bio lives there).
-    useEffect(() => { setName(user.name); setBio(user.bio || ''); }, [user.name, user.bio]);
+    useEffect(() => { setName(noName ? '' : user.name); setBio(user.bio || ''); }, [user.name, user.bio, noName]);
     const isPublic = myProfileMeta ? myProfileMeta.discoverable !== false : true;
     const notifOn = (k) => (myProfileMeta && myProfileMeta.notificationPrefs
       ? myProfileMeta.notificationPrefs[k] !== false
@@ -224,7 +228,8 @@
               // 'avatar' scope uploads the file AND persists profiles.avatar_url.
               h('div', { className: 'w-24' }, h(Field, { label: 'Photo' }, h(MediaPicker, { value: profilePhoto, onChange: setProfilePhoto, aspect: '1/1', label: 'photo', scope: 'avatar' }))),
               h('div', { className: 'flex-1 space-y-3' },
-                h(Field, { label: 'Display name' }, h(Input, { value: name, onChange: (e) => setName(e.target.value) })))),
+                h(Field, { label: 'Display name', hint: noName ? 'Add your name. Until you do, other people see you as “Citizen”.' : undefined },
+                  h(Input, { value: name, placeholder: noName ? user.name : undefined, onChange: (e) => setName(e.target.value) })))),
             h(Field, { label: 'Bio' }, h(Textarea, { value: bio, rows: 3, onChange: (e) => setBio(e.target.value) })),
             // An uploaded photo is already persisted by /api/avatar; reflect it across
             // the app (header, profile) immediately via updateAvatar. Name + bio
@@ -232,7 +237,7 @@
             h(Button, { variant: 'gold', size: 'sm', icon: 'Check', disabled: saving, onClick: () => {
               if (profilePhoto) updateAvatar(profilePhoto);
               setSaving(true);
-              saveProfile({ name: name.trim() || user.name, bio: bio || '' }, () => setSaving(false));
+              saveProfile({ name: name.trim() || (noName ? '' : user.name), bio: bio || '' }, () => setSaving(false));
             } }, saving ? 'Saving…' : 'Save Profile')),
 
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },

@@ -71,35 +71,54 @@ export function fakeSession(u: FakeUser) {
   };
 }
 
+export type FakeProjectOpts = {
+  user: FakeUser;
+  profile: { role: string; contributor_status: string; full_name?: string; avatar_url?: string | null };
+  rpc?: (fn: string) => unknown;
+};
+
+/**
+ * The app calls the fake "project" cross-origin, and a fulfilled response is
+ * still CORS-checked by the browser — so every answer carries these headers.
+ */
+export const FAKE_PROJECT_CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+  "Access-Control-Expose-Headers": "Content-Range",
+};
+
 /**
  * Seeds the session and answers the fake project. `profile` is the row
  * auth-client.js loadSession() reads; `rpc` answers /rest/v1/rpc/<fn>
  * (default `[]`). Returns the RPC names called, in order.
  */
-export async function signInToFakeProject(
-  page: Page,
-  opts: {
-    user: FakeUser;
-    profile: { role: string; contributor_status: string; full_name?: string; avatar_url?: string | null };
-    rpc?: (fn: string) => unknown;
-  },
-): Promise<string[]> {
-  const rpcCalls: string[] = [];
+export async function signInToFakeProject(page: Page, opts: FakeProjectOpts): Promise<string[]> {
   const session = fakeSession(opts.user);
   await page.addInitScript((s) => {
     localStorage.setItem("sb-e2eproj-auth-token", JSON.stringify(s));
   }, session);
+  return installFakeProject(page, opts, session);
+}
+
+/**
+ * Answers the fake project's auth / REST / RPC endpoints and realtime socket
+ * for `session` WITHOUT seeding it into localStorage, so the app starts signed
+ * out. A spec that signs in through the UI (email code) registers its own
+ * /auth/v1/otp and /auth/v1/verify routes AFTER this call — Playwright runs the
+ * most recently registered matching route first, and `route.fallback()` hands a
+ * request back to this one. Returns the RPC names called, in order.
+ */
+export async function installFakeProject(
+  page: Page,
+  opts: FakeProjectOpts,
+  session: ReturnType<typeof fakeSession> = fakeSession(opts.user),
+): Promise<string[]> {
+  const rpcCalls: string[] = [];
   // Realtime: accept the socket locally and never connect it anywhere.
   await page.routeWebSocket(/e2eproj\.supabase\.test/, () => {});
 
-  // The app calls this "project" cross-origin, and a fulfilled response is
-  // still CORS-checked by the browser — so answer preflights and allow it.
-  const cors = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Access-Control-Expose-Headers": "Content-Range",
-  };
+  const cors = FAKE_PROJECT_CORS;
   await page.route(`${FAKE_PROJECT}/**`, async (route: Route) => {
     const request = route.request();
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
