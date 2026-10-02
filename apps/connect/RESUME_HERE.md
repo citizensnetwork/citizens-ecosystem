@@ -49,10 +49,10 @@
 
 ## 2. Current state snapshot (verified 2026-09-27)
 
-- **`main` @ `abd0205`** (PRs #72–#74, 2026-09-27 overnight). Production READY on all three apps. No open
-  feature PRs, no open issues.
-- **Database head = migration 177** (`20260927184421 / 177_profiles_column_privacy_finalize`). **Next migration # = 178.**
-- **Security advisor baseline: 0 ERROR / 118 WARN / 3 INFO.** Every WARN is known and accepted: 105
+- **`main`** = PR #79 (admin Delete, mig 178) on top of `82e4dff` (PR #77, email sign-in; live and verified).
+  Production READY on all three apps. CI green again after the 2026-10-02 dependency-advisory fix (#76).
+- **Database head = migration 178** (`20261002231716 / 178_admin_remove_contributor_listing`). **Next migration # = 179.**
+- **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
   (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
   design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
@@ -64,8 +64,8 @@
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
   map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, PR #77):** Connect 820 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 20/20**.
+- **Tests (last full run, PR #79):** Connect 853 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 23/23**.
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -190,7 +190,18 @@ design session first.
 | C7 | Guest mode: Consider / Follow / Connect on a real listing silently does nothing after an optimistic UI flip. Add toast-and-revert (about 10 call sites). (§3AH) | P3 | S |
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
 | C9 | Small polish, founder's choice: Noir/dark landing variant (§3AJ) · step-level Back inside wizards (§3AN) · cover-photo reorder UI (§3AM) · enforce `p_status` inside `find_or_create_conversation` (§3E) · gallery images via the Form (logo and cover only today) · update the Drive field-spec doc (it still lists the 17 event categories) · label `docs/feature-clarity/*` as deferred (§3AD). | P3 | S each |
-| C10 | **Decision: Form approval when the owner email already has an account.** Today the intake refuses with a clear Note (`email_already_registered`: "sign in → Settings → Become a Contributor, or change the owner email"). Option: create the listing under a placeholder account and let the existing claim flow attach it on that person's next sign-in. That changes an existing person's account, and GoTrue's acceptance of the placeholder address needs a live check. (PR #73) | Parked | S–M |
+| C10 | **Verify-first attach for a Form approval whose owner email already has an account** (founder decided 2026-10-03; design below, nothing built). (PR #73) | P2 | M–L |
+| C11 | **Wear's crown logo + loading splash in Connect** (founder request; spec below). | P3 | S |
+
+**C10 design (agreed 2026-10-03; nothing built yet).**
+- *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
+- *Flow:* on approving an existing-email row the listing goes **live now under a placeholder** (it needs an alias auth email, since emails are unique; GoTrue's acceptance of the alias needs a live check, and never mail it) with `contributor_claim_email` = the real owner email. The owner gets a different welcome email, signs in (the 6-digit code proves the inbox, or Google), and sees **"Attach 'X' to your account? [Confirm] [Not me]"**. Only Confirm runs the claim.
+- *Always* an explicit confirm, admin-created listings included: it replaces today's silent auto-claim (`store.jsx` `landOwnListing`). Make the claim RPC require `email_confirmed_at is not null`, and add a read-only `peek_claimable_listing()` for the confirm screen.
+- *Sheet:* the **database** holds the state. The Apps Script polls `POST /api/intake/google-form/status` (HMAC, like the intake route) about every 10 minutes and writes "Awaiting owner" / "Owner confirmed ✓" into the row's Status. The Sheet never triggers anything. Re-paste `intake.gs` after changing it.
+- *Process:* needs migration **179** (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). *Still to ask:* what happens if the owner ignores or declines (expiry? stays live as an unclaimed placeholder? tell the admin?). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md` and `intake-v2.gs`; they may overlap.
+
+**C11 spec (Wear's crown + loader in Connect).** Use Wear's PNG crown (`apps/wear/src/frontend/assets/citizens-crown.png`, 642×347, 127 KB: resize to about 240 px wide before copying) on the landing (replacing the line-art `CrownMark`; the founder's request supersedes design spec §01), on the sidebar brand tile (a gold PNG would vanish on the gold tile: use a paper/glass tile or the bare crown), and in a loading splash. Splash: an `authResolved` state in `store.jsx` (initially `!window.CC_AUTH || !likelySession()`, where likelySession = a `sb-*-auth-token` localStorage key or `code=` / `access_token=` in the URL; set true after the first `apply()` plus an 8 s safety timeout); `shell.jsx` shows it (landing wash + crown at about 56 px + a gold-topped ring spinner) while `!authed && !guestMode && !authResolved`. A signed-in user then never sees a landing flash, and a first-time visitor sees no splash. e2e: a delayed profile response shows the splash and no landing. Screenshots at 390 and 1280 px.
+
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -273,9 +284,13 @@ design session first.
   raising the `pnpm.overrides` floors in **#76** (`cb0a049`), checked against OSV.dev. **#77:** *Continue with
   email* on Connect's landing (6-digit code, `shouldCreateUser: true`): owners without Google (e.g. on Outlook)
   can finally reach their dashboard; guests are no longer dead-ended into Google; 40 unit + 6 e2e tests
-  (e2e 20/20). Open: founder steps **A10**, Vision port (**C5**), the C10 design discussion. Handoff:
-  `docs/handoffs/CONNECT_EMAIL_CODE_SIGNIN_AND_ADMIN_DELETE_HANDOFF.md` (kept untracked: it names a real
-  organisation, and this repo is public). No migration (next # still 178).
+  (e2e 20/20). **#79 (2026-10-03):** admin **Delete** on every Listings row. A listing is an account, so the
+  database decides from one fact (has the owner ever signed in?): never = the placeholder is hard-deleted;
+  signed in = only the listing goes and the person stays a citizen (their re-application would start
+  hidden). **Migration 178 applied** (one admin-only SECDEF function; probe-verified; advisors 0/119/3).
+  Route `/api/admin/contributors/delete-listing` (the old `/contributors/delete` discards applications).
+  Founder decisions on C10 recorded above. Open: founder steps **A10**, Vision port (**C5**), **C10**, **C11**.
+  The 2026-10-02 handoff stays untracked (it names a real organisation; this repo is public).
 - **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
   #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
   and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every

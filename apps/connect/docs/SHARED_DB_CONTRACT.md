@@ -213,7 +213,20 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-09-27, project `xyiajtrvhlxaeplsiajj`, head = **mig 177**)
+## 9. Verification snapshot (updated 2026-10-03, project `xyiajtrvhlxaeplsiajj`, head = **mig 178**)
+
+> **2026-10-03: mig 178 (`admin_remove_contributor_listing`) APPLIED to prod** (version
+> `20261002231716`; pre-apply tag `connect-pre-mig178-admin-remove-listing` → `82e4dff`;
+> founder-approved in chat). ONE new SECURITY DEFINER function behind Admin → Listings → **Delete**:
+> admin-only (`auth.uid() is null or not is_admin()` guard, `search_path=''`, anon/public revoked,
+> authenticated granted), runs on the admin's own session. A never-signed-in placeholder is
+> hard-deleted; a real account keeps the person and loses only the listing; the audit row commits in
+> the same transaction. Refuses an admin, the caller, a non-listing, a Wear brand owner and Vision
+> data (ownership reads only: **R2.5**). Verified: a rollback-only probe of the exact SQL against the
+> live schema (18 scenarios, zero residue; it caught a `text[] || 'literal'` bug before apply), then
+> the post-apply catalog check and a smoke call (no login → `not_admin`, admin + unknown id →
+> `not_found`). **Advisors: 0 ERROR / 119 WARN / 3 INFO**: the previous baseline plus exactly the one
+> expected WARN (authenticated SECURITY DEFINER EXECUTE 105 → 106). **Next migration # = 179.**
 
 > **2026-09-27: mig 177 (`profiles_column_privacy_finalize`) APPLIED — the lockdown is complete.**
 > Applied only after PR #67 (merge `6836180`) was deployed to production (`dpl_CY4ZnD47…`, READY on
