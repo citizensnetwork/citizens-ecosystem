@@ -69,6 +69,25 @@ describe("/api/admin/users", () => {
     expect(json.meta.total).toBe(1);
   });
 
+  it("GET ?role=contributor lists only Contributors, with their hidden + claim state (Listings tab)", async () => {
+    adminClient._chain._result.data = [];
+    adminClient._chain._result.count = 0;
+    const res = await GET(makeReq(null, "GET", "?role=contributor"));
+    expect(res.status).toBe(200);
+    expect(adminClient._chain.eq).toHaveBeenCalledWith("role", "contributor");
+    const columns = String(adminClient._chain.select.mock.calls[0][0]);
+    for (const col of ["contributor_slug", "contributor_hidden", "contributor_claim_email", "contributor_claimed_at"]) {
+      expect(columns).toContain(col);
+    }
+  });
+
+  it("GET ignores an unknown role filter instead of passing it to the query", async () => {
+    adminClient._chain._result.data = [];
+    const res = await GET(makeReq(null, "GET", "?role=king"));
+    expect(res.status).toBe(200);
+    expect(adminClient._chain.eq).not.toHaveBeenCalledWith("role", expect.anything());
+  });
+
   it("PATCH rejects when admin tries to demote self", async () => {
     const res = await PATCH(makeReq({ user_id: ADMIN_ID, role: "citizen" }));
     expect(res.status).toBe(400);

@@ -1,9 +1,20 @@
 # HANDOFF — Google Form → Map: Contributor Intake Pipeline
 
-> **Status (2026-09-26, later):** **phases 1–5 BUILT and pushed** (`32edec6`). Migration 173 is written
-> and tagged but **not applied** (it awaits the founder's go-ahead). Phase 6 (the live test) is next.
-> See `RESUME_HERE.md` §3AP for what shipped and the decisions made while building. Decisions that
-> superseded this brief:
+> **Status (2026-09-27): phases 1–5 LIVE on production; only Phase 6 (the live test with the founder)
+> remains** — RESUME_HERE item **A1**.
+> - Shipped in PR #63; production's build was fixed by PR #64. Migration 173 is applied.
+> - The founder's `testConnection` says "Connected ✓ — the secret matches" (2026-09-27).
+> - **Re-verified live after the migs 174–177 `profiles` lockdown** with a rollback-only probe on prod
+>   (0 residue): the intake RPC, anon seeing the new pin, `mark_own_listing_claimed` and the
+>   different-account claim all work.
+> - PR #73 added **Admin Panel → Listings** (two-step, reversible Hide / Unhide — the undo for an
+>   approval, and how to remove the Phase 6 test listing) and clear 409 Notes for an owner email that
+>   already has an account (`listing_exists` with the URL, or `email_already_registered`).
+> - As of 2026-09-27 the Sheet held only the 3 hand-typed sample rows (no real submission yet). Delete
+>   them rather than approve them: approving publishes a real listing and emails column E.
+>
+> See `RESUME_HERE.md` (archived §3AP) for what shipped and the decisions made while building. Decisions
+> that superseded this brief:
 > - Q2.2 labels are **Church / Christian Nonprofit / Ministry / Christian Business / Individual**.
 > - The listing URL is **`/c/<slug>`** (a redirect).
 > - Images are capped at **1.5 MB** each, not 2 MB (Vercel body limit). The script resizes larger photos.
