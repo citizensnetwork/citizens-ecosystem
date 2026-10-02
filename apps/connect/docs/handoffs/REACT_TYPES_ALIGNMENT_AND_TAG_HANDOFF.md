@@ -8,6 +8,16 @@
 >
 > Written for a **stateless** session: every fact, command and expected output you need is here.
 > Base: `main` @ `4c82fcb` (merge of PR #68). Repo `citizensnetwork/citizens-ecosystem`.
+>
+> **⚠ RESUME_HERE.md was restructured on 2026-09-27 (after this brief was written).** It no longer has
+> `## 3A…` sections or a NEXT STEPS block; §3A–§3AT now live verbatim in
+> `docs/archive/RESUME_HISTORY_2026H2.md` (do not edit the archive). This work is **item S2** in RESUME §4.
+> Wherever this brief says "add a RESUME section" or "update NEXT STEPS", instead: delete item S2 from §4,
+> fix the S2 tag note, and add a short entry at the top of §6 (Recent sessions). In the canary-file comment,
+> cite the PR number instead of a RESUME section. Task B's tag status was re-checked on 2026-09-27: neither
+> `connect-pre-mig174-profiles-privacy` nor `pre-mig-172-entity-socials` exists locally or on the remote
+> (create them, don't just push); `connect-pre-mig158`, `connect-v1-pre-mig164` and `wear-pre-mig163` exist
+> only locally (push them too).
 
 ---
 

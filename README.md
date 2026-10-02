@@ -66,7 +66,7 @@ Each app deploys independently. Per project, set:
   workspace deps are unaffected)
 
 Deploy-gate env values per app are listed in
-[`apps/connect/RESUME_HERE.md`](apps/connect/RESUME_HERE.md) (NEXT STEPS §founder-only).
+[`apps/connect/RESUME_HERE.md`](apps/connect/RESUME_HERE.md) (§2 env snapshot + §4A founder actions).
 
 ## History
 
