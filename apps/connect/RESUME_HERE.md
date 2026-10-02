@@ -49,8 +49,8 @@
 
 ## 2. Current state snapshot (verified 2026-09-27)
 
-- **`main` @ `abd0205`** (PRs #72–#74, 2026-09-27 overnight). Production READY on all three apps. No open
-  feature PRs, no open issues.
+- **`main` @ `bba102f`** (PR #78, merged 2026-10-02 23:46 UTC; after #75–#77). The post-merge CI and the Vercel
+  production deploys were **not yet confirmed** when this was written: check them first (see §6, newest entry).
 - **Database head = migration 177** (`20260927184421 / 177_profiles_column_privacy_finalize`). **Next migration # = 178.**
 - **Security advisor baseline: 0 ERROR / 118 WARN / 3 INFO.** Every WARN is known and accepted: 105
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
@@ -62,14 +62,11 @@
   contributor digest, Vision MV refresh ×3, Vision daily snapshots, Vision advisory eval, live-location cleanup
   (every 15 min), impersonation expiry sweep (every 5 min).
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
-  map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
+  map**) · 40 Places · 3 Events (**all in the past, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, map-preview PR):** Connect 852 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 30/30**.
-- **2026-10-02 map-preview PR (branch `claude/connect-map-preview-consistency`):** one preview card for every pin;
-  Contributors hide below zoom 6, names from 15 (founder D1/D2); org logos shown whole; finished events leave the
-  map/Discovery (`DATA.isPastEvent`); social values with spaces refused/dropped, SA WhatsApp → `27…`; one prod row
-  fixed. New pipeline items C11–C13. Full §6 write-up still to add (see the PR description).
+- **Tests (last full run, PR #78):** Connect 852 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 30/30**. (`frontend-build`'s "hashed outputs"
+  test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -294,6 +291,19 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
+  intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
+  included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors
+  hide below zoom 6 (D1, his own answer), names from zoom 15 (D2). Org logos are shown whole (contain on white;
+  Individuals' photos still fill). Finished events leave the map and Discovery and sit under "Past events" on
+  the profile and dashboard (no end time ⇒ up for the rest of its day). A social value with spaces is a display
+  name: refused on dashboard/Apply/admin, dropped with a Note on the Form intake; local SA WhatsApp numbers
+  store as `27…`. The first Form submission's three bad socials were corrected with a guarded single-row UPDATE.
+  First-view framing is clamped and centred so nationally spread data can't open blank (e2e, mutation-checked).
+  Connect 852 unit, e2e 30/30, no migration. New items **C11–C13**. Not yet confirmed at write-up: post-merge CI
+  and the production deploys, and the founder's production re-check. **Start here:**
+  [`docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md`](docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md).
+  The original brief (`…MAP_PREVIEW_CONSISTENCY_HANDOFF.md`) stays untracked: it names a real organisation.
 - **2026-10-02 — Merged #71 and #75, fixed a red `main`, shipped email-code sign-in (C5).** #71 (`9eb727e`)
   and #75 (`b85f5ae`) merged. #75's Verify failed on the OSV gate only: 20 advisories published after 09-27
   (brace-expansion, js-yaml, undici, all dev/test-time) had turned `main` red since #71's merge; fixed by
@@ -325,11 +335,9 @@ design session first.
   `react.cache` build error (pnpm hoisting).
 - **2026-09-26/27 — PRs #64/#65, §3AQ–§3AR:** production build fix; 26 OSV advisories fixed; a live CVSS-10
   MapLibre XSS patched by vendoring v6.11.2.
-- **2026-09-26 — PR #63, §3AP:** Google Form → map Contributor intake (mig 173, 12 Contributor types,
-  Individual kind, `/c/<slug>` links).
-- **2026-08-23 → 08-26 — §3AD–§3AO (PRs #40–#62):** Connect v1 re-scope, self-serve go-live, Kingdom
-  Discovery, contributor portal, guest landing, the production-500 root cause, Bearer-auth sweep, map pins
-  and labels, social parity.
+- **Earlier (2026-08-23 → 09-26, PRs #40–#63):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
+  contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
+  Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
 
 ---
 
