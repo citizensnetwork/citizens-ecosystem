@@ -28,7 +28,7 @@
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
-    const { user, role, go, isAdmin, isContributor, signOut, signIn, authed, toast, realUser } = app;
+    const { user, role, go, isAdmin, isContributor, signOut, showSignIn, authed, toast, realUser } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
@@ -117,9 +117,9 @@
             ? React.createElement('button', { onClick: () => { onClose(); signOut(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors' },
                 React.createElement(Icon, { name: 'LogOut', size: 15 }),
                 React.createElement('span', null, 'Sign Out'))
-            : React.createElement('button', { onClick: () => { onClose(); signIn(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gold-dark hover:bg-accent/60 transition-colors' },
+            : React.createElement('button', { onClick: () => { onClose(); showSignIn(); }, className: 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gold-dark hover:bg-accent/60 transition-colors' },
                 React.createElement(Icon, { name: 'LogIn', size: 15 }),
-                React.createElement('span', null, 'Sign in with Google')))));
+                React.createElement('span', null, 'Sign in')))));
   }
 
   // ── AccountButton — THE profile entry point, top-right, everywhere ────

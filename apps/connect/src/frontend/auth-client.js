@@ -6,11 +6,79 @@
 //  the @supabase/supabase-js UMD global (window.supabase) and window.__CC_ENV
 //  (config.js) loaded first, then exposes window.CC_AUTH for store.jsx.
 //
-//  Google is the only provider. Role is read from public.profiles.role
-//  (never the JWT). If config/Supabase is missing, CC_AUTH is null and the
-//  app falls back to the local demo sign-in — so the prototype still runs.
+//  Two ways in: Google OAuth, and a passwordless 6-digit code emailed to the
+//  person's address (Supabase email OTP — the same provider Wear uses). Role
+//  is read from public.profiles.role (never the JWT). If config/Supabase is
+//  missing, CC_AUTH is null and the app falls back to the local demo sign-in —
+//  so the prototype still runs.
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  // ── Pure helpers ───────────────────────────────────────────────────
+  //  Need no Supabase, so they sit ABOVE the "not configured" early return and
+  //  are unit-tested in src/__tests__/frontend/authClientHelpers.test.ts.
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function normaliseEmail(v) {
+    return String(v == null ? "" : v).trim().toLowerCase();
+  }
+
+  function isValidEmail(v) {
+    return EMAIL_RE.test(normaliseEmail(v));
+  }
+
+  // Digits only, at most 6 — so "123 456", "123-456" and a pasted " 123456\n"
+  // all become "123456".
+  function cleanCode(v) {
+    return String(v == null ? "" : v).replace(/\D/g, "").slice(0, 6);
+  }
+
+  // Plain-language message for a failed email-code request. `step` is "send"
+  // or "verify". Never surfaces raw GoTrue text or JSON.
+  function mapAuthError(err, step) {
+    var msg = String((err && err.message) || "").toLowerCase();
+    var code = String((err && (err.code || err.error_code)) || "").toLowerCase();
+    var status = err && typeof err.status === "number" ? err.status : null;
+    if (status === 429 || /rate.?limit|too many|only request this after/.test(code + " " + msg)) {
+      return "Too many attempts — wait a minute and try again.";
+    }
+    if (err && (err.name === "AuthRetryableFetchError" || status === 0 ||
+        /failed to fetch|networkerror|load failed|network request failed/.test(msg))) {
+      return "We couldn't reach Citizens — check your connection and try again.";
+    }
+    if (step === "verify" && (code === "otp_expired" || status === 403 || status === 400 ||
+        /expired|invalid/.test(msg))) {
+      return "That code didn't work or has expired — request a new one.";
+    }
+    if (code === "email_address_invalid" || code === "validation_failed" ||
+        /invalid.*email|email.*invalid|unable to validate email/.test(msg)) {
+      return "That email address doesn't look right — check it and try again.";
+    }
+    if (code === "signup_disabled" || /signups? not allowed/.test(msg)) {
+      return "New accounts can't be created with email right now. Please continue with Google.";
+    }
+    return "Something went wrong. Please try again.";
+  }
+
+  // Display-only stand-in for a person with no name yet (email-code sign-ups
+  // arrive with none): "jane.doe+news@x.com" → "Jane Doe". It never contains the
+  // domain and is never written to the database, so other people keep seeing
+  // "Citizen" until the person sets a real name in Settings.
+  function displayNameFor(email) {
+    var local = String(email || "").split("@")[0].split("+")[0];
+    var words = local.replace(/[._-]+/g, " ").replace(/[^\p{L}\p{N} ]/gu, "").trim()
+      .split(/\s+/).filter(Boolean).slice(0, 3);
+    if (!words.length || !/\p{L}/u.test(words.join(""))) return "Citizen";
+    return words.map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ").slice(0, 40);
+  }
+
+  window.CC_AUTH_HELPERS = {
+    normaliseEmail: normaliseEmail,
+    isValidEmail: isValidEmail,
+    cleanCode: cleanCode,
+    mapAuthError: mapAuthError,
+    displayNameFor: displayNameFor,
+  };
+
   var env = window.__CC_ENV || {};
   if (!window.supabase || !window.supabase.createClient || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY ||
       env.SUPABASE_ANON_KEY.indexOf("REPLACE_WITH") === 0) {
@@ -31,6 +99,16 @@
     return !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
   }
 
+  // The web return URL for the OAuth redirect and for the magic-link fallback in
+  // the sign-in email. A bare hostname (e.g. "www.citizenscentral.co.za") has no
+  // scheme, so Supabase treats it as a relative path on its own domain and the
+  // redirect lands on supabase.co/<hostname>?code=…  which 404s.
+  function webRedirectUrl() {
+    var origin = env.FRONTEND_ORIGIN || window.location.origin;
+    if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
+    return origin + window.location.pathname;
+  }
+
   // Sign in / sign up with Google (OAuth — same call for both).
   // Web: normal in-page redirect to Google, back to the app origin.
   // Native (Capacitor): the webview's own origin (capacitor://localhost /
@@ -44,17 +122,7 @@
       try { localStorage.setItem(PENDING, "contributor"); } catch (e) {}
     }
     var native = isNativeShell();
-    var redirectTo;
-    if (native) {
-      redirectTo = NATIVE_REDIRECT;
-    } else {
-      var origin = env.FRONTEND_ORIGIN || window.location.origin;
-      // A bare hostname (e.g. "www.citizenscentral.co.za") has no scheme, so
-      // Supabase treats it as a relative path on its own domain and the OAuth
-      // redirect lands on supabase.co/<hostname>?code=…  which 404s.
-      if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
-      redirectTo = origin + window.location.pathname;
-    }
+    var redirectTo = native ? NATIVE_REDIRECT : webRedirectUrl();
     var res = await client.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -67,6 +135,39 @@
     if (native && res.data && res.data.url && window.CapBrowser) {
       await window.CapBrowser.open({ url: res.data.url });
     }
+  }
+
+  // ── Email code (passwordless — no Google account needed) ───────────
+  //  Emails a 6-digit code (mailer_otp_length=6) and signs the person in when
+  //  they type it back. Needs no deep link, so it works the same in the native
+  //  shell. DELIBERATELY unlike Wear's sendEmailCode (shouldCreateUser:false):
+  //  Connect has no other non-Google way to make an account, so an address we
+  //  haven't seen creates a citizen on verification — receiving the code IS the
+  //  proof of owning the inbox. An address that already has an account (e.g. a
+  //  listing the founder approved for an owner on Outlook) signs in to THAT
+  //  account. GoTrue answers identically either way, so this does not reveal
+  //  which addresses exist. The same email also carries a magic link
+  //  (emailRedirectTo) as a fallback; it only completes in the browser that
+  //  asked for it (PKCE), which is why the code is the primary path.
+  async function sendEmailCode(email) {
+    var res = await client.auth.signInWithOtp({
+      email: normaliseEmail(email),
+      options: { shouldCreateUser: true, emailRedirectTo: webRedirectUrl() },
+    });
+    if (res.error) throw res.error;
+  }
+
+  // Exchanges the emailed code for a session. On success supabase-js fires
+  // SIGNED_IN through onAuthChange, so the store's normal post-sign-in path
+  // (profile + role, landOwnListing, dashboard for contributors) runs unchanged.
+  async function verifyEmailCode(email, token) {
+    var res = await client.auth.verifyOtp({
+      email: normaliseEmail(email),
+      token: cleanCode(token),
+      type: "email",
+    });
+    if (res.error) throw res.error;
+    return res.data;
   }
 
   // Catches the `citizensconnect://auth-callback?code=…` deep link the
@@ -112,10 +213,15 @@
     var pending = null;
     try { pending = localStorage.getItem(PENDING); } catch (e) {}
 
+    // Email-code sign-ups have no name until they set one, so give the UI a
+    // readable stand-in (display only — see displayNameFor) instead of a blank.
+    var realName = profile.full_name || meta.full_name || meta.name || "";
+
     return {
       user: session.user,
       role: profile.role || "citizen",
-      name: profile.full_name || meta.full_name || meta.name || "",
+      name: realName || displayNameFor(session.user.email),
+      nameIsFallback: !realName,
       avatarUrl: profile.avatar_url || meta.avatar_url || meta.picture || "",
       contributorStatus: profile.contributor_status || "not_applied",
       // Route a fresh contributor sign-up into the application wizard.
@@ -152,6 +258,8 @@
 
   window.CC_AUTH = {
     signInWithGoogle: signInWithGoogle,
+    sendEmailCode: sendEmailCode,
+    verifyEmailCode: verifyEmailCode,
     loadSession: loadSession,
     getAccessToken: getAccessToken,
     signOut: signOut,

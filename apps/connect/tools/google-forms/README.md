@@ -3,8 +3,9 @@
 A new Contributor fills in the Google Form **"New 219-Connect Contributor"**. You review the row in
 the responses Sheet and tick **Approve**. That is the only manual step: the Contributor goes live on
 the map and in Kingdom Discovery, the row is stamped, and the owner gets a welcome email asking them
-to sign in with Google. Signing in with that email lands them straight on their own Contributor
-dashboard.
+to sign in with that owner email: a 6-digit emailed code (works for any inbox, including Outlook), or
+Google if it's a Google account. Signing in with that email lands them straight on their own
+Contributor dashboard.
 
 ```
 You tick "Approve" in the Sheet
@@ -13,7 +14,7 @@ You tick "Approve" in the Sheet
   → Connect: check signature → validate → map labels → locate → create listing → upload logo/cover
   → the Sheet row gets Status / Listing URL / Processed at / Notes
   → the owner gets a welcome email (from your Gmail)
-Owner signs in with Google (same email) → lands on their dashboard
+Owner signs in with that email (6-digit code, or Google) → lands on their dashboard
 ```
 
 | File | What it is |
@@ -33,7 +34,8 @@ Owner signs in with Google (same email) → lands on their dashboard
 
 1. **Form confirmation message.** Form → Settings → Presentation → Confirmation message:
    > Thank you! We'll email you at the owner address you gave us when your listing is live. Then just
-   > sign in to Citizens Connect with that Google account to manage your profile.
+   > sign in to Citizens Connect with that email address (we'll send you a 6-digit code, or you can use
+   > Google if it's a Google account) to manage your profile.
 2. **Sheet columns.** In the **Form Responses 1** tab, to the right of the last question column
    (`Question 7.5: Permission to publish`), add these five headers in row 1:
    `Approve` · `Status` · `Listing URL` · `Processed at` · `Notes`. Capitals and extra spaces don't
@@ -170,17 +172,30 @@ clear note; they are never published under a guessed category.
 
 ## How the owner gets in
 
-The listing is created under an account with the **owner's email**. When the owner signs in with
-**Google using that same email**, Supabase links the sign-in to that account. They are the listing's
-owner and land on their dashboard.
+The listing is created under an account with the **owner's email**, and the owner signs in with
+**that same email**, either way:
 
-If Supabase ever creates a *separate* account for that same email instead of linking, the app claims
-the listing for them automatically on sign-in. The account menu's **Claim a Contributor listing** does
-the same by hand.
+- **Continue with email (a 6-digit code).** Works for any inbox, including Outlook and company mail,
+  so nobody needs a Google account. They enter the address, we email a 6-digit code, they type it back.
+  They are signed in AS the listing's account and land on their dashboard. Receiving the code is the
+  proof they own the inbox.
+- **Google, using that same email.** Supabase links the Google sign-in to that account, with the same
+  result.
 
-A **different** Google address can't claim the listing; that person is simply an ordinary citizen.
-The welcome email tells the owner exactly which address to sign in with, and to sign out and back in
-with it if they picked the wrong account.
+If Supabase ever creates a *separate* account for that same email instead of linking (only possible
+via Google), the app claims the listing for them automatically on sign-in. The account menu's **Claim a
+Contributor listing** does the same by hand.
+
+A **different** address can't claim the listing; that person is simply an ordinary citizen. The
+welcome email tells the owner exactly which address to sign in with, and to sign out and back in with
+it if they used the wrong one.
+
+> **After you change `intake.gs` in the repo, re-paste it into the Sheet's Apps Script** (one-time
+> setup, step 5). The welcome email only changes once the Sheet's copy of the script does.
+
+> **The 6-digit email must carry the code.** In Supabase → Authentication → Email Templates, both the
+> **Magic Link** and **Confirm signup** templates need `{{ .Token }}` in the body: existing accounts
+> (like a listing's owner) get the first, brand-new addresses get the second.
 
 ---
 

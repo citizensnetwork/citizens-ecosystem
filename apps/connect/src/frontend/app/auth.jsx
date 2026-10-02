@@ -2,9 +2,10 @@
 //  Citizens Connect — Landing + Sign-in screen
 //  · Crown (line-art, gold) → italic scripture (Eph. 2:19) → "Citizens"
 //    → "Connecting [carousel]" slogan → circular Google sign-in →
-//    Browse as Guest. No manual role picker — every Google sign-in
-//    resolves its role from profiles.role (defaults to citizen; only an
-//    account already marked contributor/admin in the database gets that
+//    "Continue with email" (a 6-digit code, for anyone without Google) →
+//    Browse as Guest. No manual role picker — every sign-in, Google or
+//    email, resolves its role from profiles.role (defaults to citizen; only
+//    an account already marked contributor/admin in the database gets that
 //    access — see auth-client.js loadSession()).
 //  · Deliberately spare: one gold (--gold-crown, the brand's crown-logo
 //    gold), one voice (Manrope, "font-brand"), generous vertical rhythm.
@@ -13,7 +14,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx } = window.UI;
+  const { cx, Button, inputCls } = window.UI;
 
   // ── "Connecting ___" rotating slogan (2s) ──
   const PHRASES = [
@@ -69,10 +70,149 @@
       h('path', { d: 'M43,-1 L57,-1' }));
   }
 
+  // ── Email-code sign-in ──
+  //  "Continue with email" opens this inline (same screen, no new route):
+  //  email → 6-digit code → in. The store does the rest on SIGNED_IN (profile,
+  //  role, an owner's listing landing), so success needs no navigation here.
+  //  The pure bits (validation, code cleaning, error wording) live in
+  //  window.CC_AUTH_HELPERS (auth-client.js) so they are unit-tested.
+  const RESEND_SECONDS = 60; // GoTrue refuses a second code to one address inside 60 s anyway
+
+  // Counts down to a wall-clock deadline rather than chaining one timeout per
+  // second: someone who switches to their mail app to fetch the code leaves this
+  // tab throttled in the background, and a chained countdown would then lag far
+  // behind the real 60 s. Returns [secondsLeft, restart].
+  function useCountdown() {
+    const [until, setUntil] = useState(0); // epoch ms at which "Resend" re-enables
+    const [now, setNow] = useState(() => Date.now());
+    const left = Math.max(0, Math.ceil((until - now) / 1000));
+    const running = left > 0;
+    useEffect(() => {
+      if (!running) return undefined;
+      const t = setInterval(() => setNow(Date.now()), 500);
+      return () => clearInterval(t);
+    }, [running]);
+    return [left, () => { const n = Date.now(); setNow(n); setUntil(n + RESEND_SECONDS * 1000); }];
+  }
+
+  const linkBtn = 'font-brand text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:hover:text-muted-foreground';
+  const spinner = (tone) => h('span', { className: cx('w-4 h-4 rounded-full border-2 border-t-transparent spin', tone) });
+
+  function EmailSignIn({ onClose }) {
+    const { sendEmailCode, verifyEmailCode } = window.useApp();
+    const A = window.CC_AUTH_HELPERS;
+    const [step, setStep] = useState('email'); // 'email' | 'code'
+    const [email, setEmail] = useState('');
+    const [code, setCode] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [done, setDone] = useState(false); // code accepted — the store is loading the account
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [left, startCooldown] = useCountdown();
+
+    const send = async (e) => {
+      if (e) e.preventDefault();
+      if (busy) return;
+      setError(''); setNotice('');
+      if (!A.isValidEmail(email)) { setError('Please enter a valid email address.'); return; }
+      const resending = step === 'code';
+      setBusy(true);
+      try {
+        await sendEmailCode(A.normaliseEmail(email));
+        setEmail(A.normaliseEmail(email));
+        setCode('');
+        setStep('code');
+        startCooldown();
+        if (resending) setNotice('A new code is on its way.');
+      } catch (err) {
+        setError(A.mapAuthError(err, 'send'));
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const verify = async (e) => {
+      if (e) e.preventDefault();
+      if (busy) return;
+      setError(''); setNotice('');
+      const digits = A.cleanCode(code);
+      if (digits.length !== 6) { setError('Enter the 6-digit code from your email.'); return; }
+      setBusy(true);
+      try {
+        await verifyEmailCode(email, digits);
+        setDone(true); // stay busy: SIGNED_IN unmounts this screen once the account loads
+      } catch (err) {
+        setError(A.mapAuthError(err, 'verify'));
+        setBusy(false);
+      }
+    };
+
+    const panel = 'w-full rounded-2xl border border-border bg-white/70 backdrop-blur-sm shadow-sm p-4 font-brand text-left fade-in';
+    const labelCls = 'block text-xs font-semibold text-foreground/80 mb-1.5';
+    const errorEl = error && h('p', { role: 'alert', className: 'text-xs font-semibold text-destructive leading-relaxed' }, error);
+    const noticeEl = notice && h('p', { role: 'status', className: 'text-xs font-semibold text-gold-dark leading-relaxed' }, notice);
+
+    if (done) {
+      return h('div', { role: 'status', className: cx(panel, 'flex items-center justify-center gap-3 py-6') },
+        spinner('border-gold'),
+        h('span', { className: 'text-sm font-semibold text-foreground' }, 'Signing you in…'));
+    }
+
+    if (step === 'code') {
+      return h('form', { onSubmit: verify, noValidate: true, className: cx(panel, 'space-y-3') },
+        h('p', { className: 'text-sm text-foreground leading-relaxed' },
+          'We sent a 6-digit code to ', h('strong', { className: 'break-words' }, email), '.'),
+        h('p', { className: 'text-[11px] text-muted-foreground -mt-1' }, 'It can take a minute. Check your junk folder too.'),
+        h('div', null,
+          h('label', { htmlFor: 'cc-email-code', className: labelCls }, '6-digit code'),
+          h('input', {
+            id: 'cc-email-code', type: 'text', inputMode: 'numeric', pattern: '[0-9]*', autoComplete: 'one-time-code',
+            maxLength: 6, autoFocus: true, placeholder: '123456', value: code,
+            onChange: (e) => setCode(A.cleanCode(e.target.value)),
+            // maxLength would cut a pasted "123 456" to "123 45" before onChange
+            // sees it, so take the paste ourselves and strip the spaces first.
+            onPaste: (e) => {
+              const text = e.clipboardData && e.clipboardData.getData('text');
+              if (text) { e.preventDefault(); setCode(A.cleanCode(text)); }
+            },
+            className: cx(inputCls, '!text-2xl text-center font-semibold tracking-[0.4em]'),
+          })),
+        errorEl,
+        noticeEl,
+        h(Button, { type: 'submit', variant: 'gold', size: 'lg', disabled: busy, className: 'w-full' },
+          busy ? h(F, null, spinner('border-white'), 'Signing in…') : 'Sign in'),
+        h('div', { className: 'flex items-center justify-between gap-3 pt-1' },
+          h('button', { type: 'button', onClick: send, disabled: busy || left > 0, className: linkBtn },
+            left > 0 ? 'Resend code in ' + left + 's' : 'Resend code'),
+          h('button', {
+            type: 'button', disabled: busy, className: linkBtn,
+            onClick: () => { setStep('email'); setCode(''); setError(''); setNotice(''); },
+          }, 'Use a different email')));
+    }
+
+    return h('form', { onSubmit: send, noValidate: true, className: cx(panel, 'space-y-3') },
+      h('div', null,
+        h('label', { htmlFor: 'cc-email', className: labelCls }, 'Your email address'),
+        h('input', {
+          id: 'cc-email', type: 'email', inputMode: 'email', autoComplete: 'email', autoCapitalize: 'none',
+          autoCorrect: 'off', spellCheck: false, autoFocus: true, placeholder: 'you@example.com', value: email,
+          onChange: (e) => setEmail(e.target.value),
+          className: cx(inputCls, '!text-base'),
+        }),
+        h('p', { className: 'text-[11px] text-muted-foreground mt-1.5' }, 'We’ll email you a 6-digit code. No password needed.')),
+      errorEl,
+      h(Button, { type: 'submit', variant: 'gold', size: 'lg', disabled: busy, className: 'w-full' },
+        busy ? h(F, null, spinner('border-white'), 'Sending…') : 'Send code'),
+      h('button', { type: 'button', onClick: onClose, className: cx(linkBtn, 'block mx-auto') }, 'Back'));
+  }
+
   // ── Main screen ──
   function AuthScreen() {
     const { signIn, browseAsGuest } = window.useApp();
     const [loading, setLoading] = useState(false);
+    const [emailOpen, setEmailOpen] = useState(false);
+    // Email sign-in needs a configured Supabase; demo mode can't sign anyone in.
+    const canEmail = !!window.CC_AUTH;
 
     const onGoogle = () => {
       if (loading) return;
@@ -111,8 +251,8 @@
           // slogan carousel — same gap as crown→scripture (equal rhythm either side of the title)
           h('div', { className: 'mt-7' }, h(SloganCarousel)),
 
-          // circular Google sign-in + guest link
-          h('div', { className: 'flex flex-col items-center gap-4 mt-12' },
+          // circular Google sign-in, then the email-code option, then the guest link
+          h('div', { className: 'flex flex-col items-center gap-4 mt-12 w-full' },
             h('button', {
               onClick: onGoogle, disabled: loading, type: 'button', 'aria-label': 'Continue with Google',
               className: 'w-14 h-14 rounded-full bg-white border border-border shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:hover:scale-100',
@@ -120,6 +260,13 @@
               loading
                 ? h('span', { className: 'w-5 h-5 rounded-full border-2 border-gold border-t-transparent spin' })
                 : h(GoogleMark)),
+
+            canEmail && (emailOpen
+              ? h(EmailSignIn, { onClose: () => setEmailOpen(false) })
+              : h('button', {
+                  type: 'button', onClick: () => setEmailOpen(true),
+                  className: 'font-brand text-sm font-semibold text-gold-dark hover:text-foreground transition-colors',
+                }, 'Continue with email')),
 
             h('button', {
               type: 'button', onClick: browseAsGuest,

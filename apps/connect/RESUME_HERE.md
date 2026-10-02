@@ -64,8 +64,8 @@
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
   map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, PR #73):** Connect 780 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 14/14**.
+- **Tests (last full run, PR #77):** Connect 820 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 20/20**.
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -87,7 +87,9 @@
   (`pnpm --filter citizens-connect test:e2e`, also the `e2e-connect` CI job). Run `pnpm format:check` locally:
   CI runs it and the turbo gates don't. Run `turbo build` **before** `turbo typecheck`; running them together
   wipes `.next/types` mid-check. CI also runs **CodeQL** and a **blocking OSV-Scanner** (`osv-scanner.toml`'s
-  baseline is empty: fix the dependency, don't baseline it).
+  baseline is empty: fix the dependency, don't baseline it). **New advisories can turn `main` red with no code
+  change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
+  check the lockfile against OSV.dev before pushing.
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
 
 **Database / migrations**
@@ -131,6 +133,14 @@
   its React line's range. `react-canary.d.ts` stays as belt-and-braces.
 - Signed-in (real-mode) Connect e2e specs use `e2e/support/fake-project.ts`: a fake `.test` Supabase project
   answered by `page.route()`, with `test.use({ bypassCSP: true })`. Nothing reaches the real project.
+  `signInToFakeProject` seeds a session; `installFakeProject` starts **signed out** (used by
+  `email-code-signin.spec.ts`, which answers `/auth/v1/otp` and `/auth/v1/verify` itself).
+- **Sign-in:** Connect has two ways in, Google and a 6-digit emailed code (`shouldCreateUser: true`, unlike
+  Wear's sign-in-only). In-app "sign in" prompts call `showSignIn()` (the landing with every option), never
+  the Google-only `signIn()`, or someone without Google is dead-ended. Email sign-ups arrive with no name; the
+  UI shows a display-only stand-in (`displayNameFor`) that must never be written to `profiles.full_name`.
+- **Public repo:** never commit a real organisation's or person's contact details (emails, user ids) in tests,
+  docs or handoffs. Use reserved `.example` addresses.
 
 **Deploy / auth**
 - `next.config`'s `outputFileTracingRoot` must be the monorepo root, or every API route crashes on Vercel
@@ -158,7 +168,7 @@ design session first.
 ### A. Founder actions (no code needed)
 | ID | Item | Pri |
 |---|---|---|
-| A1 | **Phase 6 live test of the Google Form intake.** `testConnection` already says "Connected ✓" (2026-09-27). First **delete the 3 hand-typed sample rows** in the Sheet (approving one publishes a real listing and emails column E). Then submit a real test response through the Form, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that Google account, confirm you land on the dashboard, and remove the test listing in **Admin → Listings → Hide**. The DB path was re-verified live after migs 174–177 (rollback-only probe). (§3AP, PR #73) | P1 |
+| A1 | **Phase 6 live test of the Google Form intake.** `testConnection` already says "Connected ✓" (2026-09-27). First **delete the 3 hand-typed sample rows** in the Sheet (approving one publishes a real listing and emails column E). Then submit a real test response through the Form, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that address (6-digit code, or Google), confirm you land on the dashboard, and remove the test listing in **Admin → Listings → Hide**. The DB path was re-verified live after migs 174–177 (rollback-only probe). (§3AP, PR #73) | P1 |
 | A2 | **One production smoke walk on Connect** (replaces five separate "please confirm" asks): sign in with Google (never machine-verified since the supabase-js pin, §3AT) → Become a Contributor (§3AL) → dashboard edit, cancel and News → Admin Create + Claim → phone-to-desktop map resize (§3AJ) → Android Back button and cards (§3AN). | P1 |
 | A3 | **Wear walk-through:** the sign-in-as (impersonation) flow as admin (only the seed and smoke sessions exist, §3AB), plus a live email test: sign-up confirmation, password reset and 6-digit code via Resend (§3S). | P2 |
 | A4 | **Write the Ts&Cs, Code of Conduct and fee-schedule documents.** The Wear brand application's checkboxes refer to them by name only, and the app-store listings will need them too. | P2 |
@@ -167,6 +177,7 @@ design session first.
 | A7 | Decide what to do with the **Supabase Preview** GitHub check. It reports "skipped" on every PR (Free tier), so it's harmless: uninstall it or leave it (§3M). | P3 |
 | A8 | Mobile store accounts: **F1** Firebase (Android push), **F2** Apple Developer + a Mac, **Step 6** store compliance (privacy/terms URLs, data-safety form, icons, screenshots, age rating), **Step 7** release process (§3G). | Parked |
 | A9 | Supabase **Pro** upgrade decision. It unlocks HIBP leaked-password protection and DB branching (safer migrations). | Parked |
+| A10 | **Finish the email-code sign-in (PR #77).** (1) Supabase → Authentication → Email Templates: **both** *Magic Link* and *Confirm signup* must contain `{{ .Token }}` (existing accounts get the first, brand-new addresses the second). (2) Authentication → Rate Limits: emails/hour ≥ 30; optionally lower the email OTP expiry from 1 h to about 15 min. (3) **Re-paste `tools/google-forms/intake.gs`** into the Sheet's Apps Script. (4) Live test in a private window: an owner on Outlook mail → *Continue with email* → code → their dashboard (and `last_sign_in_at` set, no duplicate account); a never-registered address → a citizen; Google still works for the admin. | P1 |
 
 ### C. Connect: the v1 discovery loop (current product focus)
 | ID | Item | Pri | Size |
@@ -174,7 +185,7 @@ design session first.
 | C1 | **Bug:** a cancelled Event or Place disappears from its owner's dashboard after a reload, because `/api/v1/*` only returns published rows and there is no owner-scoped fetch. Restore only works in the session that cancelled it. (§3AO) | P1 | S–M |
 | C3 | **Apply wizard: collect the Contributor kind** (incl. Individual; the data model is done in mig 173) and relax the "Organisation / ministry name" copy for solo people. (§3AP, V1_SCOPE §7) | P2 | S |
 | C4 | **Admin Create parity:** add X, LinkedIn, WhatsApp, public contact email and cover photo (the intake RPC already takes them). (§3AP) | P2 | S |
-| C5 | **Email + password and 6-digit-code sign-in for Connect** (and Vision). Both are Google-only today; the provider is enabled project-wide and Wear's screens are the pattern. You flagged that Google Auth "may not be available soon". (§3P, §3S) | P2 | M |
+| C5 | **6-digit-code sign-in for Vision.** Connect shipped it (PR #77) and Wear already has it; Vision is still Google-only. Port Connect's `EmailSignIn` panel and `CC_AUTH_HELPERS` (`auth.jsx`, `auth-client.js`). Email + password for Connect was dropped on purpose: passwordless only. (§3P, §3S) | P2 | S–M |
 | C6 | **Lazy profiles:** stop `on_auth_user_created` from creating a `public.profiles` row for every auth user (verified still present). Add "ensure profile on first Connect sign-in" **first**, or new sign-ups break. It touches live auth, so it needs its own tested session. (§3S) | P3 | M |
 | C7 | Guest mode: Consider / Follow / Connect on a real listing silently does nothing after an optimistic UI flip. Add toast-and-revert (about 10 call sites). (§3AH) | P3 | S |
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
@@ -256,6 +267,15 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-02 — Merged #71 and #75, fixed a red `main`, shipped email-code sign-in (C5).** #71 (`9eb727e`)
+  and #75 (`b85f5ae`) merged. #75's Verify failed on the OSV gate only: 20 advisories published after 09-27
+  (brace-expansion, js-yaml, undici, all dev/test-time) had turned `main` red since #71's merge; fixed by
+  raising the `pnpm.overrides` floors in **#76** (`cb0a049`), checked against OSV.dev. **#77:** *Continue with
+  email* on Connect's landing (6-digit code, `shouldCreateUser: true`): owners without Google (e.g. on Outlook)
+  can finally reach their dashboard; guests are no longer dead-ended into Google; 40 unit + 6 e2e tests
+  (e2e 20/20). Open: founder steps **A10**, Vision port (**C5**), the C10 design discussion. Handoff:
+  `docs/handoffs/CONNECT_EMAIL_CODE_SIGNIN_AND_ADMIN_DELETE_HANDOFF.md` (kept untracked: it names a real
+  organisation, and this repo is public). No migration (next # still 178).
 - **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
   #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
   and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every
