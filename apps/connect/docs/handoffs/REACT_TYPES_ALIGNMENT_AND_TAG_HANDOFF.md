@@ -1,10 +1,17 @@
 # HANDOFF — (A) One React-types version per React line + Next-scoped type resolution · (B) push the pre-mig-174 git tag
 
-> **Status (2026-09-27):** founder-approved, **not started**. Both tasks were proposed at the end of
-> `RESUME_HERE.md` §3AS and the founder said: *"I'd like to enact both of those suggestions."*
-> Task A's exact change was **validated end-to-end** in the authoring sandbox (every workspace gate green,
-> all three apps typecheck under every possible hoist), then **reverted**. Nothing below has been
-> committed, and no database work is involved.
+> **Status: ✅ DONE (2026-09-27).** Task A shipped in
+> [PR #72](https://github.com/citizensnetwork/citizens-ecosystem/pull/72) (merged `0231014`; production READY on
+> all three apps, 0 runtime errors). §A.5 matched exactly, and the §A.6 proof gave 0/0/0 under every hoist with
+> and without the canary file (the control on `main` showed connect=1 under 18.3.3 and 19.2.17). On Windows the
+> virtual store is `<root>/.pnpm` with NTFS junctions, so the harness re-points the slot with
+> `fs.symlinkSync(target, slot, "junction")` rather than `ln -sfn`. Task B: all five tags are on `origin`
+> (`connect-pre-mig174-profiles-privacy`, `pre-mig-172-entity-socials` created; `connect-pre-mig158`,
+> `connect-v1-pre-mig164`, `wear-pre-mig163` pushed). Canary comment + contract note: PR #74.
+>
+> *Original status:* founder-approved, not started. Both tasks were proposed at the end of `RESUME_HERE.md` §3AS
+> and the founder said: *"I'd like to enact both of those suggestions."* Task A's exact change was validated
+> end-to-end in the authoring sandbox, then reverted.
 >
 > Written for a **stateless** session: every fact, command and expected output you need is here.
 > Base: `main` @ `4c82fcb` (merge of PR #68). Repo `citizensnetwork/citizens-ecosystem`.
