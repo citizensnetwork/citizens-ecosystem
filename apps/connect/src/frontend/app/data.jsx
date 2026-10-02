@@ -78,6 +78,28 @@
     CONTRIBUTOR_TYPES.filter((t) => !getEventCategory(t.id) && !getPlaceCategory(t.id)),
   );
 
+  // ── Events: has it finished? ─────────────────────────────────────────
+  //  The ONE definition behind "does this still belong on the map / in the
+  //  discovery list" (home.jsx, kingdom-discovery.jsx) and "which group does it
+  //  sit in on the organiser's profile and dashboard". An event is over once its
+  //  END is behind us. End time is optional on the create form, so an event with
+  //  no end stays up for the rest of its calendar day rather than vanishing the
+  //  minute it starts. `startsAt`/`endsAt` are the raw ISO instants store.jsx
+  //  adaptEvent keeps; an optimistic local draft carries only `date`; an event
+  //  with no time information at all is never called past (one stale pin beats
+  //  a hidden live event).
+  //  Recurrence is not modelled: create.jsx defers it to v2 and /api/v1/events
+  //  does not expose is_recurring, so each row is a single occurrence.
+  const isPastEvent = (e, now = Date.now()) => {
+    if (!e) return false;
+    const end = Date.parse(e.endsAt || '');
+    if (!isNaN(end)) return end < now;
+    const start = e.startsAt ? new Date(e.startsAt) : (e.date ? new Date(e.date + 'T00:00:00') : null);
+    if (!start || isNaN(start.getTime())) return false;
+    const endOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+    return endOfDay.getTime() < now;
+  };
+
   // ── Social platforms an Event / Place / Contributor can publish ──────
   //  ONE table. The apply + onboarding + portal + create-listing inputs, the
   //  public profile chips, the map preview and the Kingdom Discovery card all
@@ -90,6 +112,11 @@
   //  server validation and take the entire profile save down with it.
   const stripHandle = (v) => (v || '').trim().replace(/^@+/, '').replace(/^\/+/, '').replace(/\/+$/, '');
   const isAbsolute = (v) => /^https?:\/\//i.test((v || '').trim());
+  // No platform handle contains a space, so "Grace Radio" is a DISPLAY NAME
+  // typed into a link box, not a handle. Building facebook.com/Grace Radio out
+  // of it makes a dead link (the first real Form submission did exactly that),
+  // so every builder below returns '' for it and SocialLinks draws nothing.
+  const isDisplayName = (v) => !isAbsolute(v) && /\s/.test((v || '').trim());
   // Strip any leading "host/" (with or without www.) the user pasted in, so
   // "instagram.com/damcool" and "damcool" both resolve to the same link.
   //
@@ -120,7 +147,7 @@
   const bareHandle = (v) => v.replace(/^@+/, '');
   const onHost = (host, prefix) => (v) => {
     const t = (v || '').trim();
-    if (!t) return '';
+    if (!t || isDisplayName(t)) return '';
     if (isAbsolute(t)) return t;
     const handle = prefix ? bareHandle(stripHost(t, host)) : stripHost(t, host);
     return handle ? 'https://' + host + '/' + (prefix || '') + handle : '';
@@ -130,7 +157,7 @@
     { key: 'facebook', label: 'Facebook', icon: 'BrandFacebook', prefix: '/', placeholder: 'facebook.com/yourpage', urlFor: onHost('facebook.com') },
     { key: 'youtube', label: 'YouTube', icon: 'BrandYouTube', prefix: '@', placeholder: '@yourchannel', urlFor: (v) => {
       const t = (v || '').trim();
-      if (!t) return '';
+      if (!t || isDisplayName(t)) return '';
       if (isAbsolute(t)) return t;
       // YouTube's modern vanity URLs are /@handle; legacy ones are /c/… or
       // /channel/… . Keep an explicit path, prefix a bare handle with @.
@@ -142,7 +169,7 @@
     { key: 'x', label: 'X', icon: 'BrandX', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('x.com') },
     { key: 'linkedin', label: 'LinkedIn', icon: 'BrandLinkedIn', prefix: '/', placeholder: 'linkedin.com/company/you', urlFor: (v) => {
       const t = (v || '').trim();
-      if (!t) return '';
+      if (!t || isDisplayName(t)) return '';
       if (isAbsolute(t)) return t;
       const h = stripHost(t, 'linkedin.com');
       if (!h) return '';
@@ -154,11 +181,19 @@
       const t = (v || '').trim();
       if (!t) return '';
       if (isAbsolute(t)) return t;
-      // A phone number (the usual case) → wa.me. Anything else is treated as
-      // a wa.me / chat.whatsapp.com path the contributor pasted without the
-      // scheme, so it still becomes a real link instead of dead text.
-      const digits = t.replace(/[^\d]/g, '');
-      if (/^[+\d][\d\s().-]*$/.test(t) && digits.length >= 7) return 'https://wa.me/' + digits;
+      // A phone number (the usual case) → wa.me, which wants the international
+      // form with no leading 0: a local South African "0712345678" is
+      // 27712345678 (the first Form submission stored it the local way).
+      // Anything else is treated as a wa.me / chat.whatsapp.com path the
+      // contributor pasted without the scheme, so it still becomes a real link
+      // instead of dead text — unless it has spaces, which makes it a name.
+      let digits = t.replace(/[^\d]/g, '');
+      if (/^[+\d][\d\s().-]*$/.test(t) && digits.length >= 7) {
+        // "+27 (0)71…" keeps South Africa's trunk 0 after the country code.
+        if (/^270\d{9}$/.test(digits)) digits = '27' + digits.slice(3);
+        return 'https://wa.me/' + (/^0\d{9}$/.test(digits) && t.charAt(0) !== '+' ? '27' + digits.slice(1) : digits);
+      }
+      if (isDisplayName(t)) return '';
       const h = stripHandle(t);
       return h ? 'https://' + h.replace(/^(https?:\/\/)?/i, '') : '';
     } },
@@ -173,6 +208,8 @@
   const socialDisplay = (key, v) => {
     const t = (v || '').trim();
     if (!t) return '';
+    // A stored number is international digits with no "+" (what wa.me wants): show it as one.
+    if (key === 'whatsapp' && /^\d{7,15}$/.test(t)) return '+' + t;
     if (key === 'whatsapp') return t.replace(/^https?:\/\/(www\.)?wa\.me\//i, '+').replace(/^https?:\/\//i, '');
     const bare = t.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '');
     const path = bare.indexOf('/') > -1 ? bare.slice(bare.indexOf('/') + 1) : bare;
@@ -232,6 +269,7 @@
     getContributorType,
     getCategory,
     getItemCategory,
+    isPastEvent,
     SOCIAL_PLATFORMS,
     SOCIAL_COLUMNS,
     getSocialPlatform,

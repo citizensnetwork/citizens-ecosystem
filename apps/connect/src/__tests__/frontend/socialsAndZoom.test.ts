@@ -25,6 +25,7 @@ type SocialPlatform = {
   urlFor: (v: string) => string;
 };
 type DataGlobal = {
+  isPastEvent: (e: Record<string, unknown> | null | undefined, now?: number) => boolean;
   SOCIAL_PLATFORMS: SocialPlatform[];
   SOCIAL_COLUMNS: Record<string, Record<string, string>>;
   getSocialPlatform: (k: string) => SocialPlatform;
@@ -33,7 +34,7 @@ type DataGlobal = {
   socialsToRow: (socials: Record<string, string>, kind: string) => Record<string, string | null>;
 };
 type MapZoom = {
-  GATES: { place: number; event: number };
+  GATES: { place: number; event: number; contributor: number };
   LABELS: number;
   bandFor: (z: number) => string;
   hidden: (type: string, z: number, selected: boolean) => boolean;
@@ -183,36 +184,132 @@ describe("SOCIAL_PLATFORMS — one table for every surface", () => {
     expect(DATA.socialDisplay("instagram", "https://instagram.com/dam")).toBe("dam");
     expect(DATA.socialDisplay("instagram", "@dam")).toBe("@dam");
     expect(DATA.socialDisplay("whatsapp", "https://wa.me/27820000000")).toBe("+27820000000");
+    // Stored numbers are international digits without the "+" — show them as a number.
+    expect(DATA.socialDisplay("whatsapp", "27712345678")).toBe("+27712345678");
   });
 });
 
 describe("map zoom gates", () => {
-  it("hides places at provincial zoom and events too at national zoom", () => {
-    // z≈10-11 metro · z≈8-9 province · z≈5-6 the whole country.
+  it("peels pins away as you zoom out: places, then events, then contributors", () => {
+    // z≈10-11 metro · z≈8-9 province · z≈6-7 several provinces · z<6 the country.
     expect(MAP_ZOOM.bandFor(11)).toBe("all");
     expect(MAP_ZOOM.bandFor(8.5)).toBe("places");
-    expect(MAP_ZOOM.bandFor(5.5)).toBe("contributors");
+    expect(MAP_ZOOM.bandFor(6.5)).toBe("contributors");
+    expect(MAP_ZOOM.bandFor(5.5)).toBe("none");
 
     expect(MAP_ZOOM.hidden("place", 11, false)).toBe(false);
     expect(MAP_ZOOM.hidden("place", 8.5, false)).toBe(true);
     expect(MAP_ZOOM.hidden("event", 8.5, false)).toBe(false);
-    expect(MAP_ZOOM.hidden("event", 5.5, false)).toBe(true);
+    expect(MAP_ZOOM.hidden("event", 6.5, false)).toBe(true);
+    expect(MAP_ZOOM.hidden("contributor", 6.5, false)).toBe(false);
+    expect(MAP_ZOOM.hidden("contributor", 5.5, false)).toBe(true);
   });
 
-  it("never gates a contributor — an organisation is what national zoom is for", () => {
-    for (const z of [2, 5.5, 8.5, 11, 16]) {
-      expect(MAP_ZOOM.hidden("contributor", z, false), `z=${z}`).toBe(false);
-      expect(MAP_ZOOM.hidden("idea", z, false), `z=${z}`).toBe(false);
+  it("hides each type exactly below its own gate and shows it at the gate", () => {
+    // Founder decision D1 (2026-10-02): Contributors hide below zoom 6 so the
+    // national view reads clean. They used to be permanent anchors.
+    expect(MAP_ZOOM.GATES).toEqual({ place: 9.5, event: 7.5, contributor: 6 });
+    for (const type of ["place", "event", "contributor"] as const) {
+      const gate = MAP_ZOOM.GATES[type];
+      expect(MAP_ZOOM.hidden(type, gate - 0.01, false), `${type} just below`).toBe(true);
+      expect(MAP_ZOOM.hidden(type, gate, false), `${type} at the gate`).toBe(false);
     }
   });
 
-  it("never gates the SELECTED pin — its preview panel is open", () => {
-    expect(MAP_ZOOM.hidden("place", 3, true)).toBe(false);
-    expect(MAP_ZOOM.hidden("event", 3, true)).toBe(false);
+  it("reports a band that matches what is actually hidden, so the on-screen hint never lies", () => {
+    for (const z of [3, 5.99, 6, 7.49, 7.5, 9.49, 9.5, 12]) {
+      const hiddenTypes = (["contributor", "event", "place"] as const).filter((t) => MAP_ZOOM.hidden(t, z, false));
+      const expected: Record<string, string[]> = {
+        all: [],
+        places: ["place"],
+        contributors: ["event", "place"],
+        none: ["contributor", "event", "place"],
+      };
+      expect(hiddenTypes.sort(), `z=${z}`).toEqual(expected[MAP_ZOOM.bandFor(z)].sort());
+    }
   });
 
-  it("keeps the gates ordered and the label threshold above both", () => {
+  it("never gates an Impact Idea — it is an opt-in layer", () => {
+    for (const z of [2, 5.5, 8.5, 11, 16]) expect(MAP_ZOOM.hidden("idea", z, false), `z=${z}`).toBe(false);
+  });
+
+  it("never gates the SELECTED pin — its preview panel is open", () => {
+    for (const type of ["place", "event", "contributor"]) expect(MAP_ZOOM.hidden(type, 3, true), type).toBe(false);
+  });
+
+  it("keeps the gates ordered, with names appearing only once every pin type is on screen", () => {
+    expect(MAP_ZOOM.GATES.contributor).toBeLessThan(MAP_ZOOM.GATES.event);
     expect(MAP_ZOOM.GATES.event).toBeLessThan(MAP_ZOOM.GATES.place);
     expect(MAP_ZOOM.LABELS).toBeGreaterThan(MAP_ZOOM.GATES.place);
+    // Founder decision D2: names from neighbourhood scale.
+    expect(MAP_ZOOM.LABELS).toBe(15);
+  });
+});
+
+describe("isPastEvent — what leaves the map and the discovery list", () => {
+  const NOW = new Date("2026-10-02T12:00:00").getTime();
+  const at = (iso: string) => new Date(iso).toISOString();
+
+  it("is past once its end is behind us, and not before", () => {
+    const e = { startsAt: at("2026-10-02T09:00:00"), endsAt: at("2026-10-02T11:00:00") };
+    expect(DATA.isPastEvent(e, NOW)).toBe(true);
+    expect(DATA.isPastEvent({ ...e, endsAt: at("2026-10-02T13:00:00") }, NOW)).toBe(false);
+  });
+
+  it("an event that has started but not ended is still on", () => {
+    expect(DATA.isPastEvent({ startsAt: at("2026-10-02T11:00:00"), endsAt: at("2026-10-02T14:00:00") }, NOW)).toBe(false);
+  });
+
+  it("with no end time, stays up for the rest of its day, then goes", () => {
+    // End time is optional on the create form; a 09:00 service must not vanish at 09:00.
+    expect(DATA.isPastEvent({ startsAt: at("2026-10-02T09:00:00") }, NOW)).toBe(false);
+    expect(DATA.isPastEvent({ startsAt: at("2026-10-01T18:00:00") }, NOW)).toBe(true);
+  });
+
+  it("the three real production events (May, June, August) are all past in October", () => {
+    for (const date of ["2026-05-29", "2026-06-25", "2026-08-29"]) {
+      expect(DATA.isPastEvent({ startsAt: at(`${date}T16:00:00`) }, NOW), date).toBe(true);
+    }
+  });
+
+  it("falls back to the calendar date for an event with no timestamps (an optimistic local draft)", () => {
+    expect(DATA.isPastEvent({ date: "2026-10-02" }, NOW)).toBe(false);
+    expect(DATA.isPastEvent({ date: "2026-10-03" }, NOW)).toBe(false);
+    expect(DATA.isPastEvent({ date: "2026-10-01" }, NOW)).toBe(true);
+  });
+
+  it("never calls an event with no time information past — one stale pin beats a hidden live event", () => {
+    expect(DATA.isPastEvent({}, NOW)).toBe(false);
+    expect(DATA.isPastEvent({ startsAt: "not a date", date: "" }, NOW)).toBe(false);
+    expect(DATA.isPastEvent(null, NOW)).toBe(false);
+    expect(DATA.isPastEvent(undefined, NOW)).toBe(false);
+  });
+});
+
+describe("social links never render a value that isn't a link", () => {
+  const link = (key: string, v: string) => DATA.getSocialPlatform(key).urlFor(v);
+
+  it("makes no link from a display name (the first real Form submission)", () => {
+    expect(link("facebook", "Grace Radio")).toBe("");
+    expect(link("youtube", "Grace Online")).toBe("");
+    expect(link("instagram", "Grace Point Church")).toBe("");
+    expect(link("tiktok", "our page")).toBe("");
+    expect(link("x", "Grace Radio")).toBe("");
+    expect(link("linkedin", "Grace Radio")).toBe("");
+    expect(link("whatsapp", "call the office")).toBe("");
+  });
+
+  it("still links a real handle, a pasted URL and a spaced international number", () => {
+    expect(link("facebook", "GraceRadio")).toBe("https://facebook.com/GraceRadio");
+    expect(link("facebook", "https://facebook.com/grace radio")).toBe("https://facebook.com/grace radio");
+    expect(link("whatsapp", "+44 7911 123456")).toBe("https://wa.me/447911123456");
+  });
+
+  it("opens a local South African WhatsApp number through wa.me in international form", () => {
+    // wa.me/0712345678 is a dead link; the number must lose its 0 and gain 27.
+    expect(link("whatsapp", "0712345678")).toBe("https://wa.me/27712345678");
+    expect(link("whatsapp", "071 234 5678")).toBe("https://wa.me/27712345678");
+    expect(link("whatsapp", "27712345678")).toBe("https://wa.me/27712345678");
+    expect(link("whatsapp", "+27 (0)71 234 5678")).toBe("https://wa.me/27712345678");
   });
 });

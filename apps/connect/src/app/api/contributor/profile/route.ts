@@ -15,7 +15,7 @@
 import { getRouteAuth } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { normalisePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
+import { normalisePublicUrl, normaliseSocialField } from "@/lib/publicUrl";
 
 const ALLOWED_KEYS = [
   "bio",
@@ -149,17 +149,24 @@ export async function POST(request: Request) {
     update.website_url = norm;
   }
 
-  // Socials accept a handle OR a URL — see normaliseSocialValue. Before this,
-  // an @handle typed into the Facebook box failed URL validation and, because
-  // this route rejects on the first bad field, took the entire profile save
-  // down with it: the reason a real contributor ended up with one handle
-  // stored out of the several they had filled in.
+  // Socials accept a handle OR a URL (WhatsApp: a number OR a wa.me link) — see
+  // normaliseSocialField. Before this, an @handle typed into the Facebook box
+  // failed URL validation and, because this route rejects on the first bad
+  // field, took the entire profile save down with it: the reason a real
+  // contributor ended up with one handle stored out of the several they had
+  // filled in. A value with spaces ("Grace Radio") is a name, not a handle,
+  // and is refused the same way — the owner is here to correct it.
   for (const key of SOCIAL_KEYS) {
     if (update[key] === undefined) continue;
-    const norm = normaliseSocialValue(update[key], MAX_SOCIAL);
+    const norm = normaliseSocialField(key, update[key], MAX_SOCIAL);
     if (norm === undefined) {
       return NextResponse.json(
-        { error: `${key} must be a handle or a valid https/http link` },
+        {
+          error:
+            key === "whatsapp_number"
+              ? `${key} must be a phone number (e.g. 071 234 5678 or +27 71 234 5678) or a wa.me link`
+              : `${key} must be a handle (no spaces) or a valid https/http link`,
+        },
         { status: 400 },
       );
     }

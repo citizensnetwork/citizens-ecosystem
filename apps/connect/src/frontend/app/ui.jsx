@@ -27,15 +27,25 @@
   // A missing or broken src never shows a broken-image glyph: it degrades to the
   // person/org's initials on gold, or a neutral User icon when we have no name —
   // honest, never a fake stock face (VISION: don't misrepresent identity).
-  function Avatar({ src, alt, name, size = 40, rounded = 'full', ring, className, style }) {
+  //  fit='cover' (default) fills the frame — right for a PERSON's photo.
+  //  fit='contain' is for an organisation's LOGO: the whole mark on a white
+  //  tile with a little breathing room. A wide wordmark (a radio station's
+  //  banner) used to be cropped to its middle, and a transparent PNG took on
+  //  whatever colour sat behind it.
+  function Avatar({ src, alt, name, size = 40, rounded = 'full', ring, fit = 'cover', className, style }) {
     const [failed, setFailed] = useState(false);
     useEffect(() => setFailed(false), [src]);
     const r = rounded === 'full' ? '9999px' : rounded === 'xl' ? '14px' : '10px';
-    const box = { width: size, height: size, borderRadius: r, boxShadow: ring ? `0 0 0 2px ${ring}` : undefined, ...style };
+    const contain = fit === 'contain';
+    const box = {
+      width: size, height: size, borderRadius: r, boxShadow: ring ? `0 0 0 2px ${ring}` : undefined,
+      ...(contain ? { background: '#fff', padding: Math.max(2, Math.round(size * 0.08)), boxSizing: 'border-box' } : null),
+      ...style,
+    };
     if (src && !failed) {
       return React.createElement('img', {
         src, alt: alt || name || '', loading: 'lazy', onError: () => setFailed(true),
-        className: cx('object-cover shrink-0', className), style: box,
+        className: cx(contain ? 'object-contain' : 'object-cover', 'shrink-0', className), style: box,
       });
     }
     const ini = initials(name || alt);
@@ -45,6 +55,11 @@
       style: Object.assign({}, box, { fontSize: Math.max(9, Math.round(size * 0.4)) }),
     }, ini || React.createElement(Icon, { name: 'User', size: Math.round(size * 0.5) }));
   }
+
+  // How a Contributor's picture should be framed. An organisation's image is a
+  // logo (show all of it); an Individual's is a photo of a person (fill the
+  // frame). Same rule on the map pin, the cards and the profile pages.
+  const logoFit = (kind) => (kind === 'individual' ? 'cover' : 'contain');
 
   // ── SmartImage (graceful cover/photo) ──
   // Drop-in for cover <img>. Empty or broken src → an honest, category-tinted
@@ -349,5 +364,5 @@
         }))));
   }
 
-  window.UI = { cx, safeUrl, SocialLinks, Avatar, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
+  window.UI = { cx, safeUrl, SocialLinks, Avatar, logoFit, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
 })();

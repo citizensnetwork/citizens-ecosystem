@@ -17,11 +17,10 @@
 //  mock→real data migration.
 //
 //  Visibility: DENSITY-GATED BY ZOOM (founder ask). A place is a street-level
-//  fact and an event is a city-level one, so past a certain distance they stop
-//  being useful and start being noise — see ZOOM_GATES below. Contributors are
-//  never gated: an organisation is the one thing worth seeing at national
-//  scale. There is still no clustering, and gating is pure CSS `display` on
-//  markers MapLibre already owns — no marker churn on zoom.
+//  fact, an event a city-level one and a Contributor a regional one, so past a
+//  certain distance each stops being useful and starts being noise — see
+//  ZOOM_GATES below. There is still no clustering, and gating is pure CSS
+//  `display` on markers MapLibre already owns — no marker churn on zoom.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useRef, useEffect } = React;
@@ -38,34 +37,40 @@
   //    z≈8–9   one province, e.g. Gauteng ("provincial")
   //    z≈10–11 one metro, e.g. Pretoria
   //    z≈13+   suburb / street
-  //  Founder's rule: places drop out at provincial scale, and events drop out
-  //  with them at national scale.
-  const ZOOM_GATES = { place: 9.5, event: 7.5 };
+  //  Founder's rule: places drop out at provincial scale, events with them at
+  //  wider scale still, and — so the national view reads clean and professional
+  //  rather than as a scatter of pins — Contributors too below zoom 6
+  //  (2026-10-02; they used to be permanent anchors that never gated).
+  //  This is the ONE place the thresholds live; each type hides when z < gate.
+  const ZOOM_GATES = { place: 9.5, event: 7.5, contributor: 6 };
   //  What the current zoom is showing — reported upward so the map screen can
   //  say WHY pins vanished instead of leaving it a mystery.
   //    'all'          everything with coordinates
   //    'places'       places gated out (provincial)
-  //    'contributors' events gated out too (national) — contributors remain
+  //    'contributors' events gated out too — only Contributors remain
+  //    'none'         Contributors gated out as well (national) — nothing drawn
   function zoomBandFor(z) {
     if (z >= ZOOM_GATES.place) return 'all';
     if (z >= ZOOM_GATES.event) return 'places';
-    return 'contributors';
+    if (z >= ZOOM_GATES.contributor) return 'contributors';
+    return 'none';
   }
-  // A pin is hidden only when its own type is gated out. The SELECTED pin is
-  // always drawn: its preview panel is open, and a preview pointing at nothing
-  // would be worse than one extra marker.
+  // A pin is hidden only when its own type is gated out (Impact Ideas are an
+  // opt-in layer and are never gated). The SELECTED pin is always drawn: its
+  // preview panel is open, and a preview pointing at nothing would be worse
+  // than one extra marker.
   function markerHidden(type, z, selected) {
     if (selected) return false;
-    if (type === 'place') return z < ZOOM_GATES.place;
-    if (type === 'event') return z < ZOOM_GATES.event;
-    return false;
+    const gate = ZOOM_GATES[type];
+    return gate !== undefined && z < gate;
   }
   // Titles only earn their space once you are close enough to read a
   // neighbourhood; below that they'd overlap into mush. Tuned 12.6 → 15.6 →
   // 18 → 16.5 (2026-08-26) — 18 was too tight (labels almost never showed at
-  // normal browsing zoom), so pulled back in. The selected pin keeps its
-  // label at every zoom (CSS `.cc-pin-label.is-selected`).
-  const ZOOM_LABELS = 16.5;
+  // normal browsing zoom), so pulled back in — then 15 (2026-10-02, founder:
+  // neighbourhood scale). The selected pin keeps its label at every zoom
+  // (CSS `.cc-pin-label.is-selected`).
+  const ZOOM_LABELS = 15;
 
   function coordsFor(m) {
     if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
@@ -205,8 +210,8 @@
       w = W; h = H;
     } else {
       // Contributor > event > place, by design: an organisation is a permanent
-      // anchor (and the only pin that survives to national zoom), an event is
-      // time-bound, a place is the smallest unit.
+      // anchor (and the pin that survives furthest out — see ZOOM_GATES), an
+      // event is time-bound, a place is the smallest unit.
       const d = shape === 'contributor' ? (selected ? 46 : 38) : (selected ? 38 : 30);
       const pad = shape === 'contributor' ? 3 : 2;
       const W = d + pad * 2, c = pad + d / 2;
@@ -265,18 +270,30 @@
       // circular silhouette as the SVG badge, drawn as DOM so the photo keeps
       // its onerror fallback — a broken logo URL degrades to the category
       // glyph rather than leaving a dead image on the map.
+      //
+      // An organisation's LOGO sits whole (object-fit: contain) on a white
+      // disc, with the category colour as the ring only: a wide wordmark used
+      // to be cropped to its middle and a transparent PNG took on the category
+      // colour behind it. An Individual's PHOTO of themselves still fills the
+      // circle, as before.
       const d = selected ? 46 : 38;
+      const isPhoto = m.kind === 'individual';
       pin = document.createElement('span');
       pin.setAttribute('data-cc-pin', 'contributor-logo');
       pin.style.cssText = 'display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
-        'px;border-radius:50%;background:' + fill + ';box-shadow:0 0 0 2px ' + fill + '73, 0 3px 5px rgba(0,0,0,.32);transition:all .15s;';
+        'px;border-radius:50%;transition:all .15s;' + (isPhoto
+        ? 'background:' + fill + ';box-shadow:0 0 0 2px ' + fill + '73, 0 3px 5px rgba(0,0,0,.32);'
+        : 'box-sizing:border-box;background:#fff;border:2.5px solid ' + fill + ';box-shadow:0 0 0 1.5px #fff, 0 3px 5px rgba(0,0,0,.32);');
       const img = document.createElement('img');
       img.src = m.profilePhoto;
       img.alt = '';
-      img.style.cssText = 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;';
+      img.style.cssText = isPhoto
+        ? 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;'
+        : 'width:100%;height:100%;padding:2px;border-radius:50%;object-fit:contain;display:block;box-sizing:border-box;';
       img.onerror = () => {
         pin.style.boxShadow = 'none';
         pin.style.background = 'transparent';
+        pin.style.border = 'none';
         pin.replaceChildren(pinSvg({ shape: 'contributor', hex: fill, icon, selected }));
       };
       pin.appendChild(img);
@@ -422,6 +439,10 @@
         map.on('dragstart', onUserMove);
         map.on('zoomstart', onUserMove);
         mapRef.current = map;
+        // Inspection/test hook, in the same spirit as store.jsx's `window.__cc`:
+        // lets a spec (or the console) jumpTo an exact zoom instead of
+        // keyboard-stepping toward it. Read-only by convention; cleared on unmount.
+        window.__ccMap = map;
         setMapReady(true);
         // Density gates follow the zoom, including the programmatic flyTo /
         // fitBounds below, so the first frame is already correct.
@@ -472,6 +493,7 @@
           map.off('load', applyZoomGates);
           markerObjs.current.forEach((mk) => mk.remove());
           markerObjs.current.clear();
+          if (window.__ccMap === map) window.__ccMap = null;
           map.remove();
           mapRef.current = null;
         };
@@ -484,9 +506,10 @@
       };
     }, [applyZoomGates]);
 
-    // (re)render pins whenever inputs change. Visibility is no longer
-    // zoom-dependent, so this only needs to run on data/filter/selection/style
-    // changes — MapLibre keeps each marker glued to its coordinate on zoom/pan.
+    // (re)render pins whenever inputs change. Zoom gating is NOT done here (it
+    // is applyZoomGates, per zoom frame), so this only needs to run on
+    // data/filter/selection/style changes — MapLibre keeps each marker glued
+    // to its coordinate on zoom/pan.
     useEffect(() => {
       const mp = mapRef.current;
       if (!mp || !window.maplibregl) return;
@@ -544,8 +567,26 @@
       // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
       if (!userMovedRef.current && items.length) {
         const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
-        items.forEach(({ coords }) => b.extend(coords));
+        let outermost = Infinity;   // the lowest gate among the types actually present
+        items.forEach(({ m, coords }) => {
+          b.extend(coords);
+          const gate = ZOOM_GATES[m.type];
+          outermost = Math.min(outermost, gate === undefined ? 0 : gate);
+        });
         mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
+        // Data spread across the whole country frames out past every gate and
+        // would open on a blank map. Never zoom out further than the point where
+        // at least one type of pin is still drawn — and centre on THOSE pins, not
+        // on the middle of the data (which can be an empty stretch of country,
+        // with the pins that are drawn cropped off the edge).
+        if (mp.getZoom() < outermost) {
+          const shown = new window.maplibregl.LngLatBounds();
+          items.forEach(({ m, coords }) => {
+            const gate = ZOOM_GATES[m.type];
+            if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
+          });
+          mp.jumpTo({ center: shown.getCenter(), zoom: outermost });
+        }
       }
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.

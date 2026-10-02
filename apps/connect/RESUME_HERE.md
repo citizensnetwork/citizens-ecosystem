@@ -64,8 +64,12 @@
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
   map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, PR #77):** Connect 820 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 20/20**.
+- **Tests (last full run, map-preview PR):** Connect 852 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 30/30**.
+- **2026-10-02 map-preview PR (branch `claude/connect-map-preview-consistency`):** one preview card for every pin;
+  Contributors hide below zoom 6, names from 15 (founder D1/D2); org logos shown whole; finished events leave the
+  map/Discovery (`DATA.isPastEvent`); social values with spaces refused/dropped, SA WhatsApp → `27…`; one prod row
+  fixed. New pipeline items C11–C13. Full §6 write-up still to add (see the PR description).
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -91,6 +95,13 @@
   change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
   check the lockfile against OSV.dev before pushing.
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
+- **Working from a sibling git worktree (parallel sessions):** `preview_start name=…` resolves
+  `.claude/launch.json` from the *primary* checkout, so it serves the other session's files. Start your own
+  `npx next dev -p <port>` from the worktree's `apps/connect` instead (copy the gitignored `.env.local` in, and
+  delete the copy afterwards). **Never let two `next dev` servers share one `.next`** (e.g. your dev server plus
+  Playwright's `webServer` on 3100): the second corrupts the first and its `/api/*` routes start returning 404.
+  Stop yours before running e2e. A local dev server reads the real Supabase and the real Upstash rate-limit
+  buckets, so don't hammer `/api/v1/*` from it.
 
 **Database / migrations**
 - `supabase/` at the repo root is the one migration lineage. Apply with MCP `apply_migration`, set a pre-apply
@@ -127,6 +138,19 @@
   XSS). Bumping `maplibre-gl` means re-copying the four files; the build fails loudly otherwise. Any new map
   (e.g. Vision's Timeline Map) must use the same vendored copy, never an unpkg 4.x build.
 - Brand icons are `Brand…`-prefixed on purpose: lucide's close icon is literally called `X` (§3AO).
+- **Map rules live in one place, `map.jsx`:** `ZOOM_GATES` (each pin type hides when zoom < its gate: place 9.5,
+  event 7.5, Contributor 6; Ideas never gate; the selected pin is always drawn) and `ZOOM_LABELS` (15). Every
+  Contributor pin opens the same small `EntityCard` preview as events and places; the full profile is behind its
+  "View Full Profile" button. `window.__ccMap` exposes the map for specs (`jumpTo({center,zoom},
+  {originalEvent:{}})`; the `originalEvent` marker stops the "frame the data" effect undoing the jump).
+- **Past events:** `window.DATA.isPastEvent` is the one definition (end behind us; no end time → stays up for the
+  rest of its calendar day). Map and Kingdom Discovery filter on it; organiser profile and dashboard keep past
+  events under "Past events". Recurrence is not modelled (create.jsx defers it; the API doesn't expose it).
+- **Social values** go through one classifier (`checkSocialValue` / `checkSocialField` in `src/lib/publicUrl.ts`
+  and `urlFor` in `data.jsx`): a value with spaces is a display name, not a handle, and is refused (dashboard,
+  Apply, admin Create) or dropped with a Note (Google Form intake, `lenientSocials`). WhatsApp is stored as
+  international digits (`27…`). A logo is shown whole (`Avatar fit="contain"` / `logoFit(kind)`); an Individual's
+  photo fills the frame.
 - **React types: one `@types/react` per React line** (connect/wear/ui on `^18.3.28`, vision on `^19`), and root
   `pnpm.packageExtensions` gives `next` optional `@types/react(-dom)` peers, so each app's Next resolves its own
   types instead of pnpm's hoist slot (the phantom `react.cache` build error; PR #72). Keep a new app's types on
@@ -169,7 +193,7 @@ design session first.
 | ID | Item | Pri |
 |---|---|---|
 | A1 | **Phase 6 live test of the Google Form intake.** `testConnection` already says "Connected ✓" (2026-09-27). First **delete the 3 hand-typed sample rows** in the Sheet (approving one publishes a real listing and emails column E). Then submit a real test response through the Form, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that address (6-digit code, or Google), confirm you land on the dashboard, and remove the test listing in **Admin → Listings → Hide**. The DB path was re-verified live after migs 174–177 (rollback-only probe). (§3AP, PR #73) | P1 |
-| A2 | **One production smoke walk on Connect** (replaces five separate "please confirm" asks): sign in with Google (never machine-verified since the supabase-js pin, §3AT) → Become a Contributor (§3AL) → dashboard edit, cancel and News → Admin Create + Claim → phone-to-desktop map resize (§3AJ) → Android Back button and cards (§3AN). | P1 |
+| A2 | **One production smoke walk on Connect** (replaces five separate "please confirm" asks): sign in with Google (never machine-verified since the supabase-js pin, §3AT) → Become a Contributor (§3AL) → dashboard edit, cancel and News → Admin Create + Claim → phone-to-desktop map resize (§3AJ) → Android Back button and cards (§3AN). **Part 1 (the map: pins, previews, zoom, logos) was walked on 2026-10-02 and its findings are fixed in the map-preview PR; re-check it on production with the list in §6, then do the rest.** | P1 |
 | A3 | **Wear walk-through:** the sign-in-as (impersonation) flow as admin (only the seed and smoke sessions exist, §3AB), plus a live email test: sign-up confirmation, password reset and 6-digit code via Resend (§3S). | P2 |
 | A4 | **Write the Ts&Cs, Code of Conduct and fee-schedule documents.** The Wear brand application's checkboxes refer to them by name only, and the app-store listings will need them too. | P2 |
 | A5 | **Get the 4 invisible Contributors onto the map** (Josh Mkhari, Ricardo Goncalves, Sound Storage inc, Grav: no category, no location). Ask them to finish their profiles, or fill them in from Admin. | P2 |
@@ -191,6 +215,9 @@ design session first.
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
 | C9 | Small polish, founder's choice: Noir/dark landing variant (§3AJ) · step-level Back inside wizards (§3AN) · cover-photo reorder UI (§3AM) · enforce `p_status` inside `find_or_create_conversation` (§3E) · gallery images via the Form (logo and cover only today) · update the Drive field-spec doc (it still lists the 17 event categories) · label `docs/feature-clarity/*` as deferred (§3AD). | P3 | S each |
 | C10 | **Decision: Form approval when the owner email already has an account.** Today the intake refuses with a clear Note (`email_already_registered`: "sign in → Settings → Become a Contributor, or change the owner email"). Option: create the listing under a placeholder account and let the existing claim flow attach it on that person's next sign-in. That changes an existing person's account, and GoTrue's acceptance of the placeholder address needs a live check. (PR #73) | Parked | S–M |
+| C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. Fix with the existing `from=` filter for the map/Discovery fetch plus an owner-scoped fetch for past and cancelled events (this overlaps **C1**: design them together). Today: 3 events, so not urgent. | P2 | M |
+| C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
+| C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
