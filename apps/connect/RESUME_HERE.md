@@ -49,7 +49,8 @@
 
 ## 2. Current state snapshot (verified 2026-09-27)
 
-- **`main` @ `c7978e7`** (PR #70). Production READY on all three apps. No open feature PRs, no open issues.
+- **`main` @ `abd0205`** (PRs #72–#74, 2026-09-27 overnight). Production READY on all three apps. No open
+  feature PRs, no open issues.
 - **Database head = migration 177** (`20260927184421 / 177_profiles_column_privacy_finalize`). **Next migration # = 178.**
 - **Security advisor baseline: 0 ERROR / 118 WARN / 3 INFO.** Every WARN is known and accepted: 105
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
@@ -63,8 +64,8 @@
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
   map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, PR #66):** Connect 775 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 13/13**.
+- **Tests (last full run, PR #73):** Connect 780 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 14/14**.
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -124,8 +125,12 @@
   XSS). Bumping `maplibre-gl` means re-copying the four files; the build fails loudly otherwise. Any new map
   (e.g. Vision's Timeline Map) must use the same vendored copy, never an unpkg 4.x build.
 - Brand icons are `Brand…`-prefixed on purpose: lucide's close icon is literally called `X` (§3AO).
-- `apps/connect/src/types/react-canary.d.ts` keeps React's `cache` typed regardless of pnpm hoisting. Keep it
-  until item **S2** lands.
+- **React types: one `@types/react` per React line** (connect/wear/ui on `^18.3.28`, vision on `^19`), and root
+  `pnpm.packageExtensions` gives `next` optional `@types/react(-dom)` peers, so each app's Next resolves its own
+  types instead of pnpm's hoist slot (the phantom `react.cache` build error; PR #72). Keep a new app's types on
+  its React line's range. `react-canary.d.ts` stays as belt-and-braces.
+- Signed-in (real-mode) Connect e2e specs use `e2e/support/fake-project.ts`: a fake `.test` Supabase project
+  answered by `page.route()`, with `test.use({ bypassCSP: true })`. Nothing reaches the real project.
 
 **Deploy / auth**
 - `next.config`'s `outputFileTracingRoot` must be the monorepo root, or every API route crashes on Vercel
@@ -153,7 +158,7 @@ design session first.
 ### A. Founder actions (no code needed)
 | ID | Item | Pri |
 |---|---|---|
-| A1 | **Phase 6 live test of the Google Form intake.** Re-run `testConnection` (expect "Connected ✓"), submit a real test response, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that Google account, confirm you land on the dashboard, then delete the test user. **Verified not done:** no intake-created listing exists in prod. (§3AP) | P1 |
+| A1 | **Phase 6 live test of the Google Form intake.** `testConnection` already says "Connected ✓" (2026-09-27). First **delete the 3 hand-typed sample rows** in the Sheet (approving one publishes a real listing and emails column E). Then submit a real test response through the Form, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that Google account, confirm you land on the dashboard, and remove the test listing in **Admin → Listings → Hide**. The DB path was re-verified live after migs 174–177 (rollback-only probe). (§3AP, PR #73) | P1 |
 | A2 | **One production smoke walk on Connect** (replaces five separate "please confirm" asks): sign in with Google (never machine-verified since the supabase-js pin, §3AT) → Become a Contributor (§3AL) → dashboard edit, cancel and News → Admin Create + Claim → phone-to-desktop map resize (§3AJ) → Android Back button and cards (§3AN). | P1 |
 | A3 | **Wear walk-through:** the sign-in-as (impersonation) flow as admin (only the seed and smoke sessions exist, §3AB), plus a live email test: sign-up confirmation, password reset and 6-digit code via Resend (§3S). | P2 |
 | A4 | **Write the Ts&Cs, Code of Conduct and fee-schedule documents.** The Wear brand application's checkboxes refer to them by name only, and the app-store listings will need them too. | P2 |
@@ -167,7 +172,6 @@ design session first.
 | ID | Item | Pri | Size |
 |---|---|---|---|
 | C1 | **Bug:** a cancelled Event or Place disappears from its owner's dashboard after a reload, because `/api/v1/*` only returns published rows and there is no owner-scoped fetch. Restore only works in the session that cancelled it. (§3AO) | P1 | S–M |
-| C2 | **Admin hide/unhide button** for `set_contributor_hidden`. The backend and `/api/admin/contributors/hide` have been live since mig 164. It is the moderation safety net for self-serve go-live, and it has no UI. (§3AE) | P1 | S |
 | C3 | **Apply wizard: collect the Contributor kind** (incl. Individual; the data model is done in mig 173) and relax the "Organisation / ministry name" copy for solo people. (§3AP, V1_SCOPE §7) | P2 | S |
 | C4 | **Admin Create parity:** add X, LinkedIn, WhatsApp, public contact email and cover photo (the intake RPC already takes them). (§3AP) | P2 | S |
 | C5 | **Email + password and 6-digit-code sign-in for Connect** (and Vision). Both are Google-only today; the provider is enabled project-wide and Wear's screens are the pattern. You flagged that Google Auth "may not be available soon". (§3P, §3S) | P2 | M |
@@ -175,12 +179,12 @@ design session first.
 | C7 | Guest mode: Consider / Follow / Connect on a real listing silently does nothing after an optimistic UI flip. Add toast-and-revert (about 10 call sites). (§3AH) | P3 | S |
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
 | C9 | Small polish, founder's choice: Noir/dark landing variant (§3AJ) · step-level Back inside wizards (§3AN) · cover-photo reorder UI (§3AM) · enforce `p_status` inside `find_or_create_conversation` (§3E) · gallery images via the Form (logo and cover only today) · update the Drive field-spec doc (it still lists the 17 event categories) · label `docs/feature-clarity/*` as deferred (§3AD). | P3 | S each |
+| C10 | **Decision: Form approval when the owner email already has an account.** Today the intake refuses with a clear Note (`email_already_registered`: "sign in → Settings → Become a Contributor, or change the owner email"). Option: create the listing under a placeholder account and let the existing claim flow attach it on that person's next sign-in. That changes an existing person's account, and GoTrue's acceptance of the placeholder address needs a live check. (PR #73) | Parked | S–M |
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
 |---|---|---|---|
 | S1 | **Give Wear a Content-Security-Policy.** It sends none (its `next.config.js` comment claims one). Its `index.html` has no inline scripts, so a strict `script-src` looks achievable. Brief: [`docs/handoffs/WEAR_CSP_HANDOFF.md`](docs/handoffs/WEAR_CSP_HANDOFF.md). (§3AT) | P1 | S–M |
-| S2 | **React-types alignment + missing git tags.** Founder-approved, validated, then reverted; not restarted. Brief: [`docs/handoffs/REACT_TYPES_ALIGNMENT_AND_TAG_HANDOFF.md`](docs/handoffs/REACT_TYPES_ALIGNMENT_AND_TAG_HANDOFF.md). Tag status: `connect-pre-mig174-profiles-privacy` (→ `dca4411`) and `pre-mig-172-entity-socials` (→ `c555d02`) **exist nowhere** and must be created; `connect-pre-mig158`, `connect-v1-pre-mig164` and `wear-pre-mig163` exist only on the founder's machine and need pushing. | P1 | S |
 | S3 | **Connect: compile Tailwind statically** and drop the Tailwind Play CDN (a runtime JIT not meant for production; the `.cc-map` rule already makes the switch safe). Add **SRI to the pinned lucide tag**. (§3AN, §3AO) | P2 | M |
 | S4 | Set `"incremental": false` in the `apps/vision` and `apps/wear` tsconfigs, matching Connect. (§3AQ) | P2 | S |
 | S5 | **Wear account deletion can fail for brand owners:** the marketplace FKs are not DEFERRABLE (verified: 0 in `wear`), so a cascading delete can hit error 23503. Make them `DEFERRABLE INITIALLY DEFERRED`, or add a bottom-up SECDEF cleanup function. Needed before any "delete my account" flow. (§3R) | P2 | S |
@@ -230,9 +234,8 @@ design session first.
 
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
-| P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live. The live end-to-end test was never run. | A1 |
+| P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live; DB path re-verified after migs 174–177; moderation tab + clear 409 Notes shipped (PR #73). The live end-to-end test was never run. | A1 |
 | P2 | **Connect Daily Routine** (drafted 2026-09-21) | Draft v1 of a daily "check, discover, suggest" routine that reports to a Drive folder, plus onboarding presets. Never committed, never scheduled; the presets are "not wired into the wizard". | Adopt (commit + schedule) or discard. H7 |
-| P3 | React-types alignment + tag push | Approved, validated end-to-end, reverted, not restarted. | S2 |
 | P4 | Wear CSP | Flagged in §3AT. The brief was only in local `%TEMP%`; now rescued to `docs/handoffs/WEAR_CSP_HANDOFF.md`. | S1 |
 | P5 | Vision Timeline Map | Placeholder since 2026-07-02; unblocked since 2026-07-18; never started. | V1 |
 | P6 | Vision network graph + Phase D | Scoped only. | V2, V3 |
@@ -242,7 +245,6 @@ design session first.
 | P10 | Lazy profiles | Designed (§3S), not built. | C6 |
 | P11 | Email/password sign-in for Connect + Vision | The Wear pattern exists; not ported. | C5 |
 | P12 | Contributor kind in the Apply wizard | Data model done (mig 173); wizard UI not. | C3 |
-| P13 | Contributor moderation | Backend done (mig 164); no admin button. | C2 |
 | P14 | Rate-limit consolidation | Wear is on `@citizens/utils`; Connect and Vision still use their own copies. | S7 |
 | P15 | Tailwind static compile | The prerequisite (`.cc-map` rule) landed; the compile itself isn't done. | S3 |
 | P16 | Vision e2e | The suite exists, crashes on boot, and isn't in CI. | S9 |
@@ -254,6 +256,13 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
+  #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
+  and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every
+  hoist, even without `react-canary.d.ts` (the control on `main` reproduced the `cache` error). Pushed all 5
+  missing tags (the remote now has 12). Intake: prod DB path re-probed after 174–177 (rollback-only, all green);
+  new **Admin → Listings** (hide/unhide, owner-sign-in state); actionable 409 Notes; README updated. Found: the
+  Sheet holds only 3 hand-typed sample rows (A1). New founder decision C10. No migration (next # still 178).
 - **2026-09-27 — RESUME_HERE audit + slim-down** (branch `claude/resume-here-slimdown`). Moved §3A–§3AT and the
   old NEXT STEPS verbatim to `docs/archive/RESUME_HISTORY_2026H2.md` (this file: 3,849 → about 300 lines).
   Re-verified every open item against live state. Closed as already done: Upstash env set; Wear brand queue
