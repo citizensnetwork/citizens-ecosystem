@@ -93,7 +93,9 @@ export function coercePublicUrl(
  *   · empty            → null (an explicit clear)
  *   · dangerous scheme → rejected, always ("javascript:" is not a typo)
  *   · URL-shaped       → coerced + validated exactly as before
- *   · anything else    → kept verbatim as a handle
+ *   · one token        → kept verbatim as a handle
+ *   · contains spaces  → rejected: a display name ("Grace Radio"), not a
+ *                        handle — see `checkSocialValue`
  *
  * A stored handle is never rendered raw: the client turns it into a platform
  * URL through `window.DATA.SOCIAL_PLATFORMS[].urlFor()`, and every render site
@@ -108,17 +110,154 @@ export function normaliseSocialValue(
   value: unknown,
   maxLength: number = MAX_PUBLIC_URL_LENGTH,
 ): string | null | undefined {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.length > maxLength) return undefined;
-  if (hasUnsafeScheme(trimmed)) return undefined;
-  // URL-shaped: an explicit http(s) scheme, or a dotted host before any path
-  // ("facebook.com/us"). A bare "@handle" or "ourchurch" has neither.
+  const check = checkSocialValue(value, maxLength);
+  return check.ok ? check.value : undefined;
+}
+
+/**
+ * Why a social value was refused. `invalid` is never recoverable (a dangerous
+ * scheme, a non-string, over the length bound). `not_a_link` and `not_a_number`
+ * are "this isn't what the box asks for" — a display name typed into a link
+ * box, a phone number we can't use — which a caller with nobody to ask (the
+ * Google Form intake) may drop and report instead of failing the whole listing.
+ */
+export type SocialCheck =
+  | { ok: true; value: string | null }
+  | { ok: false; reason: "invalid" | "not_a_link" | "not_a_number" };
+
+const INVALID: SocialCheck = { ok: false, reason: "invalid" };
+
+/** True for a value with a scheme or a dotted host before any path ("facebook.com/us"). */
+function looksLikeUrl(trimmed: string): boolean {
   const beforePath = trimmed.split(/[/?#]/, 1)[0];
-  const looksLikeUrl = EXPLICIT_SCHEME_RE.test(trimmed) || /^[^\s@]+\.[a-z]{2,}$/i.test(beforePath);
-  if (!looksLikeUrl) return trimmed;
+  return EXPLICIT_SCHEME_RE.test(trimmed) || /^[^\s@]+\.[a-z]{2,}$/i.test(beforePath);
+}
+
+/**
+ * `normaliseSocialValue` with the reason a value was refused. A bare handle is
+ * ONE token — no platform allows a space in one — so "Grace Radio" typed into
+ * a Facebook box is a display name, not a handle, and storing it only ever
+ * produced a dead link (the first real Form submission did exactly that).
+ */
+export function checkSocialValue(
+  value: unknown,
+  maxLength: number = MAX_PUBLIC_URL_LENGTH,
+): SocialCheck {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  if (typeof value !== "string") return INVALID;
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (trimmed.length > maxLength) return INVALID;
+  if (hasUnsafeScheme(trimmed)) return INVALID;
+  if (!looksLikeUrl(trimmed)) {
+    return /\s/.test(trimmed) ? { ok: false, reason: "not_a_link" } : { ok: true, value: trimmed };
+  }
   const coerced = coercePublicUrl(trimmed, maxLength);
-  return coerced === null ? undefined : coerced;
+  return coerced === null ? INVALID : { ok: true, value: coerced };
+}
+
+/**
+ * A WhatsApp number as international digits without the "+" (`27712345678`,
+ * what wa.me wants), or null when it can't be read as one.
+ *
+ * Accepts the shapes people actually type: local South African
+ * (`071 234 5678`, `0712345678`), country-coded (`27 71 234 5678`,
+ * `+27 (0)71 234 5678`, `0027…`) and any other explicitly international
+ * number (`+44 7911 123456`). A local number that isn't a 10-digit
+ * 0-prefixed South African one is ambiguous (whose country?) and is refused.
+ */
+export function normaliseWhatsappNumber(raw: string): string | null {
+  const text = raw.trim();
+  // Bounded class + length: nothing here can backtrack.
+  if (!/^\+?[\d\s().-]{6,40}$/.test(text)) return null;
+  let digits = text.replace(/\D/g, "");
+  let international = text.startsWith("+");
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+    international = true;
+  }
+  // "+27 (0)71…" keeps South Africa's trunk 0 after the country code.
+  if (/^270\d{9}$/.test(digits)) digits = "27" + digits.slice(3);
+  if (international) return /^[1-9]\d{6,14}$/.test(digits) ? digits : null;
+  if (/^0\d{9}$/.test(digits)) return "27" + digits.slice(1);
+  if (/^27\d{9}$/.test(digits)) return digits;
+  return null;
+}
+
+/** A WhatsApp box takes a number or a wa.me / chat.whatsapp.com link. */
+export function checkWhatsappValue(
+  value: unknown,
+  maxLength: number = MAX_PUBLIC_URL_LENGTH,
+): SocialCheck {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  if (typeof value !== "string") return INVALID;
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (trimmed.length > maxLength) return INVALID;
+  if (hasUnsafeScheme(trimmed)) return INVALID;
+  if (looksLikeUrl(trimmed)) {
+    const coerced = coercePublicUrl(trimmed, maxLength);
+    return coerced === null ? INVALID : { ok: true, value: coerced };
+  }
+  const number = normaliseWhatsappNumber(trimmed);
+  return number === null ? { ok: false, reason: "not_a_number" } : { ok: true, value: number };
+}
+
+/** The hosts each `profiles` social column's links may legitimately point at. */
+const SOCIAL_HOSTS: Readonly<Record<string, readonly string[]>> = {
+  instagram_handle: ["instagram.com", "instagr.am"],
+  facebook_url: ["facebook.com", "fb.com", "fb.me"],
+  tiktok_handle: ["tiktok.com"],
+  youtube_url: ["youtube.com", "youtu.be"],
+  x_handle: ["x.com", "twitter.com"],
+  linkedin_url: ["linkedin.com", "lnkd.in"],
+  whatsapp_number: ["wa.me", "whatsapp.com"],
+};
+
+/** True when `url`'s host is (a subdomain of) one the column's platform uses. */
+function onPlatformHost(column: string, url: string): boolean {
+  const hosts = SOCIAL_HOSTS[column];
+  if (!hosts) return true;
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return hosts.some((h) => host === h || host.endsWith(`.${h}`));
+}
+
+/**
+ * One entry point for every social column, so no route can forget that
+ * WhatsApp is a number and the rest are handles or links.
+ *
+ * `matchPlatformHost` additionally refuses a link that points at some OTHER
+ * site (a YouTube URL in the Facebook box, or worse, an unrelated domain
+ * wearing a Facebook icon on a public profile). It is for unattended writers
+ * only: an owner's existing profile may hold a link-in-bio URL that
+ * `/api/contributor/profile` re-sends on every save, and rejecting it there
+ * would fail the whole save.
+ */
+export function checkSocialField(
+  column: string,
+  value: unknown,
+  maxLength: number = MAX_PUBLIC_URL_LENGTH,
+  opts: { matchPlatformHost?: boolean } = {},
+): SocialCheck {
+  const check =
+    column === "whatsapp_number" ? checkWhatsappValue(value, maxLength) : checkSocialValue(value, maxLength);
+  if (check.ok && check.value && opts.matchPlatformHost && /^https?:\/\//i.test(check.value)) {
+    if (!onPlatformHost(column, check.value)) return { ok: false, reason: "not_a_link" };
+  }
+  return check;
+}
+
+/** `normaliseSocialValue` for a named column (WhatsApp-aware). `undefined` = reject. */
+export function normaliseSocialField(
+  column: string,
+  value: unknown,
+  maxLength: number = MAX_PUBLIC_URL_LENGTH,
+): string | null | undefined {
+  const check = checkSocialField(column, value, maxLength);
+  return check.ok ? check.value : undefined;
 }

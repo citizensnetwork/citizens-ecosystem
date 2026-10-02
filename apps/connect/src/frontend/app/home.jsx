@@ -9,19 +9,23 @@
 
   // ── Preview panel (on pin click) ──
   //  The card body is window.EntityCard — the SAME component Kingdom
-  //  Exploration renders, at its 'panel' density. Founder call: a Place or an
-  //  Event must not look like two different things depending on whether you
-  //  found it on the map or in the list.
+  //  Exploration renders, at its 'panel' density. Founder call: an Event, a
+  //  Place and a Contributor must not look like different things depending on
+  //  whether you found them on the map or in the list — and every pin opens
+  //  the same small card (its "View Full Profile" button is the way in to the
+  //  full page), so no kind of listing feels more or less important than any
+  //  other.
   function PreviewPanel({ id, type, onClose }) {
     const app = window.useApp();
     // A Back press dismisses the pin preview before it leaves the map —
     // the same expectation a native map app sets.
     useBackGuard(true, onClose);
-    const { events, places, ideas, toggleIdeaVote } = app;
+    const { events, places, contributors, ideas, toggleIdeaVote } = app;
     const isIdea = type === 'idea';
     let item;
     if (type === 'event') item = events.find((e) => e.id === id);
     else if (type === 'place') item = places.find((p) => p.id === id);
+    else if (type === 'contributor') item = contributors.find((c) => c.id === id);
     else item = ideas.find((i) => i.id === id);
     if (!item) return null;
 
@@ -64,14 +68,15 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, contributors, ideas, dismissBubble, trackImpression, go } = app;
+    const { events, places, contributors, ideas, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
     const [focus, setFocus] = useState(false);
-    // Which entity types the current zoom is showing. The map owns the
+    // Which entity types the current zoom is showing ('all' | 'places' |
+    // 'contributors' | 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
     // one state update per crossing, not one per zoom frame.
     const [zoomBand, setZoomBand] = useState('all');
@@ -79,8 +84,11 @@
 
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
+    const now = Date.now();
     const markers = [
-      ...events.filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
+      // A finished event is history, not a place to turn up: it leaves the map
+      // (it stays on its organiser's profile and dashboard, under "Past events").
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
       ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
       // Contributors: same marker shape, minus the event-only isLive/isBusy/
       // broadcast fields (a Contributor pin is just a plain coloured pin —
@@ -102,11 +110,9 @@
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: filter, selectedId: selected,
-          // Contributor pins have no preview-panel treatment (PreviewPanel
-          // only knows event/place/idea) — go straight to their profile,
-          // the same target the Kingdom Exploration cards already use.
+          // Every pin type — Contributor included — opens the same small
+          // preview card; the full profile is one tap further, on the card.
           onSelect: (id, t) => {
-            if (t === 'contributor') { go('profile', { id }); return; }
             setSelected((p) => (p === id ? null : id)); setSelType(t); if (t === 'event') trackImpression(id);
           },
           onDismissBubble: dismissBubble,
@@ -144,7 +150,9 @@
         },
           React.createElement(Icon, { name: 'ZoomIn', size: 12, className: 'text-gold-dark shrink-0' }),
           React.createElement('span', { className: 'text-[10px] font-semibold text-foreground/75 leading-tight' },
-            zoomBand === 'contributors' ? 'Zoom in to see events and places' : 'Zoom in to see places')),
+            zoomBand === 'none' ? 'Zoom in to see contributors, events and places'
+              : zoomBand === 'contributors' ? 'Zoom in to see events and places'
+              : 'Zoom in to see places')),
         React.createElement('div', { className: 'glass rounded-xl p-2.5 border border-white/60 shadow-lg space-y-1.5' },
           React.createElement('p', { className: 'text-[8px] font-bold text-muted-foreground uppercase tracking-widest' }, 'Map Key'),
           React.createElement(LegendRow, { color: '#ef4444', label: 'Live', pulse: true }),

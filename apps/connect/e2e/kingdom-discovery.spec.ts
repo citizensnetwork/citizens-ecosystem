@@ -132,8 +132,14 @@ test.describe("Kingdom Discovery — v1 self-serve go-live", () => {
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
 
-    // ── Click the pin → lands on the Contributor's profile ──
+    // ── Click the pin → the same small preview card every pin opens (it used
+    //     to jump straight to the full page), and its "View Full Profile"
+    //     button is the way in to the Contributor's profile ──
     await marker.click();
+    const card = page.locator('[data-entity-card="contributor"]');
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await expect(card.getByText(orgName)).toBeVisible();
+    await card.getByRole("button", { name: "View Full Profile" }).click();
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(orgName).first()).toBeVisible();
   });

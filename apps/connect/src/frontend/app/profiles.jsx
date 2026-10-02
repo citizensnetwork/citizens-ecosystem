@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, safeUrl, Avatar, SmartImage, Button, Empty, SocialLinks } = window.UI;
+  const { cx, safeUrl, Avatar, logoFit, SmartImage, Button, Empty, SocialLinks } = window.UI;
   const catOf = (x) => window.DATA.getCategory(x && x.category);
   const Icon = window.Icon;
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -118,7 +118,7 @@
           // a non-clickable identity row when we only have a name; omitted entirely
           // when the event carries no organiser at all.
           org ? h('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
-            h(Avatar, { src: org.profilePhoto, name: org.name, size: 40, rounded: 'xl' }),
+            h(Avatar, { src: org.profilePhoto, name: org.name, size: 40, rounded: 'xl', fit: logoFit(org.kind) }),
             h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, (org.followerCount || 0).toLocaleString() + ' followers')),
             h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))
             : orgName ? h('div', { className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
@@ -246,6 +246,13 @@
     const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
     const cEvents = events.filter((e) => e.organizerId === c.id);
+    // Finished events leave the map and the discovery list but stay on the
+    // organiser's own profile, under their own heading.
+    const upcomingEvents = cEvents.filter((e) => !window.DATA.isPastEvent(e));
+    const pastEvents = cEvents.filter((e) => window.DATA.isPastEvent(e));
+    const eventTile = (e) => h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'rounded-2xl overflow-hidden border border-border bg-card text-left' },
+      h('div', { className: 'relative h-20' }, h(SmartImage, { src: e.coverPhoto, cat: catOf(e), alt: e.title, className: 'w-full h-full' }), e.isLive && h('span', { className: 'absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full' }, 'LIVE')),
+      h('div', { className: 'p-2' }, h('p', { className: 'text-xs font-bold text-foreground truncate' }, e.title), h('p', { className: 'text-[10px] text-muted-foreground' }, new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))));
     const cPlaces = places.filter((p) => p.organizerId === c.id);
     const cNews = (newsPosts || []).filter((n) => n.contributorId === c.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const collabs = (c.collaborators || []).map((cid) => contributors.find((x) => x.id === cid)).filter(Boolean);
@@ -257,7 +264,7 @@
           h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' }),
           h(BackBar, { onBack: () => go('home'), floating: true })),
         h('div', { className: 'px-4 max-w-2xl mx-auto -mt-12 relative' },
-          h(Avatar, { src: c.profilePhoto, name: c.name, size: 84, rounded: 'xl', ring: '#F7F4EE' }),
+          h(Avatar, { src: c.profilePhoto, name: c.name, size: 84, rounded: 'xl', ring: '#F7F4EE', fit: logoFit(c.kind) }),
           h('div', { className: 'mt-3 mb-4' },
             h('div', { className: 'flex items-center gap-2 flex-wrap' },
               h('h1', { className: 'text-xl text-foreground font-display' }, c.name), h(Icon, { name: 'BadgeCheck', size: 16, className: 'text-gold' })),
@@ -289,11 +296,12 @@
             // whole app (window.UI.SocialLinks).
             h(SocialLinks, { socials: c.socials, label: 'Find them online' }),
             h(Gallery, { imgs: c.gallery }),
-            cEvents.length > 0 && h('div', null,
-              h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events (' + cEvents.length + ')'),
-              h('div', { className: 'grid grid-cols-2 gap-2' }, cEvents.map((e) => h('button', { key: e.id, onClick: () => go('event', { id: e.id }), className: 'rounded-2xl overflow-hidden border border-border bg-card text-left' },
-                h('div', { className: 'relative h-20' }, h(SmartImage, { src: e.coverPhoto, cat: catOf(e), alt: e.title, className: 'w-full h-full' }), e.isLive && h('span', { className: 'absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full' }, 'LIVE')),
-                h('div', { className: 'p-2' }, h('p', { className: 'text-xs font-bold text-foreground truncate' }, e.title), h('p', { className: 'text-[10px] text-muted-foreground' }, new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))))))),
+            upcomingEvents.length > 0 && h('div', null,
+              h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Events (' + upcomingEvents.length + ')'),
+              h('div', { className: 'grid grid-cols-2 gap-2' }, upcomingEvents.map(eventTile))),
+            pastEvents.length > 0 && h('div', null,
+              h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Past events (' + pastEvents.length + ')'),
+              h('div', { className: 'grid grid-cols-2 gap-2' }, pastEvents.map(eventTile))),
             cPlaces.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Places'),
               h('div', { className: 'space-y-2' }, cPlaces.map((p) => h('button', { key: p.id, onClick: () => go('place', { id: p.id }), className: 'w-full flex items-center gap-3 p-2.5 bg-card rounded-2xl border border-border text-left' },
@@ -312,7 +320,7 @@
             collabs.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Collaborates with'),
               h('div', { className: 'flex gap-2' }, collabs.map((cc) => h('button', { key: cc.id, onClick: () => go('profile', { id: cc.id }), className: 'flex items-center gap-2 p-2 pr-3 bg-card rounded-full border border-border' },
-                h(Avatar, { src: cc.profilePhoto, name: cc.name, size: 28, rounded: 'full' }), h('span', { className: 'text-xs font-semibold text-foreground' }, cc.name)))))))));
+                h(Avatar, { src: cc.profilePhoto, name: cc.name, size: 28, rounded: 'full', fit: logoFit(cc.kind) }), h('span', { className: 'text-xs font-semibold text-foreground' }, cc.name)))))))));
   }
 
   window.EventProfilePage = EventProfilePage;

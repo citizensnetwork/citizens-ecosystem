@@ -86,6 +86,84 @@ describe("parseListingFields", () => {
   });
 });
 
+describe("parseListingFields — socials that are the wrong kind of value", () => {
+  // What the first real Form submission (Grace Radio) actually contained.
+  const impact = {
+    instagram_handle: "GraceFM103",
+    facebook_url: "Grace Radio",
+    youtube_url: "Grace Online",
+    whatsapp_number: "0712345678",
+  };
+
+  it("is strict by default: a display name is an error naming the field (a person is here to fix it)", () => {
+    expect(parse({ facebook_url: "Grace Radio" })).toEqual({ ok: false, error: "invalid_facebook_url" });
+    expect(parse({ whatsapp_number: "call the office" })).toEqual({ ok: false, error: "invalid_whatsapp_number" });
+  });
+
+  it("normalises a local South African WhatsApp number in both modes", () => {
+    for (const lenientSocials of [false, true]) {
+      const res = parseListingFields({ ...valid, whatsapp_number: "071 234 5678" }, { lenientSocials });
+      expect(res.ok && res.fields.socials.whatsapp_number, `lenient=${lenientSocials}`).toBe("27712345678");
+    }
+  });
+
+  it("lenient: leaves each bad social empty, keeps the good ones, and writes one Note per skipped field", () => {
+    const res = parseListingFields({ ...valid, ...impact }, { lenientSocials: true });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.fields.socials).toMatchObject({
+      instagram_handle: "GraceFM103",
+      facebook_url: null,
+      youtube_url: null,
+      whatsapp_number: "27712345678",
+    });
+    expect(res.notes).toHaveLength(2);
+    expect(res.notes[0]).toMatch(/^Facebook skipped: "Grace Radio" isn't a link or a handle \(facebook_not_a_link\)/);
+    expect(res.notes[1]).toMatch(/^YouTube skipped: "Grace Online" isn't a link or a handle \(youtube_not_a_link\)/);
+  });
+
+  it("lenient: reports an unreadable WhatsApp number and a link to another site", () => {
+    const res = parseListingFields(
+      { ...valid, whatsapp_number: "ring the church", x_handle: "https://evil.example/x" },
+      { lenientSocials: true },
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.fields.socials.whatsapp_number).toBeNull();
+    expect(res.fields.socials.x_handle).toBeNull();
+    expect(res.notes.join("\n")).toContain("whatsapp_invalid_number");
+    expect(res.notes.join("\n")).toContain("x_not_a_link");
+  });
+
+  it("lenient never excuses a dangerous or oversized value", () => {
+    expect(parseListingFields({ ...valid, facebook_url: "javascript:alert(1)" }, { lenientSocials: true })).toEqual({
+      ok: false,
+      error: "invalid_facebook_url",
+    });
+    expect(parseListingFields({ ...valid, x_handle: "a".repeat(501) }, { lenientSocials: true })).toEqual({
+      ok: false,
+      error: "invalid_x_handle",
+    });
+  });
+
+  it("a Note is one clipped line, so a hostile value can't break the Sheet row or flood it", () => {
+    const res = parseListingFields(
+      { ...valid, facebook_url: `${"Grace Radio ".repeat(30)}\n=HYPERLINK("http://evil")` },
+      { lenientSocials: true },
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.notes).toHaveLength(1);
+    expect(res.notes[0]).not.toContain("\n");
+    expect(res.notes[0].length).toBeLessThan(300);
+  });
+
+  it("returns no notes when every social is fine", () => {
+    const res = parseListingFields({ ...valid, instagram_handle: "@gracepoint", facebook_url: "facebook.com/gracepoint" });
+    expect(res.ok && res.notes).toEqual([]);
+  });
+});
+
 describe("normaliseEmail", () => {
   it("trims and lower-cases a plausible address", () => {
     expect(normaliseEmail(" A@B.co ")).toBe("a@b.co");

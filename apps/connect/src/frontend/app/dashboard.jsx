@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, Avatar, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
+  const { cx, Avatar, logoFit, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
   const Icon = window.Icon;
 
   // Build the last-7-days series from the real analytics API response
@@ -304,6 +304,11 @@
     const myEvents = events.filter((e) => e.organizerId === activeContributorId);
     const myPlaces = places.filter((p) => p.organizerId === activeContributorId);
     const myNews = newsPosts.filter((n) => n.contributorId === activeContributorId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const renderEventCard = (ev) => h(EventManageCard, {
+      key: ev.id, ev, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
+      onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); },
+      onToggleStatus: () => setEventStatus(ev.id, ev.status === 'cancelled' ? 'published' : 'cancelled'),
+    });
     const totalConnects = myEvents.reduce((a, e) => a + e.connectCount, 0);
     const totalConsider = myEvents.reduce((a, e) => a + e.considerCount, 0);
     // Real-mode signals (null/undefined in demo → the mock placeholders show).
@@ -316,7 +321,7 @@
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
         h('div', { className: 'flex items-center justify-between' },
           h('div', { className: 'flex items-center gap-3' },
-            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)' }),
+            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)', fit: logoFit(activeContributor.kind) }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name))),
@@ -360,11 +365,12 @@
               h(Button, { variant: 'primary', icon: 'CalendarPlus', onClick: () => openCreate('event') }, 'Create Event'),
               h(Button, { variant: 'outline', icon: 'MapPin', onClick: () => openCreate('place') }, 'Add Place')),
             myEvents.length === 0 && h(Empty, { icon: 'Calendar', title: 'No events yet', sub: 'Create your first event to appear on the map.' }),
-            myEvents.map((ev) => h(EventManageCard, {
-              key: ev.id, ev, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
-              onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); },
-              onToggleStatus: () => setEventStatus(ev.id, ev.status === 'cancelled' ? 'published' : 'cancelled'),
-            })),
+            // Upcoming first; finished events stay here (the organiser's record)
+            // under their own heading — they just no longer sit on the public map.
+            myEvents.filter((ev) => !window.DATA.isPastEvent(ev)).map(renderEventCard),
+            myEvents.some((ev) => window.DATA.isPastEvent(ev)) && h(F, null,
+              h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Past events'),
+              myEvents.filter((ev) => window.DATA.isPastEvent(ev)).map(renderEventCard)),
             myPlaces.length > 0 && h(F, null,
               h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Your Places'),
               myPlaces.map((p) => h(PlaceManageRow, {

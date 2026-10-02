@@ -10,7 +10,7 @@
  */
 
 import { isContributorType, type ContributorType } from "@/lib/categories";
-import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
+import { checkSocialField, coercePublicUrl } from "@/lib/publicUrl";
 import { isContributorKind, type ContributorKind } from "@/types/db";
 
 export const MAX_DISPLAY_NAME = 120;
@@ -74,8 +74,34 @@ export type ListingFields = {
 };
 
 export type ListingFieldsResult =
-  | { ok: true; fields: ListingFields }
+  | { ok: true; fields: ListingFields; notes: string[] }
   | { ok: false; error: string };
+
+export type ParseListingOptions = {
+  /**
+   * For writers with nobody to ask (the Google Form intake, approved later and
+   * asynchronously): a social that is the wrong KIND of value — a display name
+   * in a link box, a phone number we can't read, a link to another site — is
+   * left empty and reported in `notes`, so the listing still goes live. A
+   * dangerous or oversized value still fails the whole listing. Without this
+   * (admin Create, where a person is present to fix it) every bad social is an
+   * error.
+   */
+  lenientSocials?: boolean;
+};
+
+const NOTE_VALUE_MAX = 60;
+
+/** One human-readable line for the Sheet's Notes column; the value is clipped and single-line. */
+function socialNote(label: string, reason: "not_a_link" | "not_a_number", raw: unknown): string {
+  const shown = String(raw).replace(/\s+/g, " ").trim().slice(0, NOTE_VALUE_MAX);
+  return reason === "not_a_number"
+    ? `${label} skipped: "${shown}" isn't a phone number we can use (whatsapp_invalid_number). ` +
+        "Use a South African number like 071 234 5678, or an international one starting with +. " +
+        "The owner can add it from their dashboard."
+    : `${label} skipped: "${shown}" isn't a link or a handle (${label.toLowerCase()}_not_a_link). ` +
+        "The owner can add it from their dashboard.";
+}
 
 /**
  * Validate + normalise a listing payload. Keys are the snake_case API names
@@ -88,7 +114,10 @@ export type ListingFieldsResult =
  * types. "No fixed location" nulls the address and pin regardless of input,
  * and a pin needs BOTH coordinates or neither is kept.
  */
-export function parseListingFields(payload: Record<string, unknown>): ListingFieldsResult {
+export function parseListingFields(
+  payload: Record<string, unknown>,
+  options: ParseListingOptions = {},
+): ListingFieldsResult {
   const displayName = trimOrNull(payload.display_name, MAX_DISPLAY_NAME);
   if (!displayName || displayName.length < MIN_DISPLAY_NAME) {
     return { ok: false, error: "display_name_required" };
@@ -114,11 +143,19 @@ export function parseListingFields(payload: Record<string, unknown>): ListingFie
   const contactEmail = hasContactEmail ? normaliseEmail(payload.contact_email) : null;
   if (hasContactEmail && !contactEmail) return { ok: false, error: "invalid_contact_email" };
 
+  const lenient = options.lenientSocials === true;
+  const notes: string[] = [];
   const socials = {} as Record<SocialField, string | null>;
-  for (const [key] of SOCIAL_FIELDS) {
-    const norm = normaliseSocialValue(payload[key], MAX_SOCIAL);
-    if (norm === undefined) return { ok: false, error: `invalid_${key}` };
-    socials[key] = norm;
+  for (const [key, label] of SOCIAL_FIELDS) {
+    const check = checkSocialField(key, payload[key], MAX_SOCIAL, { matchPlatformHost: lenient });
+    if (check.ok) {
+      socials[key] = check.value;
+    } else if (lenient && check.reason !== "invalid") {
+      socials[key] = null;
+      notes.push(socialNote(label, check.reason, payload[key]));
+    } else {
+      return { ok: false, error: `invalid_${key}` };
+    }
   }
 
   const noFixedLocation = payload.no_fixed_location === true;
@@ -142,5 +179,6 @@ export function parseListingFields(payload: Record<string, unknown>): ListingFie
       latitude,
       longitude,
     },
+    notes,
   };
 }
