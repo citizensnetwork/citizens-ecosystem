@@ -63,6 +63,13 @@ through the **versioned, rate-limited, API-key-capable** HTTP API — never Post
   in `docs/api-v1.md` in the same change**. An undocumented endpoint is not part of the contract.
 - **R2.4** Auth tiers: anonymous (IP rate-limited) or API key (`cck_live_…`, minted via
   `create_api_key`, scoped, revocable). The gate is `v1Gate` / `api_keys`.
+- **R2.5** *(mig 178)* One deliberate, narrow exception to "never read a sibling's tables":
+  `admin_remove_contributor_listing()` (SECDEF, admin only) reads **ownership only**
+  (`wear.brands.owner_user_id`, `vision.organisations.created_by`, and the Vision `created_by` /
+  `claimed_by` / partnership columns whose FKs into `auth.users` are NO ACTION) so Admin → Listings
+  can refuse to delete or demote an account that Wear or Vision depend on. It is a deletion-safety
+  check, not a data feature: the only thing it returns is a blocker name. Don't copy the pattern for
+  anything that moves data.
 
 Current v1 surface (see `docs/api-v1.md` for full shapes): `contributors`,
 `contributors/{slug}`, `contributors/{slug}/stats`, `events`, `events/{id}`, `categories`,

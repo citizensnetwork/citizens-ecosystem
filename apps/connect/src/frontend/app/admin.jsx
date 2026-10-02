@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle } = window.UI;
+  const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle, Overlay } = window.UI;
   const Icon = window.Icon;
 
   const STATUS = {
@@ -189,7 +189,7 @@
   // listing off the map and Kingdom Discovery for everyone, reversibly —
   // POST /api/admin/contributors/hide (set_contributor_hidden, mig 164). Also
   // shows whether a form/admin-created listing's owner has signed in yet.
-  function ListingRow({ row, confirming, busy, onAsk, onCancel, onConfirm }) {
+  function ListingRow({ row, confirming, busy, onAsk, onCancel, onConfirm, onDelete }) {
     const hidden = !!row.contributor_hidden;
     const name = row.full_name || 'this listing';
     const kind = CONTRIBUTOR_KINDS.find((k) => k.value === row.contributor_kind);
@@ -200,9 +200,11 @@
     // a slug-less duplicate, so it gets no toggle.
     const movedToOwner = hidden && !row.contributor_slug && !!row.contributor_claimed_at;
     return h('div', { className: 'bg-card rounded-2xl border border-border p-3', 'data-listing': row.contributor_slug || row.id },
-      h('div', { className: 'flex items-center gap-3' },
+      // On a phone the two buttons wrap onto their own line (the info block keeps
+      // at least 10rem) so the name stays readable; from `sm` up they sit inline.
+      h('div', { className: 'flex items-center gap-3 flex-wrap sm:flex-nowrap' },
         h(Avatar, { src: row.avatar_url, name: row.full_name, size: 40, rounded: 'xl' }),
-        h('div', { className: 'flex-1 min-w-0' },
+        h('div', { className: 'flex-1 min-w-[10rem] sm:min-w-0' },
           h('div', { className: 'flex items-center gap-2 flex-wrap' },
             h('p', { className: 'text-sm font-bold text-foreground truncate' }, row.full_name || 'Unnamed listing'),
             h('span', {
@@ -216,7 +218,14 @@
             movedToOwner
               ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))
               : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
-        !confirming && !movedToOwner && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide')),
+        !confirming && h('div', { className: 'flex items-center gap-1 shrink-0 ml-auto' },
+          !movedToOwner && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide'),
+          // Delete is allowed on every row, including a placeholder that moved to
+          // its owner (the way to clear the empty shell) — the server decides what it does.
+          h('button', {
+            type: 'button', onClick: onDelete, disabled: busy, 'aria-label': 'Delete ' + name,
+            className: 'inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-[#DC2626] hover:bg-[#FEE2E2] transition-colors disabled:opacity-40',
+          }, h(Icon, { name: 'Trash2', size: 13 }), 'Delete'))),
       confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
         h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
           ? 'Put ' + name + ' back on the map and in Kingdom Discovery?'
@@ -225,6 +234,108 @@
           h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', className: 'flex-1', disabled: busy, onClick: onConfirm },
             busy ? 'Saving…' : hidden ? 'Confirm unhide' : 'Confirm hide'),
           h(Button, { size: 'sm', variant: 'outline', disabled: busy, onClick: onCancel }, 'Cancel'))));
+  }
+
+  // ── Admin: delete a listing ──
+  // What "delete" does is decided by the SERVER from one fact — has the owner
+  // ever signed in? — so the modal first asks it (GET = a read-only preflight)
+  // and says, in plain words, which of the two will happen:
+  //   placeholder  never signed in  → removed for good, with everything attached
+  //   account      has signed in    → only the LISTING goes; the person stays
+  // The admin must type the listing's name to enable the button. Nothing leaves
+  // the list until the server answers 2xx. POST /api/admin/contributors/delete-listing
+  // (migration 178); it is NOT /contributors/delete, which discards applications.
+  const normName = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+  function DeleteListingModal({ row, onClose, onDone }) {
+    const [preview, setPreview] = useState(null); // the server's preflight; null until it answers
+    const [problem, setProblem] = useState(''); // why it can't be done, or couldn't be checked
+    const [typed, setTyped] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+      let active = true;
+      (async () => {
+        try {
+          const res = await window.authedFetch('/api/admin/contributors/delete-listing?id=' + encodeURIComponent(row.id));
+          const json = await res.json().catch(() => ({}));
+          if (!active) return;
+          if (!res.ok) { setProblem(json.message || 'Could not check this listing — please try again.'); return; }
+          // Wear brand owners and Vision users are refused: the server says why.
+          if (Array.isArray(json.blockers) && json.blockers.length > 0) { setProblem(json.message); return; }
+          setPreview(json);
+        } catch (e) {
+          if (active) setProblem('Could not check this listing — please try again.');
+        }
+      })();
+      return () => { active = false; };
+    }, [row.id]);
+
+    const name = (preview && preview.name) || row.full_name || 'this listing';
+    // A listing with no name is confirmed by typing "delete" (mirrors the database).
+    const expected = (preview && preview.name) || 'delete';
+    const matches = !!preview && normName(typed) === normName(expected);
+    const placeholder = !!preview && preview.case === 'placeholder';
+    const touched = preview ? [
+      preview.eventsAffected > 0 && plural(preview.eventsAffected, 'live event'),
+      preview.placesAffected > 0 && plural(preview.placesAffected, 'place'),
+      preview.newsPosts > 0 && plural(preview.newsPosts, 'news post'),
+      preview.teamMembers > 0 && plural(preview.teamMembers, 'team member'),
+    ].filter(Boolean) : [];
+
+    const confirmDelete = async () => {
+      if (!matches || busy) return;
+      setBusy(true);
+      setError('');
+      try {
+        const res = await window.authedFetch('/api/admin/contributors/delete-listing', {
+          method: 'POST',
+          body: JSON.stringify({ id: row.id, confirmName: typed }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) { setError(json.message || 'Could not delete that listing — please try again.'); setBusy(false); return; }
+        onDone(json);
+      } catch (e) {
+        setError('Could not delete that listing — please try again.');
+        setBusy(false);
+      }
+    };
+
+    return h(Overlay, { onClose, title: 'Delete listing', maxWidth: 480 },
+      h('div', { className: 'p-5 space-y-4 overflow-y-auto', 'data-delete-listing': row.contributor_slug || row.id },
+        !preview && !problem && h('p', { className: 'text-sm text-muted-foreground' }, 'Checking what this will do…'),
+
+        problem && h('div', { className: 'space-y-3' },
+          h('p', { role: 'alert', className: 'text-sm text-[#B91C1C] bg-[#FEE2E2] rounded-xl p-3 leading-relaxed' }, problem),
+          h(Button, { variant: 'outline', className: 'w-full', onClick: onClose }, 'Close')),
+
+        preview && h(F, null,
+          h('p', { className: 'text-sm text-foreground leading-relaxed' }, placeholder
+            ? h(F, null, h('strong', null, name), ' has never been signed into. Deleting removes it and everything attached to it ', h('strong', null, 'permanently'), '.')
+            : h(F, null, h('strong', null, name), ' has an account. Deleting removes their Contributor listing, events and places, but ', h('strong', null, 'keeps their citizen account'), '.')),
+          touched.length > 0 && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+            (placeholder ? 'Removes: ' : 'Takes down: ') + touched.join(', ') + '.'),
+          !placeholder && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+            'They can still sign in and apply again. A new listing would start hidden until you unhide it here.'),
+          preview.movedPlaceholder && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+            'Its owner’s live listing now sits on their own account and is not touched.'),
+
+          h(Field, { label: 'Type “' + expected + '” to confirm' },
+            h(Input, {
+              value: typed, onChange: (e) => setTyped(e.target.value), autoFocus: true,
+              autoComplete: 'off', spellCheck: false, 'aria-label': 'Type the listing name to confirm',
+              onKeyDown: (e) => { if (e.key === 'Enter') confirmDelete(); },
+            })),
+          error && h('p', { role: 'alert', className: 'text-xs font-semibold text-[#B91C1C] leading-relaxed' }, error),
+
+          h('div', { className: 'flex gap-2' },
+            h('button', {
+              type: 'button', disabled: !matches || busy, onClick: confirmDelete,
+              className: 'flex-1 inline-flex items-center justify-center gap-2 font-bold rounded-xl text-sm px-4 py-2.5 bg-[#DC2626] text-white hover:bg-[#B91C1C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            }, h(Icon, { name: 'Trash2', size: 14 }), busy ? 'Deleting…' : 'Delete listing'),
+            h(Button, { variant: 'outline', disabled: busy, onClick: onClose }, 'Cancel')))));
   }
 
   function AdminListings() {
@@ -237,6 +348,7 @@
     const [failed, setFailed] = useState(false);
     const [confirmId, setConfirmId] = useState(null);
     const [busyId, setBusyId] = useState(null);
+    const [deleting, setDeleting] = useState(null); // the row whose Delete modal is open
 
     // GET /api/admin/users?role=contributor (admin-gated, service-role read —
     // it carries the claim columns). Page 1 replaces, later pages append;
@@ -284,13 +396,29 @@
       setConfirmId(null);
     };
 
+    // Only after the server answers 2xx does the row leave the list (the modal
+    // keeps itself open and shows the error otherwise). Either outcome takes the
+    // listing off the map and out of this tab: a deleted placeholder is gone,
+    // and a person whose listing was removed is a citizen again.
+    const handleDeleted = (row, result) => {
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((n) => Math.max(0, n - 1));
+      syncListingVisibility({ id: row.id, slug: row.contributor_slug, hidden: true });
+      const label = row.full_name || 'Listing';
+      toast(result.outcome === 'deleted'
+        ? label + ' was deleted.'
+        : label + '’s listing was removed. They keep their citizen account.', 'green');
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) toast(result.warnings[0], 'gold');
+      setDeleting(null);
+    };
+
     if (!realUser) {
       return h(Empty, { icon: 'Store', title: 'Sign in as an admin to manage live listings' });
     }
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-listings': '' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        'Every Contributor listing. Hide takes one off the map and Kingdom Discovery for everyone — nothing is deleted, and Unhide puts it straight back.'),
+        'Every Contributor listing. Hide takes one off the map and Kingdom Discovery for everyone — nothing is deleted, and Unhide puts it straight back. Delete removes a listing for good; if its owner has an account, only the listing goes and they stay as a citizen.'),
       h('div', { className: 'flex items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl' },
         h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
         h('input', {
@@ -308,9 +436,11 @@
               onAsk: () => setConfirmId(r.id),
               onCancel: () => setConfirmId(null),
               onConfirm: () => setHidden(r, !r.contributor_hidden),
+              onDelete: () => { setConfirmId(null); setDeleting(r); },
             })),
       loading && h('p', { className: 'text-xs text-muted-foreground text-center py-2' }, 'Loading…'),
-      !loading && !failed && rows.length < total && h(Button, { variant: 'outline', className: 'w-full', onClick: () => setPage((n) => n + 1) }, 'Load more'));
+      !loading && !failed && rows.length < total && h(Button, { variant: 'outline', className: 'w-full', onClick: () => setPage((n) => n + 1) }, 'Load more'),
+      deleting && h(DeleteListingModal, { row: deleting, onClose: () => setDeleting(null), onDone: (result) => handleDeleted(deleting, result) }));
   }
 
   function AdminPage() {
