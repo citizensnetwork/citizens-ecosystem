@@ -11,3 +11,6 @@ apps/connect
 apps/vision
 # Deno edge functions + SQL migrations — not prettier-managed
 supabase
+
+# Vendored third-party code (patched braces@3.0.3): keeps upstream style so a diff against upstream stays minimal
+packages/braces-patched
