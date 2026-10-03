@@ -66,9 +66,10 @@
 - **Live data (2026-10-03):** 16 profiles · 5 Contributors (**only 2 are on the map; the other 3 lack a category or a pin, or are hidden**) · 40 Places ·
   4 Events (**0 upcoming, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin.
   Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
-- **Tests (last full run, the crown PR on the merged tree, 2026-10-03):** Connect 885 unit (+32 live-only, skipped in CI) ·
-  Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 36/36**. (`frontend-build`'s
-  "hashed outputs" test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
+- **Tests (last full run, the braces-fork PR on the merged tree, 2026-10-03):** Connect 902 unit (+32 live-only, skipped in CI) ·
+  Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · `braces-patched` 150 · **Connect Playwright e2e 41/41**.
+  (Two tests can hit their 5 s timeout when every app's suite runs in parallel on a busy machine: `frontend-build`'s
+  "hashed outputs" and Connect's `profiles-column-privacy` "176 alone". Both pass alone in seconds.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -92,9 +93,11 @@
   wipes `.next/types` mid-check. CI also runs **CodeQL** and a **blocking OSV-Scanner** (`osv-scanner.toml`'s
   baseline is empty: fix the dependency, don't baseline it). **New advisories can turn `main` red with no code
   change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
-  check the lockfile against OSV.dev before pushing. **One dated exception exists:** `braces` 3.0.3
-  (GHSA-vfj7-8cjw-p6xm, dev tooling only, no fixed version on npm) is ignored in `osv-scanner.toml` until
-  **2026-11-02**, founder-approved 2026-10-03. Don't renew it silently or treat it as precedent; see item **H8**.
+  check the lockfile against OSV.dev before pushing. **`braces` is a patched local fork**
+  (`packages/braces-patched`, wired in through the root `pnpm.overrides`): GHSA-vfj7-8cjw-p6xm affects
+  every `braces` on npm (<= 3.0.3, no fixed release), so we ship the 3.0.3 tarball plus a nesting-depth
+  guard and the lockfile holds no npm `braces` for OSV to match. There is no exception in `osv-scanner.toml`.
+  Remove the fork once npm ships a fixed `braces` (item **H10**; steps in the package's `PATCHED.md`).
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
 - **Parallel sessions claim the same IDs.** Item IDs (C11 was claimed twice on 2026-10-03) and migration numbers: fetch `main`
   and take the next free one at merge time. A sibling session may also merge `main` into your PR branch: `git fetch` before you push.
@@ -292,8 +295,8 @@ design session first.
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
 | H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
-| H8 | **Re-check `braces` GHSA-vfj7-8cjw-p6xm by 2026-11-02** (the dated OSV exception in `osv-scanner.toml`, §3 Process). Once npm ships a fixed `braces`, bump it via `pnpm.overrides`, delete the `[[IgnoredVulns]]` entry and restore the "baseline is empty" header; if there is still no fix, decide again with the founder. After that date CI goes red on this advisory if nothing was done. |
 | H9 | **Repo/live drift on the Apps Script.** The live Sheet runs the corrected `intake-v2.gs` (founder confirmed 2026-10-03), but the repo's `apps/connect/tools/google-forms/intake.gs` is still the OLD copy that finds answers by question NUMBER, which misreads the consent question after the founder's Section 7 reorder. Anyone who re-pastes the repo copy re-introduces the bug. Until **C16** lands, sync the repo copy (a tiny PR: copy `intake-v2.gs` over it, drop its banner, README: "matched by wording"), after checking it holds no real names or emails. |
+| H10 | **Check monthly for an upstream `braces` fix** (the patched fork `packages/braces-patched`, §3 Process). Run `npm view braces version` AND read GHSA-vfj7-8cjw-p6xm's affected ranges: a new version only counts if it is not listed as affected. When one ships, follow "Removing the fork" in the package's `PATCHED.md` (delete the `braces` override and the package, `pnpm install`, run the CI's OSV command). Until then the fork is the whole fix. A fix for `micromatch/braces` is drafted in the PR that introduced the fork; post it only with the founder's OK. |
 
 ---
 
@@ -323,6 +326,7 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-03 — `braces` patched fork replaces the OSV exception (H8 closed, PR #87).** Instead of renewing the dated exception, `packages/braces-patched` (private, `3.0.3-citizens.1`) is the exact `braces@3.0.3` tarball (sha512 checked against the lockfile, MIT kept) plus a nesting-depth guard: `lib/parse.js` refuses more than 100 nested `{`/`(` blocks with a `SyntaxError`, and `compile`/`expand`/`stringify` count depth for caller-built ASTs; `options.maxDepth` can only lower the limit. Root `pnpm.overrides` has `"braces": "link:./packages/braces-patched"`, so `pnpm-lock.yaml` holds no npm `braces` and `osv-scanner.toml` is empty again (no `[[IgnoredVulns]]`). **Proof:** the CI's exact command (osv-scanner v2.3.8, run locally) says "No issues found" on the new lockfile and, as a control, flags only this advisory on the old one. Normal patterns behave byte-for-byte as before: a golden test of about 490 000 results against the pristine tarball, and eslint over 473 files in 7 packages gives byte-identical JSON with the pristine copy swapped in. **Gotchas:** (1) CI runs `pnpm test:coverage`, so the fork defines that script too, or turbo skips its 150 tests. Once it ran, the first CI run failed on a fixture generated on Windows: picomatch writes `[\\/]` in a regex on a Windows host and `\/` on Linux unless its `windows` option is a boolean, so the golden now pins `windows: false` (regenerated against the pristine braces). Anything generated on this machine and compared on CI must not depend on the OS. (2) Pristine braces' failing depth at the default stack is erratic (V8 JIT state); `node --stack-size=200` is the deterministic repro. (3) Two load flakes (5 s timeouts) when Vision's suite hogs the CPU: `frontend-build` "hashed outputs" and Connect's `profiles-column-privacy` "176 alone"; both pass alone, and `turbo run test:coverage --concurrency=2` helps. Open: **H10** (check monthly for an upstream fix); the upstream draft for `micromatch/braces` is in the PR description and is NOT posted (needs the founder's OK).
 - **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (#82, merged `ec19099`).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
   `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
   applied beforehand. **Crown + splash (was C14):** Wear's gold PNG (127 KB resized to 5 KB) replaces the line-art crown on the landing and the sidebar's gold tile; a new `authResolved` store state shows a crown + ring-spinner splash instead of the sign-in landing while a probable session (a `sb-*-auth-token` key, `?code=` or `#access_token=`) is still resolving, with an 8 s safety timeout. First-time visitors and demo mode start resolved, so they see no splash flash. 3 e2e tests, mutation-checked. The founder also reported the Outlook-owner live test green (A10 reduced). Open: **C1/C1b**, **C15**, **C16**, **C10** (decisions recorded in its design block), **C5**, **A10** (optional: OTP expiry and two re-tests; the email rate limit is 60/h), **H8**, **H9**. **Gotchas:** a PC crash zeroed two uncommitted files (commit early; git fsck stayed clean), and Python `open(p, "w")` on Windows rewrites LF as CRLF (use `newline=""`). The item ID **C11** was claimed twice by parallel sessions; the crown item was renumbered C14.
