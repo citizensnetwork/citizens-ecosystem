@@ -9,8 +9,9 @@
 >   unchanged**, so a doc that cites "RESUME_HERE §3AS" resolves there.
 > - Phase 0 → mid-June 2026 (§2x batches): [`docs/archive/RESUME_HISTORY_2026H1.md`](docs/archive/RESUME_HISTORY_2026H1.md).
 >
-> **Last full audit: 2026-09-27** (`main` @ `c7978e7`). Every open item below was re-checked that day against
-> git, GitHub, Supabase, Vercel and the code. Tags like `(§3AP)` point to the archived section with the detail.
+> **Last audit: 2026-10-03** (`main` @ `ec19099`). §2, the A, C and H items and §5's P1/P11 were re-checked that day against
+> git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. Tags like `(§3AP)` point to the
+> archived section with the detail.
 
 ### How to update this file (end of every session)
 1. Update §2 (state snapshot) when a number changes: migration head, advisor baseline, test counts, deploys.
@@ -47,24 +48,24 @@
 
 ---
 
-## 2. Current state snapshot (verified 2026-09-27)
+## 2. Current state snapshot (verified 2026-10-03)
 
-- **`main` @ `8ebfed3`** (PR #79, admin Delete + mig 178, merged 2026-10-03 on top of #78/#80 map-preview work and #81, the dated
-  `braces` OSV exception). CI and CodeQL are green on it and the Connect, Vision and Wear production deploys completed
-  (checked 2026-10-03). The crown + loading-splash PR (§6, newest entry) is open on top.
+- **`main` @ `ec19099`** (PR #82, Wear's crown + loading splash, merged 2026-10-03 on top of #79 admin Delete + mig 178, #78/#80
+  map-preview work and #81, the dated `braces` OSV exception). CI and CodeQL are green on it and the Connect production deploy
+  completed (Vision and Wear "not affected"). No open feature PRs; the 14 open PRs are all stale Dependabot ones (item **H1**).
 - **Database head = migration 178** (`20261002231716 / 178_admin_remove_contributor_listing`). **Next migration # = 179.**
 - **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
   (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
   design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
 - **Performance advisor debt (not yet addressed):** 214 `auth_rls_initplan`, 319 `multiple_permissive_policies`,
-  65 unindexed foreign keys (19 of them in `wear`), 6 duplicate indexes (all in `public`). See item **S6**.
+  65 unindexed foreign keys (19 of them in `wear`), 6 duplicate indexes (all in `public`). See item **S6**. (Counts from 2026-09-27, not re-measured.)
 - **14 cron jobs, all active:** map prominence, messaging purge, contributor analytics ×3, search-term purge,
   contributor digest, Vision MV refresh ×3, Vision daily snapshots, Vision advisory eval, live-location cleanup
   (every 15 min), impersonation expiry sweep (every 5 min).
-- **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
-  map**) · 40 Places · 3 Events (**all in the past, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
-  0 linked to a Connect Contributor.
+- **Live data (2026-10-03):** 16 profiles · 5 Contributors (**only 2 are on the map; the other 3 lack a category or a pin, or are hidden**) · 40 Places ·
+  4 Events (**0 upcoming, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin.
+  Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
 - **Tests (last full run, the crown PR on the merged tree, 2026-10-03):** Connect 885 unit (+32 live-only, skipped in CI) ·
   Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 36/36**. (`frontend-build`'s
   "hashed outputs" test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
@@ -95,6 +96,10 @@
   (GHSA-vfj7-8cjw-p6xm, dev tooling only, no fixed version on npm) is ignored in `osv-scanner.toml` until
   **2026-11-02**, founder-approved 2026-10-03. Don't renew it silently or treat it as precedent; see item **H8**.
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
+- **Parallel sessions claim the same IDs.** Item IDs (C11 was claimed twice on 2026-10-03) and migration numbers: fetch `main`
+  and take the next free one at merge time. A sibling session may also merge `main` into your PR branch: `git fetch` before you push.
+- **Windows:** a script that rewrites files must not change line endings (Python: `open(p, "w", newline="")`), and a PC crash can
+  leave uncommitted files full of zero bytes, so commit early. After a crash, scan with `tr -cd '\000' < file | wc -c`.
 - **Working from a sibling git worktree (parallel sessions):** `preview_start name=…` resolves
   `.claude/launch.json` from the *primary* checkout, so it serves the other session's files. Start your own
   `npx next dev -p <port>` from the worktree's `apps/connect` instead (copy the gitignored `.env.local` in, and
@@ -138,6 +143,10 @@
   XSS). Bumping `maplibre-gl` means re-copying the four files; the build fails loudly otherwise. Any new map
   (e.g. Vision's Timeline Map) must use the same vendored copy, never an unpkg 4.x build.
 - Brand icons are `Brand…`-prefixed on purpose: lucide's close icon is literally called `X` (§3AO).
+- **A new top-level folder under `apps/connect/src/frontend/`** (e.g. `assets/`) is copied to `public/<dir>/` by the build. Add
+  `/public/<dir>/` to `apps/connect/.gitignore` (the generated copies are ignored one path at a time), reference files
+  root-absolute with a `?v=` (the service worker is cache-first for same-origin static files) and never relative (pages load
+  from `/index.html` and `/dashboard`).
 - **Map rules live in one place, `map.jsx`:** `ZOOM_GATES` (each pin type hides when zoom < its gate: place 9.5,
   event 7.5, Contributor 6; Ideas never gate; the selected pin is always drawn) and `ZOOM_LABELS` (15). Every
   Contributor pin opens the same small `EntityCard` preview as events and places; the full profile is behind its
@@ -192,21 +201,20 @@ design session first.
 ### A. Founder actions (no code needed)
 | ID | Item | Pri |
 |---|---|---|
-| A1 | **Phase 6 live test of the Google Form intake.** `testConnection` already says "Connected ✓" (2026-09-27). First **delete the 3 hand-typed sample rows** in the Sheet (approving one publishes a real listing and emails column E). Then submit a real test response through the Form, tick Approve, check the pin, Kingdom Discovery and the email, sign in with that address (6-digit code, or Google), confirm you land on the dashboard, and remove the test listing in **Admin → Listings → Hide**. The DB path was re-verified live after migs 174–177 (rollback-only probe). (§3AP, PR #73) | P1 |
-| A2 | **One production smoke walk on Connect** (replaces five separate "please confirm" asks): sign in with Google (never machine-verified since the supabase-js pin, §3AT) → Become a Contributor (§3AL) → dashboard edit, cancel and News → Admin Create + Claim → phone-to-desktop map resize (§3AJ) → Android Back button and cards (§3AN). **Part 1 (the map: pins, previews, zoom, logos) was walked on 2026-10-02 and its findings are fixed in the map-preview PR; re-check it on production with the list in §6, then do the rest.** | P1 |
+| A2 | **Finish the production smoke walk on Connect.** Done by the founder: Google sign-in as admin, map and Admin → Listings; a Contributor's dashboard, Profile tab and News post; Admin → Listings → **Delete** (2026-10-03, "works beautifully"). The cancel/restore step found bug **C1/C1b**. Still to do: **Become a Contributor** with a fresh citizen account (the 6-digit code makes this easy) · phone-to-desktop map resize (§3AJ) · Android Back button and cards (§3AN, a device is needed) · re-test C1/C1b once fixed. (Admin Create + Claim still works as a silent auto-claim until **C10** replaces it with a confirm screen.) | P1 |
 | A3 | **Wear walk-through:** the sign-in-as (impersonation) flow as admin (only the seed and smoke sessions exist, §3AB), plus a live email test: sign-up confirmation, password reset and 6-digit code via Resend (§3S). | P2 |
 | A4 | **Write the Ts&Cs, Code of Conduct and fee-schedule documents.** The Wear brand application's checkboxes refer to them by name only, and the app-store listings will need them too. | P2 |
-| A5 | **Get the 4 invisible Contributors onto the map** (Josh Mkhari, Ricardo Goncalves, Sound Storage inc, Grav: no category, no location). Ask them to finish their profiles, or fill them in from Admin. | P2 |
+| A5 | **Get the 3 invisible Contributors onto the map** (each lacks a category or a pin, or is hidden; see Admin → Listings). Ask them to finish their profiles, or fill them in from Admin. | P2 |
 | A6 | Custom domains (e.g. `wear.` and `vision.citizenscentral.co.za`) plus a branded storage-asset origin, so URLs stop exposing `*.vercel.app` hashes and the Supabase project id (§3U). | P3 |
 | A7 | Decide what to do with the **Supabase Preview** GitHub check. It reports "skipped" on every PR (Free tier), so it's harmless: uninstall it or leave it (§3M). | P3 |
 | A8 | Mobile store accounts: **F1** Firebase (Android push), **F2** Apple Developer + a Mac, **Step 6** store compliance (privacy/terms URLs, data-safety form, icons, screenshots, age rating), **Step 7** release process (§3G). | Parked |
 | A9 | Supabase **Pro** upgrade decision. It unlocks HIBP leaked-password protection and DB branching (safer migrations). | Parked |
-| A10 | **Last bit of the email-code sign-in (PR #77).** The founder reported on 2026-10-03 that the live test with an Outlook-mail owner passed (code → their dashboard) and that `intake-v2.gs` is pasted into the Sheet, so the templates and the re-paste are done. Still to confirm: Supabase → Authentication → Rate Limits → emails/hour ≥ 30 (and optionally lower the email OTP expiry from 1 h to about 15 min). A never-registered address → a citizen, and Google for the admin, were not re-tested in the report. | P2 |
+| A10 | **Last bit of the email-code sign-in (PR #77).** The founder reported on 2026-10-03 that the live test with an Outlook-mail owner passed (code → their dashboard) and that `intake-v2.gs` is pasted into the Sheet, so the templates and the re-paste are done. The Supabase email rate limit is **60 emails/hour** (founder, 2026-10-03; the target was at least 30), so that is done too. Still open and optional: lower the email OTP expiry from 1 h to about 15 min (Authentication → Providers → Email), and re-test a never-registered address (should become a citizen) and Google for the admin, which the report did not cover. | P3 |
 
 ### C. Connect: the v1 discovery loop (current product focus)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| C1 | **Bug:** a cancelled Event or Place disappears from its owner's dashboard after a reload, because `/api/v1/*` only returns published rows and there is no owner-scoped fetch. Restore only works in the session that cancelled it. (§3AO) | P1 | S–M |
+| C1 | **Bugs C1 + C1b (found live on 2026-10-03):** a cancelled Event or Place (C1) vanishes from its owner's dashboard after a reload, because `/api/v1/*` returns published rows only; and (C1b) its pin stays on the map until reload. Fix: an owner-scoped read of all statuses for the Dashboard (RLS already allows it, no migration), published-only everywhere public. Full spec: PR 1 of the local, untracked brief `docs/handoffs/CONNECT_URL_ROUTING_AND_OWNER_FETCH_HANDOFF.md`. A cancelled test event is kept in prod on purpose for the re-test. (§3AO) | P1 | S–M |
 | C3 | **Apply wizard: collect the Contributor kind** (incl. Individual; the data model is done in mig 173) and relax the "Organisation / ministry name" copy for solo people. (§3AP, V1_SCOPE §7) | P2 | S |
 | C4 | **Admin Create parity:** add X, LinkedIn, WhatsApp, public contact email and cover photo (the intake RPC already takes them). (§3AP) | P2 | S |
 | C5 | **6-digit-code sign-in for Vision.** Connect shipped it (PR #77) and Wear already has it; Vision is still Google-only. Port Connect's `EmailSignIn` panel and `CC_AUTH_HELPERS` (`auth.jsx`, `auth-client.js`). Email + password for Connect was dropped on purpose: passwordless only. (§3P, §3S) | P2 | S–M |
@@ -218,6 +226,9 @@ design session first.
 | C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. Fix with the existing `from=` filter for the map/Discovery fetch plus an owner-scoped fetch for past and cancelled events (this overlaps **C1**: design them together). Today: 3 events, so not urgent. | P2 | M |
 | C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
+| C15 | **A real URL for every screen** (founder request after the A2 walk). Today the bar says `/index.html` almost everywhere, so a refresh drops you on the map and nothing can be shared or bookmarked. Route table, history integration (`pushState`/`popstate`, retiring the single-entry Back trap), a safe auth return path and tests are specified in PR 2 of the same local brief as C1. Do it after C1/C1b. Afterwards confirm Supabase → Auth → URL Configuration still lists the site root. | P2 | M–L |
+| C16 | **Listing Automation Phase 1** (consent-first, POPIA; founder decisions D-8 to D-11 in the local planning handoff): private consent columns on `profiles`, `listing_sources` and `listing_suggestions` tables, a scoped `POST /api/automation/suggestions`, a dashboard "Automatic updates" panel and Suggestions tab, and a daily email. It replaces the repo's `tools/google-forms/intake.gs` with the corrected `intake-v2.gs` (see **H9**). Needs a migration (ask the founder first). The founder chose it **before C10**. Phase 2 (a daily scheduled reader that posts suggestions) comes after. Brief: local, untracked `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`. | P2 | L |
+| C17 | **One design reference, then a periodic check** (founder idea, 2026-10-03; not a priority). Collect the preferred look in one living reference, then audit screens against it: the rounded, blurred-backdrop modal (the admin Delete popup), font faces and colours, window patterns, the colour scheme and the one crown logo (now Wear's PNG). Today three definitions drift apart: `packages/ui/src/tokens.ts` (Wear-targeted, gold `#C9A24A`, a placeholder SVG crown, no consumer), Connect's CSS variables (`--gold-crown #D4AF37`) and Wear's PNG. First step: reconcile them into `packages/ui` tokens plus a short design reference with screenshots; the "daily check" could later become a step in P2's routine. | P3 | M |
 
 **C10 design (agreed 2026-10-03; nothing built yet).**
 - *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
@@ -253,7 +264,7 @@ design session first.
 | ID | Item | Pri | Size |
 |---|---|---|---|
 | V1 | **Timeline Map with live MapLibre.** `views.jsx TimelineMap()` is still a placeholder; `/api/map/activities` and `/api/timeline` exist and the MapTiler key is set. No migration. Vision's `index.html` loads **no** MapLibre today: use the vendored 6.11.2 copy (see §3). (§3AC) | P2 | M |
-| V2 | **Network graph** (§4.3 of the wiring spec): "which orgs share your audience?" Its own PR + migration (next free # is **178**; older notes say 164 or 168, both taken). Reuse `org_active_persons` + the mig-155/156 orbit pattern; it feeds `vision.org_partnerships` + `/api/metrics/cross-org`. | P3 | L |
+| V2 | **Network graph** (§4.3 of the wiring spec): "which orgs share your audience?" Its own PR + migration (take the next free number at apply time: head + 1, which was 179 on 2026-10-03). Reuse `org_active_persons` + the mig-155/156 orbit pattern; it feeds `vision.org_partnerships` + `/api/metrics/cross-org`. | P3 | L |
 | V3 | Phase D: exports, partnerships, scheduled reports. | Parked | L |
 | V4 | Adoption: 1 Vision organisation exists and none is linked to a Connect Contributor. Onboard a real organisation (founder). | P2 | — |
 | V5 | `apps/vision/docs/ADMIN_GUIDE.md` still describes the retired Connect-sync subsystem. | P3 | S |
@@ -275,13 +286,14 @@ design session first.
 | ID | Item |
 |---|---|
 | H1 | **14 stale Dependabot PRs** (#9–#17, #24–#27, #39, #43; oldest 2026-06-21). Several are majors that need real review (TypeScript 7, `@types/node` 26, GitHub Actions v7). Close them and let Dependabot regenerate, or batch-review them. |
-| H2 | Delete the 24 merged remote branches, plus 3 squash-merged leftovers (`claude/event-location-map-ui-kib8od` = PR #60, `claude/map-icon-zoom-visibility-1yzg4a` = #61, `claude/map-icon-label-zoom-16-5` = #62) and the local `feat/connect-guest-landing-location-picker` (= PR #47). `origin/chore/phase-4-local-rewrite` (Wear, May 2026) looks obsolete: confirm, then delete. |
+| H2 | Delete the merged remote branches: 53 remote branches besides `main` existed on 2026-10-03 (almost all merged; PRs #71-#82 added a dozen), plus about 17 stale local ones. `origin/chore/phase-4-local-rewrite` (Wear, May 2026) looks obsolete: confirm, then delete. |
 | H3 | Park the standalone `../citizens-connect` checkout (4 uncommitted: `.gitignore`, `RESUME_HERE.md`, decision brief, `.codeviz/`). Clear the sibling clutter (`../citizens-wear-pr8`, `../cv-temp`, `../citizens-connect.worktrees`) and the orphan `.claude/worktrees/agent-a4219a…` folder. |
 | H4 | Retire stale status docs that compete with this file: `apps/connect/.github/PROJECT_STATUS.md` (last updated 2026-07-01), `apps/connect/.github/workflows/ci.yml` (nested, so GitHub never runs it), root `.github/PROJECT_STATUS.md` (Wear, May 2026), and ECOSYSTEM_DECISION_BRIEF rows 0 ("in flight"; done since §3H) and 5 (monorepo; done). |
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
 | H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
 | H8 | **Re-check `braces` GHSA-vfj7-8cjw-p6xm by 2026-11-02** (the dated OSV exception in `osv-scanner.toml`, §3 Process). Once npm ships a fixed `braces`, bump it via `pnpm.overrides`, delete the `[[IgnoredVulns]]` entry and restore the "baseline is empty" header; if there is still no fix, decide again with the founder. After that date CI goes red on this advisory if nothing was done. |
+| H9 | **Repo/live drift on the Apps Script.** The live Sheet runs the corrected `intake-v2.gs` (founder confirmed 2026-10-03), but the repo's `apps/connect/tools/google-forms/intake.gs` is still the OLD copy that finds answers by question NUMBER, which misreads the consent question after the founder's Section 7 reorder. Anyone who re-pastes the repo copy re-introduces the bug. Until **C16** lands, sync the repo copy (a tiny PR: copy `intake-v2.gs` over it, drop its banner, README: "matched by wording"), after checking it holds no real names or emails. |
 
 ---
 
@@ -289,8 +301,8 @@ design session first.
 
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
-| P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live; DB path re-verified after migs 174–177; moderation tab + clear 409 Notes shipped (PR #73). The live end-to-end test was never run. | A1 |
-| P2 | **Connect Daily Routine** (drafted 2026-09-21) | Draft v1 of a daily "check, discover, suggest" routine that reports to a Drive folder, plus onboarding presets. Never committed, never scheduled; the presets are "not wired into the wizard". | Adopt (commit + schedule) or discard. H7 |
+| P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live. The live end-to-end test **passed on 2026-10-02** (a real listing, owner on Outlook mail, welcome email, 6-digit sign-in on 2026-10-03). Existing-email approvals still refuse with a clear Note until C10. | C10, C16, H9 |
+| P2 | **Connect Daily Routine** (drafted 2026-09-21; a design-consistency step could join it, C17) | Draft v1 of a daily "check, discover, suggest" routine that reports to a Drive folder, plus onboarding presets. Never committed, never scheduled; the presets are "not wired into the wizard". | Adopt (commit + schedule) or discard. H7 |
 | P4 | Wear CSP | Flagged in §3AT. The brief was only in local `%TEMP%`; now rescued to `docs/handoffs/WEAR_CSP_HANDOFF.md`. | S1 |
 | P5 | Vision Timeline Map | Placeholder since 2026-07-02; unblocked since 2026-07-18; never started. | V1 |
 | P6 | Vision network graph + Phase D | Scoped only. | V2, V3 |
@@ -298,7 +310,7 @@ design session first.
 | P8 | **Notification edge functions** | 5 of 14 deployed (incl. notify-broadcast, notify-event-update, send-contributor-digest). Never deployed: notify-event-cancelled, notify-interested-users, notify-nearby-rsvp, notify-new-follower, prompt-post-event-reviews, send-daily-digest, send-event-reminder, send-rsvp-reminders, submit-contributor-application. Push notifications also need F1/F2. | H5, A8 |
 | P9 | Mobile launch (Capacitor) | Connect's native shell, deep-link OAuth and native geolocation are code-complete (§3G) but have never run on a device. Wear has no shell. Store work not started. | A8, W3 |
 | P10 | Lazy profiles | Designed (§3S), not built. | C6 |
-| P11 | Email/password sign-in for Connect + Vision | The Wear pattern exists; not ported. | C5 |
+| P11 | 6-digit-code sign-in | Done on Connect (#77) and Wear. Vision is still Google-only. | C5 |
 | P12 | Contributor kind in the Apply wizard | Data model done (mig 173); wizard UI not. | C3 |
 | P14 | Rate-limit consolidation | Wear is on `@citizens/utils`; Connect and Vision still use their own copies. | S7 |
 | P15 | Tailwind static compile | The prerequisite (`.cc-map` rule) landed; the compile itself isn't done. | S3 |
@@ -311,9 +323,12 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
-- **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (this PR).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
+- **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (#82, merged `ec19099`).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
   `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
-  applied beforehand. **Crown + splash (was C14):** Wear's gold PNG (127 KB resized to 5 KB) replaces the line-art crown on the landing and the sidebar's gold tile; a new `authResolved` store state shows a crown + ring-spinner splash instead of the sign-in landing while a probable session (a `sb-*-auth-token` key, `?code=` or `#access_token=`) is still resolving, with an 8 s safety timeout. First-time visitors and demo mode start resolved, so they see no splash flash. 3 e2e tests, mutation-checked. The founder also reported the Outlook-owner live test green (A10 reduced). Open: **C10** (still to ask: what happens if the owner never confirms?), **C5**, **A10** rate limit, **H8**. **Gotchas:** a PC crash zeroed two uncommitted files (commit early; git fsck stayed clean), and Python `open(p, "w")` on Windows rewrites LF as CRLF (use `newline=""`). The item ID **C11** was claimed twice by parallel sessions; the crown item was renumbered C14.
+  applied beforehand. **Crown + splash (was C14):** Wear's gold PNG (127 KB resized to 5 KB) replaces the line-art crown on the landing and the sidebar's gold tile; a new `authResolved` store state shows a crown + ring-spinner splash instead of the sign-in landing while a probable session (a `sb-*-auth-token` key, `?code=` or `#access_token=`) is still resolving, with an 8 s safety timeout. First-time visitors and demo mode start resolved, so they see no splash flash. 3 e2e tests, mutation-checked. The founder also reported the Outlook-owner live test green (A10 reduced). Open: **C1/C1b**, **C15**, **C16**, **C10** (decisions recorded in its design block), **C5**, **A10** (optional: OTP expiry and two re-tests; the email rate limit is 60/h), **H8**, **H9**. **Gotchas:** a PC crash zeroed two uncommitted files (commit early; git fsck stayed clean), and Python `open(p, "w")` on Windows rewrites LF as CRLF (use `newline=""`). The item ID **C11** was claimed twice by parallel sessions; the crown item was renumbered C14.
+  **Evening audit:** RESUME re-checked against live state; A1 closed (passed), A2/A5/C1/P1/P11/H2/V2 corrected; new C15 (URL per
+  screen), C16 (Listing Automation Phase 1), C17 (design reference) and H9 (repo `intake.gs` is the old script). Admin Delete was
+  tested live by the founder and works.
 - **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
   intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
   included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors
