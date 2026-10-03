@@ -1,9 +1,10 @@
-# OSV-Scanner configuration — dependency-advisory baseline (NOW EMPTY)
+# OSV-Scanner configuration — dependency-advisory baseline (EMPTY, bar ONE dated exception below)
 # =====================================================================
 # The CI "Verify" job scans pnpm-lock.yaml with OSV-Scanner and BLOCKS on any
 # known vulnerability (`osv-scanner scan --config=osv-scanner.toml -L
 # pnpm-lock.yaml`, pinned v2.3.8). This file is intentionally kept (CI passes
-# `--config=osv-scanner.toml`) but carries NO ignored advisories.
+# `--config=osv-scanner.toml`) and carries no long-lived ignored advisories (only
+# the single expiring entry at the bottom).
 #
 # History: when the blocking gate was introduced (2026-07-16, RESUME §3Z) it
 # surfaced 27 pre-existing advisories that had been latent while the previous
@@ -26,3 +27,19 @@
 # ⚠ Do NOT add IgnoredVulns entries here to silence NEW advisories — fix the
 # dependency instead (bump via pnpm.overrides, or drop the pulling dep). The gate
 # is meant to block; this file staying empty is the goal.
+#
+# THE ONE DATED EXCEPTION (2026-10-03, founder-approved in chat): `braces`
+# <= 3.0.3, GHSA-vfj7-8cjw-p6xm / CVE-2026-93687 (stack exhaustion on deeply
+# nested brace patterns). OSV published `last_affected: 3.0.3` on 2026-10-02 and
+# npm's latest `braces` IS 3.0.3, so NO fixed version exists: there is nothing to
+# bump to (RESUME §3 Process; item H8). It is dev tooling only (eslint-config-next
+# / @typescript-eslint -> fast-glob -> micromatch -> braces) and only globs our
+# own file patterns; it never ships in a production runtime. The entry expires on
+# 2026-11-02, after which the gate blocks again. Re-check by then, bump via
+# `pnpm.overrides` once a fixed version exists, otherwise decide again. Do NOT
+# renew this entry silently, and do NOT use it as a precedent for other advisories.
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-11-02
+reason = "braces <= 3.0.3 stack-exhaustion DoS (CVE-2026-93687). No patched version exists on npm. Dev tooling only (eslint-config-next / @typescript-eslint -> fast-glob -> micromatch); never in a production runtime. Founder-approved 2026-10-03; revisit by the expiry."
