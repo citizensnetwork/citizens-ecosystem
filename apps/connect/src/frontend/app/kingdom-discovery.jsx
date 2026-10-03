@@ -39,8 +39,11 @@
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q);
 
+    // Finished events don't belong in a list of what to turn up to; they stay
+    // on their organiser's profile under "Past events".
+    const now = Date.now();
     const items = [
-      ...events.filter(matches).map((e) => ({ ...e, type: 'event' })),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ ...e, type: 'event' })),
       ...places.filter(matches).map((p) => ({ ...p, type: 'place' })),
       ...contributors.filter(matches).map((c) => ({ ...c, type: 'contributor' })),
     ].filter((i) => type === 'all' || i.type === type);
@@ -87,7 +90,9 @@
         items.length
           ? h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 content-start' },
               items.map((item) => h(window.EntityCard, { key: item.type + '-' + item.id, item, layout: 'grid', myLoc })))
-          : h(Empty, { icon: 'SearchX', title: 'Nothing here yet', sub: q ? 'Try a different search term.' : 'Nothing matches this filter yet.' })));
+          : type === 'event' && !q
+            ? h(Empty, { icon: 'CalendarX', title: 'No upcoming events yet', sub: 'Follow organisations to hear when they post.' })
+            : h(Empty, { icon: 'SearchX', title: 'Nothing here yet', sub: q ? 'Try a different search term.' : 'Nothing matches this filter yet.' })));
   }
 
   window.KingdomDiscoveryPage = KingdomDiscoveryPage;

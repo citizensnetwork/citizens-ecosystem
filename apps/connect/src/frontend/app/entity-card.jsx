@@ -23,7 +23,7 @@
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { cx, safeUrl, Avatar, SmartImage, SocialLinks } = window.UI;
+  const { cx, safeUrl, Avatar, logoFit, SmartImage, SocialLinks } = window.UI;
   const Icon = window.Icon;
 
   // Most Contributors haven't picked a category yet, but nearly all carry a
@@ -94,6 +94,8 @@
     // title: initials taken from an event name would read as an organisation
     // that doesn't exist.
     const logo = isContributor ? item.profilePhoto : ((org && org.profilePhoto) || '');
+    // An organisation's logo is shown whole, on white; an Individual's photo fills the frame.
+    const logoKind = isContributor ? item.kind : (org && org.kind);
     const locationText = isEvent ? item.location : isPlace ? item.address
       : (item.noFixedLocation ? 'Online — no fixed location' : item.location);
     const dist = (myLoc && typeof item.lat === 'number' && typeof item.lng === 'number')
@@ -168,7 +170,7 @@
       // own initials when it doesn't, the category glyph when we don't know.
       h('div', { className: 'absolute -bottom-4 left-3 rounded-full ring-2 ring-white shadow-md overflow-hidden bg-white' },
         (logo || orgName)
-          ? h(Avatar, { src: logo, name: orgName, size: isPanel ? 42 : 36, rounded: 'full' })
+          ? h(Avatar, { src: logo, name: orgName, size: isPanel ? 42 : 36, rounded: 'full', fit: logoFit(logoKind) })
           : h('span', {
               className: 'flex items-center justify-center rounded-full',
               style: { width: isPanel ? 42 : 36, height: isPanel ? 42 : 36, background: hex + '24', color: hex },
@@ -271,7 +273,7 @@
         className: cx('font-bold text-foreground leading-snug', isPanel ? 'text-lg line-clamp-2 font-display' : 'text-sm line-clamp-2'),
       }, title),
       description && h('p', {
-        className: 'text-xs text-muted-foreground leading-snug mt-1 ' + (isPanel ? 'line-clamp-3' : 'line-clamp-2'),
+        className: 'text-xs text-muted-foreground leading-snug mt-1 ' + (isPanel && !isContributor ? 'line-clamp-3' : 'line-clamp-2'),
       }, description));
     const head = isPanel
       ? h('div', null, band, titleBlock)

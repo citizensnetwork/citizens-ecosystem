@@ -168,6 +168,47 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     });
   });
 
+  it("publishes a listing whose socials are display names, and tells the Sheet what it skipped (Grace Radio)", async () => {
+    // The first real Form submission: names typed into the link boxes and a
+    // local-format phone number. All three used to be stored verbatim.
+    const res = await POST(
+      signedReq({ ...row, instagram: "GraceFM103", facebook: "Grace Radio", youtube: "Grace Online", whatsapp: "0712345678" }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.warnings).toHaveLength(2);
+    expect(body.warnings[0]).toContain('Facebook skipped: "Grace Radio"');
+    expect(body.warnings[0]).toContain("facebook_not_a_link");
+    expect(body.warnings[1]).toContain('YouTube skipped: "Grace Online"');
+    expect(body.warnings[1]).toContain("youtube_not_a_link");
+    expect(rpcArgs()).toMatchObject({
+      _instagram_handle: "GraceFM103",
+      _facebook_url: null,
+      _youtube_url: null,
+      _whatsapp_number: "27712345678",
+    });
+  });
+
+  it("drops a link to some other site and a number it can't read, one Note each, and still publishes", async () => {
+    const res = await POST(
+      signedReq({ ...row, facebook: "https://evil.example/login", whatsapp: "call the office" }),
+    );
+    expect(res.status).toBe(200);
+    const { warnings } = await res.json();
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("facebook_not_a_link");
+    expect(warnings[1]).toContain("whatsapp_invalid_number");
+    expect(rpcArgs()).toMatchObject({ _facebook_url: null, _whatsapp_number: null });
+  });
+
+  it("still refuses the whole listing for a dangerous social value — leniency is not a bypass", async () => {
+    const res = await POST(signedReq({ ...row, youtube: "javascript:alert(1)" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_youtube_url");
+    expect(mockAdmin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
   it("prefers NEXT_PUBLIC_SITE_URL for the listing URL", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.citizenscentral.co.za/");
     const res = await POST(signedReq(row));

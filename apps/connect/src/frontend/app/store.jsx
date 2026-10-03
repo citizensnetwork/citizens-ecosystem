@@ -173,6 +173,8 @@
       date: validDt ? validDt.toISOString().slice(0, 10) : '',
       time: fmtTime(validDt), endTime: fmtTime(validEnd),
       time24: to24(validDt), endTime24: to24(validEnd),
+      // Raw instants, for window.DATA.isPastEvent (date/time above are display strings).
+      startsAt: validDt ? validDt.toISOString() : '', endsAt: validEnd ? validEnd.toISOString() : '',
       status: r.status || 'published',
       location: r.location || '', address: r.location || '',
       // organizerId = created_by (UUID). community_contributor is a BOOLEAN on

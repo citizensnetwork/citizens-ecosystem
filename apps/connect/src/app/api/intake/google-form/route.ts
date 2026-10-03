@@ -162,28 +162,36 @@ export async function POST(request: Request) {
   const hasAddress = typeof body.street_address === "string" && body.street_address.trim() !== "";
   const noFixedLocation = fixed === false || (fixed === null && !hasAddress);
 
-  const parsed = parseListingFields({
-    display_name: body.organisation_name,
-    claim_email: body.owner_email,
-    contributor_kind: kind.value,
-    contributor_category: category.value,
-    bio: body.bio,
-    website_url: body.website,
-    contact_email: body.contact_email,
-    instagram_handle: body.instagram,
-    facebook_url: body.facebook,
-    tiktok_handle: body.tiktok,
-    youtube_url: body.youtube,
-    x_handle: body.x,
-    linkedin_url: body.linkedin,
-    whatsapp_number: body.whatsapp,
-    no_fixed_location: noFixedLocation,
-    physical_address: body.street_address,
-  });
+  // lenientSocials: nobody is here to correct a Form answer (the row is approved
+  // later), so a social that isn't a link/handle/number — "Grace Radio" typed
+  // into the Facebook box, a local-format phone we can't read — is left empty
+  // and reported in the warnings (the Sheet's Notes) rather than refusing a
+  // listing that is otherwise good. Dangerous values still fail it outright.
+  const parsed = parseListingFields(
+    {
+      display_name: body.organisation_name,
+      claim_email: body.owner_email,
+      contributor_kind: kind.value,
+      contributor_category: category.value,
+      bio: body.bio,
+      website_url: body.website,
+      contact_email: body.contact_email,
+      instagram_handle: body.instagram,
+      facebook_url: body.facebook,
+      tiktok_handle: body.tiktok,
+      youtube_url: body.youtube,
+      x_handle: body.x,
+      linkedin_url: body.linkedin,
+      whatsapp_number: body.whatsapp,
+      no_fixed_location: noFixedLocation,
+      physical_address: body.street_address,
+    },
+    { lenientSocials: true },
+  );
   if (!parsed.ok) return fail(400, parsed.error);
   const fields = parsed.fields;
 
-  const warnings: string[] = [];
+  const warnings: string[] = [...parsed.notes];
 
   // Images are checked BEFORE anything is created; a refused image is a
   // warning (the owner adds it from the dashboard), never a failed intake.

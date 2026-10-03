@@ -3,6 +3,10 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 declare global {
   interface Window {
     __cc: { go: (page: string, params?: Record<string, unknown>) => void };
+    // The map's inspection hook (map.jsx) — lets a spec jump to an exact zoom.
+    __ccMap: {
+      jumpTo: (o: { center: [number, number]; zoom: number }, eventData?: Record<string, unknown>) => void;
+    };
   }
 }
 
@@ -108,7 +112,31 @@ const CONTRIBUTOR = {
   created_at: new Date().toISOString(),
 };
 
-async function mockNetwork(page: Page) {
+// An event that finished months ago — it must not sit on the map or in the
+// discovery list, only on its organiser's profile under "Past events".
+const PAST_EVENT = {
+  ...EVENT,
+  id: "e2e-event-past",
+  title: "Last Summer's Beach Camp",
+  date: new Date(Date.now() - 120 * 86_400_000).toISOString(),
+  end_time: new Date(Date.now() - 120 * 86_400_000 + 7_200_000).toISOString(),
+  latitude: PRETORIA.lat + 0.01,
+  longitude: PRETORIA.lng - 0.01,
+};
+
+// A WIDE wordmark on a transparent background, like Grace Radio's — the shape
+// that used to be cropped to its middle on a category-coloured disc.
+const WORDMARK =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80" viewBox="0 0 300 80">' +
+      '<text x="150" y="56" text-anchor="middle" font-size="44" font-family="Arial" fill="#111">GRACE FM</text></svg>',
+  );
+
+async function mockNetwork(
+  page: Page,
+  seedOverride: Partial<Record<"events" | "places" | "contributors", unknown[]>> = {},
+) {
   await page.route("**/config.js", (route: Route) =>
     route.fulfill({
       contentType: "application/javascript",
@@ -128,6 +156,7 @@ async function mockNetwork(page: Page) {
     events: [EVENT],
     places: [PLACE],
     contributors: [CONTRIBUTOR],
+    ...seedOverride,
   };
   for (const path of Object.keys(seed)) {
     await page.route(`**/api/v1/${path}**`, (route: Route) =>
@@ -302,32 +331,240 @@ test.describe("One card, both surfaces", () => {
   });
 });
 
-test.describe("Map density gates and pin labels", () => {
-  test("places drop out at provincial zoom, events at national, contributors never", async ({ page }) => {
+test.describe("Every pin opens the same small card", () => {
+  test("tapping a Contributor pin opens the preview card on the map — not the full profile — and View Full Profile opens it", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
 
+    await page.locator('[data-cc-pin="contributor"]').first().click();
+    const card = page.locator('[data-entity-card="contributor"]');
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    // Still on the map: the full-screen profile page was the old behaviour.
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
+    await expect(page.locator('[data-screen="profile"]')).toHaveCount(0);
+
+    // Same anatomy as the event card: name, bio, address, a primary action, and
+    // the way in to the full page.
+    await expect(card.getByText("Anchor Community Church")).toBeVisible();
+    await expect(card.getByText("We serve our city through weekly gatherings")).toBeVisible();
+    await expect(card.getByText("212 Justice Mahomed Street, Brooklyn, Pretoria")).toBeVisible();
+    await expect(card.getByRole("button", { name: "Follow" }).first()).toBeVisible();
+    await expect(card.getByRole("button", { name: "View Full Profile" })).toBeVisible();
+
+    await card.getByRole("button", { name: "View Full Profile" }).click();
+    await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Anchor Community Church" })).toBeVisible();
+  });
+
+  test("the Back button closes a Contributor preview before it leaves the map", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/manifest.json");
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+
+    await page.locator('[data-cc-pin="contributor"]').first().click();
+    await expect(page.locator('[data-entity-card="contributor"]')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('[data-entity-card="contributor"]')).toBeHidden();
+    await expect.poll(() => screenName(page)).toBe("discover");
+  });
+});
+
+test.describe("Finished events", () => {
+  test("a past event is not on the map or in Kingdom Discovery, and stays on its organiser's profile under Past events", async ({ page }) => {
+    await mockNetwork(page, { events: [EVENT, PAST_EVENT] });
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+
+    // Place + contributor + the ONE upcoming event; the finished one is absent.
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1);
+
+    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
+    const list = page.locator('[data-screen="kingdom-discovery"]');
+    await expect(list.locator('[data-entity-card="event"]')).toHaveCount(1, { timeout: 10_000 });
+    await expect(list.getByText("Hatfield Sunday Celebration").first()).toBeVisible();
+    await expect(list.getByText("Last Summer's Beach Camp")).toHaveCount(0);
+
+    // The organiser's own profile keeps it, under its own heading.
+    await page.evaluate((id) => window.__cc.go("profile", { id }), ORG_ID);
+    const profile = page.locator('[data-screen="profile"]');
+    await expect(profile.getByText("Events (1)", { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(profile.getByText("Past events (1)", { exact: true })).toBeVisible();
+    await expect(profile.getByText("Last Summer's Beach Camp")).toBeVisible();
+  });
+
+  test("with no upcoming events the Events tab says so plainly instead of showing a blank list", async ({ page }) => {
+    await mockNetwork(page, { events: [PAST_EVENT] });
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    // Map: only the place and the contributor.
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
+    await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(0);
+
+    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
+    const list = page.locator('[data-screen="kingdom-discovery"]');
+    await expect(list).toBeVisible();
+    await page.getByRole("button", { name: "Events", exact: true }).click();
+    await expect(list.getByText("No upcoming events yet")).toBeVisible();
+    await expect(list.getByText("Follow organisations to hear when they post.")).toBeVisible();
+    await expect(list.locator("[data-entity-card]")).toHaveCount(0);
+  });
+});
+
+test.describe("Contributor logos", () => {
+  const withLogo = (extra: Record<string, unknown>) => ({ ...CONTRIBUTOR, logo_url: WORDMARK, ...extra });
+
+  test("an organisation's wide logo sits whole on a white disc, with the category as the ring", async ({ page }) => {
+    await mockNetwork(page, { contributors: [withLogo({ category: "media-broadcasting" })] });
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+
+    const pin = page.locator('[data-cc-pin="contributor-logo"]');
+    await expect(pin).toHaveCount(1);
+    const disc = await pin.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const img = el.querySelector("img")!;
+      const ics = getComputedStyle(img);
+      return {
+        background: cs.backgroundColor,
+        ring: cs.borderTopColor,
+        ringWidth: parseFloat(cs.borderTopWidth),
+        fit: ics.objectFit,
+        padding: parseFloat(ics.paddingTop),
+      };
+    });
+    // White disc, the WHOLE logo (contain, never a cropping cover), a little
+    // breathing room, and a real coloured ring (not white, not transparent).
+    expect(disc.background).toBe("rgb(255, 255, 255)");
+    expect(disc.fit).toBe("contain");
+    expect(disc.padding).toBeGreaterThanOrEqual(2);
+    expect(disc.ringWidth).toBeGreaterThan(0);
+    expect(disc.ring).not.toBe("rgb(255, 255, 255)");
+    expect(disc.ring).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("an Individual's photo of themselves still fills the circle", async ({ page }) => {
+    await mockNetwork(page, { contributors: [withLogo({ contributor_kind: "individual" })] });
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    const fit = await page
+      .locator('[data-cc-pin="contributor-logo"] img')
+      .evaluate((el) => getComputedStyle(el).objectFit);
+    expect(fit).toBe("cover");
+  });
+
+  test("a logo that fails to load degrades to the category glyph, never a dead image", async ({ page }) => {
+    const broken = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
+    await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
+    await mockNetwork(page, { contributors: [withLogo({ logo_url: broken })] });
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator('[data-cc-pin="contributor"] g')).toHaveCount(1, { timeout: 10_000 });
+  });
+
+  test("the preview card shows the logo whole too", async ({ page }) => {
+    await mockNetwork(page, { contributors: [withLogo({})] });
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await page.locator('[data-cc-pin="contributor-logo"]').click();
+    const card = page.locator('[data-entity-card="contributor"]');
+    await expect(card).toBeVisible();
+    const fit = await card.locator("img").first().evaluate((el) => getComputedStyle(el).objectFit);
+    expect(fit).toBe("contain");
+  });
+});
+
+test.describe("Map density gates and pin labels", () => {
+  test("pins peel away as you zoom out — places, then events, then contributors — and the hint says what is hidden", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
+
     const pin = (shape: string) =>
       page.locator(`.maplibregl-marker:has([data-cc-pin="${shape}"])`).first();
-    // City zoom (the default framing): everything is on the map.
+    // `originalEvent` marks the jump as the user's own, so the map's
+    // "frame the data" fallback doesn't undo it on the next re-render.
+    const zoomTo = (z: number) =>
+      page.evaluate(
+        (zoom) => window.__ccMap.jumpTo({ center: [28.2293, -25.7479], zoom }, { originalEvent: {} }),
+        z,
+      );
+    const hint = page.locator("[data-zoom-hint]");
+
+    // City zoom: everything is on the map, nothing to explain.
+    await zoomTo(11);
     await expect(pin("place")).toBeVisible();
     await expect(pin("event")).toBeVisible();
     await expect(pin("contributor")).toBeVisible();
+    await expect(hint).toHaveCount(0);
 
-    // Zoom out to provincial scale — MapLibre's own wheel/keyboard zoom, so
-    // the gate is exercised through the same path a real user takes.
-    await page.locator(".cc-map").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("Shift+Minus");
-    await page.waitForTimeout(1200);
-    for (let i = 0; i < 6; i++) {
-      await page.keyboard.press("Minus");
-      await page.waitForTimeout(250);
-    }
-    await expect(pin("place")).toBeHidden({ timeout: 10_000 });
+    // Provincial (below 9.5): places go; events and contributors stay.
+    await zoomTo(8.5);
+    await expect(pin("place")).toBeHidden();
+    await expect(pin("event")).toBeVisible();
     await expect(pin("contributor")).toBeVisible();
-    await expect(page.locator("[data-zoom-hint]")).toBeVisible();
+    await expect(hint).toHaveAttribute("data-zoom-hint", "places");
+
+    // Wider (below 7.5): events go too; only contributors remain.
+    await zoomTo(6.5);
+    await expect(pin("event")).toBeHidden();
+    await expect(pin("contributor")).toBeVisible();
+    await expect(hint).toHaveAttribute("data-zoom-hint", "contributors");
+
+    // National (below 6): contributors go as well — a clean map, and the hint
+    // says why it is empty. Founder decision D1, 2026-10-02.
+    await zoomTo(5.5);
+    await expect(pin("contributor")).toBeHidden();
+    await expect(page.locator(".maplibregl-marker:visible")).toHaveCount(0);
+    await expect(hint).toHaveAttribute("data-zoom-hint", "none");
+    await expect(hint).toContainText("contributors, events and places");
+
+    // …and exactly at the gate they are back.
+    await zoomTo(6);
+    await expect(pin("contributor")).toBeVisible();
+  });
+
+  test("data spread across the whole country never opens on an empty map", async ({ page }) => {
+    // Pretoria contributor + event, but a place in Cape Town: framing ALL the
+    // data lands far below the Contributor gate (zoom 6), where every pin is
+    // hidden. The first screen must stop at the gate and centre on what shows.
+    const capeTownPlace = { ...PLACE, id: "e2e-place-ct", name: "Table Bay Chapel", latitude: -33.92, longitude: 18.42 };
+    await mockNetwork(page, { places: [capeTownPlace] });
+    // A phone: at zoom 6 its screen spans ~800 km, so a view centred on the
+    // middle of the data (Northern Cape) would crop the Gauteng pin off the edge.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
+
+    const contributor = page.locator('.maplibregl-marker:has([data-cc-pin="contributor"])');
+    await expect(contributor).toBeVisible();
+    await expect(contributor).toBeInViewport({ ratio: 1 });
+    await expect(page.locator("[data-zoom-hint]")).toHaveAttribute("data-zoom-hint", "contributors");
+  });
+
+  test("a pin's name appears from neighbourhood zoom (15), not before", async ({ page }) => {
+    await mockNetwork(page);
+    await page.goto("/");
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
+
+    const zoomTo = (z: number) =>
+      page.evaluate(
+        (zoom) => window.__ccMap.jumpTo({ center: [28.2293, -25.7479], zoom }, { originalEvent: {} }),
+        z,
+      );
+    const labelsOn = () => page.locator(".cc-map").getAttribute("data-cc-labels");
+
+    await zoomTo(14.9);
+    await expect.poll(labelsOn).toBe("0");
+    await zoomTo(15);
+    await expect.poll(labelsOn).toBe("1");
   });
 
   test("pin names float on a mist, with no capsule around them", async ({ page }) => {
