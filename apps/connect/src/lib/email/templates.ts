@@ -19,7 +19,7 @@ const SIGN_OFF_TEXT = "Connecting the Kingdom — one citizen, one contributor, 
 
 /** A subject line is one short line; never trust a user-supplied name inside one. */
 function subjectSafe(value: string): string {
-  return value.replace(/[\r\n  ]+/g, " ").trim().slice(0, 120);
+  return value.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 120);
 }
 
 function layout(heading: string, bodyHtml: string): string {

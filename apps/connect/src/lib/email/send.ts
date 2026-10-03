@@ -60,7 +60,7 @@ export function escapeHtml(value: unknown): string {
 
 /** Collapse any line break so a value can never smuggle a second header. */
 function oneLine(value: string, max = 200): string {
-  return value.replace(/[\r\n  ]+/g, " ").trim().slice(0, max);
+  return value.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, max);
 }
 
 /**
