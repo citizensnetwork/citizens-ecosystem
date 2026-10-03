@@ -18,10 +18,18 @@
  * deleted so no orphaned account is left behind. Every field is validated
  * (shared rules: `@/lib/contributorFields`) BEFORE the auth user is created.
  *
+ * Welcome email (founder decision D-13): unless the admin unticks "Email the
+ * owner" (`email_owner: false`; on by default), Connect itself mails the owner
+ * the sign-in steps from no-reply@citizenscentral.co.za, with the admin's notify
+ * address as Reply-To. It is sent only AFTER the listing exists, and it is
+ * fail-soft: a mail problem never fails the create. The response carries
+ * `email: "sent" | "failed" | "skipped"` ("skipped" = not requested, or no
+ * sending key / usable address) so the success panel can say what happened.
+ *
  * Body: { display_name, claim_email, contributor_kind?, contributor_category,
  *   bio?, website_url?, instagram_handle?, facebook_url?, tiktok_handle?,
  *   youtube_url?, no_fixed_location?, physical_address?, physical_latitude?,
- *   physical_longitude?, logo_url?, gallery_urls? }
+ *   physical_longitude?, logo_url?, gallery_urls?, email_owner? }
  */
 
 import { getRouteAuth } from "@/lib/supabase/route";
@@ -31,6 +39,8 @@ import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { coercePublicUrl } from "@/lib/publicUrl";
 import { MAX_URL, parseListingFields, trimOrNull } from "@/lib/contributorFields";
+import { adminNotifyEmail, sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
+import { ownerWelcomeEmail } from "@/lib/email/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,10 +151,29 @@ export async function POST(request: NextRequest) {
     metadata: { display_name: fields.displayName, claim_email: fields.claimEmail },
   });
 
+  // The listing exists. Welcome the owner (on unless the admin unticked it).
+  // Not rate-limited separately: only an admin reaches this route, which has its
+  // own mutation limit, and there is deliberately no "resend" button.
+  let email: EmailOutcome = "skipped";
+  if (payload.email_owner !== false) {
+    const origin = siteOrigin(request);
+    email = await sendEmail({
+      to: fields.claimEmail,
+      replyTo: adminNotifyEmail(),
+      ...ownerWelcomeEmail({
+        name: fields.displayName,
+        ownerEmail: fields.claimEmail,
+        listingUrl: result.slug ? `${origin}/c/${encodeURIComponent(result.slug)}` : origin,
+        signInUrl: `${origin}/dashboard`,
+      }),
+    });
+  }
+
   return NextResponse.json({
     success: true,
     contributor_id: newUserId,
     slug: result.slug,
     claim_email: fields.claimEmail,
+    email,
   });
 }
