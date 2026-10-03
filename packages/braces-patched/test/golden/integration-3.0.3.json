@@ -1,0 +1,366 @@
+{
+  "braces": {
+    "**/*.{ts,tsx,js,jsx,json,md,css}": {
+      "compile": [
+        "**/*.(ts|tsx|js|jsx|json|md|css)"
+      ],
+      "expand": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.js",
+        "**/*.jsx",
+        "**/*.json",
+        "**/*.md",
+        "**/*.css"
+      ]
+    },
+    "src/**/*.{ts,tsx}": {
+      "compile": [
+        "src/**/*.(ts|tsx)"
+      ],
+      "expand": [
+        "src/**/*.ts",
+        "src/**/*.tsx"
+      ]
+    },
+    "src/**/*.test.{ts,tsx}": {
+      "compile": [
+        "src/**/*.test.(ts|tsx)"
+      ],
+      "expand": [
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx"
+      ]
+    },
+    "src/__tests__/**/*.test.{ts,tsx}": {
+      "compile": [
+        "src/__tests__/**/*.test.(ts|tsx)"
+      ],
+      "expand": [
+        "src/__tests__/**/*.test.ts",
+        "src/__tests__/**/*.test.tsx"
+      ]
+    },
+    "{src,test}/**/*.ts": {
+      "compile": [
+        "(src|test)/**/*.ts"
+      ],
+      "expand": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
+    },
+    "apps/{connect,vision,wear}/src/**/*.{ts,tsx}": {
+      "compile": [
+        "apps/(connect|vision|wear)/src/**/*.(ts|tsx)"
+      ],
+      "expand": [
+        "apps/connect/src/**/*.ts",
+        "apps/connect/src/**/*.tsx",
+        "apps/vision/src/**/*.ts",
+        "apps/vision/src/**/*.tsx",
+        "apps/wear/src/**/*.ts",
+        "apps/wear/src/**/*.tsx"
+      ]
+    },
+    "**/*.{test,spec}.{ts,tsx}": {
+      "compile": [
+        "**/*.(test|spec).(ts|tsx)"
+      ],
+      "expand": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+      ]
+    },
+    "src/{a,b}/{c,d}/*.ts": {
+      "compile": [
+        "src/(a|b)/(c|d)/*.ts"
+      ],
+      "expand": [
+        "src/a/c/*.ts",
+        "src/a/d/*.ts",
+        "src/b/c/*.ts",
+        "src/b/d/*.ts"
+      ]
+    },
+    "file-{1..3}.txt": {
+      "compile": [
+        "file-([1-3]).txt"
+      ],
+      "expand": [
+        "file-1.txt",
+        "file-2.txt",
+        "file-3.txt"
+      ]
+    },
+    "chunk-{a..c}.js": {
+      "compile": [
+        "chunk-([a-c]).js"
+      ],
+      "expand": [
+        "chunk-a.js",
+        "chunk-b.js",
+        "chunk-c.js"
+      ]
+    },
+    "{01..03}/index.ts": {
+      "compile": [
+        "(0[1-3])/index.ts"
+      ],
+      "expand": [
+        "01/index.ts",
+        "02/index.ts",
+        "03/index.ts"
+      ]
+    },
+    "@(a|{b,c})/*.ts": {
+      "compile": [
+        "@(a|(b|c))/*.ts"
+      ],
+      "expand": [
+        "@(a|b)/*.ts",
+        "@(a|c)/*.ts"
+      ]
+    },
+    "!(node_modules)/**": {
+      "compile": [
+        "!(node_modules)/**"
+      ],
+      "expand": [
+        "!(node_modules)/**"
+      ]
+    },
+    ".next/**": {
+      "compile": [
+        ".next/**"
+      ],
+      "expand": [
+        ".next/**"
+      ]
+    },
+    "plain/no-braces.txt": {
+      "compile": [
+        "plain/no-braces.txt"
+      ],
+      "expand": [
+        "plain/no-braces.txt"
+      ]
+    }
+  },
+  "makeRe": {
+    "**/*.{ts,tsx,js,jsx,json,md,css}": "^(?:(?:^|\\/|(?:(?:(?!(?:^|\\/)\\.).)*?)\\/)(?!\\.)(?=.)[^/]*?\\.(ts|tsx|js|jsx|json|md|css))$",
+    "src/**/*.{ts,tsx}": "^(?:src(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\/|\\/|$)(?!\\.)(?=.)[^/]*?\\.(ts|tsx))$",
+    "src/**/*.test.{ts,tsx}": "^(?:src(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\/|\\/|$)(?!\\.)(?=.)[^/]*?\\.test\\.(ts|tsx))$",
+    "src/__tests__/**/*.test.{ts,tsx}": "^(?:src\\/__tests__(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\/|\\/|$)(?!\\.)(?=.)[^/]*?\\.test\\.(ts|tsx))$",
+    "{src,test}/**/*.ts": "^(?:(src|test)(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\/|\\/|$)(?!\\.)(?=.)[^/]*?\\.ts)$",
+    "apps/{connect,vision,wear}/src/**/*.{ts,tsx}": "^(?:apps\\/(connect|vision|wear)\\/src(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\/|\\/|$)(?!\\.)(?=.)[^/]*?\\.(ts|tsx))$",
+    "**/*.{test,spec}.{ts,tsx}": "^(?:(?:^|\\/|(?:(?:(?!(?:^|\\/)\\.).)*?)\\/)(?!\\.)(?=.)[^/]*?\\.(test|spec)\\.(ts|tsx))$",
+    "src/{a,b}/{c,d}/*.ts": "^(?:src\\/(a|b)\\/(c|d)\\/(?!\\.)(?=.)[^/]*?\\.ts)$",
+    "file-{1..3}.txt": "^(?:file-[1-3]\\.txt)$",
+    "chunk-{a..c}.js": "^(?:chunk-[a-c]\\.js)$",
+    "{01..03}/index.ts": "^(?:01..03\\/.ts)$",
+    "@(a|{b,c})/*.ts": "^(?:(a|(b|c))\\/(?!\\.)(?=.)[^/]*?\\.ts)$",
+    "!(node_modules)/**": "^(?:(?=.)(?:(?!(?:node_modules))[^/]*?)(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)|$))$",
+    ".next/**": "^(?:\\.next(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)|$))$",
+    "plain/no-braces.txt": "^(?:plain\\/no-braces\\.txt)$"
+  },
+  "match": {
+    "**/*.{ts,tsx,js,jsx,json,md,css}": [
+      "src/index.ts",
+      "src/app.tsx",
+      "src/util.js",
+      "src/__tests__/app.test.tsx",
+      "src/a/c/x.ts",
+      "test/deep/b.spec.ts",
+      "apps/vision/src/v.tsx",
+      "apps/other/src/o.ts",
+      "chunk-b.js",
+      "01/index.ts",
+      "README.md",
+      "node_modules/dep/index.ts"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "src/index.ts",
+      "src/app.tsx",
+      "src/__tests__/app.test.tsx",
+      "src/a/c/x.ts"
+    ],
+    "src/**/*.test.{ts,tsx}": [
+      "src/__tests__/app.test.tsx"
+    ],
+    "src/__tests__/**/*.test.{ts,tsx}": [
+      "src/__tests__/app.test.tsx"
+    ],
+    "{src,test}/**/*.ts": [
+      "src/index.ts",
+      "src/a/c/x.ts",
+      "test/deep/b.spec.ts"
+    ],
+    "apps/{connect,vision,wear}/src/**/*.{ts,tsx}": [
+      "apps/vision/src/v.tsx"
+    ],
+    "**/*.{test,spec}.{ts,tsx}": [
+      "src/__tests__/app.test.tsx",
+      "test/deep/b.spec.ts"
+    ],
+    "src/{a,b}/{c,d}/*.ts": [
+      "src/a/c/x.ts"
+    ],
+    "file-{1..3}.txt": [
+      "file-2.txt"
+    ],
+    "chunk-{a..c}.js": [
+      "chunk-b.js"
+    ],
+    "{01..03}/index.ts": [],
+    "@(a|{b,c})/*.ts": [],
+    "!(node_modules)/**": [
+      "src/index.ts",
+      "src/app.tsx",
+      "src/util.js",
+      "src/__tests__/app.test.tsx",
+      "src/a/c/x.ts",
+      "test/deep/b.spec.ts",
+      "apps/vision/src/v.tsx",
+      "apps/other/src/o.ts",
+      "file-2.txt",
+      "file-4.txt",
+      "chunk-b.js",
+      "01/index.ts",
+      "README.md"
+    ],
+    ".next/**": [],
+    "plain/no-braces.txt": []
+  },
+  "fastGlob": {
+    "**/*.{ts,tsx,js,jsx,json,md,css}": [
+      "01/index.ts",
+      "02/index.ts",
+      "04/index.ts",
+      "README.md",
+      "apps/connect/src/c.ts",
+      "apps/other/src/o.ts",
+      "apps/vision/src/v.tsx",
+      "apps/wear/src/w.ts",
+      "chunk-a.js",
+      "chunk-b.js",
+      "chunk-d.js",
+      "data.json",
+      "node_modules/dep/index.ts",
+      "package.json",
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts",
+      "src/a/c/x.ts",
+      "src/app.tsx",
+      "src/b/d/y.ts",
+      "src/index.ts",
+      "src/util.js",
+      "styles/main.css",
+      "test/a.ts",
+      "test/deep/b.spec.ts"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts",
+      "src/a/c/x.ts",
+      "src/app.tsx",
+      "src/b/d/y.ts",
+      "src/index.ts"
+    ],
+    "src/**/*.test.{ts,tsx}": [
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts"
+    ],
+    "src/__tests__/**/*.test.{ts,tsx}": [
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts"
+    ],
+    "{src,test}/**/*.ts": [
+      "src/__tests__/index.test.ts",
+      "src/a/c/x.ts",
+      "src/b/d/y.ts",
+      "src/index.ts",
+      "test/a.ts",
+      "test/deep/b.spec.ts"
+    ],
+    "apps/{connect,vision,wear}/src/**/*.{ts,tsx}": [
+      "apps/connect/src/c.ts",
+      "apps/vision/src/v.tsx",
+      "apps/wear/src/w.ts"
+    ],
+    "**/*.{test,spec}.{ts,tsx}": [
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts",
+      "test/deep/b.spec.ts"
+    ],
+    "src/{a,b}/{c,d}/*.ts": [
+      "src/a/c/x.ts",
+      "src/b/d/y.ts"
+    ],
+    "file-{1..3}.txt": [
+      "file-1.txt",
+      "file-2.txt",
+      "file-3.txt"
+    ],
+    "chunk-{a..c}.js": [
+      "chunk-a.js",
+      "chunk-b.js"
+    ],
+    "{01..03}/index.ts": [
+      "01/index.ts",
+      "02/index.ts"
+    ],
+    "@(a|{b,c})/*.ts": [],
+    "!(node_modules)/**": [
+      ".hidden/x.ts",
+      ".next/cache.ts",
+      "01/index.ts",
+      "02/index.ts",
+      "04/index.ts",
+      "README.md",
+      "apps/connect/src/c.ts",
+      "apps/other/src/o.ts",
+      "apps/vision/src/v.tsx",
+      "apps/wear/src/w.ts",
+      "chunk-a.js",
+      "chunk-b.js",
+      "chunk-d.js",
+      "data.json",
+      "file-1.txt",
+      "file-2.txt",
+      "file-3.txt",
+      "file-4.txt",
+      "package.json",
+      "src/__tests__/app.test.tsx",
+      "src/__tests__/index.test.ts",
+      "src/a/c/x.ts",
+      "src/app.tsx",
+      "src/b/d/y.ts",
+      "src/index.ts",
+      "src/util.js",
+      "styles/main.css",
+      "test/a.ts",
+      "test/deep/b.spec.ts"
+    ],
+    ".next/**": [
+      ".next/cache.ts"
+    ],
+    "plain/no-braces.txt": [],
+    "(all, with negation)": [
+      "01/index.ts",
+      "02/index.ts",
+      "04/index.ts",
+      "apps/connect/src/c.ts",
+      "apps/other/src/o.ts",
+      "apps/vision/src/v.tsx",
+      "apps/wear/src/w.ts",
+      "src/a/c/x.ts",
+      "src/app.tsx",
+      "src/b/d/y.ts",
+      "src/index.ts",
+      "test/a.ts"
+    ]
+  }
+}
