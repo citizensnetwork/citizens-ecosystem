@@ -3,6 +3,10 @@
 module.exports = {
   MAX_LENGTH: 10000,
 
+  // Citizens patch (GHSA-vfj7-8cjw-p6xm): the most nested `{`/`(` blocks the parser accepts and the
+  // tree walkers (compile, expand, stringify) recurse into. See PATCHED.md.
+  MAX_DEPTH: 100,
+
   // Digits
   CHAR_0: '0', /* 0 */
   CHAR_9: '9', /* 9 */

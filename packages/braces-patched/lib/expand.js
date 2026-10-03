@@ -33,7 +33,13 @@ const append = (queue = '', stash = '', enclose = false) => {
 const expand = (ast, options = {}) => {
   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
 
-  const walk = (node, parent = {}) => {
+  // Citizens patch (GHSA-vfj7-8cjw-p6xm): `walk` recurses once per nested block. The parser already
+  // caps nesting, but an AST passed straight to braces.expand() never went through it.
+  const maxDepth = utils.maxDepth(options);
+
+  const walk = (node, parent = {}, depth = 0) => {
+    if (node.nodes && depth > maxDepth) throw utils.depthError('AST', depth, maxDepth);
+
     node.queue = [];
 
     let p = parent;
@@ -100,7 +106,7 @@ const expand = (ast, options = {}) => {
       }
 
       if (child.nodes) {
-        walk(child, node);
+        walk(child, node, depth + 1);
       }
     }
 

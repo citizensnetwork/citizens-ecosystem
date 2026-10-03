@@ -1,6 +1,7 @@
 'use strict';
 
 const stringify = require('./stringify');
+const utils = require('./utils');
 
 /**
  * Constants
@@ -38,6 +39,10 @@ const parse = (input, options = {}) => {
   if (input.length > max) {
     throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);
   }
+
+  // Citizens patch (GHSA-vfj7-8cjw-p6xm): the tree walkers recurse once per nested block, so bound
+  // how deep the blocks on `stack` (braces and parens alike) may nest while parsing.
+  const maxDepth = utils.maxDepth(opts);
 
   const ast = { type: 'root', input, nodes: [] };
   const stack = [ast];
@@ -143,6 +148,7 @@ const parse = (input, options = {}) => {
      */
 
     if (value === CHAR_LEFT_PARENTHESES) {
+      if (stack.length > maxDepth) throw utils.depthError('Input', stack.length, maxDepth);
       block = push({ type: 'paren', nodes: [] });
       stack.push(block);
       push({ type: 'text', value });
@@ -195,6 +201,7 @@ const parse = (input, options = {}) => {
      */
 
     if (value === CHAR_LEFT_CURLY_BRACE) {
+      if (stack.length > maxDepth) throw utils.depthError('Input', stack.length, maxDepth);
       depth++;
 
       const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;

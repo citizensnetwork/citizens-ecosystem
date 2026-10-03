@@ -1,5 +1,28 @@
 'use strict';
 
+const { MAX_DEPTH } = require('./constants');
+
+/**
+ * Citizens patch (GHSA-vfj7-8cjw-p6xm): the nesting limit in effect for `options`. It can only be
+ * lowered with `options.maxDepth`, never raised above MAX_DEPTH, so an options object cannot
+ * re-open the stack-exhaustion hole. Anything that is not a number >= 0 (NaN, negatives, strings)
+ * falls back to MAX_DEPTH rather than silently disabling the limit.
+ */
+
+exports.maxDepth = options => {
+  const requested = options && options.maxDepth;
+  return typeof requested === 'number' && requested >= 0 ? Math.min(MAX_DEPTH, requested) : MAX_DEPTH;
+};
+
+/**
+ * Citizens patch: the error thrown when a pattern (`what` = 'Input') or an AST handed to
+ * compile/expand/stringify (`what` = 'AST') nests deeper than the limit.
+ */
+
+exports.depthError = (what, depth, max) => {
+  return new SyntaxError(`${what} nesting depth (${depth}), exceeds max depth (${max})`);
+};
+
 exports.isInteger = num => {
   if (typeof num === 'number') {
     return Number.isInteger(num);

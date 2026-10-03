@@ -4,7 +4,13 @@ const fill = require('fill-range');
 const utils = require('./utils');
 
 const compile = (ast, options = {}) => {
-  const walk = (node, parent = {}) => {
+  // Citizens patch (GHSA-vfj7-8cjw-p6xm): `walk` recurses once per nested block. The parser already
+  // caps nesting, but an AST passed straight to braces.compile() never went through it.
+  const maxDepth = utils.maxDepth(options);
+
+  const walk = (node, parent = {}, depth = 0) => {
+    if (node.nodes && depth > maxDepth) throw utils.depthError('AST', depth, maxDepth);
+
     const invalidBlock = utils.isInvalidBrace(parent);
     const invalidNode = node.invalid === true && options.escapeInvalid === true;
     const invalid = invalidBlock === true || invalidNode === true;
@@ -47,7 +53,7 @@ const compile = (ast, options = {}) => {
 
     if (node.nodes) {
       for (const child of node.nodes) {
-        output += walk(child, node);
+        output += walk(child, node, depth + 1);
       }
     }
 
