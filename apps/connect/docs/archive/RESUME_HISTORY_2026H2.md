@@ -3864,3 +3864,16 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 - [docs/SHARED_DB_CONTRACT.md](docs/SHARED_DB_CONTRACT.md) — shared-project schema contract (head mig **171** live; next # = **172**; `public`/`vision`/`wear`).
 - [docs/strategy/ECOSYSTEM_DECISION_BRIEF.md](docs/strategy/ECOSYSTEM_DECISION_BRIEF.md) — **the ecosystem code progress plan** (single source of truth).
 - [docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md](docs/strategy/STEP3_WEAR_INTEGRATION_SCOPE.md) — Wear Phase 3 spec (**✅ complete — §3L**).
+
+---
+
+### RESUME_HERE §6 entries moved here on 2026-10-04 (verbatim)
+
+- **2026-09-27 — PR #70** (docs): brief for React-types alignment + the tag push (S2).
+- **2026-09-27 — PR #66, §3AT:** CDN tags hardened on all 3 apps (supabase-js pinned + SRI, React production
+  builds, both build-enforced). Flagged Wear's missing CSP (S1).
+- **2026-09-26/27 — PRs #67/#68, §3AS:** `public.profiles` PII lockdown, migs 174–177 (anon could read every
+  user's email). Column allowlist + server-owned-column guard. Found the real cause of the phantom
+  `react.cache` build error (pnpm hoisting).
+- **2026-09-26/27 — PRs #64/#65, §3AQ–§3AR:** production build fix; 26 OSV advisories fixed; a live CVSS-10
+  MapLibre XSS patched by vendoring v6.11.2.
