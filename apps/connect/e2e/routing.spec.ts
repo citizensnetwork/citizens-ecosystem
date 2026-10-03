@@ -465,12 +465,12 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     // Closing pops the panel's own history entry; that popstate must not be mistaken for a
     // screen change (which would reset the scroll to the top).
     await openDemo(page);
-    await page.goto("/discover");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible({ timeout: 15_000 });
+    await page.goto("/settings");
+    await expect(page.locator('[data-screen="settings"]')).toBeVisible({ timeout: 15_000 });
     const scrolled = () => page.evaluate(() => document.getElementById("main-scroll")?.scrollTop ?? -1);
     await page.evaluate(() => {
       const main = document.getElementById("main-scroll") as HTMLElement;
-      const pad = document.createElement("div"); // the demo list is short: make the screen tall enough to scroll
+      const pad = document.createElement("div"); // make the screen tall enough to scroll
       pad.style.height = "4000px";
       main.appendChild(pad);
       main.scrollTop = 600;
@@ -483,7 +483,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
     await page.waitForTimeout(400); // the panel's own history.back() settles
     expect(await scrolled()).toBeGreaterThan(500);
-    expect(path(page)).toBe("/discover");
+    expect(path(page)).toBe("/settings");
   });
 
   test("opening and closing a card twice never stacks entries or traps Back", async ({ page }) => {
