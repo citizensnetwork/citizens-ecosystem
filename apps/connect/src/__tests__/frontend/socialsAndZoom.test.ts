@@ -13,10 +13,7 @@
  *     an event is on the map at all. A silent off-by-one here empties the map.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-const APP_DIR = join(process.cwd(), "src/frontend/app");
+import { loadFrontend } from "./support/loadFrontend";
 
 type SocialPlatform = {
   key: string;
@@ -39,23 +36,6 @@ type MapZoom = {
   bandFor: (z: number) => string;
   hidden: (type: string, z: number, selected: boolean) => boolean;
 };
-
-/** Evaluate one frontend IIFE against a stub `window` and return that window. */
-function loadFrontend(file: string, win: Record<string, unknown> = {}) {
-  const src = readFileSync(join(APP_DIR, file), "utf8");
-  // Enough of React for a module body that only DESTRUCTURES hooks at load
-  // time; nothing here renders.
-  const React = {
-    createElement: () => null,
-    useRef: () => ({ current: null }),
-    useEffect: () => {},
-    useState: () => [undefined, () => {}],
-    useCallback: (f: unknown) => f,
-    Fragment: "Fragment",
-  };
-  new Function("window", "React", "document", src)(win, React, undefined);
-  return win as Record<string, unknown>;
-}
 
 let DATA: DataGlobal;
 let MAP_ZOOM: MapZoom;

@@ -100,6 +100,40 @@
     return endOfDay.getTime() < now;
   };
 
+  // ── Events and places: who may see a row? ────────────────────────────
+  //  store.jsx keeps ONE merged list per kind: the public feed (published rows
+  //  only, /api/v1) plus the signed-in owner's own rows of EVERY status (a direct
+  //  owner-scoped read, RLS allows it). These three helpers split that list back
+  //  into the two audiences, so a cancelled row can never reach the map, Kingdom
+  //  Discovery or any public list, and can never vanish from its owner's dashboard.
+  //  A row with no `status` (an optimistic local draft, the demo seed) is live.
+  const isPubliclyListed = (r) => !!r && (r.status || 'published') === 'published' && (r.visibility || 'public') === 'public';
+  const publicRows = (rows) => (rows || []).filter(isPubliclyListed);
+  // The owner's rows, whatever their status. No owner id means no rows, never "all rows".
+  const ownedRows = (rows, ownerId) => (ownerId ? (rows || []).filter((r) => r.organizerId === ownerId) : []);
+  // Fields that live on a row but arrive from other sources (map bubbles, the
+  // per-event counts), so a fresh read of the row must not zero them.
+  const KEEP_ON_MERGE = ['broadcast', 'connectCount', 'considerCount', 'viewCount'];
+  // Merge freshly read rows into the list by id: the fresh row wins, the KEEP_ON_MERGE
+  // fields of the row it replaces survive, rows the read did not mention stay, and new
+  // rows go in front (newest first, like a create). Returns `prev` untouched when
+  // there is nothing to merge, so React skips a pointless re-render.
+  const mergeRowsById = (prev, incoming) => {
+    if (!incoming || !incoming.length) return prev;
+    const fresh = new Map(incoming.map((r) => [r.id, r]));
+    const seen = new Set();
+    const merged = prev.map((old) => {
+      const row = fresh.get(old.id);
+      if (!row) return old;
+      seen.add(old.id);
+      const kept = {};
+      KEEP_ON_MERGE.forEach((k) => { if (old[k] != null && (row[k] == null || row[k] === 0)) kept[k] = old[k]; });
+      return { ...row, ...kept };
+    });
+    const added = incoming.filter((r) => !seen.has(r.id));
+    return added.length ? [...added, ...merged] : merged;
+  };
+
   // ── Social platforms an Event / Place / Contributor can publish ──────
   //  ONE table. The apply + onboarding + portal + create-listing inputs, the
   //  public profile chips, the map preview and the Kingdom Discovery card all
@@ -270,6 +304,10 @@
     getCategory,
     getItemCategory,
     isPastEvent,
+    isPubliclyListed,
+    publicRows,
+    ownedRows,
+    mergeRowsById,
     SOCIAL_PLATFORMS,
     SOCIAL_COLUMNS,
     getSocialPlatform,
