@@ -2,8 +2,9 @@
 
 // Regression tests for GHSA-vfj7-8cjw-p6xm (stack exhaustion on deeply nested patterns): the patch
 // caps nesting at MAX_DEPTH (100) and fails fast with a SyntaxError instead of a RangeError.
-// Pristine braces@3.0.3 threw "RangeError: Maximum call stack size exceeded" from expand() at a
-// nesting depth of about 3743 on Node 24 (about 3500 for compile() on the reporter's build).
+// Pristine braces@3.0.3 throws "RangeError: Maximum call stack size exceeded" for such a pattern. The
+// failing depth at the default stack is erratic (V8 JIT state; the reporter saw about 3500 for
+// compile() on Node 26), so the stack-safety tests below pin a small stack to be deterministic.
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

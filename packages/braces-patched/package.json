@@ -23,7 +23,8 @@
     "node": ">=8"
   },
   "scripts": {
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:coverage": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
     "fill-range": "^7.1.1"

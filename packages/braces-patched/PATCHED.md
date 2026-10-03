@@ -15,10 +15,12 @@ fixed version**, so there was nothing to bump to. Delete this package as soon as
 - Our only path to it is dev tooling: `eslint-config-next` / `@typescript-eslint/typescript-estree` ->
   `fast-glob` -> `micromatch@4.0.8` -> `braces`. Nothing ships to users. The CI's OSV-Scanner gate still
   blocks on it, and the founder chose to ship a fixed copy rather than renew a dated exception.
-- Reproduced here (Node 24.14, default stack): unpatched `expand()` throws `RangeError: Maximum call
-stack size exceeded` at a nesting depth of **3743** (about 7.5 k characters). `compile()` and
-  `stringify()` fail at the same kind of depth on a smaller stack or a different V8 build (the reporter
-  saw about 3500 for `compile()` on Node 26).
+- Reproduced here (Node 24.14): unpatched braces throws `RangeError: Maximum call stack size
+  exceeded` for a pattern under the length limit. At the default stack the failing depth is erratic (it
+  depends on V8's JIT state: one cold run survived depth 4500, a warmed-up process failed near 3750; the
+  reporter saw about 3500 for `compile()` on Node 26). With a fixed stack it is deterministic:
+  `node --stack-size=200` fails `braces('{'.repeat(2000) + 'a,b' + '}'.repeat(2000), { expand: true })`
+  every time (9003 characters), and the patched copy throws the `SyntaxError` below instead.
 
 ## What is this code
 
@@ -91,6 +93,9 @@ remains in pnpm's virtual store.
 pnpm --filter braces-patched test        # golden (identical behaviour), depth guard, integration
 pnpm why braces -r                       # every path ends in braces-patched / link
 ```
+
+CI's unit-test step runs `pnpm test:coverage`, so this package defines `test:coverage` as the same
+command as `test` (there is no coverage report); without it turbo would skip the suite in CI.
 
 To re-derive the comparison from scratch (needs `npm`; on Windows Git Bash add `--force-local` to tar):
 
