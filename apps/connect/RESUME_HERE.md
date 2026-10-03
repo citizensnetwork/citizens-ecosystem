@@ -49,10 +49,9 @@
 
 ## 2. Current state snapshot (verified 2026-09-27)
 
-- **`main` @ `abd0205`** (PRs #72–#74, 2026-09-27 overnight). Production READY on all three apps. No open
-  feature PRs, no open issues.
-- **Database head = migration 177** (`20260927184421 / 177_profiles_column_privacy_finalize`). **Next migration # = 178.**
-- **Security advisor baseline: 0 ERROR / 118 WARN / 3 INFO.** Every WARN is known and accepted: 105
+- **`main`** holds #78 (map preview, `bba102f`), #80 (handoff) and #81 (dated `braces` OSV exception); this PR (#79: admin Delete, migration 178, which is **already applied** to the live database) lands on top of them. Post-merge CI and the Vercel production deploys of the latest `main` were **not yet confirmed** when this was written: check them first (see §6, newest entries).
+- **Database head = migration 178** (`20261002231716 / 178_admin_remove_contributor_listing`). **Next migration # = 179.**
+- **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
   (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
   design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
@@ -62,14 +61,11 @@
   contributor digest, Vision MV refresh ×3, Vision daily snapshots, Vision advisory eval, live-location cleanup
   (every 15 min), impersonation expiry sweep (every 5 min).
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
-  map**) · 40 Places · 3 Events · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
+  map**) · 40 Places · 3 Events (**all in the past, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, map-preview PR):** Connect 852 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 30/30**.
-- **2026-10-02 map-preview PR (branch `claude/connect-map-preview-consistency`):** one preview card for every pin;
-  Contributors hide below zoom 6, names from 15 (founder D1/D2); org logos shown whole; finished events leave the
-  map/Discovery (`DATA.isPastEvent`); social values with spaces refused/dropped, SA WhatsApp → `27…`; one prod row
-  fixed. New pipeline items C11–C13. Full §6 write-up still to add (see the PR description).
+- **Tests (last full run, PR #79 merged with #78):** Connect 885 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
+  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 33/33**. (`frontend-build`'s "hashed outputs"
+  test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -93,7 +89,9 @@
   wipes `.next/types` mid-check. CI also runs **CodeQL** and a **blocking OSV-Scanner** (`osv-scanner.toml`'s
   baseline is empty: fix the dependency, don't baseline it). **New advisories can turn `main` red with no code
   change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
-  check the lockfile against OSV.dev before pushing.
+  check the lockfile against OSV.dev before pushing. **One dated exception exists:** `braces` 3.0.3
+  (GHSA-vfj7-8cjw-p6xm, dev tooling only, no fixed version on npm) is ignored in `osv-scanner.toml` until
+  **2026-11-02**, founder-approved 2026-10-03. Don't renew it silently or treat it as precedent; see item **H8**.
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
 - **Working from a sibling git worktree (parallel sessions):** `preview_start name=…` resolves
   `.claude/launch.json` from the *primary* checkout, so it serves the other session's files. Start your own
@@ -214,10 +212,21 @@ design session first.
 | C7 | Guest mode: Consider / Follow / Connect on a real listing silently does nothing after an optimistic UI flip. Add toast-and-revert (about 10 call sites). (§3AH) | P3 | S |
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
 | C9 | Small polish, founder's choice: Noir/dark landing variant (§3AJ) · step-level Back inside wizards (§3AN) · cover-photo reorder UI (§3AM) · enforce `p_status` inside `find_or_create_conversation` (§3E) · gallery images via the Form (logo and cover only today) · update the Drive field-spec doc (it still lists the 17 event categories) · label `docs/feature-clarity/*` as deferred (§3AD). | P3 | S each |
-| C10 | **Decision: Form approval when the owner email already has an account.** Today the intake refuses with a clear Note (`email_already_registered`: "sign in → Settings → Become a Contributor, or change the owner email"). Option: create the listing under a placeholder account and let the existing claim flow attach it on that person's next sign-in. That changes an existing person's account, and GoTrue's acceptance of the placeholder address needs a live check. (PR #73) | Parked | S–M |
+| C10 | **Verify-first attach for a Form approval whose owner email already has an account** (founder decided 2026-10-03; design below, nothing built). (PR #73) | P2 | M–L |
 | C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. Fix with the existing `from=` filter for the map/Discovery fetch plus an owner-scoped fetch for past and cancelled events (this overlaps **C1**: design them together). Today: 3 events, so not urgent. | P2 | M |
 | C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
+| C14 | **Wear's crown logo + loading splash in Connect** (founder request; spec below). | P3 | S |
+
+**C10 design (agreed 2026-10-03; nothing built yet).**
+- *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
+- *Flow:* on approving an existing-email row the listing goes **live now under a placeholder** (it needs an alias auth email, since emails are unique; GoTrue's acceptance of the alias needs a live check, and never mail it) with `contributor_claim_email` = the real owner email. The owner gets a different welcome email, signs in (the 6-digit code proves the inbox, or Google), and sees **"Attach 'X' to your account? [Confirm] [Not me]"**. Only Confirm runs the claim.
+- *Always* an explicit confirm, admin-created listings included: it replaces today's silent auto-claim (`store.jsx` `landOwnListing`). Make the claim RPC require `email_confirmed_at is not null`, and add a read-only `peek_claimable_listing()` for the confirm screen.
+- *Sheet:* the **database** holds the state. The Apps Script polls `POST /api/intake/google-form/status` (HMAC, like the intake route) about every 10 minutes and writes "Awaiting owner" / "Owner confirmed ✓" into the row's Status. The Sheet never triggers anything. Re-paste `intake.gs` after changing it.
+- *Process:* needs migration **179** (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). *Still to ask:* what happens if the owner ignores or declines (expiry? stays live as an unclaimed placeholder? tell the admin?). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md` and `intake-v2.gs`; they may overlap.
+
+**C14 spec (Wear's crown + loader in Connect).** Use Wear's PNG crown (`apps/wear/src/frontend/assets/citizens-crown.png`, 642×347, 127 KB: resize to about 240 px wide before copying) on the landing (replacing the line-art `CrownMark`; the founder's request supersedes design spec §01), on the sidebar brand tile (a gold PNG would vanish on the gold tile: use a paper/glass tile or the bare crown), and in a loading splash. Splash: an `authResolved` state in `store.jsx` (initially `!window.CC_AUTH || !likelySession()`, where likelySession = a `sb-*-auth-token` localStorage key or `code=` / `access_token=` in the URL; set true after the first `apply()` plus an 8 s safety timeout); `shell.jsx` shows it (landing wash + crown at about 56 px + a gold-topped ring spinner) while `!authed && !guestMode && !authResolved`. A signed-in user then never sees a landing flash, and a first-time visitor sees no splash. e2e: a delayed profile response shows the splash and no landing. Screenshots at 390 and 1280 px.
+
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -265,6 +274,7 @@ design session first.
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
 | H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
+| H8 | **Re-check `braces` GHSA-vfj7-8cjw-p6xm by 2026-11-02** (the dated OSV exception in `osv-scanner.toml`, §3 Process). Once npm ships a fixed `braces`, bump it via `pnpm.overrides`, delete the `[[IgnoredVulns]]` entry and restore the "baseline is empty" header; if there is still no fix, decide again with the founder. After that date CI goes red on this advisory if nothing was done. |
 
 ---
 
@@ -294,15 +304,32 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
+  intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
+  included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors
+  hide below zoom 6 (D1, his own answer), names from zoom 15 (D2). Org logos are shown whole (contain on white;
+  Individuals' photos still fill). Finished events leave the map and Discovery and sit under "Past events" on
+  the profile and dashboard (no end time ⇒ up for the rest of its day). A social value with spaces is a display
+  name: refused on dashboard/Apply/admin, dropped with a Note on the Form intake; local SA WhatsApp numbers
+  store as `27…`. The first Form submission's three bad socials were corrected with a guarded single-row UPDATE.
+  First-view framing is clamped and centred so nationally spread data can't open blank (e2e, mutation-checked).
+  Connect 852 unit, e2e 30/30, no migration. New items **C11–C13**. Not yet confirmed at write-up: post-merge CI
+  and the production deploys, and the founder's production re-check. **Start here:**
+  [`docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md`](docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md).
+  The original brief (`…MAP_PREVIEW_CONSISTENCY_HANDOFF.md`) stays untracked: it names a real organisation.
 - **2026-10-02 — Merged #71 and #75, fixed a red `main`, shipped email-code sign-in (C5).** #71 (`9eb727e`)
   and #75 (`b85f5ae`) merged. #75's Verify failed on the OSV gate only: 20 advisories published after 09-27
   (brace-expansion, js-yaml, undici, all dev/test-time) had turned `main` red since #71's merge; fixed by
   raising the `pnpm.overrides` floors in **#76** (`cb0a049`), checked against OSV.dev. **#77:** *Continue with
   email* on Connect's landing (6-digit code, `shouldCreateUser: true`): owners without Google (e.g. on Outlook)
   can finally reach their dashboard; guests are no longer dead-ended into Google; 40 unit + 6 e2e tests
-  (e2e 20/20). Open: founder steps **A10**, Vision port (**C5**), the C10 design discussion. Handoff:
-  `docs/handoffs/CONNECT_EMAIL_CODE_SIGNIN_AND_ADMIN_DELETE_HANDOFF.md` (kept untracked: it names a real
-  organisation, and this repo is public). No migration (next # still 178).
+  (e2e 20/20). **#79 (2026-10-03):** admin **Delete** on every Listings row. A listing is an account, so the
+  database decides from one fact (has the owner ever signed in?): never = the placeholder is hard-deleted;
+  signed in = only the listing goes and the person stays a citizen (their re-application would start
+  hidden). **Migration 178 applied** (one admin-only SECDEF function; probe-verified; advisors 0/119/3).
+  Route `/api/admin/contributors/delete-listing` (the old `/contributors/delete` discards applications).
+  Founder decisions on C10 recorded above. Open: founder steps **A10**, Vision port (**C5**), **C10**, **C14**.
+  The 2026-10-02 handoff stays untracked (it names a real organisation; this repo is public).
 - **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
   #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
   and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every
@@ -325,11 +352,9 @@ design session first.
   `react.cache` build error (pnpm hoisting).
 - **2026-09-26/27 — PRs #64/#65, §3AQ–§3AR:** production build fix; 26 OSV advisories fixed; a live CVSS-10
   MapLibre XSS patched by vendoring v6.11.2.
-- **2026-09-26 — PR #63, §3AP:** Google Form → map Contributor intake (mig 173, 12 Contributor types,
-  Individual kind, `/c/<slug>` links).
-- **2026-08-23 → 08-26 — §3AD–§3AO (PRs #40–#62):** Connect v1 re-scope, self-serve go-live, Kingdom
-  Discovery, contributor portal, guest landing, the production-500 root cause, Bearer-auth sweep, map pins
-  and labels, social parity.
+- **Earlier (2026-08-23 → 09-26, PRs #40–#63):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
+  contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
+  Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
 
 ---
 

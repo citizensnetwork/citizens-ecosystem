@@ -207,6 +207,20 @@ sign-in"). **Hide** (then **Confirm hide**) takes a listing off the map and King
 everyone; nothing is deleted, and **Unhide** puts it straight back. Use it for an approval you
 regret, or for the Phase 6 test listing once you've checked it.
 
+**Delete** removes a listing for good. A listing is really a user account, so what Delete does
+depends on one fact, and the app works it out and tells you before you confirm (you type the
+listing's name to enable the button):
+
+| The owner has… | Delete does |
+|---|---|
+| **never signed in** (an intake or Admin-Create placeholder, "Awaiting owner sign-in") | Removes it permanently, with everything attached to it (events, places, news posts, uploaded images). |
+| **signed in at least once** (a real person) | Removes only the **listing**: their Contributor profile, events, places, news posts and team go, but they **keep their citizen account** and can sign in and apply again. A new listing would start **hidden** until you unhide it in Listings. |
+
+Delete **refuses** (and says why) for an admin, for your own account, and for anyone who owns a
+Citizens Wear brand or has Citizens Vision data; use **Hide** for those. Every delete is written to
+the admin audit log. Use Hide when you only want something off the map for now, and Delete for test,
+duplicate or bad listings.
+
 ## Privacy (POPIA)
 
 The Sheet holds applicants' personal details (names, phone numbers, emails). Keep it shared with as

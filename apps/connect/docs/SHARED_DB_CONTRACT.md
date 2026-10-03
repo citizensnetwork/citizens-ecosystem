@@ -63,6 +63,13 @@ through the **versioned, rate-limited, API-key-capable** HTTP API — never Post
   in `docs/api-v1.md` in the same change**. An undocumented endpoint is not part of the contract.
 - **R2.4** Auth tiers: anonymous (IP rate-limited) or API key (`cck_live_…`, minted via
   `create_api_key`, scoped, revocable). The gate is `v1Gate` / `api_keys`.
+- **R2.5** *(mig 178)* One deliberate, narrow exception to "never read a sibling's tables":
+  `admin_remove_contributor_listing()` (SECDEF, admin only) reads **ownership only**
+  (`wear.brands.owner_user_id`, `vision.organisations.created_by`, and the Vision `created_by` /
+  `claimed_by` / partnership columns whose FKs into `auth.users` are NO ACTION) so Admin → Listings
+  can refuse to delete or demote an account that Wear or Vision depend on. It is a deletion-safety
+  check, not a data feature: the only thing it returns is a blocker name. Don't copy the pattern for
+  anything that moves data.
 
 Current v1 surface (see `docs/api-v1.md` for full shapes): `contributors`,
 `contributors/{slug}`, `contributors/{slug}/stats`, `events`, `events/{id}`, `categories`,
@@ -206,7 +213,20 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 
 ---
 
-## 9. Verification snapshot (updated 2026-09-27, project `xyiajtrvhlxaeplsiajj`, head = **mig 177**)
+## 9. Verification snapshot (updated 2026-10-03, project `xyiajtrvhlxaeplsiajj`, head = **mig 178**)
+
+> **2026-10-03: mig 178 (`admin_remove_contributor_listing`) APPLIED to prod** (version
+> `20261002231716`; pre-apply tag `connect-pre-mig178-admin-remove-listing` → `82e4dff`;
+> founder-approved in chat). ONE new SECURITY DEFINER function behind Admin → Listings → **Delete**:
+> admin-only (`auth.uid() is null or not is_admin()` guard, `search_path=''`, anon/public revoked,
+> authenticated granted), runs on the admin's own session. A never-signed-in placeholder is
+> hard-deleted; a real account keeps the person and loses only the listing; the audit row commits in
+> the same transaction. Refuses an admin, the caller, a non-listing, a Wear brand owner and Vision
+> data (ownership reads only: **R2.5**). Verified: a rollback-only probe of the exact SQL against the
+> live schema (18 scenarios, zero residue; it caught a `text[] || 'literal'` bug before apply), then
+> the post-apply catalog check and a smoke call (no login → `not_admin`, admin + unknown id →
+> `not_found`). **Advisors: 0 ERROR / 119 WARN / 3 INFO**: the previous baseline plus exactly the one
+> expected WARN (authenticated SECURITY DEFINER EXECUTE 105 → 106). **Next migration # = 179.**
 
 > **2026-09-27: mig 177 (`profiles_column_privacy_finalize`) APPLIED — the lockdown is complete.**
 > Applied only after PR #67 (merge `6836180`) was deployed to production (`dpl_CY4ZnD47…`, READY on
