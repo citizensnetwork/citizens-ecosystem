@@ -14,6 +14,49 @@
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const isRealId = (id) => typeof id === 'string' && UUID_RE.test(id);
 
+  // The route table (routes.jsx) is the one place that knows which URL belongs to
+  // which screen; nothing here writes a path string by hand.
+  const ROUTES = window.CC_ROUTES;
+  const HOME_NAV = { page: 'home', params: {} };
+  // JSON-safe copy of a nav for history.state (pushState structured-clones it).
+  const plainNav = (n) => {
+    try { return { page: n.page, params: JSON.parse(JSON.stringify(n.params || {})) }; } catch (e) { return HOME_NAV; }
+  };
+  // Where the address bar says we are on page load (a deep link, or a refresh), plus
+  // the history.state we stamped on this entry if it is a reload of a screen we opened.
+  function readBootRoute() {
+    try {
+      const r = ROUTES.navFromPath(window.location.pathname, window.location.search);
+      const st = window.history && window.history.state;
+      return { ...r, state: st && st.cc ? st : null };
+    } catch (e) {
+      return { ok: true, nav: HOME_NAV, canonical: '/', legacy: false, state: null };
+    }
+  }
+  // After a Google sign-in the browser comes back to the site ROOT (a fixed,
+  // allow-listed redirect). The screen the person was on is carried across in
+  // sessionStorage, written by stashReturnPath() and read ONCE by takeReturnPath().
+  // Both ends go through routes.jsx safeReturnPath, so only a known app path (never
+  // a host, scheme or query string) can ever come back out.
+  const RETURN_KEY = 'cc_return_to';
+  const RETURN_MAX_AGE_MS = 60 * 60 * 1000;
+  function stashReturnPath() {
+    try {
+      const path = ROUTES.safeReturnPath(window.location.pathname + window.location.search);
+      if (path && path !== '/') sessionStorage.setItem(RETURN_KEY, JSON.stringify({ p: path, t: Date.now() }));
+      else sessionStorage.removeItem(RETURN_KEY);
+    } catch (e) { /* storage blocked: we just land on the map after sign-in */ }
+  }
+  function takeReturnPath() {
+    try {
+      const raw = sessionStorage.getItem(RETURN_KEY);
+      sessionStorage.removeItem(RETURN_KEY);
+      const v = raw ? JSON.parse(raw) : null;
+      if (!v || typeof v.t !== 'number' || Date.now() - v.t > RETURN_MAX_AGE_MS) return null;
+      return ROUTES.safeReturnPath(v.p);
+    } catch (e) { return null; }
+  }
+
   // Authenticated cross-origin fetch to the API. The static frontend's Supabase
   // session lives in localStorage (no cookie), so authenticated mutations must
   // carry the access token as a Bearer header (see src/lib/supabase/route.ts).
@@ -514,7 +557,11 @@
     // flips. Demo mode (no CC_AUTH) and first-time visitors start resolved.
     const [authResolved, setAuthResolved] = useState(() => !window.CC_AUTH || !likelySession());
     const [role, setRole] = useState(_saved && _saved.role ? _saved.role : 'citizen');
-    const [nav, setNav] = useState({ page: 'home', params: {} });
+    // Read the address bar once, before the first render, so a deep link or a
+    // refresh opens the right screen straight away (no flash of the map).
+    const boot = useRef(null);
+    if (boot.current === null) boot.current = readBootRoute();
+    const [nav, setNav] = useState(boot.current.nav);
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
     const [createEditing, setCreateEditing] = useState(null); // null | the existing event/place object being edited
     const [creationStyle, setCreationStyle] = useState('sheet'); // sheet | modal | side  (tweakable)
@@ -531,6 +578,11 @@
     const [placeRows, setPlaces] = useState(() => DATA.places.map((p) => ({ ...p })));
     const events = useMemo(() => DATA.publicRows(eventRows), [eventRows]);
     const places = useMemo(() => DATA.publicRows(placeRows), [placeRows]);
+    // Which loads have finished (success or not), so a deep-linked page can tell
+    // "still loading" from "not found" (see entityStatus).
+    const [feedsSettled, setFeedsSettled] = useState({ events: false, places: false, contributors: false });
+    const [ownerRowsSettled, setOwnerRowsSettled] = useState(false);
+    const [entityLookup, setEntityLookup] = useState({});
     const [contributors, setContributors] = useState(() => DATA.contributors.map((c) => ({ ...c })));
     const [applications, setApplications] = useState(() => DATA.applications.map((a) => ({ ...a })));
     const [conversations, setConversations] = useState(() => DATA.conversations.map((c) => ({ ...c, messages: c.messages.slice() })));
@@ -576,31 +628,97 @@
     // window.CC_AUTH is null there, so this guard never fires.
     const AUTH_REQUIRED_PAGES = new Set(['apply', 'onboarding']);
 
-    // ── In-app back stack (hardware / browser Back) ──────────────────
-    //  Connect lives on ONE URL, so with no history of its own an Android
-    //  Back press pops the *browser's* entry and leaves the app entirely
-    //  (founder report). We keep our own stack of {page,params} plus a LIFO
-    //  registry of "back guards" (whatever overlay is currently open), and
-    //  translate one Back press into: close the topmost overlay → else pop
-    //  one screen → else genuinely leave. Capped so a long session can't
-    //  grow it without bound.
-    const NAV_STACK_MAX = 40;
-    const navStack = useRef([{ page: 'home', params: {} }]);
+    // ── Navigation = the browser's own history ───────────────────────────
+    //  Every screen has a real URL (routes.jsx), so the browser's stack does the
+    //  work: go() pushes an entry, Back/Forward walk them (popstate, below), a
+    //  refresh reopens the same screen, a link can be shared. history.state carries
+    //  { cc, idx, nav }: idx is our depth (0 = the entry the person arrived on, which
+    //  IS the first screen), nav lets Back restore a screen exactly, params and all.
+    //  What the browser cannot see are OVERLAYS (preview card, menus, the create
+    //  sheet): each registers a "back guard", which pushes one { guard: true } entry
+    //  at the moment the overlay opens, so Back pops that entry and closes the overlay
+    //  instead of moving the screen (see registerBackGuard and the popstate handler).
+    //  RULE: an entry is only ever pushed inside a tap (go(), or a guard right after
+    //  the tap that opened an overlay), never on page load and never from popstate.
+    //  Chrome (Android) skips entries a page added without a user gesture when Back
+    //  is pressed, which made Back leave Connect altogether (founder, 2026-10-03).
+    const histIdx = useRef(0);
+    const selfPops = useRef(0); // history.back() calls we made ourselves; popstate ignores them
+    const navRef = useRef(nav);
     const backGuards = useRef([]);
+    const contributorsRef = useRef(contributors);
+    contributorsRef.current = contributors;
+    const canHistory = () => !!(window.history && window.history.pushState);
     const sameNav = (a, b) => {
       if (!a || a.page !== b.page) return false;
       const ka = Object.keys(a.params || {}), kb = Object.keys(b.params || {});
       return ka.length === kb.length && ka.every((k) => a.params[k] === b.params[k]);
     };
+    // The address for a screen; null when it has none (an entity id that is not a
+    // UUID, which only demo data has). A Contributor's id becomes its /c/<slug> link.
+    const pathOf = useCallback((n) => ROUTES.pathFor(n, {
+      slugFor: (id) => { const c = contributorsRef.current.find((x) => x.id === id); return c && c.slug ? c.slug : null; },
+    }), []);
+    // Write `next` into history: pushState for a new screen, replaceState for a
+    // replace / the same screen again (no duplicate entries). Never throws.
+    // An overlay's guard entry on top is only a copy of the screen under it, so moving
+    // on REPLACES it instead of stacking on it (no leftover entry, one Back per screen).
+    const writeHistory = useCallback((next, replace) => {
+      if (!canHistory()) return;
+      const path = pathOf(next);
+      const url = path !== null ? path : window.location.pathname + window.location.search;
+      try {
+        const cur = window.history.state;
+        const onGuard = !!(cur && cur.cc && cur.guard);
+        if (replace || onGuard) {
+          const state = { cc: 1, idx: histIdx.current, nav: plainNav(next) };
+          if (onGuard && sameNav(cur.nav, state.nav)) state.guard = true; // same screen: the overlay is still open
+          window.history.replaceState(state, '', url);
+        } else {
+          window.history.pushState({ cc: 1, idx: histIdx.current + 1, nav: plainNav(next) }, '', url);
+          histIdx.current += 1;
+        }
+      } catch (e) { /* pushState is rate-limited in some webviews; the screen still changes */ }
+    }, [pathOf]);
 
-    // An open overlay registers here so Back dismisses it before it moves
-    // the app off the current screen. Returns its own unregister function —
-    // an overlay closed by its × / backdrop simply unregisters, no history
-    // bookkeeping needed (the web trap below re-arms on every press).
+    // An open overlay registers here so Back dismisses it before it moves the app off
+    // the current screen. This runs right after the tap that opened the overlay, so the
+    // entry it pushes counts as user-initiated. Returns the unregister function.
+    const ownsTopEntry = () => backGuards.current.some((g) => g.idx === histIdx.current);
     const registerBackGuard = useCallback((close) => {
-      const entry = { close };
+      const entry = { close, idx: -1 };
       backGuards.current.push(entry);
-      return () => { backGuards.current = backGuards.current.filter((g) => g !== entry); };
+      if (canHistory()) {
+        try {
+          const cur = window.history.state;
+          if (cur && cur.cc && cur.guard && !ownsTopEntry() && sameNav(cur.nav, plainNav(navRef.current))) {
+            // An overlay that is being replaced by another (same commit: its cleanup has
+            // run, its pop is still pending) left its entry on top: take it over.
+            entry.idx = histIdx.current;
+          } else {
+            window.history.pushState(
+              { cc: 1, idx: histIdx.current + 1, nav: plainNav(navRef.current), guard: true }, '',
+              window.location.pathname + window.location.search + window.location.hash);
+            histIdx.current += 1;
+            entry.idx = histIdx.current;
+          }
+        } catch (e) { /* no entry: Back then moves the screen as well as closing the overlay */ }
+      }
+      return () => {
+        backGuards.current = backGuards.current.filter((g) => g !== entry);
+        // Closed by a button or a tap outside (not by Back): take our entry back off the
+        // stack. Deferred to the end of the current task so a replacement overlay can adopt
+        // it first (history.back() is asynchronous, a pushState is not), and only while it
+        // is still the top entry and nobody owns it. If the person moved on, writeHistory
+        // already replaced it; if Back popped it, histIdx has moved below it.
+        Promise.resolve().then(() => {
+          const cur = canHistory() ? window.history.state : null;
+          if (entry.idx !== -1 && entry.idx === histIdx.current && cur && cur.guard && !ownsTopEntry()) {
+            selfPops.current += 1;
+            window.history.back();
+          }
+        });
+      };
     }, []);
 
     const scrollTop = () => {
@@ -608,48 +726,45 @@
       if (main) main.scrollTop = 0;
     };
 
+    const commitNav = useCallback((next, replace, scroll) => {
+      const same = sameNav(navRef.current, next);
+      navRef.current = next;
+      setNav(next);
+      writeHistory(next, replace || same);
+      if (scroll) scrollTop();
+    }, [writeHistory]);
+
     const go = useCallback((page, params = {}, opts) => {
       if (AUTH_REQUIRED_PAGES.has(page) && !realUser && window.CC_AUTH) {
         showSignIn();
         return;
       }
-      const st = navStack.current;
-      const next = { page, params };
-      if (opts && opts.replace) st[st.length - 1] = next;
-      else if (!sameNav(st[st.length - 1], next)) {
-        st.push(next);
-        if (st.length > NAV_STACK_MAX) st.shift();
-      }
-      setNav(next);
-      scrollTop();
-    }, [realUser]);
+      commitNav({ page, params }, !!(opts && opts.replace), !(opts && opts.keepScroll));
+    }, [realUser, commitNav]);
 
-    // Hard reset of the stack — for transitions where "back" must NOT lead
-    // into the previous session's screens (sign-out, post-auth routing, a
-    // /dashboard deep link landing).
+    // Hard reset: the address is REPLACED, not pushed — for transitions where the
+    // screen we were on must not be a Back away (sign-out, post-auth routing, a
+    // deep link landing on a screen the person may not have).
     const resetNav = useCallback((page, params = {}) => {
-      navStack.current = [{ page, params }];
-      setNav({ page, params });
-      scrollTop();
-    }, []);
+      commitNav({ page, params }, true, true);
+    }, [commitNav]);
 
-    // One Back press. Returns false only when there is genuinely nothing
-    // left to dismiss — the caller then lets the platform leave the app.
+    // One Back press from the platform's own button (Capacitor). Returns false only
+    // when there is genuinely nothing left to dismiss, and the caller then exits.
+    // The browser's Back button never comes through here: popstate handles it. Closing
+    // the overlay unregisters its guard, which pops the guard's own history entry.
     const handleBack = useCallback(() => {
       const guards = backGuards.current;
       if (guards.length) {
         const g = guards[guards.length - 1];
-        backGuards.current = guards.slice(0, -1);
         try { g.close(); } catch (e) { /* a closed overlay is still handled */ }
+        // If close() did not unmount it (a stale guard), drop it ourselves.
+        backGuards.current = backGuards.current.filter((x) => x !== g);
         return true;
       }
-      const st = navStack.current;
-      if (st.length < 2) return false;
-      st.pop();
-      const prev = st[st.length - 1];
-      setNav({ page: prev.page, params: prev.params });
-      scrollTop();
-      return true;
+      // idx 0 is the entry the person arrived on, i.e. the first screen.
+      if (canHistory() && histIdx.current > 0) { window.history.back(); return true; }
+      return false;
     }, []);
 
     // "Browse as Guest" — dismiss the landing screen without signing in.
@@ -659,8 +774,11 @@
     // cleanly from guest → real session without a stale guest flag lingering.
     const browseAsGuest = useCallback(() => {
       try { sessionStorage.setItem(GUEST_KEY, '1'); } catch (e) {}
+      // A link to a signed-in-only screen (/messages, /dashboard...) shows the sign-in
+      // landing; choosing "browse as guest" there must land on the map, not that screen.
+      if (window.CC_AUTH && ROUTES.accessFor(navRef.current) !== 'public') commitNav(HOME_NAV, true, true);
       setGuestMode(true);
-    }, []);
+    }, [commitNav]);
     // The way back: leave guest browsing and show the landing screen, where
     // every way in lives (Google, emailed code). In-app "sign in" prompts use
     // this rather than jumping straight to Google, so a person without a Google
@@ -673,6 +791,47 @@
     // opens the same sheet pre-filled to edit that record.
     const openCreate = useCallback((kind, record) => { setCreateEditing(record || null); setCreateKind(kind); }, []);
     const closeCreate = useCallback(() => { setCreateKind(null); setCreateEditing(null); }, []);
+
+    // ── Settle the screen the ADDRESS named against who the person is ─────────
+    //  Only for screens reached by URL (a deep link, a refresh, Back/Forward): in-app
+    //  go() keeps its own rules. The URL grants nothing; this just routes sensibly and
+    //  the real walls (RLS, the admin/RPC guards) stay where they were:
+    //    signed-in-only screen, signed out -> the sign-in landing, and the screen is KEPT
+    //      so signing in lands right on it (email code: same page; Google: the stashed path)
+    //    /dashboard, not a Contributor     -> the Become-a-Contributor nudge (an admin: /admin)
+    //    /admin, not an admin              -> the map
+    const gatePending = useRef(ROUTES.accessFor(boot.current.nav) !== 'public');
+    const authRef = useRef({ authed, role, guest: guestMode });
+    authRef.current = { authed, role, guest: guestMode };
+    const settleRoute = useCallback((facts) => {
+      if (!gatePending.current || !window.CC_AUTH) return;
+      const n = navRef.current;
+      const need = ROUTES.accessFor(n);
+      if (need === 'public') { gatePending.current = false; return; }
+      if (!facts.authed) {
+        if (facts.guest) showSignIn();
+        return; // keep waiting: the landing is showing and the screen is kept
+      }
+      gatePending.current = false;
+      if (need === 'contributor' && facts.role !== 'contributor') {
+        if (facts.role === 'admin') resetNav('admin');
+        else { resetNav('apply'); toast('Become a Contributor to unlock your portal.', 'gold'); }
+      } else if (need === 'admin' && facts.role !== 'admin') {
+        resetNav('home');
+        toast('That page is for admins.', 'red');
+      }
+    }, [resetNav, showSignIn, toast]);
+
+    // Back from Google: we are on the site root; carry on to the screen the person
+    // was on when they tapped sign-in (stashReturnPath). A deep link in the address bar wins.
+    const restoreReturnPath = useCallback(() => {
+      const rt = takeReturnPath();
+      if (!rt || window.location.pathname !== '/' || navRef.current.page !== 'home') return;
+      const r = ROUTES.navFromPath(rt, '');
+      if (!r.ok || sameNav(r.nav, HOME_NAV)) return;
+      commitNav(r.nav, true, true);
+      gatePending.current = ROUTES.accessFor(r.nav) !== 'public';
+    }, [commitNav]);
 
     // active org the contributor manages: their real org (signed-in
     // contributor), an assist-mode/freshly-onboarded org, else demo Grace City.
@@ -1869,6 +2028,7 @@
         // Returned so callers (e.g. the landing screen's button) can reset
         // their own loading state in a .finally() \u2014 this never rejects, it
         // always resolves once the redirect attempt is settled either way.
+        stashReturnPath(); // Google returns to the site root; remember the screen
         return window.CC_AUTH.signInWithGoogle(intent).catch((e) => {
           console.error('[signIn]', e);
           toast('Sign-in failed \u2014 please try again.', 'red');
@@ -1886,9 +2046,11 @@
     // message, so these just hand the promise through. Success needs no follow-up
     // here: supabase-js fires SIGNED_IN and the bootstrap effect below resolves
     // the profile + role (and an owner's listing landing), exactly as for Google.
-    const sendEmailCode = useCallback((email) => (
-      window.CC_AUTH ? window.CC_AUTH.sendEmailCode(email) : Promise.reject(new Error('Sign-in is not configured.'))
-    ), []);
+    const sendEmailCode = useCallback((email) => {
+      if (!window.CC_AUTH) return Promise.reject(new Error('Sign-in is not configured.'));
+      stashReturnPath(); // the emailed link (a fallback to the code) returns to the site root
+      return window.CC_AUTH.sendEmailCode(email);
+    }, []);
     const verifyEmailCode = useCallback((email, token) => (
       window.CC_AUTH ? window.CC_AUTH.verifyEmailCode(email, token) : Promise.reject(new Error('Sign-in is not configured.'))
     ), []);
@@ -1905,6 +2067,7 @@
       resetNav('home');
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
       try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
+      try { sessionStorage.removeItem(RETURN_KEY); } catch (e) {}
     }, [resetNav]);
 
     // ── real Supabase session bootstrap (no-op in demo mode) ──
@@ -1913,25 +2076,12 @@
     useEffect(() => {
       if (!window.CC_AUTH) return;
       let active = true;
-      // The Contributor portal has a real, bookmarkable URL — "/dashboard"
-      // (see next.config.ts rewrites). Handle it once per page load, right
-      // after the session/role resolves: a genuine contributor lands on
-      // their Dashboard directly; anyone else is nudged to apply instead of
-      // seeing a blank/inaccessible page. Guarded so a later auth event
-      // (e.g. a token refresh) doesn't keep yanking the user back here after
-      // they've navigated elsewhere in the SPA.
-      let deepLinkHandled = false;
-      const handleDashboardDeepLink = (resolvedRole) => {
-        if (deepLinkHandled) return;
-        if (!/^\/dashboard(\/|$)/.test(window.location.pathname)) return;
-        deepLinkHandled = true;
-        if (resolvedRole === 'contributor') {
-          resetNav('dashboard');
-        } else {
-          resetNav('apply');
-          toast('Become a Contributor to unlock your portal.', 'gold');
-        }
-      };
+      // Every screen has a real URL, so a deep link (/dashboard/events, /admin, ...)
+      // has already opened its screen (the nav state starts from the address bar).
+      // Once the session and role resolve, settleRoute() checks that the person may
+      // be there: a Contributor stays on their Dashboard, anyone else is nudged to
+      // apply. It runs once per URL-originated screen (gatePending), so a later auth
+      // event (a token refresh) never yanks the person back.
       // Owners of a listing made FOR them (Google Form intake, or admin
       // Create) land on their own dashboard the first time they sign in —
       // once per browser session, best-effort (the account menu's "Claim a
@@ -1957,6 +2107,8 @@
             }
           } else if (s.role === 'citizen' && s.contributorStatus === 'not_applied') {
             const res = await authedFetch('/api/contributor/claim', { method: 'POST' });
+            // A full load, on purpose: the claim just changed this account's role in the
+            // database, and the whole app (role, listing, menus) re-reads it on a fresh load.
             if (active && res.ok) window.location.href = '/dashboard';
           }
         } catch (e) { /* best-effort */ }
@@ -1970,7 +2122,10 @@
             setAuthed(true);
             setRole(s.role || 'citizen');
             if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
-            else handleDashboardDeepLink(s.role || 'citizen');
+            else {
+              restoreReturnPath();
+              settleRoute({ authed: true, role: s.role || 'citizen' });
+            }
             landOwnListing(s);
           } else {
             setRealUser(null);
@@ -2239,8 +2394,6 @@
     //  Own inserts are skipped; for messages in other conversations the unread
     //  badge increments and the preview line updates without a page refresh.
     //  Uses a navRef so the subscription outlives navigation changes.
-    const navRef = React.useRef(nav);
-    React.useEffect(() => { navRef.current = nav; }, [nav]);
     useEffect(() => {
       const sb = window.CC_SUPABASE;
       if (!sb || !realUser) return;
@@ -2285,7 +2438,7 @@
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptEvent);
           if (active) setEvents((prev) => DATA.mergeRowsById(prev, adapted));
-        } catch (e) { console.warn('[events] live fetch failed', e); }
+        } catch (e) { console.warn('[events] live fetch failed', e); } finally { setFeedsSettled((f) => ({ ...f, events: true })); }
       })();
 
       // 1b) Real places at real coordinates (NOT NULL lat/lng → anchor directly).
@@ -2296,7 +2449,7 @@
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptPlace);
           if (active) setPlaces((prev) => DATA.mergeRowsById(prev, adapted));
-        } catch (e) { console.warn('[places] live fetch failed', e); }
+        } catch (e) { console.warn('[places] live fetch failed', e); } finally { setFeedsSettled((f) => ({ ...f, places: true })); }
       })();
 
       // 2) Real Contributors — merge into the directory so real events/places
@@ -2314,7 +2467,7 @@
             adapted.forEach((c) => byId.set(c.id, c));
             return [...byId.values()];
           });
-        } catch (e) { /* directory is optional — org falls back to its name */ }
+        } catch (e) { /* directory is optional — org falls back to its name */ } finally { setFeedsSettled((f) => ({ ...f, contributors: true })); }
       })();
 
       // 3) Active map bubbles (anon RPC) — attach to whatever events are loaded.
@@ -2349,6 +2502,7 @@
       const sb = window.CC_SUPABASE;
       if (!sb || !ownerId) return undefined;
       let active = true;
+      setOwnerRowsSettled(false);
       (async () => {
         try {
           const [ev, pl] = await Promise.all([
@@ -2364,40 +2518,10 @@
             setPlaces((prev) => DATA.mergeRowsById(prev, (pl.data || []).map((r) =>
               adaptPlace({ ...r, category: r.categories ? r.categories.slug : null }))));
           }
-        } catch (e) { console.warn('[owner rows] read failed', e); }
+        } catch (e) { console.warn('[owner rows] read failed', e); } finally { if (active) setOwnerRowsSettled(true); }
       })();
       return () => { active = false; };
     }, [ownerId]);
-
-    // ── Public listing link: /c/<slug> ──────────────────────────────
-    //  The shareable Contributor URL (the Google Form intake's welcome email
-    //  and the Sheet's "Listing URL"). next.config.ts redirects /c/:slug to
-    //  /index.html?c=<slug>; the slug is resolved directly (so it works
-    //  beyond the directory's first page) and its profile opens with
-    //  Discover beneath it, so Back stays inside Connect. Someone following a
-    //  shared link sees the listing as a guest instead of the sign-in screen.
-    useEffect(() => {
-      let slug = null;
-      try { slug = new URLSearchParams(window.location.search).get('c'); } catch (e) { /* no listing link */ }
-      if (!slug || !/^[a-z0-9-]{1,120}$/.test(slug)) return undefined;
-      let active = true;
-      (async () => {
-        let listing = null;
-        try {
-          const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
-          const res = await fetch(base + '/api/v1/contributors/' + slug);
-          const json = res.ok ? await res.json() : null;
-          if (json && json.data && json.data.profile) listing = adaptContributor(json.data.profile);
-        } catch (e) { /* reported below */ }
-        if (!active) return;
-        if (!listing) { toast('That Contributor listing could not be found.', 'red'); return; }
-        setContributors((prev) => [...prev.filter((c) => c.id !== listing.id), listing]);
-        if (!authed) browseAsGuest();
-        resetNav('home');
-        go('profile', { id: listing.id });
-      })();
-      return () => { active = false; };
-    }, []);
 
     // Admin Listings tab: reflect a hide/unhide on this admin's own map and
     // Kingdom Discovery straight away (everyone else's next
@@ -2438,6 +2562,22 @@
     // Reflect a freshly-uploaded avatar immediately (header + profile). The
     // /api/avatar route already persisted it to profiles.avatar_url, so this is
     // just the optimistic in-session overlay for citizen/admin. No-op in demo mode.
+    // Copy (or, on a phone, hand to the share sheet) the real address of a screen. The
+    // native shell's own origin is not a web address, so it shares the public site.
+    const shareLink = useCallback(async (n) => {
+      const path = pathOf(n || navRef.current);
+      if (path === null) { toast('This page has no shareable link yet.', 'red'); return; }
+      const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+      const url = (isNative ? 'https://www.citizenscentral.co.za' : window.location.origin) + path;
+      try {
+        if (navigator.share && /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent)) { await navigator.share({ url }); return; }
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // the person closed the share sheet
+      }
+      try { await navigator.clipboard.writeText(url); toast('Link copied', 'gold'); }
+      catch (e) { toast('Copy this link: ' + url, 'gold'); }
+    }, [pathOf, toast]);
+
     const updateAvatar = useCallback((url) => {
       setRealUser((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
     }, []);
@@ -2499,53 +2639,220 @@
       })();
     }, [realUser, toast]);
 
-    // ── Platform Back button → handleBack() ─────────────────────────
-    //  Native (Capacitor/Android): registering a 'backButton' listener
-    //  overrides Capacitor's default (history.back(), else exit), so the
-    //  whole decision is ours — including exitApp() when nothing is left.
-    //  Web (incl. Chrome on Android, which is where the founder hit this):
-    //  keep exactly ONE spare history entry armed. A Back press pops that
-    //  entry instead of the page; we act in-app and immediately re-arm.
-    //  Only when handleBack() reports nothing left do we stand down and let
-    //  the browser really navigate away.
+    // ── Browser Back / Forward (popstate) ───────────────────────────────
+    //  The browser's own stack walks the screens now. Cases, in order:
+    //   0. A history.back() we made ourselves (an overlay closed by a button popped its
+    //      own guard entry): nothing to do but note where we are.
+    //   1. Back with an overlay open: its guard entry was just popped, so close the
+    //      overlay and stay on the screen. Nothing is pushed back (see the RULE above).
+    //   2. We landed on a guard entry no open overlay owns (a leftover: an overlay under
+    //      another one was closed first). Going Back, step over it, since it is only a copy
+    //      of the screen below it; going Forward, make it an ordinary entry.
+    //   3. A screen: restore it exactly (history.state.nav), or parse the address, then
+    //      check the person may be there (settleRoute).
     useEffect(() => {
-      const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
-      if (isNative && window.CapApp && window.CapApp.addListener) {
-        let handle = null, cancelled = false;
-        Promise.resolve(window.CapApp.addListener('backButton', () => {
-          if (handleBack()) return;
-          if (window.CapApp.exitApp) window.CapApp.exitApp();
-        })).then((hnd) => {
-          if (cancelled) { if (hnd && hnd.remove) hnd.remove(); } else handle = hnd;
-        }).catch(() => {});
-        return () => { cancelled = true; if (handle && handle.remove) handle.remove(); };
-      }
-      if (!window.history || !window.history.pushState) return undefined;
-      let armed = false, standingDown = false;
-      const arm = () => {
-        if (armed) return;
-        try { window.history.pushState({ ccBack: 1 }, ''); armed = true; } catch (e) { /* rate-limited */ }
-      };
-      const onPop = () => {
-        armed = false;
-        if (handleBack()) { arm(); return; }
-        // Nothing left in-app: consume our own listener and repeat the Back
-        // for real. If Connect was the first entry in this tab, back() is a
-        // no-op and we are still here — re-arm so Back keeps working.
-        standingDown = true;
-        window.removeEventListener('popstate', onPop);
-        window.history.back();
-        setTimeout(() => {
-          if (!standingDown) return;
-          standingDown = false;
-          window.addEventListener('popstate', onPop);
-          arm();
-        }, 500);
+      if (!canHistory()) return undefined;
+      const onPop = (e) => {
+        const st = e.state && e.state.cc ? e.state : null;
+        const from = histIdx.current;
+        histIdx.current = st && typeof st.idx === 'number' ? st.idx : 0;
+        if (selfPops.current > 0) { selfPops.current -= 1; return; }
+        const goingBack = histIdx.current < from;
+        const guards = backGuards.current;
+        let closed = null;
+        if (guards.length && goingBack) {
+          closed = guards[guards.length - 1];
+          backGuards.current = guards.slice(0, -1);
+          try { closed.close(); } catch (err) { /* a closed overlay is still handled */ }
+        }
+        const leftover = !!(st && st.guard) && !ownsTopEntry();
+        // The overlay's own entry was the one just popped when we are back on the same
+        // screen. If the screen was replaced under the overlay, follow the entry instead.
+        if (closed && closed.idx !== -1 && !leftover && st && sameNav(st.nav, plainNav(navRef.current))) return;
+        let state = st;
+        if (leftover) {
+          if (goingBack && histIdx.current > 0) { window.history.back(); return; }
+          try {
+            state = { cc: 1, idx: state.idx, nav: state.nav };
+            window.history.replaceState(state, '', window.location.pathname + window.location.search + window.location.hash);
+          } catch (err) { /* the entry just keeps its flag */ }
+        }
+        let next = state && state.nav && ROUTES.PAGES.indexOf(state.nav.page) !== -1 ? state.nav : null;
+        if (!next) next = ROUTES.navFromPath(window.location.pathname, window.location.search).nav;
+        navRef.current = next;
+        setNav(next);
+        scrollTop();
+        gatePending.current = ROUTES.accessFor(next) !== 'public';
+        settleRoute(authRef.current);
       };
       window.addEventListener('popstate', onPop);
-      arm();
-      return () => { window.removeEventListener('popstate', onPop); };
+      return () => window.removeEventListener('popstate', onPop);
+    }, [settleRoute]);
+
+    // ── The platform's own Back button (Capacitor / Android) ─────────────
+    //  Registering a 'backButton' listener overrides Capacitor's default
+    //  (history.back(), else exit), so the whole decision is ours: close the topmost
+    //  overlay, else step back through the screens, else exit the app from the first one.
+    useEffect(() => {
+      const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+      if (!isNative || !window.CapApp || !window.CapApp.addListener) return undefined;
+      let handle = null, cancelled = false;
+      Promise.resolve(window.CapApp.addListener('backButton', () => {
+        if (handleBack()) return;
+        if (window.CapApp.exitApp) window.CapApp.exitApp();
+      })).then((hnd) => {
+        if (cancelled) { if (hnd && hnd.remove) hnd.remove(); } else handle = hnd;
+      }).catch(() => {});
+      return () => { cancelled = true; if (handle && handle.remove) handle.remove(); };
     }, [handleBack]);
+
+    // ── Page load: stamp the arrival entry, and tidy the address ───────────────
+    //  The entry the person arrived on IS the first screen: it is only REPLACED (state
+    //  stamped, address made canonical), never added to. Nothing is pushed on page load
+    //  (the RULE above), so Back from the first screen leaves Connect, as it should, and
+    //  from the second screen lands on the first. Old and alias addresses
+    //  (/index.html, /map, ?c=<slug>, a trailing slash, an unknown tab) are replaced by
+    //  the canonical one. A reload keeps its depth, so Back/Forward still line up.
+    //
+    //  A shared listing (/e/<id>, /p/<id>, /c/<slug>) is the only entry a fresh tab has, so
+    //  Back from it would leave Connect. The map goes UNDER it the first time the visitor
+    //  taps or presses a key, inside that gesture: the arrival entry is replaced by the map
+    //  and the listing pushed again, so Back from a shared link then lands on the map and
+    //  the visitor keeps discovering. A Back before any interaction simply leaves, as it
+    //  does on any web page.
+    useEffect(() => {
+      const b = boot.current;
+      let disarm = () => {};
+      if (canHistory()) {
+        const here = b.legacy || !b.ok ? b.canonical : window.location.pathname + window.location.search + window.location.hash;
+        try {
+          // A reload while an overlay's guard entry was on top: the overlay is gone, so
+          // the entry becomes an ordinary one (the stamp below carries no guard flag).
+          histIdx.current = b.state && typeof b.state.idx === 'number' ? b.state.idx : 0;
+          window.history.replaceState({ cc: 1, idx: histIdx.current, nav: plainNav(b.nav) }, '', here);
+        } catch (e) { /* history is best-effort; the screen is already open */ }
+        if (!b.state && b.ok && ROUTES.isEntityRoute(b.nav)) {
+          const arm = () => {
+            disarm();
+            try {
+              const cur = window.history.state;
+              // Nothing to do if something already moved on, or the link turned out to be
+              // nothing (an unknown /c/<slug> falls back to the map: no listing to put it under).
+              if (histIdx.current !== 0 || !cur || cur.idx !== 0 || !ROUTES.isEntityRoute(navRef.current)) return;
+              const listing = window.location.pathname + window.location.search + window.location.hash;
+              window.history.replaceState({ cc: 1, idx: 0, nav: HOME_NAV }, '', '/');
+              window.history.pushState({ cc: 1, idx: 1, nav: plainNav(navRef.current) }, '', listing);
+              histIdx.current = 1;
+            } catch (e) { /* the listing simply stays the first entry */ }
+          };
+          disarm = () => {
+            document.removeEventListener('click', arm, true);
+            document.removeEventListener('keydown', arm, true);
+          };
+          // Capture phase: runs before the app's own handler for the same tap, so any
+          // entry that tap pushes lands on top of the two.
+          document.addEventListener('click', arm, true);
+          document.addEventListener('keydown', arm, true);
+        }
+      }
+      if (!b.ok) toast("That link doesn't match anything in Connect, so here is the map.", 'gold');
+      // A shared public link (/e/<id>, /c/<slug>, /discover...) opens for a signed-out
+      // visitor as a guest, not behind the sign-in screen.
+      if (!authed && b.ok && b.nav.page !== 'home' && ROUTES.accessFor(b.nav) === 'public') browseAsGuest();
+      return () => disarm();
+    }, []);
+
+    // The screen the address named is checked against who the person is as soon as
+    // that is known (and again if they sign in later from the landing).
+    useEffect(() => {
+      if (authResolved) settleRoute({ authed, role, guest: guestMode });
+    }, [authResolved, authed, role, guestMode, settleRoute]);
+
+    // ── A Contributor listing link: /c/<slug> (and the old /index.html?c=<slug>) ──
+    //  The route carries a slug until we know whose it is. Resolve it directly (so it
+    //  works beyond the directory's first page), add it to the directory, and swap the
+    //  screen for that Contributor's profile, keeping /c/<slug> in the address bar.
+    useEffect(() => {
+      // Validated again here: a nav can also come back out of history.state, and a slug
+      // is only ever put into a request path once it matches the route table's own rule.
+      const slug = nav.page === 'profile' && !nav.params.id && ROUTES.isSlug(nav.params.slug) ? nav.params.slug : null;
+      if (!slug) return undefined;
+      let active = true;
+      (async () => {
+        let listing = null;
+        try {
+          const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+          const res = await fetch(base + '/api/v1/contributors/' + slug);
+          const json = res.ok ? await res.json() : null;
+          if (json && json.data && json.data.profile) listing = adaptContributor(json.data.profile);
+        } catch (e) { /* reported below */ }
+        if (!active) return;
+        if (!listing) {
+          toast('That Contributor listing could not be found.', 'red');
+          commitNav(HOME_NAV, true, true);
+          return;
+        }
+        setContributors((prev) => [...prev.filter((c) => c.id !== listing.id), listing]);
+        contributorsRef.current = [...contributorsRef.current.filter((c) => c.id !== listing.id), listing];
+        commitNav({ page: 'profile', params: { id: listing.id } }, true, true);
+      })();
+      return () => { active = false; };
+    }, [nav.page, nav.params.slug, nav.params.id]);
+
+    // ── An event or place opened by link that the public lists do not hold ─────
+    //  /e/<id> and /p/<id> work for anything published, not just the first 100 rows the
+    //  map loaded: a past event, a place beyond the page. Events come from
+    //  /api/v1/events/<id> (published and public only, 404 otherwise); places straight
+    //  from Supabase (published only, whoever asks). The Contributor's own cancelled or
+    //  private rows were already loaded by the owner read above. entityStatus() tells a
+    //  page whether to show "loading" or "not found".
+    const lookupRef = useRef(new Set());
+    useEffect(() => {
+      const kind = nav.page === 'event' || nav.page === 'place' ? nav.page : null;
+      const id = nav.params && nav.params.id;
+      if (!kind || !isRealId(id)) return;
+      const key = kind + ':' + id;
+      const have = kind === 'event' ? eventRows.some((e) => e.id === id) : placeRows.some((x) => x.id === id);
+      if (have || lookupRef.current.has(key)) return;
+      if (!feedsSettled[kind === 'event' ? 'events' : 'places']) return; // still arriving: it is probably in there
+      lookupRef.current.add(key);
+      (async () => {
+        try {
+          if (kind === 'event') {
+            const base = (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
+            const res = await fetch(base + '/api/v1/events/' + id);
+            const json = res.ok ? await res.json() : null;
+            if (json && json.data && json.data.id === id) setEvents((prev) => DATA.mergeRowsById(prev, [adaptEvent(json.data)]));
+          } else if (window.CC_SUPABASE) {
+            const { data } = await window.CC_SUPABASE.from('places').select('*, categories(slug)').eq('id', id).eq('status', 'published').maybeSingle();
+            if (data) setPlaces((prev) => DATA.mergeRowsById(prev, [adaptPlace({ ...data, category: data.categories ? data.categories.slug : null })]));
+          }
+        } catch (e) { /* shown as not found below */ }
+        setEntityLookup((m) => ({ ...m, [key]: true }));
+      })();
+    }, [nav.page, nav.params.id, eventRows, placeRows, feedsSettled]);
+    const entityStatus = useCallback((kind, id) => {
+      if (kind === 'profile') {
+        if (contributors.some((c) => c.id === id)) return 'ready';
+        return feedsSettled.contributors || !isRealId(id) ? 'missing' : 'loading';
+      }
+      const rows = kind === 'event' ? eventRows : placeRows;
+      if (rows.some((x) => x.id === id)) return 'ready';
+      if (!isRealId(id)) return 'missing';
+      const ownerReady = ownerRowsSettled || (authResolved && !ownerId);
+      if (!feedsSettled[kind === 'event' ? 'events' : 'places'] || !ownerReady || !entityLookup[kind + ':' + id]) return 'loading';
+      return 'missing';
+    }, [eventRows, placeRows, contributors, feedsSettled, ownerRowsSettled, entityLookup, authResolved, ownerId]);
+
+    // ── Tab / history title ───────────────────────────────────────────────
+    useEffect(() => {
+      const p = nav.params || {};
+      let name;
+      if (nav.page === 'event') { const e = eventRows.find((x) => x.id === p.id); name = e && e.title; }
+      else if (nav.page === 'place') { const x = placeRows.find((y) => y.id === p.id); name = x && x.name; }
+      else if (nav.page === 'profile') { const c = contributors.find((y) => y.id === p.id); name = c && c.name; }
+      document.title = ROUTES.titleFor(nav, name);
+    }, [nav, eventRows, placeRows, contributors]);
 
     useEffect(() => { window.__cc = { go, setRole, openCreate, closeCreate, setNav, submitApplication, reviewApplication, completeOnboarding, createEvent, createPlace, sendBroadcast }; });
 
@@ -2554,7 +2861,7 @@
       guestMode, browseAsGuest, showSignIn, authResolved,
       role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
-      events, places, ownEvents, ownPlaces, findEvent, findPlace,
+      events, places, ownEvents, ownPlaces, findEvent, findPlace, entityStatus, shareLink,
       contributors, applications, conversations, notifications,
       ideas, toggleIdeaVote, submitIdea, scheduleKingdomProject, confirmIdea,
       citizens: DATA.citizens,
