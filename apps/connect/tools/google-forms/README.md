@@ -36,8 +36,8 @@ Owner signs in with that email (6-digit code, or Google) → lands on their dash
    > Thank you! We'll email you at the owner address you gave us when your listing is live. Then just
    > sign in to Citizens Connect with that email address (we'll send you a 6-digit code, or you can use
    > Google if it's a Google account) to manage your profile.
-2. **Sheet columns.** In the **Form Responses 1** tab, to the right of the last question column
-   (`Question 7.5: Permission to publish`), add these five headers in row 1:
+2. **Sheet columns.** In the **Form Responses 1** tab, to the right of the last question column,
+   add these five headers in row 1:
    `Approve` · `Status` · `Listing URL` · `Processed at` · `Notes`. Capitals and extra spaces don't
    matter.
    Then select the `Approve` column below the header and choose **Insert → Checkbox**.
@@ -52,7 +52,7 @@ Owner signs in with that email (6-digit code, or Google) → lands on their dash
    work.
    - Click into the code area and select everything (Ctrl+A), including the placeholder
      `function myFunction() { … }`, then delete it.
-   - Paste the **entire contents** of `intake.gs`: all ~370 lines, from the opening `/**` comment to
+   - Paste the **entire contents** of `intake.gs`: all ~410 lines, from the opening `/**` comment to
      the last `}`. `intake.gs` is the name of the file whose code you paste in. You don't type it
      anywhere. The file's name in the left sidebar doesn't matter.
    - Save with Ctrl+S or the disk icon.
@@ -105,14 +105,15 @@ Notes point to, then tick **Approve** again.
 
 | Notes say | What happened | What to do |
 |---|---|---|
-| `Unknown Primary category "…"` | Q2.3 isn't one of the 12 types below | Change the cell to one of the 12 labels, then tick again |
-| `Unknown Organisation Type "…"` | Q2.2 isn't a known option | Use one of the four options below |
-| `Unrecognised fixed-location answer "…"` | Q3.1 isn't Yes/No | Set it to `Yes` or `No` |
-| `display_name_required` / `valid_claim_email_required` | Q2.1 name / Q1.3 owner's email missing or invalid | Fix the cell |
+| `Unknown Primary category "…"` | The *Primary category* answer isn't one of the 12 types below | Change the cell to one of the 12 labels, then tick again |
+| `Unknown Organisation Type "…"` | The *Organisation type* answer isn't a known option | Use one of the four options below |
+| `Unrecognised fixed-location answer "…"` | The *Fixed physical location* answer isn't Yes/No | Set it to `Yes` or `No` |
+| `display_name_required` / `valid_claim_email_required` | The *Organisation / ministry name* or the *Owner's email* is missing or invalid | Fix the cell |
 | `invalid_website_url`, `invalid_contact_email`, `invalid_<social>` | That answer can't be used as-is (or is a dangerous link) | Fix or clear that cell |
-| `Faith alignment and permission to publish must both be given.` | Q7.4 is empty, or Q7.5 is empty/"No" | Can't publish without consent |
+| `Faith alignment and permission to publish must both be given.` | *Faith alignment* is empty, or *Permission to publish* is empty or "No" | Can't publish without consent |
 | `… already has a Contributor listing: …/c/<name> — nothing was changed.` | This owner is already live (e.g. the row was approved before, or they applied in the app). Says `(currently hidden)` if you hid it | Nothing to do, or unhide it in Admin → Listings |
 | `… already has a Citizens Connect account, so no listing was created. …` | The owner email belongs to someone who already signed in to the app as a citizen | They can go live themselves: Settings → Become a Contributor. Or change the owner's email on the row and tick again |
+| `Sheet columns: no question containing "…"` / `"…" matches 2 questions` | A Form question was renamed or duplicated, and the script finds every question by its wording (see below) | Restore the wording, or update `Q` in `intake.gs` and re-paste it |
 | `unauthorized` | The two secrets differ | Re-copy the same value into Vercel and the Script property, then redeploy |
 | `intake_not_configured` | Vercel has no `INTAKE_WEBHOOK_SECRET` | Add it (step 4) and redeploy |
 | `INTAKE_URL redirects …` | `INTAKE_URL` isn't the exact `www` address | Fix the Script property (step 6) |
@@ -127,7 +128,7 @@ Notes point to, then tick **Approve** again.
 
 ## Answers Connect understands
 
-**Q2.2 Organisation Type** (how you're set up):
+**Organisation type** (how you're set up):
 
 | Form answer | Kind on Connect |
 |---|---|
@@ -136,7 +137,7 @@ Notes point to, then tick **Approve** again.
 | Christian Business | Business |
 | Individual | Individual (a person serving in their own capacity) |
 
-**Q2.3 Primary category** (what you do). These set the pin colour and icon: Church · Outreach /
+**Primary category** (what you do). These set the pin colour and icon: Church · Outreach /
 Mission · Market / Expo · Business · Sport & Recreation · Social Gathering · Arts & Culture · Media ·
 Retreat / Healing · Clinic · Education / Equipping · Rehab / Development.
 
@@ -148,11 +149,20 @@ clear note; they are never published under a guessed category.
 
 **What isn't imported:**
 
-- Q1.1, 1.2, 1.4: applicant name, role and phone. These are for your vetting only.
-- Q3.4: areas served.
-- Q6.3: gallery photos. The owner adds them from the dashboard.
-- Q7.1: team invites. The owner invites the team after signing in.
-- Q7.2, 7.3.
+- The applicant's name, role and phone. These are for your vetting only.
+- Areas served.
+- Gallery photos. The owner adds them from the dashboard.
+- Team members to invite. The owner invites the team after signing in.
+- Whether they run regular events or have venues, and how they heard of Citizens.
+- *Keeping your listing up to date*: the script reads it (`off` / `suggest` / `events_auto`) and sends it
+  as `auto_update`, but Connect ignores the field until Listing Automation lands (RESUME item C16).
+
+**How the script finds the Form's questions.** Each question is found by its **wording** (the text after
+`Question N.N:`), never by its number or position, because Google inserts columns whenever the Form is
+edited and the numbers change when you reorder a section (Section 7 was reordered on 2026-10-02, which
+made the earlier number-based script read the wrong answers). Every phrase must match exactly one
+column: `setup()` and every approval stop and name the phrase if it matches none or several. If you
+reword a question, change its phrase in the `Q` table at the top of `intake.gs` and re-paste.
 
 **Location:**
 

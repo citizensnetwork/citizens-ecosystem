@@ -28,31 +28,53 @@ var STATUS_ERROR = 'Error';
 // Columns the founder adds to the right of the Form's columns.
 var MANUAL_HEADERS = ['Approve', 'Status', 'Listing URL', 'Processed at', 'Notes'];
 
-// Form columns are found by their "Question N.N:" prefix, never by position —
-// Google inserts columns whenever the Form is edited.
+// Form columns are found by the WORDING of each question (the text after
+// "Question N.N:"), never by position or number — Google inserts columns
+// whenever the Form is edited, and the founder renumbers questions when he
+// reorders a section (2026-10-02: Section 7 was reordered, which silently
+// pointed the old "Question 7.4/7.5" lookups at the wrong answers).
+// Each phrase must match EXACTLY ONE column; setup() and every approval
+// throw, naming the phrase, if one matches none or several.
 var Q = {
-  ownerEmail: 'Question 1.3:',
-  name: 'Question 2.1:',
-  type: 'Question 2.2:',
-  category: 'Question 2.3:',
-  fixed: 'Question 3.1:',
-  address: 'Question 3.2:',
-  maps: 'Question 3.3:',
-  bio: 'Question 4.1:',
-  website: 'Question 4.2:',
-  contactEmail: 'Question 4.3:',
-  instagram: 'Question 5.1:',
-  facebook: 'Question 5.2:',
-  tiktok: 'Question 5.3:',
-  youtube: 'Question 5.4:',
-  x: 'Question 5.5:',
-  linkedin: 'Question 5.6:',
-  whatsapp: 'Question 5.7:',
-  logo: 'Question 6.1:',
-  cover: 'Question 6.2:',
-  faith: 'Question 7.4:',
-  permission: 'Question 7.5:',
+  ownerEmail: "owner's email",
+  name: 'organisation / ministry name',
+  type: 'organisation type',
+  category: 'primary category',
+  fixed: 'fixed physical location',
+  address: 'street address',
+  maps: 'google maps link',
+  bio: 'short bio',
+  website: 'website',
+  contactEmail: 'public contact email',
+  instagram: 'instagram',
+  facebook: 'facebook',
+  tiktok: 'tiktok',
+  youtube: 'youtube',
+  x: 'x (twitter)',
+  linkedin: 'linkedin',
+  whatsapp: 'whatsapp',
+  logo: 'logo/profile photo',
+  cover: 'cover / banner photo',
+  faith: 'faith alignment',
+  permission: 'permission to publish',
+  autoUpdate: 'keeping your listing up to date',
 };
+
+/**
+ * "Keeping your listing up to date" answer → the consent level Connect stores.
+ *   events_auto — publish events automatically, suggest everything else
+ *   suggest     — suggest updates for approval
+ *   off         — no reading of website / socials (also: blank, "No thanks", anything unrecognised)
+ */
+function autoUpdateLevel_(answer, notes) {
+  var a = String(answer || '').trim();
+  if (!a) return 'off';
+  if (/^no\b/i.test(a)) return 'off';
+  if (/publish events automatically/i.test(a)) return 'events_auto';
+  if (/^yes\b/i.test(a)) return 'suggest';
+  notes.push('Unrecognised "Keeping your listing up to date" answer — stored as off: ' + a);
+  return 'off';
+}
 
 // ── Setup ────────────────────────────────────────────────────────────────
 
@@ -180,6 +202,8 @@ function buildPayload_(str, notes) {
     whatsapp: str(Q.whatsapp),
     faith_alignment: str(Q.faith) !== '',
     permission_to_publish: str(Q.permission) !== '' && !/^no\b/i.test(str(Q.permission)),
+    auto_update: autoUpdateLevel_(str(Q.autoUpdate), notes),
+    auto_update_answer: str(Q.autoUpdate),
     logo: image_(str(Q.logo), 'logo', notes),
     cover: image_(str(Q.cover), 'cover', notes),
   };
@@ -353,26 +377,36 @@ function getSheet_() {
 }
 
 /**
- * {header or "Question N.N:" prefix → 1-based column}. Throws naming anything missing.
- * Matching ignores capitals and extra spaces ("Processed At" = "Processed at").
+ * {header or question phrase → 1-based column}. Throws naming anything missing or ambiguous.
+ * Manual headers match exactly (ignoring capitals and extra spaces: "Processed At" = "Processed at").
+ * Form questions match when the text AFTER "Question N.N:" contains the phrase.
  */
 function columns_(sheet) {
-  var norm = function (s) { return String(s).replace(/\s+/g, ' ').trim().toLowerCase(); };
+  var norm = function (s) {
+    return String(s).replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+  };
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(norm);
+  // "question 7.2: permission to publish" → "permission to publish"
+  var questionText = headers.map(function (h) {
+    var m = h.match(/^question\s+\d+(\.\d+)*\s*:\s*(.*)$/);
+    return m ? m[2] : null;
+  });
   var cols = {};
-  var missing = [];
+  var problems = [];
   MANUAL_HEADERS.forEach(function (name) {
     var i = headers.indexOf(norm(name));
-    if (i === -1) missing.push(name); else cols[name] = i + 1;
+    if (i === -1) problems.push('missing "' + name + '"'); else cols[name] = i + 1;
   });
   Object.keys(Q).forEach(function (key) {
-    var prefix = norm(Q[key]);
-    var i = -1;
-    for (var c = 0; c < headers.length; c++) {
-      if (headers[c].indexOf(prefix) === 0) { i = c; break; }
+    var phrase = norm(Q[key]);
+    var hits = [];
+    for (var c = 0; c < questionText.length; c++) {
+      if (questionText[c] !== null && questionText[c].indexOf(phrase) !== -1) hits.push(c);
     }
-    if (i === -1) missing.push(Q[key]); else cols[Q[key]] = i + 1;
+    if (hits.length === 0) problems.push('no question containing "' + Q[key] + '"');
+    else if (hits.length > 1) problems.push('"' + Q[key] + '" matches ' + hits.length + ' questions');
+    else cols[Q[key]] = hits[0] + 1;
   });
-  if (missing.length) throw new Error('Missing column header(s): ' + missing.join(', '));
+  if (problems.length) throw new Error('Sheet columns: ' + problems.join('; '));
   return cols;
 }
