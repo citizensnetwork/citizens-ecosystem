@@ -90,7 +90,9 @@
   wipes `.next/types` mid-check. CI also runs **CodeQL** and a **blocking OSV-Scanner** (`osv-scanner.toml`'s
   baseline is empty: fix the dependency, don't baseline it). **New advisories can turn `main` red with no code
   change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
-  check the lockfile against OSV.dev before pushing.
+  check the lockfile against OSV.dev before pushing. **One dated exception exists:** `braces` 3.0.3
+  (GHSA-vfj7-8cjw-p6xm, dev tooling only, no fixed version on npm) is ignored in `osv-scanner.toml` until
+  **2026-11-02**, founder-approved 2026-10-03. Don't renew it silently or treat it as precedent; see item **H8**.
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
 - **Working from a sibling git worktree (parallel sessions):** `preview_start name=…` resolves
   `.claude/launch.json` from the *primary* checkout, so it serves the other session's files. Start your own
@@ -262,6 +264,7 @@ design session first.
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
 | H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
+| H8 | **Re-check `braces` GHSA-vfj7-8cjw-p6xm by 2026-11-02** (the dated OSV exception in `osv-scanner.toml`, §3 Process). Once npm ships a fixed `braces`, bump it via `pnpm.overrides`, delete the `[[IgnoredVulns]]` entry and restore the "baseline is empty" header; if there is still no fix, decide again with the founder. After that date CI goes red on this advisory if nothing was done. |
 
 ---
 
