@@ -17,6 +17,7 @@ type Script = {
   post_: (payload: unknown) => { code: number; body: Record<string, unknown> };
   columns_: (sheet: unknown) => Record<string, number>;
   buildPayload_: (str: (k: string) => string, notes: string[]) => Record<string, unknown>;
+  autoUpdateLevel_: (answer: string, notes: string[]) => string;
   sendWelcome_: (email: string, name: string, url: string) => void;
   Q: Record<string, string>;
 };
@@ -71,7 +72,7 @@ function load(): Script {
   const names = Object.keys(google);
   const factory = new Function(
     ...names,
-    `${SRC}\nreturn { post_, columns_, buildPayload_, sendWelcome_, Q };`,
+    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, Q };`,
   );
   return factory(...names.map((n) => google[n as keyof typeof google])) as Script;
 }
@@ -114,24 +115,51 @@ describe("intake.gs → server signature compatibility", () => {
 });
 
 describe("intake.gs row handling", () => {
-  it("finds columns by 'Question N.N:' prefix wherever they sit, and names missing headers", () => {
+  const sheetWith = (headers: string[]) => ({
+    getLastColumn: () => headers.length,
+    getRange: () => ({ getValues: () => [headers] }),
+  });
+  // A Form header as Google writes it: "Question N.N: <wording>".
+  const questionHeaders = (script: Script) =>
+    Object.values(script.Q).map((phrase, i) => `Question ${Math.floor(i / 4) + 1}.${(i % 4) + 1}: ${phrase} (extra words)`);
+  const MANUAL = ["Approve", "Status", "Listing URL", "Processed at", "Notes"];
+
+  it("finds each question by its WORDING, wherever it sits, and names missing manual headers", () => {
     const script = load();
-    const sheetWith = (headers: string[]) => ({
-      getLastColumn: () => headers.length,
-      getRange: () => ({ getValues: () => [headers] }),
-    });
-    const questionHeaders = Object.values(script.Q).map((p) => `${p} something`);
-    const cols = script.columns_(sheetWith(["Timestamp", ...questionHeaders.reverse(), "Approve", "Status", "Listing URL", "Processed at", "Notes"]));
-    expect(cols["Question 2.3:"]).toBeGreaterThan(1);
-    expect(cols.Approve).toBe(questionHeaders.length + 2);
-    expect(() => script.columns_(sheetWith(["Timestamp", ...questionHeaders]))).toThrow(/Approve/);
+    const headers = questionHeaders(script);
+    const cols = script.columns_(sheetWith(["Timestamp", ...[...headers].reverse(), ...MANUAL]));
+    expect(cols[script.Q.category]).toBeGreaterThan(1);
+    expect(cols.Approve).toBe(headers.length + 2);
+    expect(() => script.columns_(sheetWith(["Timestamp", ...headers]))).toThrow(/Approve/);
 
     // The founder's real Sheet says "Processed At" — capitals/spacing must not matter.
     const relaxed = script.columns_(
-      sheetWith(["Timestamp", ...questionHeaders, " approve ", "STATUS", "Listing  URL", "Processed At", "notes"]),
+      sheetWith(["Timestamp", ...headers, " approve ", "STATUS", "Listing  URL", "Processed At", "notes"]),
     );
-    expect(relaxed["Processed at"]).toBe(questionHeaders.length + 5);
-    expect(relaxed.Approve).toBe(questionHeaders.length + 2);
+    expect(relaxed["Processed at"]).toBe(headers.length + 5);
+    expect(relaxed.Approve).toBe(headers.length + 2);
+  });
+
+  it("is not fooled by renumbering: reordering a section keeps every answer on its own question", () => {
+    // 2026-10-02 regression: Section 7 was reordered, so "Question 7.4" and "7.5" held other
+    // questions. Match on the wording and the numbers are irrelevant.
+    const script = load();
+    const renumbered = questionHeaders(script).map((h) => h.replace(/^Question \d+\.\d+:/, "Question 7.9:"));
+    const cols = script.columns_(sheetWith(["Timestamp", ...renumbered, ...MANUAL]));
+    expect(cols[script.Q.faith]).not.toBe(cols[script.Q.permission]);
+    expect(cols[script.Q.permission]).toBe(renumbered.findIndex((h) => h.includes(script.Q.permission)) + 2);
+  });
+
+  it("refuses a question that is missing or matches more than one column, naming it", () => {
+    const script = load();
+    const headers = questionHeaders(script);
+    const without = headers.filter((h) => !h.includes(script.Q.permission));
+    expect(() => script.columns_(sheetWith(["Timestamp", ...without, ...MANUAL]))).toThrow(
+      new RegExp(`no question containing "${script.Q.permission}"`),
+    );
+    // "Website" must not silently bind to a second question that merely contains the word.
+    const twice = [...headers, `Question 9.9: ${script.Q.permission} (again)`];
+    expect(() => script.columns_(sheetWith(["Timestamp", ...twice, ...MANUAL]))).toThrow(/matches 2 questions/);
   });
 
   it("builds the payload from raw answers: consents as booleans, first Drive file, geocode hint", () => {
@@ -166,6 +194,25 @@ describe("intake.gs row handling", () => {
 
     const refused = script.buildPayload_((k) => (k === script.Q.permission ? "No" : answers[k] ?? ""), []);
     expect(refused.permission_to_publish).toBe(false);
+  });
+
+  it("sends the listing-update consent level, defaulting to off", () => {
+    const script = load();
+    const levelFor = (answer: string) => {
+      const notes: string[] = [];
+      const payload = script.buildPayload_((k) => (k === script.Q.autoUpdate ? answer : ""), notes);
+      return { level: payload.auto_update, echoed: payload.auto_update_answer, notes };
+    };
+    expect(levelFor("").level).toBe("off");
+    // A plain "no" is a clean answer: off, and nothing for the admin to double-check.
+    expect(levelFor("No thanks")).toMatchObject({ level: "off", notes: [] });
+    expect(levelFor("Yes, suggest updates for my approval").level).toBe("suggest");
+    expect(levelFor("Yes, and publish events automatically").level).toBe("events_auto");
+    // An answer nobody planned for is treated as NO consent, and the row says so.
+    const odd = levelFor("Perhaps later");
+    expect(odd.level).toBe("off");
+    expect(odd.notes[0]).toMatch(/Unrecognised .*stored as off/);
+    expect(odd.echoed).toBe("Perhaps later");
   });
 
   it("escapes applicant-supplied text in the welcome email", () => {
