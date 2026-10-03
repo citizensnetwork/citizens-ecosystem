@@ -65,13 +65,17 @@ test.describe("Listing link /c/<slug>", () => {
     await mockApp(page, { supabaseUrl: "", anonKey: "" });
     await page.goto(`/c/${SLUG}`);
 
-    await expect(page).toHaveURL(new RegExp(`/index\\.html\\?c=${SLUG}$`));
+    // The listing link keeps its own address in the bar (it used to bounce to /index.html?c=<slug>).
+    await expect(page).toHaveURL(new RegExp(`/c/${SLUG}$`));
     const profile = page.locator('[data-screen="profile"]');
     await expect(profile).toBeVisible({ timeout: 15_000 });
     await expect(profile.getByRole("heading", { name: "Grace Point Community Church" })).toBeVisible();
     // The contributor-type label (not the place category's) for a reused slug.
     await expect(profile.getByText("Church", { exact: true }).first()).toBeVisible();
 
+    // The map goes under the listing at the visitor's first tap (a push on page load would be
+    // skipped by Chrome's Back), so Back from a shared link stays inside Connect.
+    await profile.getByRole("heading", { name: "Grace Point Community Church" }).click();
     await page.goBack();
     await expect.poll(() => screenName(page)).toBe("discover");
   });
@@ -123,9 +127,11 @@ test.describe("Sign-in landing for a form-created listing", () => {
     await expect(page.getByText("Your listing is live", { exact: false })).toBeVisible();
     expect(rpcCalls.filter((f) => f === "mark_own_listing_claimed")).toHaveLength(1);
 
-    // Once per browser session: a reload doesn't stamp or redirect again.
+    // Every screen has its own URL, so a reload keeps them on the dashboard, and the
+    // welcome (once per browser session) is not stamped or shown a second time.
     await page.reload();
-    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Your listing is live", { exact: false })).toHaveCount(0);
     expect(rpcCalls.filter((f) => f === "mark_own_listing_claimed")).toHaveLength(1);
   });
 
