@@ -4,7 +4,8 @@
  * Real-consumer smoke data: what micromatch@4.0.8 and fast-glob@3.3.3 (the packages that pull braces
  * into our eslint/prettier tooling) return for globs taken from our own configs. The committed
  * integration-3.0.3.json was captured while those packages still used pristine braces@3.0.3, so
- * integration.test.js proves they give the same answers on the patched copy.
+ * integration.test.js proves they give the same answers on the patched copy. (Its makeRe section was
+ * regenerated with `windows: false` pinned, again against pristine braces, so it is the same on every OS.)
  *
  *   node test/golden/integration.js --generate   rewrite integration-3.0.3.json (only valid while
  *                                                micromatch resolves PRISTINE braces; it checks)
@@ -103,7 +104,9 @@ function compute() {
       compile: attempt(() => micromatch.braces(glob)),
       expand: attempt(() => micromatch.braces(glob, { expand: true })),
     };
-    out.makeRe[glob] = attempt(() => micromatch.makeRe(glob).source);
+    // picomatch emits `[\\/]` on a Windows host and `\/` elsewhere unless `windows` is a boolean, so pin
+    // it: the golden must not depend on which OS generated it (it did, and failed on CI's Linux).
+    out.makeRe[glob] = attempt(() => micromatch.makeRe(glob, { windows: false }).source);
     out.match[glob] = attempt(() => micromatch(PATHS, glob));
   }
 
