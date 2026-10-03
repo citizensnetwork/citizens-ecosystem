@@ -141,7 +141,7 @@ test.describe("Dashboard keeps every status; the map shows published only", () =
 
     // C1: the public feed never returns the cancelled row; the owner read does.
     await expect(card(page, CANCELLED_EVENT)).toBeVisible({ timeout: 15_000 });
-    await expect(card(page, CANCELLED_EVENT).getByText("CANCELLED")).toBeVisible();
+    await expect(card(page, CANCELLED_EVENT).getByText("CANCELLED", { exact: true })).toBeVisible();
     await expect(card(page, CANCELLED_EVENT).getByRole("button", { name: "Restore" })).toBeVisible();
     await expect(card(page, LIVE_EVENT).getByRole("button", { name: "Cancel" })).toBeVisible();
     expect(requests).toContain(`GET events eq.${OWNER.id}`);
@@ -178,7 +178,7 @@ test.describe("Dashboard keeps every status; the map shows published only", () =
     await page.evaluate(() => window.__cc.go("dashboard"));
     await page.getByRole("button", { name: /^events$/i }).click();
     await expect(card(page, LIVE_EVENT)).toBeVisible({ timeout: 15_000 });
-    await expect(card(page, LIVE_EVENT).getByText("CANCELLED")).toBeVisible();
+    await expect(card(page, LIVE_EVENT).getByText("CANCELLED", { exact: true })).toBeVisible();
 
     // Restore: the pin comes straight back, no reload.
     await card(page, LIVE_EVENT).getByRole("button", { name: "Restore" }).click();
@@ -208,7 +208,7 @@ test.describe("Dashboard keeps every status; the map shows published only", () =
     await expect(pins(page, "place")).toHaveCount(0);
     await page.evaluate(() => window.__cc.go("dashboard"));
     await page.getByRole("button", { name: /^events$/i }).click();
-    await expect(card(page, LIVE_PLACE).getByText("CANCELLED")).toBeVisible({ timeout: 15_000 });
+    await expect(card(page, LIVE_PLACE).getByText("CANCELLED", { exact: true })).toBeVisible({ timeout: 15_000 });
 
     await card(page, LIVE_PLACE).getByRole("button", { name: "Restore" }).click();
     await page.evaluate(() => window.__cc.go("home"));
