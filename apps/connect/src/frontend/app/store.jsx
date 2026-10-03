@@ -473,6 +473,21 @@
   const GUEST_KEY = 'cc_guest_browse_v1';
   const loadGuestFlag = () => { try { return sessionStorage.getItem(GUEST_KEY) === '1'; } catch (e) { return false; } };
 
+  // Does this browser probably hold a Supabase session, or is it mid sign-in
+  // return (PKCE `?code=`, implicit `#access_token=`)? Only then is the sign-in
+  // landing held back behind the loading splash while the session resolves
+  // (`authResolved`); a first-time visitor has neither, so they see the landing
+  // at once with no splash flash. The `$` anchor skips the PKCE
+  // `…-auth-token-code-verifier` key, which can outlive an abandoned sign-in.
+  const likelySession = () => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        if (/^sb-.+-auth-token$/.test(localStorage.key(i) || '')) return true;
+      }
+    } catch (e) { /* storage blocked: no session to wait for */ }
+    return /[?&#](code|access_token)=/.test(window.location.search + window.location.hash);
+  };
+
   // Neutral identity scaffolds per role. The signed-in person's REAL identity
   // (name/photo/bio from their profiles row) is overlaid onto these — see the
   // `user` derivation below. They are never a fabricated persona: with no real
@@ -491,6 +506,10 @@
     const _saved = loadSession();
     const [authed, setAuthed] = useState(!!(_saved && _saved.authed));
     const [guestMode, setGuestMode] = useState(loadGuestFlag);
+    // False only while a probable session is still resolving (see likelySession):
+    // the shell shows the loading splash instead of the sign-in landing until it
+    // flips. Demo mode (no CC_AUTH) and first-time visitors start resolved.
+    const [authResolved, setAuthResolved] = useState(() => !window.CC_AUTH || !likelySession());
     const [role, setRole] = useState(_saved && _saved.role ? _saved.role : 'citizen');
     const [nav, setNav] = useState({ page: 'home', params: {} });
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
@@ -1922,27 +1941,37 @@
         } catch (e) { /* best-effort */ }
       };
       const apply = async () => {
-        const s = await window.CC_AUTH.loadSession();
-        if (!active) return;
-        if (s) {
-          setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email, nameIsFallback: !!s.nameIsFallback });
-          setAuthed(true);
-          setRole(s.role || 'citizen');
-          if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
-          else handleDashboardDeepLink(s.role || 'citizen');
-          landOwnListing(s);
-        } else {
-          setRealUser(null);
-          setAuthed(false);
+        try {
+          const s = await window.CC_AUTH.loadSession();
+          if (!active) return;
+          if (s) {
+            setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email, nameIsFallback: !!s.nameIsFallback });
+            setAuthed(true);
+            setRole(s.role || 'citizen');
+            if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
+            else handleDashboardDeepLink(s.role || 'citizen');
+            landOwnListing(s);
+          } else {
+            setRealUser(null);
+            setAuthed(false);
+          }
+        } finally {
+          // Resolved either way (signed in, signed out, or loadSession threw), so
+          // the loading splash never outlives the first attempt.
+          setAuthResolved(true);
         }
       };
       apply();
+      // Safety net: if the session lookup hangs (offline, slow network), drop the
+      // splash after 8 s and show the landing rather than spinning forever.
+      const splashTimer = setTimeout(() => setAuthResolved(true), 8000);
       const sub = window.CC_AUTH.onAuthChange((event) => {
         if (event === 'SIGNED_OUT') { setRealUser(null); setAuthed(false); setRole('citizen'); }
         else { apply(); }
       });
       return () => {
         active = false;
+        clearTimeout(splashTimer);
         if (sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe();
       };
     }, []);
@@ -2466,7 +2495,7 @@
 
     const value = {
       authed, signIn, signOut, sendEmailCode, verifyEmailCode,
-      guestMode, browseAsGuest, showSignIn,
+      guestMode, browseAsGuest, showSignIn, authResolved,
       role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
       events, places, contributors, applications, conversations, notifications,

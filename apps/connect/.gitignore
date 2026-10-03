@@ -50,6 +50,7 @@ yarn-error.log*
 /public/app/
 /public/supabase-auth.js
 /public/vendor/
+/public/assets/
 
 # vercel
 .vercel
