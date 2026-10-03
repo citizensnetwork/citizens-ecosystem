@@ -178,8 +178,9 @@
         onClick: () => go('home'),
         className: cx('px-4 py-5 border-b border-white/30 flex items-center', collapsed ? 'justify-center' : 'gap-3'),
       },
-        React.createElement('div', { className: 'w-9 h-9 rounded-xl gold-gradient flex items-center justify-center shadow-lg shrink-0' },
-          React.createElement(Icon, { name: 'Crown', size: 16, className: 'text-white', strokeWidth: 2.5 })),
+        // the Citizens crown (auth.jsx), bare on the glass: the gold PNG would
+        // vanish on the old gold-gradient tile
+        React.createElement(window.CrownMark, { size: 40 }),
         !collapsed && React.createElement('div', { className: 'text-left overflow-hidden' },
           React.createElement('p', { className: 'text-sm font-bold text-foreground tracking-tight leading-none font-display' }, 'Citizens'),
           React.createElement('p', { className: 'text-[10px] text-gold font-bold tracking-[0.22em] uppercase mt-0.5' }, 'Connect'))),
@@ -340,8 +341,10 @@
   }
 
   function Shell() {
-    const { createKind, createEditing, authed, guestMode } = window.useApp();
-    if (!authed && !guestMode) return React.createElement(window.AuthScreen);
+    const { createKind, createEditing, authed, guestMode, authResolved } = window.useApp();
+    // Signed out: the landing — but while a probable session is still resolving,
+    // the loading splash instead, so a returning member sees no "sign in" flash.
+    if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
     return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
       React.createElement(Sidebar),
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },

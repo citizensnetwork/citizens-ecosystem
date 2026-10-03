@@ -49,7 +49,9 @@
 
 ## 2. Current state snapshot (verified 2026-09-27)
 
-- **`main`** holds #78 (map preview, `bba102f`), #80 (handoff) and #81 (dated `braces` OSV exception); this PR (#79: admin Delete, migration 178, which is **already applied** to the live database) lands on top of them. Post-merge CI and the Vercel production deploys of the latest `main` were **not yet confirmed** when this was written: check them first (see §6, newest entries).
+- **`main` @ `8ebfed3`** (PR #79, admin Delete + mig 178, merged 2026-10-03 on top of #78/#80 map-preview work and #81, the dated
+  `braces` OSV exception). CI and CodeQL are green on it and the Connect, Vision and Wear production deploys completed
+  (checked 2026-10-03). The crown + loading-splash PR (§6, newest entry) is open on top.
 - **Database head = migration 178** (`20261002231716 / 178_admin_remove_contributor_listing`). **Next migration # = 179.**
 - **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
@@ -63,9 +65,9 @@
 - **Live data:** 15 profiles · 5 Contributors (**only 1 has a map pin and a category, so 4 are invisible on the
   map**) · 40 Places · 3 Events (**all in the past, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin. Vision: 1 organisation,
   0 linked to a Connect Contributor.
-- **Tests (last full run, PR #79 merged with #78):** Connect 885 unit (+32 live-only, skipped in CI) · Vision 734 · Wear 115 ·
-  `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 33/33**. (`frontend-build`'s "hashed outputs"
-  test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
+- **Tests (last full run, the crown PR on the merged tree, 2026-10-03):** Connect 885 unit (+32 live-only, skipped in CI) ·
+  Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · **Connect Playwright e2e 36/36**. (`frontend-build`'s
+  "hashed outputs" test can time out when every app's tests run in parallel on a busy machine; it passes alone in 5 s.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
   domain verified).
@@ -199,7 +201,7 @@ design session first.
 | A7 | Decide what to do with the **Supabase Preview** GitHub check. It reports "skipped" on every PR (Free tier), so it's harmless: uninstall it or leave it (§3M). | P3 |
 | A8 | Mobile store accounts: **F1** Firebase (Android push), **F2** Apple Developer + a Mac, **Step 6** store compliance (privacy/terms URLs, data-safety form, icons, screenshots, age rating), **Step 7** release process (§3G). | Parked |
 | A9 | Supabase **Pro** upgrade decision. It unlocks HIBP leaked-password protection and DB branching (safer migrations). | Parked |
-| A10 | **Finish the email-code sign-in (PR #77).** (1) Supabase → Authentication → Email Templates: **both** *Magic Link* and *Confirm signup* must contain `{{ .Token }}` (existing accounts get the first, brand-new addresses the second). (2) Authentication → Rate Limits: emails/hour ≥ 30; optionally lower the email OTP expiry from 1 h to about 15 min. (3) **Re-paste `tools/google-forms/intake.gs`** into the Sheet's Apps Script. (4) Live test in a private window: an owner on Outlook mail → *Continue with email* → code → their dashboard (and `last_sign_in_at` set, no duplicate account); a never-registered address → a citizen; Google still works for the admin. | P1 |
+| A10 | **Last bit of the email-code sign-in (PR #77).** The founder reported on 2026-10-03 that the live test with an Outlook-mail owner passed (code → their dashboard) and that `intake-v2.gs` is pasted into the Sheet, so the templates and the re-paste are done. Still to confirm: Supabase → Authentication → Rate Limits → emails/hour ≥ 30 (and optionally lower the email OTP expiry from 1 h to about 15 min). A never-registered address → a citizen, and Google for the admin, were not re-tested in the report. | P2 |
 
 ### C. Connect: the v1 discovery loop (current product focus)
 | ID | Item | Pri | Size |
@@ -216,17 +218,22 @@ design session first.
 | C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. Fix with the existing `from=` filter for the map/Discovery fetch plus an owner-scoped fetch for past and cancelled events (this overlaps **C1**: design them together). Today: 3 events, so not urgent. | P2 | M |
 | C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
-| C14 | **Wear's crown logo + loading splash in Connect** (founder request; spec below). | P3 | S |
 
 **C10 design (agreed 2026-10-03; nothing built yet).**
 - *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
 - *Flow:* on approving an existing-email row the listing goes **live now under a placeholder** (it needs an alias auth email, since emails are unique; GoTrue's acceptance of the alias needs a live check, and never mail it) with `contributor_claim_email` = the real owner email. The owner gets a different welcome email, signs in (the 6-digit code proves the inbox, or Google), and sees **"Attach 'X' to your account? [Confirm] [Not me]"**. Only Confirm runs the claim.
 - *Always* an explicit confirm, admin-created listings included: it replaces today's silent auto-claim (`store.jsx` `landOwnListing`). Make the claim RPC require `email_confirmed_at is not null`, and add a read-only `peek_claimable_listing()` for the confirm screen.
 - *Sheet:* the **database** holds the state. The Apps Script polls `POST /api/intake/google-form/status` (HMAC, like the intake route) about every 10 minutes and writes "Awaiting owner" / "Owner confirmed ✓" into the row's Status. The Sheet never triggers anything. Re-paste `intake.gs` after changing it.
-- *Process:* needs migration **179** (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). *Still to ask:* what happens if the owner ignores or declines (expiry? stays live as an unclaimed placeholder? tell the admin?). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md` and `intake-v2.gs`; they may overlap.
-
-**C14 spec (Wear's crown + loader in Connect).** Use Wear's PNG crown (`apps/wear/src/frontend/assets/citizens-crown.png`, 642×347, 127 KB: resize to about 240 px wide before copying) on the landing (replacing the line-art `CrownMark`; the founder's request supersedes design spec §01), on the sidebar brand tile (a gold PNG would vanish on the gold tile: use a paper/glass tile or the bare crown), and in a loading splash. Splash: an `authResolved` state in `store.jsx` (initially `!window.CC_AUTH || !likelySession()`, where likelySession = a `sb-*-auth-token` localStorage key or `code=` / `access_token=` in the URL; set true after the first `apply()` plus an 8 s safety timeout); `shell.jsx` shows it (landing wash + crown at about 56 px + a gold-topped ring spinner) while `!authed && !guestMode && !authResolved`. A signed-in user then never sees a landing flash, and a first-time visitor sees no splash. e2e: a delayed profile response shows the splash and no landing. Screenshots at 390 and 1280 px.
-
+- *Founder decisions on the open questions (2026-10-03):* **"Not me"** hides the placeholder listing at once and flags it
+  for the admin (the Sheet status says "Owner declined"; the admin decides whether to Delete); nothing on the existing
+  account changes. **No response:** the listing stays live, the Sheet shows "Awaiting owner" with its age, and **one reminder
+  email goes out at 7 days**; nothing is ever attached without the owner's yes, and no auto-expiry.
+- *Order of work (founder, 2026-10-03):* **Listing Automation Phase 1 comes first**, then C10. Both need a migration (take the
+  next free number at apply time, not necessarily 179) and both edit the intake route and the Apps Script. Automation replaces
+  the repo's `tools/google-forms/intake.gs` with `docs/handoffs/intake-v2.gs` wholesale; **C10 must start from that**, never
+  from the old number-matching copy (it misreads the consent question after the Section 7 reorder). Both designs agree: the
+  database is the source of truth, consent comes first, and no Google Sheet sits in the data path.
+- *Process:* needs a migration (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`, `intake-v2.gs` and `PLANNING_SESSION_HANDOFF_2026-10-02.md` (decisions D-8 to D-11).
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -304,6 +311,9 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (this PR).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
+  `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
+  applied beforehand. **Crown + splash (was C14):** Wear's gold PNG (127 KB resized to 5 KB) replaces the line-art crown on the landing and the sidebar's gold tile; a new `authResolved` store state shows a crown + ring-spinner splash instead of the sign-in landing while a probable session (a `sb-*-auth-token` key, `?code=` or `#access_token=`) is still resolving, with an 8 s safety timeout. First-time visitors and demo mode start resolved, so they see no splash flash. 3 e2e tests, mutation-checked. The founder also reported the Outlook-owner live test green (A10 reduced). Open: **C10** (still to ask: what happens if the owner never confirms?), **C5**, **A10** rate limit, **H8**. **Gotchas:** a PC crash zeroed two uncommitted files (commit early; git fsck stayed clean), and Python `open(p, "w")` on Windows rewrites LF as CRLF (use `newline=""`). The item ID **C11** was claimed twice by parallel sessions; the crown item was renumbered C14.
 - **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
   intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
   included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors

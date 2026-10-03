@@ -55,19 +55,47 @@
       h('path', { fill: '#1976D2', d: 'M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C40.972 34.86 44 30.082 44 24c0-1.341-.138-2.65-.389-3.917z' }));
   }
 
-  // ── Crown mark — the brand's line-art crown-with-cross. Single-weight
-  //    stroke, never filled (design spec §01). Gold is set on the group so
-  //    every path inherits --gold-crown without repeating it per-path.
+  // ── Crown mark — the Citizens crown: the same gold PNG Citizens Wear uses
+  //    (apps/wear/src/frontend/app/icons.jsx `Crown`; asset resized from 642 px
+  //    to 240 px wide, 127 KB → 5 KB, which is still ~3x for the sizes used
+  //    here). The founder asked for it on 2026-10-02, which supersedes the old
+  //    line-art crown and its "single-weight stroke, never filled" rule (design
+  //    spec §01). It keeps Wear's own gold rather than --gold-crown on purpose:
+  //    one crown across the whole ecosystem. `size` is the WIDTH; the height
+  //    follows the PNG's 642×347 ratio. Root-absolute src: pages load from
+  //    /index.html or /dashboard. The ?v= defeats the service worker's
+  //    cache-first static cache if the file is ever replaced.
+  const CROWN_SRC = '/assets/citizens-crown.png?v=20261003a';
   function CrownMark({ size = 46 }) {
-    return h('svg', {
-      width: size, height: size * 0.72, viewBox: '0 -10 100 76', fill: 'none',
-      stroke: 'var(--gold-crown)', strokeWidth: 3.4, strokeLinecap: 'round', strokeLinejoin: 'round',
-      'aria-hidden': true,
+    return h('img', {
+      src: CROWN_SRC, alt: '', width: size, height: Math.round((size * 347) / 642),
+      draggable: false, 'aria-hidden': true,
+      style: { display: 'block', flex: 'none', objectFit: 'contain' },
+    });
+  }
+
+  // The landing's warm-paper wash, shared with LoadingSplash so the hand-over
+  // from one to the other doesn't flash a different colour.
+  const LANDING_WASH = 'radial-gradient(120% 70% at 50% 0%, #FBF8F1 0%, #F3ECDB 55%, #ECE1C4 100%)';
+
+  // ── Loading splash — shown instead of the landing while a session that is
+  //    probably there is still being resolved (see `authResolved` in store.jsx),
+  //    so a returning member never sees "sign in" flash past. Ported from Wear's
+  //    auth-loading gate (app.jsx: crown 56 + ring spinner). Inline styles only:
+  //    it paints before Tailwind's Play CDN has generated any class (S3).
+  function LoadingSplash() {
+    return h('div', {
+      role: 'status', 'aria-label': 'Loading Citizens Connect', 'data-screen-label': 'Loading',
+      style: {
+        height: '100%', width: '100%', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 20, background: LANDING_WASH,
+      },
     },
-      h('path', { d: 'M14,48 L30,20 L40,38 L50,8 L60,38 L70,20 L86,48' }),
-      h('path', { d: 'M10,54 Q50,64 90,54' }),
-      h('path', { d: 'M50,8 L50,-6' }),
-      h('path', { d: 'M43,-1 L57,-1' }));
+      h(CrownMark, { size: 72 }),
+      h('div', {
+        className: 'spin',
+        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(212,175,55,0.25)', borderTopColor: '#D4AF37' },
+      }));
   }
 
   // ── Email-code sign-in ──
@@ -224,7 +252,7 @@
       // simple warm-paper wash — no busy map illustration; the crown does the work
       h('div', {
         className: 'absolute inset-0',
-        style: { background: 'radial-gradient(120% 70% at 50% 0%, #FBF8F1 0%, #F3ECDB 55%, #ECE1C4 100%)' },
+        style: { background: LANDING_WASH },
       }),
       h('div', {
         className: 'relative min-h-full flex flex-col items-center px-6',
@@ -233,7 +261,7 @@
         h('div', { className: 'w-full max-w-xs flex flex-col items-center fade-in' },
 
           // crown — floats near the top of the screen
-          h(CrownMark, { size: 46 }),
+          h(CrownMark, { size: 84 }),
 
           // scripture eyebrow — small gap below the crown
           h('p', { className: 'font-brand italic text-[12px] sm:text-[13px] text-foreground/60 text-center leading-relaxed mt-7 px-2' },
@@ -277,4 +305,6 @@
   }
 
   window.AuthScreen = AuthScreen;
+  window.LoadingSplash = LoadingSplash;
+  window.CrownMark = CrownMark; // the shell's sidebar brand mark
 })();
