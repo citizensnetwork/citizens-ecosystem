@@ -28,7 +28,7 @@
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
-    const { user, role, go, isAdmin, isContributor, signOut, showSignIn, authed, toast, realUser } = app;
+    const { user, role, go, isAdmin, isContributor, isPendingApplicant, signOut, showSignIn, authed, toast, realUser } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
@@ -75,6 +75,8 @@
     // Settings now, not this everyday menu — founder ask: stop advertising
     // it everywhere and let a citizen find it in their own profile management.
     if (isContributor) links.push({ p: 'dashboard', label: 'Contributor Portal', icon: 'LayoutDashboard' });
+    // Someone whose application is waiting for an admin has a Dashboard too (D-12).
+    else if (isPendingApplicant) links.push({ p: 'dashboard', label: 'My Application', icon: 'Clock' });
     if (isAdmin) links.push({ p: 'admin', label: 'Admin Panel', icon: 'Shield' });
     links.push({ p: 'settings', label: 'Settings', icon: 'Settings' });
 
@@ -157,12 +159,13 @@
   // ── Desktop sidebar ──
   function Sidebar() {
     const app = window.useApp();
-    const { role, nav, go, user, isAdmin, isContributor, unreadNotifs, unreadMsgs, myApplication } = app;
+    const { role, nav, go, user, isAdmin, isContributor, isPendingApplicant, unreadNotifs, unreadMsgs } = app;
     const [collapsed, setCollapsed] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
 
     const tabs = [...BASE_TABS];
     if (isContributor) tabs.push({ page: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
+    else if (isPendingApplicant) tabs.push({ page: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
     if (isAdmin) tabs.push({ page: 'admin', label: 'Admin Panel', icon: 'Shield' });
     tabs.push({ page: 'settings', label: 'Settings', icon: 'Settings' });
 
@@ -225,20 +228,14 @@
       // the flow, never as cold advertising. "Become a Contributor" itself
       // now lives only in Settings (founder ask: stop pitching it on every
       // page; a citizen finds it in their own profile management instead).
-      !collapsed && role === 'citizen' && myApplication && (myApplication.status === 'pending' || myApplication.status === 'approved') &&
+      // Pending (D-12) → their Dashboard; an approved one is already a Contributor.
+      !collapsed && isPendingApplicant &&
         React.createElement('div', { className: 'px-3 pb-3 border-t border-white/20 pt-3' },
-          myApplication.status === 'pending'
-            ? React.createElement('div', { className: 'rounded-xl p-3.5 bg-accent/70 border border-gold/20' },
-                React.createElement('div', { className: 'flex items-center gap-2 mb-1' },
-                  React.createElement(Icon, { name: 'Clock', size: 13, className: 'text-gold-dark' }),
-                  React.createElement('p', { className: 'text-[11px] font-bold text-gold-dark' }, 'Application under review')),
-                React.createElement('p', { className: 'text-[9px] text-gold-dark/75' }, "We'll notify you once an admin responds."))
-            : React.createElement('button', { onClick: () => go('onboarding'), className: 'w-full rounded-xl p-3.5 bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/50 text-left' },
-                React.createElement('div', { className: 'flex items-center gap-2 mb-1' },
-                  React.createElement(Icon, { name: 'PartyPopper', size: 13, className: 'text-[#16A34A]' }),
-                  React.createElement('p', { className: 'text-[11px] font-bold text-[#15803d]' }, "You're approved!")),
-                React.createElement('p', { className: 'text-[9px] text-[#15803d]/80 mb-2' }, 'Set up your contributor profile to go live.'),
-                React.createElement('span', { className: 'text-[10px] font-bold text-[#16A34A] flex items-center gap-1' }, 'Complete setup', React.createElement(Icon, { name: 'ArrowRight', size: 11 })))),
+          React.createElement('button', { onClick: () => go('dashboard'), className: 'w-full text-left rounded-xl p-3.5 bg-accent/70 border border-gold/20 hover:bg-accent' },
+            React.createElement('div', { className: 'flex items-center gap-2 mb-1' },
+              React.createElement(Icon, { name: 'Clock', size: 13, className: 'text-gold-dark' }),
+              React.createElement('p', { className: 'text-[11px] font-bold text-gold-dark' }, 'Application under review')),
+            React.createElement('p', { className: 'text-[9px] text-gold-dark/75' }, "Finish your profile while you wait. We'll notify you once an admin responds."))),
 
       // collapse
       React.createElement('div', { className: cx('border-t border-white/20', collapsed ? 'p-2' : 'px-3 py-3') },
@@ -303,7 +300,7 @@
 
   // ── Page router ──
   function CurrentPage() {
-    const { nav } = window.useApp();
+    const { nav, isPendingApplicant } = window.useApp();
     const p = nav.page;
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
@@ -311,7 +308,7 @@
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
-      case 'dashboard': return React.createElement(window.DashboardPage);
+      case 'dashboard': return React.createElement(isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage);
       case 'admin': return React.createElement(window.AdminPage);
       case 'settings': return React.createElement(window.SettingsPage);
       case 'apply': return React.createElement(window.ApplyPage);

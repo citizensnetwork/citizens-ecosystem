@@ -3,7 +3,8 @@
  *
  * Admin-only. Toggles `profiles.contributor_hidden` via the
  * `set_contributor_hidden` RPC (migration 164) — the moderation safety
- * net for v1's self-serve go-live (no pre-publish admin review). Hiding
+ * net for a live listing (self-serve applications are reviewed before they
+ * go live since D-12, but Form-intake and admin-created ones are not). Hiding
  * removes a Contributor from `directory_contributors` and
  * `/api/v1/contributors` without rejecting their application or deleting
  * their data, so it's reversible.

@@ -541,6 +541,9 @@
 
     // contributor onboarding state
     const [myApplication, setMyApplication] = useState(null); // {id,status,...}
+    // profiles.contributor_status of the signed-in person (loadSession; demo mode drives it
+    // itself). 'pending' = an application waiting for an admin (D-12): they get the pending Dashboard.
+    const [contributorStatus, setContributorStatus] = useState('not_applied');
     const [myContributor, setMyContributor] = useState(null); // contributor obj once onboarded
     const [assistMode, setAssistMode] = useState(false); // admin assisting as a contributor
     const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
@@ -721,16 +724,18 @@
       : baseUser;
 
     // ── actions ─────────────────────────────────────────────────────
-    // v1 self-serve go-live (V1_SCOPE.md, migration 164): no admin wait —
-    // submitting IS approving. Mirrors createEvent/createPlace's
-    // geocode-then-write shape (same geocodeAddress helper) and their
-    // (form, done) signature so the wizard can show a submitting state
-    // instead of navigating before the write actually lands.
+    // An application WAITS for an admin (founder decision D-12, migration 180):
+    // nothing of the applicant's is public until they approve it, so submitting
+    // lands the person on their pending Dashboard (banner + profile editor), not
+    // on the map. Mirrors createEvent/createPlace's geocode-then-write shape
+    // (same geocodeAddress helper) and their (form, done) signature so the
+    // wizard can show a submitting state instead of navigating before the write
+    // actually lands.
     const submitApplication = useCallback((form, done) => {
       const finish = (ok) => { if (done) done(ok); };
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
-        bio: form.bio, category: form.category, weeklyEvents: 1, status: 'approved',
+        bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
         submittedAt: today(), location: form.noFixedLocation ? '' : form.location,
         lat: form.noFixedLocation ? null : form.lat, lng: form.noFixedLocation ? null : form.lng,
         noFixedLocation: !!form.noFixedLocation,
@@ -739,8 +744,9 @@
       if (!realUser) {
         setMyApplication(app);
         setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
-        toast("You're live! Set up your contributor profile.", 'green');
-        go('onboarding');
+        setContributorStatus('pending');
+        toast('Application submitted. An admin will review it.', 'gold');
+        go('dashboard');
         finish(true);
         return;
       }
@@ -769,30 +775,37 @@
               physical_latitude: geo ? geo.lat : null,
               physical_longitude: geo ? geo.lng : null,
               website_url: form.website || null,
-              // The applications table carries only the original four social
-              // columns; the route reads exactly the keys it stores, so the
-              // extra platforms in this payload are simply ignored there and
-              // are captured on the profile itself during onboarding.
+              // This route reads only the four original social columns; the
+              // other platforms are added from the pending Dashboard
+              // (PATCH /api/contributor/application) right after this.
               ...contributorSocialPayload(form.socials || {}, 'create'),
             }),
           });
           const body = await res.json().catch(() => ({}));
           if (!res.ok) {
+            if (res.status === 409 && body.error === 'already_pending') {
+              // Already waiting for an admin: take them to the pending Dashboard.
+              setContributorStatus('pending');
+              toast('Your application is already being reviewed.', 'gold');
+              go('dashboard');
+              finish(true);
+              return;
+            }
             // A 400 from this route is always a field-level message written
             // for the applicant (see /api/contributor/apply) — showing it
             // beats "please try again" when the fix is one field away.
-            toast(body.error === 'already_pending' || body.error === 'already_approved'
-              ? 'You already have a contributor application on file.'
+            toast(body.error === 'already_approved'
+              ? 'You are already a Contributor. Refresh to see your Dashboard.'
               : (res.status === 400 && typeof body.error === 'string' && body.error)
                 || 'Could not submit — please try again.', 'red');
             finish(false);
             return;
           }
-          const approved = body.approved !== false;
-          setMyApplication({ ...app, status: approved ? 'approved' : 'pending' });
+          setMyApplication({ ...app, id: body.application_id || app.id, status: 'pending' });
           setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
-          toast(approved ? "You're live! Set up your contributor profile." : 'Application submitted — finishing setup shortly.', approved ? 'green' : 'gold');
-          go('onboarding');
+          setContributorStatus('pending');
+          toast('Application submitted. An admin will review it soon.', 'gold');
+          go('dashboard');
           finish(true);
         } catch (e) {
           console.warn('[apply] network error', e);
@@ -802,11 +815,48 @@
       })();
     }, [realUser, toast, go]);
 
-    const reviewApplication = useCallback((id, status, note) => {
+    // Records a decision in local state. For a real admin this runs only AFTER
+    // /api/admin/contributors/review succeeded (admin.jsx waits for the server;
+    // opts.silent lets it show its own toast). In demo mode there is no server, so
+    // approving the demo applicant's own application is what puts it live: it is
+    // promoted into a Contributor the way approve_contributor_application does
+    // for a real one.
+    const reviewApplication = useCallback((id, status, note, opts) => {
       setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status, reviewNote: note || a.reviewNote, reviewedAt: today() } : a)));
       setMyApplication((m) => (m && m.id === id ? { ...m, status, reviewNote: note, reviewedAt: today() } : m));
-      toast(status === 'approved' ? 'Application approved — contributor access granted.' : 'Application rejected.', status === 'approved' ? 'green' : 'red');
-    }, [toast]);
+      const mine = !realUser ? applications.find((x) => x.id === id && x.isMine) : null;
+      if (mine && status === 'rejected') setContributorStatus('rejected');
+      if (mine && status === 'approved') {
+        setContributorStatus('approved');
+        (async () => {
+          const geo = mine.noFixedLocation
+            ? null
+            : (typeof mine.lat === 'number' && typeof mine.lng === 'number')
+              ? { lat: mine.lat, lng: mine.lng }
+              : await geocodeAddress(mine.location);
+          const org = {
+            id: uid('c'), name: mine.name || 'My Ministry', role: 'contributor', kind: 'organization', slug: null,
+            bio: mine.bio || '', profilePhoto: mine.photo || '', coverPhoto: mine.coverPhoto || '',
+            category: mine.category, website: mine.website || '', contactEmail: mine.contactEmail || '',
+            location: mine.noFixedLocation ? '' : (mine.location || ''), members: [], followerCount: 0,
+            noFixedLocation: !!mine.noFixedLocation,
+            dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: mine.category }) || { name: 'Community' }).name,
+            involvementLevel: 'Shepherd', collaborators: [], socials: mine.socials || {}, isMine: true, verified: true,
+            lat: geo ? geo.lat : null, lng: geo ? geo.lng : null,
+          };
+          setContributors((prev) => [...prev.filter((c) => c.id !== org.id), org]);
+          setMyContributor(org);
+        })();
+      }
+      if (!(opts && opts.silent)) toast(status === 'approved' ? 'Application approved — contributor access granted.' : 'Application rejected.', status === 'approved' ? 'green' : 'red');
+    }, [toast, realUser, applications]);
+
+    // Demo mode only: the pending Dashboard's profile editor saves into the local
+    // application (a real applicant's edits go to /api/contributor/application).
+    const updateMyApplication = useCallback((patch) => {
+      setMyApplication((m) => (m ? { ...m, ...patch } : m));
+      setApplications((prev) => prev.map((a) => (a.id === 'app-mine' ? { ...a, ...patch } : a)));
+    }, []);
 
     // Review a volunteer application; writes through to the volunteers API
     // (which notifies the applicant) for real contributors, with rollback.
@@ -1901,6 +1951,7 @@
       setRole('citizen');
       setMyContributor(null);
       setMyApplication(null);
+      setContributorStatus('not_applied');
       setAssistMode(false);
       resetNav('home');
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
@@ -1921,11 +1972,12 @@
       // (e.g. a token refresh) doesn't keep yanking the user back here after
       // they've navigated elsewhere in the SPA.
       let deepLinkHandled = false;
-      const handleDashboardDeepLink = (resolvedRole) => {
+      const handleDashboardDeepLink = (resolvedRole, status) => {
         if (deepLinkHandled) return;
         if (!/^\/dashboard(\/|$)/.test(window.location.pathname)) return;
         deepLinkHandled = true;
-        if (resolvedRole === 'contributor') {
+        // A pending applicant has a Dashboard too (the "being reviewed" page).
+        if (resolvedRole === 'contributor' || (resolvedRole === 'citizen' && status === 'pending')) {
           resetNav('dashboard');
         } else {
           resetNav('apply');
@@ -1969,8 +2021,9 @@
             setRealUser({ id: s.user.id, name: s.name, avatarUrl: s.avatarUrl, email: s.user.email, nameIsFallback: !!s.nameIsFallback });
             setAuthed(true);
             setRole(s.role || 'citizen');
+            setContributorStatus(s.contributorStatus || 'not_applied');
             if (s.routeToApply) { window.CC_AUTH.clearPendingIntent(); resetNav('apply'); }
-            else handleDashboardDeepLink(s.role || 'citizen');
+            else handleDashboardDeepLink(s.role || 'citizen', s.contributorStatus);
             landOwnListing(s);
           } else {
             setRealUser(null);
@@ -1987,7 +2040,7 @@
       // splash after 8 s and show the landing rather than spinning forever.
       const splashTimer = setTimeout(() => setAuthResolved(true), 8000);
       const sub = window.CC_AUTH.onAuthChange((event) => {
-        if (event === 'SIGNED_OUT') { setRealUser(null); setAuthed(false); setRole('citizen'); }
+        if (event === 'SIGNED_OUT') { setRealUser(null); setAuthed(false); setRole('citizen'); setContributorStatus('not_applied'); }
         else { apply(); }
       });
       return () => {
@@ -2561,9 +2614,12 @@
       volunteerApps, reviewVolunteer, applyToVolunteer, cityReach, reports, resolveReport,
       assistMode, assistLoginAs, exitAssist,
       myApplication, myContributor, contributorDash,
+      contributorStatus, setContributorStatus, updateMyApplication,
       connected, considering, followedOrgs, followedPlaces,
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
+      // A citizen whose Contributor application is waiting for an admin (D-12): their Dashboard is the "being reviewed" page.
+      isPendingApplicant: role === 'citizen' && contributorStatus === 'pending',
       unreadNotifs, unreadMsgs, toasts, toast,
       createKind, createEditing, openCreate, closeCreate, updateAvatar,
       updateEvent, setEventStatus, updatePlace, setPlaceStatus,
