@@ -45,6 +45,9 @@ export const dynamic = "force-dynamic";
 
 const MAX_MOTIVATION = 2_000;
 
+/** At most this many "new application" emails to the admin per hour, across all applicants. */
+const ADMIN_NOTIFY_LIMIT = { limit: 20, windowMs: 3_600_000 } as const;
+
 function finiteOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
@@ -234,9 +237,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "apply_failed" }, { status: 500 });
   }
 
-  // Tell the admin. Fail-soft: the application is already saved.
+  // Tell the admin. Fail-soft: the application is already saved. The notices
+  // share one global cap so a flood of throwaway sign-ups (anyone can create an
+  // account with an emailed code) cannot mail-bomb the admin's inbox or burn the
+  // sending quota; past the cap the application still shows up in Admin →
+  // Applications, it just isn't announced by email.
   const adminTo = adminNotifyEmail();
-  if (adminTo) {
+  const notifyBudget = adminTo ? await checkRateLimit("contrib-apply-admin-notify", ADMIN_NOTIFY_LIMIT) : null;
+  if (adminTo && notifyBudget && !notifyBudget.success) {
+    console.warn("[/api/contributor/apply] admin notification cap reached; the admin was not emailed");
+  } else if (adminTo) {
     const categoryLabel = contributorCategory
       ? (CONTRIBUTOR_TYPES.find((t) => t.value === contributorCategory)?.label ?? null)
       : null;

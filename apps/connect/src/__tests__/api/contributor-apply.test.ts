@@ -378,6 +378,21 @@ describe("POST /api/contributor/apply", () => {
       expect(mockSendEmail).not.toHaveBeenCalled();
     });
 
+    it("stops emailing the admin after 20 notices an hour, but every application is still saved", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      let saved = 0;
+      for (let i = 0; i < 22; i++) {
+        // A different applicant each time, so the per-user limit never gets in the way.
+        mockGetRouteAuth.mockResolvedValueOnce({ supabase: mockClient, user: { id: `${USER_ID.slice(0, -2)}${String(i).padStart(2, "0")}` } });
+        preflight();
+        const res = await POST(makeReq({ display_name: `Applicant ${i}` }));
+        if (res.status === 200) saved += 1;
+      }
+      expect(saved).toBe(22);
+      expect(adminClient._chain.insert).toHaveBeenCalledTimes(22);
+      expect(mockSendEmail).toHaveBeenCalledTimes(20);
+    });
+
     it("still succeeds when the email fails (the application is already saved)", async () => {
       mockSendEmail.mockResolvedValueOnce("failed");
       mockUser({ id: USER_ID });

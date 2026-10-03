@@ -1,12 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { goTo, mapReady } from "./support/app-hooks";
 import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-project";
-
-declare global {
-  interface Window {
-    __cc: { go: (page: string, params?: Record<string, unknown>) => void };
-    __ccMap?: unknown;
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════
 //  D-12, signed in (real mode): a self-serve application WAITS for an admin.
@@ -96,7 +90,7 @@ test.describe("signed in: applying and waiting", () => {
 
   async function applyThroughTheWizard(page: Page) {
     await bootAt(page);
-    await page.evaluate(() => window.__cc.go("apply"));
+    await goTo(page, "apply");
     await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
     await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
@@ -127,10 +121,10 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.getByRole("heading", { name: "You're approved!" })).toHaveCount(0);
 
     // Not on the map, not in Kingdom Discovery.
-    await page.evaluate(() => window.__cc.go("home"));
-    await page.waitForFunction(() => !!window.__ccMap, undefined, { timeout: 15_000 });
+    await goTo(page, "home");
+    await mapReady(page);
     await expect(page.locator(".maplibregl-marker")).toHaveCount(0);
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
+    await goTo(page, "kingdom-discovery");
     await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
     await expect(page.locator('[data-screen="kingdom-discovery"]').getByText(ORG_NAME)).toHaveCount(0);
   });
@@ -169,7 +163,7 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.getByTestId("pending-banner")).toBeVisible();
 
     // Settings no longer pitches "Apply to become a Contributor" to someone who already has.
-    await page.evaluate(() => window.__cc.go("settings"));
+    await goTo(page, "settings");
     await expect(page.getByText("Your Contributor application is being reviewed")).toBeVisible();
     await expect(page.getByRole("button", { name: "Apply to become a Contributor" })).toHaveCount(0);
     await page.getByRole("button", { name: "Open my application" }).click();
@@ -189,7 +183,7 @@ test.describe("signed in: applying and waiting", () => {
     const db = await openAsApplicant(page);
     db.profile.contributor_status = "rejected";
     await bootAt(page);
-    await page.evaluate(() => window.__cc.go("settings"));
+    await goTo(page, "settings");
     await expect(page.getByText(/wasn't approved this time/)).toBeVisible();
     await page.getByRole("button", { name: "Apply again" }).click();
     await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
@@ -237,7 +231,7 @@ test.describe("signed in as the admin: Applications", () => {
     );
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-    await page.evaluate(() => window.__cc.go("admin"));
+    await goTo(page, "admin");
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     return reviews;
   }

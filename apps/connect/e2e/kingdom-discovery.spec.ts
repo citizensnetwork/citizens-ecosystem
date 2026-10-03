@@ -1,16 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-
-// The app's own debug/test hook (store.jsx: `window.__cc = { go, ... }`) —
-// only the subset this suite drives.
-declare global {
-  interface Window {
-    __cc: {
-      go: (page: string, params?: Record<string, unknown>) => void;
-      setRole: (role: "citizen" | "contributor" | "admin") => void;
-    };
-    __ccMap?: unknown;
-  }
-}
+import { goTo, mapReady, setRoleAndGo } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
 //  Connect v1 golden path (founder decision D-12): a self-serve Contributor
@@ -104,7 +93,7 @@ async function applyAsContributor(page: Page) {
   // ── Apply — reached via Settings. "Become a Contributor" was moved out
   //     of the always-visible sidebar/account-menu and now lives only
   //     under a citizen's own profile management (Settings). ──
-  await page.evaluate(() => window.__cc.go("settings"));
+  await goTo(page, "settings");
   await page.getByRole("button", { name: "Apply to become a Contributor" }).click();
   await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
 
@@ -133,10 +122,7 @@ async function applyAsContributor(page: Page) {
 
 /** Switches the demo person to the admin and opens their application card. */
 async function openApplicationAsAdmin(page: Page) {
-  await page.evaluate(() => {
-    window.__cc.setRole("admin");
-    window.__cc.go("admin");
-  });
+  await setRoleAndGo(page, "admin", "admin");
   await expect(page.locator('[data-screen="admin"]')).toBeVisible();
   const card = page.locator('[data-application="app-mine"]');
   await expect(card).toBeVisible();
@@ -150,19 +136,19 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await applyAsContributor(page);
 
     // ── Pending: nothing of theirs is public ──
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
+    await goTo(page, "kingdom-discovery");
     const discoveryScreen = page.locator('[data-screen="kingdom-discovery"]');
     await expect(discoveryScreen).toBeVisible();
     await expect(discoveryScreen.getByText(ORG_NAME)).toHaveCount(0);
 
-    await page.evaluate(() => window.__cc.go("home"));
+    await goTo(page, "home");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     // The map exists, so "no pin" is a real result and not a page that never loaded.
-    await page.waitForFunction(() => !!window.__ccMap, undefined, { timeout: 15_000 });
+    await mapReady(page);
     await expect(page.locator(".maplibregl-marker")).toHaveCount(0);
 
     // ── They can finish their profile while they wait ──
-    await page.evaluate(() => window.__cc.go("dashboard"));
+    await goTo(page, "dashboard");
     await expect(page.locator('[data-screen="pending-application"]')).toBeVisible();
     await page.getByPlaceholder("Tell citizens who you are…").fill("A quiet retreat in the heart of the city.");
     await page.getByRole("button", { name: "Save changes" }).click();
@@ -176,13 +162,13 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(card.getByText(/Approved — contributor access granted/)).toBeVisible();
 
     // ── Kingdom Discovery — the new Contributor is listed ──
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
+    await goTo(page, "kingdom-discovery");
     await expect(discoveryScreen).toBeVisible();
     await expect(discoveryScreen.getByText(ORG_NAME)).toBeVisible({ timeout: 10_000 });
 
     // ── Map — the new Contributor has a pin (this is the exact gap fixed:
     //     Contributors previously never appeared on the map at all) ──
-    await page.evaluate(() => window.__cc.go("home"));
+    await goTo(page, "home");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
@@ -199,10 +185,7 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(page.getByText(ORG_NAME).first()).toBeVisible();
 
     // ── And as the Contributor they now have the full Dashboard ──
-    await page.evaluate(() => {
-      window.__cc.setRole("contributor");
-      window.__cc.go("dashboard");
-    });
+    await setRoleAndGo(page, "contributor", "dashboard");
     await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 10_000 });
   });
 
@@ -224,15 +207,12 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(card.getByText(/add a website or a social page/)).toBeVisible();
 
     // Still a citizen, never on the map…
-    await page.evaluate(() => {
-      window.__cc.setRole("citizen");
-      window.__cc.go("home");
-    });
-    await page.waitForFunction(() => !!window.__ccMap, undefined, { timeout: 15_000 });
+    await setRoleAndGo(page, "citizen", "home");
+    await mapReady(page);
     await expect(page.locator(".maplibregl-marker")).toHaveCount(0);
 
     // …and Settings now offers to apply again.
-    await page.evaluate(() => window.__cc.go("settings"));
+    await goTo(page, "settings");
     await page.getByRole("button", { name: "Apply again" }).click();
     await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
   });
