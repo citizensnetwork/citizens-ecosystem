@@ -2,7 +2,7 @@
 //  Citizens Connect — app store (state + actions + tiny router)
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { createContext, useContext, useState, useCallback, useRef, useEffect } = React;
+  const { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } = React;
   const AppCtx = createContext(null);
 
   const today = () => new Date().toISOString().slice(0, 10);
@@ -176,6 +176,9 @@
       // Raw instants, for window.DATA.isPastEvent (date/time above are display strings).
       startsAt: validDt ? validDt.toISOString() : '', endsAt: validEnd ? validEnd.toISOString() : '',
       status: r.status || 'published',
+      // The public feed only ever returns public rows (so this defaults to 'public');
+      // the owner's own read returns private ones too, which DATA.publicRows must hide.
+      visibility: r.visibility || 'public',
       location: r.location || '', address: r.location || '',
       // organizerId = created_by (UUID). community_contributor is a BOOLEAN on
       // the live schema (community-posted flag) — only use it as a name if some
@@ -517,8 +520,17 @@
     const [creationStyle, setCreationStyle] = useState('sheet'); // sheet | modal | side  (tweakable)
     const [bubbleStyle, setBubbleStyle] = useState('speech'); // speech | tag | minimal (tweakable)
 
-    const [events, setEvents] = useState(() => DATA.events.map((e) => ({ ...e })));
-    const [places, setPlaces] = useState(() => DATA.places.map((p) => ({ ...p })));
+    // ONE merged list per kind: the public feed (published rows) plus the signed-in
+    // owner's own rows of EVERY status (their dashboard must never lose a cancelled
+    // item). `events` / `places` below are the PUBLIC view (published and public
+    // only) and are what the map, Kingdom Discovery, search and every public list
+    // read; the owner's view is `ownEvents` / `ownPlaces`. Writers (create, edit,
+    // cancel, restore, the live feed) all go through setEvents / setPlaces, so both
+    // views move together without a reload.
+    const [eventRows, setEvents] = useState(() => DATA.events.map((e) => ({ ...e })));
+    const [placeRows, setPlaces] = useState(() => DATA.places.map((p) => ({ ...p })));
+    const events = useMemo(() => DATA.publicRows(eventRows), [eventRows]);
+    const places = useMemo(() => DATA.publicRows(placeRows), [placeRows]);
     const [contributors, setContributors] = useState(() => DATA.contributors.map((c) => ({ ...c })));
     const [applications, setApplications] = useState(() => DATA.applications.map((a) => ({ ...a })));
     const [conversations, setConversations] = useState(() => DATA.conversations.map((c) => ({ ...c, messages: c.messages.slice() })));
@@ -668,6 +680,15 @@
     const activeContributorId = myContributor
       ? myContributor.id
       : (realUser && role === 'contributor' ? realUser.id : 'c1');
+    // The active Contributor's own events / places, whatever their status
+    // (cancelled ones stay listed, with Restore). Dashboard only; never a public list.
+    const ownEvents = useMemo(() => DATA.ownedRows(eventRows, activeContributorId), [eventRows, activeContributorId]);
+    const ownPlaces = useMemo(() => DATA.ownedRows(placeRows, activeContributorId), [placeRows, activeContributorId]);
+    // Look one up by id for its own page. Searches every row we hold, cancelled
+    // included: a cancelled row is only ever in memory for its owner (or an admin
+    // assisting them), so this cannot hand one to the public.
+    const findEvent = useCallback((id) => eventRows.find((e) => e.id === id) || null, [eventRows]);
+    const findPlace = useCallback((id) => placeRows.find((p) => p.id === id) || null, [placeRows]);
     const activeContributor =
       (myContributor && myContributor.id === activeContributorId ? myContributor : null)
       || contributors.find((c) => c.id === activeContributorId)
@@ -960,7 +981,7 @@
           const start = form.date ? new Date(form.date + 'T' + (form.time || '09:00')) : null;
           if (!start || isNaN(start.getTime())) { toast('Please pick a date and start time.', 'red'); finish(false); return; }
           const end = form.endTime ? new Date(form.date + 'T' + form.endTime) : null;
-          const existing = events.find((e) => e.id === id);
+          const existing = eventRows.find((e) => e.id === id);
           const newLocation = [form.location, form.address].filter(Boolean).join(', ');
           const locationChanged = !existing || newLocation !== existing.location;
           const geo = locationChanged ? await geocodeAddress(form.address || form.location) : null;
@@ -988,7 +1009,7 @@
           finish(false);
         }
       })();
-    }, [events, realUser, toast]);
+    }, [eventRows, realUser, toast]);
 
     // Cancel/restore: a status flip only, never a delete — a cancelled event
     // stays in the DB and remains directly viewable (RLS explicitly allows
@@ -1080,7 +1101,7 @@
       }
       (async () => {
         try {
-          const existing = places.find((p) => p.id === id);
+          const existing = placeRows.find((p) => p.id === id);
           const addressChanged = !existing || form.address !== existing.address;
           const geo = addressChanged ? await geocodeAddress(form.address) : null;
           if (addressChanged && !geo) { toast('We couldn’t find that address — add a suburb and city, then try again.', 'red'); finish(false); return; }
@@ -1108,7 +1129,7 @@
           finish(false);
         }
       })();
-    }, [places, realUser, toast]);
+    }, [placeRows, realUser, toast]);
 
     const setPlaceStatus = useCallback((id, status, done) => {
       const finish = (ok) => { if (done) done(ok); };
@@ -2263,7 +2284,7 @@
           if (!res.ok) return;
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptEvent);
-          if (active && adapted.length) setEvents(adapted);
+          if (active) setEvents((prev) => DATA.mergeRowsById(prev, adapted));
         } catch (e) { console.warn('[events] live fetch failed', e); }
       })();
 
@@ -2274,7 +2295,7 @@
           if (!res.ok) return;
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptPlace);
-          if (active && adapted.length) setPlaces(adapted);
+          if (active) setPlaces((prev) => DATA.mergeRowsById(prev, adapted));
         } catch (e) { console.warn('[places] live fetch failed', e); }
       })();
 
@@ -2312,6 +2333,41 @@
 
       return () => { active = false; };
     }, []);
+
+    // ── The owner's own events + places, every status (C1 / C1b) ─────────
+    //  /api/v1/* is the PUBLIC feed: published rows only, so a cancelled event or
+    //  place fell out of its owner's dashboard on the next reload and could never be
+    //  restored. A Contributor (or an admin assisting one: activeContributorId is
+    //  the assisted org) therefore also reads their own rows straight from
+    //  Supabase with the signed-in session, scoped by created_by. RLS already
+    //  allows exactly this (events: published/cancelled, or created_by = me, or
+    //  admin; places: readable) and gives nobody anyone else's drafts, so no
+    //  migration and no service_role. The rows merge into the same list the public
+    //  feed fills; `events` / `places` stay published-only, so the map is untouched.
+    const ownerId = realUser && isRealId(activeContributorId) ? activeContributorId : null;
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !ownerId) return undefined;
+      let active = true;
+      (async () => {
+        try {
+          const [ev, pl] = await Promise.all([
+            sb.from('events').select('*').eq('created_by', ownerId).limit(500),
+            // A raw places row carries category_id, not the slug the API embeds.
+            sb.from('places').select('*, categories(slug)').eq('created_by', ownerId).limit(500),
+          ]);
+          if (!active) return;
+          if (ev.error) console.warn('[owner events] read failed', ev.error);
+          else setEvents((prev) => DATA.mergeRowsById(prev, (ev.data || []).map(adaptEvent)));
+          if (pl.error) console.warn('[owner places] read failed', pl.error);
+          else {
+            setPlaces((prev) => DATA.mergeRowsById(prev, (pl.data || []).map((r) =>
+              adaptPlace({ ...r, category: r.categories ? r.categories.slug : null }))));
+          }
+        } catch (e) { console.warn('[owner rows] read failed', e); }
+      })();
+      return () => { active = false; };
+    }, [ownerId]);
 
     // ── Public listing link: /c/<slug> ──────────────────────────────
     //  The shareable Contributor URL (the Google Form intake's welcome email
@@ -2498,7 +2554,8 @@
       guestMode, browseAsGuest, showSignIn, authResolved,
       role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
-      events, places, contributors, applications, conversations, notifications,
+      events, places, ownEvents, ownPlaces, findEvent, findPlace,
+      contributors, applications, conversations, notifications,
       ideas, toggleIdeaVote, submitIdea, scheduleKingdomProject, confirmIdea,
       citizens: DATA.citizens,
       volunteerApps, reviewVolunteer, applyToVolunteer, cityReach, reports, resolveReport,

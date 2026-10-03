@@ -65,7 +65,7 @@
   function EventManageCard({ ev, onView, onEdit, onBroadcast, onToggleStatus }) {
     const cat = window.DATA.getEventCategory(ev.category);
     const cancelled = ev.status === 'cancelled';
-    return h('div', { className: cx('bg-card rounded-2xl border border-border overflow-hidden', cancelled && 'opacity-60') },
+    return h('div', { 'data-manage-card': ev.id, 'data-status': ev.status || 'published', className: cx('bg-card rounded-2xl border border-border overflow-hidden', cancelled && 'opacity-60') },
       h('div', { className: 'relative h-28' },
         h(SmartImage, { src: ev.coverPhoto, cat, label: 'Event', alt: ev.title, className: 'w-full h-full' }),
         h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/65 to-transparent' }),
@@ -94,7 +94,7 @@
 
   function PlaceManageRow({ p, onView, onEdit, onToggleStatus }) {
     const cancelled = p.status === 'cancelled';
-    return h('div', { className: cx('flex items-center gap-3 p-3 bg-card rounded-2xl border border-border', cancelled && 'opacity-60') },
+    return h('div', { 'data-manage-card': p.id, 'data-status': p.status || 'published', className: cx('flex items-center gap-3 p-3 bg-card rounded-2xl border border-border', cancelled && 'opacity-60') },
       h(Avatar, { src: p.coverPhoto, name: p.name, size: 56, rounded: 'xl' }),
       h('div', { className: 'flex-1 min-w-0' },
         h('div', { className: 'flex items-center gap-1.5' },
@@ -293,7 +293,7 @@
   function DashboardPage() {
     const app = window.useApp();
     const {
-      activeContributor, activeContributorId, events, places, conversations, contributorDash, realUser, openCreate, go,
+      activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, realUser, openCreate, go,
       setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
     } = app;
     const [tab, setTab] = useState('overview');
@@ -301,16 +301,23 @@
     const [bcTarget, setBcTarget] = useState('');
     const [newsComposing, setNewsComposing] = useState(false);
     const [newsEditing, setNewsEditing] = useState(null);
-    const myEvents = events.filter((e) => e.organizerId === activeContributorId);
-    const myPlaces = places.filter((p) => p.organizerId === activeContributorId);
+    // Every status: a cancelled event or place stays listed here, with Restore, and
+    // survives a reload (the public lists, and the map, carry published rows only).
+    const myEvents = ownEvents;
+    const myPlaces = ownPlaces;
+    // The stat cards count what is live. A cancelled row is still listed below but
+    // is no longer one of your events on the map, so it must not inflate the numbers.
+    const isLive = (r) => (r.status || 'published') === 'published';
+    const liveEvents = myEvents.filter(isLive);
+    const livePlaces = myPlaces.filter(isLive);
     const myNews = newsPosts.filter((n) => n.contributorId === activeContributorId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const renderEventCard = (ev) => h(EventManageCard, {
       key: ev.id, ev, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
       onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); },
       onToggleStatus: () => setEventStatus(ev.id, ev.status === 'cancelled' ? 'published' : 'cancelled'),
     });
-    const totalConnects = myEvents.reduce((a, e) => a + e.connectCount, 0);
-    const totalConsider = myEvents.reduce((a, e) => a + e.considerCount, 0);
+    const totalConnects = liveEvents.reduce((a, e) => a + e.connectCount, 0);
+    const totalConsider = liveEvents.reduce((a, e) => a + e.considerCount, 0);
     // Real-mode signals (null/undefined in demo → the mock placeholders show).
     const dash = contributorDash;
     const realWeek = dash && dash.week ? buildWeek(dash.week) : null;
@@ -333,8 +340,8 @@
         h('div', { className: 'px-4 sm:px-5 py-4 grid grid-cols-4 gap-2' },
           h(StatCard, { label: 'Connected', value: totalConnects, color: '#C9A84C' }),
           h(StatCard, { label: 'Considering', value: totalConsider, color: '#7C3AED' }),
-          h(StatCard, { label: 'Events', value: myEvents.length, color: '#16A34A' }),
-          h(StatCard, { label: 'Places', value: myPlaces.length, color: '#2563EB' })),
+          h(StatCard, { label: 'Events', value: liveEvents.length, color: '#16A34A' }),
+          h(StatCard, { label: 'Places', value: livePlaces.length, color: '#2563EB' })),
 
         h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'news', 'profile', 'messages', 'tools'], value: tab, onChange: setTab })),
 

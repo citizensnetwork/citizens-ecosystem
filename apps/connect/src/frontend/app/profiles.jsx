@@ -85,8 +85,10 @@
   // ── Event ──
   function EventProfilePage({ id }) {
     const app = window.useApp();
-    const { events, contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, toast, trackImpression } = app;
-    const ev = events.find((e) => e.id === id);
+    const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, toast, trackImpression } = app;
+    // findEvent also finds a cancelled event (the public `events` list never holds
+    // one), so its owner can still open it from the Dashboard.
+    const ev = app.findEvent(id);
     useEffect(() => { trackImpression(id); }, [id]); // deduplicated server-side
     if (!ev) return h(Empty, { icon: 'CalendarX', title: 'Event not found' });
     const cat = window.DATA.getCategory(ev.category);
@@ -114,6 +116,8 @@
           h('div', null, h('p', { className: 'text-[10px] font-bold uppercase tracking-wide text-gold-dark' }, 'Latest broadcast'), h('p', { className: 'text-sm text-foreground' }, ev.broadcast.message))),
         UUID_RE.test(id) && h(BroadcastReactions, { eventId: id }),
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
+          ev.status === 'cancelled' && h('div', { role: 'status', className: 'flex items-center gap-2 p-3 rounded-2xl bg-muted border border-border text-sm font-semibold text-foreground' },
+            h(Icon, { name: 'Ban', size: 15, className: 'shrink-0 text-muted-foreground' }), 'This event has been cancelled.'),
           // Organiser row: clickable when the org is a real directory profile;
           // a non-clickable identity row when we only have a name; omitted entirely
           // when the event carries no organiser at all.
@@ -125,7 +129,7 @@
               h('div', { className: 'w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center shrink-0' }, h(Icon, { name: 'Users', size: 18, className: 'text-gold-dark' })),
               h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, orgName), h('p', { className: 'text-xs text-muted-foreground' }, 'Organiser')))
             : null,
-          h('div', { className: 'grid grid-cols-2 gap-2' },
+          ev.status !== 'cancelled' && h('div', { className: 'grid grid-cols-2 gap-2' },
             h(Button, { variant: isC ? 'success' : 'gold', icon: isC ? 'Check' : 'CalendarCheck', onClick: () => toggleConnect(id) }, isC ? 'Connected' : 'Connect'),
             h(Button, { variant: isCo ? 'soft' : 'outline', icon: 'Star', onClick: () => toggleConsider(id) }, isCo ? 'Considering' : 'Consider')),
           h('div', { className: 'flex items-center gap-4 text-xs text-muted-foreground' },
@@ -157,8 +161,8 @@
   // ── Place ──
   function PlaceProfilePage({ id }) {
     const app = window.useApp();
-    const { places, events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith, toast } = app;
-    const pl = places.find((p) => p.id === id);
+    const { events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith, toast } = app;
+    const pl = app.findPlace(id); // includes a cancelled place for its owner (see EventProfilePage)
     if (!pl) return h(Empty, { icon: 'MapPinOff', title: 'Place not found' });
     const isFollowingPlace = followedPlaces.has(id);
     const cat = window.DATA.getCategory(pl.category);
@@ -175,6 +179,8 @@
             cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white mb-2', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 10 }), cat.name),
             h('h1', { className: 'text-white text-2xl font-display drop-shadow' }, pl.name))),
         h('div', { className: 'p-4 max-w-2xl mx-auto space-y-4' },
+          pl.status === 'cancelled' && h('div', { role: 'status', className: 'flex items-center gap-2 p-3 rounded-2xl bg-muted border border-border text-sm font-semibold text-foreground' },
+            h(Icon, { name: 'Ban', size: 15, className: 'shrink-0 text-muted-foreground' }), 'This place is not listed on the map right now.'),
           h('div', { className: 'flex gap-2' },
             h(Button, { variant: isFollowingPlace ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => togglePlaceFollow(id, pl.name) }, isFollowingPlace ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
