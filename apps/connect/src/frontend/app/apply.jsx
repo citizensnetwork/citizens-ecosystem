@@ -1,12 +1,12 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Apply to become Contributor + Onboarding
 // ════════════════════════════════════════════════════════════════════
-//  V1 SCOPE NOTE (see V1_SCOPE.md at repo root): submitting IS approving
-//  as of migration 164 — no admin wait. The wizard below is the v1
-//  required path (3 steps: about / story / review); Links & socials and
-//  the admin-review "reason" field were dropped from it per the
-//  DEFER TO V2 markers a prior session left — SocialInputs stays defined
-//  below and IS still used by OnboardingPage, just not by ApplyPage.
+//  V1 SCOPE NOTE (see V1_SCOPE.md at repo root): an application WAITS for an
+//  admin (founder decision D-12, migration 180); the self-approving v1 path
+//  of migration 164 is gone. The wizard below is the required path (3 steps:
+//  about / story / review); the applicant finishes their profile (logo, cover,
+//  socials) from the pending Dashboard — pending-application.jsx — while they
+//  wait. SocialInputs is shared with that screen through window.ApplyParts.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -112,10 +112,9 @@
               }))),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
-      // v1: short bio only (optional), plus Website folded in from the old
-      // "Links & socials" step. No "reason" field — there's no admin to
-      // read it — and no multi-network SocialInputs block; those stay
-      // available on OnboardingPage for after go-live.
+      // Short bio only (optional), plus Website folded in from the old
+      // "Links & socials" step. The multi-network socials, logo and cover are
+      // added from the pending Dashboard right after submitting.
       {
         title: 'Your story', subtitle: 'A little about who you are.',
         node: h(F, null,
@@ -135,7 +134,7 @@
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
             h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5' }),
-            h('p', { className: 'text-xs leading-relaxed' }, "You'll go live immediately — no admin wait. Next you'll add your logo & contact details to finish your profile."))),
+            h('p', { className: 'text-xs leading-relaxed' }, "An admin reviews every application before it goes on the map. You can add your logo and contact details from your Dashboard while you wait."))),
       },
     ];
 
@@ -147,14 +146,17 @@
 
     return h(Wizard, {
       hero, steps, step, setStep, onClose: () => go('home'), onComplete: submit,
-      completeLabel: submitting ? 'Submitting…' : 'Submit & Go Live', busy: submitting,
+      completeLabel: submitting ? 'Submitting…' : 'Submit application', busy: submitting,
     });
   }
   const ReviewRow = ({ label, value }) => value ? h('div', null,
     h('p', { className: 'text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-0.5' }, label),
     h('p', { className: 'text-xs text-foreground leading-relaxed' }, value)) : null;
 
-  // ── Onboarding page (after approval) ──
+  // ── Onboarding page ──
+  //  Since D-12 an applicant finishes their profile on the pending Dashboard,
+  //  and approval copies it across, so nothing routes here in the normal flow.
+  //  It stays as the profile-setup wizard for an already-approved Contributor.
   function OnboardingPage() {
     const { completeOnboarding, go, myApplication } = window.useApp();
     const [step, setStep] = useState(0);
@@ -183,8 +185,8 @@
     const hero = h('div', { className: 'rounded-2xl bg-gradient-to-br from-[#DCFCE7] to-[#bbf7d0]/60 p-5 mb-5 flex items-center gap-3' },
       h('div', { className: 'w-11 h-11 rounded-2xl bg-[#16A34A] flex items-center justify-center shrink-0' }, h(Icon, { name: 'PartyPopper', size: 20, className: 'text-white' })),
       h('div', null,
-        h('h1', { className: 'text-[#15803d] text-lg leading-tight' }, "You're approved!"),
-        h('p', { className: 'text-[#15803d]/80 text-xs' }, 'Set up your public contributor profile to go live.')));
+        h('h1', { className: 'text-[#15803d] text-lg leading-tight' }, 'Set up your profile'),
+        h('p', { className: 'text-[#15803d]/80 text-xs' }, 'Add your logo, cover and contact details so citizens can find you.')));
 
     const steps = [
       {
@@ -227,9 +229,11 @@
       },
     ];
 
-    return h(Wizard, { hero, steps, step, setStep, onClose: () => go('home'), onComplete: () => completeOnboarding(f), completeLabel: 'Go Live' });
+    return h(Wizard, { hero, steps, step, setStep, onClose: () => go('home'), onComplete: () => completeOnboarding(f), completeLabel: 'Save profile' });
   }
 
+  // Shared with pending-application.jsx (the pending Dashboard's profile editor).
+  window.ApplyParts = { SocialInputs };
   window.ApplyPage = ApplyPage;
   window.OnboardingPage = OnboardingPage;
 })();

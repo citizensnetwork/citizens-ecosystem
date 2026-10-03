@@ -18,12 +18,32 @@
     return h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' }, children);
   }
 
+  // One application. Everything on it is the applicant's own, UNTRUSTED text:
+  // it is rendered as text, and a link only when it is http(s).
+  // `onReview(id, 'approved' | 'rejected', note)` returns a promise of
+  // { ok, error }: the buttons wait for the server and a failure is shown here
+  // instead of the card pretending the decision was made.
   function AppCard({ app, onReview }) {
     const [mode, setMode] = useState(null); // 'approve' | 'reject' | null
     const [note, setNote] = useState('');
-    const st = STATUS[app.status];
-    const cat = window.DATA.getEventCategory(app.category);
-    return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden' },
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const st = STATUS[app.status] || STATUS.pending;
+    // The map category: one of the 12 Contributor types (an older row may hold an event/place slug).
+    const cat = window.DATA.getItemCategory({ type: 'contributor', category: app.category });
+    const website = window.UI.safeUrl(app.website);
+    const covers = (app.covers || []).filter((u) => window.UI.safeUrl(u));
+    const needsReason = mode === 'reject' && !note.trim();
+    const confirm = async () => {
+      if (busy || needsReason) return;
+      setBusy(true);
+      setError('');
+      const result = await onReview(app.id, mode === 'approve' ? 'approved' : 'rejected', note.trim());
+      setBusy(false);
+      if (result && result.ok === false) { setError(result.error || 'Something went wrong. Please try again.'); return; }
+      setMode(null);
+    };
+    return h('div', { className: 'bg-card rounded-2xl border border-border overflow-hidden', 'data-application': app.id },
       h('div', { className: 'p-4' },
         h('div', { className: 'flex items-start gap-3' },
           h(Avatar, { src: app.photo, name: app.name, size: 48, rounded: 'xl' }),
@@ -37,18 +57,24 @@
               cat && h('span', { className: 'text-[10px] font-semibold px-2 py-0.5 rounded-full', style: { background: cat.hex + '1c', color: cat.hex } }, cat.name),
               h('span', { className: 'text-[10px] text-muted-foreground flex items-center gap-1' }, h(Icon, { name: 'MapPin', size: 9 }), app.location),
               h('span', { className: 'text-[10px] text-muted-foreground' }, 'Applied ' + fmt(app.submittedAt))))),
+        // A removal is moderation: whoever decides on a re-application should know before approving.
+        app.status === 'pending' && app.previouslyRemovedAt && h('div', { className: 'mt-3 flex items-start gap-2 p-3 rounded-xl bg-[#FEF3C7] text-[#92400E]', 'data-testid': 'previously-removed' },
+          h(Icon, { name: 'Flag', size: 14, className: 'shrink-0 mt-0.5' }),
+          h('p', { className: 'text-xs leading-relaxed' }, 'Previously removed by an admin on ' + fmt(app.previouslyRemovedAt) + '. Check why before you approve this one.')),
         h('p', { className: 'text-xs text-muted-foreground mt-3 leading-relaxed' }, app.bio),
         h('div', { className: 'mt-3 p-3 bg-muted/60 rounded-xl' },
           h('p', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1' }, 'Why they want to contribute'),
           h('p', { className: 'text-xs text-foreground leading-relaxed' }, app.reason)),
+        covers.length > 0 && h('div', { className: 'flex gap-2 mt-3 overflow-x-auto scrollbar-none' },
+          covers.map((u) => h('img', { key: u, src: u, alt: '', loading: 'lazy', className: 'h-16 w-28 rounded-lg object-cover border border-border shrink-0' }))),
         h('div', { className: 'flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap' },
-          app.website && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Globe', size: 11, className: 'text-gold' }), app.website),
-          // Was: the first social value with an Instagram icon hard-coded
-          // beside it, whatever platform it actually belonged to. Now every
-          // handle they submitted, each with its own brand mark.
-          app.socials && Object.entries(app.socials).filter(([, v]) => v).map(([k, v]) =>
-            h('span', { key: k, className: 'flex items-center gap-1' },
-              h(Icon, { name: window.DATA.getSocialPlatform(k).icon, size: 11, className: 'text-gold' }), v))),
+          website
+            ? h('a', { href: website, target: '_blank', rel: 'noopener noreferrer', className: 'flex items-center gap-1 hover:text-foreground underline-offset-2 hover:underline' }, h(Icon, { name: 'Globe', size: 11, className: 'text-gold' }), app.website)
+            : (app.website && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Globe', size: 11, className: 'text-gold' }), app.website)),
+          app.contactEmail && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Mail', size: 11, className: 'text-gold' }), app.contactEmail)),
+        // Every platform they gave, each with its own brand mark; a value whose
+        // link can't be made safe (not http/https) is dropped by SocialLinks.
+        app.socials && Object.keys(app.socials).length > 0 && h(window.UI.SocialLinks, { socials: app.socials, className: 'mt-3' }),
         app.reviewNote && h('div', { className: 'mt-3 p-3 bg-card border border-border rounded-xl' },
           h('p', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1' }, 'Admin note'),
           h('p', { className: 'text-xs text-foreground' }, app.reviewNote))),
@@ -60,10 +86,13 @@
               h(Button, { variant: 'danger', className: 'flex-1', icon: 'XCircle', onClick: () => setMode('reject') }, 'Reject'))
           : h('div', { className: 'space-y-3 fade-in' },
               h('p', { className: 'text-xs font-bold text-foreground' }, (mode === 'approve' ? '✅ Approving' : '❌ Rejecting') + ' — ' + app.name),
-              h('textarea', { value: note, onChange: (e) => setNote(e.target.value), rows: 2, placeholder: 'Optional note to applicant…', className: window.UI.inputCls + ' resize-none' }),
+              mode === 'approve' && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, 'This puts them on the map and in Kingdom Discovery, and emails them.'),
+              // Only a rejection carries words: the applicant is shown this reason (notification + email).
+              mode === 'reject' && h('textarea', { value: note, onChange: (e) => setNote(e.target.value), rows: 3, maxLength: 1000, placeholder: 'Why not yet? The applicant will read this, so keep it kind and clear.', 'aria-label': 'Reason for the applicant', className: window.UI.inputCls + ' resize-none' }),
+              error && h('p', { className: 'text-xs font-semibold text-[#DC2626]', role: 'alert' }, error),
               h('div', { className: 'flex gap-2' },
-                h('button', { onClick: () => { onReview(app.id, mode === 'approve' ? 'approved' : 'rejected', note.trim()); setMode(null); }, className: cx('flex-1 py-2.5 rounded-xl text-xs font-bold text-white', mode === 'approve' ? 'bg-[#16A34A] hover:bg-green-700' : 'bg-[#DC2626] hover:bg-red-700') }, 'Confirm'),
-                h(Button, { variant: 'outline', onClick: () => { setMode(null); setNote(''); } }, 'Cancel')))),
+                h('button', { onClick: confirm, disabled: busy || needsReason, className: cx('flex-1 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50', mode === 'approve' ? 'bg-[#16A34A] hover:bg-green-700' : 'bg-[#DC2626] hover:bg-red-700') }, busy ? 'Saving…' : 'Confirm'),
+                h(Button, { variant: 'outline', disabled: busy, onClick: () => { setMode(null); setNote(''); setError(''); } }, 'Cancel')))),
       app.status === 'approved' && h('div', { className: 'border-t border-green-100 px-4 py-3 bg-[#DCFCE7]/40 flex items-center gap-2' },
         h(Icon, { name: 'CheckCircle2', size: 14, className: 'text-[#16A34A]' }),
         h('p', { className: 'text-xs font-semibold text-[#16A34A]' }, 'Approved — contributor access granted' + (app.reviewedAt ? ' · ' + fmt(app.reviewedAt) : ''))),
@@ -444,26 +473,46 @@
   }
 
   function AdminPage() {
-    const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser } = window.useApp();
+    const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser, toast } = window.useApp();
     const [tab, setTab] = useState('applications');
     const [status, setStatus] = useState('all');
     const [search, setSearch] = useState('');
 
     // Applications are fetched into the store for real admins (replacing the
     // demo seeds), so the same list powers this tab AND the overview counts.
+    //
+    // A real decision WAITS for the server: the card only turns Approved/Rejected
+    // once the database function has run (it used to flip optimistically and fire
+    // the request into the void, so a failure looked like success). Resolves to
+    // { ok, error } for the card. Demo mode (no server) just records it locally.
     const handleReview = async (id, reviewStatus, note) => {
-      // Optimistic local update (covers demo mode + the store list).
-      reviewApplication(id, reviewStatus, note);
-      // Sync to the review API for real UUID applications.
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!UUID_RE.test(id) || !realUser) return;
+      if (!UUID_RE.test(id) || !realUser) {
+        reviewApplication(id, reviewStatus, note);
+        return { ok: true };
+      }
       try {
         const res = await window.authedFetch('/api/admin/contributors/review', {
           method: 'POST',
           body: JSON.stringify({ application_id: id, action: reviewStatus === 'approved' ? 'approve' : 'reject', reason: note || '' }),
         });
-        if (!res.ok) console.warn('[admin review] API error', res.status);
-      } catch (e) { console.warn('[admin review] network error', e); }
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          return { ok: false, error: (typeof body.message === 'string' && body.message) || 'Could not save the decision. Please try again.' };
+        }
+        reviewApplication(id, reviewStatus, note, { silent: true });
+        const approved = reviewStatus === 'approved';
+        const mailed = body.email === 'sent';
+        toast(
+          (approved ? 'Approved. They are live on the map.' : 'Rejected. They can apply again.')
+            + (mailed ? ' We emailed them.' : " We couldn't email them, so let them know yourself."),
+          approved && mailed ? 'green' : 'gold',
+        );
+        return { ok: true };
+      } catch (e) {
+        console.warn('[admin review] network error', e);
+        return { ok: false, error: 'Could not reach the server. Check your connection and try again.' };
+      }
     };
 
     const displayApps = applications;
