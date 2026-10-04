@@ -176,6 +176,10 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/admin/pending-elevations/route.ts": ["email"],
   // `admin` = createAdminClient(); fan-out mute filter for broadcast pushes
   "app/api/contributor/[handle]/broadcasts/route.ts": ["muted_source_ids"],
+  // createAdminClient() after the `automation:suggest` API-key check (mig 181): the consent
+  // level is read to enforce "consent gates everything" (level off => 409 consent_off). It
+  // decides the response and is never returned; the intake route only WRITES these columns.
+  "app/api/automation/suggestions/route.ts": ["auto_update_level"],
 };
 
 /**
