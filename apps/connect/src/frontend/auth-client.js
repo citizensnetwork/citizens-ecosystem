@@ -103,10 +103,18 @@
   // the sign-in email. A bare hostname (e.g. "www.citizenscentral.co.za") has no
   // scheme, so Supabase treats it as a relative path on its own domain and the
   // redirect lands on supabase.co/<hostname>?code=…  which 404s.
+  //
+  // ALWAYS the site root, never the current path. Every screen has its own URL
+  // now (/e/<id>, /dashboard/events, ...), and Supabase only returns to a URL on
+  // its Redirect URLs allow-list (anything else silently falls back to the Site
+  // URL). One fixed, allow-listed target is predictable and cannot be steered by
+  // a crafted link. The screen the person was on is kept by the app instead:
+  // store.jsx stashes a validated same-origin path in sessionStorage before
+  // leaving and restores it after sign-in (routes.jsx safeReturnPath).
   function webRedirectUrl() {
     var origin = env.FRONTEND_ORIGIN || window.location.origin;
     if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
-    return origin + window.location.pathname;
+    return origin + "/";
   }
 
   // Sign in / sign up with Google (OAuth — same call for both).

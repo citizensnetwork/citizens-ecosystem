@@ -57,6 +57,19 @@ function statements(sql: string): string[] {
     .filter(Boolean);
 }
 
+// replayLineage() runs several times (the end state, then 175 and 176). Parsing the whole
+// lineage each time pushed one test past vitest's 5 s default on a busy machine, so each
+// migration is read and split once.
+const parsedMigrations = new Map<string, string[]>();
+function migrationStatements(file: string): string[] {
+  let parsed = parsedMigrations.get(file);
+  if (!parsed) {
+    parsed = statements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
+    parsedMigrations.set(file, parsed);
+  }
+  return parsed;
+}
+
 function rolesIn(clause: string): Array<"anon" | "authenticated"> {
   const names = clause.split(/[ ,]+/).map((r) => r.trim());
   const out: Array<"anon" | "authenticated"> = [];
@@ -79,7 +92,7 @@ function replayLineage(upTo = Infinity): LineageState {
   };
   for (const file of migrationFiles()) {
     if (Number(file.split("_")[0]) > upTo) continue;
-    for (const st of statements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"))) {
+    for (const st of migrationStatements(file)) {
       let m: RegExpMatchArray | null;
       if ((m = st.match(new RegExp(String.raw`^grant (?:select|all(?: privileges)?)(?: on (?:${PROFILES}|${ALL_PUBLIC})) to (.+)$`)))) {
         for (const r of rolesIn(m[1])) state[r].tableLevel = true;
@@ -121,9 +134,7 @@ describe("profiles column privacy — migration lineage", () => {
   });
 
   it("models the mig 082 footgun: its column REVOKE left the table GRANT (and every column) in place", () => {
-    const st082 = statements(
-      readFileSync(join(MIGRATIONS_DIR, "082_billing_privacy_and_trial_stamp.sql"), "utf8"),
-    );
+    const st082 = migrationStatements("082_billing_privacy_and_trial_stamp.sql");
     expect(st082.some((s) => s.startsWith("revoke select (billing_tier"))).toBe(true);
     // Up to 175 the table-level grant still stood — billing, email and the
     // rest stayed readable by anon until 176 revoked it.

@@ -293,10 +293,14 @@
   function DashboardPage() {
     const app = window.useApp();
     const {
-      activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, realUser, openCreate, go,
+      activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, openCreate, go,
       setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
     } = app;
-    const [tab, setTab] = useState('overview');
+    // The tab is part of the address (/dashboard/events), so a refresh keeps it and a
+    // link can point at it. Replaced rather than pushed: the tabs are views of ONE
+    // screen, so Back should leave the Dashboard, not step through every tab.
+    const tab = window.CC_ROUTES.DASHBOARD_TABS.indexOf(app.nav.params.tab) !== -1 ? app.nav.params.tab : 'overview';
+    const setTab = (t) => go('dashboard', t === 'overview' ? {} : { tab: t }, { replace: true, keepScroll: true });
     const [tool, setTool] = useState(null); // null | 'volunteer' | 'analytics'
     const [bcTarget, setBcTarget] = useState('');
     const [newsComposing, setNewsComposing] = useState(false);

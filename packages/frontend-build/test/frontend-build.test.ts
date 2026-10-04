@@ -16,6 +16,11 @@ import {
 } from '../index.js';
 import type { BuildFrontendOptions, ConfigVar } from '../index.js';
 
+// buildFrontend runs esbuild synchronously, which takes a few seconds when every app's
+// suite runs in parallel on a busy machine; vitest's 5 s default made the end-to-end
+// tests flaky (they pass alone in about 1 s).
+vi.setConfig({ testTimeout: 30_000 });
+
 const INDEX_HTML = `<!doctype html>
 <html>
 <head>

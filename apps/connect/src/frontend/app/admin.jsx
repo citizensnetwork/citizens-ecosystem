@@ -473,8 +473,10 @@
   }
 
   function AdminPage() {
-    const { isAdmin, applications, reviewApplication, contributors, events, places, citizens, go, realUser, toast } = window.useApp();
-    const [tab, setTab] = useState('applications');
+    const { isAdmin, applications, reviewApplication, go, realUser, nav, toast } = window.useApp();
+    // The tab is part of the address (/admin/listings); replaced rather than pushed (see DashboardPage).
+    const tab = window.CC_ROUTES.ADMIN_TABS.indexOf(nav.params.tab) !== -1 ? nav.params.tab : 'applications';
+    const setTab = (t) => go('admin', t === 'applications' ? {} : { tab: t }, { replace: true, keepScroll: true });
     const [status, setStatus] = useState('all');
     const [search, setSearch] = useState('');
 
