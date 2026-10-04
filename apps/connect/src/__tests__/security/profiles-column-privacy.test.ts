@@ -166,7 +166,9 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // createAdminClient() after requireAdmin()
   // + the claim columns: the admin Listings tab shows whether an admin- or
   // form-created listing's owner has signed in yet.
-  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at"],
+  // + auto_update_level (mig 181): the Listings tab shows each listing's automation level
+  // (a separate, best-effort read after the list; never returned to anyone but the admin).
+  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at", "auto_update_level"],
   "app/api/admin/suggestions/export/route.ts": ["email"],
   "app/api/admin/contributor-applications/route.ts": ["email"],
   // createAdminClient() after requireAdmin() AND after the approve/reject RPC
@@ -176,6 +178,14 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/admin/pending-elevations/route.ts": ["email"],
   // `admin` = createAdminClient(); fan-out mute filter for broadcast pushes
   "app/api/contributor/[handle]/broadcasts/route.ts": ["muted_source_ids"],
+  // createAdminClient() after the `automation:suggest` API-key check (mig 181): the consent
+  // level is read to enforce "consent gates everything" (level off => 409 consent_off). It
+  // decides the response and is never returned; the intake route only WRITES these columns.
+  "app/api/automation/suggestions/route.ts": ["auto_update_level"],
+  // createAdminClient() after the `automation:digest` API-key check (mig 181): reads the owner's
+  // address, notification preference, consent level and last-nudge time to decide whether to send
+  // the daily "new suggestions" email. The address goes only to the mailer; the response is counts.
+  "app/api/automation/digest/route.ts": ["email", "notification_email", "notification_prefs", "auto_update_level", "auto_update_nudged_at"],
 };
 
 /**

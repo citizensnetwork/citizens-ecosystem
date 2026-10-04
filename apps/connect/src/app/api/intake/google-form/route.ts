@@ -26,7 +26,9 @@
  *     fixed_location, street_address?, maps_link?, geocoded?: {lat,lng},
  *     bio?, website?, contact_email?, instagram?, facebook?, tiktok?, youtube?,
  *     x?, linkedin?, whatsapp?, faith_alignment: true,
- *     permission_to_publish: true, logo?: {mime, base64}, cover?: {mime, base64} }
+ *     permission_to_publish: true, logo?: {mime, base64}, cover?: {mime, base64},
+ *     auto_update?: 'off'|'suggest'|'events_auto' (Form "Keeping your listing up to date",
+ *     mig 181: stored with a consent stamp, and the listed sources are saved) }
  * Response 200: { success, slug, url, warnings: string[] }
  * Errors: { error: <code>, message?: <human-readable, for the Sheet's Notes> }
  */
@@ -37,6 +39,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/v1Gate";
 import { parseListingFields } from "@/lib/contributorFields";
+import { parseAutoUpdateLevel } from "@/lib/automation/suggestions";
+import { sourcesFromListing } from "@/lib/automation/sources";
 import {
   decodeIntakeImage,
   geocodeWithMapTiler,
@@ -292,6 +296,53 @@ export async function POST(request: Request) {
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     console.error("[/api/intake/google-form] profile rpc", rpcErr, result);
     return fail(500, result?.reason ?? "create_failed");
+  }
+
+  // Listing automation (mig 181): the Form's "Keeping your listing up to date" answer and
+  // the sources the owner listed. Only when the script sent the answer at all. Fail-closed:
+  // the listing is already live, so a problem here is a Note on the Sheet, never a failed
+  // intake, and it can only leave automation off or inert. Sources go in first (switched
+  // on only if consent was given), the consent level last, so a half-finished run can
+  // never leave automation ON without its sources recorded.
+  if (body.auto_update !== undefined) {
+    const consent = parseAutoUpdateLevel(body.auto_update);
+    if (consent.warning) warnings.push(consent.warning);
+    let stage = "sources";
+    try {
+      const rows = sourcesFromListing(
+        {
+          websiteUrl: fields.websiteUrl,
+          youtube: fields.socials.youtube_url,
+          facebook: fields.socials.facebook_url,
+          instagram: fields.socials.instagram_handle,
+          tiktok: fields.socials.tiktok_handle,
+        },
+        consent.level !== "off",
+      );
+      if (rows.length) {
+        const { error } = await admin.from("listing_sources").insert(rows.map((r) => ({ contributor_id: userId, ...r })));
+        if (error) throw error;
+      }
+      stage = "consent";
+      if (consent.level !== "off") {
+        const { error } = await admin
+          .from("profiles")
+          .update({
+            auto_update_level: consent.level,
+            auto_update_consent_at: new Date().toISOString(),
+            auto_update_consent_source: "google_form",
+          })
+          .eq("id", userId);
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error(`[/api/intake/google-form] automation ${stage}`, e);
+      warnings.push(
+        stage === "sources"
+          ? "Automatic updates: the owner's website and social links could not be saved as sources; the owner can add them in their dashboard."
+          : "Automatic updates: the owner's choice could not be saved, so automatic updates are off. The owner can switch them on in their dashboard.",
+      );
+    }
   }
 
   console.info("[/api/intake/google-form] live", { userId, slug: result.slug, warnings: warnings.length });

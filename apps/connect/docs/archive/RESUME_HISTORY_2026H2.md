@@ -3877,3 +3877,20 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   `react.cache` build error (pnpm hoisting).
 - **2026-09-26/27 — PRs #64/#65, §3AQ–§3AR:** production build fix; 26 OSV advisories fixed; a live CVSS-10
   MapLibre XSS patched by vendoring v6.11.2.
+
+### RESUME_HERE §6 entries moved here on 2026-10-04, second batch (verbatim)
+
+- **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
+  #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
+  and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every
+  hoist, even without `react-canary.d.ts` (the control on `main` reproduced the `cache` error). Pushed all 5
+  missing tags (the remote now has 12). Intake: prod DB path re-probed after 174–177 (rollback-only, all green);
+  new **Admin → Listings** (hide/unhide, owner-sign-in state); actionable 409 Notes; README updated. Found: the
+  Sheet holds only 3 hand-typed sample rows (A1). New founder decision C10. No migration (next # still 178).
+- **2026-09-27 — RESUME_HERE audit + slim-down** (branch `claude/resume-here-slimdown`). Moved §3A–§3AT and the
+  old NEXT STEPS verbatim to `docs/archive/RESUME_HISTORY_2026H2.md` (this file: 3,849 → about 300 lines).
+  Re-verified every open item against live state. Closed as already done: Upstash env set; Wear brand queue
+  cleared (all 6 brands verified, incl. the Mustard Seed demo); "Dam Cool" socials re-entered; Resend DNS,
+  Vision deploy gates, PAT rotation and the code-as-hero email template all done. New finds: orphan prod tables
+  and functions (H6), 9 undeployed edge functions (H5), missing git tags (S2), 4 invisible Contributors (A5),
+  perf-advisor debt (S6), stale status docs (H4). Rescued the Wear CSP brief from `%TEMP%`. No code or DB change.

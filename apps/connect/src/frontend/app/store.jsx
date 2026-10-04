@@ -1114,7 +1114,8 @@
     // location comes from geocoding the address — no coordinates is still a
     // valid event (it lists, but can't sit on the map yet).
     const createEvent = useCallback((form, done) => {
-      const finish = (ok) => { if (done) done(ok); };
+      // done(ok, row): the created row comes back too (the Suggestions tab links a suggestion to it).
+      const finish = (ok, row) => { if (done) done(ok, row); };
       if (!realUser || !window.CC_SUPABASE) {
         const ev = {
           id: uid('e'), title: form.title, category: form.category, description: form.description,
@@ -1162,7 +1163,7 @@
           setEvents((prev) => [adaptEvent(data), ...prev]);
           toast(geo ? 'Event published — now live on the map!' : 'Event published! We couldn’t place that address on the map — refine it later.', 'green');
           if (form.launchBroadcast && role === 'contributor') sendBroadcast('event', data.id, form.launchBroadcast);
-          finish(true);
+          finish(true, data);
         } catch (e) {
           console.warn('[createEvent]', e);
           toast('Could not publish the event — please try again.', 'red');
@@ -1598,7 +1599,7 @@
     // listing page — separate from the ephemeral 24h Broadcast map bubble.
     // Requires migration 167 (supabase/migrations/167_place_status_open_hours_news_posts.sql).
     const createNewsPost = useCallback((form, done) => {
-      const finish = (ok) => { if (done) done(ok); };
+      const finish = (ok, row) => { if (done) done(ok, row); };
       if (!realUser || !window.CC_SUPABASE) {
         setNewsPosts((prev) => [{ id: uid('n'), contributorId: activeContributorId, title: form.title, body: form.body, image: form.image || '', date: form.date || today(), createdAt: new Date().toISOString() }, ...prev]);
         toast('News post published.', 'green');
@@ -1612,7 +1613,7 @@
           if (error) throw error;
           setNewsPosts((prev) => [adaptNewsPost(data), ...prev]);
           toast('News post published.', 'green');
-          finish(true);
+          finish(true, data);
         } catch (e) {
           console.warn('[createNewsPost]', e);
           toast('Could not publish that post — please try again.', 'red');

@@ -9,7 +9,7 @@
 >   unchanged**, so a doc that cites "RESUME_HERE §3AS" resolves there.
 > - Phase 0 → mid-June 2026 (§2x batches): [`docs/archive/RESUME_HISTORY_2026H1.md`](docs/archive/RESUME_HISTORY_2026H1.md).
 >
-> **Last audit: 2026-10-04** (`main` @ `aeaf966`, plus the C15 routing PR). §2, the A, C and H items and §5's P1/P11 were re-checked against
+> **Last audit: 2026-10-04** (`main` = the C16 PR #92's merge commit, on top of the C15 routing PR #89 `6acbdcc`). §2, the A, C and H items and §5's P1/P11 were re-checked against
 > git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. Tags like `(§3AP)` point to the
 > archived section with the detail.
 
@@ -50,18 +50,20 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` @ `aeaf966`** (PR #88, D-12 mig 180: self-serve applications wait for an admin), on top of #86 (mig 179), #87 (the patched
-  `braces` fork), #85 (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown +
-  splash). **This file was updated inside PR #89 (C15, a real URL for every screen); once that merges, `main` is its merge commit.**
-  Other open PRs, all sibling sessions': **#90** (D-13, admin-created listings email the owner a welcome) and **#91** (docs: H10, H2),
-  which will conflict with this file's edits, so whoever merges second merges `main` in; plus the 14 stale Dependabot ones (item **H1**).
-- **Database head = migration 179 when checked on 2026-10-04** (`20261003145437 / 179_approve_resets_hidden_and_review_fixes`, #86).
-  #88 merged with a **180** file (`180_contributor_applications_need_admin_approval`): its apply step was NOT verified here, so run
-  `list_migrations` and **take the next free number at apply time.** C15 needed no migration.
-- **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
-  authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
-  (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
-  design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
+- **`main` = the merge commit of PR #92** (C16, Listing Automation Phase 1; see its §6 entry), on top of `6acbdcc` (PR #89, C15: a real URL
+  for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
+  (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). Sibling
+  sessions' PRs: **#90** (D-13, admin-created listings email the owner a welcome) and **#91** (docs: H10, H2), which will conflict with this
+  file's edits, so whoever merges second merges `main` in; plus the 14 stale Dependabot ones (item **H1**).
+- **Database head = migration 181** (`20261004103205 / 181_listing_automation_phase1`, applied 2026-10-04 with the founder's yes; 180 is
+  `20261004061633`, #88; 179 is #86). Always re-run `list_migrations` and **take the next free number at apply time.** Pre-apply tag
+  `connect-pre-mig181-listing-automation` (pushed). The 30-check rollback-only probe passed with no FAIL and left no rows. The recorded
+  statement differs from the repo file only in its header comment (the SQL is the same); the repo file is the reference. Everything
+  is dormant: every Contributor is at `off`, no key is minted.
+- **Security advisor baseline: 0 ERROR / 121 WARN / 3 INFO** (re-measured 2026-10-04 right after 181: it was 118 WARN before, not 119, and
+  181 added exactly the three expected functions). Every WARN is known and accepted: 108 authenticated + 11 anon SECURITY DEFINER EXECUTE
+  grants (by design, each documented in its migration), HIBP (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are
+  `search_term_stats` (service_role-only by design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
 - **Performance advisor debt (not yet addressed):** 214 `auth_rls_initplan`, 319 `multiple_permissive_policies`,
   65 unindexed foreign keys (19 of them in `wear`), 6 duplicate indexes (all in `public`). See item **S6**. (Counts from 2026-09-27, not re-measured.)
 - **14 cron jobs, all active:** map prominence, messaging purge, contributor analytics ×3, search-term purge,
@@ -70,9 +72,10 @@
 - **Live data (2026-10-03):** 16 profiles · 5 Contributors (**only 2 are on the map; the other 3 lack a category or a pin, or are hidden**) · 40 Places ·
   4 Events (**0 upcoming, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin.
   Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
-- **Tests (last full run, the C15 routing PR on the tree merged with `main` @ `aeaf966` (#88, D-12), 2026-10-04):** Connect 1102 unit
-  (+32 live-only, skipped in CI) · Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · `braces-patched` 150 (#87's
-  count, not re-run) · **Connect Playwright e2e 108/108**. (Two suites used to hit vitest's 5 s default when every app's tests run
+- **Tests (last full run, the C16 branch on `main` @ `6acbdcc`, 2026-10-04; format, lint, build, typecheck all green):** Connect **1237** unit
+  (+36 live-only, skipped in CI) · Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · connect-client 21 · utils 7 ·
+  `braces-patched` 150 (#87's count, not re-run) · **Connect Playwright e2e 127/127** (19 new, `listing-automation.spec.ts`; the C15
+  routing suite is 57 of them). (Two suites used to hit vitest's 5 s default when every app's tests run
   in parallel on a busy machine: `frontend-build`'s end-to-end test now has an explicit 30 s, and the migration-lineage security
   tests (`profiles-column-privacy`, `contributor-approval-migrations`) read the lineage once instead of per call.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
@@ -199,8 +202,23 @@
   Wear's sign-in-only). In-app "sign in" prompts call `showSignIn()` (the landing with every option), never
   the Google-only `signIn()`, or someone without Google is dead-ended. Email sign-ups arrive with no name; the
   UI shows a display-only stand-in (`displayNameFor`) that must never be written to `profiles.full_name`.
+- **Listing automation (C16): the consent is the database's, never the client's.** `profiles.auto_update_level`
+  (`off` | `suggest` | `events_auto`, default `off`) plus its consent time/source are private and written ONLY by
+  `set_my_automation_level()` (or the Form intake route, last, fail-closed); a trigger blocks every other writer, and turning it
+  off at once disables every source and dismisses what is pending. Nothing is ever published without the owner: a suggestion
+  waits on the Suggestions tab, and the single exception is a FUTURE event at `events_auto`. **No images in Phase 1** (the CSP's
+  `img-src` allows only our hosts, so a third-party image would render broken): `image_url` is dropped with a warning and logo/cover
+  are not suggestible. Facebook, Instagram and TikTok sources are stored but never enabled (no scraping of Meta/TikTok). Personal
+  contact details found by a reader are scrubbed, and `validateSuggestion()` in `src/lib/automation/suggestions.ts` is the one
+  validator (the dashboard's `CC_AUTOMATION_HELPERS` copy is held equal by a drift test). Owner actions run client-side on the
+  owner's own session (RLS + the SECDEF RPCs), not through `/api`; the two machine routes (`POST /api/automation/suggestions`,
+  `POST /api/automation/digest`) take admin-minted scoped keys (`automation:suggest`, `automation:digest`) and the digest emails via
+  #88's `src/lib/email/send.ts` (needs `RESEND_API_KEY` in Vercel; at most one email a day, only for new pending suggestions).
 - **Public repo:** never commit a real organisation's or person's contact details (emails, user ids) in tests,
-  docs or handoffs. Use reserved `.example` addresses.
+  docs or handoffs. Use reserved `.example` addresses. **Stage with explicit paths, never `git add -A` / `git add .`:** the
+  working tree holds untracked local briefs that name real organisations (`docs/handoffs/*` not listed in git, `intake-v2.gs`,
+  `docs/routines/`, `config/onboarding-presets.json`); a blanket add once swept ten of them into a local commit (caught before
+  any push and removed from the history).
 
 **Deploy / auth**
 - `next.config`'s `outputFileTracingRoot` must be the monorepo root, or every API route crashes on Vercel
@@ -252,7 +270,7 @@ design session first.
 | C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. The owner half is done (#84: the Dashboard reads its owner's own rows, so past and cancelled events no longer depend on that page). Still open: the map/Discovery fetch should use the existing `from=` filter. Today: 3 events, so not urgent. | P2 | M |
 | C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
-| C16 | **Listing Automation Phase 1** (consent-first, POPIA; founder decisions D-8 to D-11 in the local planning handoff): private consent columns on `profiles`, `listing_sources` and `listing_suggestions` tables, a scoped `POST /api/automation/suggestions`, a dashboard "Automatic updates" panel and Suggestions tab, and a daily email. The repo's `tools/google-forms/intake.gs` is already the corrected, wording-matched script (#85), so it starts from that. Needs a migration (ask the founder first). The founder chose it **before C10**. Phase 2 (a daily scheduled reader that posts suggestions) comes after. Brief: local, untracked `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`. | P2 | L |
+| C16 | **Listing Automation Phase 1: MERGED and DORMANT** (consent-first, POPIA; founder decisions D-8 to D-11 in the local planning handoff). Code and tests are in PR #92; **migration 181 is applied** (2026-10-04, probe clean, advisors +3 WARN as predicted). Every Contributor is at `off`, no key exists, no mail is sent. **Still to do, each needing the founder:** **(1)** mint two keys, `automation:suggest` and `automation:digest`, from an admin session with `POST /api/admin/api-keys` (the secret is shown once, so it should not pass through a chat); **(2)** confirm `RESEND_API_KEY` is set in Vercel (without it the digest reports "skipped", not "failed"); **(3)** optionally the one-off backfill for the first real organisation (a throw-away script, never committed); **(4)** Phase 2, the scheduled reader. Check after the keys: a Contributor flips their level on the Dashboard → Profile card and the Suggestions tab works end to end. Deviations from the brief: no images in Phase 1 (CSP), owner actions run on the owner's own session instead of new `/api` routes, the digest is a Next route using #88's mailer (not an Edge Function; `send-contributor-digest` only writes an in-app notification), no new notification type, and "Edit & publish" is inline on the card. **Phase 2** (a daily scheduled reader that calls the suggest route, then the digest route) comes after, as does a scheduler for the digest. Brief: local, untracked `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`. | P2 | M left |
 | C17 | **One design reference, then a periodic check** (founder idea, 2026-10-03; not a priority). Collect the preferred look in one living reference, then audit screens against it: the rounded, blurred-backdrop modal (the admin Delete popup), font faces and colours, window patterns, the colour scheme and the one crown logo (now Wear's PNG). Today three definitions drift apart: `packages/ui/src/tokens.ts` (Wear-targeted, gold `#C9A24A`, a placeholder SVG crown, no consumer), Connect's CSS variables (`--gold-crown #D4AF37`) and Wear's PNG. First step: reconcile them into `packages/ui` tokens plus a short design reference with screenshots; the "daily check" could later become a step in P2's routine. | P3 | M |
 
 **C10 design (agreed 2026-10-03; nothing built yet).**
@@ -264,8 +282,8 @@ design session first.
   for the admin (the Sheet status says "Owner declined"; the admin decides whether to Delete); nothing on the existing
   account changes. **No response:** the listing stays live, the Sheet shows "Awaiting owner" with its age, and **one reminder
   email goes out at 7 days**; nothing is ever attached without the owner's yes, and no auto-expiry.
-- *Order of work (founder, 2026-10-03):* **Listing Automation Phase 1 comes first**, then C10. Both need a migration (take the
-  next free number at apply time; 179 is applied and 180 is claimed by #88) and both edit the intake route and the Apps Script. The repo's
+- *Order of work (founder, 2026-10-03):* **Listing Automation Phase 1 comes first** (now shipped, C16), then C10. C10 needs a
+  migration (take the next free number at apply time; 181 is the current head) and both edit the intake route (C16 already has) and the Apps Script. The repo's
   `tools/google-forms/intake.gs` is now the corrected, wording-matched script (#85); **C10 starts from it**, never from the old
   number-matching copy (it misread the consent question after the Section 7 reorder). Both designs agree: the
   database is the source of truth, consent comes first, and no Google Sheet sits in the data path.
@@ -289,7 +307,7 @@ design session first.
 | ID | Item | Pri | Size |
 |---|---|---|---|
 | V1 | **Timeline Map with live MapLibre.** `views.jsx TimelineMap()` is still a placeholder; `/api/map/activities` and `/api/timeline` exist and the MapTiler key is set. No migration. Vision's `index.html` loads **no** MapLibre today: use the vendored 6.11.2 copy (see §3). (§3AC) | P2 | M |
-| V2 | **Network graph** (§4.3 of the wiring spec): "which orgs share your audience?" Its own PR + migration (take the next free number at apply time: head + 1, and 180 is already claimed by PR #88, see §2). Reuse `org_active_persons` + the mig-155/156 orbit pattern; it feeds `vision.org_partnerships` + `/api/metrics/cross-org`. | P3 | L |
+| V2 | **Network graph** (§4.3 of the wiring spec): "which orgs share your audience?" Its own PR + migration (take the next free number at apply time: head + 1; 180 and 181 are applied, see §2). Reuse `org_active_persons` + the mig-155/156 orbit pattern; it feeds `vision.org_partnerships` + `/api/metrics/cross-org`. | P3 | L |
 | V3 | Phase D: exports, partnerships, scheduled reports. | Parked | L |
 | V4 | Adoption: 1 Vision organisation exists and none is linked to a Connect Contributor. Onboard a real organisation (founder). | P2 | — |
 | V5 | `apps/vision/docs/ADMIN_GUIDE.md` still describes the retired Connect-sync subsystem. | P3 | S |
@@ -342,11 +360,36 @@ design session first.
 | P17 | Monetisation | PayFast schema only (mig 081); a brand fee is agreed in a form but never collected. | M1, A4 |
 | P18 | Figma-Make prototypes | Leftover tables and edge functions in prod from the June experiments. | H6 |
 | P19 | Address hygiene | Roadmap only: custom domains + a branded storage origin. | A6 |
+| P20 | **Listing Automation Phase 1** (C16) | Merged (#92) and migration 181 applied; dormant: every level is `off`, no `automation:*` key is minted, `RESEND_API_KEY` is unconfirmed. Phase 2 (the scheduled reader) is not started. | C16 |
 
 ---
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-04 — C16: Listing Automation Phase 1 (PR #92), migration 181 applied, merged, DORMANT.** The founder first said "read the brief
+  and plan, apply nothing", so the PR was code, SQL and tests; once it was ready he said yes, in chat, to the apply, to merging after a
+  green CI, and to Auto-fix. **Applied:** pre-apply tag `connect-pre-mig181-listing-automation` pushed, a read-only check that every
+  column and function the function bodies name exists (plpgsql is not checked at `CREATE`), `apply_migration` (`20261004103205`), then a
+  30-check rollback-only probe (consent guard, private columns, RLS for owner / other user / anon, https-only and Meta/TikTok rules,
+  dedupe, all three RPCs, instant withdrawal, role-loss reset): no FAIL, nothing left behind. Advisors: +3 WARN (the three functions),
+  0 ERROR, nothing else changed (§2). **What exists:** `181_listing_automation_phase1.sql`
+  (four private consent columns on `profiles` behind their own guard trigger, `events.source_url`, `listing_sources`, `listing_suggestions`,
+  RLS on both, a reset when someone stops being a Contributor, and three SECDEF RPCs: `get_my_automation_settings`,
+  `set_my_automation_level`, `decide_listing_suggestion`); `src/lib/automation/` (the one validator, `validateSuggestion`; source rows);
+  `POST /api/automation/suggestions` (scope `automation:suggest`: eligibility, consent, source, validation, 100/hour cap, dedupe by
+  fingerprint, auto-publish of a future event only at `events_auto`) and `POST /api/automation/digest` (scope `automation:digest`: the
+  once-a-day "new suggestions" email); the Form intake route records the consent last and fails closed; the dashboard gets an
+  Automatic updates card (Profile tab) and a Suggestions tab; Admin → Listings shows each level and pending count. **Rules in §3.**
+  **Deviations from the brief** (decided on evidence, listed in C16): no images in Phase 1 (CSP), owner actions on the owner's own
+  session instead of new `/api` routes, the digest is a Next route on #88's mailer (the brief said `send-contributor-digest` emails; it
+  only writes an in-app notification), no new notification type, "Edit & publish" inline. **Checks:** Connect 1237 unit (36 live-only
+  skipped), Playwright e2e (incl. 19 new listing-automation tests; see §2), lint, typecheck, build, format; 40 mutations of the
+  validator, routes, digest and card code, 39 caught, the one survivor was dead code and was removed. **Gotchas:** (1) `git add -A`
+  swept ten untracked local files into a wip commit; caught before any push and removed from the history (stage explicit paths,
+  §3). (2) A Next route file may export only handlers and config: a stray `export const SUGGEST_SCOPE` failed the build. (3) A Facebook,
+  Instagram or TikTok source is stored but must never be enabled. (4) The advisor baseline was 118 WARN live, not the 119 this file
+  said. **Still to do (founder):** mint the two `automation:*` keys from an admin session (the secret is shown once), confirm
+  `RESEND_API_KEY` in Vercel, then the optional one-off backfill (never committed). **Not started:** Phase 2, the scheduled reader.
 - **2026-10-04 — C15: a real URL for every screen (PR #89).** C1/C1b (#84) and H9 (#85) merged the day before. Every screen has
   its own address (`/`, `/discover`, `/e/<id>`, `/p/<id>`, `/c/<slug>`, `/me`, `/dashboard/<tab>`, `/admin/<tab>`...), so a refresh
   keeps you where you are and a link can be shared. The table is `app/routes.jsx`; the server rewrites an explicit list (never a
@@ -361,7 +404,7 @@ design session first.
   with #88 (D-12) mid-flight:** the route gate now lets a pending applicant keep their Dashboard (the being-reviewed page). **To confirm:** `/discover` for Kingdom Exploration (the tab says "Exploration"; `/explore` is a
   one-line change in `routes.jsx`, `next.config.ts` and the tests). **Gotchas:** a mutation harness stopped with `taskkill /F` left a
   mutated tree (stash originals, hash the tree before and after); a sibling session's `next build` makes e2e 3-5x slower. **Open:**
-  the founder's live checks; C16 waits for his yes (it needs a migration).
+  the founder's live checks (C16 has since shipped, see the entry above).
 - **2026-10-03 — `braces` patched fork replaces the OSV exception (H8 closed, PR #87).** Instead of renewing the dated exception, `packages/braces-patched` (private, `3.0.3-citizens.1`) is the exact `braces@3.0.3` tarball (sha512 checked against the lockfile, MIT kept) plus a nesting-depth guard: `lib/parse.js` refuses more than 100 nested `{`/`(` blocks with a `SyntaxError`, and `compile`/`expand`/`stringify` count depth for caller-built ASTs; `options.maxDepth` can only lower the limit. Root `pnpm.overrides` has `"braces": "link:./packages/braces-patched"`, so `pnpm-lock.yaml` holds no npm `braces` and `osv-scanner.toml` is empty again (no `[[IgnoredVulns]]`). **Proof:** the CI's exact command (osv-scanner v2.3.8, run locally) says "No issues found" on the new lockfile and, as a control, flags only this advisory on the old one. Normal patterns behave byte-for-byte as before: a golden test of about 490 000 results against the pristine tarball, and eslint over 473 files in 7 packages gives byte-identical JSON with the pristine copy swapped in. **Gotchas:** (1) CI runs `pnpm test:coverage`, so the fork defines that script too, or turbo skips its 150 tests. Once it ran, the first CI run failed on a fixture generated on Windows: picomatch writes `[\\/]` in a regex on a Windows host and `\/` on Linux unless its `windows` option is a boolean, so the golden now pins `windows: false` (regenerated against the pristine braces). Anything generated on this machine and compared on CI must not depend on the OS. (2) Pristine braces' failing depth at the default stack is erratic (V8 JIT state); `node --stack-size=200` is the deterministic repro. (3) Two load flakes (5 s timeouts) when Vision's suite hogs the CPU: `frontend-build` "hashed outputs" and Connect's `profiles-column-privacy` "176 alone"; both pass alone, and `turbo run test:coverage --concurrency=2` helps. Open: **H10** (check monthly for an upstream fix); the upstream draft for `micromatch/braces` is in the PR description and is NOT posted (needs the founder's OK).
 - **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (#82, merged `ec19099`).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
   `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
@@ -395,21 +438,7 @@ design session first.
   Route `/api/admin/contributors/delete-listing` (the old `/contributors/delete` discards applications).
   Founder decisions on C10 recorded above. Open: founder steps **A10**, Vision port (**C5**), **C10**, **C14**.
   The 2026-10-02 handoff stays untracked (it names a real organisation; this repo is public).
-- **2026-09-27 (overnight) — React-types alignment (S2), all missing tags, intake moderation (C2).** PRs
-  #72 (`0231014`), #73 (`abd0205`) and #74 (`279a677`), all merged. wear/ui now use connect's `@types/react`,
-  and `pnpm.packageExtensions` gives `next` per-app `@types` peers. Hoist-swap proof: 0 tsc errors under every
-  hoist, even without `react-canary.d.ts` (the control on `main` reproduced the `cache` error). Pushed all 5
-  missing tags (the remote now has 12). Intake: prod DB path re-probed after 174–177 (rollback-only, all green);
-  new **Admin → Listings** (hide/unhide, owner-sign-in state); actionable 409 Notes; README updated. Found: the
-  Sheet holds only 3 hand-typed sample rows (A1). New founder decision C10. No migration (next # still 178).
-- **2026-09-27 — RESUME_HERE audit + slim-down** (branch `claude/resume-here-slimdown`). Moved §3A–§3AT and the
-  old NEXT STEPS verbatim to `docs/archive/RESUME_HISTORY_2026H2.md` (this file: 3,849 → about 300 lines).
-  Re-verified every open item against live state. Closed as already done: Upstash env set; Wear brand queue
-  cleared (all 6 brands verified, incl. the Mustard Seed demo); "Dam Cool" socials re-entered; Resend DNS,
-  Vision deploy gates, PAT rotation and the code-as-hero email template all done. New finds: orphan prod tables
-  and functions (H6), 9 undeployed edge functions (H5), missing git tags (S2), 4 invisible Contributors (A5),
-  perf-advisor debt (S6), stale status docs (H4). Rescued the Wear CSP brief from `%TEMP%`. No code or DB change.
-- **Earlier (2026-08-23 → 09-26, PRs #40–#63):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
+- **Earlier (2026-08-23 → 09-27, PRs #40–#74; the 09-27 entries are in the archive's second moved batch):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
   contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
   Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
 

@@ -28,7 +28,7 @@
   const isSlug = (v) => typeof v === 'string' && SLUG_RE.test(v);
 
   // First entry is each screen's default tab (it gets the short URL).
-  const DASHBOARD_TABS = ['overview', 'events', 'news', 'profile', 'messages', 'tools'];
+  const DASHBOARD_TABS = ['overview', 'events', 'news', 'suggestions', 'profile', 'messages', 'tools'];
   const ADMIN_TABS = ['applications', 'overview', 'listings', 'create', 'reports'];
 
   // page → path, for the screens that are one fixed path.
