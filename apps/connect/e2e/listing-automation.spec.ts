@@ -546,3 +546,43 @@ test.describe("Automatic updates card (Profile tab)", () => {
     await expect(cardLoc(page).locator('[data-source="facebook"]')).toHaveCount(0);
   });
 });
+
+test.describe("Admin → Listings shows each listing's automation", () => {
+  const ADMIN: FakeUser = { id: "55555555-5555-4555-8555-555555555555", email: "admin@automation.example", fullName: "Admin" };
+  const row = (over: Row) => ({
+    avatar_url: null,
+    role: "contributor",
+    contributor_kind: "organization",
+    contributor_status: "approved",
+    contributor_hidden: false,
+    contributor_claim_email: null,
+    contributor_claimed_at: "2026-09-20T10:00:00Z",
+    created_at: "2026-09-19T08:00:00Z",
+    ...over,
+  });
+
+  test("the level and the number of suggestions waiting, and nothing for a row the server could not look up", async ({ page }) => {
+    await mockAppShell(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
+    await signInToFakeProject(page, { user: ADMIN, profile: { role: "admin", contributor_status: "not_applied" } });
+    await page.route("**/api/admin/users**", (route: Route) => {
+      const params = new URL(route.request().url()).searchParams;
+      const data =
+        params.get("role") !== "contributor"
+          ? []
+          : [
+              row({ id: "a1000000-0000-4000-8000-000000000001", full_name: "Auto Org", contributor_slug: "auto-org", auto_update_level: "events_auto", pending_suggestions: 3 }),
+              row({ id: "a1000000-0000-4000-8000-000000000002", full_name: "Quiet Org", contributor_slug: "quiet-org", auto_update_level: "off", pending_suggestions: 0 }),
+              row({ id: "a1000000-0000-4000-8000-000000000003", full_name: "Suggest Org", contributor_slug: "suggest-org", auto_update_level: "suggest", pending_suggestions: 1 }),
+              row({ id: "a1000000-0000-4000-8000-000000000004", full_name: "Unknown Org", contributor_slug: "unknown-org" }),
+            ];
+      return route.fulfill({ json: { data, meta: { page: 1, pageSize: 20, total: data.length } } });
+    });
+
+    await page.goto("/admin/listings");
+    await expect(page.locator('[data-listing="auto-org"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-listing="auto-org"]').getByText("Automatic updates: Auto events · 3 pending")).toBeVisible();
+    await expect(page.locator('[data-listing="quiet-org"]').getByText("Automatic updates: Off", { exact: true })).toBeVisible();
+    await expect(page.locator('[data-listing="suggest-org"]').getByText("Automatic updates: Suggest · 1 pending")).toBeVisible();
+    await expect(page.locator('[data-listing="unknown-org"]').locator("[data-automation]")).toHaveCount(0);
+  });
+});

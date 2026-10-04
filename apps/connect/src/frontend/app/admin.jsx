@@ -243,6 +243,10 @@
           h('div', { className: 'flex items-center gap-x-3 gap-y-0.5 mt-0.5 flex-wrap text-[10px] text-muted-foreground' },
             kind && h('span', null, kind.label),
             row.contributor_slug && h('a', { href: '/c/' + row.contributor_slug, target: '_blank', rel: 'noopener noreferrer', className: 'text-gold-dark hover:underline' }, '/c/' + row.contributor_slug),
+            row.auto_update_level && h('span', { className: 'flex items-center gap-1', 'data-automation': row.auto_update_level },
+              h(Icon, { name: 'Sparkles', size: 9 }),
+              'Automatic updates: ' + ({ off: 'Off', suggest: 'Suggest', events_auto: 'Auto events' }[row.auto_update_level] || row.auto_update_level) +
+                (row.pending_suggestions ? ' · ' + row.pending_suggestions + ' pending' : '')),
             awaitingOwner && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Clock', size: 9 }), 'Awaiting owner sign-in · ' + row.contributor_claim_email),
             movedToOwner
               ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))

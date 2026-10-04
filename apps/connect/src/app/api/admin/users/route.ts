@@ -70,7 +70,8 @@ export async function GET(request: NextRequest) {
   // authorisation; the service-role client only performs this admin-gated
   // read. The hidden/claim columns feed the admin Listings tab (hide a
   // listing, see whether its owner has signed in yet).
-  let query = createAdminClient()
+  const admin = createAdminClient();
+  let query = admin
     .from("profiles")
     .select(
       "id, email, full_name, avatar_url, role, contributor_kind, contributor_status, contributor_slug, contributor_hidden, contributor_claim_email, contributor_claimed_at, created_at",
@@ -97,8 +98,46 @@ export async function GET(request: NextRequest) {
     console.error("[admin/users GET]", error);
     return NextResponse.json({ error: "Query failed" }, { status: 500 });
   }
+  const rows = (data ?? []) as { id: string; role?: string | null }[];
+
+  // Listing automation (mig 181), for the Listings tab: each Contributor's level and how many
+  // suggestions wait for them. BEST-EFFORT and separate from the list above on purpose: if the
+  // migration is not applied (or the read fails) the list is unchanged and the tab simply shows
+  // no automation column. `auto_update_level` is private, hence the admin-gated service-role read.
+  const automation = new Map<string, { level: string; pending: number }>();
+  const contributorIds = rows.filter((r) => r.role === "contributor").map((r) => r.id);
+  if (contributorIds.length > 0) {
+    try {
+      const [levels, pending] = await Promise.all([
+        admin.from("profiles").select("id, auto_update_level").in("id", contributorIds),
+        admin
+          .from("listing_suggestions")
+          .select("contributor_id")
+          .eq("status", "pending")
+          .in("contributor_id", contributorIds)
+          .limit(5000),
+      ]);
+      if (!levels.error) {
+        for (const l of (levels.data ?? []) as { id: string; auto_update_level: string }[]) {
+          automation.set(l.id, { level: l.auto_update_level, pending: 0 });
+        }
+        if (!pending.error) {
+          for (const s of (pending.data ?? []) as { contributor_id: string }[]) {
+            const a = automation.get(s.contributor_id);
+            if (a) a.pending += 1;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[admin/users GET] automation lookup skipped", e);
+    }
+  }
+
   return NextResponse.json({
-    data: data ?? [],
+    data: rows.map((r) => {
+      const a = automation.get(r.id);
+      return a ? { ...r, auto_update_level: a.level, pending_suggestions: a.pending } : r;
+    }),
     meta: { page, pageSize: PAGE_SIZE, total: count ?? 0 },
   });
 }

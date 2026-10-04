@@ -166,7 +166,9 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // createAdminClient() after requireAdmin()
   // + the claim columns: the admin Listings tab shows whether an admin- or
   // form-created listing's owner has signed in yet.
-  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at"],
+  // + auto_update_level (mig 181): the Listings tab shows each listing's automation level
+  // (a separate, best-effort read after the list; never returned to anyone but the admin).
+  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at", "auto_update_level"],
   "app/api/admin/suggestions/export/route.ts": ["email"],
   "app/api/admin/contributor-applications/route.ts": ["email"],
   // createAdminClient() after requireAdmin() AND after the approve/reject RPC
