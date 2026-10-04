@@ -212,7 +212,7 @@ describe("POST /api/automation/suggestions: storing", () => {
     const body = await res.json();
     expect(body.results[0].warnings.join(" ")).toMatch(/removed/);
     const stored = state.listing_suggestions[0].payload as Row;
-    expect(Object.keys(stored).sort()).toEqual(["category", "description", "end", "image_url", "location", "start", "title", "website_url"]);
+    expect(Object.keys(stored).sort()).toEqual(["category", "description", "end", "location", "start", "title", "website_url"]);
     expect(String(stored.description)).toBe("Call [removed] or mail [removed]");
   });
 

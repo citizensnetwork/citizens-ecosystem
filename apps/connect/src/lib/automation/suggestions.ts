@@ -17,6 +17,13 @@
  *
  * Auto-publish is for events only, only at level `events_auto`, and never for
  * an event that has already started (`isAutoPublishable`).
+ *
+ * No IMAGES in Phase 1. A suggestion's image would be someone else's URL, and the
+ * site's CSP (`img-src`) only allows our own hosts, so a hotlinked picture would
+ * render broken (and hotlinking leaks viewers' addresses to a third party). Images
+ * need a server-side copy into our own storage, which is a Phase 2 step; until then
+ * an `image_url` on an event or news item is dropped with a warning, and a logo or cover
+ * is not a suggestible profile field at all.
  */
 
 import { createHash } from "node:crypto";
@@ -58,6 +65,7 @@ const MAX_DAYS_AHEAD = 730;
 /** An end time further than this after the start is dropped (a wrong year, a series). */
 const MAX_EVENT_HOURS = 14 * 24;
 const REMOVED = "[removed]";
+const IMAGES_NOT_IMPORTED = "Images are not imported yet, so the image link was left out.";
 
 // ── consent level ────────────────────────────────────────────────────────
 
@@ -156,7 +164,6 @@ export type EventPayload = {
   end: string | null;
   location: string;
   category: string;
-  image_url: string | null;
   website_url: string | null;
 };
 
@@ -164,17 +171,17 @@ export type NewsPayload = {
   title: string;
   body: string;
   link: string | null;
-  image_url: string | null;
   /** YYYY-MM-DD */
   post_date: string;
 };
 
-/** The profile fields a suggestion may change. Phone and WhatsApp numbers are deliberately absent. */
+/**
+ * The profile fields a suggestion may change: text and links only. Phone and WhatsApp
+ * numbers are deliberately absent, and so are the logo and cover (images wait for Phase 2).
+ */
 export const PROFILE_FIELDS = [
   "bio",
   "website_url",
-  "logo_url",
-  "cover_url",
   "contact_email",
   "instagram_handle",
   "facebook_url",
@@ -255,8 +262,7 @@ function validateEvent(raw: Record<string, unknown>, now: Date, warnings: string
   }
   const category = known ? (raw.category as string) : "church-services";
 
-  const image = raw.image_url === undefined || raw.image_url === null || raw.image_url === "" ? null : httpsUrlOrNull(raw.image_url);
-  if (raw.image_url && !image) warnings.push("The image link was not a usable https link and was dropped.");
+  if (raw.image_url) warnings.push(IMAGES_NOT_IMPORTED);
   const website = raw.website_url === undefined || raw.website_url === null || raw.website_url === "" ? null : httpsUrlOrNull(raw.website_url);
   if (raw.website_url && !website) warnings.push("The website link was not a usable https link and was dropped.");
 
@@ -268,7 +274,6 @@ function validateEvent(raw: Record<string, unknown>, now: Date, warnings: string
       end: end ? end.toISOString() : null,
       location,
       category,
-      image_url: image,
       website_url: website,
     },
   };
@@ -292,15 +297,14 @@ function validateNews(raw: Record<string, unknown>, now: Date, warnings: string[
 
   const link = raw.link === undefined || raw.link === null || raw.link === "" ? null : httpsUrlOrNull(raw.link);
   if (raw.link && !link) warnings.push("The link was not a usable https link and was dropped.");
-  const image = raw.image_url === undefined || raw.image_url === null || raw.image_url === "" ? null : httpsUrlOrNull(raw.image_url);
-  if (raw.image_url && !image) warnings.push("The image link was not a usable https link and was dropped.");
+  if (raw.image_url) warnings.push(IMAGES_NOT_IMPORTED);
 
   let postDate = now.toISOString().slice(0, 10);
   if (typeof raw.post_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.post_date)) {
     const d = new Date(`${raw.post_date}T00:00:00Z`);
     if (!Number.isNaN(d.getTime()) && d.getTime() <= now.getTime() + 86_400_000 && d.getUTCFullYear() >= 2000) postDate = raw.post_date;
   }
-  return { payload: { title: safeTitle, body, link, image_url: image, post_date: postDate } };
+  return { payload: { title: safeTitle, body, link, post_date: postDate } };
 }
 
 function validateProfile(raw: Record<string, unknown>, warnings: string[]): { payload: ProfilePayload } | { reason: string } {
@@ -316,7 +320,7 @@ function validateProfile(raw: Record<string, unknown>, warnings: string[]): { pa
     if (r.removed) warnings.push("Phone numbers or email addresses were removed from the text.");
     return { payload: { field: f, value: r.text } };
   }
-  if (f === "website_url" || f === "logo_url" || f === "cover_url") {
+  if (f === "website_url") {
     const url = httpsUrlOrNull(raw.value);
     return url ? { payload: { field: f, value: url } } : { reason: "profile_value_invalid" };
   }

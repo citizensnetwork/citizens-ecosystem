@@ -293,7 +293,6 @@ async function publishEvent(
       end_time: event.end,
       location: event.location,
       created_by: contributorId,
-      image_url: event.image_url,
       website_url: event.website_url,
       latitude: point ? point.lat : null,
       longitude: point ? point.lng : null,

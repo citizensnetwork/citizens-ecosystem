@@ -22,7 +22,6 @@ const goodEvent = {
   end: "2026-10-11T11:00:00+02:00",
   location: "12 Church Street, Pretoria",
   category: "church-services",
-  image_url: "https://www.church.example/img/a.jpg",
   website_url: "https://www.church.example/sunday",
 };
 
@@ -111,7 +110,7 @@ describe("validateSuggestion: events", () => {
   it("copies ONLY the allow-listed keys (an unknown key is dropped, never stored)", () => {
     const r = validateSuggestion("event", { ...goodEvent, created_by: "someone-else", status: "cancelled", visibility: "private", contact_phone: "0821234567", attendee_list: ["a"] }, SRC, NOW);
     if (!r.ok) throw new Error(r.reason);
-    expect(Object.keys(r.payload).sort()).toEqual(["category", "description", "end", "image_url", "location", "start", "title", "website_url"]);
+    expect(Object.keys(r.payload).sort()).toEqual(["category", "description", "end", "location", "start", "title", "website_url"]);
   });
 
   it("requires a real title and a start with an explicit offset", () => {
@@ -157,13 +156,19 @@ describe("validateSuggestion: events", () => {
     expect(r.warnings.filter((w) => /removed/.test(w))).toHaveLength(1);
   });
 
-  it("falls back to Church services for an unknown category, and drops non-https links, each with a warning", () => {
-    const r = validateSuggestion("event", { ...goodEvent, category: "bingo", image_url: "http://x.example/a.jpg", website_url: "javascript:alert(1)" }, SRC, NOW);
+  it("imports no images: an image link is dropped with a warning (the CSP would block a third-party picture, and hotlinking leaks viewers' addresses)", () => {
+    const r = validateSuggestion("event", { ...goodEvent, image_url: "https://www.church.example/img/a.jpg" }, SRC, NOW);
+    if (!r.ok || r.kind !== "event") throw new Error("expected an event");
+    expect(r.payload).not.toHaveProperty("image_url");
+    expect(r.warnings.join(" ")).toMatch(/Images are not imported/);
+  });
+
+  it("falls back to Church services for an unknown category, and drops a bad website link, each with a warning", () => {
+    const r = validateSuggestion("event", { ...goodEvent, category: "bingo", website_url: "javascript:alert(1)" }, SRC, NOW);
     if (!r.ok || r.kind !== "event") throw new Error("expected an event");
     expect(r.payload.category).toBe("church-services");
-    expect(r.payload.image_url).toBeNull();
     expect(r.payload.website_url).toBeNull();
-    expect(r.warnings).toHaveLength(3);
+    expect(r.warnings).toHaveLength(2);
   });
 
   it("caps lengths and strips control characters", () => {
@@ -197,7 +202,7 @@ describe("isAutoPublishable: events only, at events_auto only, never already-sta
     expect(isAutoPublishable("suggest", { kind: "event", payload: future }, NOW)).toBe(false);
   });
   it("never for news or profile suggestions, even at events_auto", () => {
-    expect(isAutoPublishable("events_auto", { kind: "news", payload: { title: "x", body: "y", link: null, image_url: null, post_date: "2026-10-04" } }, NOW)).toBe(false);
+    expect(isAutoPublishable("events_auto", { kind: "news", payload: { title: "x", body: "y", link: null, post_date: "2026-10-04" } }, NOW)).toBe(false);
     expect(isAutoPublishable("events_auto", { kind: "profile", payload: { field: "bio", value: "x" } }, NOW)).toBe(false);
   });
   it("never for an event that has already started, nor one starting this very instant", () => {
@@ -207,7 +212,7 @@ describe("isAutoPublishable: events only, at events_auto only, never already-sta
 });
 
 describe("validateSuggestion: news", () => {
-  const news = { title: "New building opens", body: "We open our doors on Sunday.", link: "https://www.church.example/news/1", image_url: "https://www.church.example/n.jpg" };
+  const news = { title: "New building opens", body: "We open our doors on Sunday.", link: "https://www.church.example/news/1" };
 
   it("accepts a news post and defaults the date to today", () => {
     const r = validateSuggestion("news", news, SRC, NOW);
@@ -221,7 +226,7 @@ describe("validateSuggestion: news", () => {
   it("copies only the allow-listed keys and scrubs personal contact details", () => {
     const r = validateSuggestion("news", { ...news, body: "Ring Pastor on 082 123 4567 or pastor@home.example", author_id: "x", pinned: true }, SRC, NOW);
     if (!r.ok || r.kind !== "news") throw new Error("expected news");
-    expect(Object.keys(r.payload).sort()).toEqual(["body", "image_url", "link", "post_date", "title"]);
+    expect(Object.keys(r.payload).sort()).toEqual(["body", "link", "post_date", "title"]);
     expect(r.payload.body).toBe("Ring Pastor on [removed] or [removed]");
     expect(r.warnings.join(" ")).toMatch(/removed/);
   });
@@ -233,6 +238,12 @@ describe("validateSuggestion: news", () => {
     expect(ok.payload.post_date).toBe("2026-10-01");
     expect(future.payload.post_date).toBe("2026-10-04");
     expect(junk.payload.post_date).toBe("2026-10-04");
+  });
+  it("imports no images for news either (dropped with a warning)", () => {
+    const r = validateSuggestion("news", { ...news, image_url: "https://www.church.example/n.jpg" }, SRC, NOW);
+    if (!r.ok || r.kind !== "news") throw new Error("expected news");
+    expect(r.payload).not.toHaveProperty("image_url");
+    expect(r.warnings.join(" ")).toMatch(/Images are not imported/);
   });
   it("dedupes on the article link when there is one, else on the title", () => {
     const a = validateSuggestion("news", news, SRC, NOW);
@@ -247,11 +258,11 @@ describe("validateSuggestion: news", () => {
 });
 
 describe("validateSuggestion: profile updates", () => {
-  it("offers organisation fields only: no personal phone or WhatsApp number, nothing else", () => {
+  it("offers organisation text and links only: no phone or WhatsApp number, and no logo or cover (images wait for Phase 2)", () => {
     expect([...PROFILE_FIELDS].sort()).toEqual(
-      ["bio", "contact_email", "cover_url", "facebook_url", "instagram_handle", "linkedin_url", "logo_url", "tiktok_handle", "website_url", "x_handle", "youtube_url"].sort(),
+      ["bio", "contact_email", "facebook_url", "instagram_handle", "linkedin_url", "tiktok_handle", "website_url", "x_handle", "youtube_url"].sort(),
     );
-    for (const field of ["whatsapp_number", "phone", "email", "role", "contributor_status", "contributor_hidden", "billing_tier", "full_name", "physical_address", "id"]) {
+    for (const field of ["whatsapp_number", "phone", "email", "logo_url", "cover_url", "role", "contributor_status", "contributor_hidden", "billing_tier", "full_name", "physical_address", "id"]) {
       expect(validateSuggestion("profile", { field, value: "x" }, SRC, NOW), field).toEqual({ ok: false, reason: "profile_field_not_allowed" });
     }
     expect(validateSuggestion("profile", { value: "x" }, SRC, NOW)).toEqual({ ok: false, reason: "profile_field_not_allowed" });
@@ -262,8 +273,8 @@ describe("validateSuggestion: profile updates", () => {
     expect(r.payload).toEqual({ field: "bio", value: "We serve Pretoria. Call [removed]." });
     expect(validateSuggestion("profile", { field: "bio", value: "  " }, SRC, NOW)).toEqual({ ok: false, reason: "profile_value_required" });
   });
-  it("requires https links for website, logo and cover", () => {
-    for (const field of ["website_url", "logo_url", "cover_url"]) {
+  it("requires an https link for the website", () => {
+    for (const field of ["website_url"]) {
       expect(validateSuggestion("profile", { field, value: "https://www.church.example/a.png" }, SRC, NOW).ok, field).toBe(true);
       for (const value of ["http://www.church.example/a.png", "javascript:1", "church.example", ""]) {
         expect(validateSuggestion("profile", { field, value }, SRC, NOW), `${field} ${value}`).toEqual({ ok: false, reason: "profile_value_invalid" });
