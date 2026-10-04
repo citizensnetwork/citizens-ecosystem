@@ -169,6 +169,10 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at"],
   "app/api/admin/suggestions/export/route.ts": ["email"],
   "app/api/admin/contributor-applications/route.ts": ["email"],
+  // createAdminClient() after requireAdmin() AND after the approve/reject RPC
+  // committed: the applicant's address is read only to send them the verdict
+  // email, and is never returned to the browser (contributors-review.test.ts pins that).
+  "app/api/admin/contributors/review/route.ts": ["email"],
   "app/api/admin/pending-elevations/route.ts": ["email"],
   // `admin` = createAdminClient(); fan-out mute filter for broadcast pushes
   "app/api/contributor/[handle]/broadcasts/route.ts": ["muted_source_ids"],

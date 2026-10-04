@@ -193,7 +193,7 @@
   ];
   function SettingsPage() {
     const app = window.useApp();
-    const { user, role, go, toast, isCitizen, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
+    const { user, role, go, toast, isCitizen, isPendingApplicant, contributorStatus, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
     const { useEffect } = React;
     // An email-code sign-up has no name yet (user.name is only a readable
     // stand-in, never stored): leave the field empty with the stand-in as its
@@ -249,10 +249,18 @@
               NOTIF_PREFS.map(([k, l, d]) => h('div', { key: k, className: 'p-3 rounded-xl bg-white/60 border border-border' },
                 h(Toggle, { checked: notifOn(k), onChange: (v) => toggleNotif(k, v), label: l, desc: d }))))),
 
-          isCitizen && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/40 border border-gold/30' },
-            h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, 'Weekly contribution')),
-            h('p', { className: 'text-xs text-gold-dark/80 mb-3' }, 'Citizens can post one community-organised event each week. Want to do more? Apply to become a Contributor.'),
-            h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, 'Apply to become a Contributor')),
+          // The Contributor call-to-action follows where the person is in the (D-12) flow:
+          // waiting for an admin → their Dashboard; turned down → apply again; otherwise → apply.
+          isCitizen && isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]/50 border border-[#D97706]/20' },
+            h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Clock', size: 16, className: 'text-[#92400E]' }), h('p', { className: 'text-sm font-bold text-[#92400E]' }, 'Your Contributor application is being reviewed')),
+            h('p', { className: 'text-xs text-[#92400E]/80 mb-3' }, 'You can finish your profile while you wait. It goes on the map once an admin approves it.'),
+            h(Button, { variant: 'gold', size: 'sm', icon: 'LayoutDashboard', onClick: () => go('dashboard') }, 'Open my application')),
+          isCitizen && !isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/40 border border-gold/30' },
+            h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, contributorStatus === 'rejected' ? 'Your last application' : 'Weekly contribution')),
+            h('p', { className: 'text-xs text-gold-dark/80 mb-3' }, contributorStatus === 'rejected'
+              ? "Your last Contributor application wasn't approved this time. The reason is in your notifications and email. You're welcome to make those changes and apply again."
+              : 'Citizens can post one community-organised event each week. Want to do more? Apply to become a Contributor.'),
+            h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, contributorStatus === 'rejected' ? 'Apply again' : 'Apply to become a Contributor')),
 
           h(Section, { title: 'Account' },
             h('div', { className: 'flex items-center justify-between' },
