@@ -52,9 +52,9 @@
 
 - **`main` @ `ec19099`** (PR #82, Wear's crown + loading splash, merged 2026-10-03 on top of #79 admin Delete + mig 178, #78/#80
   map-preview work and #81, the dated `braces` OSV exception). CI and CodeQL are green on it and the Connect production deploy
-  completed (Vision and Wear "not affected"). No open feature PRs; the 14 open PRs are all stale Dependabot ones (item **H1**).
-- **Database head = migration 178** (`20261002231716 / 178_admin_remove_contributor_listing`). **Next migration # = 179.**
-- **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
+  completed (Vision and Wear "not affected"). Since then (2026-10-04): #86 (mig 179) and #88 (D-12, mig 180) landed, and the D-13 welcome-email PR (#90) follows (see §6). **#89 (C15, URL routing; another session) overlaps them in `store.jsx`, `shell.jsx`, `admin.jsx` and `index.html`: whoever merges second merges `main` in and re-bumps the `?v=` stamps.** The 14 stale Dependabot PRs remain (item **H1**).
+- **Database head = migration 180** (`20261004061633 / 180_contributor_applications_need_admin_approval`, applied 2026-10-04 after PR #88's deploy; pre-apply tag `connect-pre-mig180-contributor-approval`). **Next migration # = 181.** (179, `20261003145437`, made approve reset `contributor_hidden` and repaired the admin review RPCs.)
+- **Security advisor baseline: 0 ERROR / 118 WARN / 3 INFO** (re-checked 2026-10-04 after mig 180: one fewer WARN than before, because the dropped `self_approve_contributor_application` was one of the authenticated SECURITY DEFINER grants). Every WARN is known and accepted: 105
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
   (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
   design) and two orphan tables (item **H6**). Compare new work against **this** baseline.
@@ -66,13 +66,15 @@
 - **Live data (2026-10-03):** 16 profiles · 5 Contributors (**only 2 are on the map; the other 3 lack a category or a pin, or are hidden**) · 40 Places ·
   4 Events (**0 upcoming, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin.
   Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
-- **Tests (last full run, the braces-fork PR on the merged tree, 2026-10-03):** Connect 902 unit (+32 live-only, skipped in CI) ·
-  Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · `braces-patched` 150 · **Connect Playwright e2e 41/41**.
+- **Tests (2026-10-04: Connect from the D-13 branch, the rest from the D-12 workspace run):** Connect 1035 unit (+32 live-only, skipped in CI) ·
+  Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · `braces-patched` 150 · **Connect Playwright e2e 57/57**.
   (Two tests can hit their 5 s timeout when every app's suite runs in parallel on a busy machine: `frontend-build`'s
   "hashed outputs" and Connect's `profiles-column-privacy` "176 alone". Both pass alone in seconds.)
 - **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash (rate limiting is live), `INTAKE_WEBHOOK_SECRET`
   and the Vercel↔Supabase integration vars. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`,
-  domain verified).
+  domain verified). **Connect has no `RESEND_API_KEY` and no `ADMIN_NOTIFY_EMAIL` in Vercel yet (founder step A11):** until
+  they are added, the emails Connect sends itself (new-application notice, approve/reject verdict, owner welcome) are
+  `skipped`, which is logged and never an error.
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -101,7 +103,9 @@
 - Never `pnpm add vercel` (it once pulled in 26 advisories, §3AA). Use `npx vercel@latest` when needed.
 - **Parallel sessions claim the same IDs.** Item IDs (C11 was claimed twice on 2026-10-03) and migration numbers: fetch `main`
   and take the next free one at merge time. A sibling session may also merge `main` into your PR branch: `git fetch` before you push.
-- **Windows:** a script that rewrites files must not change line endings (Python: `open(p, "w", newline="")`), and a PC crash can
+- **Windows / scripted edits:** a heredoc script that contains `\r\n`-style escapes can have its backslashes collapsed, which writes real line
+  breaks (or U+2028/2029) into a source file and breaks the parse. Build such strings with `String.fromCharCode(92)` and re-read the result.
+  A script that rewrites files must not change line endings (Python: `open(p, "w", newline="")`), and a PC crash can
   leave uncommitted files full of zero bytes, so commit early. After a crash, scan with `tr -cd '\000' < file | wc -c`.
 - **Working from a sibling git worktree (parallel sessions):** `preview_start name=…` resolves
   `.claude/launch.json` from the *primary* checkout, so it serves the other session's files. Start your own
@@ -109,7 +113,9 @@
   delete the copy afterwards). **Never let two `next dev` servers share one `.next`** (e.g. your dev server plus
   Playwright's `webServer` on 3100): the second corrupts the first and its `/api/*` routes start returning 404.
   Stop yours before running e2e. A local dev server reads the real Supabase and the real Upstash rate-limit
-  buckets, so don't hammer `/api/v1/*` from it.
+  buckets, so don't hammer `/api/v1/*` from it. **Port 3100 may already belong to another session's dev server** (`netstat -ano | grep :3100`);
+  Playwright's `reuseExistingServer` would then silently test THEIR files. Run e2e from your own worktree on a free port with a throwaway
+  config (copy `playwright.config.ts`, change both ports, `reuseExistingServer: false`) and delete it before committing.
 
 **Database / migrations**
 - `supabase/` at the repo root is the one migration lineage. Apply with MCP `apply_migration`, set a pre-apply
@@ -175,6 +181,16 @@
   Wear's sign-in-only). In-app "sign in" prompts call `showSignIn()` (the landing with every option), never
   the Google-only `signIn()`, or someone without Google is dead-ended. Email sign-ups arrive with no name; the
   UI shows a display-only stand-in (`displayNameFor`) that must never be written to `profiles.full_name`.
+- **A pending Contributor applicant (D-12) is `role='citizen'` + `contributor_status='pending'`.** Their profile edits are STAGED on their own
+  `contributor_applications` row (owner + admins can read it; **no client write privilege since mig 180**, so every write goes through a
+  validated server route with the service-role client scoped to the verified `user.id`) and `approve_contributor_application` copies them to
+  `profiles`. Never save them to `profiles`/`places`/`news_posts`: their SELECT policies are `true`. The `protect_role_column` trigger is
+  SECURITY INVOKER and polices only requests that arrive as anon/authenticated: a user can go `not_applied`/`rejected` → `pending`, nothing else.
+- **Email Connect sends itself** is `src/lib/email` (Resend over HTTP): `sendEmail` never throws and returns `sent | failed | skipped`, logs no
+  address or key; wording lives in `templates.ts` and every interpolated value is escaped there. Callers must treat it as fail-soft. Tests mock
+  `sendEmail` only (no real mail in CI).
+- **e2e specs must not redeclare `Window.__cc` / `__ccMap`** (specs share one TypeScript program and the shapes clash). Use
+  `e2e/support/app-hooks.ts` (`goTo`, `setRoleAndGo`, `mapReady`).
 - **Public repo:** never commit a real organisation's or person's contact details (emails, user ids) in tests,
   docs or handoffs. Use reserved `.example` addresses.
 
@@ -204,7 +220,7 @@ design session first.
 ### A. Founder actions (no code needed)
 | ID | Item | Pri |
 |---|---|---|
-| A2 | **Finish the production smoke walk on Connect.** Done by the founder: Google sign-in as admin, map and Admin → Listings; a Contributor's dashboard, Profile tab and News post; Admin → Listings → **Delete** (2026-10-03, "works beautifully"). The cancel/restore step found bug **C1/C1b**. Still to do: **Become a Contributor** with a fresh citizen account (the 6-digit code makes this easy) · phone-to-desktop map resize (§3AJ) · Android Back button and cards (§3AN, a device is needed) · re-test C1/C1b once fixed. (Admin Create + Claim still works as a silent auto-claim until **C10** replaces it with a confirm screen.) | P1 |
+| A2 | **Finish the production smoke walk on Connect.** Done by the founder: Google sign-in as admin, map and Admin → Listings; a Contributor's dashboard, Profile tab and News post; Admin → Listings → **Delete** (2026-10-03, "works beautifully"). The cancel/restore step found bug **C1/C1b**. Still to do: **Become a Contributor** with a fresh citizen account (since D-12 it waits for an admin: walk the whole loop, see A11's live checks) · phone-to-desktop map resize (§3AJ) · Android Back button and cards (§3AN, a device is needed) · re-test C1/C1b once fixed. (Admin Create + Claim still works as a silent auto-claim until **C10** replaces it with a confirm screen.) | P1 |
 | A3 | **Wear walk-through:** the sign-in-as (impersonation) flow as admin (only the seed and smoke sessions exist, §3AB), plus a live email test: sign-up confirmation, password reset and 6-digit code via Resend (§3S). | P2 |
 | A4 | **Write the Ts&Cs, Code of Conduct and fee-schedule documents.** The Wear brand application's checkboxes refer to them by name only, and the app-store listings will need them too. | P2 |
 | A5 | **Get the 3 invisible Contributors onto the map** (each lacks a category or a pin, or is hidden; see Admin → Listings). Ask them to finish their profiles, or fill them in from Admin. | P2 |
@@ -213,6 +229,7 @@ design session first.
 | A8 | Mobile store accounts: **F1** Firebase (Android push), **F2** Apple Developer + a Mac, **Step 6** store compliance (privacy/terms URLs, data-safety form, icons, screenshots, age rating), **Step 7** release process (§3G). | Parked |
 | A9 | Supabase **Pro** upgrade decision. It unlocks HIBP leaked-password protection and DB branching (safer migrations). | Parked |
 | A10 | **Last bit of the email-code sign-in (PR #77).** The founder reported on 2026-10-03 that the live test with an Outlook-mail owner passed (code → their dashboard) and that `intake-v2.gs` is pasted into the Sheet, so the templates and the re-paste are done. The Supabase email rate limit is **60 emails/hour** (founder, 2026-10-03; the target was at least 30), so that is done too. Still open and optional: lower the email OTP expiry from 1 h to about 15 min (Authentication → Providers → Email), and re-test a never-registered address (should become a citizen) and Google for the admin, which the report did not cover. | P3 |
+| A11 | **Finish the contributor-approval rollout (D-12 / D-13).** *Founder steps:* (1) add `RESEND_API_KEY` (a sending-only Resend key) and `ADMIN_NOTIFY_EMAIL` to the Vercel **Connect** project for Production and Preview, then redeploy; until then no email leaves Connect. *Live checks:* ① Become a Contributor with a fresh Gmail plus-address (e.g. `+applytest2`) → Dashboard shows the "being reviewed" banner → not on the map → the admin email arrives → Admin → Applications → Approve → the applicant gets "You're live" and the pin appears. ② Reject one → the applicant gets the reason and can apply again. ③ Admin → Create with "Email the owner" ticked → the welcome arrives (check junk) → 6-digit sign-in → Dashboard; clean up via Admin → Listings → Delete. ④ Delete a test listing, re-apply with the same account, approve → it **is** on the map (the mig 179 fix). | P1 |
 
 ### C. Connect: the v1 discovery loop (current product focus)
 | ID | Item | Pri | Size |
@@ -225,13 +242,14 @@ design session first.
 | C7 | Guest mode: Consider / Follow / Connect on a real listing silently does nothing after an optimistic UI flip. Add toast-and-revert (about 10 call sites). (§3AH) | P3 | S |
 | C8 | e2e coverage for the contributor portal (edit, cancel, Profile, News). (§3AG) | P3 | S |
 | C9 | Small polish, founder's choice: Noir/dark landing variant (§3AJ) · step-level Back inside wizards (§3AN) · cover-photo reorder UI (§3AM) · enforce `p_status` inside `find_or_create_conversation` (§3E) · gallery images via the Form (logo and cover only today) · update the Drive field-spec doc (it still lists the 17 event categories) · label `docs/feature-clarity/*` as deferred (§3AD). | P3 | S each |
-| C10 | **Verify-first attach for a Form approval whose owner email already has an account** (founder decided 2026-10-03; design below, nothing built). (PR #73) | P2 | M–L |
+| C10 | **Verify-first attach for a Form approval whose owner email already has an account** (founder decided 2026-10-03; design below, nothing built). (PR #73). *Note (2026-10-04):* admin-created listings now email the owner a welcome (`ownerWelcomeEmail`, D-13); keep its "sign in to see your listing" wording true when this confirm screen lands. | P2 | M–L |
 | C11 | **Events feed ceiling.** `/api/v1/events` is `order by date ASC, limit 100` and the store fetches page 1 once, so once total event rows (past included) pass 100, the *upcoming* ones fall off the page and never reach the map. Fix with the existing `from=` filter for the map/Discovery fetch plus an owner-scoped fetch for past and cancelled events (this overlaps **C1**: design them together). Today: 3 events, so not urgent. | P2 | M |
 | C12 | **First-view framing.** With geolocation denied the map frames *all* data, and a few far-away places push it to a national view. It now stops at the lowest visible gate and centres on the visible pins, but a new guest would be better served by framing the densest cluster (median-based, so one outlier doesn't pull the camera away from Pretoria). | P3 | S |
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
 | C15 | **A real URL for every screen** (founder request after the A2 walk). Today the bar says `/index.html` almost everywhere, so a refresh drops you on the map and nothing can be shared or bookmarked. Route table, history integration (`pushState`/`popstate`, retiring the single-entry Back trap), a safe auth return path and tests are specified in PR 2 of the same local brief as C1. Do it after C1/C1b. Afterwards confirm Supabase → Auth → URL Configuration still lists the site root. | P2 | M–L |
 | C16 | **Listing Automation Phase 1** (consent-first, POPIA; founder decisions D-8 to D-11 in the local planning handoff): private consent columns on `profiles`, `listing_sources` and `listing_suggestions` tables, a scoped `POST /api/automation/suggestions`, a dashboard "Automatic updates" panel and Suggestions tab, and a daily email. It replaces the repo's `tools/google-forms/intake.gs` with the corrected `intake-v2.gs` (see **H9**). Needs a migration (ask the founder first). The founder chose it **before C10**. Phase 2 (a daily scheduled reader that posts suggestions) comes after. Brief: local, untracked `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`. | P2 | L |
 | C17 | **One design reference, then a periodic check** (founder idea, 2026-10-03; not a priority). Collect the preferred look in one living reference, then audit screens against it: the rounded, blurred-backdrop modal (the admin Delete popup), font faces and colours, window patterns, the colour scheme and the one crown logo (now Wear's PNG). Today three definitions drift apart: `packages/ui/src/tokens.ts` (Wear-targeted, gold `#C9A24A`, a placeholder SVG crown, no consumer), Connect's CSS variables (`--gold-crown #D4AF37`) and Wear's PNG. First step: reconcile them into `packages/ui` tokens plus a short design reference with screenshots; the "daily check" could later become a step in P2's routine. | P3 | M |
+| C18 | **Drafts for pending applicants.** D-12 asked that a pending applicant can also draft events (and places, news) that publish on approval. v1 of D-12 gives them **profile only** (founder decision 2026-10-03): `places` and `news_posts` SELECT policies are `true`, so anything they saved there would be world-readable. Doing drafts properly needs a staging model (e.g. a `status='draft'` the open SELECT policies exclude, or staging on the application row like the profile) plus approval publishing them. Do it after the first real applicants say they want it. | P3 | M–L |
 
 **C10 design (agreed 2026-10-03; nothing built yet).**
 - *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
@@ -262,6 +280,7 @@ design session first.
 | S9 | Vision's Playwright e2e crashes without real Supabase env and isn't in CI. Give it Connect's hermetic-mock treatment, then wire it into CI. (§3AF) | P3 | M |
 | S10 | Build guard: fail the build if `index.html`'s app script list and `appFileOrder` disagree (the §3Y bug class). | P3 | S |
 | S11 | Vision's and Wear's `scripts/build-frontend.js` should load `.env.local` the way Connect's does (local dev only). (§3AH) | P3 | S |
+| S12 | **Tighten the open policies found during D-12 (verified live 2026-10-04, not fixed).** `news_posts` INSERT is `auth.uid() = contributor_id` for any signed-in user (places need `is_organiser()`; news has no such check) and `news_posts` / `places` / `profiles` SELECT are `true` (`profiles` is column-allowlisted). A citizen can therefore insert a world-readable news row for themselves and write their own `profiles` columns (bio, website…) directly; none of it surfaces on a public listing (those read approved Contributors only) but it should require an approved Contributor. Also `/api/v1/contributors/<slug>/stats` has no `contributor_hidden` guard (the other two public contributor reads do). Needs a migration (ask the founder first). | P2 | S |
 
 ### V. Vision (live since 2026-07-18)
 | ID | Item | Pri | Size |
@@ -292,7 +311,7 @@ design session first.
 | H2 | Delete the merged remote branches: 53 remote branches besides `main` existed on 2026-10-03 (almost all merged; PRs #71-#82 added a dozen), plus about 17 stale local ones. `origin/chore/phase-4-local-rewrite` (Wear, May 2026) looks obsolete: confirm, then delete. |
 | H3 | Park the standalone `../citizens-connect` checkout (4 uncommitted: `.gitignore`, `RESUME_HERE.md`, decision brief, `.codeviz/`). Clear the sibling clutter (`../citizens-wear-pr8`, `../cv-temp`, `../citizens-connect.worktrees`) and the orphan `.claude/worktrees/agent-a4219a…` folder. |
 | H4 | Retire stale status docs that compete with this file: `apps/connect/.github/PROJECT_STATUS.md` (last updated 2026-07-01), `apps/connect/.github/workflows/ci.yml` (nested, so GitHub never runs it), root `.github/PROJECT_STATUS.md` (Wear, May 2026), and ECOSYSTEM_DECISION_BRIEF rows 0 ("in flight"; done since §3H) and 5 (monorepo; done). |
-| H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
+| H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is still deployed but **nothing calls it any more** (since D-12 `/api/admin/contributors/review` calls the approve/reject RPCs directly and its email deep-link mode is gone): the founder decides whether to undeploy it. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
 | H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
 | H9 | **Repo/live drift on the Apps Script.** The live Sheet runs the corrected `intake-v2.gs` (founder confirmed 2026-10-03), but the repo's `apps/connect/tools/google-forms/intake.gs` is still the OLD copy that finds answers by question NUMBER, which misreads the consent question after the founder's Section 7 reorder. Anyone who re-pastes the repo copy re-introduces the bug. Until **C16** lands, sync the repo copy (a tiny PR: copy `intake-v2.gs` over it, drop its banner, README: "matched by wording"), after checking it holds no real names or emails. |
@@ -321,11 +340,13 @@ design session first.
 | P17 | Monetisation | PayFast schema only (mig 081); a brand fee is agreed in a form but never collected. | M1, A4 |
 | P18 | Figma-Make prototypes | Leftover tables and edge functions in prod from the June experiments. | H6 |
 | P19 | Address hygiene | Roadmap only: custom domains + a branded storage origin. | A6 |
+| P20 | Contributor approval gate (D-12) + owner welcome email (D-13) | Built and merged 2026-10-04 (PRs #86, #88, #90); mig 180 applied. Not yet walked live: the Resend env vars are missing in Vercel. | A11, C18, S12 |
 
 ---
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-04 — Contributor approval gate (D-12) and owner welcome email (D-13): #86, #88, #90.** A re-applied Contributor stayed `contributor_hidden` (approve now resets it, mig 179; the live admin Approve RPC had also been broken since mig 164: it inserted into a `notifications.url` column that does not exist). Self-serve "Become a Contributor" now **waits for an admin**: mig 180 closes four self-approval doors (RPC dropped, `protect_role_column` tightened, `contributor_applications` made server-written only), the applicant lands on a "being reviewed" Dashboard (new `pending-application.jsx`; profile edits staged on their application, copied on approval), Admin → Applications approves/rejects through the RPCs directly (shows "Previously removed by an admin on…", waits for the server) and the admin/applicant are emailed (`src/lib/email`, Resend, fail-soft, admin-notice cap 20/h). #90: admin Create emails the owner a welcome (checkbox, default on; the stale "sign in with Google" copy is fixed). Founder decision: pending applicants get **profile only**, drafts are **C18**. Found, not fixed: **S12**. Gates: Connect 1035 unit, e2e 57/57. Open: **A11** (Resend env vars + live checks), **C18**, **S12**, **H5**, **C15 (#89) overlaps these files**. Mig 180 was applied right after #88's deploy (probe green in production; advisors 0 ERROR / 118 WARN / 3 INFO).
 - **2026-10-03 — `braces` patched fork replaces the OSV exception (H8 closed, PR #87).** Instead of renewing the dated exception, `packages/braces-patched` (private, `3.0.3-citizens.1`) is the exact `braces@3.0.3` tarball (sha512 checked against the lockfile, MIT kept) plus a nesting-depth guard: `lib/parse.js` refuses more than 100 nested `{`/`(` blocks with a `SyntaxError`, and `compile`/`expand`/`stringify` count depth for caller-built ASTs; `options.maxDepth` can only lower the limit. Root `pnpm.overrides` has `"braces": "link:./packages/braces-patched"`, so `pnpm-lock.yaml` holds no npm `braces` and `osv-scanner.toml` is empty again (no `[[IgnoredVulns]]`). **Proof:** the CI's exact command (osv-scanner v2.3.8, run locally) says "No issues found" on the new lockfile and, as a control, flags only this advisory on the old one. Normal patterns behave byte-for-byte as before: a golden test of about 490 000 results against the pristine tarball, and eslint over 473 files in 7 packages gives byte-identical JSON with the pristine copy swapped in. **Gotchas:** (1) CI runs `pnpm test:coverage`, so the fork defines that script too, or turbo skips its 150 tests. Once it ran, the first CI run failed on a fixture generated on Windows: picomatch writes `[\\/]` in a regex on a Windows host and `\/` on Linux unless its `windows` option is a boolean, so the golden now pins `windows: false` (regenerated against the pristine braces). Anything generated on this machine and compared on CI must not depend on the OS. (2) Pristine braces' failing depth at the default stack is erratic (V8 JIT state); `node --stack-size=200` is the deterministic repro. (3) Two load flakes (5 s timeouts) when Vision's suite hogs the CPU: `frontend-build` "hashed outputs" and Connect's `profiles-column-privacy` "176 alone"; both pass alone, and `turbo run test:coverage --concurrency=2` helps. Open: **H10** (check monthly for an upstream fix); the upstream draft for `micromatch/braces` is in the PR description and is NOT posted (needs the founder's OK).
 - **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (#82, merged `ec19099`).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
   `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
