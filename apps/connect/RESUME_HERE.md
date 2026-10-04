@@ -56,9 +56,8 @@
   it must NOT merge before migration 181 is applied).** Sibling sessions' PRs: **#90** (D-13, admin-created listings email the owner a
   welcome) and **#91** (docs: H10, H2), which will conflict with this file's edits, so whoever merges second merges `main` in; plus the 14
   stale Dependabot ones (item **H1**).
-- **Database head = migration 179 when checked on 2026-10-04** (`20261003145437 / 179_approve_resets_hidden_and_review_fixes`, #86).
-  #88 merged with a **180** file (`180_contributor_applications_need_admin_approval`): its apply step was NOT verified here, so run
-  `list_migrations` and **take the next free number at apply time.** C15 needed no migration. **C16's `181_listing_automation_phase1.sql`
+- **Database head = migration 180** (verified with `list_migrations` on 2026-10-04: `20261004061633 / 180_contributor_applications_need_admin_approval`,
+  #88; 179 is #86). Always re-run `list_migrations` and **take the next free number at apply time.** C15 needed no migration. **C16's `181_listing_automation_phase1.sql`
   is written and tested but NOT applied** (the founder said "read the brief and plan, apply nothing"); the apply needs his fresh yes.
   Expected advisor delta once applied: **+3 WARN** (the three new authenticated-only SECURITY DEFINER functions), 0 ERROR.
 - **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
