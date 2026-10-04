@@ -105,7 +105,6 @@ export function scrubPersonalContact(text: string): { text: string; removed: boo
   return { text: scrubbed, removed: scrubbed !== text };
 }
 
-// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 /** A single-line string: control characters gone, whitespace collapsed, capped. */
