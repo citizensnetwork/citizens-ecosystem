@@ -55,7 +55,8 @@
     if (typeof raw !== 'string') return null;
     let t = raw.trim();
     if (!t || t.length > 500) return null;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(t) && !/^https?:\/\//i.test(t)) return null; // javascript:, data:, ftp:, mailto:
+    // Anything that is not already http(s):// gets https:// put in front of it, so the scheme can only
+    // ever end up https: "javascript:x" becomes the (invalid) host "javascript" and is refused below.
     if (!/^https?:\/\//i.test(t)) t = 'https://' + t;
     let u;
     try { u = new URL(t); } catch (e) { return null; }

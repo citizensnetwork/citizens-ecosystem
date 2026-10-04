@@ -70,6 +70,9 @@ describe("parseSourceUrl", () => {
     expect(H.parseSourceUrl("church.example")).toBe("https://church.example/");
     expect(H.parseSourceUrl("  http://church.example/x  ")).toBe("https://church.example/x");
   });
+  it("accepts a host with a port (it is not a scheme)", () => {
+    expect(H.parseSourceUrl("church.example:8443/events.ics")).toBe("https://church.example:8443/events.ics");
+  });
   it("refuses other schemes, credentials, bare words, empties and over-long links", () => {
     for (const bad of [
       "javascript:alert(1)",
