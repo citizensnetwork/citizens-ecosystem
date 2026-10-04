@@ -71,4 +71,8 @@ export const PRIVATE_PROFILE_COLUMNS = [
   "needs_re_review",
   "contributor_claimed_at",
   "contributor_created_by_admin",
+  // Listing automation consent (mig 181): private, server-owned (set_my_automation_level).
+  "auto_update_level",
+  "auto_update_consent_at",
+  "auto_update_consent_source",
 ] as const;
