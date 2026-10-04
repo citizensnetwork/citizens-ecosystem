@@ -10,6 +10,7 @@ import {
   applicationApprovedEmail,
   applicationRejectedEmail,
   newApplicationAdminEmail,
+  ownerWelcomeEmail,
 } from "@/lib/email/templates";
 
 const mail = {
@@ -204,6 +205,50 @@ describe("email templates", () => {
     expect(e.text).toContain(hostile);
     expect(e.text).not.toContain("<p>");
     expect(e.subject).toContain("You're live");
+  });
+
+  describe("owner welcome email (admin-created listings)", () => {
+    const input = {
+      name: "Grace Hub",
+      ownerEmail: "owner@grace.example",
+      listingUrl: "https://www.citizens.example/c/grace-hub",
+      signInUrl: "https://www.citizens.example/dashboard",
+    };
+
+    it("gives the Form's 6-digit steps: Continue with email, the code, the Dashboard, Google as the alternative", () => {
+      const e = ownerWelcomeEmail(input);
+      for (const part of [e.html, e.text]) {
+        expect(part).toContain("Continue with email");
+        expect(part).toContain("6-digit code");
+        expect(part).toContain("junk folder");
+        expect(part).toContain("Google");
+        expect(part).toContain("Sign out, then sign in again with");
+        expect(part).toContain("owner@grace.example");
+      }
+      expect(e.text).toContain(input.listingUrl);
+      expect(e.text).toContain(input.signInUrl);
+      expect(e.subject).toBe("You're live on Citizens Connect — Grace Hub");
+    });
+
+    it("says 'sign in to see your listing', never that it is automatically theirs (a confirm screen is coming)", () => {
+      const e = ownerWelcomeEmail(input);
+      expect(e.text).toContain("To see your listing and manage it, sign in with");
+      expect((e.html + e.text).toLowerCase()).not.toContain("automatically");
+      expect((e.html + e.text).toLowerCase()).not.toContain("belongs to that address");
+    });
+
+    it("escapes the name, the address and the links in the HTML part, and keeps the subject on one line", () => {
+      const e = ownerWelcomeEmail({
+        name: `<script>alert(1)</script>\r\nBcc: evil@citizens.example`,
+        ownerEmail: 'a"b@grace.example',
+        listingUrl: 'https://www.citizens.example/c/x"><script>',
+        signInUrl: "https://www.citizens.example/dashboard",
+      });
+      expect(e.html).not.toContain("<script>");
+      expect(e.html).toContain("&lt;script&gt;");
+      expect(e.html).toContain("a&quot;b@grace.example");
+      expect(e.subject).not.toMatch(/[\r\n]/);
+    });
   });
 
   it("rejected email shows the reason (escaped in HTML, verbatim in text) and how to re-apply", () => {

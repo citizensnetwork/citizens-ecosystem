@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { createMockSupabaseClient } from "../../helpers/supabase-mock";
 import { resetRateLimitStore } from "@/lib/rate-limit";
@@ -19,11 +19,19 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: vi.fn(() => mockAdmin),
 }));
+// No real emails, ever: only the network send is faked (escapeHtml / siteOrigin /
+// adminNotifyEmail stay real).
+const mockSendEmail = vi.fn();
+vi.mock("@/lib/email/send", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email/send")>()),
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+}));
 
 const { POST } = await import("@/app/api/admin/contributors/create/route");
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const NEW_USER_ID = "22222222-2222-2222-2222-222222222222";
+const ADMIN_INBOX = "admin@citizens.example";
 
 function req(body: unknown) {
   return new NextRequest("http://localhost/api/admin/contributors/create", {
@@ -54,6 +62,12 @@ beforeEach(() => {
     data: { user: { id: NEW_USER_ID } },
     error: null,
   });
+  mockSendEmail.mockResolvedValue("sent");
+  vi.stubEnv("ADMIN_NOTIFY_EMAIL", ADMIN_INBOX);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("POST /api/admin/contributors/create", () => {
@@ -160,5 +174,102 @@ describe("POST /api/admin/contributors/create", () => {
     });
     const res = await POST(req(validBody));
     expect(res.status).toBe(409);
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  // ── D-13: the owner's welcome email ─────────────────────────────────────
+  describe("welcome email to the owner", () => {
+    const created = () =>
+      mockClient.rpc.mockResolvedValueOnce({ data: { success: true, slug: "grace-outreach" }, error: null });
+
+    it("is sent by default, to the owner's address, after the listing exists", async () => {
+      created();
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(200);
+      expect((await res.json()).email).toBe("sent");
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      const mail = mockSendEmail.mock.calls[0][0] as { to: string; replyTo: string; subject: string; html: string; text: string };
+      expect(mail.to).toBe("org@example.com");
+      expect(mail.replyTo).toBe(ADMIN_INBOX);
+      expect(mail.subject).toContain("Grace Outreach");
+    });
+
+    it("carries the 6-digit sign-in steps, the listing link and 'sign in to see your listing' wording", async () => {
+      created();
+      await POST(req(validBody));
+      const mail = mockSendEmail.mock.calls[0][0] as { text: string; html: string };
+      expect(mail.text).toContain("Continue with email");
+      expect(mail.text).toContain("6-digit code");
+      expect(mail.text).toContain("/c/grace-outreach");
+      expect(mail.text).toContain("/dashboard");
+      expect(mail.text).toContain("sign in with org@example.com");
+      // C10 will put a confirm screen in front of every claim: never promise it is "automatically yours".
+      expect(mail.text.toLowerCase()).not.toContain("automatically");
+      expect(mail.html).toContain("Google");
+    });
+
+    it("is skipped, and nothing is sent, when the admin unticks 'Email the owner'", async () => {
+      created();
+      const res = await POST(req({ ...validBody, email_owner: false }));
+      expect(res.status).toBe(200);
+      expect((await res.json()).email).toBe("skipped");
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("only an explicit false turns it off (a missing or truthy value still sends)", async () => {
+      for (const email_owner of [undefined, true, "false", 0]) {
+        mockSendEmail.mockClear();
+        resetRateLimitStore();
+        created();
+        await POST(req({ ...validBody, email_owner }));
+        expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it("never fails the create when the email fails, and says so", async () => {
+      created();
+      mockSendEmail.mockResolvedValueOnce("failed");
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.email).toBe("failed");
+    });
+
+    it("reports 'skipped' when email isn't configured (sendEmail's own answer)", async () => {
+      created();
+      mockSendEmail.mockResolvedValueOnce("skipped");
+      const res = await POST(req(validBody));
+      expect((await res.json()).email).toBe("skipped");
+    });
+
+    it("sends no Reply-To rather than a bad one when ADMIN_NOTIFY_EMAIL isn't set", async () => {
+      vi.stubEnv("ADMIN_NOTIFY_EMAIL", "");
+      created();
+      await POST(req(validBody));
+      expect((mockSendEmail.mock.calls[0][0] as { replyTo: unknown }).replyTo).toBeNull();
+    });
+
+    it("escapes a hostile name in the HTML part", async () => {
+      created();
+      await POST(req({ ...validBody, display_name: '<img src=x onerror="alert(1)"> Co' }));
+      const mail = mockSendEmail.mock.calls[0][0] as { html: string };
+      expect(mail.html).not.toContain("<img");
+      expect(mail.html).toContain("&lt;img");
+    });
+
+    it("sends nothing when the listing could not be created", async () => {
+      mockClient.rpc.mockResolvedValueOnce({ data: { success: false, reason: "target_not_found" }, error: null });
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(500);
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("is never sent for a non-admin", async () => {
+      mockClient._chain._result.data = { role: "citizen" };
+      await POST(req(validBody));
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
   });
 });

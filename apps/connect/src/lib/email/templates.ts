@@ -128,3 +128,52 @@ export function applicationRejectedEmail(input: {
       `We would be glad to look again.\n${input.siteUrl}\n\n${SIGN_OFF_TEXT}`,
   };
 }
+
+// ── To the owner of a listing an admin created for them: welcome ─────────
+
+/**
+ * The same plain-language steps as the Google Form's welcome email
+ * (docs/handoffs/intake-v2.gs `sendWelcome_`): Continue with email → a 6-digit
+ * code → the Dashboard; Google as the alternative; and what to do if they signed
+ * in with a different address. Worded "sign in to see your listing", never "it is
+ * automatically yours": the claim confirm screen (RESUME C10) will sit in front of
+ * every claim, admin-created ones included, and this email must stay true then.
+ */
+export function ownerWelcomeEmail(input: {
+  name: string;
+  ownerEmail: string;
+  listingUrl: string;
+  signInUrl: string;
+}): Email {
+  const email = escapeHtml(input.ownerEmail);
+  return {
+    subject: subjectSafe(`You're live on Citizens Connect — ${input.name}`),
+    html: layout(
+      `${input.name} is live on Citizens Connect 🎉`,
+      "<p>Thank you for joining the Body on Citizens Connect. A listing for you has been added, " +
+        "and it is now on the map and in Kingdom Discovery, where citizens across the city can find, " +
+        "follow and connect with you.</p>" +
+        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View your listing</a></p>` +
+        `<p><strong>To see your listing and manage it</strong>, sign in with <strong>${email}</strong>. ` +
+        "You don't need a Google account:</p>" +
+        '<ol style="padding-left:20px;margin:0 0 14px">' +
+        `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD}">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>` +
+        `<li>Enter <strong>${email}</strong>. We'll email you a 6-digit code (check your junk folder too).</li>` +
+        "<li>Type the code in. You'll land on your Contributor dashboard.</li>" +
+        "</ol>" +
+        button(input.signInUrl, "Sign in to your Contributor Portal") +
+        `<p style="font-size:13px;color:#555">Is ${email} a Google account? You can tap the Google button instead. ` +
+        `Signed in with a different address by mistake? Sign out, then sign in again with ${email}.</p>`,
+    ),
+    text:
+      `${input.name} is live on Citizens Connect.\n\n` +
+      "Thank you for joining the Body. A listing for you has been added, and it is now on the map and in Kingdom Discovery.\n\n" +
+      `View your listing: ${input.listingUrl}\n\n` +
+      `To see your listing and manage it, sign in with ${input.ownerEmail}. You don't need a Google account:\n` +
+      `1. Open ${input.signInUrl} and tap "Continue with email".\n` +
+      `2. Enter ${input.ownerEmail}. We'll email you a 6-digit code (check your junk folder too).\n` +
+      "3. Type the code in. You'll land on your Contributor dashboard.\n\n" +
+      `Is ${input.ownerEmail} a Google account? You can tap the Google button instead.\n` +
+      `Signed in with a different address by mistake? Sign out, then sign in again with ${input.ownerEmail}.\n\n${SIGN_OFF_TEXT}`,
+  };
+}
