@@ -98,7 +98,7 @@ describe("pathFor ↔ navFromPath: every row of the route table", () => {
   });
 
   it("covers every tab the screens offer", () => {
-    expect(R.DASHBOARD_TABS).toEqual(["overview", "events", "news", "profile", "messages", "tools"]);
+    expect(R.DASHBOARD_TABS).toEqual(["overview", "events", "news", "suggestions", "profile", "messages", "tools"]);
     expect(R.ADMIN_TABS).toEqual(["applications", "overview", "listings", "create", "reports"]);
   });
 });
