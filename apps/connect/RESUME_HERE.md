@@ -9,7 +9,7 @@
 >   unchanged**, so a doc that cites "RESUME_HERE §3AS" resolves there.
 > - Phase 0 → mid-June 2026 (§2x batches): [`docs/archive/RESUME_HISTORY_2026H1.md`](docs/archive/RESUME_HISTORY_2026H1.md).
 >
-> **Last audit: 2026-10-04** (`main` @ `5e25793`, plus the C15 routing PR). §2, the A, C and H items and §5's P1/P11 were re-checked against
+> **Last audit: 2026-10-04** (`main` @ `947ab4e`, plus the C15 routing PR). §2, the A, C and H items and §5's P1/P11 were re-checked against
 > git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. Tags like `(§3AP)` point to the
 > archived section with the detail.
 
@@ -50,14 +50,14 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` @ `5e25793`** (PR #87, the patched `braces` fork), on top of #85 (the repo's `intake.gs` is the corrected script),
-  #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). **This file was updated inside PR #89 (C15, a real
-  URL for every screen); once that merges, `main` is its merge commit.** Other open PRs: **#86** (mig 179, approving a Contributor
-  resets the hide flag) and **#88** (mig 180, self-serve applications wait for an admin), both sibling sessions', plus the 14 stale
+- **`main` @ `947ab4e`** (PR #86, mig 179: approving a Contributor resets the hide flag), on top of #87 (the patched `braces` fork),
+  #85 (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash).
+  **This file was updated inside PR #89 (C15, a real URL for every screen); once that merges, `main` is its merge commit.** The only
+  other open feature PR is **#88** (mig 180, self-serve applications wait for an admin, a sibling session's), plus the 14 stale
   Dependabot ones (item **H1**).
-- **Database head = migration 179** (`20261003145437 / 179_approve_resets_hidden_and_review_fixes`), already applied from PR #86,
-  which is still open, so its `.sql` file is not on `main` yet. PR #88 carries **180** (not applied when checked 2026-10-04). Whichever
-  merges second must re-check numbering; **take the next free number at apply time.** C15 needed no migration.
+- **Database head = migration 179** (`20261003145437 / 179_approve_resets_hidden_and_review_fixes`, #86, applied and merged).
+  PR #88 carries **180** (not applied when checked 2026-10-04): whoever applies next must re-check numbering, so **take the next
+  free number at apply time.** C15 needed no migration.
 - **Security advisor baseline: 0 ERROR / 119 WARN / 3 INFO.** Every WARN is known and accepted: 106
   authenticated + 11 anon SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP
   (needs Supabase Pro), and `pg_net` in `public`. The 3 INFO are `search_term_stats` (service_role-only by
@@ -70,7 +70,7 @@
 - **Live data (2026-10-03):** 16 profiles · 5 Contributors (**only 2 are on the map; the other 3 lack a category or a pin, or are hidden**) · 40 Places ·
   4 Events (**0 upcoming, so none is on the map or in Discovery's list**) · 1 News post. Wear: 6 verified brands, 1 Wear admin.
   Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
-- **Tests (last full run, the C15 routing PR on the tree merged with `main` @ `5e25793`, 2026-10-04):** Connect 982 unit
+- **Tests (last full run, the C15 routing PR, 2026-10-04; e2e ran on the tree merged with `main` @ `5e25793`, and `main` @ `947ab4e` (#86) added only a migration file and its test, re-run as unit):** Connect 991 unit
   (+32 live-only, skipped in CI) · Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · `braces-patched` 150 (#87's
   count, not re-run) · **Connect Playwright e2e 97/97**. (`frontend-build`'s "hashed outputs" test can hit its 5 s timeout when
   every app's suite runs in parallel on a busy machine; it passes alone in seconds. Connect's `profiles-column-privacy` used to do
