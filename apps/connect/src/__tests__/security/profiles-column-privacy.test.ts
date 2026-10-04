@@ -180,6 +180,10 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // level is read to enforce "consent gates everything" (level off => 409 consent_off). It
   // decides the response and is never returned; the intake route only WRITES these columns.
   "app/api/automation/suggestions/route.ts": ["auto_update_level"],
+  // createAdminClient() after the `automation:digest` API-key check (mig 181): reads the owner's
+  // address, notification preference, consent level and last-nudge time to decide whether to send
+  // the daily "new suggestions" email. The address goes only to the mailer; the response is counts.
+  "app/api/automation/digest/route.ts": ["email", "notification_email", "notification_prefs", "auto_update_level", "auto_update_nudged_at"],
 };
 
 /**

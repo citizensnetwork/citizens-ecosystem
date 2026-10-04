@@ -16,7 +16,7 @@
 --  1. Consent gates everything, and the DEFAULT IS OFF. A level other than
 --     'off' cannot exist without a recorded time and source of the consent
 --     (profiles_auto_update_consent_recorded).
---  2. The three consent columns are PRIVATE and SERVER-OWNED. They are not in
+--  2. The consent columns (and the nudge timestamp) are PRIVATE and SERVER-OWNED. They are not in
 --     profiles' public column allow-list (mig 176/177), and a BEFORE UPDATE guard
 --     stops an authenticated, non-admin caller changing them through the REST
 --     API (authenticated holds table-level UPDATE on profiles, mig 175). The
@@ -46,7 +46,8 @@
 alter table public.profiles
   add column if not exists auto_update_level text not null default 'off',
   add column if not exists auto_update_consent_at timestamptz,
-  add column if not exists auto_update_consent_source text;
+  add column if not exists auto_update_consent_source text,
+  add column if not exists auto_update_nudged_at timestamptz;
 
 alter table public.profiles drop constraint if exists profiles_auto_update_level_check;
 alter table public.profiles
@@ -71,9 +72,11 @@ comment on column public.profiles.auto_update_consent_at is
   'When the owner last made an automation decision (granted, changed or withdrawn). Server-stamped.';
 comment on column public.profiles.auto_update_consent_source is
   'Where that decision was made: google_form | dashboard | admin. Server-stamped.';
+comment on column public.profiles.auto_update_nudged_at is
+  'When the owner was last emailed about new suggestions (at most one a day). Written only by POST /api/automation/digest (service_role).';
 
 -- Guard: raw anon/authenticated non-admin callers cannot write the consent
--- record. A separate function + trigger from guard_profile_server_columns (mig
+-- record (or the nudge bookkeeping). A separate function + trigger from guard_profile_server_columns (mig
 -- 175), which is left untouched so the two stay independent. SECURITY INVOKER on
 -- purpose: current_user must be the caller's role. service_role, SECURITY DEFINER
 -- bodies (set_my_automation_level) and admins pass.
@@ -92,7 +95,8 @@ begin
   end if;
   if new.auto_update_level is distinct from old.auto_update_level
      or new.auto_update_consent_at is distinct from old.auto_update_consent_at
-     or new.auto_update_consent_source is distinct from old.auto_update_consent_source then
+     or new.auto_update_consent_source is distinct from old.auto_update_consent_source
+     or new.auto_update_nudged_at is distinct from old.auto_update_nudged_at then
     raise exception 'profiles.auto_update_* is managed by the server'
       using errcode = '42501';
   end if;
@@ -255,6 +259,7 @@ begin
     new.auto_update_level := 'off';
     new.auto_update_consent_at := null;
     new.auto_update_consent_source := null;
+    new.auto_update_nudged_at := null;
     delete from public.listing_suggestions where contributor_id = new.id;
     delete from public.listing_sources where contributor_id = new.id;
   end if;

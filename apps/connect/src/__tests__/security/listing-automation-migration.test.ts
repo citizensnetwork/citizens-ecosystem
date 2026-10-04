@@ -45,7 +45,7 @@ describe("mig 181: consent record on profiles", () => {
     expect(g.header).toMatch(/set search_path = ''/);
     expect(g.body).toContain("current_user not in ('anon', 'authenticated')");
     expect(g.body).toContain("public.is_admin()");
-    for (const col of ["auto_update_level", "auto_update_consent_at", "auto_update_consent_source"]) {
+    for (const col of ["auto_update_level", "auto_update_consent_at", "auto_update_consent_source", "auto_update_nudged_at"]) {
       expect(g.body, col).toContain(`new.${col} is distinct from old.${col}`);
     }
     expect(flat).toContain("revoke all on function public.guard_profile_automation_columns() from public, anon, authenticated");
@@ -125,6 +125,7 @@ describe("mig 181: losing the listing clears automation", () => {
     expect(r.header).toMatch(/set search_path to ''/);
     expect(r.body).toContain("old.role = 'contributor' and new.role is distinct from 'contributor'");
     expect(r.body).toContain("new.auto_update_level := 'off'");
+    expect(r.body).toContain("new.auto_update_nudged_at := null");
     expect(r.body).toContain("delete from public.listing_suggestions where contributor_id = new.id");
     expect(r.body).toContain("delete from public.listing_sources where contributor_id = new.id");
     expect(flat).toMatch(/trg_profiles_reset_automation before update of role on public\.profiles/);

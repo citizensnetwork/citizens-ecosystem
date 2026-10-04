@@ -1,63 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { resetRateLimitStore } from "@/lib/rate-limit";
+import { createFakeTables, type Row } from "../../helpers/fake-tables";
 
 const CONTRIB = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const SRC_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_SRC = "44444444-4444-4444-8444-444444444444";
 
-type Row = Record<string, unknown>;
-const state = {
-  profiles: [] as Row[],
-  listing_sources: [] as Row[],
-  listing_suggestions: [] as Row[],
-  events: [] as Row[],
-  failEventInsert: false,
-  seq: 0,
-};
-
-/** A tiny in-memory stand-in for the four tables the route touches. */
-function from(table: keyof Omit<typeof state, "failEventInsert" | "seq">) {
-  const filters: [string, unknown][] = [];
-  let op: "select" | "insert" | "upsert" | "update" = "select";
-  let payload: Row = {};
-  let opts: { onConflict?: string; ignoreDuplicates?: boolean } = {};
-  let selected = false;
-  const matching = () => state[table].filter((r) => filters.every(([c, v]) => r[c] === v));
-  const run = (mode: "many" | "maybe" | "single") => {
-    if (op === "select") {
-      const rows = matching();
-      if (mode === "single") return rows[0] ? { data: rows[0], error: null } : { data: null, error: { message: "no rows" } };
-      return { data: mode === "maybe" ? (rows[0] ?? null) : rows, error: null };
-    }
-    if (op === "update") {
-      for (const r of matching()) Object.assign(r, payload);
-      return { data: null, error: null };
-    }
-    if (table === "events" && state.failEventInsert) return { data: null, error: { message: "boom" } };
-    if (op === "upsert" && opts.ignoreDuplicates && opts.onConflict) {
-      const cols = opts.onConflict.split(",");
-      if (state[table].some((r) => cols.every((c) => r[c] === payload[c]))) return { data: [], error: null };
-    }
-    const row = { id: `00000000-0000-4000-8000-${String(++state.seq).padStart(12, "0")}`, ...payload };
-    state[table].push(row);
-    const out = selected ? (mode === "single" ? row : [row]) : null;
-    return { data: out, error: null };
-  };
-  const b: Record<string, unknown> = {
-    select: () => ((selected = true), b),
-    eq: (c: string, v: unknown) => (filters.push([c, v]), b),
-    insert: (p: Row) => ((op = "insert"), (payload = p), b),
-    upsert: (p: Row, o: typeof opts) => ((op = "upsert"), (payload = p), (opts = o), b),
-    update: (p: Row) => ((op = "update"), (payload = p), b),
-    maybeSingle: () => Promise.resolve(run("maybe")),
-    single: () => Promise.resolve(run("single")),
-    then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(run("many")).then(res, rej),
-  };
-  return b;
-}
-
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({ from })) }));
+const fake = createFakeTables(["profiles", "listing_sources", "listing_suggestions", "events"]);
+const state = fake.state as { profiles: Row[]; listing_sources: Row[]; listing_suggestions: Row[]; events: Row[] };
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({ from: (table: string) => fake.from(table) })) }));
 
 const gate = vi.fn();
 vi.mock("@/lib/v1Gate", () => ({ gateV1: (...a: unknown[]) => gate(...a) }));
@@ -94,8 +46,7 @@ beforeEach(() => {
   state.listing_sources = [{ id: SRC_ID, contributor_id: CONTRIB, kind: "website", url: "https://www.church.example/", enabled: true, last_checked_at: null, last_status: null }];
   state.listing_suggestions = [];
   state.events = [];
-  state.failEventInsert = false;
-  state.seq = 0;
+  fake.failInsert.clear();
   gate.mockResolvedValue({ key: KEY, identifier: "key:1" });
   geocode.mockResolvedValue({ lat: -25.75, lng: 28.19 });
 });
@@ -299,7 +250,7 @@ describe("POST /api/automation/suggestions: automatic publishing is for future e
   });
 
   it("if the event cannot be created the suggestion stays pending, with a warning, rather than being lost", async () => {
-    state.failEventInsert = true;
+    fake.failInsert.add("events");
     const res = await POST(req(event()));
     const r = (await res.json()).results[0];
     expect(r.status).toBe("pending");

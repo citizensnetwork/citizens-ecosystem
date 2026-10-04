@@ -75,4 +75,5 @@ export const PRIVATE_PROFILE_COLUMNS = [
   "auto_update_level",
   "auto_update_consent_at",
   "auto_update_consent_source",
+  "auto_update_nudged_at",
 ] as const;
