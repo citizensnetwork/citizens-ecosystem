@@ -1,41 +1,52 @@
 /**
  * POST /api/contributor/apply
  *
- * Inserts a pending `contributor_applications` row for the caller, then
- * — as of Connect v1's self-serve go-live (migration 164,
- * V1_SCOPE.md) — immediately calls `self_approve_contributor_application`
- * so the Contributor is live on submit, no admin wait. RLS enforces
- * `user_id = auth.uid()`, the unique-pending partial index prevents
- * duplicates, and the `protect_role_column` trigger allows the exact two
- * transitions this route drives in sequence: `not_applied → pending`
- * (the flip below) then `pending → approved` (inside the RPC).
+ * Self-serve "Become a Contributor" — and it WAITS for an admin (founder
+ * decision D-12, migration 180). The route saves a `pending`
+ * `contributor_applications` row, flips `profiles.contributor_status`
+ * `not_applied | rejected → pending`, and emails the admin. Nothing of the
+ * applicant's is public until an admin approves it in Admin → Applications
+ * (`approve_contributor_application`, which also copies their staged profile
+ * onto `profiles` and clears any `contributor_hidden` left by an earlier
+ * removal).
  *
- * NOTE: Admin notification is NOT fired from this route — there is no
- * admin gate to notify for in v1. The application row still exists as an
- * audit trail (`reviewer_id` = the applicant themselves on self-approval,
- * distinguishing it from an admin-reviewed row) and admins retain
- * `set_contributor_hidden` as the moderation safety net.
+ * Writes are server-side on purpose. Migration 180 takes every client write
+ * privilege away from `contributor_applications` (a signed-in user could
+ * otherwise rewrite their own row after validation, and approval copies it
+ * onto the public profile), so this route validates here and writes with the
+ * service-role client — always scoped to the VERIFIED `user.id`, never to
+ * anything the body says. The self-approve RPC from v1 no longer exists.
  *
- * Historical context: this route previously proxied the entire
- * insert through the `submit-contributor-application` Edge Function.
- * Any deploy skew / missing secret surfaced to end users as
- * "Something went wrong" and left no DB row, so applications were
- * silently lost. Inserting directly here is the durability fix.
+ * Failure handling: the application insert and the profile flip are two
+ * writes. If the flip fails the application is deleted again and the caller
+ * gets a 500, so the person is never left "pending" in one table and
+ * "not applied" in the other. The admin email is fail-soft: a mail problem
+ * never fails an application that is already saved.
+ *
+ * Historical context: this route once proxied through the
+ * `submit-contributor-application` Edge Function (never deployed, so
+ * applications were silently lost); inserting directly is the durability fix.
  */
 
 import { getRouteAuth } from "@/lib/supabase/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
-import { isContributorType } from "@/lib/categories";
+import { CONTRIBUTOR_TYPES, isContributorType } from "@/lib/categories";
 import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
 import { MAX_ADDRESS, MAX_BIO, MAX_DISPLAY_NAME, MAX_URL, trimOrNull } from "@/lib/contributorFields";
+import { adminNotifyEmail, sendEmail, siteOrigin } from "@/lib/email/send";
+import { newApplicationAdminEmail } from "@/lib/email/templates";
 import { isContributorKind } from "@/types/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_MOTIVATION = 2_000;
+
+/** At most this many "new application" emails to the admin per hour, across all applicants. */
+const ADMIN_NOTIFY_LIMIT = { limit: 20, windowMs: 3_600_000 } as const;
 
 function finiteOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -75,7 +86,8 @@ export async function POST(request: Request) {
   }
 
   // Duplicate-pending check up-front (cheaper than the DB unique index
-  // path and gives a stable error shape).
+  // path and gives a stable error shape). Reads stay on the caller's own
+  // session: RLS lets them see their own applications.
   const { data: existing } = await supabase
     .from("contributor_applications")
     .select("id")
@@ -140,10 +152,9 @@ export async function POST(request: Request) {
   // scheme is refused, a URL-shaped value is normalised, and a plain handle is
   // kept verbatim for the display layer to turn into a platform URL.
   //
-  // NOTE: `contributor_applications` carries only these four social columns.
-  // X / LinkedIn / WhatsApp (migration 172) exist on `profiles` and are
-  // collected in onboarding + the portal, not in this wizard — v1's apply path
-  // deliberately asks for the minimum (V1_SCOPE.md).
+  // This wizard asks for four socials. The rest (X / LinkedIn / WhatsApp, the
+  // logo, cover photos and public contact email) are staged afterwards from the
+  // pending Dashboard through PATCH /api/contributor/application.
   const socialUrls: Record<string, string | null> = {};
   for (const [key, label] of [
     ["instagram_handle", "Instagram"],
@@ -161,6 +172,7 @@ export async function POST(request: Request) {
     socialUrls[key] = norm;
   }
 
+  const physicalAddress = noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS);
   const insertRow = {
     user_id: user.id,
     status: "pending" as const,
@@ -174,13 +186,16 @@ export async function POST(request: Request) {
     tiktok_handle: socialUrls.tiktok_handle,
     youtube_url: socialUrls.youtube_url,
     no_fixed_location: noFixedLocation,
-    physical_address: noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS),
+    physical_address: physicalAddress,
     physical_latitude: noFixedLocation ? null : finiteOrNull(payload.physical_latitude),
     physical_longitude: noFixedLocation ? null : finiteOrNull(payload.physical_longitude),
     motivation_text: trimOrNull(payload.motivation_text, MAX_MOTIVATION),
   };
 
-  const { data: inserted, error: insertErr } = await supabase
+  // Everything below writes as the server, scoped to the verified user.id.
+  const admin = createAdminClient();
+
+  const { data: inserted, error: insertErr } = await admin
     .from("contributor_applications")
     .insert(insertRow)
     .select("id")
@@ -200,44 +215,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "insert_failed" }, { status: 500 });
   }
 
-  // Flip profile status so the trigger's not_applied → pending transition
-  // is satisfied before we call the pending → approved RPC below.
-  // Non-fatal on error the OLD way is no longer safe here — v1 depends on
-  // this succeeding for self-approval to be reachable — but the trigger
-  // itself is the actual gate, so a failure here means self-approve will
-  // cleanly no-op (not_found_or_not_pending) rather than corrupt state.
-  const { error: profileErr } = await supabase
+  // Flip the profile to `pending` (this is what puts them on the pending
+  // Dashboard). Only from the two states an applicant may apply from; a profile
+  // that is already `pending` simply matches nothing. If it fails, take the
+  // application back out so the two tables never disagree.
+  const { error: profileErr } = await admin
     .from("profiles")
     .update({ contributor_status: "pending" })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .in("contributor_status", ["not_applied", "rejected"]);
   if (profileErr) {
     console.error("[/api/contributor/apply] profile flip", profileErr);
+    const { error: rollbackErr } = await admin
+      .from("contributor_applications")
+      .delete()
+      .eq("id", inserted.id)
+      .eq("user_id", user.id);
+    if (rollbackErr) {
+      console.error("[/api/contributor/apply] rollback of the application failed", rollbackErr);
+    }
+    return NextResponse.json({ error: "apply_failed" }, { status: 500 });
   }
 
-  // v1 self-serve go-live: approve the caller's own application
-  // immediately — no admin review. self_approve_contributor_application
-  // is SECURITY DEFINER but internally re-checks auth.uid() === the
-  // application's user_id, so this is exactly as safe as the client
-  // calling the RPC directly would be.
-  const { data: approveResult, error: approveErr } = await supabase.rpc(
-    "self_approve_contributor_application",
-    { _application_id: inserted.id },
-  );
-  if (approveErr) {
-    console.error("[/api/contributor/apply] self-approve RPC", approveErr);
+  // Tell the admin. Fail-soft: the application is already saved. The notices
+  // share one global cap so a flood of throwaway sign-ups (anyone can create an
+  // account with an emailed code) cannot mail-bomb the admin's inbox or burn the
+  // sending quota; past the cap the application still shows up in Admin →
+  // Applications, it just isn't announced by email.
+  const adminTo = adminNotifyEmail();
+  const notifyBudget = adminTo ? await checkRateLimit("contrib-apply-admin-notify", ADMIN_NOTIFY_LIMIT) : null;
+  if (adminTo && notifyBudget && !notifyBudget.success) {
+    console.warn("[/api/contributor/apply] admin notification cap reached; the admin was not emailed");
+  } else if (adminTo) {
+    const categoryLabel = contributorCategory
+      ? (CONTRIBUTOR_TYPES.find((t) => t.value === contributorCategory)?.label ?? null)
+      : null;
+    await sendEmail({
+      to: adminTo,
+      ...newApplicationAdminEmail({
+        name: displayName,
+        categoryLabel,
+        area: physicalAddress,
+        siteUrl: siteOrigin(request),
+      }),
+    });
+  } else {
+    console.warn("[/api/contributor/apply] ADMIN_NOTIFY_EMAIL is not set; the admin was not emailed");
   }
-  const approved =
-    !approveErr &&
-    !!approveResult &&
-    (approveResult as { success?: boolean }).success === true;
-  const slug = approved
-    ? (approveResult as { slug?: string }).slug ?? null
-    : null;
 
   return NextResponse.json({
     success: true,
     application_id: inserted.id,
-    approved,
-    slug,
+    status: "pending",
+    approved: false,
+    slug: null,
   });
 }

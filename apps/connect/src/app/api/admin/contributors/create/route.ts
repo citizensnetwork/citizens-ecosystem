@@ -13,7 +13,7 @@
  * `profiles` row, then fills in the Contributor fields on it directly
  * (service_role bypasses RLS — this is an admin-privileged write, not a
  * self-serve one, so it does not go through `contributor_applications` or
- * `self_approve_contributor_application`). Best-effort rollback: if the
+ * the admin review step). Best-effort rollback: if the
  * profile fill-in fails after the auth user was created, the auth user is
  * deleted so no orphaned account is left behind. Every field is validated
  * (shared rules: `@/lib/contributorFields`) BEFORE the auth user is created.

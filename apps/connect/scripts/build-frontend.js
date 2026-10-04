@@ -96,7 +96,7 @@ buildFrontend({
   // `window.X` set by earlier ones).
   appFileOrder: [
     'icons.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'auth.jsx', 'map.jsx',
-    'entity-card.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'admin.jsx', 'dashboard.jsx', 'insights.jsx',
+    'entity-card.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'insights.jsx',
     'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],

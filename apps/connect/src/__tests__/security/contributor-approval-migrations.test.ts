@@ -126,14 +126,69 @@ describe("reject_contributor_application (live definition)", () => {
 });
 
 describe("every other path that approves an account also resets contributor_hidden", () => {
-  // self_approve is retired by a later migration; when it is gone this block
-  // simply has one name fewer. The claim path stays.
-  for (const name of ["self_approve_contributor_application", "claim_admin_created_contributor"]) {
-    it(`${name} (if still live) resets the flag and keeps search_path = ''`, () => {
-      const def = liveDefinition(name);
-      if (def === null) return; // retired
-      expect(flat(def.header)).toMatch(/set search_path to ''/);
-      expect(flat(def.body)).toMatch(/contributor_status = 'approved',\s*contributor_hidden = false/);
-    });
-  }
+  it("claim_admin_created_contributor resets the flag and keeps search_path = ''", () => {
+    const def = liveDefinition("claim_admin_created_contributor");
+    expect(def).not.toBeNull();
+    expect(flat(def!.header)).toMatch(/set search_path to ''/);
+    expect(flat(def!.body)).toMatch(/contributor_status = 'approved',\s*contributor_hidden = false/);
+  });
+});
+
+// ── D-12: an applicant can never approve themselves ──────────────────────
+// There were four doors (mig 180's header lists them). The RPC is gone, the
+// trigger no longer lets a signed-in user flip their own role/status, and the
+// application row is no longer client-writable.
+
+describe("D-12: no self-approval path is left", () => {
+  it("self_approve_contributor_application is dropped, not just revoked", () => {
+    expect(liveDefinition("self_approve_contributor_application")).toBeNull();
+  });
+
+  const guard = liveDefinition("protect_role_column");
+
+  it("protect_role_column is SECURITY INVOKER and trusts only non-anon/authenticated sessions", () => {
+    expect(guard).not.toBeNull();
+    const h = flat(guard!.header);
+    expect(h).not.toContain("security definer"); // current_user would always be the owner
+    expect(h).toMatch(/set search_path to ''/);
+    expect(flat(guard!.body)).toContain("current_user not in ('anon', 'authenticated')");
+  });
+
+  it("protect_role_column no longer lets a user change their own role or approve their own status", () => {
+    const b = flat(guard!.body);
+    // The two exemptions that made self-approval possible.
+    expect(b).not.toMatch(/new\.id = auth\.uid\(\)/);
+    expect(b).not.toMatch(/new\.contributor_status = 'approved'/);
+    expect(b).not.toMatch(/new\.role = 'contributor'/);
+    // Apply and re-apply are the only user transitions left.
+    expect(b).toContain("old.contributor_status = 'not_applied' and new.contributor_status = 'pending'");
+    expect(b).toContain("old.contributor_status = 'rejected' and new.contributor_status = 'pending'");
+  });
+
+  it("clients cannot write contributor_applications (server-written only)", () => {
+    const sql = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort((a, b) => Number(a.split("_")[0]) - Number(b.split("_")[0]))
+      .map((f) => stripComments(readFileSync(join(MIGRATIONS_DIR, f), "utf8")))
+      .join("\n");
+    const flatSql = flat(sql);
+    expect(flatSql).toContain("revoke all on table public.contributor_applications from anon");
+    expect(flatSql).toMatch(
+      /revoke insert, update, delete, truncate, references, trigger on table public\.contributor_applications from authenticated/,
+    );
+  });
+
+  it("approve copies the staged profile fields an applicant could edit while pending", () => {
+    const def = liveDefinition("approve_contributor_application");
+    const b = flat(def!.body);
+    for (const col of [
+      "cover_photo_urls",
+      "x_handle",
+      "linkedin_url",
+      "whatsapp_number",
+      "contributor_contact_email",
+    ]) {
+      expect(b).toContain(`${col} = `);
+    }
+  });
 });

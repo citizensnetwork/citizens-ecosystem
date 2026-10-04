@@ -7,6 +7,16 @@
 > (`kingdom-discovery.jsx`), and Contributors now actually appear on the map (they never did
 > before, even once approved — see §3AE's root-cause note). Sections below are left as the
 > session-1 record; §7/§8 status columns are updated in place rather than rewritten.
+>
+> **2026-10-03 update (founder decision D-12, migration 180): self-serve go-live is REVERSED.** A
+> "Become a Contributor" application now **waits for an admin**. The applicant still gets their
+> Dashboard at once (a "your listing is being reviewed" page where they finish their profile: logo,
+> cover, bio, socials, pin), but nothing of theirs is public — map, Kingdom Discovery, `/c/<slug>`,
+> `/api/v1` — until an admin approves it in Admin → Applications. The admin is emailed per new
+> application and the applicant on approve/reject. Why: it matches the Google Form path (the founder
+> ticks Approve) and keeps a directory of real organisations. Wherever this document says "no admin
+> wait" or "go live immediately" below, read it as the August decision that D-12 replaced; those
+> lines are kept as the record and marked in place.
 
 ---
 
@@ -48,7 +58,7 @@
 ### Added session 2 (2026-08-24 — RESUME_HERE.md §3AE)
 | Feature | Where |
 |---|---|
-| Self-serve Contributor go-live — submitting the Apply form approves it immediately, no admin wait | `store.jsx` (`submitApplication`), `/api/contributor/apply`, migration 164 (`self_approve_contributor_application`) |
+| ~~Self-serve Contributor go-live — submitting the Apply form approves it immediately, no admin wait~~ **Superseded 2026-10-03 (D-12, mig 180):** the application stays `pending` until an admin approves it; `self_approve_contributor_application` is dropped and a signed-in user can no longer change their own role or approve themselves | `store.jsx` (`submitApplication`), `/api/contributor/apply`, `pending-application.jsx`, `/api/admin/contributors/review`, migrations 164 → 180 |
 | `list.jsx` renamed to `kingdom-discovery.jsx` at every identifier level (file/component/route/nav) | `kingdom-discovery.jsx`, `home.jsx`, `shell.jsx`, `build-frontend.js`, `index.html` |
 | Contributors now render on the map (the actual root fix — they never did before) | `home.jsx` markers array, `store.jsx` `adaptContributor()`, migration 164 `contributor_category` column |
 | Contributor map category — fixed a real bug where the Apply wizard's category picker was silently discarded (sent to the wrong DB column) | migration 164, `/api/contributor/apply`, `/api/v1/contributors` |
@@ -117,7 +127,7 @@ v1's minimal scope serves this purpose directly: a Christian entity that cannot 
 
 ## 5. Current friction points discussed in our conversation
 
-1. The admin-approval gate between applying and appearing on the platform makes the add → list → map → engage loop impossible to test end-to-end without personally acting as admin every time.
+1. The admin-approval gate between applying and appearing on the platform makes the add → list → map → engage loop impossible to test end-to-end without personally acting as admin every time. *(D-12 brought the gate back on purpose. The e2e suite keeps the loop testable: in demo mode one person is both applicant and admin, and a signed-in spec covers the pending page.)*
 2. No scrollable list view existed; discovery was map-only.
 3. The Create Event / Create Place forms present more fields as part of the core flow than a v1 listing needs (galleries, recurring dates, volunteering toggle, launch broadcast).
 4. Recent engineering effort concentrated on Citizens Wear and Citizens Vision rather than Connect's own core discovery loop, even though Connect is the flagship / first-focus app.
@@ -127,7 +137,7 @@ v1's minimal scope serves this purpose directly: a Christian entity that cannot 
 
 ## 6. Solutions to frictions
 
-1. Remove the admin-approval requirement from the v1 path; a Contributor's listing goes live immediately on submission.
+1. ~~Remove the admin-approval requirement from the v1 path; a Contributor's listing goes live immediately on submission.~~ **Reversed 2026-10-03 (D-12):** keep the approval but make it light. The applicant gets their Dashboard immediately and can finish their profile while they wait; the admin is emailed per application and approves or rejects (with a reason) in one screen. Nothing is public until approved.
 2. Build a plain scrollable list screen reusing the existing category and data model.
 3. Mark the non-essential fields and steps in `create.jsx` and `apply.jsx` as v1-deferred in place, so a future pass can drop them from the required path without losing the code.
 4. Track effort allocation across the three apps explicitly as a portfolio-level decision, not just a Connect-level one (see §8).
@@ -143,7 +153,7 @@ v1's minimal scope serves this purpose directly: a Christian entity that cannot 
 | Map ↔ List toggle | Done this session | One button added to the Discover top bar (`home.jsx`), next to the existing search and category-filter buttons, calling `go('list')`. A matching button on the list screen calls `go('home')`. A visible toggle was chosen over a swipe gesture for discoverability; a plain two-screen toggle was chosen over a draggable bottom sheet to keep the build simple, per the founder's direction to go simple first. |
 | Router wiring | Done this session | `case 'list'` added to the page switch in `shell.jsx`. |
 | V1-scope markers | Done session 1 | `DEFER TO V2` comments added directly above the relevant fields/sections in `apply.jsx` and `create.jsx`, plus a scope note at the top of each file. |
-| Remove admin-approval gate | **Done session 2** | `self_approve_contributor_application` RPC (migration 164, own-row-only) called immediately after the `contributor_applications` insert in `/api/contributor/apply`; `submitApplication` navigates straight to onboarding instead of waiting. Admin's `approve_contributor_application` RPC still exists, untouched, for edge cases. |
+| ~~Remove admin-approval gate~~ | ~~Done session 2~~ **Reversed 2026-10-03 (D-12)** | ~~`self_approve_contributor_application` RPC (migration 164, own-row-only) called immediately after the insert~~. Now: `/api/contributor/apply` saves a `pending` application server-side and emails the admin; `submitApplication` lands the applicant on the pending Dashboard (`pending-application.jsx`), whose edits are staged on their own application row (the `profiles`, `places` and `news_posts` tables are world-readable, so nothing is written there while pending); Admin → Applications approves or rejects through `approve_contributor_application` / `reject_contributor_application` (migrations 179–180), which copies the staged profile across, assigns the slug and clears any hide flag. Pending applicants get profile only: events, places and news open on approval (RESUME C18). |
 | Contributors appear on the map | **Done session 2** | The actual blocking bug: `home.jsx` never included `contributors` in its marker list, `adaptContributor()` never mapped lat/lng, and there was no DB column for a Contributor's map category. All three fixed; verified via Playwright (a real `.maplibregl-marker` renders). |
 | Founder-only hide/flag | **Backend done session 2, no UI yet** | `set_contributor_hidden` RPC + `/api/admin/contributors/hide` exist and are tested; admin.jsx has no button wired to it yet — flagged as the next small addition in RESUME_HERE.md §3AE. |
 | Individual Contributor kind | **Done (2026-09-26, mig 173, §3AP)** for the data model, every kind validator, `/api/v1` + `@citizens/connect-client`, Admin Create, map/card glyphs, and the Google Form intake ("Individual" answer). Still open: `apply.jsx` collects no kind at all, a pre-existing gap. Relaxing its "Organisation / ministry name" label for a solo person belongs with that. |
@@ -153,7 +163,7 @@ v1's minimal scope serves this purpose directly: a Christian entity that cannot 
 
 The founder has not stated these explicitly. They follow from the friction points above and are offered here for confirmation or edit, matching this project's convention of tracking open items rather than deciding them unilaterally:
 
-1. ~~Bypass or auto-approve the Contributor application for v1~~ **✅ Done session 2.**
+1. ~~Bypass or auto-approve the Contributor application for v1~~ ~~✅ Done session 2.~~ **Reversed 2026-10-03 (D-12): self-serve applications need admin approval.**
 2. ~~Add a lightweight, founder-only hide/flag control for a listing~~ **✅ Backend done session 2 (no admin.jsx button yet).**
 3. Add "Individual" as a Contributor kind, and adjust onboarding copy to support a solo person.
 4. Correct `README.md`.
