@@ -668,6 +668,16 @@ test.describe("Signed-in-only screens reached by link", () => {
     await expect.poll(() => path(page)).toBe("/apply");
   });
 
+  test("an applicant whose application is pending keeps their Dashboard (the being-reviewed page) when they open /dashboard", async ({ page }) => {
+    await realShell(page);
+    await signInToFakeProject(page, { user: CITIZEN, profile: { role: "citizen", contributor_status: "pending" } });
+    await page.goto("/dashboard");
+    await expect(page.locator('[data-screen="pending-application"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-screen="apply"]')).toHaveCount(0);
+    await expect(page.getByText("Become a Contributor to unlock your portal.")).toHaveCount(0);
+    expect(path(page)).toBe("/dashboard");
+  });
+
   test("a signed-in non-admin who opens /admin lands on the map", async ({ page }) => {
     await realShell(page);
     await signInToFakeProject(page, { user: MEMBER, profile: { role: "contributor", contributor_status: "approved" } });
