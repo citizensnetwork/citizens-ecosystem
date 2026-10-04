@@ -15,9 +15,11 @@ type Rewrite = { source: string; destination: string };
 let R: Routes;
 let rewrites: Rewrite[];
 
+const escapeRegExp = (literal: string) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /** Does a Next.js `source` pattern (`/e/:id`) match this concrete path? One segment per `:param`. */
 const matches = (source: string, path: string) =>
-  new RegExp("^" + source.replace(/:[A-Za-z]+/g, "[^/]+").replace(/\//g, "\\/") + "$").test(path);
+  new RegExp("^" + source.split(/:[A-Za-z]+/).map(escapeRegExp).join("[^/]+") + "$").test(path);
 
 beforeAll(async () => {
   R = loadFrontend("routes.jsx").CC_ROUTES as Routes;
