@@ -54,7 +54,20 @@ The earlier milestone runs (M1, M2, M3, M4) were green too; the one red e2e step
 | P1-12 | pin, label and ring contrast >= 3:1 on the dark base from sampled pixels; text >= 4.5:1; tile usage within the free tier; screenshots light and dark x 3                   | PASS                                                                                                                                      | `m4-pin-contrast-dark.json`; `m4-tiles-usage-dark.json` (+12 requests only for people who switch; about 17 per visit, 100,000 a month free); `mapv2-sheet-dark-*.png` |
 | P1-13 | every Accept line PASS / FAIL / NOT MEASURED; zero console errors; Lighthouse >= 95 if it can run                                                                          | see below                                                                                                                                 | this file; `phase1-qa-matrix.json` (120 checks, 0 failed)                                                                                                             |
 
-**Lighthouse: NOT MEASURED.** It is not a dependency of the repo and this run does not install tools; the accessibility checks that were run are the ones above (names, roles, focus, targets, contrast, reduced motion) plus the keyboard pass.
+**Lighthouse: measured on the landing screen only (2026-10-10, `data/lighthouse-preview-08458ac.json`).** Lighthouse 12.8.2, default mobile profile, 4 runs per flag on the Vercel preview of `08458ac`. A fresh profile lands on the sign-in splash, and guest mode lives in `sessionStorage`, so the CLI cannot reach the map screen itself; the map screen's accessibility checks are the ones above (names, roles, focus, targets, contrast, reduced motion) plus the keyboard pass.
+
+| Median of 4    | flag off (`?map=v1`) | flag on (`?map=v2`) |
+| -------------- | -------------------- | ------------------- |
+| Performance    | 68.5                 | 63                  |
+| LCP            | 5.0 s                | 5.1 s               |
+| Total blocking | 78 ms                | 249 ms              |
+| Layout shift   | 0.0005               | 0.0032              |
+| Accessibility  | 92                   | 92                  |
+
+- **Accessibility 92, not 95, with the flag on or off:** the only failing audit is `meta-viewport` (`maximum-scale` blocks pinch zoom). It is app-wide and not changed by Map v2: a separate decision, because it also governs the Capacitor app.
+- **The flag-on layout shift came from the "map v2" badge**, which was added before `map-v2.css` had loaded and then jumped to its fixed corner. Fixed after this measurement: the badge is now added when the stylesheet loads.
+- **Flag-on blocking time is about 170 ms higher on the landing screen.** A CPU profile of 3 cold loads per flag (CPU x4) shows the same JavaScript time for both, so the extra is style work from the extra stylesheet and the `data-theme` attribute landing inside a script task. It affects flag-on testers only; look at it again before the flag defaults on (D14).
+- SEO 50 for both is the preview's `noindex`, not a production signal. LCP (5 s) is the same for both flags and is the app's existing landing cost.
 
 ## 5. QA matrix (`phase1-qa-matrix.json`): 120 checks, 0 failed
 

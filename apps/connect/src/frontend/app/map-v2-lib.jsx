@@ -97,21 +97,25 @@
       api.styleReady = true;
       try { window.dispatchEvent(new Event('cc-map-v2-style')); } catch { /* old webview */ }
     };
-    const link = doc.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = CSS_HREF;
-    link.onload = done;
-    link.onerror = done;
-    doc.head.appendChild(link);
     // The corner badge says which build someone is testing; hidden from assistive tech.
-    if (doc.body && !doc.getElementById('cc-map-v2-badge')) {
+    // Added only once the stylesheet has loaded: before that it has no
+    // `position: fixed`, so it would sit in the page flow and then jump (Lighthouse
+    // measured that jump as a 0.003 layout shift on the landing screen).
+    const addBadge = () => {
+      if (!doc.body || doc.getElementById('cc-map-v2-badge')) return;
       const b = doc.createElement('div');
       b.id = 'cc-map-v2-badge';
       b.className = 'mv2-badge';
       b.setAttribute('aria-hidden', 'true');
       b.textContent = 'map v2';
       doc.body.appendChild(b);
-    }
+    };
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = CSS_HREF;
+    link.onload = () => { addBadge(); done(); };
+    link.onerror = done;
+    doc.head.appendChild(link);
   }
   if (doc) {
     if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', mount);
