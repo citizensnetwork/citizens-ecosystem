@@ -11,7 +11,16 @@ Run 2026-10-10 on branch `feat/map-v2`. Every number below has a file behind it;
 
 ## 2. The repo gates (workspace-wide)
 
-GATES_TABLE
+| Gate (run on commit `b0cb62d`)            | Result                                                                                                                                                                                                         |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`                       | pass                                                                                                                                                                                                           |
+| `pnpm lint`                               | pass, 0 errors                                                                                                                                                                                                 |
+| `pnpm build`                              | pass (all three apps)                                                                                                                                                                                          |
+| `pnpm typecheck`                          | pass                                                                                                                                                                                                           |
+| `pnpm test`                               | pass: Connect **1,313** passed and 36 live-only skipped (five new frontend test files: `mapV2Lib`, `mapV2Tokens`, `mapV2Pins`, `mapV2Time`, `mapV2Strings`); Vision, Wear and the packages unchanged and green |
+| `pnpm --filter citizens-connect test:e2e` | **182 passed** (the 127 existing tests plus 55 new Map v2 tests: the flag, pins, sheet, devices and safe areas, News, look)                                                                                    |
+
+The earlier milestone runs (M1, M2, M3, M4) were green too; the one red e2e step in the M3 run was the not-yet-built look spec landing in the tree before its code (`.claude/sessions/map-v2-gates-m*.log`, local). CI on PR #96: Verify, E2E and CodeQL analysis pass; the CodeQL check had failed on two warnings in the local scripts, fixed in `2c3e8ca`.
 
 ## 3. Measures M1 to M9
 
