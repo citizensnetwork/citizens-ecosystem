@@ -24,6 +24,7 @@ Computed with the WCAG 2.x relative-luminance formula by `apps/connect/scripts/m
 | Focus ring on a raised surface (`--focus-ring` on `--surface-2`)                                 | 3:1   | 4.51  | 10.70 |
 | Pin white border on the map base (`--pin-border` on `--map-base`)                                | 3:1   | n/a   | 14.55 |
 | Pin dark hairline on the map base (composited) (`--pin-hairline` on `--map-base`)                | 3:1   | 5.59  | n/a   |
+| Photo viewer text on its backdrop (over the sheet) (`--viewer-fg` on `--viewer-bg`)              | 4.5:1 | 16.19 | 18.03 |
 | Category glyph on its category fill: best of white or `#0a0908`, worst of 23 colours (`#e91e63`) | 4.5:1 | 4.58  | 4.58  |
 
 ## Notes

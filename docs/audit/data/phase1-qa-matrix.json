@@ -1,0 +1,847 @@
+{
+  "fixedNow": "2026-10-10T08:00:00.000Z",
+  "total": 120,
+  "failed": 0,
+  "rows": [
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":360,\"top\":432,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=360"
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "light",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":360,\"top\":432,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=360"
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "360x800",
+      "theme": "dark",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":390,\"top\":456,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=390"
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "light",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":390,\"top\":456,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=390"
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "390x844",
+      "theme": "dark",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":412,\"top\":494,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=412"
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "light",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "the sheet opens on a tap and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":412,\"top\":494,\"headVisible\":true,\"wide\":false,\"overflowX\":false}"
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "bottom sheet spans the width",
+      "result": "PASS",
+      "detail": "w=412"
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=10"
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "412x915",
+      "theme": "dark",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "the sheet opens on a click and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":380,\"top\":112,\"headVisible\":true,\"wide\":true,\"overflowX\":false}"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "side panel is 380 px wide",
+      "result": "PASS",
+      "detail": "w=380"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=9"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "light",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "the sheet opens on a click and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":380,\"top\":112,\"headVisible\":true,\"wide\":true,\"overflowX\":false}"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "side panel is 380 px wide",
+      "result": "PASS",
+      "detail": "w=380"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=9"
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "768x1024",
+      "theme": "dark",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "the sheet opens on a click and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":380,\"top\":112,\"headVisible\":true,\"wide\":true,\"overflowX\":false}"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "side panel is 380 px wide",
+      "result": "PASS",
+      "detail": "w=380"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=9"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "light",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "data-theme matches the chosen look",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "the sheet opens on a click and its header is on screen",
+      "result": "PASS",
+      "detail": "{\"w\":380,\"top\":112,\"headVisible\":true,\"wide\":true,\"overflowX\":false}"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "side panel is 380 px wide",
+      "result": "PASS",
+      "detail": "w=380"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "no horizontal scroll",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "sheet controls are 44 px targets",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "Escape closes the sheet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "Tab reaches a map pin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "the focused pin shows a 2 px focus ring",
+      "result": "PASS",
+      "detail": "solid 2px"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "Enter opens the sheet and moves focus inside it",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "the sheet has focusable controls",
+      "result": "PASS",
+      "detail": "count=9"
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "focus returns to the pin on close",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "vp": "1280x800",
+      "theme": "dark",
+      "check": "console clean: no page errors and no console errors",
+      "result": "PASS",
+      "detail": ""
+    }
+  ]
+}

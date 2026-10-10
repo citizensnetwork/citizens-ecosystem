@@ -8,6 +8,7 @@ const seed = smallSeed(FIXED_NOW);
 const s = await openSession({ viewport: VIEWPORTS[vp], dsf: Number(process.env.DSF || 1), tiles: process.env.TILES || 'mock', seed, colorScheme: process.env.SCHEME || 'light', reducedMotion: !!process.env.REDUCED });
 try {
   await openMap(s.page, '/' + query, { minMarkers: 8 });
+  if (process.env.THEME) { await s.page.evaluate((t) => window.MapV2.setTheme(t), process.env.THEME); await s.page.waitForTimeout(process.env.TILES === 'real' ? 3500 : 400); }
   const c0 = seed.contributors[0];
   await jumpTo(s.page, { lng: c0.physical_longitude, lat: c0.physical_latitude, zoom: Number(zoom) });
   if (select) {

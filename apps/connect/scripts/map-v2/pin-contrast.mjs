@@ -67,10 +67,39 @@ try {
     }, [shot.toString('base64'), info.cx, info.cy, R, DSF]);
     return { label, zoom, ...res, pass: res.median >= 3 };
   };
+  // the name label: the pixel that differs most from the map around the text (the halo is part of the design,
+  // so this is the contrast a reader actually gets), against the median of the ring just outside it
+  const measureLabel = async (zoom, selector, label, at) => {
+    await jumpTo(s.page, { lng: at.lng, lat: at.lat, zoom });
+    await s.page.waitForTimeout(2200);
+    const rect = await s.page.evaluate((sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }, selector);
+    if (!rect) return { error: 'selector not found: ' + selector };
+    const shot = await s.page.screenshot({ animations: 'disabled', caret: 'hide' });
+    const res = await s.page.evaluate(async ([b64, r, dsf]) => {
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const bmp = await createImageBitmap(new Blob([bin], { type: 'image/png' }));
+      const cv = new OffscreenCanvas(bmp.width, bmp.height);
+      const g = cv.getContext('2d');
+      g.drawImage(bmp, 0, 0);
+      const lum = (d, i) => { const v = [d[i], d[i + 1], d[i + 2]].map((x) => x / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+      const px = (x, y, w, h) => g.getImageData(Math.round(x * dsf), Math.round(y * dsf), Math.max(1, Math.round(w * dsf)), Math.max(1, Math.round(h * dsf)));
+      const inner = px(r.x, r.y, r.w, r.h);
+      // ring: 3 CSS px bands above and below the text box
+      const ringLums = [];
+      for (const band of [px(r.x, r.y - 6, r.w, 3), px(r.x, r.y + r.h + 3, r.w, 3)]) for (let i = 0; i < band.data.length; i += 4) ringLums.push(lum(band.data, i));
+      ringLums.sort((a, b) => a - b);
+      const bg = ringLums[Math.floor(ringLums.length / 2)];
+      let far = bg;
+      for (let i = 0; i < inner.data.length; i += 4) { const l = lum(inner.data, i); if (Math.abs(l - bg) > Math.abs(far - bg)) far = l; }
+      return { ratio: (Math.max(far, bg) + 0.05) / (Math.min(far, bg) + 0.05) };
+    }, [shot.toString('base64'), rect, DSF]);
+    return { label, zoom, ratio: res.ratio, pass: res.ratio >= 4.5 };
+  };
   // contributor disc: 48 px, scaled 0.8333 (glyph state) or 1 (logo state), centred in the 48 x 56 body
   out.results.contributor_glyph_z12 = await measure(12, '.mv2-pin--contributor [data-mv2="disc"]', 'Contributor glyph pin', (i) => i.w / 2);
   out.results.contributor_logo_z15 = await measure(15.5, '.mv2-pin--contributor [data-mv2="disc"]', 'Contributor logo pin', (i) => i.w / 2);
   out.results.place_z15 = await measure(15.5, '.mv2-pin--place [data-mv2="body"]', 'Place circle', (i) => i.w / 2 - 3, { lng: seed.places[0].longitude, lat: seed.places[0].latitude });
+  out.results.label_z15 = await measureLabel(15.5, '.mv2-pin--contributor [data-mv2="label-text"]', 'Pin name label (text vs the map around it)', { lng: c0.physical_longitude, lat: c0.physical_latitude });
   console.log(JSON.stringify(out, null, 2));
   if (args.out) writeFileSync(args.out, JSON.stringify(out, null, 2));
 } finally { await s.close(); }

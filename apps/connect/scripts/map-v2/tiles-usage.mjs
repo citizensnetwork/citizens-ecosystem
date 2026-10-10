@@ -1,5 +1,5 @@
 // P0-02: how many MapTiler requests does one map view cost? One run, real tiles.
-//   node scripts/map-v2/tiles-usage.mjs
+//   node scripts/map-v2/tiles-usage.mjs [darkStyleId] [v2]   (v2 = switch through the app's Map look setting)
 // Counts requests to api.maptiler.com (the unit the free tier meters: tile, glyph,
 // sprite and style requests), for: first view, a short browse (3 pans, 1 zoom in),
 // and a switch to the dark style on the same map. The key comes from .env.local and is not printed.
@@ -22,7 +22,7 @@ const kinds = (reqs) => {
 };
 const mark = () => s.log.requests.length;
 try {
-  await openMap(s.page, '/', { minMarkers: 8 });
+  await openMap(s.page, process.argv[3] === 'v2' ? '/?map=v2' : '/', { minMarkers: 8 });
   await jumpTo(s.page, { lng: PRETORIA.lng, lat: PRETORIA.lat, zoom: 12 });
   await s.page.waitForTimeout(2500);
   const first = kinds(s.log.requests);
@@ -38,7 +38,9 @@ try {
   const darkId = process.argv[2] || 'dataviz-dark';
   const swapped = await s.page.evaluate(async (id) => {
     const key = window.__CC_ENV.MAPTILER_KEY;
-    window.__ccMap.setStyle('https://api.maptiler.com/maps/' + id + '/style.json?key=' + key);
+    // the app's own path when Map v2 is on (the Map look setting), the raw style swap otherwise
+    if (window.MapV2 && window.isMapV2()) window.MapV2.setTheme('dark');
+    else window.__ccMap.setStyle('https://api.maptiler.com/maps/' + id + '/style.json?key=' + key);
     await new Promise((res) => { window.__ccMap.once('idle', res); setTimeout(res, 6000); });
     return true;
   }, darkId);
