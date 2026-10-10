@@ -1,0 +1,354 @@
+{
+  "profile": {
+    "viewport": "390x844",
+    "dsf": 3,
+    "cpu": 4,
+    "apiDelayMs": 200,
+    "galleryTiles": 12,
+    "jpegBytes": {
+      "min": 41556,
+      "median": 45262,
+      "max": 46619
+    },
+    "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "m1_tap_to_header_ms": {
+    "runs": [
+      83,
+      105,
+      106,
+      116,
+      123,
+      134,
+      139,
+      220,
+      245,
+      375
+    ],
+    "median": 123,
+    "worst": 375
+  },
+  "m2_tap_to_skeleton_ms": {
+    "runs": [
+      83,
+      105,
+      107,
+      117,
+      123,
+      134,
+      139,
+      220,
+      246,
+      376
+    ],
+    "median": 123,
+    "worst": 376
+  },
+  "m2_tap_to_first_tile_ms": {
+    "runs": [
+      807,
+      824,
+      830,
+      834,
+      836,
+      850,
+      856,
+      861,
+      888,
+      1196
+    ],
+    "median": 836,
+    "worst": 1196
+  },
+  "m4_cls": {
+    "runs": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "worst": 0
+  },
+  "m6_tap_targets_half": [
+    {
+      "el": "Show more details",
+      "w": 390,
+      "h": 24,
+      "under44": true,
+      "hitOk": true
+    },
+    {
+      "el": "Close details",
+      "w": 44,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 127.6,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 97,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 114.3,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "tab",
+      "w": 72,
+      "h": 43,
+      "under44": true,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 1 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 2 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 3 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 4 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 5 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 6 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 7 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 8 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 9 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 10 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 11 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 12 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "view-full",
+      "w": 358,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    }
+  ],
+  "m6_tap_targets_full": [
+    {
+      "el": "Show less",
+      "w": 390,
+      "h": 24,
+      "under44": true,
+      "hitOk": true
+    },
+    {
+      "el": "Close details",
+      "w": 44,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 127.6,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 97,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "action",
+      "w": 114.3,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "tab",
+      "w": 72,
+      "h": 43,
+      "under44": true,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 1 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 2 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 3 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 4 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 5 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 6 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 7 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 8 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 9 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 10 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 11 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "Photo 12 of 12",
+      "w": 118,
+      "h": 118,
+      "under44": false,
+      "hitOk": true
+    },
+    {
+      "el": "view-full",
+      "w": 358,
+      "h": 44,
+      "under44": false,
+      "hitOk": true
+    }
+  ],
+  "m6_summary": {
+    "half_under44_without_padded_hit_area": [],
+    "full_under44_without_padded_hit_area": [],
+    "total_half": 19,
+    "total_full": 19
+  }
+}
