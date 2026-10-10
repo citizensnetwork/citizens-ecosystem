@@ -19,7 +19,8 @@
 //  Visibility: DENSITY-GATED BY ZOOM (founder ask). A place is a street-level
 //  fact, an event a city-level one and a Contributor a regional one, so past a
 //  certain distance each stops being useful and starts being noise — see
-//  ZOOM_GATES below. There is still no clustering, and gating is pure CSS
+//  ZOOM_GATES below. There is still no clustering (Map v2 only adds a "+N" hint
+//  on overlapping pins, worked out when the map goes idle), and gating is pure CSS
 //  `display` on markers MapLibre already owns — no marker churn on zoom.
 // ════════════════════════════════════════════════════════════════════
 (function () {
@@ -71,6 +72,11 @@
   // neighbourhood scale). The selected pin keeps its label at every zoom
   // (CSS `.cc-pin-label.is-selected`).
   const ZOOM_LABELS = 15;
+  // Map v2 (flag ?map=v2, founder D8): a Contributor pin shows its LOGO at and above this zoom and its
+  // category glyph below it; the selected pin always shows its logo. The founder's map-layering.md says no
+  // pictures in the mid tier. Tuned inside 13-15 (tracker E6); starts where the name labels start.
+  const ZOOM_PHOTO = 15;
+  const v2On = () => !!(window.isMapV2 && window.isMapV2() && window.MapV2Pins && window.MapV2Strings);
 
   function coordsFor(m) {
     if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
@@ -134,15 +140,6 @@
       const a = Object.keys(attrs || {}).map((k) => k + '="' + esc(attrs[k]) + '"').join(' ');
       return '<' + tag + (a ? ' ' + a : '') + '></' + tag + '>';
     }).join('');
-  }
-
-  function lucideSvgString(name, opts) {
-    const size = (opts && opts.size) || 16;
-    const color = (opts && opts.color) || '#fff';
-    const inner = lucideInner(name);
-    if (!inner) return '';
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color +
-      '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
   }
 
   // ── Pin content builder ─────────────────────────────────────────────
@@ -398,6 +395,7 @@
       const z = mp.getZoom();
       const el = containerRef.current;
       if (el) el.setAttribute('data-cc-labels', z >= ZOOM_LABELS ? '1' : '0');
+      if (el && v2On()) el.setAttribute('data-cc-photo', z >= ZOOM_PHOTO ? '1' : '0');
       markerObjs.current.forEach((mk) => {
         const w = mk.getElement();
         if (!w) return;
@@ -409,6 +407,24 @@
         bandRef.current = band;
         if (onZoomBandChangeRef.current) onZoomBandChangeRef.current(band);
       }
+    }, []);
+
+    // Map v2, when the map goes idle (never per frame): load the logos that are about to show (zoom >=
+    // ZOOM_PHOTO, inside the viewport + 20 %), put "+N" on overlapping pins, and hide colliding labels.
+    const layoutV2 = React.useCallback(() => {
+      const mp = mapRef.current;
+      const P = window.MapV2Pins;
+      if (!mp || !P) return;
+      const z = mp.getZoom();
+      if (P.photoShown(z, ZOOM_PHOTO, false)) {
+        const b = mp.getBounds();
+        const padLng = (b.getEast() - b.getWest()) * 0.2, padLat = (b.getNorth() - b.getSouth()) * 0.2;
+        markerObjs.current.forEach((mk) => {
+          const ll = mk.getLngLat();
+          if (ll.lng >= b.getWest() - padLng && ll.lng <= b.getEast() + padLng && ll.lat >= b.getSouth() - padLat && ll.lat <= b.getNorth() + padLat) P.ensureLogo(mk.getElement());
+        });
+      }
+      P.layoutOnIdle({ markers: markerObjs.current, project: (ll) => mp.project(ll), selectedId: selectedRef.current, showLabels: z >= ZOOM_LABELS });
     }, []);
 
     // init the map once — deferred until window.maplibregl is actually ready
@@ -448,6 +464,11 @@
         // fitBounds below, so the first frame is already correct.
         map.on('zoom', applyZoomGates);
         map.on('load', applyZoomGates);
+        // 'idle' fires after every discrete render (a programmatic pan fires it each frame), so the work is
+        // debounced: it runs once the map has been quiet for 150 ms, never while it is being moved.
+        let idleTimer = null;
+        const onIdleV2 = v2On() ? () => { clearTimeout(idleTimer); idleTimer = setTimeout(layoutV2, 150); } : null;
+        if (onIdleV2) map.on('idle', onIdleV2);
         applyZoomGates();
 
         // MapLibre sizes its canvas once, from the container's dimensions at
@@ -491,6 +512,7 @@
           if (ro) ro.disconnect();
           map.off('zoom', applyZoomGates);
           map.off('load', applyZoomGates);
+          if (onIdleV2) { map.off('idle', onIdleV2); clearTimeout(idleTimer); }
           markerObjs.current.forEach((mk) => mk.remove());
           markerObjs.current.clear();
           if (window.__ccMap === map) window.__ccMap = null;
@@ -504,7 +526,7 @@
         stopWaiting();
         if (cleanupInner) cleanupInner();
       };
-    }, [applyZoomGates]);
+    }, [applyZoomGates, layoutV2]);
 
     // (re)render pins whenever inputs change. Zoom gating is NOT done here (it
     // is applyZoomGates, per zoom frame), so this only needs to run on
@@ -518,7 +540,45 @@
       const items = [];
       markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
 
+      // Map v2: one upsert per pin. Selecting a pin only toggles a class on the pin that is already there
+      // (so the 200 ms scale can animate and a tap does not rebuild every marker); a pin is rebuilt only when
+      // what it shows changes (its signature). The marker's outer element is still never replaced.
+      function upsertPinV2(m, cat, coords, anchor, dim, selected) {
+        const S = window.MapV2Strings, P = window.MapV2Pins;
+        const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
+        const label = P.ariaLabelFor(m, catLabel, S.pin);
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
+          m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
+        const fill = m.type === 'idea' ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
+        const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
+        let mk = markerObjs.current.get(m.id);
+        if (mk && mk._ccAnchor === anchor) {
+          const wrap = mk.getElement();
+          if (mk._ccSig !== sig) { wrap.replaceChildren(build()); wrap.setAttribute('aria-label', label); mk._ccSig = sig; }
+          mk.setLngLat(coords);
+        } else {
+          if (mk) mk.remove();
+          const wrap = document.createElement('div');
+          wrap.setAttribute('data-cc-id', m.id);
+          wrap.setAttribute('aria-label', label);
+          wrap.appendChild(build());
+          const activate = () => { if (onSelectRef.current) onSelectRef.current(m.id, m.type); };
+          P.makeOperable(wrap, activate);
+          wrap.addEventListener('click', (e) => { e.stopPropagation(); activate(); });
+          mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
+          mk._ccAnchor = anchor;
+          mk._ccSig = sig;
+          markerObjs.current.set(m.id, mk);
+        }
+        mk._ccType = m.type;
+        mk._ccId = m.id;
+        mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
+        P.applyDim(mk.getElement(), dim);
+        P.applySelected(mk.getElement(), selected);
+      }
+
       // ── individual pins — show them all ──
+      const useV2 = v2On();
       const seenPins = new Set();
       items.forEach(({ m, coords }) => {
         seenPins.add(m.id);
@@ -527,7 +587,8 @@
         const selected = selectedId === m.id;
         // Event badges carry a locating nub, so they hang from their point
         // ('bottom'); every other pin is a symmetric badge centred on it.
-        const anchor = m.type === 'event' ? 'bottom' : 'center';
+        const anchor = (m.type === 'event' || (useV2 && m.type === 'contributor')) ? 'bottom' : 'center';
+        if (useV2) { upsertPinV2(m, cat, coords, anchor, dim, selected); return; }
         const inner = buildPinInner(m, cat, { selected, onDismissBubble: onDismissBubbleRef.current });
         const existing = markerObjs.current.get(m.id);
         // Reuse the marker (and its MapLibre-owned outer element) whenever the
@@ -591,7 +652,8 @@
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.
       applyZoomGates();
-    }, [markers, filterCategory, selectedId, applyZoomGates, mapReady]);
+      if (useV2) layoutV2();
+    }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
 
     return React.createElement('div', {
       ref: containerRef, className: 'absolute inset-0 cc-map',
@@ -725,7 +787,7 @@
 
   // Exported so tests (and any future surface) assert against the SAME
   // thresholds the map enforces, instead of re-declaring them.
-  window.MAP_ZOOM = { GATES: ZOOM_GATES, LABELS: ZOOM_LABELS, bandFor: zoomBandFor, hidden: markerHidden };
+  window.MAP_ZOOM = { GATES: ZOOM_GATES, LABELS: ZOOM_LABELS, PHOTO: ZOOM_PHOTO, bandFor: zoomBandFor, hidden: markerHidden };
   window.StylizedMap = StylizedMap;
   window.LocationPicker = LocationPicker;
 })();

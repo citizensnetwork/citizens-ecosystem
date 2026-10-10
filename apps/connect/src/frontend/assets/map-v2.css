@@ -54,6 +54,8 @@
   --elev-1: 0 1px 3px rgba(10, 9, 8, 0.16);
   --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
   --pin-shadow: drop-shadow(0 3px 5px rgba(10, 9, 8, 0.32));
+  --pin-lift: 0 3px 6px rgba(10, 9, 8, 0.3);
+  --live: #d32f2f;
 
   /* ── scales (the same in both looks) ── */
   /* spacing, 4-pt */
@@ -101,7 +103,12 @@
   --focus-offset: 2px;
   --pin-size: 48px;              /* the logo / glyph pin body */
   --pin-selected-scale: 1.6;
+  --pin-selected-scale-shape: 1.3;  /* place / event silhouettes grow less than the organisation pin */
+  --pin-mid-scale: 0.8333;          /* the glyph pin below the photo zoom is 40 px of the 48 px disc */
+  --pin-glyph-size: 22px;
+  --label-max-w: 192px;
   --pin-border-w: 3px;
+  --pin-ring-w: 3px;               /* the category-colour ring around a logo */
   --pin-badge: 14px;             /* category glyph badge on a logo pin */
   --pin-tail: 8px;
   --sheet-radius: var(--radius-lg);
@@ -114,6 +121,7 @@
   --avatar-peek: 40px;
   --avatar-half: 56px;
   --gallery-gap: 2px;
+  --dim-opacity: 0.3;               /* a pin outside the chosen category filter */
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -146,6 +154,8 @@
   --elev-1: 0 1px 3px rgba(0, 0, 0, 0.5);
   --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
   --pin-shadow: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  --pin-lift: 0 3px 6px rgba(0, 0, 0, 0.6);
+  --live: #ff5252;
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
@@ -182,4 +192,288 @@
 .mv2-focusable:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+/* ── 4a. Pins (app/map-v2-pins.jsx) ─────────────────────────────────
+   Only transform and opacity animate. The hit area is padded to --hit with
+   a transparent ::before, so the drawn pin can stay small. */
+/* The marker's OUTER element gets its style rewritten on every frame of a pan, so it carries no
+   var() property at all (measured: that was worth about 8 ms p95 per frame on 150 pins at CPU x4);
+   the focus ring, the dim fade and everything else sit on or below the inner .mv2-pin. */
+.mv2-marker {
+  cursor: pointer;
+  line-height: 0;
+}
+.mv2-marker:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-md);
+}
+.mv2-pin {
+  position: relative;
+  line-height: 0;
+  transition: opacity var(--dur-fast) linear;
+}
+.mv2-pin[data-dim] {
+  opacity: var(--dim-opacity);
+}
+.mv2-pin::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--hit));
+  height: max(100%, var(--hit));
+  transform: translate(-50%, -50%);
+}
+.mv2-pin--contributor {
+  width: var(--pin-size);
+  height: calc(var(--pin-size) + var(--pin-tail));
+}
+[data-mv2='body'] {
+  display: block;
+  position: relative;
+  transform-origin: 50% 100%;
+  transform: scale(var(--pin-scale, 1));
+  transition: transform var(--dur-base) var(--ease-enter);
+}
+.mv2-pin--contributor [data-mv2='body'] {
+  position: absolute;
+  inset: 0;
+  --pin-scale: var(--pin-mid-scale);
+}
+.cc-map[data-cc-photo='1'] .mv2-pin--contributor [data-mv2='body'] {
+  --pin-scale: 1;
+}
+.mv2-pin--place [data-mv2='body'],
+.mv2-pin--idea [data-mv2='body'] {
+  transform-origin: 50% 50%;
+}
+.mv2-pin.is-selected [data-mv2='body'] {
+  --pin-scale: var(--pin-selected-scale);
+}
+.mv2-pin--place.is-selected [data-mv2='body'],
+.mv2-pin--event.is-selected [data-mv2='body'],
+.mv2-pin--idea.is-selected [data-mv2='body'] {
+  --pin-scale: var(--pin-selected-scale-shape);
+}
+
+/* contributor: disc on a tail */
+[data-mv2='disc'] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--pin-size);
+  height: var(--pin-size);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: var(--pin-border-w) solid var(--pin-border);
+  background: var(--pin-cat);
+  color: var(--pin-glyph);
+  box-shadow: 0 0 0 1px var(--pin-hairline), var(--pin-lift);
+}
+[data-mv2='glyph'] {
+  width: var(--pin-glyph-size);
+  height: var(--pin-glyph-size);
+}
+[data-mv2='tail'] {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: var(--pin-tail) solid transparent;
+  border-right: var(--pin-tail) solid transparent;
+  border-top: var(--pin-tail) solid var(--pin-cat);
+}
+[data-mv2='logo-wrap'] {
+  position: absolute;
+  inset: var(--pin-ring-w);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-fast) linear;
+}
+[data-mv2='logo'] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--space-1);
+  object-fit: contain;
+}
+[data-mv2='logo-wrap'][data-photo] [data-mv2='logo'] {
+  padding: 0;
+  object-fit: cover;
+}
+[data-mv2='badge'] {
+  position: absolute;
+  right: calc(var(--space-1) * -1);
+  top: calc(var(--pin-size) - var(--pin-badge) - var(--space-1));
+  width: var(--pin-badge);
+  height: var(--pin-badge);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--pin-cat);
+  color: var(--pin-glyph);
+  border: 1px solid var(--pin-border);
+  opacity: 0;
+  transition: opacity var(--dur-fast) linear;
+}
+[data-mv2='badge-glyph'] {
+  width: 70%;
+  height: 70%;
+}
+/* the logo shows at and above the photo zoom, or when selected, once it has loaded */
+.cc-map[data-cc-photo='1'] .mv2-pin.is-loaded:not(.is-broken) [data-mv2='logo-wrap'],
+.mv2-pin.is-selected.is-loaded:not(.is-broken) [data-mv2='logo-wrap'],
+.cc-map[data-cc-photo='1'] .mv2-pin.is-loaded:not(.is-broken) [data-mv2='badge'],
+.mv2-pin.is-selected.is-loaded:not(.is-broken) [data-mv2='badge'] {
+  opacity: 1;
+}
+
+/* place / event / idea silhouettes */
+[data-mv2='shape-svg'] {
+  display: block;
+  overflow: visible;
+  filter: var(--pin-shadow);
+}
+[data-mv2='shape'] {
+  stroke: var(--pin-border);
+  stroke-width: var(--pin-border-w);
+  stroke-linejoin: round;
+}
+[data-mv2='shape-hair'] {
+  fill: none;
+  stroke: var(--pin-hairline);
+  stroke-width: calc(var(--pin-border-w) + var(--space-1) / 2);
+  stroke-linejoin: round;
+}
+
+/* a live event: a static dot (no looping pulse), with "live now" in the pin's name */
+[data-mv2='live'] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--space-3);
+  height: var(--space-3);
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  border: var(--space-1) solid var(--pin-border);
+  box-shadow: 0 0 0 1px var(--pin-hairline);
+}
+
+/* name label: 12 px / 600 with a halo; hidden when it would collide */
+[data-mv2='label'] {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: var(--space-1);
+  max-width: var(--label-max-w);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) linear;
+}
+[data-mv2='label-text'] {
+  display: block;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  color: var(--pin-label);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 var(--space-1) var(--pin-label-halo), 0 0 var(--space-2) var(--pin-label-halo);
+}
+.cc-map[data-cc-labels='1'] [data-mv2='label']:not([data-off]),
+.mv2-pin.is-selected [data-mv2='label'] {
+  opacity: 1;
+}
+
+/* "+N" when pins overlap at this zoom (computed when the map goes idle) */
+[data-mv2='count'] {
+  display: none;
+  position: absolute;
+  top: calc(var(--space-1) * -1);
+  right: calc(var(--space-3) * -1);
+  min-width: var(--space-4);
+  height: var(--space-4);
+  box-sizing: border-box;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--pin-hairline);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  text-align: center;
+  pointer-events: none;
+}
+[data-mv2='count'][data-on] {
+  display: block;
+}
+
+/* a short update over the pin */
+[data-mv2='bubble'] {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: var(--space-2);
+  width: max-content;
+  max-width: var(--label-max-w);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-1);
+  color: var(--text-1);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) var(--space-1);
+  box-shadow: var(--elev-1);
+  line-height: var(--lh-1);
+}
+[data-mv2='bubble-text'] {
+  min-width: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-mv2='bubble-x'] {
+  position: relative;
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  cursor: pointer;
+}
+[data-mv2='bubble-x']::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--hit);
+  height: var(--hit);
+  transform: translate(-50%, -50%);
 }

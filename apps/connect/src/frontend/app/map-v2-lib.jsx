@@ -22,7 +22,7 @@
   const THEME_KEY = 'cc_map_theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files.
-  const CSS_HREF = '/assets/map-v2.css?v=20261010a';
+  const CSS_HREF = '/assets/map-v2.css?v=20261010e';
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
