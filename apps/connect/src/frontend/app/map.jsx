@@ -365,7 +365,7 @@
   }
 
   // ── The map component ──────────────────────────────────────────────
-  function StylizedMap({ markers, filterCategory, selectedId, onSelect, onDismissBubble, onZoomBandChange }) {
+  function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
@@ -654,6 +654,26 @@
       applyZoomGates();
       if (useV2) layoutV2();
     }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
+
+    // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
+    // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
+    // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
+    // later, so the first paint belongs to the sheet's header. Reduced motion makes it a jump.
+    useEffect(() => {
+      if (!apiRef) return undefined;
+      apiRef.current = {
+        focusSelected(padding) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !mk || !padding) return;
+            userMovedRef.current = true;   // the "frame the data" fallback must never undo this
+            mp.easeTo({ center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          });
+        },
+      };
+      return () => { apiRef.current = null; };
+    }, [apiRef]);
 
     return React.createElement('div', {
       ref: containerRef, className: 'absolute inset-0 cc-map',

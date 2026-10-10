@@ -88,6 +88,8 @@
     const app = window.useApp();
     const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
+    // Map v2: the sheet reports how much of the map it covers; the map keeps the selected pin clear of it
+    const mapApi = useRef(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
     const [showIdeas, setShowIdeas] = useState(false);
@@ -130,7 +132,7 @@
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
         React.createElement(window.StylizedMap, {
-          markers, filterCategory: filter, selectedId: selected,
+          markers, filterCategory: filter, selectedId: selected, apiRef: mapApi,
           // Every pin type — Contributor included — opens the same small
           // preview card; the full profile is one tap further, on the card.
           onSelect: (id, t) => {
@@ -180,7 +182,10 @@
           React.createElement(LegendRow, { label: 'Place', square: true }),
           React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }))),
 
-      selected && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }));
+      // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
+      selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
+        ? React.createElement(window.MapV2Sheet, { id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); } })
+        : React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) })));
   }
 
   const LegendRow = ({ color, label, pulse, square }) => React.createElement('div', { className: 'flex items-center gap-1.5' },

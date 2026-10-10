@@ -71,6 +71,7 @@ export const PAIRS = [
   ['Focus ring on a raised surface', '--focus-ring', '--surface-2', 3],
   ['Pin white border on the map base', '--pin-border', '--map-base', 3, 'border'],
   ['Pin dark hairline on the map base (composited)', '--pin-hairline', '--map-base', 3, 'over'],
+  ['Photo viewer text on its backdrop (over the sheet)', '--viewer-fg', '--viewer-bg', 4.5, 'bgalpha', '--surface-1'],
 ];
 
 /** Best of white or near-black as a glyph colour on a category fill: the glyph rule. */
@@ -94,12 +95,13 @@ export function categoryGlyphMin(dataJsx) {
 export function evaluate(css) {
   const t = parseTokens(css);
   const rows = [];
-  for (const [label, fg, bg, need, kind] of PAIRS) {
+  for (const [label, fg, bg, need, kind, base] of PAIRS) {
     const out = { label, fg, bg, need, ratios: {} };
     for (const look of ['light', 'dark']) {
       const tokens = t[look];
-      const b = toRgba(tokens[bg], tokens);
+      let b = toRgba(tokens[bg], tokens);
       let f = toRgba(tokens[fg], tokens);
+      if (kind === 'bgalpha') b = over(b, toRgba(tokens[base], tokens)); // the background itself is translucent: composite it first
       if (kind === 'over') {
         // a fully transparent hairline (dark look) draws nothing: the white border carries the separation there
         if (f[3] === 0) {

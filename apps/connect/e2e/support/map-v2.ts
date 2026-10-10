@@ -59,3 +59,39 @@ export async function openMap(page: Page, path = "/", min = 1) {
     { timeout: 20_000 },
   );
 }
+
+/** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
+export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
+const fixtureSvg = (n: number) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400"><rect width="300" height="400" fill="hsl(${(n * 53) % 360} 45% 45%)"/><text x="150" y="215" text-anchor="middle" font-size="64" font-family="Arial" fill="#fff">${n}</text></svg>`;
+
+/**
+ * Answers GET /api/v1/contributors/<slug> (the per-slug detail the sheet fetches for its photos) and
+ * the fixture images. `failFirst` makes the first N detail requests fail with a 500; `delayMs` holds
+ * every detail response back, so the skeleton can be seen and measured.
+ */
+export async function mockContributorDetail(
+  page: Page,
+  seed: MapSeed,
+  o: { gallery?: number; delayMs?: number; failFirst?: number; covers?: number } = {},
+) {
+  let calls = 0;
+  await page.route("**/fixture-img/*.svg", (route: Route) => {
+    const n = Number(/(\d+)\.svg/.exec(route.request().url())?.[1] ?? 0);
+    return route.fulfill({ contentType: "image/svg+xml", body: fixtureSvg(n) });
+  });
+  await page.route("**/api/v1/contributors/*", async (route: Route) => {
+    const slug = decodeURIComponent(new URL(route.request().url()).pathname.split("/").pop() ?? "");
+    const profile = (seed.contributors as { contributor_slug: string }[]).find((c) => c.contributor_slug === slug);
+    calls++;
+    if (o.delayMs) await new Promise((r) => setTimeout(r, o.delayMs));
+    if (o.failFirst && calls <= o.failFirst) return route.fulfill({ status: 500, json: { error: "boom" } });
+    if (!profile) return route.fulfill({ status: 404, json: { error: "Contributor not found" } });
+    const gallery = Array.from({ length: o.gallery ?? 0 }, (_, i) => fixtureImageUrl(i + 1));
+    const covers = Array.from({ length: o.covers ?? 0 }, (_, i) => ({ url: fixtureImageUrl(100 + i), caption: `Cover ${i + 1}` }));
+    return route.fulfill({
+      json: { data: { profile: { ...profile, gallery_urls: gallery, cover_photo_urls: covers }, upcoming_events: [], past_events: [], places: [], counts: {} } },
+    });
+  });
+  return { calls: () => calls };
+}
