@@ -256,3 +256,31 @@ test.describe("flag off: v1 pins are untouched", () => {
     await expect(page.locator('[data-cc-pin="contributor-logo"]').first()).toBeAttached();
   });
 });
+
+test.describe("E23 and the 12.3 states", () => {
+  test("flag on: the locate and zoom buttons are 44 px; flag off: they keep their v1 size", async ({ page }) => {
+    await mockMapNetwork(page);
+    await openMap(page, "/?map=v2", 8);
+    const size = () => page.locator(".maplibregl-ctrl-group button").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]));
+    for (const wh of await size()) expect(wh).toEqual([44, 44]);
+    await page.goto("/?map=v1");
+    await page.waitForSelector('[data-screen="discover"]');
+    for (const wh of await size()) expect(wh).toEqual([29, 29]);
+  });
+
+  test("an action has a hover state and a pressed state on top of its focus ring", async ({ page }) => {
+    const seed = smallSeed(FIXED_NOW) as Seed;
+    await mockMapNetwork(page, seed);
+    await openMap(page, "/?map=v2", 8);
+    const c = seed.contributors[0] as { id: string; physical_longitude: number; physical_latitude: number };
+    await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    const share = page.locator("[data-mv2='sheet']").getByRole("button", { name: "Share" });
+    await expect(share).toBeVisible();
+    await share.hover();
+    await expect(share).toHaveCSS("border-top-color", "rgb(139, 105, 20)"); // --accent-ink on hover
+    await page.mouse.down();
+    await expect.poll(() => share.evaluate((e) => getComputedStyle(e).transform)).not.toBe("none"); // pressed: scale(0.97)
+    await page.mouse.up();
+  });
+});

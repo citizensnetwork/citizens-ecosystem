@@ -166,7 +166,7 @@
     svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = body + (glyph
       ? '<g transform="translate(' + gx + ' ' + gy + ') scale(' + (gsize / 24) + ')" fill="none" stroke="' + glyphColor(hex) +
-        '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + glyph + '</g>'
+        '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + glyph + '</g>'
       : '');
     return svg;
   }

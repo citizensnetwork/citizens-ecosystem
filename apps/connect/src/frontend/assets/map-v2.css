@@ -1087,3 +1087,54 @@
   border-color: var(--accent-ink);
   background: var(--accent-ink);
 }
+
+/* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
+[data-mv2='action'],
+[data-mv2='view-full'],
+[data-mv2='more'],
+[data-mv2='icon-btn'],
+[data-mv2='row'],
+[data-mv2='tab'],
+[data-mv2='tile-btn'],
+[data-mv2='look-btn'],
+[data-mv2='look-item'] {
+  transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
+}
+[data-mv2='action']:active,
+[data-mv2='view-full']:active,
+[data-mv2='more']:active,
+[data-mv2='icon-btn']:active,
+[data-mv2='row']:active,
+[data-mv2='tab']:active,
+[data-mv2='tile-btn']:active,
+[data-mv2='look-btn']:active,
+[data-mv2='look-item']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='action']:hover {
+    border-color: var(--accent-ink);
+  }
+  [data-mv2='action'][data-primary]:hover {
+    opacity: 0.9;
+  }
+  [data-mv2='view-full']:hover,
+  [data-mv2='more']:hover,
+  [data-mv2='icon-btn']:hover,
+  [data-mv2='look-btn']:hover,
+  [data-mv2='look-item']:hover,
+  [data-mv2='row']:hover {
+    background: var(--surface-2);
+  }
+  [data-mv2='tab']:hover {
+    color: var(--text-1);
+  }
+  [data-mv2='tile-btn']:hover [data-mv2='tile-img'] {
+    opacity: 0.9;
+  }
+}
+/* the locate and zoom buttons MapLibre draws are 29 px; under Map v2 they are a thumb's size */
+.maplibregl-ctrl-group button {
+  width: var(--hit);
+  height: var(--hit);
+}
