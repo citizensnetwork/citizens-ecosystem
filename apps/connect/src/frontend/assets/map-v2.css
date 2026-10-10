@@ -1,0 +1,185 @@
+/* ════════════════════════════════════════════════════════════════════
+   Citizens Connect — Map v2 design tokens and styles (flag ?map=v2 only)
+   ------------------------------------------------------------------
+   Loaded by app/map-v2-lib.jsx ONLY when the flag is on, so the v1 page
+   never requests it. Bump the ?v= in map-v2-lib.jsx when this file changes.
+
+   RULE (tracker P1-02): every raw colour and every px value lives in the
+   token blocks below. The component rules further down read var(--…) only
+   (0 and 1px borders excepted). Light is the default look; dark is
+   [data-theme="dark"], set by map-v2-lib.jsx from the `auto | light | dark`
+   setting. docs/audit/contrast.md lists the computed ratios, and
+   src/__tests__/frontend/mapV2Tokens.test.ts fails if a pair drops under its
+   threshold (text 4.5:1; icons, rings, pin borders 3:1).
+
+   Gold: it is a FILL with a near-black label (--accent / --accent-contrast),
+   and dark gold (--accent-ink) for gold text, rings and icons: plain gold is
+   2.29:1 on white (founder D3).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tokens: light (the default) ─────────────────────────────────── */
+:root {
+  /* surfaces */
+  --surface-0: #f7f4ee;          /* app and map chrome background (the body colour) */
+  --surface-1: #ffffff;          /* the sheet */
+  --surface-2: #f5f1e8;          /* raised elements, tile placeholders */
+  --map-base: #f9f9f6;           /* the live base style's background, for contrast checks */
+
+  /* text */
+  --text-1: #0a0908;
+  --text-2: #5c5444;
+
+  /* accent: a fill with a near-black label; gold ink for text, rings, icons */
+  --accent: #c9a84c;
+  --accent-contrast: #0a0908;
+  --accent-ink: #8b6914;
+
+  /* status: always paired with text, never colour alone */
+  --ok: #1e6b3c;
+  --closed: #a32d22;
+  --error: #a32d22;
+
+  /* pins: white border plus a dark hairline and the shadow, so a pin separates from a light map */
+  --pin-border: #ffffff;
+  --pin-hairline: rgba(10, 9, 8, 0.62);
+  --pin-label: #171310;
+  --pin-label-halo: rgba(255, 255, 255, 0.95);
+
+  /* focus ring, dividers, dimming behind a stacked menu */
+  --focus-ring: #8b6914;
+  --divider: rgba(10, 9, 8, 0.12);
+  --scrim: rgba(10, 9, 8, 0.4);
+
+  /* elevation: two levels */
+  --elev-1: 0 1px 3px rgba(10, 9, 8, 0.16);
+  --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
+  --pin-shadow: drop-shadow(0 3px 5px rgba(10, 9, 8, 0.32));
+
+  /* ── scales (the same in both looks) ── */
+  /* spacing, 4-pt */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  /* radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+  /* type: three sizes, two weights */
+  --fs-1: 12px;
+  --lh-1: 16px;
+  --fs-2: 14px;
+  --lh-2: 20px;
+  --fs-3: 18px;
+  --lh-3: 24px;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  /* z-index: the app's real stacking (bottom nav 50, the v1 preview 120, modals 200, toasts 400) */
+  --z-pin: 10;
+  --z-controls: 20;
+  --z-sheet: 120;
+  --z-menu: 130;
+  --z-viewer: 300;
+  --z-toast: 400;
+  --z-badge: 9999;
+  /* motion: transform and opacity only. The JS twins are MapV2.motion. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --shimmer-dur: 1200ms;
+
+  /* ── sizes ── */
+  --hit: 44px;                   /* minimum tap target */
+  --focus-w: 2px;
+  --focus-offset: 2px;
+  --pin-size: 48px;              /* the logo / glyph pin body */
+  --pin-selected-scale: 1.6;
+  --pin-border-w: 3px;
+  --pin-badge: 14px;             /* category glyph badge on a logo pin */
+  --pin-tail: 8px;
+  --sheet-radius: var(--radius-lg);
+  --sheet-peek-h: 88px;
+  --sheet-half-h: 46dvh;
+  --sheet-full-h: 90dvh;
+  --sheet-panel-w: 380px;
+  --handle-w: 36px;
+  --handle-h: 4px;
+  --avatar-peek: 40px;
+  --avatar-half: 56px;
+  --gallery-gap: 2px;
+}
+
+/* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
+[data-theme='dark'] {
+  --surface-0: #0a0908;
+  --surface-1: #1a1714;
+  --surface-2: #26221d;
+  --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
+
+  --text-1: #f7f4ee;
+  --text-2: #b9ae9a;
+
+  --accent: #c9a84c;
+  --accent-contrast: #0a0908;
+  --accent-ink: #e8d48b;
+
+  --ok: #62d68f;
+  --closed: #ff8f80;
+  --error: #ff8f80;
+
+  --pin-border: #ffffff;
+  --pin-hairline: rgba(255, 255, 255, 0);
+  --pin-label: #f7f4ee;
+  --pin-label-halo: rgba(10, 9, 8, 0.9);
+
+  --focus-ring: #e8d48b;
+  --divider: rgba(247, 244, 238, 0.14);
+  --scrim: rgba(0, 0, 0, 0.55);
+
+  --elev-1: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+  --pin-shadow: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+}
+
+/* ── 3. Reduced motion: every duration collapses, so no transition or
+      animation built from these tokens runs longer than a frame ── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+    --shimmer-dur: 0ms;
+  }
+}
+
+/* ── 4. Components (tokens only below this line) ───────────────────── */
+
+/* Corner badge: which build is on screen. Never takes a tap. */
+.mv2-badge {
+  position: fixed;
+  top: env(safe-area-inset-top, 0);
+  right: var(--space-2);
+  z-index: var(--z-badge);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* Visible keyboard focus on everything Map v2 draws. */
+.mv2-focusable:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
