@@ -33,13 +33,21 @@ const settled = async (page: Page, want: number) => {
   // a snap is a 200 ms transform transition: wait for the top edge to arrive, not for a fixed time
   await expect.poll(() => top(page), { timeout: 3000 }).toBeCloseTo(want, -1);
 };
-// A flick: the pointer travels `dy` px in a few quick moves with no pause (well over 0.5 px/ms).
-const flick = async (page: Page, from: { x: number; y: number }, dy: number) => {
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  for (let i = 1; i <= 4; i++) await page.mouse.move(from.x, from.y + (dy * i) / 4);
-  await page.mouse.up();
-};
+// A flick: the pointer travels `dy` px within a few milliseconds. The events are dispatched inside the page with a
+// 2 ms gap between them, so the speed (well over 0.5 px/ms) does not depend on how busy the test machine is.
+const flick = (page: Page, from: { x: number; y: number }, dy: number) =>
+  page.evaluate(
+    ([x, y, d]) => {
+      const grab = document.querySelector("[data-mv2='handle']") as HTMLElement;
+      const ev = (type: string, yy: number) => new PointerEvent(type, { pointerId: 7, pointerType: "touch", isPrimary: true, clientX: x, clientY: yy, bubbles: true, cancelable: true });
+      const gap = () => { const t = performance.now(); while (performance.now() - t < 2); };
+      grab.dispatchEvent(ev("pointerdown", y));
+      for (let i = 1; i <= 4; i++) { gap(); document.dispatchEvent(ev("pointermove", y + (d * i) / 4)); }
+      gap();
+      document.dispatchEvent(ev("pointerup", y + d));
+    },
+    [from.x, from.y, dy],
+  );
 const drag = async (page: Page, from: { x: number; y: number }, dy: number, ms: number) => {
   const steps = 10;
   await page.mouse.move(from.x, from.y);
@@ -117,7 +125,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(sheet(page)).toHaveAttribute("data-snap", "full");
 
     // a quick flick down moves ONE state (full -> half), however short
-    await flick(page, await handle(), 60);
+    await flick(page, await handle(), 200);
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
 
     // slow drag a long way down: nearest is peek
@@ -126,7 +134,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await settled(page, h - 88);
 
     // a flick down from peek closes it
-    await flick(page, await handle(), 80);
+    await flick(page, await handle(), 120);
     await expect(sheet(page)).toHaveCount(0);
   });
 

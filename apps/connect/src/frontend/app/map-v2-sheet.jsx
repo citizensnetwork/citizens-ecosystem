@@ -65,6 +65,8 @@
   }
   const directionsUrl = (it) => (typeof it.lat === 'number' && typeof it.lng === 'number')
     ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(it.lat + ',' + it.lng) : '';
+  // A public contact address only becomes a mailto: link when it is one plain address (no spaces, no header tricks).
+  const mailUrl = (addr) => (/^[^\s@<>"',;?&=]+@[^\s@<>"',;?&=]+\.[^\s@<>"',;?&=]+$/.test(String(addr || '')) ? 'mailto:' + encodeURI(addr) : '');
   const telUrl = (phone) => {
     const t = String(phone || '').replace(/[^\d+]/g, '');
     return t.replace(/\D/g, '').length >= 6 ? 'tel:' + t : '';
@@ -214,6 +216,9 @@
     }, []);
     useEffect(() => { if (title.current) title.current.focus({ preventScroll: true }); }, [id]);
 
+    // A press that is still going when the sheet unmounts must not leave listeners on the document.
+    useEffect(() => () => { const d = dragState.current; if (d && d.end) d.end(); }, []);
+
     // Escape closes at once (an open photo viewer takes the key first: it listens in the capture phase).
     useEffect(() => {
       const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
@@ -296,6 +301,7 @@
       };
       const onUp = (ev) => { end(); finishDrag(ev); };
       const onCancel = () => { end(); onPointerCancel(); };
+      dragState.current.end = end;
       document.addEventListener('pointermove', onPointerMove, true);
       document.addEventListener('pointerup', onUp, true);
       document.addEventListener('pointercancel', onCancel, true);
@@ -343,7 +349,7 @@
     const dir = directionsUrl(item);
     const site = window.UI.safeUrl(item.website);
     const tel = type === 'place' ? telUrl(item.phone) : '';
-    const email = isContributor && item.contactEmail ? 'mailto:' + item.contactEmail : '';
+    const email = isContributor ? mailUrl(item.contactEmail) : '';
 
     const tabs = [];
     if (orgEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
