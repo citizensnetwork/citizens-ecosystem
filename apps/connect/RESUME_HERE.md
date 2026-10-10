@@ -11,7 +11,8 @@
 >
 > **Last audit: 2026-10-04** (`main` = the C16 PR #92's merge commit `30507e9`, on top of the C15 routing PR #89 `6acbdcc`). §2, the A, C and H items and §5's P1/P11 were re-checked against
 > git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. **2026-10-10:** the founder signed off the
-> C15 live checks and re-entered the Resend key (nothing else was re-audited; `main` had not moved). Tags like `(§3AP)` point to the
+> C15 live checks and re-entered the Resend key (nothing else was re-audited; `main` had not moved). **Later the same day:** the Map v2
+> runner prompt and tracker were reconciled against this file, `git`/GitHub and `map.jsx` (docs only; item **C19**). Tags like `(§3AP)` point to the
 > archived section with the detail.
 
 ### How to update this file (end of every session)
@@ -85,6 +86,10 @@
   on 2026-10-10.** It only reaches code running in a NEW deployment, and Connect's last production deploy before that was `30507e9`
   (2026-10-04), so the next deploy (any merge touching `apps/connect`, or Redeploy in Vercel) picks it up. Not yet seen sending: the first
   real email (an admin notice, an applicant verdict, a welcome) is the proof; until then the app only logs "email skipped".
+- **Map v2 (C19): planned, not started (2026-10-10).** No `feat/map-v2` branch, no `docs/audit/`, no code. The tracker
+  [`../../docs/MAP_UX_TRACKER.md`](../../docs/MAP_UX_TRACKER.md) and the refreshed runner prompt
+  [`../../docs/MAP_V2_RUNNER_PROMPT.md`](../../docs/MAP_V2_RUNNER_PROMPT.md) are the working files. **The founder chose the LIGHT map**
+  (the live look: MapTiler `streets-v2`); a dark map is deferred. Decision block under item C19.
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -276,6 +281,7 @@ design session first.
 | C13 | Map polish found in the map-preview PR: the preview card shows no distance on the map (the list does: `HomePage` never passes `myLoc` to `EntityCard`), the Map Key has no Contributor entry, and Impact Ideas never gate by zoom. | P3 | S |
 | C16 | **Listing Automation Phase 1: MERGED and DORMANT** (consent-first, POPIA; founder decisions D-8 to D-11 in the local planning handoff). Code and tests are in PR #92; **migration 181 is applied** (2026-10-04, probe clean, advisors +3 WARN as predicted). Every Contributor is at `off`, no key exists, nothing calls the new routes. **Still to do, each needing the founder:** **(1)** mint two keys, `automation:suggest` and `automation:digest`, with `POST /api/admin/api-keys` called with an admin token (there is no admin screen for it; the body is `name`, `owner_email` or `owner_id` of an approved Contributor or an admin, and `scopes`; the secret is shown once, so it should not pass through a chat). **Nothing uses these keys until Phase 2 or a manual test post, so mint them then, not before;** **(2)** ~~confirm `RESEND_API_KEY`~~ done 2026-10-10: it was stale and the founder re-entered it; it goes live with the next deployment and the first real email is the proof (§2); **(3)** optionally the one-off backfill for the first real organisation (a throw-away script, never committed; the alternative is that the owner switches it on from their own Dashboard); **(4)** Phase 2, the scheduled reader. Note that the Suggestions tab stays empty until something posts to `/api/automation/suggestions`, so an end-to-end walk needs the suggest key and one test post (a Contributor first flips their level on the Dashboard → Profile card, and needs an enabled source). Deviations from the brief: no images in Phase 1 (CSP), owner actions run on the owner's own session instead of new `/api` routes, the digest is a Next route using #88's mailer (not an Edge Function; `send-contributor-digest` only writes an in-app notification), no new notification type, and "Edit & publish" is inline on the card. **Phase 2** (a daily scheduled reader that calls the suggest route, then the digest route) comes after, as does a scheduler for the digest. Brief: local, untracked `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`. | P2 | M left |
 | C17 | **One design reference, then a periodic check** (founder idea, 2026-10-03; not a priority). Collect the preferred look in one living reference, then audit screens against it: the rounded, blurred-backdrop modal (the admin Delete popup), font faces and colours, window patterns, the colour scheme and the one crown logo (now Wear's PNG). Today three definitions drift apart: `packages/ui/src/tokens.ts` (Wear-targeted, gold `#C9A24A`, a placeholder SVG crown, no consumer), Connect's CSS variables (`--gold-crown #D4AF37`) and Wear's PNG. First step: reconcile them into `packages/ui` tokens plus a short design reference with screenshots; the "daily check" could later become a step in P2's routine. | P3 | M |
+| C19 | **Map v2: photo pins and a three-state bottom sheet, behind `?map=v2`** (founder-started 2026-10-05 from an Instagram map recording; **light map chosen 2026-10-10**). Planned, Phase 0 audit not started. Run it by pasting `docs/MAP_V2_RUNNER_PROMPT.md`; the plan, measures, decisions and the tunable design values are in `docs/MAP_UX_TRACKER.md`. The core loop (onboarding → listing → map → events) outranks it. Decision block below. (ID note: C18 is taken by PR #90's branch, "drafts for pending applicants".) | P2 | L |
 
 **C10 design (agreed 2026-10-03; nothing built yet).**
 - *Threat:* the Form is public and `owner_email` is unverified. An approval that attached a listing to an existing account on its own would let a stranger plant content on a victim's account. So nothing on an existing account changes without the verified owner's explicit yes.
@@ -292,6 +298,28 @@ design session first.
   number-matching copy (it misread the consent question after the Section 7 reorder). Both designs agree: the
   database is the source of truth, consent comes first, and no Google Sheet sits in the data path.
 - *Process:* needs a migration (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`, `intake-v2.gs` and `PLANNING_SESSION_HANDOFF_2026-10-02.md` (decisions D-8 to D-11).
+
+**C19 decisions, facts and design knobs (2026-10-10; nothing built yet).**
+- *Decided (founder):* the map is **light**. Phase 1 ships light only; the dark style and dark tokens move to tracker P2-11. (Read as "drop dark from Phase 1", not "light by default plus a dark setting": confirm.)
+- *Reconciling the prompt with this file found 22 corrections* (tracker §13). The ones that change how it is run: the prompt never mentioned `VISION.md` or the offload protocol; tracker ids (H, M, D, P) collide with ours, so cite them as `MAP:H2`, `MAP:D1`; v1 pins are **shape-per-type DOM markers** (circle Place, rounded rectangle Event, ringed circle Contributor) under three zoom gates (6 / 7.5 / 9.5) and labels at 15, which Map v2 keeps; every screen already has a URL (C15), so Share needs no new handler; the sheet's Back behaviour must follow the history rule in §3 and needs a real-phone check; there is no stylesheet file (one inline `<style>` plus the Tailwind CDN); a new `.jsx` file must go in both `index.html` and `appFileOrder`; live data has 0 upcoming events and 1 news post, so the Events and News tabs will be empty and the 150-pin test needs a synthetic fixture; M7 screenshots must be compared in one run, never as committed Windows baselines.
+- *Open decisions for the founder (tracker §10, each has a recommendation):* **D6** Android Back (recommend: close the sheet at once, one `useBackGuard` entry); **D8** pin picture by zoom: the founder's `docs/feature-clarity/map-layering.md` says no pictures at mid zoom, the tracker wanted 48 px photo pins (recommend: category glyph below about zoom 15, logo at and above it); **D9** sheet for all three pin types, not Contributors only (PR #78's one-card rule); **D10** a shared link keeps opening the full profile in Phase 1; **D3** accent on light (gold fill with a near-black label, dark gold `#8B6914` for gold text and rings; plain gold is 2.29:1 on white, calculated); **D5** gallery images contributor-supplied only (the CSP and C16 already say so).
+- *Design knobs that can be adjusted from the Instagram frame analysis* (tracker Appendix E has all 26 with the frame each came from; the only Instagram data is the 5-minute recording, read from 392 px frames, so these are proportions, not Instagram's analytics):
+
+| Knob | v1 today | Instagram (recording) | Map v2 start | Range or arbiter |
+|---|---|---|---|---|
+| Contributor pin size | 38 px | ≈ 52 px | 48 px | 40–52 px; frame time, tap target ≥ 44 px |
+| Selected-pin scale | ≈ 1.2× | ≈ 2× | 1.6× | 1.5–2× |
+| Pin edge on a light map | white 2.5 px + shadow | white ≈ 3 px (made for a dark map) | white 3 px + 1 px hairline + shadow | border contrast ≥ 3:1, sampled |
+| Picture on the pin | category glyph only | a photo at every zoom | glyph below about zoom 15, logo above (D8) | zoom 13–15 |
+| Sheet snap points | one small preview card | ≈ 10 / 46 / 90 % of height | peek / 46 % / 90 % | ±4 points |
+| Sheet surface | frosted glass, blur 20 px | opaque | solid white | glass only if pan stays smooth |
+| Name labels | from zoom 15 | ≈ 8–9 px, overlapping | ≥ 11 px, halo, hide collisions | 11–12 px |
+| Wait for content | n/a | 3 to over 6 s of spinner | skeleton, first tile ≤ 1 s | fixed target |
+| Pan smoothness | not measured | ≈ 43 frames/s median | p95 frame ≤ 20 ms, 150 pins | fixed target |
+| Accent | gold | blue | gold fill, near-black label | a new colour is a gate |
+
+- *Not measured:* everything (Phase 0 has not run). The gold contrast numbers are calculated from the hex values, not from rendered pixels.
+- *Next step:* open a session at the monorepo root, paste `docs/MAP_V2_RUNNER_PROMPT.md` (`STOP_AFTER = M1` for a cautious first run), and answer or accept the recommendations for D6, D8, D9, D10 when the run reports them.
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -365,11 +393,23 @@ design session first.
 | P18 | Figma-Make prototypes | Leftover tables and edge functions in prod from the June experiments. | H6 |
 | P19 | Address hygiene | Roadmap only: custom domains + a branded storage origin. | A6 |
 | P20 | **Listing Automation Phase 1** (C16) | Merged (#92) and migration 181 applied; dormant: every level is `off`, no `automation:*` key is minted (not needed until Phase 2), `RESEND_API_KEY` was re-entered 2026-10-10 and goes live with the next deployment. Phase 2 (the scheduled reader) is not started. | C16 |
+| P21 | **Map v2** (C19) | Plan only. Tracker `docs/MAP_UX_TRACKER.md` and runner prompt `docs/MAP_V2_RUNNER_PROMPT.md` written and reconciled with the code on 2026-10-10; light map chosen; Phase 0 audit not started; no branch. | C19 |
 
 ---
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-10 — Map v2: prompt and tracker reconciled with this file; the map is LIGHT (docs only).** The founder pasted the Map v2
+  runner prompt and chose the light map (tracker D1). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
+  `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
+  protocol; its ids collide with ours (so item **C19**, project **P21**; C18 was already taken by #90's branch); v1 pins are shape-per-type
+  DOM markers under three zoom gates; Share and deep links already exist (C15); the sheet's Back behaviour is constrained by the history
+  rule; the founder's `map-layering.md` conflicts with 48 px photo pins at mid zoom (D8); live data has 0 upcoming events. Added:
+  `docs/MAP_V2_RUNNER_PROMPT.md`, the tracker (now tracked), Appendix E (26 tunable design values against the recording), and a root
+  `.gitignore` rule for the reference frames (the folder was untracked, so `git add docs/` would have committed third-party photos).
+  **Nothing built:** no app code, migration or DB change; Phase 0 not started. Open: D3, D5, D6, D8, D9, D10 (tracker §10). The gold
+  contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
+  later merges `main` in first.
 - **2026-10-10 — Sign-off and a stale mail key (docs only).** The founder finished the whole C15 (#89) live-check list and reported
   everything solid and working (Android Back on a real phone, cancel/restore, private window, deep-link sign-in, Share, the Supabase
   redirect list); A2 is trimmed to what is left. The founder also found `RESEND_API_KEY` in Vercel **stale** and re-entered it: it reaches
@@ -471,6 +511,9 @@ design session first.
   Wear roles, the Concepts marketplace, the impersonation design (§7).
 - [`docs/api-v1.md`](docs/api-v1.md) — the public `/api/v1` contract.
 - [`docs/handoffs/`](docs/handoffs/) — stateless build briefs (Form intake, React types, Wear CSP).
+- [`../../docs/MAP_UX_TRACKER.md`](../../docs/MAP_UX_TRACKER.md) and [`../../docs/MAP_V2_RUNNER_PROMPT.md`](../../docs/MAP_V2_RUNNER_PROMPT.md) —
+  Map v2 (C19): the plan, the measures, the decisions and the paste-in prompt. The reference frames
+  (`../../docs/reference/instagram-map/*.jpg`) are local only and git-ignored; its `INDEX.md` is tracked.
 - [`docs/FUTURE_IDEAS.md`](docs/FUTURE_IDEAS.md) — deferred ideas (not the pipeline).
 - [`.github/MASTER_DIRECTION.md`](.github/MASTER_DIRECTION.md) — the original locked technical direction (batch plan).
 - [`CATEGORIES.md`](CATEGORIES.md) — category colours and icons.
