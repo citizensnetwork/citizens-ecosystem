@@ -64,7 +64,7 @@
     const {
       go, contributors, connected, considering, followedPlaces, followedOrgs,
       toggleConnect, toggleConsider, togglePlaceFollow, toggleFollow,
-      startConversationWith, toast,
+      startConversationWith, shareLink,
     } = app;
 
     const isPanel = layout === 'panel';
@@ -242,7 +242,10 @@
       isEvent && iconBtn('Bookmark', saveLabel, onSave, saved),
       website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
       messageTarget && iconBtn('MessageCircle', 'Message the organiser', onMessage),
-      iconBtn('Share2', 'Share', stop(() => toast('Share link copied', 'gold'))),
+      // The same share path as the full profile pages: the phone's share sheet,
+      // else the real /c, /p or /e address on the clipboard (C20: this used to
+      // toast "copied" and copy nothing).
+      iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
     ].filter(Boolean);
 
     const actions = h('div', { className: cx('flex items-center gap-2', isPanel ? 'flex-wrap' : '') },
