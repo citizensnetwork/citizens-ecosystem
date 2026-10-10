@@ -12,7 +12,9 @@ const kinds = (reqs) => {
   const k = { style: 0, tiles: 0, glyphs: 0, sprite: 0, other: 0 };
   for (const r of reqs) {
     const u = r.url;
-    if (!u.includes('api.maptiler.com')) continue;
+    let host = '';
+    try { host = new URL(u).hostname; } catch { /* not a URL */ }
+    if (host !== 'api.maptiler.com') continue;
     if (/style\.json/.test(u)) k.style++; else if (/\/tiles\//.test(u) || /\/tiles\.json/.test(u) || /\.(pbf|mvt|png|webp|jpg)(\?|$)/.test(u)) k.tiles++; else if (/\/fonts\//.test(u)) k.glyphs++; else if (/sprite/.test(u)) k.sprite++; else k.other++;
   }
   k.total = k.style + k.tiles + k.glyphs + k.sprite + k.other;
