@@ -1,0 +1,252 @@
+{
+  "p0_05_deep_links": {
+    "contributor": {
+      "example": "/c/fixture-fellowship-1",
+      "screen": "profile",
+      "url": "/c/fixture-fellowship-1"
+    },
+    "place": {
+      "example": "/p/<id>",
+      "screen": "place",
+      "url": "/p/<id>"
+    },
+    "event": {
+      "example": "/e/<id>",
+      "screen": "event",
+      "url": "/e/<id>"
+    },
+    "legacy_c_param": {
+      "screen": "profile",
+      "url": "/c/fixture-fellowship-1"
+    }
+  },
+  "p0_06_markers": {
+    "markerWrapper": {
+      "role": null,
+      "ariaLabel": null,
+      "tabindex": null,
+      "ariaHidden": null
+    },
+    "pinGraphic": {
+      "role": null,
+      "ariaLabel": null,
+      "tabindex": null,
+      "ariaHidden": "true"
+    },
+    "labelTextNode": {
+      "text": "Fixture Gathering 1",
+      "ariaHidden": null
+    },
+    "focusableMarkers": 0,
+    "markerCount": 8
+  },
+  "p0_06_tab_order_first_six": [
+    {
+      "tag": "CANVAS",
+      "label": "Map",
+      "outline": "auto 1px",
+      "boxShadow": "none"
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Find my location",
+      "outline": "none 3px",
+      "boxShadow": "set"
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Zoom in",
+      "outline": "none 3px",
+      "boxShadow": "set"
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Zoom out",
+      "outline": "none 3px",
+      "boxShadow": "set"
+    },
+    {
+      "tag": "INPUT",
+      "label": "",
+      "outline": "solid 2px",
+      "boxShadow": "none"
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Your account",
+      "outline": "auto 1px",
+      "boxShadow": "set"
+    }
+  ],
+  "p0_06_css": {
+    "rulesScanned": 414,
+    "focusVisibleRules": 2,
+    "reducedMotionMediaBlocks": 2
+  },
+  "p0_06_category_contrast": {
+    "count": 23,
+    "below3_vs_white": [
+      "#D4AF37",
+      "#1ABC9C",
+      "#F39C12",
+      "#2ECC71",
+      "#FF6B35",
+      "#FF8C42",
+      "#00BCD4",
+      "#B59CD9",
+      "#6FA89A"
+    ],
+    "below3_vs_prod_base": [
+      "#D4AF37",
+      "#1ABC9C",
+      "#F39C12",
+      "#2ECC71",
+      "#FF6B35",
+      "#3498DB",
+      "#FF8C42",
+      "#00BCD4",
+      "#B59CD9",
+      "#6FA89A"
+    ],
+    "rows": [
+      {
+        "hex": "#B8860B",
+        "white": 3.25,
+        "prod-map-base hsl(60,23%,97%)": 3.09,
+        "--map-bg": 2.6
+      },
+      {
+        "hex": "#D4AF37",
+        "white": 2.1,
+        "prod-map-base hsl(60,23%,97%)": 1.99,
+        "--map-bg": 1.68
+      },
+      {
+        "hex": "#1ABC9C",
+        "white": 2.41,
+        "prod-map-base hsl(60,23%,97%)": 2.28,
+        "--map-bg": 1.92
+      },
+      {
+        "hex": "#F39C12",
+        "white": 2.19,
+        "prod-map-base hsl(60,23%,97%)": 2.08,
+        "--map-bg": 1.75
+      },
+      {
+        "hex": "#2ECC71",
+        "white": 2.1,
+        "prod-map-base hsl(60,23%,97%)": 1.99,
+        "--map-bg": 1.68
+      },
+      {
+        "hex": "#FF6B35",
+        "white": 2.84,
+        "prod-map-base hsl(60,23%,97%)": 2.69,
+        "--map-bg": 2.26
+      },
+      {
+        "hex": "#E91E63",
+        "white": 4.35,
+        "prod-map-base hsl(60,23%,97%)": 4.12,
+        "--map-bg": 3.47
+      },
+      {
+        "hex": "#9B59B6",
+        "white": 4.67,
+        "prod-map-base hsl(60,23%,97%)": 4.43,
+        "--map-bg": 3.73
+      },
+      {
+        "hex": "#3498DB",
+        "white": 3.15,
+        "prod-map-base hsl(60,23%,97%)": 2.99,
+        "--map-bg": 2.52
+      },
+      {
+        "hex": "#E74C3C",
+        "white": 3.82,
+        "prod-map-base hsl(60,23%,97%)": 3.62,
+        "--map-bg": 3.05
+      },
+      {
+        "hex": "#34495E",
+        "white": 9.29,
+        "prod-map-base hsl(60,23%,97%)": 8.81,
+        "--map-bg": 7.41
+      },
+      {
+        "hex": "#C71585",
+        "white": 5.42,
+        "prod-map-base hsl(60,23%,97%)": 5.14,
+        "--map-bg": 4.33
+      },
+      {
+        "hex": "#FF8C42",
+        "white": 2.31,
+        "prod-map-base hsl(60,23%,97%)": 2.19,
+        "--map-bg": 1.85
+      },
+      {
+        "hex": "#00BCD4",
+        "white": 2.3,
+        "prod-map-base hsl(60,23%,97%)": 2.18,
+        "--map-bg": 1.83
+      },
+      {
+        "hex": "#8E44AD",
+        "white": 5.87,
+        "prod-map-base hsl(60,23%,97%)": 5.56,
+        "--map-bg": 4.68
+      },
+      {
+        "hex": "#212121",
+        "white": 16.1,
+        "prod-map-base hsl(60,23%,97%)": 15.27,
+        "--map-bg": 12.85
+      },
+      {
+        "hex": "#5D6D7E",
+        "white": 5.31,
+        "prod-map-base hsl(60,23%,97%)": 5.03,
+        "--map-bg": 4.24
+      },
+      {
+        "hex": "#8B4513",
+        "white": 7.1,
+        "prod-map-base hsl(60,23%,97%)": 6.73,
+        "--map-bg": 5.66
+      },
+      {
+        "hex": "#A67C00",
+        "white": 3.82,
+        "prod-map-base hsl(60,23%,97%)": 3.62,
+        "--map-bg": 3.04
+      },
+      {
+        "hex": "#B59CD9",
+        "white": 2.41,
+        "prod-map-base hsl(60,23%,97%)": 2.28,
+        "--map-bg": 1.92
+      },
+      {
+        "hex": "#6FA89A",
+        "white": 2.71,
+        "prod-map-base hsl(60,23%,97%)": 2.57,
+        "--map-bg": 2.16
+      },
+      {
+        "hex": "#C0392B",
+        "white": 5.44,
+        "prod-map-base hsl(60,23%,97%)": 5.16,
+        "--map-bg": 4.34
+      },
+      {
+        "hex": "#5B2C6F",
+        "white": 10.32,
+        "prod-map-base hsl(60,23%,97%)": 9.79,
+        "--map-bg": 8.24
+      }
+    ]
+  }
+}

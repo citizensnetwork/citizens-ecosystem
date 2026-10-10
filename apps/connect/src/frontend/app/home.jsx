@@ -65,11 +65,31 @@
     }
   }
 
+  function decorateForV2(markers, events, newsPosts, now) {
+    const ms = (v) => { const t = v ? Date.parse(v) : NaN; return Number.isNaN(t) ? undefined : t; };
+    const byOrg = Object.create(null);
+    const byEvent = Object.create(null);
+    const bump = (id, key, t, pick) => { if (t === undefined || !id) return; const o = byOrg[id] || (byOrg[id] = {}); o[key] = o[key] === undefined ? t : pick(o[key], t); };
+    events.forEach((e) => {
+      const start = ms(e.startsAt);
+      byEvent[e.id] = { next: start, last: ms(e.createdAt) };
+      if (!window.DATA.isPastEvent(e, now)) bump(e.organizerId, 'next', start, Math.min);
+      bump(e.organizerId, 'last', ms(e.createdAt), Math.max);
+    });
+    newsPosts.forEach((n) => bump(n.contributorId, 'last', ms(n.createdAt) || ms(n.date), Math.max));
+    markers.forEach((m) => {
+      if (m.type === 'contributor' && byOrg[m.id]) { m.nextEventAt = byOrg[m.id].next; m.lastActivityAt = byOrg[m.id].last; }
+      else if (m.type === 'event' && byEvent[m.id]) { m.nextEventAt = byEvent[m.id].next; m.lastActivityAt = byEvent[m.id].last; }
+    });
+  }
+
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, contributors, ideas, dismissBubble, trackImpression } = app;
+    const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
+    // Map v2: the sheet reports how much of the map it covers; the map keeps the selected pin clear of it
+    const mapApi = useRef(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
     const [showIdeas, setShowIdeas] = useState(false);
@@ -97,6 +117,9 @@
       ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
+    // Map v2: what decides which pin keeps its name label when two collide, and who heads a "+N" group:
+    // an upcoming event first (soonest), then the most recent activity, then the name. Never popularity.
+    if (window.isMapV2 && window.isMapV2()) decorateForV2(markers, events, newsPosts || [], now);
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
 
     // ONE category control. There used to be two — a scrollable pill row AND a
@@ -109,7 +132,7 @@
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },
         React.createElement(window.StylizedMap, {
-          markers, filterCategory: filter, selectedId: selected,
+          markers, filterCategory: filter, selectedId: selected, apiRef: mapApi,
           // Every pin type — Contributor included — opens the same small
           // preview card; the full profile is one tap further, on the card.
           onSelect: (id, t) => {
@@ -144,6 +167,7 @@
 
       // legend + zoom-gate hint
       React.createElement('div', { className: 'absolute bottom-20 md:bottom-5 left-3 z-20 flex flex-col gap-1.5 items-start' },
+        window.isMapV2 && window.isMapV2() && window.MapV2LookControl && React.createElement(window.MapV2LookControl),
         zoomBand !== 'all' && React.createElement('div', {
           className: 'glass rounded-xl px-2.5 py-1.5 border border-gold/40 shadow-lg flex items-center gap-1.5 max-w-[190px]',
           'data-zoom-hint': zoomBand,
@@ -159,7 +183,10 @@
           React.createElement(LegendRow, { label: 'Place', square: true }),
           React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }))),
 
-      selected && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }));
+      // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
+      selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
+        ? React.createElement(window.MapV2Sheet, { id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); } })
+        : React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) })));
   }
 
   const LegendRow = ({ color, label, pulse, square }) => React.createElement('div', { className: 'flex items-center gap-1.5' },

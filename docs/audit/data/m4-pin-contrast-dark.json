@@ -1,0 +1,39 @@
+{
+  "theme": "dark",
+  "dsf": 3,
+  "results": {
+    "contributor_glyph_z12": {
+      "label": "Contributor glyph pin",
+      "zoom": 12,
+      "rays": 21,
+      "min": 14.548198465495398,
+      "median": 14.743254567235402,
+      "max": 15.716827493476563,
+      "pass": true
+    },
+    "contributor_logo_z15": {
+      "label": "Contributor logo pin",
+      "zoom": 15.5,
+      "rays": 21,
+      "min": 9.461570040862105,
+      "median": 14.548198465495398,
+      "max": 15.522910417680388,
+      "pass": true
+    },
+    "place_z15": {
+      "label": "Place circle",
+      "zoom": 15.5,
+      "rays": 21,
+      "min": 13.008985262399184,
+      "median": 15.522910417680388,
+      "max": 16.857588663262874,
+      "pass": true
+    },
+    "label_z15": {
+      "label": "Pin name label (text vs the map around it)",
+      "zoom": 15.5,
+      "ratio": 13.252517991235642,
+      "pass": true
+    }
+  }
+}
