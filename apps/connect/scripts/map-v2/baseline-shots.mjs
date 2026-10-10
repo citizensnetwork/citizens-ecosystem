@@ -17,14 +17,14 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
   const seed = smallSeed(FIXED_NOW);
   const s = await openSession({ viewport, dsf: 1, tiles: 'mock', seed });
   try {
-    await openMap(s.page, '/', { minMarkers: 8 });
+    await openMap(s.page, '/' + (process.env.MAPV2_QUERY || ''), { minMarkers: 8 });
     // Map at neighbourhood zoom, labels off (z < 15) then on (z >= 15).
     await jumpTo(s.page, { lng: PRETORIA.lng, lat: PRETORIA.lat, zoom: 12.5 });
-    writeFileSync(join(outDir, `${prefix}-${name}-z12.png`), await s.page.screenshot());
+    writeFileSync(join(outDir, `${prefix}-${name}-z12.png`), await s.page.screenshot({ animations: 'disabled', caret: 'hide' }));
     // z15.5, centred on the first Contributor so it is on screen at every viewport.
     const c0 = seed.contributors[0];
     await jumpTo(s.page, { lng: c0.physical_longitude, lat: c0.physical_latitude, zoom: 15.5 });
-    writeFileSync(join(outDir, `${prefix}-${name}-z15.png`), await s.page.screenshot());
+    writeFileSync(join(outDir, `${prefix}-${name}-z15.png`), await s.page.screenshot({ animations: 'disabled', caret: 'hide' }));
 
     // Tap a Contributor pin: the v1 preview card.
     const pin = s.page.locator('.maplibregl-marker:has([data-cc-pin^="contributor"])').first();
@@ -32,7 +32,7 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     await s.page.waitForSelector('[data-entity-card]', { timeout: 5000 });
     await s.page.waitForTimeout(700); // slide-up-panel / card transitions
     const box = await s.page.locator('[data-entity-card]').first().boundingBox();
-    writeFileSync(join(outDir, `${prefix}-${name}-card.png`), await s.page.screenshot());
+    writeFileSync(join(outDir, `${prefix}-${name}-card.png`), await s.page.screenshot({ animations: 'disabled', caret: 'hide' }));
     summary[name] = { card: box, errors: s.log.pageErrors, consoleCount: s.log.console.length };
   } finally {
     await s.close();
