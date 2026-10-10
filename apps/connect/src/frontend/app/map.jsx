@@ -97,6 +97,17 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
+  // Map v2 dark look (founder D1; docs/audit/map-tiles.md): MapTiler's own dark sibling of the production
+  // Dataviz-based style. It loads with the existing key (HTTP 200 on 2026-10-10): no new key, tier or CSP entry.
+  // MAPTILER_STYLE_DARK may override it, but the build does not emit that variable, so the default is the rule.
+  const DARK_STYLE = 'dataviz-dark';
+  function styleUrlFor(theme) {
+    const key = env.MAPTILER_KEY;
+    if (!key || key.indexOf('REPLACE_WITH') === 0) return null;
+    const style = theme === 'dark' ? (env.MAPTILER_STYLE_DARK || DARK_STYLE) : (env.MAPTILER_STYLE || 'streets-v2');
+    return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
+  }
+
   // window.maplibregl now comes from a <script type="module"> in index.html
   // (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump — see that
   // file for why). Module scripts are deferred relative to the classic
@@ -437,7 +448,9 @@
 
       function init() {
         if (mapRef.current || !containerRef.current) return; // unmounted/remounted while waiting
-        const style = styleUrl();
+        // Map v2 draws the base for the look chosen now (light unless the person picked otherwise).
+        let styleTheme = v2On() ? window.MapV2.resolvedTheme() : 'light';
+        const style = v2On() ? styleUrlFor(styleTheme) : styleUrl();
         if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
         const map = new window.maplibregl.Map({
           container: containerRef.current,
@@ -464,6 +477,16 @@
         // fitBounds below, so the first frame is already correct.
         map.on('zoom', applyZoomGates);
         map.on('load', applyZoomGates);
+        // The look changed (the Map look control, or the phone's own setting while on "Match my phone"): swap the
+        // base style on the same map; the DOM pins are untouched.
+        const onTheme = () => {
+          const t = window.MapV2.resolvedTheme();
+          if (t === styleTheme) return;
+          styleTheme = t;
+          const u = styleUrlFor(t);
+          if (u) map.setStyle(u);
+        };
+        if (v2On()) window.addEventListener('cc-map-theme', onTheme);
         // 'idle' fires after every discrete render (a programmatic pan fires it each frame), so the work is
         // debounced: it runs once the map has been quiet for 150 ms, never while it is being moved.
         let idleTimer = null;
@@ -513,6 +536,7 @@
           map.off('zoom', applyZoomGates);
           map.off('load', applyZoomGates);
           if (onIdleV2) { map.off('idle', onIdleV2); clearTimeout(idleTimer); }
+          window.removeEventListener('cc-map-theme', onTheme);
           markerObjs.current.forEach((mk) => mk.remove());
           markerObjs.current.clear();
           if (window.__ccMap === map) window.__ccMap = null;

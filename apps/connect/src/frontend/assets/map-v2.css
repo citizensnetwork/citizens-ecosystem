@@ -23,6 +23,8 @@
   --surface-0: #f7f4ee;          /* app and map chrome background (the body colour) */
   --surface-1: #ffffff;          /* the sheet */
   --surface-2: #f5f1e8;          /* raised elements, tile placeholders */
+  --logo-bg: #ffffff;            /* logos are drawn for a light page: they sit on white in BOTH looks */
+  --card-bg: transparent;        /* the v1 EntityCard body inside the sheet (its text is dark): light in the dark look */
   --map-base: #f9f9f6;           /* the live base style's background, for contrast checks */
 
   /* text */
@@ -135,6 +137,8 @@
   --surface-0: #0a0908;
   --surface-1: #1a1714;
   --surface-2: #26221d;
+  --card-bg: #ffffff;
+  --map-bg: #292929;              /* what the map shows before its tiles arrive (v1's is warm beige) */
   --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
 
   --text-1: #f7f4ee;
@@ -300,7 +304,7 @@
   position: absolute;
   inset: var(--pin-ring-w);
   border-radius: var(--radius-full);
-  background: var(--surface-1);
+  background: var(--logo-bg);
   overflow: hidden;
   opacity: 0;
   transition: opacity var(--dur-fast) linear;
@@ -574,6 +578,8 @@
   opacity: 0.45;
 }
 [data-mv2='handle']:focus-visible,
+[data-mv2='look-btn']:focus-visible,
+[data-mv2='look-item']:focus-visible,
 [data-mv2='icon-btn']:focus-visible,
 [data-mv2='action']:focus-visible,
 [data-mv2='tab']:focus-visible,
@@ -622,7 +628,7 @@
   box-sizing: border-box;
   padding: var(--space-1);
   object-fit: contain;
-  background: var(--surface-1);
+  background: var(--logo-bg);
 }
 [data-mv2='titles'] {
   flex: 1 1 auto;
@@ -747,6 +753,9 @@
 }
 [data-mv2='card'] {
   margin: 0 calc(var(--space-4) * -1);
+  padding: var(--space-3) 0 var(--space-1);
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
 }
 
 [data-mv2='tabs'] {
@@ -1008,4 +1017,73 @@
 [data-mv2='viewer-count'] {
   top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
   left: var(--space-3);
+}
+
+/* ── 4d. Map look control (app/map-v2-look.jsx) ─────────────────────── */
+[data-mv2='look'] {
+  position: relative;
+  pointer-events: auto;
+}
+[data-mv2='look-btn'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+}
+[data-mv2='look-menu'] {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: calc(var(--space-8) * 4);
+  box-sizing: border-box;
+  padding: var(--space-2);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+}
+[data-mv2='look-item'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+[data-mv2='look-item'][aria-checked='true'] {
+  background: var(--surface-2);
+}
+[data-mv2='look-dot'] {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--space-3);
+  height: var(--space-3);
+  border: 1px solid var(--text-2);
+  border-radius: var(--radius-full);
+}
+[data-mv2='look-item'][aria-checked='true'] [data-mv2='look-dot'] {
+  border-color: var(--accent-ink);
+  background: var(--accent-ink);
 }

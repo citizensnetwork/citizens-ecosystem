@@ -96,7 +96,7 @@ buildFrontend({
   // `window.X` set by earlier ones).
   appFileOrder: [
     'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'auth.jsx', 'map-v2-strings.jsx', 'map-v2-time.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-sheet.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-sheet.jsx', 'map-v2-look.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
     'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],

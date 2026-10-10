@@ -167,6 +167,7 @@
 
       // legend + zoom-gate hint
       React.createElement('div', { className: 'absolute bottom-20 md:bottom-5 left-3 z-20 flex flex-col gap-1.5 items-start' },
+        window.isMapV2 && window.isMapV2() && window.MapV2LookControl && React.createElement(window.MapV2LookControl),
         zoomBand !== 'all' && React.createElement('div', {
           className: 'glass rounded-xl px-2.5 py-1.5 border border-gold/40 shadow-lg flex items-center gap-1.5 max-w-[190px]',
           'data-zoom-hint': zoomBand,
