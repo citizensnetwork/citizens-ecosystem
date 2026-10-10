@@ -52,7 +52,8 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` = the merge commit of PR #92** (C16, Listing Automation Phase 1; see its §6 entry), on top of `6acbdcc` (PR #89, C15: a real URL
+- **`main` = the merge commit of PR #93** (docs: sign-off, Map v2 plan), on top of PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
+  Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
   (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). Sibling
   sessions' PRs: **#90** (D-13, admin-created listings email the owner a welcome) and **#91** (docs: H10, H2), which will conflict with this
@@ -109,8 +110,11 @@
   CI runs it and the turbo gates don't. Run `turbo build` **before** `turbo typecheck`; running them together
   wipes `.next/types` mid-check. CI also runs **CodeQL** and a **blocking OSV-Scanner** (`osv-scanner.toml`'s
   baseline is empty: fix the dependency, don't baseline it). **New advisories can turn `main` red with no code
-  change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici): raise the `pnpm.overrides` floor, then
-  check the lockfile against OSV.dev before pushing. **`braces` is a patched local fork**
+  change** (2026-10-02, PR #76: brace-expansion, js-yaml, undici; again 2026-10-10, PR #94: Next, Capacitor, sharp, source-map-js):
+  raise the `pnpm.overrides` floor, then check the lockfile against OSV.dev before pushing. A bare `^` or `>=` floor can jump a
+  minor (Next 16.4.0, Capacitor 8.5.x), so cap it (`>=16.3.8 <16.4.0`, `~8.4.3`); an exact-version override key (`sharp@0.34.5`)
+  misses a sibling's different request (`^0.35.4`), so key on `<fixed`. With no `osv-scanner` binary installed, query
+  `https://api.osv.dev/v1/querybatch` with every `name@version` of `pnpm-lock.yaml` (public metadata only); CI's scan is the proof. **`braces` is a patched local fork**
   (`packages/braces-patched`, wired in through the root `pnpm.overrides`): GHSA-vfj7-8cjw-p6xm affects
   every `braces` on npm (<= 3.0.3, no fixed release), so we ship the 3.0.3 tarball plus a nesting-depth
   guard and the lockfile holds no npm `braces` for OSV to match. There is no exception in `osv-scanner.toml`.
@@ -417,7 +421,11 @@ design session first.
   sending yet (§2). **Found while checking:** (1) a repo ruleset, "Allow Claude", blocks deleting any branch (H2), so the merged C16 branch
   stays on the remote; (2) the `gh` CLI login on this PC had expired (`gh auth login -h github.com` fixes it; the GitHub MCP connector
   worked meanwhile); (3) the keys for `automation:suggest` / `automation:digest` have no consumer until Phase 2, so minting them early
-  gains nothing. `main` had not moved since the C16 merge; no code, migration or DB change.
+  gains nothing; (4) **CI's OSV-Scanner step went red on `main` with no code change** (nine advisories published 2026-09-18..10-07:
+  Next 15.5.26 / 16.3.6, `@capacitor/android` and `ios` 8.4.1 (critical), `sharp` 0.35.4, `source-map-js` 1.2.1) and blocked this very
+  docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
+  1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
+  The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
 - **2026-10-04 — C16: Listing Automation Phase 1 (PR #92), migration 181 applied, merged, DORMANT.** The founder first said "read the brief
   and plan, apply nothing", so the PR was code, SQL and tests; once it was ready the founder said yes, in chat, to the apply, to merging after a
   green CI, and to Auto-fix. **Applied:** pre-apply tag `connect-pre-mig181-listing-automation` pushed, a read-only check that every
