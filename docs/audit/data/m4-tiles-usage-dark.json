@@ -1,0 +1,28 @@
+{
+  "firstView": {
+    "style": 1,
+    "tiles": 9,
+    "glyphs": 0,
+    "sprite": 0,
+    "other": 0,
+    "total": 10
+  },
+  "browse3PansAndZoom": {
+    "style": 0,
+    "tiles": 7,
+    "glyphs": 0,
+    "sprite": 0,
+    "other": 0,
+    "total": 7
+  },
+  "switchToDarkOnSameMap": {
+    "style": 1,
+    "tiles": 10,
+    "glyphs": 0,
+    "sprite": 1,
+    "other": 0,
+    "total": 12
+  },
+  "darkStyle": "dataviz-dark",
+  "swapped": true
+}

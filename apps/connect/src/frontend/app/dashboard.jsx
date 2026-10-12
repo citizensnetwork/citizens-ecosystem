@@ -293,10 +293,16 @@
   function DashboardPage() {
     const app = window.useApp();
     const {
-      activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, realUser, openCreate, go,
+      activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, openCreate, go,
       setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
     } = app;
-    const [tab, setTab] = useState('overview');
+    // The tab is part of the address (/dashboard/events), so a refresh keeps it and a
+    // link can point at it. Replaced rather than pushed: the tabs are views of ONE
+    // screen, so Back should leave the Dashboard, not step through every tab.
+    const tab = window.CC_ROUTES.DASHBOARD_TABS.indexOf(app.nav.params.tab) !== -1 ? app.nav.params.tab : 'overview';
+    const setTab = (t) => go('dashboard', t === 'overview' ? {} : { tab: t }, { replace: true, keepScroll: true });
+    // Listing automation (automation.jsx): consent level, sources and the suggestions inbox.
+    const auto = window.useAutomation(app);
     const [tool, setTool] = useState(null); // null | 'volunteer' | 'analytics'
     const [bcTarget, setBcTarget] = useState('');
     const [newsComposing, setNewsComposing] = useState(false);
@@ -343,7 +349,7 @@
           h(StatCard, { label: 'Events', value: liveEvents.length, color: '#16A34A' }),
           h(StatCard, { label: 'Places', value: livePlaces.length, color: '#2563EB' })),
 
-        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'news', 'profile', 'messages', 'tools'], value: tab, onChange: setTab })),
+        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'news', { value: 'suggestions', label: 'suggestions' + (auto.pending.length ? ' (' + auto.pending.length + ')' : '') }, 'profile', 'messages', 'tools'], value: tab, onChange: setTab })),
 
         h('div', { className: 'px-4 sm:px-5' },
           tab === 'overview' && h('div', { className: 'space-y-4 fade-in' },
@@ -403,7 +409,11 @@
               onDelete: () => deleteNewsPost(post.id),
             }))),
 
-          tab === 'profile' && h(ProfileTab, { contributor: activeContributor, onSave: (fields, cb) => updateContributorProfile(fields, cb) }),
+          tab === 'suggestions' && h(window.SuggestionsTab, { auto, onOpenSettings: () => setTab('profile'), onViewEvent: (id) => go('event', { id }) }),
+
+          tab === 'profile' && h('div', { className: 'space-y-4' },
+            h(ProfileTab, { contributor: activeContributor, onSave: (fields, cb) => updateContributorProfile(fields, cb) }),
+            h(window.AutomaticUpdatesCard, { auto })),
 
           tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
             h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1' }, 'Recent Conversations'),

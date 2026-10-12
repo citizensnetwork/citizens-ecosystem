@@ -372,6 +372,37 @@ test.describe("Every pin opens the same small card", () => {
   });
 });
 
+// C20: the card's Share used to toast "Share link copied" and copy nothing.
+test.describe("The preview card's Share copies the real link", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  // Real listings have UUID ids; the shared PLACE fixture's demo id has no
+  // shareable address (routes.jsx), so this test gives the place a real one.
+  const SHARED_PLACE = { ...PLACE, id: "22222222-2222-4222-8222-000000000001" };
+  for (const [type, path] of [
+    ["contributor", `/c/${CONTRIBUTOR.contributor_slug}`],
+    ["place", `/p/${SHARED_PLACE.id}`],
+  ] as const) {
+    test(`a ${type} card copies ${path}`, async ({ page }) => {
+      await mockNetwork(page, { places: [SHARED_PLACE] });
+      await page.goto("/");
+      await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+
+      await page.locator(`[data-cc-pin="${type}"]`).first().click();
+      const card = page.locator(`[data-entity-card="${type}"]`);
+      await expect(card).toBeVisible({ timeout: 10_000 });
+      await card.getByRole("button", { name: "Share" }).click();
+
+      await expect(page.getByText("Link copied")).toBeVisible();
+      const origin = new URL(page.url()).origin;
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}${path}`);
+      // Sharing never navigates: the card stays open on the map.
+      await expect(card).toBeVisible();
+      await expect.poll(() => screenName(page)).toBe("discover");
+    });
+  }
+});
+
 test.describe("Finished events", () => {
   test("a past event is not on the map or in Kingdom Discovery, and stays on its organiser's profile under Past events", async ({ page }) => {
     await mockNetwork(page, { events: [EVENT, PAST_EVENT] });

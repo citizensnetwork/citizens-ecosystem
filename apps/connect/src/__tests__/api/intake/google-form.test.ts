@@ -348,3 +348,108 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
   });
 });
+
+describe("POST /api/intake/google-form — listing automation (mig 181)", () => {
+  type Call = { table: string; payload: unknown; column?: string; value?: unknown };
+  const inserts: Call[] = [];
+  const updates: Call[] = [];
+  let sourcesError: { message: string } | null = null;
+  let consentError: { message: string } | null = null;
+
+  const generic = {
+    ...row,
+    website: "https://church.example",
+    instagram: "@gracechurch",
+    facebook: "facebook.com/gracechurch",
+    youtube: "GraceChurchTV",
+    tiktok: "",
+  };
+
+  beforeEach(() => {
+    inserts.length = 0;
+    updates.length = 0;
+    sourcesError = null;
+    consentError = null;
+    mockAdmin.from.mockImplementation(((table: string) => ({
+      ...profileLookup,
+      insert: (payload: unknown) => {
+        inserts.push({ table, payload });
+        return Promise.resolve({ error: table === "listing_sources" ? sourcesError : null });
+      },
+      update: (payload: unknown) => ({
+        eq: (column: string, value: unknown) => {
+          updates.push({ table, payload, column, value });
+          return Promise.resolve({ error: table === "profiles" ? consentError : null });
+        },
+      }),
+    })) as never);
+  });
+
+  it("does nothing about automation when the script sent no answer (an older script)", async () => {
+    const res = await POST(signedReq(generic));
+    expect(res.status).toBe(200);
+    expect(inserts).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("'events_auto': saves the listed sources (only website and YouTube switched on) and stamps the consent as google_form", async () => {
+    const res = await POST(signedReq({ ...generic, auto_update: "events_auto" }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).warnings).toEqual([]);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0].table).toBe("listing_sources");
+    expect(inserts[0].payload).toEqual([
+      { contributor_id: NEW_USER_ID, kind: "website", url: "https://church.example/", enabled: true },
+      { contributor_id: NEW_USER_ID, kind: "youtube", url: "https://www.youtube.com/@GraceChurchTV", enabled: true },
+      { contributor_id: NEW_USER_ID, kind: "facebook", url: "https://facebook.com/gracechurch", enabled: false },
+      { contributor_id: NEW_USER_ID, kind: "instagram", url: "https://www.instagram.com/gracechurch/", enabled: false },
+    ]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      table: "profiles",
+      column: "id",
+      value: NEW_USER_ID,
+      payload: { auto_update_level: "events_auto", auto_update_consent_source: "google_form", auto_update_consent_at: expect.any(String) },
+    });
+  });
+
+  it("'suggest' stores that level", async () => {
+    await POST(signedReq({ ...generic, auto_update: "suggest" }));
+    expect(updates[0].payload).toMatchObject({ auto_update_level: "suggest" });
+  });
+
+  it("'off': the sources are saved switched OFF and no consent is recorded (the default stays off)", async () => {
+    const res = await POST(signedReq({ ...generic, auto_update: "off" }));
+    expect(res.status).toBe(200);
+    expect((inserts[0].payload as { enabled: boolean }[]).every((r) => r.enabled === false)).toBe(true);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("an unrecognised answer is off, with a Note for the Sheet", async () => {
+    const res = await POST(signedReq({ ...generic, auto_update: "maybe later" }));
+    const { warnings } = await res.json();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/left off/);
+    expect((inserts[0].payload as { enabled: boolean }[]).every((r) => r.enabled === false)).toBe(true);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("if the sources cannot be saved the listing is still live, the Notes say so, and no consent is recorded", async () => {
+    sourcesError = { message: "boom" };
+    const res = await POST(signedReq({ ...generic, auto_update: "events_auto" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.warnings.join(" ")).toMatch(/could not be saved as sources/);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("if the consent cannot be saved the listing is still live, automatic updates stay off, and the Notes say so", async () => {
+    consentError = { message: "boom" };
+    const res = await POST(signedReq({ ...generic, auto_update: "events_auto" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.warnings.join(" ")).toMatch(/automatic updates are off/);
+  });
+});

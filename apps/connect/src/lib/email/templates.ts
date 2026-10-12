@@ -18,11 +18,11 @@ const SIGN_OFF_HTML =
 const SIGN_OFF_TEXT = "Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team";
 
 /** A subject line is one short line; never trust a user-supplied name inside one. */
-function subjectSafe(value: string): string {
+export function subjectSafe(value: string): string {
   return value.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 120);
 }
 
-function layout(heading: string, bodyHtml: string): string {
+export function layout(heading: string, bodyHtml: string): string {
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#1f1f1f;line-height:1.55">' +
     `<h2 style="color:${GOLD};margin:0 0 12px">${escapeHtml(heading)}</h2>` +
@@ -32,7 +32,7 @@ function layout(heading: string, bodyHtml: string): string {
   );
 }
 
-function button(href: string, label: string): string {
+export function button(href: string, label: string): string {
   return (
     `<p><a href="${escapeHtml(href)}" style="display:inline-block;background:${GOLD};color:#fff;padding:12px 20px;` +
     `border-radius:10px;text-decoration:none;font-weight:bold">${escapeHtml(label)}</a></p>`
