@@ -64,7 +64,7 @@
     const {
       go, contributors, connected, considering, followedPlaces, followedOrgs,
       toggleConnect, toggleConsider, togglePlaceFollow, toggleFollow,
-      startConversationWith, toast,
+      startConversationWith, shareLink,
     } = app;
 
     // 'sheet' (Map v2, flag ?map=v2) is the panel body inside the Map v2 bottom sheet; every other layout is unchanged.
@@ -244,7 +244,11 @@
       isEvent && iconBtn('Bookmark', saveLabel, onSave, saved),
       !isSheet && website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
       messageTarget && iconBtn('MessageCircle', 'Message the organiser', onMessage),
-      !isSheet && iconBtn('Share2', 'Share', stop(() => toast('Share link copied', 'gold'))),
+      // The same share path as the full profile pages: the phone's share sheet,
+      // else the real /c, /p or /e address on the clipboard (C20: this used to
+      // toast "copied" and copy nothing). Inside the Map v2 sheet the sheet's own
+      // header carries Share, so the card's is hidden there.
+      !isSheet && iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
     ].filter(Boolean);
 
     const actions = h('div', { className: cx('flex items-center gap-2', isPanel ? 'flex-wrap' : '') },
