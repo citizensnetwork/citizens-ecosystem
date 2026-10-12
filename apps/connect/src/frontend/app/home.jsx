@@ -165,7 +165,7 @@
               React.createElement(Icon, { name: 'Lightbulb', size: 11, strokeWidth: 2.5 }), 'Ideas')),
           React.createElement('button', { onClick: () => scroll('r'), 'aria-label': 'Scroll categories right', className: 'glass w-7 h-7 rounded-full border border-white/60 flex items-center justify-center shadow-md shrink-0' }, React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'text-foreground/60' })))),
 
-      // legend + zoom-gate hint
+      // zoom-gate hint + the MapTiler logo (the Map Key was removed at the founder's request, 2026-10-12)
       React.createElement('div', { className: 'absolute bottom-20 md:bottom-5 left-3 z-20 flex flex-col gap-1.5 items-start' },
         zoomBand !== 'all' && React.createElement('div', {
           className: 'glass rounded-xl px-2.5 py-1.5 border border-gold/40 shadow-lg flex items-center gap-1.5 max-w-[190px]',
@@ -176,23 +176,14 @@
             zoomBand === 'none' ? 'Zoom in to see contributors, events and places'
               : zoomBand === 'contributors' ? 'Zoom in to see events and places'
               : 'Zoom in to see places')),
-        React.createElement('div', { className: 'glass rounded-xl p-2.5 border border-white/60 shadow-lg space-y-1.5' },
-          React.createElement('p', { className: 'text-[8px] font-bold text-muted-foreground uppercase tracking-widest' }, 'Map Key'),
-          React.createElement(LegendRow, { color: '#ef4444', label: 'Live', pulse: true }),
-          React.createElement(LegendRow, { label: 'Place', square: true }),
-          React.createElement(LegendRow, { color: '#C9A84C', label: 'Idea', square: true }))),
+        // MapTiler's Free plan requires its logo bottom-left on the map (map.jsx, MapTilerLogo).
+        window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
 
       // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
       selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
         ? React.createElement(window.MapV2Sheet, { id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); } })
         : React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) })));
   }
-
-  const LegendRow = ({ color, label, pulse, square }) => React.createElement('div', { className: 'flex items-center gap-1.5' },
-    pulse
-      ? React.createElement('span', { className: 'w-3 h-3 rounded-full relative flex items-center justify-center', style: { background: color } }, React.createElement('span', { className: 'absolute inset-0 rounded-full pin-pulse', style: { background: color } }))
-      : React.createElement('span', { className: cx('w-3 h-3', square ? 'rounded' : 'rounded-full'), style: { background: color || 'rgba(255,255,255,0.7)', border: color ? `1px solid ${color}99` : '1px solid rgba(10,9,8,0.3)' } }),
-    React.createElement('span', { className: 'text-[10px] text-foreground/70' }, label));
 
   window.HomePage = HomePage;
 })();
