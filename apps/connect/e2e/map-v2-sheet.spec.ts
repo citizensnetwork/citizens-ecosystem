@@ -110,7 +110,10 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
       return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
     };
 
-    // 1:1: halfway through a slow drag the sheet is where the pointer is (inline transform, no transition)
+    // 1:1: halfway through a slow drag the sheet is where the pointer is (inline transform, no transition).
+    // Start from rest: a drag that begins during the opening slide picks the sheet up where it visibly is,
+    // so on a slow machine an unsettled start would shift every number below.
+    await settled(page, h * 0.54);
     const p = await handle();
     await page.mouse.move(p.x, p.y);
     await page.mouse.down();
@@ -240,16 +243,17 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
-    await expect
-      .poll(async () => {
-        const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
-        return Math.round(((b.y + b.height / 2) / 844) * 100);
-      }, { timeout: 4000 })
-      .toBeGreaterThanOrEqual(20);
+    // The pin starts at the centre (50 %) and the map eases it up above the sheet: wait for it to arrive
+    // (on a slow machine the ease is still running when the sheet appears), then check where it stopped.
+    const pct = async () => {
+      const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
+      return Math.round(((b.y + b.height / 2) / 844) * 100);
+    };
+    await expect.poll(pct, { timeout: 6000 }).toBeLessThan(35);
+    await settled(page, (await innerH(page)) * 0.54);
+    expect(await pct()).toBeGreaterThanOrEqual(20);
     const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
-    const sheetTop = await top(page);
-    expect(b.y + b.height).toBeLessThan(sheetTop); // not hidden behind the sheet
-    expect((b.y + b.height / 2) / 844).toBeLessThan(0.35);
+    expect(b.y + b.height).toBeLessThan(await top(page)); // not hidden behind the sheet
   });
 });
 
