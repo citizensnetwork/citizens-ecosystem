@@ -25,22 +25,27 @@ import { join } from "node:path";
 
 const MIGRATIONS_DIR = join(process.cwd(), "../..", "supabase/migrations");
 
-function migrationFiles(): string[] {
-  return readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort((a, b) => Number(a.split("_")[0]) - Number(b.split("_")[0]));
-}
-
 /** Strip `-- …` comments so a word in a comment can never satisfy a check. */
 function stripComments(sql: string): string {
   return sql.replace(/--[^\n]*/g, "");
 }
 
+// Every test here replays the whole lineage (~180 files). Reading and stripping it again
+// for each call pushed single tests past vitest's 5 s default on a busy machine, so the
+// lineage is read once and each function's live definition is worked out once.
+let lineageCache: { file: string; sql: string }[] | null = null;
+function lineage(): { file: string; sql: string }[] {
+  lineageCache ??= readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort((a, b) => Number(a.split("_")[0]) - Number(b.split("_")[0]))
+    .map((file) => ({ file, sql: stripComments(readFileSync(join(MIGRATIONS_DIR, file), "utf8")) }));
+  return lineageCache;
+}
+
 type Definition = { file: string; header: string; body: string };
 
 /** Every `create or replace function public.<name>` in a file, in order. */
-function definitionsIn(file: string, name: string): Definition[] {
-  const sql = stripComments(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
+function definitionsIn(file: string, sql: string, name: string): Definition[] {
   const out: Definition[] = [];
   const start = new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${name}\\s*\\(`, "gi");
   let m: RegExpExecArray | null;
@@ -62,13 +67,15 @@ function definitionsIn(file: string, name: string): Definition[] {
 }
 
 /** The definition that wins once every migration has run (or null if dropped). */
+const liveCache = new Map<string, Definition | null>();
 function liveDefinition(name: string): Definition | null {
+  if (liveCache.has(name)) return liveCache.get(name) ?? null;
   let last: Definition | null = null;
-  for (const file of migrationFiles()) {
-    const sql = stripComments(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
-    for (const d of definitionsIn(file, name)) last = d;
+  for (const { file, sql } of lineage()) {
+    for (const d of definitionsIn(file, sql, name)) last = d;
     if (new RegExp(`drop\\s+function\\s+(if\\s+exists\\s+)?public\\.${name}\\b`, "i").test(sql)) last = null;
   }
+  liveCache.set(name, last);
   return last;
 }
 
@@ -166,10 +173,8 @@ describe("D-12: no self-approval path is left", () => {
   });
 
   it("clients cannot write contributor_applications (server-written only)", () => {
-    const sql = readdirSync(MIGRATIONS_DIR)
-      .filter((f) => f.endsWith(".sql"))
-      .sort((a, b) => Number(a.split("_")[0]) - Number(b.split("_")[0]))
-      .map((f) => stripComments(readFileSync(join(MIGRATIONS_DIR, f), "utf8")))
+    const sql = lineage()
+      .map((m) => m.sql)
       .join("\n");
     const flatSql = flat(sql);
     expect(flatSql).toContain("revoke all on table public.contributor_applications from anon");

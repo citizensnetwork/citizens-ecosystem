@@ -3,7 +3,6 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
-  const F = React.Fragment;
   const { useState, useEffect } = React;
   const { cx, safeUrl, Avatar, logoFit, SmartImage, Button, Empty, SocialLinks } = window.UI;
   const catOf = (x) => window.DATA.getCategory(x && x.category);
@@ -82,15 +81,20 @@
     h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Gallery'),
     h('div', { className: 'grid grid-cols-3 gap-2' }, imgs.map((g, i) => h('div', { key: i, className: 'aspect-square rounded-xl overflow-hidden' }, h('img', { src: g, className: 'w-full h-full object-cover' }))))) : null;
 
+  // Shown while a deep-linked event / place / Contributor is still on its way, so a
+  // refresh on /e/<id> never flashes "not found" before the data has arrived.
+  const Loading = () => h('div', { role: 'status', 'aria-label': 'Loading', className: 'flex-1 flex items-center justify-center py-24' },
+    h('div', { className: 'w-8 h-8 rounded-full border-2 border-gold/30 border-t-gold animate-spin' }));
+
   // ── Event ──
   function EventProfilePage({ id }) {
     const app = window.useApp();
-    const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, toast, trackImpression } = app;
+    const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, trackImpression } = app;
     // findEvent also finds a cancelled event (the public `events` list never holds
     // one), so its owner can still open it from the Dashboard.
     const ev = app.findEvent(id);
     useEffect(() => { trackImpression(id); }, [id]); // deduplicated server-side
-    if (!ev) return h(Empty, { icon: 'CalendarX', title: 'Event not found' });
+    if (!ev) return app.entityStatus('event', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'CalendarX', title: 'Event not found' });
     const cat = window.DATA.getCategory(ev.category);
     // Organiser may not be an approved Contributor in the directory (real events
     // created by citizens/community). Resolve to the directory row when present,
@@ -155,15 +159,15 @@
           h('div', { className: 'grid grid-cols-3 gap-2' },
             h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || ev.organizerId) }, 'Message'),
             safeUrl(ev.website) && h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => window.open(safeUrl(ev.website), '_blank', 'noopener,noreferrer') }, 'Website'),
-            h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') }, 'Share')))));
+            h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => app.shareLink({ page: 'event', params: { id } }) }, 'Share')))));
   }
 
   // ── Place ──
   function PlaceProfilePage({ id }) {
     const app = window.useApp();
-    const { events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith, toast } = app;
+    const { events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith } = app;
     const pl = app.findPlace(id); // includes a cancelled place for its owner (see EventProfilePage)
-    if (!pl) return h(Empty, { icon: 'MapPinOff', title: 'Place not found' });
+    if (!pl) return app.entityStatus('place', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'MapPinOff', title: 'Place not found' });
     const isFollowingPlace = followedPlaces.has(id);
     const cat = window.DATA.getCategory(pl.category);
     const org = contributors.find((c) => c.id === pl.organizerId) || null;
@@ -185,7 +189,7 @@
             h(Button, { variant: isFollowingPlace ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => togglePlaceFollow(id, pl.name) }, isFollowingPlace ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
             safeUrl(pl.website) && h(Button, { variant: 'outline', icon: 'Globe', onClick: () => window.open(safeUrl(pl.website), '_blank', 'noopener,noreferrer') }),
-            h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Share link copied', 'gold') })),
+            h(Button, { variant: 'outline', icon: 'Share2', onClick: () => app.shareLink({ page: 'place', params: { id } }) })),
           h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
@@ -244,11 +248,11 @@
   // ── Contributor ──
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
-    const { contributors, events, places, newsPosts, followedOrgs, toggleFollow, go, startConversationWith, toast, user } = app;
+    const { contributors, events, places, newsPosts, followedOrgs, toggleFollow, go, startConversationWith } = app;
     // Honest not-found rather than silently showing the first (wrong) org —
     // misrepresenting identity would violate the vision's integrity.
     const c = contributors.find((x) => x.id === id);
-    if (!c) return h(Empty, { icon: 'UserX', title: 'Contributor not found' });
+    if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: 'Contributor not found' });
     const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
     const cEvents = events.filter((e) => e.organizerId === c.id);
@@ -281,7 +285,7 @@
           h('div', { className: 'flex gap-2 mb-4' },
             h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true, c.id) }, 'Message'),
-            h(Button, { variant: 'outline', icon: 'Share2', onClick: () => toast('Profile link copied', 'gold') })),
+            h(Button, { variant: 'outline', icon: 'Share2', onClick: () => app.shareLink({ page: 'profile', params: { id } }) })),
           h('div', { className: 'space-y-4' },
             h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, c.bio),
             // involvement tier

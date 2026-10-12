@@ -52,3 +52,6 @@ apps/wear/src/frontend/config.js
 .vercel
 .env*.local
 .pnpm/
+
+# Map v2 reference frames contain third-party photos and handles: never commit (docs/MAP_UX_TRACKER.md H9)
+docs/reference/instagram-map/*.jpg

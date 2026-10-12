@@ -37,7 +37,6 @@
       return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
     }, [onClose]);
 
-    const ROLES = [];
     const pos = anchor === 'top' ? 'right-0 top-full mt-2' : 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
 
@@ -61,6 +60,8 @@
         }
         toast("Listing claimed — welcome to your Contributor Portal!", 'green');
         onClose();
+        // A full load, on purpose: the claim just changed this account's role in the
+        // database, and the whole app (role, listing, menus) re-reads it on a fresh load.
         window.location.href = '/dashboard';
       } catch (e) {
         toast('Could not claim a listing — please check your connection.', 'red');

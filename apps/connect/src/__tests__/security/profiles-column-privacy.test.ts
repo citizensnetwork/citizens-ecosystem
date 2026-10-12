@@ -57,6 +57,19 @@ function statements(sql: string): string[] {
     .filter(Boolean);
 }
 
+// replayLineage() runs several times (the end state, then 175 and 176). Parsing the whole
+// lineage each time pushed one test past vitest's 5 s default on a busy machine, so each
+// migration is read and split once.
+const parsedMigrations = new Map<string, string[]>();
+function migrationStatements(file: string): string[] {
+  let parsed = parsedMigrations.get(file);
+  if (!parsed) {
+    parsed = statements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
+    parsedMigrations.set(file, parsed);
+  }
+  return parsed;
+}
+
 function rolesIn(clause: string): Array<"anon" | "authenticated"> {
   const names = clause.split(/[ ,]+/).map((r) => r.trim());
   const out: Array<"anon" | "authenticated"> = [];
@@ -79,7 +92,7 @@ function replayLineage(upTo = Infinity): LineageState {
   };
   for (const file of migrationFiles()) {
     if (Number(file.split("_")[0]) > upTo) continue;
-    for (const st of statements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"))) {
+    for (const st of migrationStatements(file)) {
       let m: RegExpMatchArray | null;
       if ((m = st.match(new RegExp(String.raw`^grant (?:select|all(?: privileges)?)(?: on (?:${PROFILES}|${ALL_PUBLIC})) to (.+)$`)))) {
         for (const r of rolesIn(m[1])) state[r].tableLevel = true;
@@ -121,9 +134,7 @@ describe("profiles column privacy — migration lineage", () => {
   });
 
   it("models the mig 082 footgun: its column REVOKE left the table GRANT (and every column) in place", () => {
-    const st082 = statements(
-      readFileSync(join(MIGRATIONS_DIR, "082_billing_privacy_and_trial_stamp.sql"), "utf8"),
-    );
+    const st082 = migrationStatements("082_billing_privacy_and_trial_stamp.sql");
     expect(st082.some((s) => s.startsWith("revoke select (billing_tier"))).toBe(true);
     // Up to 175 the table-level grant still stood — billing, email and the
     // rest stayed readable by anon until 176 revoked it.
@@ -155,7 +166,9 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // createAdminClient() after requireAdmin()
   // + the claim columns: the admin Listings tab shows whether an admin- or
   // form-created listing's owner has signed in yet.
-  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at"],
+  // + auto_update_level (mig 181): the Listings tab shows each listing's automation level
+  // (a separate, best-effort read after the list; never returned to anyone but the admin).
+  "app/api/admin/users/route.ts": ["email", "contributor_claim_email", "contributor_claimed_at", "auto_update_level"],
   "app/api/admin/suggestions/export/route.ts": ["email"],
   "app/api/admin/contributor-applications/route.ts": ["email"],
   // createAdminClient() after requireAdmin() AND after the approve/reject RPC
@@ -165,6 +178,14 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/admin/pending-elevations/route.ts": ["email"],
   // `admin` = createAdminClient(); fan-out mute filter for broadcast pushes
   "app/api/contributor/[handle]/broadcasts/route.ts": ["muted_source_ids"],
+  // createAdminClient() after the `automation:suggest` API-key check (mig 181): the consent
+  // level is read to enforce "consent gates everything" (level off => 409 consent_off). It
+  // decides the response and is never returned; the intake route only WRITES these columns.
+  "app/api/automation/suggestions/route.ts": ["auto_update_level"],
+  // createAdminClient() after the `automation:digest` API-key check (mig 181): reads the owner's
+  // address, notification preference, consent level and last-nudge time to decide whether to send
+  // the daily "new suggestions" email. The address goes only to the mailer; the response is counts.
+  "app/api/automation/digest/route.ts": ["email", "notification_email", "notification_prefs", "auto_update_level", "auto_update_nudged_at"],
 };
 
 /**
