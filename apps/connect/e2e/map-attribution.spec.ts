@@ -53,6 +53,44 @@ for (const [label, path] of [
       await expect(credit).toHaveCSS("font-size", "9px");
     });
 
+    test("on a phone, zoomed out: the zoom hint and the expanded © credit never overlap", async ({ page }) => {
+      await page.setViewportSize({ width: 360, height: 800 }); // the narrowest phone we design for
+      await mockMapNetwork(page);
+      // A style whose one source carries the real credit, so the attribution control has its full text
+      // (the shared mock style has no sources, which leaves the credit empty).
+      await page.route("**/api.maptiler.com/maps/**", (route) =>
+        route.fulfill({
+          json: {
+            version: 8,
+            sources: {
+              credit: {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+                attribution:
+                  '<a href="https://www.maptiler.com/copyright/">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>',
+              },
+            },
+            layers: [{ id: "credit", type: "circle", source: "credit" }],
+          },
+        }),
+      );
+      await openMap(page, path, 0);
+      // marked as a person's move, so the app's auto-framing leaves the zoom alone
+      await page.evaluate(() =>
+        (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ zoom: 5 }, { originalEvent: {} }),
+      );
+      const hint = page.locator("[data-zoom-hint]");
+      await expect(hint).toBeVisible();
+      const credit = page.locator(".maplibregl-ctrl-attrib").first();
+      await expect(credit).toContainText("OpenStreetMap");
+      await expect(credit).toHaveClass(/maplibregl-compact-show/); // expanded, as on first load
+      const h = (await hint.boundingBox())!;
+      const c = (await credit.boundingBox())!;
+      const overlap = h.x < c.x + c.width && c.x < h.x + h.width && h.y < c.y + c.height && c.y < h.y + h.height;
+      expect(overlap).toBe(false);
+      expect(c.y + c.height).toBeLessThanOrEqual(800 - 60); // and still above the bottom navigation
+    });
+
     test("on a laptop: bottom-left of the map, never covered", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
       await mockMapNetwork(page);

@@ -165,7 +165,9 @@
   .cc-pin-label.is-selected .cc-pin-label-text { font-size:12.5px; }
   @media (prefers-reduced-motion: reduce) { .cc-pin-label { transition:none; } }
   /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
-  .maplibregl-ctrl-bottom-right { margin-bottom: 88px; }
+  /* 74 px: above the phone's bottom navigation, and low enough that the © credit sits below the bottom-left
+     zoom hint instead of under it (the hint dropped to the credit's height when the Map Key was removed). */
+  .maplibregl-ctrl-bottom-right { margin-bottom: 74px; }
   /* The © MapTiler / © OpenStreetMap credit is required on every map (MapTiler terms, the OSM licence), so it
      stays, but small and quiet: the same translucent near-black pill and white type as the MapTiler logo
      (map.jsx), not a long white bar. Selectors match maplibre-gl.css's own specificity (the old one-class
