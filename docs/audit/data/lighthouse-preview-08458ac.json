@@ -1,0 +1,99 @@
+{
+  "note": "Lighthouse 12.8.2 CLI, default mobile profile (simulated slow 4G, CPU x4), Vercel preview of PR #96 at 08458ac, fresh profile (lands on the sign-in splash: guest mode lives in sessionStorage, so the CLI cannot reach the map screen). Run 1 measured all four categories, runs 2-4 performance only. Measured 2026-10-10.",
+  "runs": {
+    "v1": [
+      {
+        "performance": 69,
+        "fcp_ms": 4962,
+        "lcp_ms": 4962,
+        "tbt_ms": 66,
+        "cls": 0.0005,
+        "bytes": 838186,
+        "accessibility": 92,
+        "best-practices": 100,
+        "seo": 50
+      },
+      {
+        "performance": 69,
+        "fcp_ms": 4931,
+        "lcp_ms": 4969,
+        "tbt_ms": 89,
+        "cls": 0.0005,
+        "bytes": 838477
+      },
+      {
+        "performance": 67,
+        "fcp_ms": 5117,
+        "lcp_ms": 5178,
+        "tbt_ms": 114,
+        "cls": 0.0005,
+        "bytes": 838150
+      },
+      {
+        "performance": 68,
+        "fcp_ms": 5028,
+        "lcp_ms": 5087,
+        "tbt_ms": 59,
+        "cls": 0.0005,
+        "bytes": 838130
+      }
+    ],
+    "v2": [
+      {
+        "performance": 63,
+        "fcp_ms": 4972,
+        "lcp_ms": 5038,
+        "tbt_ms": 292,
+        "cls": 0.0032,
+        "bytes": 873403,
+        "accessibility": 92,
+        "best-practices": 100,
+        "seo": 50
+      },
+      {
+        "performance": 67,
+        "fcp_ms": 4931,
+        "lcp_ms": 5096,
+        "tbt_ms": 159,
+        "cls": 0.0032,
+        "bytes": 873429
+      },
+      {
+        "performance": 62,
+        "fcp_ms": 5114,
+        "lcp_ms": 5187,
+        "tbt_ms": 270,
+        "cls": 0.0032,
+        "bytes": 873444
+      },
+      {
+        "performance": 63,
+        "fcp_ms": 5145,
+        "lcp_ms": 5310,
+        "tbt_ms": 227,
+        "cls": 0.0032,
+        "bytes": 873140
+      }
+    ]
+  },
+  "median": {
+    "v1": {
+      "performance": 68.5,
+      "tbt_ms": 77.5,
+      "lcp_ms": 5028,
+      "cls": 0.0005
+    },
+    "v2": {
+      "performance": 63,
+      "tbt_ms": 248.5,
+      "lcp_ms": 5141.5,
+      "cls": 0.0032
+    }
+  },
+  "findings": [
+    "accessibility 92 for both flags: the only failing audit is meta-viewport (maximum-scale blocks pinch zoom; app-wide, unchanged by Map v2)",
+    "seo 50 for both: preview deployments send noindex (is-crawlable), not a production signal",
+    "CLS 0.0027 with the flag on came from the map v2 badge appearing before map-v2.css loaded; fixed by adding the badge on the stylesheet load",
+    "flag-on TBT is higher on the landing screen; a CDP CPU profile (3 cold loads each, CPU x4) shows equal JavaScript self time for v1 and v2, so the difference is style work from the extra stylesheet and the data-theme attribute, not script"
+  ]
+}
