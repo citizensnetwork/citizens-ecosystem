@@ -108,6 +108,53 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
+  // MapTiler's Free plan (founder: staying on it, tracker MAP:D12) requires its logo, linked to
+  // maptiler.com, bottom-left on every map that shows its tiles, beside the © MapTiler / © OpenStreetMap
+  // text attribution (docs.maptiler.com, "Map attribution and how to add it"). The image is MapTiler's own
+  // file (67 x 20 px; the CSP's img-src already allows api.maptiler.com). Its lettering is white, so it sits
+  // on a translucent plate in the app's near-black (#171310), readable on the light and the dark map. Two ways in:
+  //   - MapTilerLogo: a React element; the home map renders it at the foot of its bottom-left overlay column
+  //     (under the zoom hint), so nothing overlaps it and it clears the phone's bottom navigation at every width.
+  //   - mapTilerLogoControl(): a MapLibre control for maps with no such column (the LocationPicker).
+  const MAPTILER_LOGO = {
+    href: 'https://www.maptiler.com',
+    src: 'https://api.maptiler.com/resources/logo.svg',
+    alt: 'MapTiler logo',
+    plate: 'display:inline-block;line-height:0;padding:3px 6px;border-radius:999px;background:rgba(23,19,16,0.62);',
+  };
+  function MapTilerLogo() {
+    return React.createElement('a', {
+      href: MAPTILER_LOGO.href, target: '_blank', rel: 'noopener noreferrer', 'data-cc-maptiler-logo': '',
+      style: { display: 'inline-block', lineHeight: 0, padding: '3px 6px', borderRadius: 999, background: 'rgba(23,19,16,0.62)' },
+    }, React.createElement('img', { src: MAPTILER_LOGO.src, alt: MAPTILER_LOGO.alt, width: 67, height: 20, decoding: 'async' }));
+  }
+  function mapTilerLogoControl() {
+    let el = null;
+    return {
+      onAdd() {
+        el = document.createElement('a');
+        el.className = 'maplibregl-ctrl';
+        el.href = MAPTILER_LOGO.href;
+        el.target = '_blank';
+        el.rel = 'noopener noreferrer';
+        el.setAttribute('data-cc-maptiler-logo', '');
+        el.style.cssText = MAPTILER_LOGO.plate;
+        const img = document.createElement('img');
+        img.src = MAPTILER_LOGO.src;
+        img.alt = MAPTILER_LOGO.alt;
+        img.width = 67;
+        img.height = 20;
+        img.decoding = 'async';
+        el.appendChild(img);
+        return el;
+      },
+      onRemove() {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        el = null;
+      },
+    };
+  }
+
   // window.maplibregl now comes from a <script type="module"> in index.html
   // (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump — see that
   // file for why). Module scripts are deferred relative to the classic
@@ -742,8 +789,10 @@
           container: containerRef.current, style,
           center: hasPin ? [value.lng, value.lat] : PRETORIA,
           zoom: hasPin ? 15 : 11,
-          attributionControl: false,
+          // The © MapTiler / © OpenStreetMap credit is required on every map, this small one included.
+          attributionControl: { compact: true },
         });
+        map.addControl(mapTilerLogoControl(), 'bottom-left');
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
         map.on('moveend', () => {
           if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
@@ -826,7 +875,7 @@
       (busy === 'geocode' || busy === 'reverse') && h('div', { className: 'absolute left-2 top-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5' },
         h('span', { className: 'w-2.5 h-2.5 rounded-full border-2 border-gold border-t-transparent spin' }),
         busy === 'geocode' ? 'Finding address…' : 'Reading location…'),
-      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
+      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-11 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
   }
 
   // Exported so tests (and any future surface) assert against the SAME
@@ -834,4 +883,5 @@
   window.MAP_ZOOM = { GATES: ZOOM_GATES, LABELS: ZOOM_LABELS, PHOTO: ZOOM_PHOTO, bandFor: zoomBandFor, hidden: markerHidden };
   window.StylizedMap = StylizedMap;
   window.LocationPicker = LocationPicker;
+  window.MapTilerLogo = MapTilerLogo;
 })();

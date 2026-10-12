@@ -1,0 +1,79 @@
+import { test, expect, type Page } from "@playwright/test";
+import { mockMapNetwork, openMap } from "./support/map-v2";
+
+// ════════════════════════════════════════════════════════════════════
+//  MapTiler's Free plan (founder: staying on it, tracker MAP:D12) needs its
+//  logo, linked to maptiler.com, bottom-left on EVERY map that shows its
+//  tiles, plus the © MapTiler / © OpenStreetMap text credit. The home map
+//  carries the logo at the foot of its bottom-left overlay column (the Map
+//  Key was removed at the founder's request, 2026-10-12); the LocationPicker
+//  (apply / admin forms) carries it as a map control. MapTiler is mocked
+//  here, so the image itself does not load: these checks are about the
+//  link, the file it points at, and that nothing covers it.
+// ════════════════════════════════════════════════════════════════════
+
+const LOGO = "[data-cc-maptiler-logo]";
+
+/** The logo's box, and whether the element at its centre is the logo itself (not covered). */
+async function logoState(page: Page) {
+  return page.locator(LOGO).first().evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+    return { x: b.x, y: b.y, w: b.width, h: b.height, bottom: b.bottom, uncovered: !!(hit && el.contains(hit)) };
+  });
+}
+
+async function expectLogoLink(page: Page) {
+  const logo = page.locator(LOGO).first();
+  await expect(logo).toHaveAttribute("href", "https://www.maptiler.com");
+  await expect(logo).toHaveAttribute("target", "_blank");
+  await expect(logo).toHaveAttribute("rel", /noopener/);
+  await expect(logo.locator("img")).toHaveAttribute("src", "https://api.maptiler.com/resources/logo.svg");
+  await expect(logo.locator("img")).toHaveAttribute("alt", "MapTiler logo");
+}
+
+for (const [label, path] of [
+  ["flag off", "/?map=v1"],
+  ["flag on", "/?map=v2"],
+] as const) {
+  test.describe(`the home map shows the MapTiler logo (${label})`, () => {
+    test("on a phone: bottom-left, above the bottom navigation, never covered; no Map Key; the credit is a small pill", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await mockMapNetwork(page);
+      await openMap(page, path, 1);
+      await expectLogoLink(page);
+      const s = await logoState(page);
+      expect(s.uncovered).toBe(true);
+      expect(s.x).toBeLessThan(40); // the left edge of the map
+      expect(s.bottom).toBeLessThanOrEqual(844 - 60); // clear of the bottom navigation
+      await expect(page.getByText("Map Key", { exact: true })).toHaveCount(0);
+      // the © MapTiler / © OpenStreetMap credit stays (required), as a small dark pill, not a white bar
+      const credit = page.locator(".maplibregl-ctrl-attrib").first();
+      await expect(credit).toHaveCSS("background-color", "rgba(23, 19, 16, 0.62)");
+      await expect(credit).toHaveCSS("font-size", "9px");
+    });
+
+    test("on a laptop: bottom-left of the map, never covered", async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await mockMapNetwork(page);
+      await openMap(page, path, 1);
+      const s = await logoState(page);
+      const map = await page.locator(".maplibregl-canvas").boundingBox();
+      expect(s.uncovered).toBe(true);
+      expect(s.x - map!.x).toBeLessThan(40);
+      expect(map!.y + map!.height - s.bottom).toBeLessThan(60);
+    });
+  });
+}
+
+test("the location picker (Become a Contributor) shows the logo and the © MapTiler / © OpenStreetMap credit", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockMapNetwork(page);
+  await openMap(page, "/", 1);
+  await page.evaluate(() => (window as unknown as { __cc: { go: (p: string) => void } }).__cc.go("apply"));
+  const picker = page.locator(".maplibregl-map").filter({ has: page.locator(LOGO) });
+  await expect(picker).toHaveCount(1, { timeout: 15_000 });
+  await expectLogoLink(page);
+  await expect(picker.locator(".maplibregl-ctrl-attrib")).toHaveCount(1);
+  expect((await logoState(page)).uncovered).toBe(true);
+});
