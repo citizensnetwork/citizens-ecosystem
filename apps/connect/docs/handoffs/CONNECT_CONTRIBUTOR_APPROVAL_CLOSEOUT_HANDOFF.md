@@ -3,6 +3,11 @@
 > **Type:** stateless close-out, written 2026-10-04 by the code session that built Parts A, B and C of
 > `CONNECT_CONTRIBUTOR_ONBOARDING_HANDOFF.md`. Everything below was checked against git, GitHub and the
 > production database that day. **Re-read every file before changing it.** Other sessions are active.
+>
+> **Stale in places since 2026-10-12.** PR #90 landed on 2026-10-12, not on 2026-10-04 as written below, and the numbers in §1 and §5 have
+> moved: the migration head is now **181** and the advisor baseline **0 ERROR / 121 WARN / 3 INFO** (not 180 / 118); PR #89 (C15) has merged;
+> and whether `RESEND_API_KEY` and `ADMIN_NOTIFY_EMAIL` are set in Vercel is unconfirmed (see RESUME_HERE §2 and A11). Read
+> [`RESUME_HERE.md`](../../RESUME_HERE.md) first and treat this file as the record of what Parts A to C built.
 
 ## 1. Where things stand
 
