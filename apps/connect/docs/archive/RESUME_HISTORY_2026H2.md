@@ -3894,3 +3894,32 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   Vision deploy gates, PAT rotation and the code-as-hero email template all done. New finds: orphan prod tables
   and functions (H6), 9 undeployed edge functions (H5), missing git tags (S2), 4 invisible Contributors (A5),
   perf-advisor debt (S6), stale status docs (H4). Rescued the Wear CSP brief from `%TEMP%`. No code or DB change.
+
+## Moved from RESUME_HERE §6 on 2026-10-10 (the two oldest session entries)
+
+- **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
+  intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
+  included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors
+  hide below zoom 6 (D1, his own answer), names from zoom 15 (D2). Org logos are shown whole (contain on white;
+  Individuals' photos still fill). Finished events leave the map and Discovery and sit under "Past events" on
+  the profile and dashboard (no end time ⇒ up for the rest of its day). A social value with spaces is a display
+  name: refused on dashboard/Apply/admin, dropped with a Note on the Form intake; local SA WhatsApp numbers
+  store as `27…`. The first Form submission's three bad socials were corrected with a guarded single-row UPDATE.
+  First-view framing is clamped and centred so nationally spread data can't open blank (e2e, mutation-checked).
+  Connect 852 unit, e2e 30/30, no migration. New items **C11–C13**. Not yet confirmed at write-up: post-merge CI
+  and the production deploys, and the founder's production re-check. **Start here:**
+  [`docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md`](docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md).
+  The original brief (`…MAP_PREVIEW_CONSISTENCY_HANDOFF.md`) stays untracked: it names a real organisation.
+- **2026-10-02 — Merged #71 and #75, fixed a red `main`, shipped email-code sign-in (C5).** #71 (`9eb727e`)
+  and #75 (`b85f5ae`) merged. #75's Verify failed on the OSV gate only: 20 advisories published after 09-27
+  (brace-expansion, js-yaml, undici, all dev/test-time) had turned `main` red since #71's merge; fixed by
+  raising the `pnpm.overrides` floors in **#76** (`cb0a049`), checked against OSV.dev. **#77:** *Continue with
+  email* on Connect's landing (6-digit code, `shouldCreateUser: true`): owners without Google (e.g. on Outlook)
+  can finally reach their dashboard; guests are no longer dead-ended into Google; 40 unit + 6 e2e tests
+  (e2e 20/20). **#79 (2026-10-03):** admin **Delete** on every Listings row. A listing is an account, so the
+  database decides from one fact (has the owner ever signed in?): never = the placeholder is hard-deleted;
+  signed in = only the listing goes and the person stays a citizen (their re-application would start
+  hidden). **Migration 178 applied** (one admin-only SECDEF function; probe-verified; advisors 0/119/3).
+  Route `/api/admin/contributors/delete-listing` (the old `/contributors/delete` discards applications).
+  Founder decisions on C10 recorded above. Open: founder steps **A10**, Vision port (**C5**), **C10**, **C14**.
+  The 2026-10-02 handoff stays untracked (it names a real organisation; this repo is public).

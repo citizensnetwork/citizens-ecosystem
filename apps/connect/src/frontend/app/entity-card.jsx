@@ -67,7 +67,9 @@
       startConversationWith, shareLink,
     } = app;
 
-    const isPanel = layout === 'panel';
+    // 'sheet' (Map v2, flag ?map=v2) is the panel body inside the Map v2 bottom sheet; every other layout is unchanged.
+    const isSheet = layout === 'sheet';
+    const isPanel = layout === 'panel' || isSheet;
     const isEvent = item.type === 'event';
     const isPlace = item.type === 'place';
     const isContributor = item.type === 'contributor';
@@ -240,12 +242,13 @@
       // Events get a distinct Consider (bookmark) alongside Connect; places and
       // contributors fold saving into the primary Follow button above.
       isEvent && iconBtn('Bookmark', saveLabel, onSave, saved),
-      website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
+      !isSheet && website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
       messageTarget && iconBtn('MessageCircle', 'Message the organiser', onMessage),
       // The same share path as the full profile pages: the phone's share sheet,
       // else the real /c, /p or /e address on the clipboard (C20: this used to
-      // toast "copied" and copy nothing).
-      iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
+      // toast "copied" and copy nothing). Inside the Map v2 sheet the sheet's own
+      // header carries Share, so the card's is hidden there.
+      !isSheet && iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
     ].filter(Boolean);
 
     const actions = h('div', { className: cx('flex items-center gap-2', isPanel ? 'flex-wrap' : '') },
@@ -278,7 +281,8 @@
       description && h('p', {
         className: 'text-xs text-muted-foreground leading-snug mt-1 ' + (isPanel && !isContributor ? 'line-clamp-3' : 'line-clamp-2'),
       }, description));
-    const head = isPanel
+    const sheetDesc = description ? h('p', { className: 'px-4 text-xs text-muted-foreground leading-snug line-clamp-3' }, description) : null;
+    const head = isSheet ? sheetDesc : isPanel
       ? h('div', null, band, titleBlock)
       : h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
 
@@ -287,12 +291,12 @@
       h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
-      h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, viewBtn));
+      h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn));
 
     return h('div', {
-      className: cx('bg-card overflow-hidden flex flex-col',
-        isPanel ? 'rounded-t-3xl md:rounded-3xl' : 'rounded-2xl shadow-sm transition-shadow hover:shadow-md'),
-      style: { border: '1.5px solid ' + hex + '55' },
+      className: cx(isSheet ? 'overflow-hidden flex flex-col' : 'bg-card overflow-hidden flex flex-col',
+        isSheet ? '' : isPanel ? 'rounded-t-3xl md:rounded-3xl' : 'rounded-2xl shadow-sm transition-shadow hover:shadow-md'),
+      style: isSheet ? undefined : { border: '1.5px solid ' + hex + '55' },
       'data-entity-card': item.type,
     }, head, body);
   }

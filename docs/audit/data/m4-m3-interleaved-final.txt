@@ -1,0 +1,4 @@
+v1                   median p50 67 median p95 96  all p95: 104,103,85,97,90,95,96
+v2                   median p50 73 median p95 102  all p95: 113,92,102,111,98,109,101
+v1-hidden            median p50 48 median p95 65  all p95: 65,63,65,69,62,74,61
+v2-hidden            median p50 51 median p95 70  all p95: 70,65,72,68,71,74,63

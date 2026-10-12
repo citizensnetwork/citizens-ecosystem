@@ -1,0 +1,77 @@
+{
+  "profile": {
+    "viewport": "390x844",
+    "dsf": 3,
+    "cpu": 4,
+    "network": {
+      "offline": false,
+      "downloadThroughput": 1012500,
+      "uploadThroughput": 168750,
+      "latency": 165
+    },
+    "tiles": "mock",
+    "flag": "v2",
+    "fixedNow": "2026-10-10T08:00:00.000Z"
+  },
+  "m3_pan_frame_ms": {
+    "pins": 150,
+    "z13": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 181,
+        "p50": 69,
+        "p95": 92,
+        "p99": 101,
+        "above32ms": 108,
+        "max": 106
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 252,
+        "p50": 43,
+        "p95": 60,
+        "p99": 64,
+        "above32ms": 164,
+        "max": 70
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 617,
+        "p50": 16,
+        "p95": 18,
+        "p99": 22,
+        "above32ms": 2,
+        "max": 96
+      }
+    },
+    "z15.5": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 176,
+        "p50": 64,
+        "p95": 97,
+        "p99": 113,
+        "above32ms": 118,
+        "max": 115
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 229,
+        "p50": 46,
+        "p95": 64,
+        "p99": 76,
+        "above32ms": 177,
+        "max": 81
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 608,
+        "p50": 16,
+        "p95": 20,
+        "p99": 26,
+        "above32ms": 3,
+        "max": 60
+      }
+    }
+  }
+}
