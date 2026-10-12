@@ -113,15 +113,17 @@
   // Goes live immediately (map + Kingdom Discovery), tied to an email the
   // real owner later claims — POST /api/admin/contributors/create
   // (migration 169/170). Single-page form, not a wizard: this is an admin
-  // quick-entry tool, not the citizen-facing apply flow.
+  // quick-entry tool, not the citizen-facing apply flow. "Email the owner a
+  // welcome" (D-13, on by default) has the SERVER mail them the sign-in steps;
+  // the result says whether it was sent, failed, or skipped.
   function AdminCreateContributor() {
     const { toast } = window.useApp();
     const [f, setF] = useState({
       orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '',
-      location: '', lat: null, lng: null, noFixedLocation: false,
+      location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true,
     });
     const [submitting, setSubmitting] = useState(false);
-    const [result, setResult] = useState(null); // { slug, claimEmail } once created
+    const [result, setResult] = useState(null); // { slug, claimEmail, emailRequested, email } once created
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const setLoc = (patch) => setF((s) => ({
       ...s,
@@ -150,6 +152,7 @@
             physical_address: f.noFixedLocation ? null : f.location,
             physical_latitude: f.noFixedLocation ? null : f.lat,
             physical_longitude: f.noFixedLocation ? null : f.lng,
+            email_owner: f.emailOwner,
           }),
         });
         const body = await res.json().catch(() => ({}));
@@ -160,9 +163,9 @@
           setSubmitting(false);
           return;
         }
-        setResult({ slug: body.slug, claimEmail: f.claimEmail.trim() });
+        setResult({ slug: body.slug, claimEmail: f.claimEmail.trim(), emailRequested: f.emailOwner, email: body.email });
         toast('Contributor listing created — live on the map now.', 'green');
-        setF({ orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '', location: '', lat: null, lng: null, noFixedLocation: false });
+        setF({ orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '', location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true });
       } catch (e) {
         toast('Could not create the listing — please check your connection.', 'red');
       }
@@ -171,15 +174,23 @@
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        "Create a Contributor listing on their behalf — it goes live on the map and in Kingdom Discovery immediately. When the real person or org signs in with Google using the email below, they'll be able to claim it and manage it themselves from their own Contributor Portal."),
+        "Create a Contributor listing on their behalf — it goes live on the map and in Kingdom Discovery immediately. The real person or org signs in with the email below (a 6-digit code we email them, or Google) to see the listing and manage it themselves from their own Contributor Portal."),
 
-      result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2' },
+      result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2', 'data-testid': 'create-result' },
         h(Icon, { name: 'CheckCircle2', size: 15, className: 'text-[#16A34A] shrink-0 mt-0.5' }),
-        h('p', { className: 'text-xs text-[#15803d] leading-relaxed' },
-          h('strong', null, 'Live: '), '/' + result.slug + ' — claimable by ', h('strong', null, result.claimEmail))),
+        h('div', { className: 'text-xs text-[#15803d] leading-relaxed space-y-1' },
+          h('p', null, h('strong', null, 'Live: '), '/' + result.slug + ' — claimable by ', h('strong', null, result.claimEmail)),
+          h('p', { 'data-testid': 'create-email-status', className: result.emailRequested && result.email !== 'sent' ? 'font-semibold text-[#B45309]' : undefined },
+            !result.emailRequested
+              ? 'No welcome email was sent (you chose not to). Let them know yourself.'
+              : result.email === 'sent'
+                ? 'Welcome email sent to ' + result.claimEmail + '. They may need to check their junk folder.'
+                : result.email === 'failed'
+                  ? "The welcome email couldn't be sent. Let them know yourself."
+                  : "Email isn't set up on the server yet, so no welcome was sent. Let them know yourself."))),
 
       h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
-      h(Field, { label: "Owner's email", required: true, hint: 'The email they must sign in with (Google) to claim this listing.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
+      h(Field, { label: "Owner's email", required: true, hint: 'The email they sign in with (a 6-digit code we email them, or Google) to see this listing.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
 
       h('div', { className: 'grid grid-cols-2 gap-3' },
         h(Field, { label: 'Type' }, h('select', { value: f.kind, onChange: (e) => up('kind', e.target.value), className: window.UI.inputCls },
@@ -209,12 +220,18 @@
 
       h(Field, { label: 'Short bio / about' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
 
+      h('label', { className: 'flex items-start gap-2.5 p-3 rounded-xl bg-white/60 border border-border cursor-pointer' },
+        h('input', { type: 'checkbox', checked: f.emailOwner, onChange: (e) => up('emailOwner', e.target.checked), className: 'mt-0.5 w-4 h-4 accent-[#A67C00]' }),
+        h('span', null,
+          h('span', { className: 'block text-sm font-semibold text-foreground' }, 'Email the owner a welcome'),
+          h('span', { className: 'block text-xs text-muted-foreground leading-relaxed' }, 'Sends the sign-in steps (a 6-digit code) from no-reply@citizenscentral.co.za. Untick it if you would rather tell them yourself.'))),
+
       h(Button, { variant: 'gold', icon: 'Plus', disabled: !canSubmit, onClick: submit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
   }
 
   // ── Admin: every Contributor listing — hide / unhide ──
   // The moderation safety net for listings that go live without a review
-  // step (Google Form intake, admin Create, self-serve apply): Hide takes a
+  // step (Google Form intake, admin Create; self-serve applications are reviewed first since D-12): Hide takes a
   // listing off the map and Kingdom Discovery for everyone, reversibly —
   // POST /api/admin/contributors/hide (set_contributor_hidden, mig 164). Also
   // shows whether a form/admin-created listing's owner has signed in yet.
