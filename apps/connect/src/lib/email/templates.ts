@@ -138,20 +138,26 @@ export function applicationRejectedEmail(input: {
  * in with a different address. Worded "sign in to see your listing", never "it is
  * automatically yours": the claim confirm screen (RESUME C10) will sit in front of
  * every claim, admin-created ones included, and this email must stay true then.
+ *
+ * `onMap` is whether the listing has a map pin (an admin may create one with "no
+ * fixed location"): it is always in Kingdom Discovery, but only some are on the
+ * map, and an online-only Contributor must not be told otherwise.
  */
 export function ownerWelcomeEmail(input: {
   name: string;
   ownerEmail: string;
   listingUrl: string;
   signInUrl: string;
+  onMap: boolean;
 }): Email {
   const email = escapeHtml(input.ownerEmail);
+  const where = input.onMap ? "on the map and in Kingdom Discovery" : "in Kingdom Discovery";
   return {
     subject: subjectSafe(`You're live on Citizens Connect — ${input.name}`),
     html: layout(
       `${input.name} is live on Citizens Connect 🎉`,
       "<p>Thank you for joining the Body on Citizens Connect. A listing for you has been added, " +
-        "and it is now on the map and in Kingdom Discovery, where citizens across the city can find, " +
+        `and it is now ${where}, where citizens across the city can find, ` +
         "follow and connect with you.</p>" +
         `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View your listing</a></p>` +
         `<p><strong>To see your listing and manage it</strong>, sign in with <strong>${email}</strong>. ` +
@@ -167,7 +173,7 @@ export function ownerWelcomeEmail(input: {
     ),
     text:
       `${input.name} is live on Citizens Connect.\n\n` +
-      "Thank you for joining the Body. A listing for you has been added, and it is now on the map and in Kingdom Discovery.\n\n" +
+      `Thank you for joining the Body. A listing for you has been added, and it is now ${where}.\n\n` +
       `View your listing: ${input.listingUrl}\n\n` +
       `To see your listing and manage it, sign in with ${input.ownerEmail}. You don't need a Google account:\n` +
       `1. Open ${input.signInUrl} and tap "Continue with email".\n` +

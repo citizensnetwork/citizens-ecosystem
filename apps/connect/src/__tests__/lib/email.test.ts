@@ -213,7 +213,20 @@ describe("email templates", () => {
       ownerEmail: "owner@grace.example",
       listingUrl: "https://www.citizens.example/c/grace-hub",
       signInUrl: "https://www.citizens.example/dashboard",
+      onMap: true,
     };
+
+    it("says 'on the map' only when the listing has a pin; it is always in Kingdom Discovery", () => {
+      const pinned = ownerWelcomeEmail(input);
+      for (const part of [pinned.html, pinned.text]) {
+        expect(part).toContain("now on the map and in Kingdom Discovery");
+      }
+      const online = ownerWelcomeEmail({ ...input, onMap: false });
+      for (const part of [online.html, online.text]) {
+        expect(part).toContain("now in Kingdom Discovery");
+        expect(part).not.toContain("on the map");
+      }
+    });
 
     it("gives the Form's 6-digit steps: Continue with email, the code, the Dashboard, Google as the alternative", () => {
       const e = ownerWelcomeEmail(input);
@@ -243,6 +256,7 @@ describe("email templates", () => {
         ownerEmail: 'a"b@grace.example',
         listingUrl: 'https://www.citizens.example/c/x"><script>',
         signInUrl: "https://www.citizens.example/dashboard",
+        onMap: false,
       });
       expect(e.html).not.toContain("<script>");
       expect(e.html).toContain("&lt;script&gt;");

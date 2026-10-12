@@ -165,6 +165,8 @@ export async function POST(request: NextRequest) {
         ownerEmail: fields.claimEmail,
         listingUrl: result.slug ? `${origin}/c/${encodeURIComponent(result.slug)}` : origin,
         signInUrl: `${origin}/dashboard`,
+        // A pin needs both coordinates; "no fixed location" nulls them (parseListingFields).
+        onMap: fields.latitude !== null && fields.longitude !== null,
       }),
     });
   }

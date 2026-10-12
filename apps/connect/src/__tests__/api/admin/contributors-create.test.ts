@@ -195,6 +195,30 @@ describe("POST /api/admin/contributors/create", () => {
       expect(mail.subject).toContain("Grace Outreach");
     });
 
+    it("tells a listing with a map pin it is on the map", async () => {
+      created();
+      await POST(req({ ...validBody, physical_address: "Church Square, Pretoria", physical_latitude: -25.7, physical_longitude: 28.2 }));
+      const mail = mockSendEmail.mock.calls[0][0] as { text: string; html: string };
+      expect(mail.text).toContain("now on the map and in Kingdom Discovery");
+      expect(mail.html).toContain("now on the map and in Kingdom Discovery");
+    });
+
+    it("does not say 'on the map' for a listing without a pin (no coordinates, or 'no fixed location')", async () => {
+      for (const body of [
+        validBody,
+        { ...validBody, no_fixed_location: true, physical_latitude: -25.7, physical_longitude: 28.2 },
+        { ...validBody, physical_latitude: -25.7 },
+      ]) {
+        mockSendEmail.mockClear();
+        created();
+        await POST(req(body));
+        const mail = mockSendEmail.mock.calls[0][0] as { text: string; html: string };
+        expect(mail.text).toContain("now in Kingdom Discovery");
+        expect(mail.text).not.toContain("on the map");
+        expect(mail.html).not.toContain("on the map");
+      }
+    });
+
     it("carries the 6-digit sign-in steps, the listing link and 'sign in to see your listing' wording", async () => {
       created();
       await POST(req(validBody));
