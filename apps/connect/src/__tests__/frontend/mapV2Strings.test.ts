@@ -25,8 +25,8 @@ function collect(node: unknown, path: string, out: { path: string; text: string 
 }
 
 describe("the strings file", () => {
-  it("has the pin, sheet, time and look groups, and no empty string", () => {
-    expect(Object.keys(S).sort()).toEqual(["look", "pin", "sheet", "time"]);
+  it("has the pin, sheet and time groups, and no empty string", () => {
+    expect(Object.keys(S).sort()).toEqual(["pin", "sheet", "time"]);
     const all: { path: string; text: string }[] = [];
     collect(S, "", all);
     expect(all.length).toBeGreaterThan(60);

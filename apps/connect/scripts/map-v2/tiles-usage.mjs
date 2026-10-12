@@ -36,14 +36,15 @@ try {
   const browse = kinds(s.log.requests.slice(m));
   m = mark();
   const darkId = process.argv[2] || 'dataviz-dark';
-  const swapped = await s.page.evaluate(async (id) => {
+  // the app's own path when Map v2 is on (the phone turns dark), the raw style swap otherwise
+  const v2 = await s.page.evaluate(() => !!(window.MapV2 && window.isMapV2()));
+  if (v2) await s.page.emulateMedia({ colorScheme: 'dark' });
+  const swapped = await s.page.evaluate(async ([id, already]) => {
     const key = window.__CC_ENV.MAPTILER_KEY;
-    // the app's own path when Map v2 is on (the Map look setting), the raw style swap otherwise
-    if (window.MapV2 && window.isMapV2()) window.MapV2.setTheme('dark');
-    else window.__ccMap.setStyle('https://api.maptiler.com/maps/' + id + '/style.json?key=' + key);
+    if (!already) window.__ccMap.setStyle('https://api.maptiler.com/maps/' + id + '/style.json?key=' + key);
     await new Promise((res) => { window.__ccMap.once('idle', res); setTimeout(res, 6000); });
     return true;
-  }, darkId);
+  }, [darkId, v2]);
   await s.page.waitForTimeout(1500);
   const dark = kinds(s.log.requests.slice(m));
   console.log(JSON.stringify({ firstView: first, browse3PansAndZoom: browse, switchToDarkOnSameMap: dark, darkStyle: darkId, swapped }, null, 2));

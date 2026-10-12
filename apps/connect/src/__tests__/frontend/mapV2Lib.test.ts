@@ -1,9 +1,9 @@
 /**
  * Map v2 foundations (`src/frontend/app/map-v2-lib.jsx`, tracker P1-01 / P1-03):
- * the `?map=v2` flag, the motion constants and the map-look setting. The file is
+ * the `?map=v2` flag, the motion constants and the map look. The file is
  * an IIFE that publishes `window.isMapV2` / `window.MapV2`, so it is evaluated
  * against a stub window like the other frontend modules (no DOM here, which also
- * means the stylesheet/badge mount is skipped, exactly the "does nothing without
+ * means the stylesheet mount is skipped, exactly the "does nothing without
  * a document" path).
  */
 import { describe, it, expect } from "vitest";
@@ -16,11 +16,8 @@ type MapV2 = {
   motion: { fast: number; base: number; slow: number; enter: string; exit: string };
   dur: (n: "fast" | "base" | "slow") => number;
   prefersReducedMotion: () => boolean;
-  themeSetting: () => string;
   resolvedTheme: () => string;
-  setTheme: (t: string) => void;
   FLAG_KEY: string;
-  THEME_KEY: string;
   CSS_HREF: string;
 };
 
@@ -130,25 +127,20 @@ describe("motion tokens and reduced motion", () => {
   });
 });
 
-describe("the map look setting (auto | light | dark)", () => {
-  it("defaults to LIGHT, whatever the phone is set to (founder, D1)", () => {
-    const b = boot({ dark: true });
-    expect(b.api.themeSetting()).toBe("light");
-    expect(b.api.resolvedTheme()).toBe("light");
+describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", () => {
+  it("is dark when the phone is dark and light when it is light", () => {
+    expect(boot({ dark: true }).api.resolvedTheme()).toBe("dark");
+    expect(boot({ dark: false }).api.resolvedTheme()).toBe("light");
   });
 
-  it("'dark' is dark, 'auto' follows the system, an unknown stored value falls back to light", () => {
-    expect(boot({ storage: memoryStorage({ cc_map_theme: "dark" }) }).api.resolvedTheme()).toBe("dark");
-    expect(boot({ storage: memoryStorage({ cc_map_theme: "auto" }), dark: true }).api.resolvedTheme()).toBe("dark");
-    expect(boot({ storage: memoryStorage({ cc_map_theme: "auto" }), dark: false }).api.resolvedTheme()).toBe("light");
-    expect(boot({ storage: memoryStorage({ cc_map_theme: "neon" }) }).api.themeSetting()).toBe("light");
+  it("ignores a choice stored by the retired Map look control", () => {
+    expect(boot({ storage: memoryStorage({ cc_map_theme: "dark" }), dark: false }).api.resolvedTheme()).toBe("light");
+    expect(boot({ storage: memoryStorage({ cc_map_theme: "light" }), dark: true }).api.resolvedTheme()).toBe("dark");
   });
 
-  it("setTheme stores a valid choice and ignores an invalid one", () => {
-    const b = boot();
-    b.api.setTheme("dark");
-    expect(b.api.themeSetting()).toBe("dark");
-    b.api.setTheme("sepia");
-    expect(b.api.themeSetting()).toBe("dark");
+  it("offers no way to set a look in-app", () => {
+    const api = boot().api as Record<string, unknown>;
+    expect(api.setTheme).toBeUndefined();
+    expect(api.themeSetting).toBeUndefined();
   });
 });

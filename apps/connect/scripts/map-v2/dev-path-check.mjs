@@ -15,7 +15,7 @@ for (const q of ['/', '/?map=v2', '/?map=v1']) {
     await s.page.waitForFunction(() => document.querySelectorAll('.maplibregl-marker').length >= 8, undefined, { timeout: 30_000 });
     out[q] = await s.page.evaluate(() => ({
       markers: document.querySelectorAll('.maplibregl-marker').length,
-      badge: !!document.getElementById('cc-map-v2-badge'),
+      v2: !!(window.isMapV2 && window.isMapV2()),
       theme: document.documentElement.getAttribute('data-theme'),
       babel: !!document.querySelector('script[type="text/babel"]'),
       flag: window.isMapV2 && window.isMapV2(),

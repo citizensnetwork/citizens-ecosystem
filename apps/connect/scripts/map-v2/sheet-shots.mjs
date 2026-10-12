@@ -32,7 +32,7 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
   });
   try {
     await openMap(s.page, '/?map=v2', { minMarkers: 8 });
-    if (theme === 'dark') await s.page.evaluate(() => window.MapV2.setTheme('dark'));
+    if (theme === 'dark') await s.page.emulateMedia({ colorScheme: 'dark' }); // the look follows the phone
     const shot = async (name) => writeFileSync(join(outDir, `${prefix}-${vpName}-${name}.png`), await s.page.screenshot({ animations: 'disabled', caret: 'hide' }));
     const open = async (el, lng, lat) => {
       await jumpTo(s.page, { lng, lat, zoom: 16 });

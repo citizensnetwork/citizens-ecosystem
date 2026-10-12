@@ -65,7 +65,7 @@ The earlier milestone runs (M1, M2, M3, M4) were green too; the one red e2e step
 | Accessibility  | 92                   | 92                  |
 
 - **Accessibility 92, not 95, with the flag on or off:** the only failing audit is `meta-viewport` (`maximum-scale` blocks pinch zoom). It is app-wide and not changed by Map v2: a separate decision, because it also governs the Capacitor app.
-- **The flag-on layout shift came from the "map v2" badge**, which was added before `map-v2.css` had loaded and then jumped to its fixed corner. Fixed after this measurement: the badge is now added when the stylesheet loads.
+- **The flag-on layout shift came from the "map v2" badge**, which was added before `map-v2.css` had loaded and then jumped to its fixed corner. Fixed after this measurement, then the badge was removed altogether at the founder's request (2026-10-12).
 - **Flag-on blocking time is about 170 ms higher on the landing screen.** A CPU profile of 3 cold loads per flag (CPU x4) shows the same JavaScript time for both, so the extra is style work from the extra stylesheet and the `data-theme` attribute landing inside a script task. It affects flag-on testers only; look at it again before the flag defaults on (D14).
 - SEO 50 for both is the preview's `noindex`, not a production signal. LCP (5 s) is the same for both flags and is the app's existing landing cost.
 
@@ -75,7 +75,7 @@ The earlier milestone runs (M1, M2, M3, M4) were green too; the one red e2e step
 
 ## 6. Limits and findings (stated plainly)
 
-1. **Dark covers the map, pins, labels, sheet, gallery and the Map look menu.** The shared v1 chrome (search row, category pills, Map Key, bottom navigation, MapLibre buttons) stays light; making it dark means changing every screen and belongs with the design reference (RESUME C17). The v1 `EntityCard` body inside a Place or Event sheet sits on a light card in the dark look, because its text is dark.
+1. **Dark covers the map, pins, labels, sheet and gallery** (it follows the phone's setting since 2026-10-12; the Map look menu was removed). The shared v1 chrome (search row, category pills, Map Key, bottom navigation, MapLibre buttons) stays light; making it dark means changing every screen and belongs with the design reference (RESUME C17). The v1 `EntityCard` body inside a Place or Event sheet sits on a light card in the dark look, because its text is dark.
 2. **Part of the v1 map chrome is below 44 px**: the category pills (30.5 px high), their scroll arrows (28 px) and the search input row. Map v2 does not redesign them (Q5, scope); the sheet, pins, Map look button and the MapLibre locate and zoom buttons (raised from 29 px under the flag) meet M6. Listed as a follow-up.
 3. **Gallery weight:** stored images are uploaded as they are (median 319 KB). A client-side resize before upload would fix this with no schema change; it is outside Phase 1.
 4. **Logo thumbnails:** P1-04 asked for 96 x 96 thumbnails of at most 12 KB; no thumbnail pipeline exists, so logos load at their stored size, only at zoom 15 and above, inside the viewport plus 20 %, or when selected.
@@ -86,12 +86,14 @@ The earlier milestone runs (M1, M2, M3, M4) were green too; the one red e2e step
 
 ## 7. Needs a real phone (Stephen), the Back behaviour first
 
+**2026-10-12: the Back checks passed on Stephen's Android phone** (tap a pin, Back closes the sheet and stays on the map; the same after dragging the sheet between sizes). The rest of this list is still worth a pass before the flag defaults on.
+
 Android Chrome (mid-range) and iOS Safari. Playwright cannot reproduce Chrome's Back intervention, so everything about Back here is the emulated half.
 
 1. **Back, one press:** tap a pin, the sheet opens; press the phone's Back **once**: the sheet closes and you are still on the map. Press Back again: you leave the app as before (the arrival entry).
 2. **Back after dragging:** open the sheet, drag it between peek, half and full, then press Back **once**: it must close (not step down one state, not leave the app).
 3. **Back from a photo:** Gallery tab, tap a photo, press Back: the photo closes, the sheet stays; Back again: the sheet closes.
-4. **Back from the Map look menu:** open it, press Back: the menu closes and nothing else.
+4. ~~**Back from the Map look menu**~~: the menu was removed on 2026-10-12 (the look follows the phone).
 5. **View Full Profile** from the sheet: the profile opens, Back returns to the map with no sheet.
 6. **Drag feel:** the sheet follows the finger 1:1, a quick flick moves one state, the map does not pan when the drag starts on the sheet, scrolling at full does not move the map.
 7. **iOS:** the sheet clears the notch at full and the home indicator at peek; the edge-swipe back gesture closes it.
@@ -112,5 +114,5 @@ Scope first: the PR changes **no** API route, database object, migration, RLS po
 | Links and images from stored data | websites go through `safeUrl` (http and https only) and open with `noopener noreferrer`; Directions encodes the coordinates; Call keeps digits, `+` and requires 6 digits; Email is a `mailto:` link only for one plain address (no spaces, no `? & = , ;`, so no header injection); every image URL goes through `safeUrl` and the CSP's `img-src` still decides which hosts draw. |
 | The one new network call          | `GET /api/v1/contributors/<slug>` (the existing public route), slug `encodeURIComponent`-ed, response read defensively, cached per session, failure shown as a message with Try again; the v1 rate limit (120 per minute per slug) is far above one call per open.                                                                                                                  |
 | Secrets and personal data         | no key, token or user data in any new file, screenshot, log or data file: the MapTiler key is read from `.env.local` by the local scripts and never printed (a check that no new file contains it passed); fixtures are fictional (`.example` hosts). One thing found that is not new: the MapTiler key is written in an existing tracked document (RESUME item H11).               |
-| Back and history                  | the sheet, the photo viewer and the Map look menu each use `useBackGuard`; no `pushState` was added (`historyRule.test.ts` green), and document listeners taken during a drag are removed on release, cancel and unmount.                                                                                                                                                           |
+| Back and history                  | the sheet and the photo viewer each use `useBackGuard` (the Map look menu, removed 2026-10-12, did too); no `pushState` was added (`historyRule.test.ts` green), and document listeners taken during a drag are removed on release, cancel and unmount.                                                                                                                             |
 | Local tooling                     | CodeQL flagged two warnings in the new scripts (a stat-then-read race, a URL host check by substring); both fixed (`2c3e8ca`).                                                                                                                                                                                                                                                      |

@@ -32,25 +32,26 @@ const idle = (page: Page) =>
   );
 
 test.describe("P1-01 the ?map=v2 flag", () => {
-  test("flag off (the default): no Map v2 stylesheet, no badge, nothing set on the page", async ({ page }) => {
+  test("flag off (the default): no Map v2 stylesheet, nothing set on the page", async ({ page }) => {
     const requested: string[] = [];
     page.on("request", (r) => requested.push(r.url()));
     await mockMapNetwork(page);
     await openMap(page, "/", 8);
 
     expect(requested.filter((u) => u.includes("map-v2"))).toEqual([]);
-    await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
     expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(false);
   });
 
-  test("?map=v2 turns it on, shows the badge, loads the tokens and defaults to the LIGHT look", async ({ page }) => {
+  test("?map=v2 turns it on, loads the tokens and follows a light phone with the light look; no build badge", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
     await mockMapNetwork(page);
     const css = page.waitForResponse((r) => r.url().includes("/assets/map-v2.css") && r.ok());
     await openMap(page, "/?map=v2", 8);
     await css;
 
-    await expect(page.locator("#cc-map-v2-badge")).toHaveText("map v2");
+    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
+    await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe("light");
     // the token file is really applied: --accent resolves to gold
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#c9a84c");
@@ -67,17 +68,20 @@ test.describe("P1-01 the ?map=v2 flag", () => {
     expect(new URL(page.url()).search).toBe("");
     // ...and a plain reload still has the flag on, from storage.
     await page.reload();
-    await expect(page.locator("#cc-map-v2-badge")).toHaveText("map v2");
+    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).not.toBeNull();
   });
 
   test("?map=v1 turns it off and forgets it", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
-    await expect(page.locator("#cc-map-v2-badge")).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
 
     await page.goto("/?map=v1");
     await page.waitForSelector('[data-screen="discover"]');
-    await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
     expect(await page.evaluate(() => localStorage.getItem("cc_map_v2"))).toBeNull();
   });
 });

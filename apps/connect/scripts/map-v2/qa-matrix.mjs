@@ -36,7 +36,7 @@ for (const [vpName, [width, height]] of Object.entries(VIEWPORTS)) {
     const p = s.page;
     try {
       await openMap(p, '/?map=v2', { minMarkers: 8 });
-      if (theme === 'dark') await p.evaluate(() => window.MapV2.setTheme('dark'));
+      if (theme === 'dark') await p.emulateMedia({ colorScheme: 'dark' }); // the look follows the phone
       check(vpName, theme, 'data-theme matches the chosen look', (await p.evaluate(() => document.documentElement.getAttribute('data-theme'))) === theme);
       const c = seed.contributors[1];
       await jumpTo(p, { lng: c.physical_longitude, lat: c.physical_latitude, zoom: 16 });

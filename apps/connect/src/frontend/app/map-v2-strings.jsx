@@ -71,14 +71,5 @@
       dayShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       monthShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     },
-
-    // The map-look control (P1-12)
-    look: {
-      label: 'Map look',
-      auto: 'Match my phone',
-      light: 'Light',
-      dark: 'Dark',
-      menuLabel: 'Choose the map look',
-    },
   };
 })();

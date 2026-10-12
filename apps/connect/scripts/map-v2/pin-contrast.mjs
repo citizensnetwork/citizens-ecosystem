@@ -19,7 +19,7 @@ const out = { theme, dsf: DSF, results: {} };
 try {
   await openMap(s.page, '/?map=v2', { minMarkers: 8 });
   if (theme === 'dark') {
-    await s.page.evaluate(() => window.MapV2.setTheme('dark'));
+    await s.page.emulateMedia({ colorScheme: 'dark' }); // the look follows the phone
     // the dark base style swap is P1-12: until it lands this samples the dark TOKENS over whatever base is drawn
     await s.page.waitForTimeout(1500);
   }

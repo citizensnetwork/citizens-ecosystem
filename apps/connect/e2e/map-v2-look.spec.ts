@@ -2,7 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
-//  The map look (tracker P1-12): auto | light | dark, DEFAULT LIGHT.
+//  The map look (tracker P1-12; founder, D1 as revised 2026-10-12): it
+//  follows the phone's own light/dark setting, live, with no in-app control.
 //  The dark base style is MapTiler's own `dataviz-dark`; MapTiler is
 //  answered locally here, so the spec reads which style the map asked for.
 // ════════════════════════════════════════════════════════════════════
@@ -14,57 +15,36 @@ type Seed = MapSeed & { contributors: { id: string; physical_longitude: number; 
 async function openRecording(page: Page, path = "/?map=v2") {
   const seed = smallSeed(FIXED_NOW) as Seed;
   const styles: string[] = [];
-  page.on("request", (r) => { const m = /api\.maptiler\.com\/maps\/([^/]+)\/style\.json/.exec(r.url()); if (m) styles.push(m[1]); });
+  page.on("request", (r) => {
+    const m = /api\.maptiler\.com\/maps\/([^/]+)\/style\.json/.exec(r.url());
+    if (m) styles.push(m[1]);
+  });
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed);
   await openMap(page, path, 8);
   return { seed, styles };
 }
 const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-const lookBtn = (page: Page) => page.getByRole("button", { name: "Map look" });
 
-test.describe("P1-12 map look", () => {
-  test("a first-time visitor sees LIGHT whatever their phone is set to", async ({ page }) => {
-    await page.emulateMedia({ colorScheme: "dark" });
+test.describe("P1-12 the map look follows the phone", () => {
+  test("a phone set to light gets the light map", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
     const { styles } = await openRecording(page);
     expect(await theme(page)).toBe("light");
     expect(styles).toEqual(["streets-v2"]); // the e2e config's light style; never the dark one
-    expect(await page.evaluate(() => localStorage.getItem("cc_map_theme"))).toBeNull(); // nothing is stored until someone chooses
   });
 
-  test("the control offers Match my phone, Light and Dark; Light is the one ticked at first", async ({ page }) => {
-    await openRecording(page);
-    await lookBtn(page).click();
-    const items = page.getByRole("menuitemradio");
-    await expect(items).toHaveText(["Match my phone", "Light", "Dark"]);
-    await expect(page.getByRole("menuitemradio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("menuitemradio", { name: "Dark" })).toHaveAttribute("aria-checked", "false");
-  });
-
-  test("choosing Dark switches the tokens at once and the map to the dark style; it survives a reload", async ({ page }) => {
+  test("a phone set to dark gets the dark map from the first frame: one style request, no light flash", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
     const { styles } = await openRecording(page);
-    await lookBtn(page).click();
-    await page.getByRole("menuitemradio", { name: "Dark" }).click();
     expect(await theme(page)).toBe("dark");
-    await expect.poll(() => styles).toContain("dataviz-dark");
-    expect(await page.evaluate(() => localStorage.getItem("cc_map_theme"))).toBe("dark");
+    await expect.poll(() => styles).toEqual(["dataviz-dark"]);
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--surface-1").trim())).toBe("#1a1714");
-
-    // a reload keeps it: the map is built dark from the start (no light flash, no second style request)
-    const again: string[] = [];
-    page.on("request", (r) => { const m = /maps\/([^/]+)\/style\.json/.exec(r.url()); if (m) again.push(m[1]); });
-    await page.reload();
-    await page.waitForSelector('[data-screen="discover"]');
-    expect(await theme(page)).toBe("dark");
-    await expect.poll(() => again).toEqual(["dataviz-dark"]);
   });
 
-  test("Match my phone follows the system, live", async ({ page }) => {
+  test("switching the phone's setting while the map is open switches the map at once, both ways", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     const { styles } = await openRecording(page);
-    await lookBtn(page).click();
-    await page.getByRole("menuitemradio", { name: "Match my phone" }).click();
-    expect(await theme(page)).toBe("light");
     await page.emulateMedia({ colorScheme: "dark" });
     await expect.poll(() => theme(page)).toBe("dark");
     await expect.poll(() => styles).toContain("dataviz-dark");
@@ -72,40 +52,40 @@ test.describe("P1-12 map look", () => {
     await expect.poll(() => theme(page)).toBe("light");
   });
 
-  test("the menu is an overlay: Back closes it first (and stays on the map), Escape closes it and returns focus", async ({ page }) => {
+  test("there is no Map look button and no build badge on the map", async ({ page }) => {
     await openRecording(page);
-    await lookBtn(page).click();
-    await expect(page.getByRole("menu")).toBeVisible();
-    await page.goBack();
-    await expect(page.getByRole("menu")).toHaveCount(0);
-    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
-    expect(new URL(page.url()).pathname).toBe("/");
-
-    await lookBtn(page).click();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("look-btn");
+    await expect(page.getByRole("button", { name: "Map look" })).toHaveCount(0);
+    await expect(page.locator("[data-mv2^='look']")).toHaveCount(0);
+    await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0);
+    await expect(page.getByText("map v2", { exact: true })).toHaveCount(0);
   });
 
-  test("the menu works from the keyboard and every item is 44 px tall", async ({ page }) => {
+  test("a choice stored by the retired Map look control is cleared and never overrides the phone", async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("cc_map_theme", "dark");
+      } catch {
+        /* storage blocked */
+      }
+    });
+    await page.emulateMedia({ colorScheme: "light" });
     await openRecording(page);
-    await lookBtn(page).focus();
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("menuitemradio", { name: "Light" })).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("menuitemradio", { name: "Dark" })).toBeFocused();
-    const heights = await page.getByRole("menuitemradio").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
-    await page.keyboard.press("Enter");
-    expect(await theme(page)).toBe("dark");
+    expect(await theme(page)).toBe("light");
+    expect(await page.evaluate(() => localStorage.getItem("cc_map_theme"))).toBeNull();
   });
 
   test("in the dark look the sheet, pins and labels use the dark tokens, and logos stay on white", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
     const { seed } = await openRecording(page);
-    await lookBtn(page).click();
-    await page.getByRole("menuitemradio", { name: "Dark" }).click();
     const c = seed.contributors[0];
-    await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
+    await page.evaluate(
+      ([lo, la]) =>
+        (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo(
+          { center: [lo, la], zoom: 15.5 },
+          { originalEvent: {} },
+        ),
+      [c.physical_longitude, c.physical_latitude],
+    );
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`);
     await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
     await pin.click({ force: true });
@@ -117,11 +97,11 @@ test.describe("P1-12 map look", () => {
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");
   });
 
-  test("flag off: no Map look control", async ({ page }) => {
+  test("flag off: no look is applied, even on a dark phone", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await openMap(page, "/", 8);
-    await expect(lookBtn(page)).toHaveCount(0);
     expect(await theme(page)).toBeNull();
   });
 });
