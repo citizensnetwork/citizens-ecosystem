@@ -93,6 +93,12 @@
   [`../../docs/MAP_V2_RUNNER_PROMPT.md`](../../docs/MAP_V2_RUNNER_PROMPT.md) are the working files. **The founder chose a LIGHT map by default
   (the live look: MapTiler `streets-v2`) with a dark setting**, and accepted every recommendation: no founder decision blocks the first
   run. Decision block under item C19.
+- **Agent team (items T1 to T6): the Watcher is LIVE (2026-10-12).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
+  (05:00, 10:00, 15:00, 20:00 local). It checks the public API, the security advisor (baseline 0 ERROR / 121 WARN / 3 INFO), CI on `main` and the
+  open PRs, writes a report and any cards into a private **Decision Inbox** artifact, and emails the founder once a day. It never writes to the
+  database, GitHub or Vercel. Spec: [`docs/routines/daily-routine.md`](docs/routines/daily-routine.md). Team design, authority matrix, build order and
+  paste-ready prompts: [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). The inbox URL and the founder's email are not in the
+  repo (handoff section 9).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -329,6 +335,18 @@ design session first.
 - *Not measured:* everything (Phase 0 has not run). The gold contrast numbers are calculated from the hex values, not from rendered pixels.
 - *Next step:* open a session at the monorepo root, `git fetch`, and paste `docs/MAP_V2_RUNNER_PROMPT.md` (it starts with the decisions above; `STOP_AFTER = M1` for a cautious first run). The run creates `feat/map-v2` from the latest `origin/main` and begins with the Phase 0 audit. Nothing is waiting on the founder.
 
+### T. Agent team (the Watcher is live; the rest is to build)
+| ID | Item | Pri | Size |
+|---|---|---|---|
+| T1 | **Merge the agent-team docs PR** (`claude/agent-watcher`: the Watcher spec v3 and `docs/handoffs/AGENT_TEAM_HANDOFF.md`). The founder's call. | P1 | S |
+| T2 | **Close the 14 stale Dependabot PRs** (H1). The founder answered 'close' in the Decision Inbox on 2026-10-12; an explicit yes in chat comes first (an answer is intent, not authority). | P1 | S |
+| T3 | **Dispatcher and Reviewer** (handoff section 4, steps 3 and 4): turn answered cards into labelled issues, and review any agent PR with fresh context. | P2 | M |
+| T4 | **Builder**, first task `q-ci-schedule`: add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time. | P2 | M |
+| T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
+| T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
+
+Open founder cards in the Decision Inbox: `d-authority` (what an answer may authorise) and `d-team-first` (which role to build next).
+
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
 |---|---|---|---|
@@ -374,7 +392,7 @@ design session first.
 | H4 | Retire stale status docs that compete with this file: `apps/connect/.github/PROJECT_STATUS.md` (last updated 2026-07-01), `apps/connect/.github/workflows/ci.yml` (nested, so GitHub never runs it), root `.github/PROJECT_STATUS.md` (Wear, May 2026), and ECOSYSTEM_DECISION_BRIEF rows 0 ("in flight"; done since §3H) and 5 (monorepo; done). |
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is deployed but serves the pre-self-serve admin-review path. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
-| H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
+| H7 | `apps/connect/config/onboarding-presets.json` is still an untracked local draft (the daily routine, `docs/routines/daily-routine.md`, was adopted by the agent-team PR on 2026-10-12). Commit or delete the presets file before Phase 3 of the routine. |
 | H10 | **Check monthly for an upstream `braces` fix** (the patched fork `packages/braces-patched`, §3 Process). Run `npm view braces version` AND read GHSA-vfj7-8cjw-p6xm's affected ranges: a new version only counts if it is not listed as affected. When one ships, follow "Removing the fork" in the package's `PATCHED.md` (delete the `braces` override and the package, `pnpm install`, run the CI's OSV command). Until then the fork is the whole fix. A fix for `micromatch/braces` is drafted in the PR that introduced the fork; post it only with the founder's OK. |
 
 ---
@@ -384,7 +402,7 @@ design session first.
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
 | P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live. The live end-to-end test **passed on 2026-10-02** (a real listing, owner on Outlook mail, welcome email, 6-digit sign-in on 2026-10-03). Existing-email approvals still refuse with a clear Note until C10. | C10, C16 |
-| P2 | **Connect Daily Routine** (drafted 2026-09-21; a design-consistency step could join it, C17) | Draft v1 of a daily "check, discover, suggest" routine that reports to a Drive folder, plus onboarding presets. Never committed, never scheduled; the presets are "not wired into the wizard". | Adopt (commit + schedule) or discard. H7 |
+| P2 | **Connect Daily Routine** (the Watcher; a design-consistency step could join it, C17) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets are still not wired into the wizard. | T1 to T6, H7 |
 | P4 | Wear CSP | Flagged in §3AT. The brief was only in local `%TEMP%`; now rescued to `docs/handoffs/WEAR_CSP_HANDOFF.md`. | S1 |
 | P5 | Vision Timeline Map | Placeholder since 2026-07-02; unblocked since 2026-07-18; never started. | V1 |
 | P6 | Vision network graph + Phase D | Scoped only. | V2, V3 |
@@ -407,6 +425,15 @@ design session first.
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-12 — Agent team kick-off: the Watcher and the Decision Inbox (docs only, branch `claude/agent-watcher`).** The founder asked for agents that help
+  build the Citizens network. Built and running: a **Decision Inbox** (a private artifact: cards with a recommendation and one-tap answers, a Queue with a
+  one-agent-PR limit, daily Reports with a runs timeline) and the **Watcher** (a local scheduled task, four runs a day, read-only, one email a day to the
+  founder). The first run succeeded and the email was confirmed. **Found:** CI runs on push only, so a red `main` from a new advisory goes unseen (the founder
+  approved a scheduled run as the Builder's first task, T4); the advisor result is about 59 KB (count it by script); the first run stamped its cards 45
+  minutes ahead (timestamps now come from the clock only); PRs #90 and #91 have been untouched since 4 Oct. **The founder answered:** the phone Back check on
+  PR #96 passed; close the 14 Dependabot PRs (not done: needs a yes in chat, T2); run CI every morning (yes). **Not done:** the Dispatcher, Reviewer, Builder
+  and Reader; the inbox page was never checked on a phone; nothing merged. Handoff with the team design and paste-ready prompts:
+  [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). No app code, migration or database change.
 - **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
   dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
   recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back

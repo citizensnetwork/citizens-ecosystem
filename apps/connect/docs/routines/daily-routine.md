@@ -1,6 +1,6 @@
 # Connect Daily Routine (the Watcher): instructions
 
-> **Status:** v2, 2026-10-12. Phase 1 (Step A only) is set up as a **local scheduled task** at 05:00 Africa/Johannesburg. Phases 2 to 5 are not enabled.
+> **Status:** v3, 2026-10-12. Phase 1 (Step A only) runs as a **local scheduled task four times a day** (05:00, 10:00, 15:00, 20:00 Africa/Johannesburg). Phases 2 to 5 are not enabled. The Watcher is one role of a planned agent team: see [`../handoffs/AGENT_TEAM_HANDOFF.md`](../handoffs/AGENT_TEAM_HANDOFF.md).
 > **Reads:** `apps/connect/VISION.md`, `apps/connect/RESUME_HERE.md`, and for later phases `apps/connect/config/onboarding-presets.json`, `apps/connect/CATEGORIES.md`, `apps/connect/V1_SCOPE.md`, `apps/connect/docs/FUTURE_IDEAS.md`.
 > **Writes:** the daily report, any new cards and the queue state into the **Decision Inbox** (a private artifact whose URL lives in the scheduled task, not in this repo), and one email a day to the founder's own address (also set in the task, not in this repo). Nothing else.
 > **Superseded:** v1 wrote reports to a Google Drive folder that was shared as "anyone with the link can edit". That channel is gone; do not recreate it.
@@ -41,6 +41,8 @@ Vision alignment (VISION.md, "Connecting the Kingdom"): every card states which 
 ## 3. Daily steps
 
 Run in this order. If a step fails, record the failure in the report and continue. Never retry a failed step more than once. Finish within about 10 minutes.
+
+**Two run types.** The **first run of each local day** (whichever it is; if the 05:00 run was missed because the app was closed, the next one is first) is a **full** run: every step, one idea card at most, the email. Every later run that day is a **check-in**: only the API, CI, pull-request/queue and answers checks, no advisor (it changes only when the schema does), no idea or direction card, no email. All timestamps come from the clock (`date -u`), never from an estimate: the first run stamped its cards about 45 minutes in the future. A single slow response is a `warn`, not a card; a card needs three slow runs in a row, or a second failed attempt at once.
 
 ### Step A: Health check (read-only). **Enabled.**
 
@@ -91,15 +93,15 @@ One private artifact with three collections:
 
 | Collection | Document id | Fields |
 |---|---|---|
-| `reports` | `YYYY-MM-DD` | `date`, `status` (`ok`/`warn`/`fail`), `summary`, `checks[]` (`name`, `status`, `detail`), `runLog`, `emailed` |
+| `reports` | `YYYY-MM-DD` | `date`, `status` (the latest run's), `summary`, `checks[]` (`name`, `status`, `detail`), `runs[]` (`at`, `kind` full/checkin, `role`, `status`, `note`; arrays are replaced wholesale, so read, append, write), `runLog`, `emailed` |
 | `inbox` | `w-<topic>` (stable, so a topic is not re-filed) | `kind` (`decision`/`idea`/`action`/`direction`/`alert`), `priority` (1 urgent, 2 soon, 3 when you can), `status` (`open`/`answered`/`snoozed`), `source`, `createdAt`, `title`, `summary`, `why` (Vision link), `size`, `risk`, `evidence`, `links[]` (https only), `options[]` (`key`, `label`), `recommendation` (an option key), `answer` (`choice`, `note`, `at`), `snoozeUntil` |
 | `queue` | `q-<topic>` | `title`, `state`, `ref`, `url`, `by` (`agent` or `session`), `updatedAt`, `note` |
 
 - **Writes:** a new document needs no version; changing an existing one needs its current `version` (`if_version`). Fields the founder writes (`status`, `answer`, `snoozeUntil`) are changed by the routine only to close a card whose condition has cleared.
 - **Caps:** at most 3 new cards per day in total; priority 1 only for something that is broken now or blocks the founder's work.
 - **Dedupe:** never re-file a card id that exists. If it was answered, re-raise only after 14 days and only if the condition is still true.
-- **Email (once a day):** subject `Citizens daily: <n> need you, health <OK|look at|FAILED>`; body is plain text with the one-line health summary, up to 3 headlines from open cards (urgent first) and the link. A re-run on the same day updates the report but does not email again (`emailed` is set).
-- **Push ping (best effort):** only when a priority 1 card is open or health is `fail`.
+- **Email (once a day, full run only):** subject `Citizens daily: <n> need you[, <k> urgent], health <OK|look at|FAILED>`; body is plain text with the one-line health summary, up to 3 headlines from open cards (urgent first) and the link. Later runs the same day never email (`emailed` is set).
+- **Push ping (best effort, any run):** only on a state change since the previous run: a new priority 1 card, or health moving to `fail`.
 
 ---
 
@@ -111,6 +113,7 @@ Work that takes more than a day must not pile up. Rules (enforced from Phase 4; 
 - Approved work becomes a GitHub issue labelled `agent:ready`, so item ids and migration numbers are claimed in one place and parallel sessions stop double-claiming them.
 - A task that spans days resumes from its offload file and pull request. The daily report shows its status; it does not start something new.
 - The routine keeps the `queue` collection in step with GitHub (open pull requests become rows; merged or closed ones move to `done`). Dependabot pull requests are not queued.
+- The queue is one part of the agent team's coordination protocol (roles, labels, authority matrix, build order): see [`../handoffs/AGENT_TEAM_HANDOFF.md`](../handoffs/AGENT_TEAM_HANDOFF.md).
 
 ---
 
