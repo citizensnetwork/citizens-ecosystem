@@ -103,12 +103,15 @@
   (Phase 2, starting with P2-07, P2-08, P2-06; R6, deleting the old map's code, waits for a release or two without opt-outs).
   Tracker [`../../docs/MAP_UX_TRACKER.md`](../../docs/MAP_UX_TRACKER.md) (section 8A); QA
   [`../../docs/audit/phase1-qa.md`](../../docs/audit/phase1-qa.md); audit [`../../docs/audit/`](../../docs/audit/).
-- **Agent team (items T3 to T6; T1, merging its docs PR, was done 2026-10-13): the Watcher is LIVE (2026-10-12).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
+- **Agent team (items T3 to T6): the Watcher is LIVE (2026-10-12) and the Dispatcher is LIVE (2026-10-13).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
   (05:00, 10:00, 15:00, 20:00 local). It checks the public API, the security advisor (baseline 0 ERROR / 121 WARN / 3 INFO), CI on `main` and the
   open PRs, writes a report and any cards into a private **Decision Inbox** artifact, and emails the founder once a day. It never writes to the
   database, GitHub or Vercel. Spec: [`docs/routines/daily-routine.md`](docs/routines/daily-routine.md). Team design, authority matrix, build order and
   paste-ready prompts: [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). The inbox URL and the founder's email are not in the
-  repo (handoff section 9).
+  repo (handoff section 9). **The Dispatcher** (`citizens-dispatcher`, 07:30 and 17:30 local) routes the founder's newly answered inbox cards: an approved
+  idea becomes a public GitHub issue labelled `agent:ready` plus a queue row (the first is issue #102, the CI-every-morning idea); an answer that asks for
+  nothing is recorded; anything that needs the founder in chat becomes one action card. It only ever creates issues. Spec:
+  [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -354,15 +357,15 @@ design session first.
 - *Next step:* start a new session with the prompt in `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md` section 5: Phase 1.5 (R1 MapTiler logo with the founder's screenshot sign-off, R2 the flag on for everyone = new decision MAP:D15, R3 quota watch, R4 the flag-on landing blocking time, R5 close D14), then Phase 2 (P2-07, P2-08, P2-06 first; P2-01 needs D2; the G1 items need migrations and the founder's yes).
 - *Facts to keep:* production runs a custom MapTiler Dataviz-based style (not `streets-v2`); `dataviz-dark` loads with the existing key (+12 tile requests for a person who switches); live data has 0 upcoming events, 0 of 40 places with opening hours and a median stored image of 319 KB; headless Chromium needs GPU flags for frame times (software GL is about 10x slower); a marker's inner nodes must not carry `class` attributes (the Tailwind CDN observer cost 31 ms p95 per pan frame on 150 pins); measurement tools are in `apps/connect/scripts/map-v2/`. Lighthouse (2026-10-10, preview, landing screen only because guest mode is in `sessionStorage`): accessibility 92 with the flag on or off (the app-wide `maximum-scale` in the viewport meta blocks pinch zoom), flag-on blocking time about +170 ms (style work, JavaScript equal), `docs/audit/phase1-qa.md` section 4.
 
-### T. Agent team (the Watcher is live; the rest is to build)
+### T. Agent team (the Watcher and the Dispatcher are live; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T3 | **Dispatcher and Reviewer** (handoff section 4, steps 3 and 4): turn answered cards into labelled issues, and review any agent PR with fresh context. | P2 | M |
+| T3 | **Reviewer** (handoff section 4, step 4): review any agent PR with fresh context (the Dispatcher, step 3, is built). Test it on the Dispatcher's own docs PR and one real draft PR. | P2 | M |
 | T4 | **Builder**, first task `q-ci-schedule`: add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
-Open founder cards in the Decision Inbox: `d-authority` (what an answer may authorise) and `d-team-first` (which role to build next).
+Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete ruleset, the API cold-start idea, and the Dispatcher's two action cards (the Dependabot one is wrong and should be dropped; the MapTiler one is real: only the founder can change that plan).
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -465,6 +468,15 @@ Open founder cards in the Decision Inbox: `d-authority` (what an answer may auth
   notification is not the end of the run (wait on the log's exit marker); `sed -i` on a file the editor has read invalidates its read state;
   `prettier --check` covers the tracker's hand-written tables (run `--write` on them). **Left:** A12 / R3 (founder), R6 (delete the old map's
   code, deferred), Phase 2 (`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`), and an optional quick Back check on the live site.
+- **2026-10-13 — The Dispatcher built and run once; the 14 Dependabot PRs closed; PR #98 unblocked (docs only, branch `claude/dispatcher-role`).** The founder's
+  scheduled "resume" run had finished unseen, so the state was re-checked live and the founder confirmed three things in chat. (1) Close the 14 Dependabot PRs:
+  done with a comment; Dependabot also removed its 14 branches, and a closed PR is replaced only when a newer version appears, it is not reopened. (2) Resolve
+  #98's conflict (`RESUME_HERE.md` only): `main` merged in and pushed; #98 was then merged by a parallel branch-review session with the founder's yes. (3) Build the Dispatcher: spec `docs/routines/dispatcher.md`,
+  four `agent:*` labels created on GitHub, task `citizens-dispatcher` (07:30 and 17:30 local). **First supervised run:** issue #102 created for the approved CI
+  idea, 4 answers recorded, 2 action cards filed, nothing else touched. **Found:** one misroute (it said 13 Dependabot PRs were open when all were closed: it
+  trusted the Watcher's stale count; the Watcher was also 1 low, 13 vs 14). The prompt now demands a live check; the original card was corrected by hand and the
+  wrong action card is left for the founder to drop. **Not done:** the Reviewer (T3), Builder (T4), Reader (T5); the inbox page was never checked on a phone or
+  for the new `dispatch` run kind; the Watcher still reports already-actioned answers as unactioned (propose-only follow-up, spec section 9). No app code, migration or database change.
 - **2026-10-13 — Branch and PR review (docs only).** Re-verified all 19 remote branches against GitHub, then asked the founder one group at a time.
   **Done with the founder's yes in chat:** deleted the 3 squash-merged map branches (#60, #61, #62; tips recorded in H2); archived and deleted
   `chore/phase-4-local-rewrite` (tag in H2); merged the agent-team docs PR #98 (T1, removed) once all its checks were green and its head was unchanged;
@@ -530,58 +542,6 @@ Open founder cards in the Decision Inbox: `d-authority` (what an answer may auth
   **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
   contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
   later merges `main` in first.
-- **2026-10-10 — Sign-off and a stale mail key (docs only).** The founder finished the whole C15 (#89) live-check list and reported
-  everything solid and working (Android Back on a real phone, cancel/restore, private window, deep-link sign-in, Share, the Supabase
-  redirect list); A2 is trimmed to what is left. The founder also found `RESEND_API_KEY` in Vercel **stale** and re-entered it: it reaches
-  code only in a new deployment (last Connect production deploy before this was `30507e9`, 2026-10-04), and no real email has been seen
-  sending yet (§2). **Found while checking:** (1) a repo ruleset, "Allow Claude", blocks deleting any branch (H2), so the merged C16 branch
-  stays on the remote; (2) the `gh` CLI login on this PC had expired (`gh auth login -h github.com` fixes it; the GitHub MCP connector
-  worked meanwhile); (3) the keys for `automation:suggest` / `automation:digest` have no consumer until Phase 2, so minting them early
-  gains nothing; (4) **CI's OSV-Scanner step went red on `main` with no code change** (nine advisories published 2026-09-18..10-07:
-  Next 15.5.26 / 16.3.6, `@capacitor/android` and `ios` 8.4.1 (critical), `sharp` 0.35.4, `source-map-js` 1.2.1) and blocked this very
-  docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
-  1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
-  The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
-- **2026-10-04 — C16: Listing Automation Phase 1 (PR #92), migration 181 applied, merged, DORMANT.** The founder first said "read the brief
-  and plan, apply nothing", so the PR was code, SQL and tests; once it was ready the founder said yes, in chat, to the apply, to merging after a
-  green CI, and to Auto-fix. **Applied:** pre-apply tag `connect-pre-mig181-listing-automation` pushed, a read-only check that every
-  column and function the function bodies name exists (plpgsql is not checked at `CREATE`), `apply_migration` (`20261004103205`), then a
-  30-check rollback-only probe (consent guard, private columns, RLS for owner / other user / anon, https-only and Meta/TikTok rules,
-  dedupe, all three RPCs, instant withdrawal, role-loss reset): no FAIL, nothing left behind. Advisors: +3 WARN (the three functions),
-  0 ERROR, nothing else changed (§2). **What exists:** `181_listing_automation_phase1.sql`
-  (four private consent columns on `profiles` behind their own guard trigger, `events.source_url`, `listing_sources`, `listing_suggestions`,
-  RLS on both, a reset when someone stops being a Contributor, and three SECDEF RPCs: `get_my_automation_settings`,
-  `set_my_automation_level`, `decide_listing_suggestion`); `src/lib/automation/` (the one validator, `validateSuggestion`; source rows);
-  `POST /api/automation/suggestions` (scope `automation:suggest`: eligibility, consent, source, validation, 100/hour cap, dedupe by
-  fingerprint, auto-publish of a future event only at `events_auto`) and `POST /api/automation/digest` (scope `automation:digest`: the
-  once-a-day "new suggestions" email); the Form intake route records the consent last and fails closed; the dashboard gets an
-  Automatic updates card (Profile tab) and a Suggestions tab; Admin → Listings shows each level and pending count. **Rules in §3.**
-  **Deviations from the brief** (decided on evidence, listed in C16): no images in Phase 1 (CSP), owner actions on the owner's own
-  session instead of new `/api` routes, the digest is a Next route on #88's mailer (the brief said `send-contributor-digest` emails; it
-  only writes an in-app notification), no new notification type, "Edit & publish" inline. **Checks:** Connect 1237 unit (36 live-only
-  skipped), Playwright e2e (incl. 19 new listing-automation tests; see §2), lint, typecheck, build, format; 40 mutations of the
-  validator, routes, digest and card code, 39 caught, the one survivor was dead code and was removed. **Gotchas:** (1) `git add -A`
-  swept ten untracked local files into a wip commit; caught before any push and removed from the history (stage explicit paths,
-  §3). (2) A Next route file may export only handlers and config: a stray `export const SUGGEST_SCOPE` failed the build. (3) A Facebook,
-  Instagram or TikTok source is stored but must never be enabled. (4) The advisor baseline was 118 WARN live, not the 119 this file
-  said. **Still to do (founder):** mint the two `automation:*` keys (only needed once Phase 2 or a manual test post exists), then the
-  optional one-off backfill (never committed); `RESEND_API_KEY` was done on 2026-10-10 (see above). **Not started:** Phase 2, the scheduled reader.
-- **2026-10-04 — C15: a real URL for every screen (PR #89).** C1/C1b (#84) and H9 (#85) merged the day before. Every screen has
-  its own address (`/`, `/discover`, `/e/<id>`, `/p/<id>`, `/c/<slug>`, `/me`, `/dashboard/<tab>`, `/admin/<tab>`...), so a refresh
-  keeps you where you are and a link can be shared. The table is `app/routes.jsx`; the server rewrites an explicit list (never a
-  catch-all) and `index.html` has `<base href="/">`; the Google redirect is the site root with the screen carried in `cc_return_to`;
-  tabs replace history; Share copies the real link; a deep-linked listing shows a loading state, not "not found". **Android Back:** my
-  first draft pushed history entries on page load, which Chrome skips (the founder's "Back leaves Connect"), so entries are now
-  pushed only inside a tap or key press (rule in §3), the map goes under a shared listing at the visitor's first tap, and a static
-  test plus a `navigator.userActivation` recorder enforce it. **The founder's phone check passed (2026-10-10, A2).** Tests: routes 72, rewrites 5,
-  rule 3, routing e2e (new), Connect 1102 unit, e2e 108/108; 18 mutations of the routing/Back code, all caught. Also fixed: three
-  load-induced test timeouts (the lineage tests read the migrations once; frontend-build gets an explicit 30 s), a CodeQL
-  regex-escaping flag in a test helper, and a dozen dead bindings in the frontend files (ESLint ignores `src/frontend`). **Merged
-  with #88 (D-12) mid-flight:** the route gate now lets a pending applicant keep their Dashboard (the being-reviewed page). **To confirm:** `/discover` for Kingdom Exploration (the tab says "Exploration"; `/explore` is a
-  one-line change in `routes.jsx`, `next.config.ts` and the tests). **Gotchas:** a mutation harness stopped with `taskkill /F` left a
-  mutated tree (stash originals, hash the tree before and after); a sibling session's `next build` makes e2e 3-5x slower. **Open:**
-  nothing: the founder's live checks all passed on 2026-10-10 (see the entry above).
-- **2026-10-04 — Contributor approval gate (D-12) and owner welcome email (D-13): #86, #88, #90.** A re-applied Contributor stayed `contributor_hidden` (approve now resets it, mig 179; the live admin Approve RPC had also been broken since mig 164: it inserted into a `notifications.url` column that does not exist). Self-serve "Become a Contributor" now **waits for an admin**: mig 180 closes four self-approval doors (RPC dropped, `protect_role_column` tightened, `contributor_applications` made server-written only), the applicant lands on a "being reviewed" Dashboard (new `pending-application.jsx`; profile edits staged on their application, copied on approval), Admin → Applications approves/rejects through the RPCs directly (shows "Previously removed by an admin on…", waits for the server) and the admin/applicant are emailed (`src/lib/email`, Resend, fail-soft, admin-notice cap 20/h). #90: admin Create emails the owner a welcome (checkbox, default on; the stale "sign in with Google" copy is fixed). Founder decision: pending applicants get **profile only**, drafts are **C18**. Found, not fixed: **S12**. Gates: Connect 1035 unit, e2e 57/57. Open: **A11** (Resend env vars + live checks), **C18**, **S12**, **H5**. Mig 180 was applied right after #88's deploy (probe green in production; advisors 0 ERROR / 118 WARN / 3 INFO). **Update 2026-10-12 (PR #90 brought up to date with `main`):** C15, C16, Map v2 and C20 had landed since, so `admin.jsx`'s cache-bust in `index.html` moved to `?v=20261012a`, the project row is **P22** (P20 and P21 were taken) and this entry sits in date order. A read of the Connect project's env var names that day showed no `RESEND_API_KEY` or `ADMIN_NOTIFY_EMAIL` (see §2), so the welcome stays `skipped` until A11 step 1 is confirmed. The review also made the welcome say "on the map" only when the listing has a pin (required `onMap` input; tests at both layers); the same claim elsewhere is tracked as **C21**.
 
 ---
 
