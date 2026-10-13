@@ -173,13 +173,13 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
 
-    // ── Click the pin → the same small preview card every pin opens (it used
-    //     to jump straight to the full page), and its "View Full Profile"
-    //     button is the way in to the Contributor's profile ──
+    // ── Click the pin → the bottom sheet every pin opens (Map v2, the default
+    //     since D15; it used to jump straight to the full page), and its
+    //     "View Full Profile" button is the way in to the Contributor's profile ──
     await marker.click();
-    const preview = page.locator('[data-entity-card="contributor"]');
+    const preview = page.locator("[data-mv2='sheet']");
     await expect(preview).toBeVisible({ timeout: 10_000 });
-    await expect(preview.getByText(ORG_NAME)).toBeVisible();
+    await expect(preview.getByText(ORG_NAME).first()).toBeVisible();
     await preview.getByRole("button", { name: "View Full Profile" }).click();
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(ORG_NAME).first()).toBeVisible();

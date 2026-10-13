@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { useOldMap } from "./support/app-hooks";
 import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
@@ -98,6 +99,7 @@ test.describe("P1-12 the map look follows the phone", () => {
   });
 
   test("flag off: no look is applied, even on a dark phone", async ({ page }) => {
+    await useOldMap(page);
     await page.emulateMedia({ colorScheme: "dark" });
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);

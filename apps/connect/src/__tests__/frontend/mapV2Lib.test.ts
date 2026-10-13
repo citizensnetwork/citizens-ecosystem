@@ -54,42 +54,80 @@ function boot(opts: { search?: string; storage?: ReturnType<typeof memoryStorage
   return { win, storage, api: win.MapV2 as MapV2, isMapV2: win.isMapV2 as () => boolean };
 }
 
-describe("the ?map=v2 flag", () => {
-  it("is OFF by default", () => {
-    expect(boot().isMapV2()).toBe(false);
-  });
+/**
+ * The same source with DEFAULT_ON flipped to false: what "roll everyone back" means. The replace is
+ * asserted, so this fails (rather than silently testing the default) if the constant is renamed.
+ */
+function bootRolledBack(opts: { search?: string; storage?: ReturnType<typeof memoryStorage> } = {}) {
+  const src = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
+  const off = src.replace("const DEFAULT_ON = true;", "const DEFAULT_ON = false;");
+  expect(off).not.toBe(src);
+  const storage = opts.storage ?? memoryStorage();
+  const win: Record<string, unknown> = {
+    location: { search: opts.search ?? "" },
+    matchMedia: () => ({ matches: false }),
+    dispatchEvent: () => true,
+    localStorage: storage,
+  };
+  new Function("window", "React", "document", off)(win, {}, undefined);
+  return { storage, isMapV2: win.isMapV2 as () => boolean };
+}
 
-  it("?map=v2 turns it on and remembers it under cc_map_v2", () => {
-    const b = boot({ search: "?map=v2" });
+describe("the Map v2 flag (default ON since D15, 2026-10-13)", () => {
+  it("is ON by default, with nothing stored", () => {
+    const b = boot();
     expect(b.isMapV2()).toBe(true);
-    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({ cc_map_v2: "v2" });
+    // a visitor who never chose anything must not get a key written for them
+    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({});
   });
 
-  it("survives a reload whose address no longer carries the query (the router rewrites it)", () => {
-    const storage = memoryStorage({ cc_map_v2: "v2" });
-    expect(boot({ search: "", storage }).isMapV2()).toBe(true);
-  });
-
-  it("?map=v1 clears it again", () => {
-    const storage = memoryStorage({ cc_map_v2: "v2" });
-    const b = boot({ search: "?map=v1", storage });
+  it("?map=v1 turns it off and remembers that choice under cc_map_v2", () => {
+    const b = boot({ search: "?map=v1" });
     expect(b.isMapV2()).toBe(false);
+    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({ cc_map_v2: "v1" });
+  });
+
+  it("the opt-out survives a reload whose address no longer carries the query (the router rewrites it)", () => {
+    const storage = memoryStorage({ cc_map_v2: "v1" });
+    expect(boot({ search: "", storage }).isMapV2()).toBe(false);
+  });
+
+  it("?map=v2 turns it back on and forgets the opt-out (back to the default)", () => {
+    const storage = memoryStorage({ cc_map_v2: "v1" });
+    const b = boot({ search: "?map=v2", storage });
+    expect(b.isMapV2()).toBe(true);
     expect(storage.dump()).toEqual({});
   });
 
-  it("ignores any other value (only the exact 'v2' stored turns it on)", () => {
-    expect(boot({ search: "?map=true" }).isMapV2()).toBe(false);
-    expect(boot({ storage: memoryStorage({ cc_map_v2: "1" }) }).isMapV2()).toBe(false);
+  it("a device that stored 'v2' while Map v2 was behind the flag stays on, and ?map=v2 tidies the key", () => {
+    expect(boot({ storage: memoryStorage({ cc_map_v2: "v2" }) }).isMapV2()).toBe(true);
+    const storage = memoryStorage({ cc_map_v2: "v2" });
+    expect(boot({ search: "?map=v2", storage }).isMapV2()).toBe(true);
+    expect(storage.dump()).toEqual({});
   });
 
-  it("with storage blocked, ?map=v2 still works for this page and nothing throws", () => {
+  it("ignores any other value (only the exact 'v1' stored, or ?map=v1, turns it off)", () => {
+    expect(boot({ search: "?map=false" }).isMapV2()).toBe(true);
+    expect(boot({ search: "?map=0" }).isMapV2()).toBe(true);
+    expect(boot({ storage: memoryStorage({ cc_map_v2: "0" }) }).isMapV2()).toBe(true);
+    expect(boot({ storage: memoryStorage({ cc_map_v2: "off" }) }).isMapV2()).toBe(true);
+  });
+
+  it("with storage blocked: on by default, and ?map=v1 still works for this page and nothing throws", () => {
+    expect(boot({ storage: "blocked" }).isMapV2()).toBe(true);
+    expect(boot({ search: "?map=v1", storage: "blocked" }).isMapV2()).toBe(false);
     expect(boot({ search: "?map=v2", storage: "blocked" }).isMapV2()).toBe(true);
-    expect(boot({ storage: "blocked" }).isMapV2()).toBe(false);
   });
 
-  it("does not write anything while off", () => {
-    const b = boot();
-    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({});
+  it("DEFAULT_ON = false is the one-line rollback: off for everyone, a device's stored choice still wins", () => {
+    expect(bootRolledBack().isMapV2()).toBe(false);
+    expect(bootRolledBack({ search: "?map=v2" }).isMapV2()).toBe(true);
+    expect(bootRolledBack({ search: "?map=v2" }).storage.dump()).toEqual({ cc_map_v2: "v2" });
+    expect(bootRolledBack({ storage: memoryStorage({ cc_map_v2: "v2" }) }).isMapV2()).toBe(true);
+    // the opt-out key is not needed when off is the default
+    const s = memoryStorage({ cc_map_v2: "v1" });
+    expect(bootRolledBack({ search: "?map=v1", storage: s }).isMapV2()).toBe(false);
+    expect(s.dump()).toEqual({});
   });
 });
 

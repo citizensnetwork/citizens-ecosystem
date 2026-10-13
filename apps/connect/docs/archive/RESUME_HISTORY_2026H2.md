@@ -4006,3 +4006,15 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
   contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
   later merges `main` in first.
+
+## Moved from RESUME_HERE §6 on 2026-10-13, third batch (the oldest session entry)
+
+- **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
+  dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
+  recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back
+  closes the sheet at once, D8 category glyph below about zoom 15 and the logo above it, D9 one sheet for all three pin types, D10 a
+  shared link keeps opening the full profile (D2 and D7 defaults stand). All of it is in tracker §10, §13.1 and its Decision Log, in the
+  runner prompt (a "decided" block at the top, so a fresh session starts with it) and in the C19 block. Also: PR #93 had already
+  merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
+  fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
+  may return if the tile provider has no dark style).

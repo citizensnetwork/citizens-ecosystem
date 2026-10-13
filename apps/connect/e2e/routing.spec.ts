@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { useOldMap } from "./support/app-hooks";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -398,6 +399,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("a card and a screen opened by real taps push inside the tap, one entry per screen", async ({ page }) => {
+    await useOldMap(page);
     await recordPushes(page);
     await openDemo(page);
     await page.goto("/manifest.json");
@@ -445,6 +447,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("closing a card with its own button leaves no extra entry behind", async ({ page }) => {
+    await useOldMap(page);
     await recordPushes(page);
     await openDemo(page);
     await page.goto("/manifest.json");
@@ -487,6 +490,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("opening and closing a card twice never stacks entries or traps Back", async ({ page }) => {
+    await useOldMap(page);
     await openDemo(page);
     await page.goto("/manifest.json");
     await page.goto("/");
@@ -514,6 +518,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("two overlays closed out of order leave nothing for Back to stall on", async ({ page }) => {
+    await useOldMap(page);
     await openDemo(page);
     await page.goto("/manifest.json");
     await page.goto("/");

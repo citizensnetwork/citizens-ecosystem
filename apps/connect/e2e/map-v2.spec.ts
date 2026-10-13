@@ -1,9 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockMapNetwork, openMap, smallSeed, FIXED_NOW } from "./support/map-v2";
-import { goTo } from "./support/app-hooks";
+import { goTo, useOldMap } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
-//  Map v2 (tracker docs/MAP_UX_TRACKER.md), everything behind `?map=v2`.
+//  Map v2 (tracker docs/MAP_UX_TRACKER.md). On by default since D15 (2026-10-13);
+//  `?map=v1` opts a device out. Most specs still pass `?map=v2`: it is the same as the default.
 //  Hermetic: the same fake network as the other map specs (no real Supabase
 //  or MapTiler), clock frozen. This file grows with each Phase 1 item; the
 //  describe blocks are named after the item they guard.
@@ -31,58 +32,79 @@ const idle = (page: Page) =>
       }),
   );
 
-test.describe("P1-01 the ?map=v2 flag", () => {
-  test("flag off (the default): no Map v2 stylesheet, nothing set on the page", async ({ page }) => {
-    const requested: string[] = [];
-    page.on("request", (r) => requested.push(r.url()));
-    await mockMapNetwork(page);
-    await openMap(page, "/", 8);
+const isOn = (page: Page) => page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2());
+const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+const stored = (page: Page) => page.evaluate(() => localStorage.getItem("cc_map_v2"));
 
-    expect(requested.filter((u) => u.includes("map-v2"))).toEqual([]);
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
-    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(false);
-  });
-
-  test("?map=v2 turns it on, loads the tokens and follows a light phone with the light look; no build badge", async ({ page }) => {
+// Map v2 is the default since D15 (2026-10-13); `?map=v1` is the escape hatch, remembered per device.
+test.describe("P1-01 the Map v2 flag (on by default; ?map=v1 opts a device out)", () => {
+  test("a first visit gets Map v2: tokens loaded, light look on a light phone, nothing written to storage", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await mockMapNetwork(page);
     const css = page.waitForResponse((r) => r.url().includes("/assets/map-v2.css") && r.ok());
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/", 8);
     await css;
 
-    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
+    expect(await isOn(page)).toBe(true);
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe("light");
+    expect(await theme(page)).toBe("light");
     // the token file is really applied: --accent resolves to gold
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#c9a84c");
-    expect(await page.evaluate(() => localStorage.getItem("cc_map_v2"))).toBe("v2");
+    // a visitor who never chose gets no key written for them
+    expect(await stored(page)).toBeNull();
   });
 
-  test("the flag survives a reload and a screen change that rewrites the address bar", async ({ page }) => {
+  test("?map=v2 is the same as the default and stores nothing", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
+    expect(await isOn(page)).toBe(true);
+    expect(await stored(page)).toBeNull();
+  });
 
-    // go() rebuilds the URL from the route table, so ?map=v2 is gone from the address bar...
+  test("?map=v1 opts a device out: the old map, no Map v2 stylesheet, nothing set on the page, remembered as v1", async ({ page }) => {
+    const requested: string[] = [];
+    page.on("request", (r) => requested.push(r.url()));
+    await mockMapNetwork(page);
+    await openMap(page, "/?map=v1", 8);
+
+    expect(requested.filter((u) => u.includes("map-v2"))).toEqual([]);
+    expect(await theme(page)).toBeNull();
+    expect(await isOn(page)).toBe(false);
+    expect(await stored(page)).toBe("v1");
+  });
+
+  test("the opt-out survives a reload and a screen change that rewrites the address bar", async ({ page }) => {
+    await mockMapNetwork(page);
+    await openMap(page, "/?map=v1", 8);
+
+    // go() rebuilds the URL from the route table, so ?map=v1 is gone from the address bar...
     await goTo(page, "kingdom-discovery");
     await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
     expect(new URL(page.url()).search).toBe("");
-    // ...and a plain reload still has the flag on, from storage.
+    // ...and a plain reload still has the old map, from storage.
     await page.reload();
     await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).not.toBeNull();
+    expect(await isOn(page)).toBe(false);
+    expect(await theme(page)).toBeNull();
   });
 
-  test("?map=v1 turns it off and forgets it", async ({ page }) => {
+  test("?map=v2 brings a device back and forgets the opt-out", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
-    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(true);
+    await openMap(page, "/?map=v1", 8);
+    expect(await isOn(page)).toBe(false);
 
-    await page.goto("/?map=v1");
+    await page.goto("/?map=v2");
     await page.waitForSelector('[data-screen="discover"]');
-    expect(await page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2())).toBe(false);
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
-    expect(await page.evaluate(() => localStorage.getItem("cc_map_v2"))).toBeNull();
+    expect(await isOn(page)).toBe(true);
+    expect(await theme(page)).not.toBeNull();
+    expect(await stored(page)).toBeNull();
+  });
+
+  test("a device that stored 'v2' while Map v2 was behind the flag stays on", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("cc_map_v2", "v2"));
+    await mockMapNetwork(page);
+    await openMap(page, "/", 8);
+    expect(await isOn(page)).toBe(true);
   });
 });
 
@@ -253,6 +275,7 @@ test.describe("P1-04 the pin (flag on)", () => {
 
 test.describe("flag off: v1 pins are untouched", () => {
   test("no Map v2 class, role or tabindex on any marker, and the v1 logo pin is still drawn at every zoom", async ({ page }) => {
+    await useOldMap(page);
     await mockMapNetwork(page);
     await openMap(page, "/", 8);
     expect(await page.locator(".mv2-marker, .mv2-pin").count()).toBe(0);
