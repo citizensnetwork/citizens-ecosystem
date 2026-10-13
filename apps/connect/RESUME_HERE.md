@@ -53,7 +53,7 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` = the merge commit of PR #98** (`af6027f`, 2026-10-13: the agent-team docs), on top of #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
+- **`main` = the merge commit of PR #104** (`b7f78ea`, 2026-10-13: the Dispatcher docs), on top of #103 (docs), PR #98 (`af6027f`: the agent-team docs), #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
   Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
   (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs were
@@ -95,7 +95,7 @@
   look. **Next: [`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`](docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md)** (Phase 1.5: MapTiler logo,
   flag on for everyone, quota watch; then Phase 2). Tracker [`../../docs/MAP_UX_TRACKER.md`](../../docs/MAP_UX_TRACKER.md); QA
   [`../../docs/audit/phase1-qa.md`](../../docs/audit/phase1-qa.md); audit [`../../docs/audit/`](../../docs/audit/).
-- **Agent team (items T3 to T6): the Watcher is LIVE (2026-10-12) and the Dispatcher is LIVE (2026-10-13).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
+- **Agent team (items T4 to T6): the Watcher is LIVE (2026-10-12); the Dispatcher and the Reviewer are LIVE (2026-10-13).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
   (05:00, 10:00, 15:00, 20:00 local). It checks the public API, the security advisor (baseline 0 ERROR / 121 WARN / 3 INFO), CI on `main` and the
   open PRs, writes a report and any cards into a private **Decision Inbox** artifact, and emails the founder once a day. It never writes to the
   database, GitHub or Vercel. Spec: [`docs/routines/daily-routine.md`](docs/routines/daily-routine.md). Team design, authority matrix, build order and
@@ -103,7 +103,9 @@
   repo (handoff section 9). **The Dispatcher** (`citizens-dispatcher`, 07:30 and 17:30 local) routes the founder's newly answered inbox cards: an approved
   idea becomes a public GitHub issue labelled `agent:ready` plus a queue row (the first is issue #102, the CI-every-morning idea); an answer that asks for
   nothing is recorded; anything that needs the founder in chat becomes one action card. It only ever creates issues. Spec:
-  [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md).
+  [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Reviewer** (`citizens-reviewer`, 08:30, 12:30 and 16:30 local) reads open same-repo
+  PRs (and any PR a `rv-pr<n>` queue row asks for, merged ones included) cold, against the repo's own rules, and posts ONE public advisory comment per PR per
+  commit with file and line. It cannot approve, label, push or merge. Spec: [`docs/routines/reviewer.md`](docs/routines/reviewer.md).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -348,15 +350,14 @@ design session first.
 - *Next step:* start a new session with the prompt in `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md` section 5: Phase 1.5 (R1 MapTiler logo with the founder's screenshot sign-off, R2 the flag on for everyone = new decision MAP:D15, R3 quota watch, R4 the flag-on landing blocking time, R5 close D14), then Phase 2 (P2-07, P2-08, P2-06 first; P2-01 needs D2; the G1 items need migrations and the founder's yes).
 - *Facts to keep:* production runs a custom MapTiler Dataviz-based style (not `streets-v2`); `dataviz-dark` loads with the existing key (+12 tile requests for a person who switches); live data has 0 upcoming events, 0 of 40 places with opening hours and a median stored image of 319 KB; headless Chromium needs GPU flags for frame times (software GL is about 10x slower); a marker's inner nodes must not carry `class` attributes (the Tailwind CDN observer cost 31 ms p95 per pan frame on 150 pins); measurement tools are in `apps/connect/scripts/map-v2/`. Lighthouse (2026-10-10, preview, landing screen only because guest mode is in `sessionStorage`): accessibility 92 with the flag on or off (the app-wide `maximum-scale` in the viewport meta blocks pinch zoom), flag-on blocking time about +170 ms (style work, JavaScript equal), `docs/audit/phase1-qa.md` section 4.
 
-### T. Agent team (the Watcher and the Dispatcher are live; the rest is to build)
+### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T3 | **Reviewer** (handoff section 4, step 4): review any agent PR with fresh context (the Dispatcher, step 3, is built). Test it on the Dispatcher's own docs PR and one real draft PR. | P2 | M |
-| T4 | **Builder**, first task `q-ci-schedule`: add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time. | P2 | M |
+| T4 | **Builder** (handoff section 4, step 5), first task GitHub issue **#102** (`agent:ready`, queue row `q-ci-schedule`): add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time, a draft; the Reviewer comments on it; a human merges. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
-Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete ruleset, the API cold-start idea, and the Dispatcher's two action cards (the Dependabot one is wrong and should be dropped; the MapTiler one is real: only the founder can change that plan).
+Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete ruleset, the API cold-start idea, and the Dispatcher's two action cards (the Dependabot one is wrong and should be dropped; the MapTiler one is real: only the founder can change that plan). Re-test triggers for the two roles' first fixes are in `docs/routines/dispatcher.md` and `docs/routines/reviewer.md` section 8/9.
 
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
@@ -414,7 +415,7 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
 | P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live. The live end-to-end test **passed on 2026-10-02** (a real listing, owner on Outlook mail, welcome email, 6-digit sign-in on 2026-10-03). Existing-email approvals still refuse with a clear Note until C10. | C10, C16 |
-| P2 | **Connect Daily Routine** (the Watcher; a design-consistency step could join it, C17) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets are still not wired into the wizard. | T3 to T6, H7 |
+| P2 | **Connect Daily Routine** (the Watcher; a design-consistency step could join it, C17) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets are still not wired into the wizard. | T4 to T6, H7 |
 | P4 | Wear CSP | Flagged in §3AT. The brief was only in local `%TEMP%`; now rescued to `docs/handoffs/WEAR_CSP_HANDOFF.md`. | S1 |
 | P5 | Vision Timeline Map | Placeholder since 2026-07-02; unblocked since 2026-07-18; never started. | V1 |
 | P6 | Vision network graph + Phase D | Scoped only. | V2, V3 |
@@ -437,6 +438,16 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 ---
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
+
+- **2026-10-13 (evening) — The Reviewer built and run once; the Dispatcher's PR #104 merged (docs only, branch `claude/reviewer-role`).** The founder asked for #104
+  to merge once the Reviewer had finished, and for the Reviewer next. #104 conflicted with #103 (`RESUME_HERE.md` only), `main` was merged in, CI went green, the
+  Reviewer's pre-merge comment on it had no blocker, and it merged (`b7f78ea`). **Reviewer:** spec `docs/routines/reviewer.md`, task `citizens-reviewer` (08:30,
+  12:30, 16:30 local), review requests are queue rows `rv-pr<n>`; it uses `add_issue_comment` only (never the review-writing tool, which can approve). **First run**
+  (founder-approved targets #104 and the merged code PR #101): both comments posted, findings checked against the repo: the two #101 nits are real (line 91 of
+  `e2e/map-attribution.spec.ts`; a garbled dash at line 167 of `index.html`), the #104 should-fix was weak. **Found and fixed:** no line numbers in findings, a false
+  "missing" claim, and a rule that banned harmless words; the prompt now demands real line numbers and a check before any "missing" claim. **Note:** comments appear
+  under the repo owner's account (the connector's identity). **Not done:** the Builder (T4), Reader (T5); the Reviewer has never seen a Builder PR; the fixes are not
+  re-tested. No app code, migration or database change.
 
 - **2026-10-13 — The Dispatcher built and run once; the 14 Dependabot PRs closed; PR #98 unblocked (docs only, branch `claude/dispatcher-role`).** The founder's
   scheduled "resume" run had finished unseen, so the state was re-checked live and the founder confirmed three things in chat. (1) Close the 14 Dependabot PRs:
@@ -501,17 +512,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
   fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
   may return if the tile provider has no dark style).
-- **2026-10-10 — Map v2: prompt and tracker reconciled with this file (docs only).** The founder pasted the Map v2
-  runner prompt and chose the light map (tracker D1; revised in the entry above). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
-  `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
-  protocol; its ids collide with ours (so item **C19**, project **P21**; C18 was already taken by #90's branch); v1 pins are shape-per-type
-  DOM markers under three zoom gates; Share and deep links already exist (C15); the sheet's Back behaviour is constrained by the history
-  rule; the founder's `map-layering.md` conflicts with 48 px photo pins at mid zoom (D8); live data has 0 upcoming events. Added:
-  `docs/MAP_V2_RUNNER_PROMPT.md`, the tracker (now tracked), Appendix E (26 tunable design values against the recording), and a root
-  `.gitignore` rule for the reference frames (the folder was untracked, so `git add docs/` would have committed third-party photos).
-  **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
-  contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
-  later merges `main` in first.
 
 ---
 

@@ -3992,3 +3992,17 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
   1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
   The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
+
+## Moved from RESUME_HERE §6 on 2026-10-13, second batch (the oldest session entry)
+
+- **2026-10-10 — Map v2: prompt and tracker reconciled with this file (docs only).** The founder pasted the Map v2
+  runner prompt and chose the light map (tracker D1; revised in the entry above). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
+  `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
+  protocol; its ids collide with ours (so item **C19**, project **P21**; C18 was already taken by #90's branch); v1 pins are shape-per-type
+  DOM markers under three zoom gates; Share and deep links already exist (C15); the sheet's Back behaviour is constrained by the history
+  rule; the founder's `map-layering.md` conflicts with 48 px photo pins at mid zoom (D8); live data has 0 upcoming events. Added:
+  `docs/MAP_V2_RUNNER_PROMPT.md`, the tracker (now tracked), Appendix E (26 tunable design values against the recording), and a root
+  `.gitignore` rule for the reference frames (the folder was untracked, so `git add docs/` would have committed third-party photos).
+  **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
+  contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
+  later merges `main` in first.
