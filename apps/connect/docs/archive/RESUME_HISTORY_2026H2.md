@@ -3937,3 +3937,58 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
 - **Earlier (2026-08-23 → 09-27, PRs #40–#74; the 09-27 entries are in the archive's second moved batch):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
   contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
   Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
+
+## Moved from RESUME_HERE §6 on 2026-10-13 (the four oldest session entries)
+
+- **2026-10-04 — C16: Listing Automation Phase 1 (PR #92), migration 181 applied, merged, DORMANT.** The founder first said "read the brief
+  and plan, apply nothing", so the PR was code, SQL and tests; once it was ready the founder said yes, in chat, to the apply, to merging after a
+  green CI, and to Auto-fix. **Applied:** pre-apply tag `connect-pre-mig181-listing-automation` pushed, a read-only check that every
+  column and function the function bodies name exists (plpgsql is not checked at `CREATE`), `apply_migration` (`20261004103205`), then a
+  30-check rollback-only probe (consent guard, private columns, RLS for owner / other user / anon, https-only and Meta/TikTok rules,
+  dedupe, all three RPCs, instant withdrawal, role-loss reset): no FAIL, nothing left behind. Advisors: +3 WARN (the three functions),
+  0 ERROR, nothing else changed (§2). **What exists:** `181_listing_automation_phase1.sql`
+  (four private consent columns on `profiles` behind their own guard trigger, `events.source_url`, `listing_sources`, `listing_suggestions`,
+  RLS on both, a reset when someone stops being a Contributor, and three SECDEF RPCs: `get_my_automation_settings`,
+  `set_my_automation_level`, `decide_listing_suggestion`); `src/lib/automation/` (the one validator, `validateSuggestion`; source rows);
+  `POST /api/automation/suggestions` (scope `automation:suggest`: eligibility, consent, source, validation, 100/hour cap, dedupe by
+  fingerprint, auto-publish of a future event only at `events_auto`) and `POST /api/automation/digest` (scope `automation:digest`: the
+  once-a-day "new suggestions" email); the Form intake route records the consent last and fails closed; the dashboard gets an
+  Automatic updates card (Profile tab) and a Suggestions tab; Admin → Listings shows each level and pending count. **Rules in §3.**
+  **Deviations from the brief** (decided on evidence, listed in C16): no images in Phase 1 (CSP), owner actions on the owner's own
+  session instead of new `/api` routes, the digest is a Next route on #88's mailer (the brief said `send-contributor-digest` emails; it
+  only writes an in-app notification), no new notification type, "Edit & publish" inline. **Checks:** Connect 1237 unit (36 live-only
+  skipped), Playwright e2e (incl. 19 new listing-automation tests; see §2), lint, typecheck, build, format; 40 mutations of the
+  validator, routes, digest and card code, 39 caught, the one survivor was dead code and was removed. **Gotchas:** (1) `git add -A`
+  swept ten untracked local files into a wip commit; caught before any push and removed from the history (stage explicit paths,
+  §3). (2) A Next route file may export only handlers and config: a stray `export const SUGGEST_SCOPE` failed the build. (3) A Facebook,
+  Instagram or TikTok source is stored but must never be enabled. (4) The advisor baseline was 118 WARN live, not the 119 this file
+  said. **Still to do (founder):** mint the two `automation:*` keys (only needed once Phase 2 or a manual test post exists), then the
+  optional one-off backfill (never committed); `RESEND_API_KEY` was done on 2026-10-10 (see above). **Not started:** Phase 2, the scheduled reader.
+- **2026-10-04 — C15: a real URL for every screen (PR #89).** C1/C1b (#84) and H9 (#85) merged the day before. Every screen has
+  its own address (`/`, `/discover`, `/e/<id>`, `/p/<id>`, `/c/<slug>`, `/me`, `/dashboard/<tab>`, `/admin/<tab>`...), so a refresh
+  keeps you where you are and a link can be shared. The table is `app/routes.jsx`; the server rewrites an explicit list (never a
+  catch-all) and `index.html` has `<base href="/">`; the Google redirect is the site root with the screen carried in `cc_return_to`;
+  tabs replace history; Share copies the real link; a deep-linked listing shows a loading state, not "not found". **Android Back:** my
+  first draft pushed history entries on page load, which Chrome skips (the founder's "Back leaves Connect"), so entries are now
+  pushed only inside a tap or key press (rule in §3), the map goes under a shared listing at the visitor's first tap, and a static
+  test plus a `navigator.userActivation` recorder enforce it. **The founder's phone check passed (2026-10-10, A2).** Tests: routes 72, rewrites 5,
+  rule 3, routing e2e (new), Connect 1102 unit, e2e 108/108; 18 mutations of the routing/Back code, all caught. Also fixed: three
+  load-induced test timeouts (the lineage tests read the migrations once; frontend-build gets an explicit 30 s), a CodeQL
+  regex-escaping flag in a test helper, and a dozen dead bindings in the frontend files (ESLint ignores `src/frontend`). **Merged
+  with #88 (D-12) mid-flight:** the route gate now lets a pending applicant keep their Dashboard (the being-reviewed page). **To confirm:** `/discover` for Kingdom Exploration (the tab says "Exploration"; `/explore` is a
+  one-line change in `routes.jsx`, `next.config.ts` and the tests). **Gotchas:** a mutation harness stopped with `taskkill /F` left a
+  mutated tree (stash originals, hash the tree before and after); a sibling session's `next build` makes e2e 3-5x slower. **Open:**
+  nothing: the founder's live checks all passed on 2026-10-10 (see the entry above).
+- **2026-10-04 — Contributor approval gate (D-12) and owner welcome email (D-13): #86, #88, #90.** A re-applied Contributor stayed `contributor_hidden` (approve now resets it, mig 179; the live admin Approve RPC had also been broken since mig 164: it inserted into a `notifications.url` column that does not exist). Self-serve "Become a Contributor" now **waits for an admin**: mig 180 closes four self-approval doors (RPC dropped, `protect_role_column` tightened, `contributor_applications` made server-written only), the applicant lands on a "being reviewed" Dashboard (new `pending-application.jsx`; profile edits staged on their application, copied on approval), Admin → Applications approves/rejects through the RPCs directly (shows "Previously removed by an admin on…", waits for the server) and the admin/applicant are emailed (`src/lib/email`, Resend, fail-soft, admin-notice cap 20/h). #90: admin Create emails the owner a welcome (checkbox, default on; the stale "sign in with Google" copy is fixed). Founder decision: pending applicants get **profile only**, drafts are **C18**. Found, not fixed: **S12**. Gates: Connect 1035 unit, e2e 57/57. Open: **A11** (Resend env vars + live checks), **C18**, **S12**, **H5**. Mig 180 was applied right after #88's deploy (probe green in production; advisors 0 ERROR / 118 WARN / 3 INFO). **Update 2026-10-12 (PR #90 brought up to date with `main`):** C15, C16, Map v2 and C20 had landed since, so `admin.jsx`'s cache-bust in `index.html` moved to `?v=20261012a`, the project row is **P22** (P20 and P21 were taken) and this entry sits in date order. A read of the Connect project's env var names that day showed no `RESEND_API_KEY` or `ADMIN_NOTIFY_EMAIL` (see §2), so the welcome stays `skipped` until A11 step 1 is confirmed. The review also made the welcome say "on the map" only when the listing has a pin (required `onMap` input; tests at both layers); the same claim elsewhere is tracked as **C21**.
+- **2026-10-10 — Sign-off and a stale mail key (docs only).** The founder finished the whole C15 (#89) live-check list and reported
+  everything solid and working (Android Back on a real phone, cancel/restore, private window, deep-link sign-in, Share, the Supabase
+  redirect list); A2 is trimmed to what is left. The founder also found `RESEND_API_KEY` in Vercel **stale** and re-entered it: it reaches
+  code only in a new deployment (last Connect production deploy before this was `30507e9`, 2026-10-04), and no real email has been seen
+  sending yet (§2). **Found while checking:** (1) a repo ruleset, "Allow Claude", blocks deleting any branch (H2), so the merged C16 branch
+  stays on the remote; (2) the `gh` CLI login on this PC had expired (`gh auth login -h github.com` fixes it; the GitHub MCP connector
+  worked meanwhile); (3) the keys for `automation:suggest` / `automation:digest` have no consumer until Phase 2, so minting them early
+  gains nothing; (4) **CI's OSV-Scanner step went red on `main` with no code change** (nine advisories published 2026-09-18..10-07:
+  Next 15.5.26 / 16.3.6, `@capacitor/android` and `ios` 8.4.1 (critical), `sharp` 0.35.4, `source-map-js` 1.2.1) and blocked this very
+  docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
+  1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
+  The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
