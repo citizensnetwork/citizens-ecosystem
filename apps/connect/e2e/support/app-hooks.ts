@@ -33,6 +33,21 @@ export function setRoleAndGo(page: Page, role: Role, to: string) {
   );
 }
 
+/**
+ * The old map, as a device that used Map v2's escape hatch (`?map=v1`) has it: the opt-out is
+ * stored before any page script runs. Map v2 is the default since D15 (2026-10-13), so a spec
+ * about the old pins or the old preview card calls this first. Call it before the first `goto`.
+ */
+export function useOldMap(page: Page) {
+  return page.addInitScript(() => {
+    try {
+      localStorage.setItem("cc_map_v2", "v1");
+    } catch {
+      /* storage blocked: the spec would then run on the default map and fail loudly */
+    }
+  });
+}
+
 /** Resolves once the MapLibre map exists, so "no pin" is a real result and not a page that never loaded. */
 export function mapReady(page: Page) {
   return page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap, undefined, {
