@@ -116,10 +116,6 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.6); }
 
   /* animations */
-  .pin-pulse::before {
-    content:''; position:absolute; inset:-5px; border-radius:50%;
-    background: inherit; opacity:.35; animation: pinPulse 2s ease-out infinite; z-index:-1;
-  }
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
   /* real-map marker pulse ring (MapLibre DOM markers) */
   .cc-pin-pulse { animation: pinPulse 2s ease-out infinite; pointer-events:none; }
@@ -169,8 +165,17 @@
   .cc-pin-label.is-selected .cc-pin-label-text { font-size:12.5px; }
   @media (prefers-reduced-motion: reduce) { .cc-pin-label { transition:none; } }
   /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
-  .maplibregl-ctrl-bottom-right { margin-bottom: 88px; }
-  .maplibregl-ctrl-attrib { font-size: 9px; }
+  /* 74 px: above the phone's bottom navigation, and low enough that the © credit sits below the bottom-left
+     zoom hint instead of under it (the hint dropped to the credit's height when the Map Key was removed). */
+  .maplibregl-ctrl-bottom-right { margin-bottom: 74px; }
+  /* The © MapTiler / © OpenStreetMap credit is required on every map (MapTiler terms, the OSM licence), so it
+     stays, but small and quiet: the same translucent near-black pill and white type as the MapTiler logo
+     (map.jsx), not a long white bar. Selectors match maplibre-gl.css's own specificity (the old one-class
+     font-size rule never applied). The "i" button is MapLibre's dark icon, inverted to read on the pill. */
+  .maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+  .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact { font-size:9px; line-height:14px; background-color:rgba(23,19,16,.62); color:#fff; }
+  .maplibregl-map .maplibregl-ctrl-attrib a { color:#fff; }
+  .maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button { background-color:transparent; filter:invert(1); }
   .bubble-bob { animation: bubbleBob .9s ease-in-out infinite alternate; }
   @keyframes bubbleBob { from{transform:translateY(0)} to{transform:translateY(-4px)} }
   .fade-in { animation: fadeIn .3s ease-out; }
@@ -219,17 +224,23 @@
 
 <script type="text/babel" src="app/icons.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/routes.jsx?v=20261004a"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261012a"></script>
 <script type="text/babel" src="app/data.jsx?v=20261003b"></script>
 <script type="text/babel" src="app/store.jsx?v=20261004b"></script>
 <script type="text/babel" src="app/ui.jsx?v=20261002b"></script>
 <script type="text/babel" src="app/auth.jsx?v=20261003a"></script>
-<script type="text/babel" src="app/map.jsx?v=20261002b"></script>
-<script type="text/babel" src="app/entity-card.jsx?v=20261002b"></script>
-<script type="text/babel" src="app/home.jsx?v=20261002b"></script>
+<script type="text/babel" src="app/map-v2-strings.jsx?v=20261012a"></script>
+<script type="text/babel" src="app/map-v2-time.jsx?v=20261010a"></script>
+<script type="text/babel" src="app/map-v2-pins.jsx?v=20261010d"></script>
+<script type="text/babel" src="app/map.jsx?v=20261012c"></script>
+<script type="text/babel" src="app/entity-card.jsx?v=20261012c20"></script>
+<script type="text/babel" src="app/map-v2-gallery.jsx?v=20261010b"></script>
+<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261010c"></script>
+<script type="text/babel" src="app/home.jsx?v=20261012c"></script>
 <script type="text/babel" src="app/kingdom-discovery.jsx?v=20261002b"></script>
 <script type="text/babel" src="app/apply.jsx?v=20261003a"></script>
 <script type="text/babel" src="app/pending-application.jsx?v=20261003a"></script>
-<script type="text/babel" src="app/admin.jsx?v=20261004b"></script>
+<script type="text/babel" src="app/admin.jsx?v=20261012a"></script>
 <script type="text/babel" src="app/dashboard.jsx?v=20261004b"></script>
 <script type="text/babel" src="app/automation.jsx?v=20261004a"></script>
 <script type="text/babel" src="app/insights.jsx?v=20260615b"></script>

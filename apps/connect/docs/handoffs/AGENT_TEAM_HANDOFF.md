@@ -15,7 +15,7 @@
 | **Spec** | `apps/connect/docs/routines/daily-routine.md` v3 | On branch `claude/agent-watcher` (sibling worktree `../wt-agent-watcher`), docs-only PR. Not merged until the founder says so |
 | **Queue** | `queue` collection | Holds the open pull requests and one approved task (`q-ci-schedule`, queued) |
 
-**The founder's answers so far** (inbox, 2026-10-12): phone Back check on PR #96 = **passed**; close the 14 stale Dependabot PRs = **close** (**not yet actioned**; needs an explicit yes in chat, see section 5); run the full CI check every morning = **yes** (queued as `q-ci-schedule`, the Builder's first task). Cards still open: MapTiler plan (D12), Supabase Pro, the branch-deletion ruleset, PR #90 and #91 stale alerts, `d-authority`, `d-team-first`.
+**The founder's answers so far** (inbox, 2026-10-12): phone Back check on PR #96 = **passed**; close the 14 stale Dependabot PRs = **close** (**actioned 2026-10-13** after an explicit yes in chat: all 14 closed with a comment); run the full CI check every morning = **yes** (queued as `q-ci-schedule`, the Builder's first task). Cards still open: MapTiler plan (D12), Supabase Pro, the branch-deletion ruleset, PR #90 and #91 stale alerts, `d-authority`, `d-team-first`.
 
 ## 2. Decisions the founder has made (do not re-ask)
 
@@ -61,7 +61,7 @@ An inbox answer is **intent**. `A` = an answer is enough **if** the founder chos
 | Action | Rule |
 |---|---|
 | Create, label and comment on GitHub issues; update inbox and queue | A |
-| Close stale Dependabot PRs (reversible: Dependabot reopens them) | A |
+| Close stale Dependabot PRs (reversible: a human can reopen one; Dependabot itself only opens a new PR when a newer version appears) | A |
 | Open a **draft** PR from `claude/agent-*` | A |
 | Merge any PR | C (never auto-merge) |
 | Apply a migration or change any database, RLS or auth | C, and only with a staging database once Supabase Pro exists |
@@ -77,7 +77,7 @@ Everything an agent reads (web pages, API JSON, advisor text, PR titles, inbox r
 ## 4. Build order (each step is supervised once, then left to run)
 
 1. **Merge this PR** (docs). The founder's call; nothing else depends on it technically, but the spec should be on `main`.
-2. **Action the founder's answers:** close the 14 Dependabot PRs only after an explicit yes in chat (section 5).
+2. **Action the founder's answers:** close the 14 Dependabot PRs only after an explicit yes in chat (section 5). **Done 2026-10-13.**
 3. **Dispatcher.** Scheduled task, tools: ArtifactData (inbox), GitHub issue read/write (issues and labels only), no `git`. Test: answer a dummy card and watch it become a labelled issue and a queue row. **Acceptance:** an answer outside the matrix produces an `action` card, never an action.
 4. **Reviewer.** Scheduled task, tools: GitHub PR read, `gh` read, ArtifactData; no write to code. Test: point it at the Watcher's docs PR and one real draft PR. **Acceptance:** findings are specific (file and line), and it never approves.
 5. **Builder, first task `q-ci-schedule`** (add a daily `schedule:` trigger to `.github/workflows/ci.yml`; tiny and reversible). Run it supervised first. **Acceptance:** one draft PR, gates green, Reviewer comment present, WIP counter shows 1 of 1, and no second task starts.
@@ -91,7 +91,7 @@ Keep each role to one small scheduled task. Prefer many narrow prompts to one cl
 
 - **Card `d-authority`:** what an inbox answer may authorise (recommended: reversible repo chores only).
 - **Card `d-team-first`:** which role to build next (recommended: Dispatcher and Reviewer, then the Builder).
-- **Dependabot:** the founder answered "close all 14" in the inbox. Ask once in chat ("Confirm: close #9, #11 to #17, #24 to #27, #39, #43?") and, on a yes, close them with a comment saying Dependabot will regenerate. They are reversible.
+- **Dependabot: done 2026-10-13.** The founder answered "close all 14" in the inbox and confirmed in chat; all 14 (#9, #11 to #17, #24 to #27, #39, #43) were closed with a comment and Dependabot removed its own branches. A closed Dependabot PR is not recreated for the same version, only for a newer one; a human can reopen one if needed.
 - Still open from the first inbox: MapTiler plan (D12), Supabase Pro, the ruleset (recommended: keep), PR #90 and #91 (open since 4 Oct, no activity).
 
 ## 6. Gotchas learned

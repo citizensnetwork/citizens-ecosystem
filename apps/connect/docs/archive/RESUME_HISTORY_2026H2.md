@@ -3894,3 +3894,46 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   Vision deploy gates, PAT rotation and the code-as-hero email template all done. New finds: orphan prod tables
   and functions (H6), 9 undeployed edge functions (H5), missing git tags (S2), 4 invisible Contributors (A5),
   perf-advisor debt (S6), stale status docs (H4). Rescued the Wear CSP brief from `%TEMP%`. No code or DB change.
+
+## Moved from RESUME_HERE §6 on 2026-10-10 (the two oldest session entries)
+
+- **2026-10-02 → 10-03 — Map: one preview card for every pin, whole logos, clean zoom gates, no past events,
+  intake hygiene** (PR #78, merged `bba102f`). From the founder's first live walk. Every pin, Contributor
+  included, opens the same small `EntityCard`; "View Full Profile" is the way in. **Founder calls:** Contributors
+  hide below zoom 6 (D1, his own answer), names from zoom 15 (D2). Org logos are shown whole (contain on white;
+  Individuals' photos still fill). Finished events leave the map and Discovery and sit under "Past events" on
+  the profile and dashboard (no end time ⇒ up for the rest of its day). A social value with spaces is a display
+  name: refused on dashboard/Apply/admin, dropped with a Note on the Form intake; local SA WhatsApp numbers
+  store as `27…`. The first Form submission's three bad socials were corrected with a guarded single-row UPDATE.
+  First-view framing is clamped and centred so nationally spread data can't open blank (e2e, mutation-checked).
+  Connect 852 unit, e2e 30/30, no migration. New items **C11–C13**. Not yet confirmed at write-up: post-merge CI
+  and the production deploys, and the founder's production re-check. **Start here:**
+  [`docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md`](docs/handoffs/CONNECT_MAP_PREVIEW_WRAPUP_HANDOFF.md).
+  The original brief (`…MAP_PREVIEW_CONSISTENCY_HANDOFF.md`) stays untracked: it names a real organisation.
+- **2026-10-02 — Merged #71 and #75, fixed a red `main`, shipped email-code sign-in (C5).** #71 (`9eb727e`)
+  and #75 (`b85f5ae`) merged. #75's Verify failed on the OSV gate only: 20 advisories published after 09-27
+  (brace-expansion, js-yaml, undici, all dev/test-time) had turned `main` red since #71's merge; fixed by
+  raising the `pnpm.overrides` floors in **#76** (`cb0a049`), checked against OSV.dev. **#77:** *Continue with
+  email* on Connect's landing (6-digit code, `shouldCreateUser: true`): owners without Google (e.g. on Outlook)
+  can finally reach their dashboard; guests are no longer dead-ended into Google; 40 unit + 6 e2e tests
+  (e2e 20/20). **#79 (2026-10-03):** admin **Delete** on every Listings row. A listing is an account, so the
+  database decides from one fact (has the owner ever signed in?): never = the placeholder is hard-deleted;
+  signed in = only the listing goes and the person stays a citizen (their re-application would start
+  hidden). **Migration 178 applied** (one admin-only SECDEF function; probe-verified; advisors 0/119/3).
+  Route `/api/admin/contributors/delete-listing` (the old `/contributors/delete` discards applications).
+  Founder decisions on C10 recorded above. Open: founder steps **A10**, Vision port (**C5**), **C10**, **C14**.
+  The 2026-10-02 handoff stays untracked (it names a real organisation; this repo is public).
+
+## Moved from RESUME_HERE §6 on 2026-10-12 (the three oldest session entries)
+
+- **2026-10-04 — `braces` fork follow-up (H10 check; no code change).** The fork PR's merge commit `5e25793` finished green (Verify including the OSV step with no exception, E2E, CodeQL, Analyze, all three Vercel deploys); `Supabase Preview` is the only red (known, **A7**). The same holds on `main` @ `947ab4e` (#86 merged right after), and the lockfile still holds no npm `braces`. **H10:** npm `latest` is still 3.0.3 and GHSA-vfj7-8cjw-p6xm still says `patched=null`, so the fork stays. Upstream has two open fix PRs (#72, #75; no maintainer activity, last upstream commit 2025-01-19) and the founder chose NOT to post our draft. **Trap found:** deleting merged remote branches (**H2**) is blocked by a repo ruleset, see H2. The two 5 s test flakes were left alone on the founder's call (CI is green). **Update 2026-10-12 (when this PR was brought up to date):** npm `braces` is still 3.0.3 and still unpatched, but both upstream fix PRs are now closed unmerged, and the ruleset no longer blocks deleting branches (see H10 and H2).
+- **2026-10-03 — `braces` patched fork replaces the OSV exception (H8 closed, PR #87).** Instead of renewing the dated exception, `packages/braces-patched` (private, `3.0.3-citizens.1`) is the exact `braces@3.0.3` tarball (sha512 checked against the lockfile, MIT kept) plus a nesting-depth guard: `lib/parse.js` refuses more than 100 nested `{`/`(` blocks with a `SyntaxError`, and `compile`/`expand`/`stringify` count depth for caller-built ASTs; `options.maxDepth` can only lower the limit. Root `pnpm.overrides` has `"braces": "link:./packages/braces-patched"`, so `pnpm-lock.yaml` holds no npm `braces` and `osv-scanner.toml` is empty again (no `[[IgnoredVulns]]`). **Proof:** the CI's exact command (osv-scanner v2.3.8, run locally) says "No issues found" on the new lockfile and, as a control, flags only this advisory on the old one. Normal patterns behave byte-for-byte as before: a golden test of about 490 000 results against the pristine tarball, and eslint over 473 files in 7 packages gives byte-identical JSON with the pristine copy swapped in. **Gotchas:** (1) CI runs `pnpm test:coverage`, so the fork defines that script too, or turbo skips its 150 tests. Once it ran, the first CI run failed on a fixture generated on Windows: picomatch writes `[\\/]` in a regex on a Windows host and `\/` on Linux unless its `windows` option is a boolean, so the golden now pins `windows: false` (regenerated against the pristine braces). Anything generated on this machine and compared on CI must not depend on the OS. (2) Pristine braces' failing depth at the default stack is erratic (V8 JIT state); `node --stack-size=200` is the deterministic repro. (3) Two load flakes (5 s timeouts) when Vision's suite hogs the CPU: `frontend-build` "hashed outputs" and Connect's `profiles-column-privacy` "176 alone"; both pass alone, and `turbo run test:coverage --concurrency=2` helps. Open: **H10** (check monthly for an upstream fix); the upstream draft for `micromatch/braces` is in the PR description and is NOT posted (needs the founder's OK).
+- **2026-10-03 — `braces` OSV exception (#81), admin Delete merged (#79), Wear's crown + loading splash (#82, merged `ec19099`).** The `braces` <= 3.0.3 advisory (GHSA-vfj7-8cjw-p6xm; no fixed version exists on npm; dev tooling only) turned CI red on
+  `main` and every PR. The founder approved ONE dated exception in `osv-scanner.toml` (expires **2026-11-02**, item **H8**; merged as #81, CI proved the TOML syntax). #79 then merged (`8ebfed3`) after picking up #80/#81; migration 178 had been
+  applied beforehand. **Crown + splash (was C14):** Wear's gold PNG (127 KB resized to 5 KB) replaces the line-art crown on the landing and the sidebar's gold tile; a new `authResolved` store state shows a crown + ring-spinner splash instead of the sign-in landing while a probable session (a `sb-*-auth-token` key, `?code=` or `#access_token=`) is still resolving, with an 8 s safety timeout. First-time visitors and demo mode start resolved, so they see no splash flash. 3 e2e tests, mutation-checked. The founder also reported the Outlook-owner live test green (A10 reduced). Open: **C1/C1b**, **C15**, **C16**, **C10** (decisions recorded in its design block), **C5**, **A10** (optional: OTP expiry and two re-tests; the email rate limit is 60/h), **H8**, **H9**. **Gotchas:** a PC crash zeroed two uncommitted files (commit early; git fsck stayed clean), and Python `open(p, "w")` on Windows rewrites LF as CRLF (use `newline=""`). The item ID **C11** was claimed twice by parallel sessions; the crown item was renumbered C14.
+  **Evening audit:** RESUME re-checked against live state; A1 closed (passed), A2/A5/C1/P1/P11/H2/V2 corrected; new C15 (URL per
+  screen), C16 (Listing Automation Phase 1), C17 (design reference) and H9 (repo `intake.gs` is the old script). Admin Delete was
+  tested live by the founder and works.
+- **Earlier (2026-08-23 → 09-27, PRs #40–#74; the 09-27 entries are in the archive's second moved batch):** Connect v1 re-scope, self-serve go-live, Kingdom Discovery,
+  contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
+  Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
