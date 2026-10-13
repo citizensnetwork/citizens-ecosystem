@@ -56,8 +56,8 @@
 - **`main` = the merge commit of PR #90** (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), on top of #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
   Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
-  (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs are
-  still open (item **H1**).
+  (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs were
+  closed on 2026-10-13 (the founder's yes in chat; Dependabot will not reopen the same version, only a newer one).
 - **Database head = migration 181** (`20261004103205 / 181_listing_automation_phase1`, applied 2026-10-04 with the founder's yes; 180 is
   `20261004061633`, #88; 179 is #86). Always re-run `list_migrations` and **take the next free number at apply time.** Pre-apply tag
   `connect-pre-mig181-listing-automation` (pushed). The 30-check rollback-only probe passed with no FAIL and left no rows. The recorded
@@ -95,6 +95,12 @@
   look. **Next: [`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`](docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md)** (Phase 1.5: MapTiler logo,
   flag on for everyone, quota watch; then Phase 2). Tracker [`../../docs/MAP_UX_TRACKER.md`](../../docs/MAP_UX_TRACKER.md); QA
   [`../../docs/audit/phase1-qa.md`](../../docs/audit/phase1-qa.md); audit [`../../docs/audit/`](../../docs/audit/).
+- **Agent team (items T1 to T6): the Watcher is LIVE (2026-10-12).** A local scheduled task, `citizens-watcher-daily`, runs four times a day
+  (05:00, 10:00, 15:00, 20:00 local). It checks the public API, the security advisor (baseline 0 ERROR / 121 WARN / 3 INFO), CI on `main` and the
+  open PRs, writes a report and any cards into a private **Decision Inbox** artifact, and emails the founder once a day. It never writes to the
+  database, GitHub or Vercel. Spec: [`docs/routines/daily-routine.md`](docs/routines/daily-routine.md). Team design, authority matrix, build order and
+  paste-ready prompts: [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). The inbox URL and the founder's email are not in the
+  repo (handoff section 9).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -339,6 +345,17 @@ design session first.
 - *Next step:* start a new session with the prompt in `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md` section 5: Phase 1.5 (R1 MapTiler logo with the founder's screenshot sign-off, R2 the flag on for everyone = new decision MAP:D15, R3 quota watch, R4 the flag-on landing blocking time, R5 close D14), then Phase 2 (P2-07, P2-08, P2-06 first; P2-01 needs D2; the G1 items need migrations and the founder's yes).
 - *Facts to keep:* production runs a custom MapTiler Dataviz-based style (not `streets-v2`); `dataviz-dark` loads with the existing key (+12 tile requests for a person who switches); live data has 0 upcoming events, 0 of 40 places with opening hours and a median stored image of 319 KB; headless Chromium needs GPU flags for frame times (software GL is about 10x slower); a marker's inner nodes must not carry `class` attributes (the Tailwind CDN observer cost 31 ms p95 per pan frame on 150 pins); measurement tools are in `apps/connect/scripts/map-v2/`. Lighthouse (2026-10-10, preview, landing screen only because guest mode is in `sessionStorage`): accessibility 92 with the flag on or off (the app-wide `maximum-scale` in the viewport meta blocks pinch zoom), flag-on blocking time about +170 ms (style work, JavaScript equal), `docs/audit/phase1-qa.md` section 4.
 
+### T. Agent team (the Watcher is live; the rest is to build)
+| ID | Item | Pri | Size |
+|---|---|---|---|
+| T1 | **Merge the agent-team docs PR** (`claude/agent-watcher`: the Watcher spec v3 and `docs/handoffs/AGENT_TEAM_HANDOFF.md`). The founder's call. | P1 | S |
+| T3 | **Dispatcher and Reviewer** (handoff section 4, steps 3 and 4): turn answered cards into labelled issues, and review any agent PR with fresh context. | P2 | M |
+| T4 | **Builder**, first task `q-ci-schedule`: add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time. | P2 | M |
+| T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
+| T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
+
+Open founder cards in the Decision Inbox: `d-authority` (what an answer may authorise) and `d-team-first` (which role to build next).
+
 ### S. Security, platform and code health
 | ID | Item | Pri | Size |
 |---|---|---|---|
@@ -379,13 +396,12 @@ design session first.
 ### H. Housekeeping (low risk; one session clears most of it)
 | ID | Item |
 |---|---|
-| H1 | **14 stale Dependabot PRs** (#9–#17, #24–#27, #39, #43; oldest 2026-06-21). Several are majors that need real review (TypeScript 7, `@types/node` 26, GitHub Actions v7). Close them and let Dependabot regenerate, or batch-review them. |
-| H2 | **Mostly done 2026-10-12.** 43 merged remote branches were deleted (each: its tip already in `main`, a merged PR, not an open PR's head; the SHAs were kept, so one can be restored with `git push origin <sha>:refs/heads/<name>`). The repo ruleset "Allow Claude" (id 24081059) used to forbid deleting branches too (GH013, first hit 2026-10-04); it was edited on 2026-10-10 and now holds only `non_fast_forward`, so deletes work and force-push stays blocked (keep it that way). 19 remote branches remain: the 14 Dependabot ones (**H1**), `claude/agent-watcher` (an open PR from another session) and 4 unmerged old branches to review, then delete or revive: `chore/phase-4-local-rewrite` (Wear, May 2026), `claude/event-location-map-ui-kib8od`, `claude/map-icon-label-zoom-16-5`, `claude/map-icon-zoom-visibility-1yzg4a`. Still to do: about 17 stale LOCAL branches and the sibling worktrees (`../wt-*`, **H3**). |
+| H2 | **Mostly done 2026-10-12.** 43 merged remote branches were deleted (each: its tip already in `main`, a merged PR, not an open PR's head; the SHAs were kept, so one can be restored with `git push origin <sha>:refs/heads/<name>`). The repo ruleset "Allow Claude" (id 24081059) used to forbid deleting branches too (GH013, first hit 2026-10-04); it was edited on 2026-10-10 and now holds only `non_fast_forward`, so deletes work and force-push stays blocked (keep it that way). 5 remote branches remain besides `main` (the 14 Dependabot ones went by themselves when their PRs were closed on 2026-10-13): `claude/agent-watcher` (an open PR from another session) and 4 unmerged old branches to review, then delete or revive: `chore/phase-4-local-rewrite` (Wear, May 2026), `claude/event-location-map-ui-kib8od`, `claude/map-icon-label-zoom-16-5`, `claude/map-icon-zoom-visibility-1yzg4a`. Still to do: about 17 stale LOCAL branches and the sibling worktrees (`../wt-*`, **H3**). |
 | H3 | Park the standalone `../citizens-connect` checkout (4 uncommitted: `.gitignore`, `RESUME_HERE.md`, decision brief, `.codeviz/`). Clear the sibling clutter (`../citizens-wear-pr8`, `../cv-temp`, `../citizens-connect.worktrees`) and the orphan `.claude/worktrees/agent-a4219a…` folder. |
 | H4 | Retire stale status docs that compete with this file: `apps/connect/.github/PROJECT_STATUS.md` (last updated 2026-07-01), `apps/connect/.github/workflows/ci.yml` (nested, so GitHub never runs it), root `.github/PROJECT_STATUS.md` (Wear, May 2026), and ECOSYSTEM_DECISION_BRIEF rows 0 ("in flight"; done since §3H) and 5 (monorepo; done). |
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is still deployed but **nothing calls it any more** (since D-12 `/api/admin/contributors/review` calls the approve/reject RPCs directly and its email deep-link mode is gone): the founder decides whether to undeploy it. |
 | H6 | **Orphans in prod (needs founder OK):** tables `public.kv_store_794cc4b9` (20 rows of demo seed data) and `public.kv_store_7f45c4c8` (empty); edge functions `make-server-794cc4b9` and `make-server-7f45c4c8` (Figma-Make prototypes from June) and `deploysmoke` (returns "ok"). None are in the repo. Drop them. |
-| H7 | Two untracked drafts sit in the working tree on `main`: `apps/connect/docs/routines/daily-routine.md` and `apps/connect/config/onboarding-presets.json` (see P2 in §5). Commit or delete them. |
+| H7 | `apps/connect/config/onboarding-presets.json` is still an untracked local draft (the daily routine, `docs/routines/daily-routine.md`, was adopted by the agent-team PR on 2026-10-12). Commit or delete the presets file before Phase 3 of the routine. |
 | H10 | **Check monthly for an upstream `braces` fix** (the patched fork `packages/braces-patched`, §3 Process). Run `npm view braces version` AND read GHSA-vfj7-8cjw-p6xm's affected ranges: a new version only counts if it is not listed as affected. When one ships, follow "Removing the fork" in the package's `PATCHED.md` (delete the `braces` override and the package, `pnpm install`, run the CI's OSV command). Until then the fork is the whole fix. **Last checked 2026-10-12:** npm `latest` is still 3.0.3 and the advisory still says `patched=null`; next check due **2026-11-02**. On 2026-10-04 upstream had two open fix PRs (`micromatch/braces` #72 and #75) and the founder decided NOT to post our draft (it is in the #87 description); **both are now closed, unmerged** (#72 closed by its author on 2026-10-05, #75 withdrawn by its author the same day), so no upstream fix is pending. Open question for the founder: keep that decision, or post the draft after all. When a release ships, prefer it over the fork. |
 | H11 | **A MapTiler key is written in a tracked document**: `apps/connect/CITIZENS_STRATEGIC_DIRECTION_MAY2026.md` (one line, the env-var table). It is a public browser key (the app ships it in `config.js`), but a repo document should not carry it, and the key should be restricted by HTTP referrer in the MapTiler dashboard. **Value removed from the doc on `feat/map-v2` (2026-10-10, PR #96); it stays in git history, so the referrer restriction was the remaining step. **2026-10-12: the founder restricted the key's Allowed HTTP origins (`www.citizenscentral.co.za`, `www.219.co.za`). Consequence: PR previews (`*.vercel.app`) and `localhost` no longer get map tiles; Vision (`vision.citizenscentral.co.za`) also reads a MapTiler key. Recommended: a second key for previews and local work, set as the Preview-only `NEXT_PUBLIC_MAPTILER_KEY` in Vercel.** (Found in C19.) |
 
@@ -396,7 +412,7 @@ design session first.
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
 | P1 | Google Form → map Contributor intake (§3AP) | Built, merged and live. The live end-to-end test **passed on 2026-10-02** (a real listing, owner on Outlook mail, welcome email, 6-digit sign-in on 2026-10-03). Existing-email approvals still refuse with a clear Note until C10. | C10, C16 |
-| P2 | **Connect Daily Routine** (drafted 2026-09-21; a design-consistency step could join it, C17) | Draft v1 of a daily "check, discover, suggest" routine that reports to a Drive folder, plus onboarding presets. Never committed, never scheduled; the presets are "not wired into the wizard". | Adopt (commit + schedule) or discard. H7 |
+| P2 | **Connect Daily Routine** (the Watcher; a design-consistency step could join it, C17) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets are still not wired into the wizard. | T1 to T6, H7 |
 | P4 | Wear CSP | Flagged in §3AT. The brief was only in local `%TEMP%`; now rescued to `docs/handoffs/WEAR_CSP_HANDOFF.md`. | S1 |
 | P5 | Vision Timeline Map | Placeholder since 2026-07-02; unblocked since 2026-07-18; never started. | V1 |
 | P6 | Vision network graph + Phase D | Scoped only. | V2, V3 |
@@ -431,6 +447,15 @@ design session first.
   re-entered on 2026-10-10: confirm both in the dashboard (A11) or every email stays `skipped`. **Gotchas:** parallel sessions fetch into the shared refs,
   so `origin/main` moves under you (re-fetch before every push); PowerShell 5.1 splits `git commit -m` at a double quote (use `-F file`); two PRs that
   each add a §6 entry at the same spot conflict again once the first merges. The three oldest §6 entries moved to the archive.
+- **2026-10-12 — Agent team kick-off: the Watcher and the Decision Inbox (docs only, branch `claude/agent-watcher`).** The founder asked for agents that help
+  build the Citizens network. Built and running: a **Decision Inbox** (a private artifact: cards with a recommendation and one-tap answers, a Queue with a
+  one-agent-PR limit, daily Reports with a runs timeline) and the **Watcher** (a local scheduled task, four runs a day, read-only, one email a day to the
+  founder). The first run succeeded and the email was confirmed. **Found:** CI runs on push only, so a red `main` from a new advisory goes unseen (the founder
+  approved a scheduled run as the Builder's first task, T4); the advisor result is about 59 KB (count it by script); the first run stamped its cards 45
+  minutes ahead (timestamps now come from the clock only); PRs #90 and #91 have been untouched since 4 Oct. **The founder answered:** the phone Back check on
+  PR #96 passed; close the 14 Dependabot PRs (done 2026-10-13 after a yes in chat: closed with a comment; T2 and H1 removed); run CI every morning (yes). **Not done:** the Dispatcher, Reviewer, Builder
+  and Reader; the inbox page was never checked on a phone; nothing merged. Handoff with the team design and paste-ready prompts:
+  [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). No app code, migration or database change.
 - **2026-10-12 — Map v2 Phase 1 finished and merged (C19, PR #96), C20 fixed (PR #97).** A continuation session validated the
   first run's handoff against git, CI and the live preview; measured Lighthouse (landing screen: accessibility 92 with the flag on or
   off because of the app-wide `maximum-scale`; flag-on blocking time +170 ms, JavaScript equal); removed the MapTiler key value from a
