@@ -3,6 +3,8 @@
 **Read this, then paste the prompt at the bottom into a new Claude Code session opened at the monorepo root.**
 Source of truth for the project: `docs/MAP_UX_TRACKER.md` (item C19 in `apps/connect/RESUME_HERE.md`).
 
+> **Update 2026-10-13 (Phase 1.5 done except R3):** Map v2 is now **the default map for everyone** (PR #PR_NUM; the founder said yes to D15 in chat). `?map=v1` opts one device out, `?map=v2` brings it back, and `DEFAULT_ON = false` in `app/map-v2-lib.jsx` is the one-line rollback. **R1** (logo) was merged earlier (#99, #101); **R2, R4 and R5 are done** (evidence: tracker section 8A and 11.2); **R3 is still the founder's step** (the MapTiler usage page and an alert; see RESUME A12). Sections 1 to 4 below describe the state BEFORE this change; **start Phase 2 at its recommended order below** (P2-07, P2-08, P2-06), and skip R1 to R5 in the section 5 prompt.
+
 ---
 
 ## 1. Where Map v2 stands

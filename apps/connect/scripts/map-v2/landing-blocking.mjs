@@ -92,9 +92,14 @@ async function once(browser, url) {
       const fcp = performance.getEntriesByName('first-contentful-paint')[0].startTime;
       const tasks = window.__lt.filter(([s]) => s >= fcp && s <= fcp + win);
       const tbt = tasks.reduce((a, [, d]) => a + Math.max(0, d - 50), 0);
+      // every long task from navigation start to the end of the window (pre-paint work included)
+      const all = window.__lt.filter(([s]) => s <= fcp + win);
+      const blockAll = all.reduce((a, [, d]) => a + Math.max(0, d - 50), 0);
       return {
         fcp,
         tbt,
+        blockAll,
+        longTasksAll: all.length,
         longTasks: tasks.length,
         mapV2: typeof window.isMapV2 === 'function' ? window.isMapV2() : null,
         stylesheet: !!document.querySelector('link[href*="map-v2.css"]'),
@@ -134,6 +139,11 @@ for (const v of variants) {
     minTbtMs: round(Math.min(...col('tbt'))),
     maxTbtMs: round(Math.max(...col('tbt'))),
     medianLongTasks: median(col('longTasks')),
+    medianBlockAllMs: round(median(col('blockAll'))),
+    minBlockAllMs: round(Math.min(...col('blockAll'))),
+    maxBlockAllMs: round(Math.max(...col('blockAll'))),
+    medianLongTasksAll: median(col('longTasksAll')),
+    blockAllEachRun: col('blockAll').map(round),
     medianFcpMs: round(median(col('fcp'))),
     medianScriptMs: round(median(col('scriptMs'))),
     medianStyleMs: round(median(col('styleMs'))),
