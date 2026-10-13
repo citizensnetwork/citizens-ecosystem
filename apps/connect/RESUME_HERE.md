@@ -13,7 +13,7 @@
 > git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. **2026-10-10:** the founder signed off the
 > C15 live checks and re-entered the Resend key (nothing else was re-audited; `main` had not moved). **Later the same day:** the Map v2
 > runner prompt and tracker were reconciled against this file, `git`/GitHub and `map.jsx`, and the founder's Map v2 decisions were recorded
-> (docs only; item **C19**; `main` had moved by PR #94 meanwhile). **Later the same day, Map v2 Phase 1 was built** (PR #96; see §2 and §6). **2026-10-12:** PR #96 (Map v2 Phase 1, still behind `?map=v2`) and PR #97 (C20, the card's Share) merged. **Later the same day:** PR #91 (docs: H10, H2) and PR #90 (D-13, the owner welcome email) merged, and 43 merged remote branches were deleted (H2); see §6. Tags like `(§3AP)` point to the
+> (docs only; item **C19**; `main` had moved by PR #94 meanwhile). **Later the same day, Map v2 Phase 1 was built** (PR #96; see §2 and §6). **2026-10-12:** PR #96 (Map v2 Phase 1, still behind `?map=v2`) and PR #97 (C20, the card's Share) merged. **Later the same day:** PR #91 (docs: H10, H2) and PR #90 (D-13, the owner welcome email) merged, and 43 merged remote branches were deleted (H2); see §6. **2026-10-13:** the agent-team docs PR #98 merged and the branch review cleared every old branch (H2, §6). Tags like `(§3AP)` point to the
 > archived section with the detail.
 
 ### How to update this file (end of every session)
@@ -53,7 +53,7 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` = the merge commit of PR #98** (`af6027f`, 2026-10-13: the Watcher spec and the agent-team handoff), on top of #100 (docs), #101 and #99 (map credit, MapTiler logo), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
+- **`main` = the merge commit of PR #98** (`af6027f`, 2026-10-13: the agent-team docs), on top of #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
   Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
   (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs were
@@ -398,7 +398,7 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 ### H. Housekeeping (low risk; one session clears most of it)
 | ID | Item |
 |---|---|
-| H2 | **Mostly done 2026-10-12.** 43 merged remote branches were deleted (each: its tip already in `main`, a merged PR, not an open PR's head; the SHAs were kept, so one can be restored with `git push origin <sha>:refs/heads/<name>`). The repo ruleset "Allow Claude" (id 24081059) used to forbid deleting branches too (GH013, first hit 2026-10-04); it was edited on 2026-10-10 and now holds only `non_fast_forward`, so deletes work and force-push stays blocked (keep it that way). 5 remote branches remain besides `main` (the 14 Dependabot ones went by themselves when their PRs were closed on 2026-10-13): `claude/agent-watcher` (an open PR from another session) and 4 unmerged old branches to review, then delete or revive: `chore/phase-4-local-rewrite` (Wear, May 2026), `claude/event-location-map-ui-kib8od`, `claude/map-icon-label-zoom-16-5`, `claude/map-icon-zoom-visibility-1yzg4a`. Still to do: about 17 stale LOCAL branches and the sibling worktrees (`../wt-*`, **H3**). |
+| H2 | **Done on the remote 2026-10-13.** 43 merged remote branches were deleted on 2026-10-12 (each: its tip already in `main`, a merged PR, not an open PR's head; the SHAs were kept, so one can be restored with `git push origin <sha>:refs/heads/<name>`). The repo ruleset "Allow Claude" (id 24081059) used to forbid deleting branches too (GH013, first hit 2026-10-04); it was edited on 2026-10-10 and now holds only `non_fast_forward`, so deletes work and force-push stays blocked (keep it that way). The repo also deletes a PR's branch when the PR merges (`delete_branch_on_merge`). **The branch review of 2026-10-13 cleared the rest:** the 14 Dependabot PRs were closed (their branches went with them); the three old map branches were deleted (earlier notes called them unmerged, but their PRs #60, #61 and #62 were squash-merged on 2026-08-26 and each tip's files were identical to what was merged; tips `9b91284`, `ad03df8`, `b213bc9`); `chore/phase-4-local-rewrite` (a May 2026 posts-and-feed prototype for the fashion app, written before the monorepo and superseded by `apps/wear`) was archived as the tag `archive/chore-phase-4-local-rewrite` (= `05d6407`) and its branch deleted; restore it with `git push origin archive/chore-phase-4-local-rewrite^{commit}:refs/heads/chore/phase-4-local-rewrite`. Only `main` is left on the remote. Still to do: about 17 stale LOCAL branches and the sibling worktrees (`../wt-*`, **H3**). |
 | H3 | Park the standalone `../citizens-connect` checkout (4 uncommitted: `.gitignore`, `RESUME_HERE.md`, decision brief, `.codeviz/`). Clear the sibling clutter (`../citizens-wear-pr8`, `../cv-temp`, `../citizens-connect.worktrees`) and the orphan `.claude/worktrees/agent-a4219a…` folder. |
 | H4 | Retire stale status docs that compete with this file: `apps/connect/.github/PROJECT_STATUS.md` (last updated 2026-07-01), `apps/connect/.github/workflows/ci.yml` (nested, so GitHub never runs it), root `.github/PROJECT_STATUS.md` (Wear, May 2026), and ECOSYSTEM_DECISION_BRIEF rows 0 ("in flight"; done since §3H) and 5 (monorepo; done). |
 | H5 | **Undeployed edge functions:** 9 of the 14 in `supabase/functions/` were never deployed and nothing calls them (see P8 in §5). Decide: deploy and wire them, or delete them. `review-contributor-application` is still deployed but **nothing calls it any more** (since D-12 `/api/admin/contributors/review` calls the approve/reject RPCs directly and its email deep-link mode is gone): the founder decides whether to undeploy it. |
@@ -441,13 +441,22 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 - **2026-10-13 — The Dispatcher built and run once; the 14 Dependabot PRs closed; PR #98 unblocked (docs only, branch `claude/dispatcher-role`).** The founder's
   scheduled "resume" run had finished unseen, so the state was re-checked live and the founder confirmed three things in chat. (1) Close the 14 Dependabot PRs:
   done with a comment; Dependabot also removed its 14 branches, and a closed PR is replaced only when a newer version appears, it is not reopened. (2) Resolve
-  #98's conflict (`RESUME_HERE.md` only): `main` merged in and pushed; the founder then merged #98. (3) Build the Dispatcher: spec `docs/routines/dispatcher.md`,
+  #98's conflict (`RESUME_HERE.md` only): `main` merged in and pushed; #98 was then merged by a parallel branch-review session with the founder's yes. (3) Build the Dispatcher: spec `docs/routines/dispatcher.md`,
   four `agent:*` labels created on GitHub, task `citizens-dispatcher` (07:30 and 17:30 local). **First supervised run:** issue #102 created for the approved CI
   idea, 4 answers recorded, 2 action cards filed, nothing else touched. **Found:** one misroute (it said 13 Dependabot PRs were open when all were closed: it
   trusted the Watcher's stale count; the Watcher was also 1 low, 13 vs 14). The prompt now demands a live check; the original card was corrected by hand and the
   wrong action card is left for the founder to drop. **Not done:** the Reviewer (T3), Builder (T4), Reader (T5); the inbox page was never checked on a phone or
   for the new `dispatch` run kind; the Watcher still reports already-actioned answers as unactioned (propose-only follow-up, spec section 9). No app code, migration or database change.
-
+- **2026-10-13 — Branch and PR review (docs only).** Re-verified all 19 remote branches against GitHub, then asked the founder one group at a time.
+  **Done with the founder's yes in chat:** deleted the 3 squash-merged map branches (#60, #61, #62; tips recorded in H2); archived and deleted
+  `chore/phase-4-local-rewrite` (tag in H2); merged the agent-team docs PR #98 (T1, removed) once all its checks were green and its head was unchanged;
+  moved the founder's old untracked `daily-routine.md` draft (v1, 2026-09-21) into the gitignored `.claude/sessions/` so a `git pull` in the main checkout
+  does not collide with the tracked v3 file. A parallel session closed the 14 Dependabot PRs the same evening and brought #98 up to date with `main`
+  (closed without an ignore rule, so Dependabot opens a fresh PR when a newer version ships). **Found:** H2 had the old-branch list wrong (three of the four
+  were merged); `.github/DECISIONS.md` (Wear, May 2026) still names the deleted phase-4 branch as a cherry-pick source, and the archive tag keeps that trail
+  valid (H4 retires the file). **Gap noted, not a regression:** Wear's `POST /api/posts` passes `taggedProductIds` through unchecked because Wear has no
+  product catalog yet; add an ownership check when it gets one. **Left:** about 17 stale local branches and the sibling worktrees (H3); §6 is over its
+  8-entry guide, so the oldest entries can move to the archive. No app code, migration or database change.
 - **2026-10-12 (later) — PRs #90 and #91 brought up to date and merged; 43 merged branches deleted (H2).** Both had sat open since 2026-10-04, 57 commits
   behind `main` and conflicting. `main` was merged into each in a sibling worktree, then everything #91 asserted was re-checked live and two claims
   were stale: **H10** (both upstream `braces` fix PRs, `micromatch/braces` #72 and #75, are now closed unmerged, so the founder's "don't post our draft"
@@ -503,18 +512,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
   contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
   later merges `main` in first.
-- **2026-10-10 — Sign-off and a stale mail key (docs only).** The founder finished the whole C15 (#89) live-check list and reported
-  everything solid and working (Android Back on a real phone, cancel/restore, private window, deep-link sign-in, Share, the Supabase
-  redirect list); A2 is trimmed to what is left. The founder also found `RESEND_API_KEY` in Vercel **stale** and re-entered it: it reaches
-  code only in a new deployment (last Connect production deploy before this was `30507e9`, 2026-10-04), and no real email has been seen
-  sending yet (§2). **Found while checking:** (1) a repo ruleset, "Allow Claude", blocks deleting any branch (H2), so the merged C16 branch
-  stays on the remote; (2) the `gh` CLI login on this PC had expired (`gh auth login -h github.com` fixes it; the GitHub MCP connector
-  worked meanwhile); (3) the keys for `automation:suggest` / `automation:digest` have no consumer until Phase 2, so minting them early
-  gains nothing; (4) **CI's OSV-Scanner step went red on `main` with no code change** (nine advisories published 2026-09-18..10-07:
-  Next 15.5.26 / 16.3.6, `@capacitor/android` and `ios` 8.4.1 (critical), `sharp` 0.35.4, `source-map-js` 1.2.1) and blocked this very
-  docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
-  1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
-  The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
 
 ---
 

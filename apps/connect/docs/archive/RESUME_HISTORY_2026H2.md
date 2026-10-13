@@ -3938,7 +3938,7 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   contributor portal, guest landing, Bearer-auth sweep, map pins and labels, social parity, and the Google
   Form → map Contributor intake (mig 173). Detail: archive §3AD–§3AP.
 
-## Moved from RESUME_HERE §6 on 2026-10-13 (the three oldest session entries)
+## Moved from RESUME_HERE §6 on 2026-10-13 (the four oldest session entries)
 
 - **2026-10-04 — C16: Listing Automation Phase 1 (PR #92), migration 181 applied, merged, DORMANT.** The founder first said "read the brief
   and plan, apply nothing", so the PR was code, SQL and tests; once it was ready the founder said yes, in chat, to the apply, to merging after a
@@ -3980,3 +3980,15 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   mutated tree (stash originals, hash the tree before and after); a sibling session's `next build` makes e2e 3-5x slower. **Open:**
   nothing: the founder's live checks all passed on 2026-10-10 (see the entry above).
 - **2026-10-04 — Contributor approval gate (D-12) and owner welcome email (D-13): #86, #88, #90.** A re-applied Contributor stayed `contributor_hidden` (approve now resets it, mig 179; the live admin Approve RPC had also been broken since mig 164: it inserted into a `notifications.url` column that does not exist). Self-serve "Become a Contributor" now **waits for an admin**: mig 180 closes four self-approval doors (RPC dropped, `protect_role_column` tightened, `contributor_applications` made server-written only), the applicant lands on a "being reviewed" Dashboard (new `pending-application.jsx`; profile edits staged on their application, copied on approval), Admin → Applications approves/rejects through the RPCs directly (shows "Previously removed by an admin on…", waits for the server) and the admin/applicant are emailed (`src/lib/email`, Resend, fail-soft, admin-notice cap 20/h). #90: admin Create emails the owner a welcome (checkbox, default on; the stale "sign in with Google" copy is fixed). Founder decision: pending applicants get **profile only**, drafts are **C18**. Found, not fixed: **S12**. Gates: Connect 1035 unit, e2e 57/57. Open: **A11** (Resend env vars + live checks), **C18**, **S12**, **H5**. Mig 180 was applied right after #88's deploy (probe green in production; advisors 0 ERROR / 118 WARN / 3 INFO). **Update 2026-10-12 (PR #90 brought up to date with `main`):** C15, C16, Map v2 and C20 had landed since, so `admin.jsx`'s cache-bust in `index.html` moved to `?v=20261012a`, the project row is **P22** (P20 and P21 were taken) and this entry sits in date order. A read of the Connect project's env var names that day showed no `RESEND_API_KEY` or `ADMIN_NOTIFY_EMAIL` (see §2), so the welcome stays `skipped` until A11 step 1 is confirmed. The review also made the welcome say "on the map" only when the listing has a pin (required `onMap` input; tests at both layers); the same claim elsewhere is tracked as **C21**.
+- **2026-10-10 — Sign-off and a stale mail key (docs only).** The founder finished the whole C15 (#89) live-check list and reported
+  everything solid and working (Android Back on a real phone, cancel/restore, private window, deep-link sign-in, Share, the Supabase
+  redirect list); A2 is trimmed to what is left. The founder also found `RESEND_API_KEY` in Vercel **stale** and re-entered it: it reaches
+  code only in a new deployment (last Connect production deploy before this was `30507e9`, 2026-10-04), and no real email has been seen
+  sending yet (§2). **Found while checking:** (1) a repo ruleset, "Allow Claude", blocks deleting any branch (H2), so the merged C16 branch
+  stays on the remote; (2) the `gh` CLI login on this PC had expired (`gh auth login -h github.com` fixes it; the GitHub MCP connector
+  worked meanwhile); (3) the keys for `automation:suggest` / `automation:digest` have no consumer until Phase 2, so minting them early
+  gains nothing; (4) **CI's OSV-Scanner step went red on `main` with no code change** (nine advisories published 2026-09-18..10-07:
+  Next 15.5.26 / 16.3.6, `@capacitor/android` and `ios` 8.4.1 (critical), `sharp` 0.35.4, `source-map-js` 1.2.1) and blocked this very
+  docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
+  1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
+  The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
