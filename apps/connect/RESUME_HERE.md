@@ -353,7 +353,7 @@ design session first.
 ### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T4 | **Builder** (handoff section 4, step 5), first task GitHub issue **#102** (`agent:ready`, queue row `q-ci-schedule`): add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time, a draft; the Reviewer comments on it; a human merges. | P2 | M |
+| T4 | **Builder** (handoff section 4, step 5; brief: [`docs/handoffs/BUILDER_ROLE_HANDOFF.md`](docs/handoffs/BUILDER_ROLE_HANDOFF.md); a night session creates it, the first run is supervised), first task GitHub issue **#102** (`agent:ready`, queue row `q-ci-schedule`): add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time, a draft; the Reviewer comments on it; a human merges. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
