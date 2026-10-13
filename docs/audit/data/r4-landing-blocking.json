@@ -1,0 +1,74 @@
+{
+  "runs": 15,
+  "windowMs": 6000,
+  "cpuThrottle": 4,
+  "viewport": "390x844",
+  "variants": {
+    "default": {
+      "url": "http://localhost:3103/",
+      "mapV2": [true],
+      "stylesheetLoaded": [true],
+      "medianTbtMs": 6,
+      "minTbtMs": 0,
+      "maxTbtMs": 27,
+      "medianLongTasks": 1,
+      "medianBlockAllMs": 1621,
+      "minBlockAllMs": 683,
+      "maxBlockAllMs": 1803,
+      "medianLongTasksAll": 4,
+      "blockAllEachRun": [
+        1371, 1514, 1655, 1707, 755, 1555, 1621, 1617, 1673, 1664, 1704, 683, 1615, 1803, 1800
+      ],
+      "medianFcpMs": 2112,
+      "medianScriptMs": 795.2,
+      "medianStyleMs": 52.9,
+      "medianLayoutMs": 228.9,
+      "medianTaskMs": 2322.7,
+      "tbtEachRun": [11, 6, 0, 9, 0, 0, 0, 6, 21, 23, 5, 0, 2, 25, 27]
+    },
+    "optout": {
+      "url": "http://localhost:3103/?map=v1",
+      "mapV2": [false],
+      "stylesheetLoaded": [false],
+      "medianTbtMs": 3,
+      "minTbtMs": 0,
+      "maxTbtMs": 15,
+      "medianLongTasks": 1,
+      "medianBlockAllMs": 1649,
+      "minBlockAllMs": 987,
+      "maxBlockAllMs": 1820,
+      "medianLongTasksAll": 4,
+      "blockAllEachRun": [
+        1360, 1649, 1668, 1610, 1611, 1613, 987, 1652, 1624, 1687, 1673, 1652, 1820, 1418, 1785
+      ],
+      "medianFcpMs": 2124,
+      "medianScriptMs": 803.5,
+      "medianStyleMs": 42.7,
+      "medianLayoutMs": 234.5,
+      "medianTaskMs": 2326.3,
+      "tbtEachRun": [0, 2, 4, 3, 10, 15, 0, 8, 8, 1, 15, 7, 1, 0, 0]
+    },
+    "old": {
+      "url": "http://localhost:3102/",
+      "mapV2": [false],
+      "stylesheetLoaded": [false],
+      "medianTbtMs": 6,
+      "minTbtMs": 0,
+      "maxTbtMs": 53,
+      "medianLongTasks": 1,
+      "medianBlockAllMs": 1665,
+      "minBlockAllMs": 787,
+      "maxBlockAllMs": 1766,
+      "medianLongTasksAll": 4,
+      "blockAllEachRun": [
+        1691, 975, 1668, 1613, 1597, 1650, 1647, 1676, 787, 1757, 1661, 1665, 1763, 1766, 1745
+      ],
+      "medianFcpMs": 2124,
+      "medianScriptMs": 821.6,
+      "medianStyleMs": 45.6,
+      "medianLayoutMs": 219.5,
+      "medianTaskMs": 2319.3,
+      "tbtEachRun": [7, 0, 18, 0, 3, 53, 11, 22, 0, 4, 4, 6, 9, 7, 0]
+    }
+  }
+}

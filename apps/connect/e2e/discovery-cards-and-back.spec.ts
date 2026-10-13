@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { useOldMap } from "./support/app-hooks";
 
 declare global {
   interface Window {
@@ -233,6 +234,7 @@ test.describe("Kingdom Discovery cards render at full size", () => {
 
 test.describe("Map pins", () => {
   test("every entity type renders its own category-coloured badge shape", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
@@ -292,6 +294,7 @@ test.describe("Device Back button", () => {
 
 test.describe("One card, both surfaces", () => {
   test("a map pin's preview and the Kingdom Exploration card are the same component with the same socials", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
@@ -333,6 +336,7 @@ test.describe("One card, both surfaces", () => {
 
 test.describe("Every pin opens the same small card", () => {
   test("tapping a Contributor pin opens the preview card on the map — not the full profile — and View Full Profile opens it", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
@@ -359,6 +363,7 @@ test.describe("Every pin opens the same small card", () => {
   });
 
   test("the Back button closes a Contributor preview before it leaves the map", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/manifest.json");
     await page.goto("/");
@@ -384,6 +389,7 @@ test.describe("The preview card's Share copies the real link", () => {
     ["place", `/p/${SHARED_PLACE.id}`],
   ] as const) {
     test(`a ${type} card copies ${path}`, async ({ page }) => {
+      await useOldMap(page);
       await mockNetwork(page, { places: [SHARED_PLACE] });
       await page.goto("/");
       await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
@@ -449,6 +455,7 @@ test.describe("Contributor logos", () => {
   const withLogo = (extra: Record<string, unknown>) => ({ ...CONTRIBUTOR, logo_url: WORDMARK, ...extra });
 
   test("an organisation's wide logo sits whole on a white disc, with the category as the ring", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page, { contributors: [withLogo({ category: "media-broadcasting" })] });
     await page.goto("/");
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
@@ -478,6 +485,7 @@ test.describe("Contributor logos", () => {
   });
 
   test("an Individual's photo of themselves still fills the circle", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page, { contributors: [withLogo({ contributor_kind: "individual" })] });
     await page.goto("/");
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
@@ -488,6 +496,7 @@ test.describe("Contributor logos", () => {
   });
 
   test("a logo that fails to load degrades to the category glyph, never a dead image", async ({ page }) => {
+    await useOldMap(page);
     const broken = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
     await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
     await mockNetwork(page, { contributors: [withLogo({ logo_url: broken })] });
@@ -497,6 +506,7 @@ test.describe("Contributor logos", () => {
   });
 
   test("the preview card shows the logo whole too", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page, { contributors: [withLogo({})] });
     await page.goto("/");
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
@@ -599,6 +609,7 @@ test.describe("Map density gates and pin labels", () => {
   });
 
   test("pin names float on a mist, with no capsule around them", async ({ page }) => {
+    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });

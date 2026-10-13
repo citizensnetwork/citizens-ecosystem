@@ -1,9 +1,13 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Map v2 foundations (tracker docs/MAP_UX_TRACKER.md)
 //  ------------------------------------------------------------------
-//  Everything Map v2 adds sits behind ONE flag, default OFF:
-//    ?map=v2   turns it on and remembers it (localStorage `cc_map_v2` = 'v2')
-//    ?map=v1   turns it off again (clears the key)
+//  Everything Map v2 adds sits behind ONE flag, default ON (founder D15,
+//  2026-10-13; MAP_V2_NEXT_PHASE_HANDOFF R2). It is the escape hatch for a
+//  release or two:
+//    ?map=v1   turns it off and remembers that on this device (`cc_map_v2` = 'v1')
+//    ?map=v2   turns it on again and forgets the choice (back to the default)
+//  A device only stores a value when it differs from DEFAULT_ON; a stored value
+//  always wins over the default. Rollback for everyone is DEFAULT_ON = false.
 //  With the flag off nothing here touches the page: no stylesheet is requested,
 //  no attribute is set. The flag is read when this file
 //  LOADS (the third app script, before the store boots), so it is captured
@@ -40,13 +44,21 @@
   const write = (k, v) => { try { const s = store(); if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); } } catch { /* private mode or blocked storage: the setting lasts this page only */ } };
 
   // ── The flag ──────────────────────────────────────────────────────
-  let on = false;
+  // Map v2 is the default (D15). Set false to take everyone back to the old map
+  // in one line (a device with a stored choice keeps it).
+  const DEFAULT_ON = true;
+  let on = DEFAULT_ON;
   function resolveFlag() {
     let q = null;
     try { q = new URLSearchParams(window.location.search).get('map'); } catch { /* no location (tests) */ }
-    if (q === 'v2') { write(FLAG_KEY, 'v2'); on = true; }
-    else if (q === 'v1') { write(FLAG_KEY, null); on = false; }
-    else on = read(FLAG_KEY) === 'v2';
+    if (q === 'v2' || q === 'v1') {
+      // Store only what differs from the default, so a later change of default reaches this device.
+      write(FLAG_KEY, (q === 'v2') === DEFAULT_ON ? null : q);
+      on = q === 'v2';
+    } else {
+      const stored = read(FLAG_KEY);
+      on = stored === 'v2' ? true : stored === 'v1' ? false : DEFAULT_ON;
+    }
   }
   resolveFlag();
   const isMapV2 = () => on;

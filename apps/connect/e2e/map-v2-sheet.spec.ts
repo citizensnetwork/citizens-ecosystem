@@ -1,8 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
+import { useOldMap } from "./support/app-hooks";
 import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
-//  Map v2 bottom sheet (tracker P1-06 to P1-11), behind `?map=v2`.
+//  Map v2 bottom sheet (tracker P1-06 to P1-11); Map v2 is on by default since D15.
 //  Hermetic, clock frozen at Saturday 2026-10-10 10:00 in Pretoria.
 //  Playwright cannot reproduce Chrome's Back intervention, so the Back
 //  behaviour here is the EMULATED half; the founder's real-phone check is
@@ -186,6 +187,56 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(sheet(page)).toHaveCount(0);
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/");
+  });
+
+  // The C15 rule (RESUME section 3), on the map everyone gets since D15: Chrome on Android skips every history
+  // entry a page added WITHOUT a user gesture, which is how Back once left Connect. Playwright's goBack() is
+  // programmatic, so it cannot show that; what it CAN show is the cause: each pushState with
+  // navigator.userActivation.isActive at that moment. (routing.spec.ts runs the same rule on the old card.)
+  test("every history entry the sheet adds is pushed inside a tap, one per opening, and Back never gets trapped", async ({ page }) => {
+    type Push = { active: boolean; guard: boolean; url: string };
+    await page.addInitScript(() => {
+      const w = window as unknown as { __pushes: Push[] };
+      w.__pushes = [];
+      const orig = History.prototype.pushState;
+      History.prototype.pushState = function (this: History, state: unknown, title: string, url?: string | URL | null) {
+        w.__pushes.push({ active: navigator.userActivation.isActive, guard: !!(state && (state as { guard?: boolean }).guard), url: String(url) });
+        return orig.call(this, state, title, url);
+      };
+    });
+    const pushes = () => page.evaluate(() => (window as unknown as { __pushes: Push[] }).__pushes);
+    const seed = seed0();
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed);
+    await page.goto("/manifest.json"); // a real previous entry, so "Back leaves Connect" is observable
+    await openMap(page, "/", 8);
+    await page.waitForTimeout(600); // let every boot effect settle: the map itself pushes nothing
+    expect(await pushes()).toEqual([]);
+
+    const c = seed.contributors[0];
+    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    expect(await pushes()).toEqual([{ active: true, guard: true, url: expect.any(String) }]);
+
+    // closed by its own button, reopened, closed by Back, reopened, closed by Back
+    await page.getByRole("button", { name: "Close details" }).click();
+    await expect(sheet(page)).toHaveCount(0);
+    await page.waitForTimeout(300); // the guard's own entry is taken back off the stack (async)
+    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await page.goBack();
+    await expect(sheet(page)).toHaveCount(0);
+    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await page.goBack();
+    await expect(sheet(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/");
+
+    // three openings = three pushes, every one inside a tap and none a screen change
+    const all = await pushes();
+    expect(all).toHaveLength(3);
+    expect(all.every((p) => p.active && p.guard)).toBe(true);
+
+    // nothing stacked under the map: the next Back leaves Connect
+    await page.goBack();
+    await expect.poll(() => page.url()).toContain("manifest.json");
   });
 
   test("Escape and the close button close it at once and give the entry back", async ({ page }) => {
@@ -512,6 +563,7 @@ test.describe("P1-06 side panel (wide screens)", () => {
 
 test.describe("flag off: the v1 card is untouched", () => {
   test("a pin still opens the v1 preview card, and no Map v2 sheet exists", async ({ page }) => {
+    await useOldMap(page);
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await openMap(page, "/", 8);
