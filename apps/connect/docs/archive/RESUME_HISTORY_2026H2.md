@@ -3992,3 +3992,26 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   docs PR. **Fixed by PR #94 (`51c2fab`):** patch bumps only (Next 15.5.27 / 16.3.8, Capacitor 8.4.3, sharp 0.35.5, source-map-js
   1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
   The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
+
+## Moved from RESUME_HERE §6 on 2026-10-14 (the two oldest session entries)
+
+- **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
+  dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
+  recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back
+  closes the sheet at once, D8 category glyph below about zoom 15 and the logo above it, D9 one sheet for all three pin types, D10 a
+  shared link keeps opening the full profile (D2 and D7 defaults stand). All of it is in tracker §10, §13.1 and its Decision Log, in the
+  runner prompt (a "decided" block at the top, so a fresh session starts with it) and in the C19 block. Also: PR #93 had already
+  merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
+  fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
+  may return if the tile provider has no dark style).
+- **2026-10-10 — Map v2: prompt and tracker reconciled with this file (docs only).** The founder pasted the Map v2
+  runner prompt and chose the light map (tracker D1; revised in the entry above). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
+  `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
+  protocol; its ids collide with ours (so item **C19**, project **P21**; C18 was already taken by #90's branch); v1 pins are shape-per-type
+  DOM markers under three zoom gates; Share and deep links already exist (C15); the sheet's Back behaviour is constrained by the history
+  rule; the founder's `map-layering.md` conflicts with 48 px photo pins at mid zoom (D8); live data has 0 upcoming events. Added:
+  `docs/MAP_V2_RUNNER_PROMPT.md`, the tracker (now tracked), Appendix E (26 tunable design values against the recording), and a root
+  `.gitignore` rule for the reference frames (the folder was untracked, so `git add docs/` would have committed third-party photos).
+  **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
+  contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
+  later merges `main` in first.

@@ -111,7 +111,10 @@
   repo (handoff section 9). **The Dispatcher** (`citizens-dispatcher`, 07:30 and 17:30 local) routes the founder's newly answered inbox cards: an approved
   idea becomes a public GitHub issue labelled `agent:ready` plus a queue row (the first is issue #102, the CI-every-morning idea); an answer that asks for
   nothing is recorded; anything that needs the founder in chat becomes one action card. It only ever creates issues. Spec:
-  [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md).
+  [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Builder (T4)** is specified
+  ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14): one approved issue to one draft PR, no cron, never merges. Its scheduled task
+  `citizens-builder` is **not created yet** (the night session's create call needed an approval nobody could give; the prompt is saved locally) and it
+  has **never run**; the switch card `d-chain` (roles starting each other, builder.md section 9) is filed, unanswered and not wired.
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -357,11 +360,11 @@ design session first.
 - *Next step:* start a new session with the prompt in `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md` section 5: Phase 1.5 (R1 MapTiler logo with the founder's screenshot sign-off, R2 the flag on for everyone = new decision MAP:D15, R3 quota watch, R4 the flag-on landing blocking time, R5 close D14), then Phase 2 (P2-07, P2-08, P2-06 first; P2-01 needs D2; the G1 items need migrations and the founder's yes).
 - *Facts to keep:* production runs a custom MapTiler Dataviz-based style (not `streets-v2`); `dataviz-dark` loads with the existing key (+12 tile requests for a person who switches); live data has 0 upcoming events, 0 of 40 places with opening hours and a median stored image of 319 KB; headless Chromium needs GPU flags for frame times (software GL is about 10x slower); a marker's inner nodes must not carry `class` attributes (the Tailwind CDN observer cost 31 ms p95 per pan frame on 150 pins); measurement tools are in `apps/connect/scripts/map-v2/`. Lighthouse (2026-10-10, preview, landing screen only because guest mode is in `sessionStorage`): accessibility 92 with the flag on or off (the app-wide `maximum-scale` in the viewport meta blocks pinch zoom), flag-on blocking time about +170 ms (style work, JavaScript equal), `docs/audit/phase1-qa.md` section 4.
 
-### T. Agent team (the Watcher and the Dispatcher are live; the rest is to build)
+### T. Agent team (the Watcher and the Dispatcher are live; the Builder is specified; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
 | T3 | **Reviewer** (handoff section 4, step 4): review any agent PR with fresh context (the Dispatcher, step 3, is built). Test it on the Dispatcher's own docs PR and one real draft PR. | P2 | M |
-| T4 | **Builder**, first task `q-ci-schedule`: add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time. | P2 | M |
+| T4 | **Builder**: spec written ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14); **task `citizens-builder` still to create** (ad hoc, no cron, from the locally saved prompt) and **first run pending**, supervised, on issue #102 (`q-ci-schedule`: a daily `schedule:` trigger in `.github/workflows/ci.yml`). Then wire the chaining (builder.md section 9) once the founder answers `d-chain`. One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
@@ -447,6 +450,17 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-14 (night, unattended) — The Builder (T4) specified; its task not yet created (docs only, branch `claude/builder-role`).** A one-time
+  scheduled session ran the founder's night prompt (`BUILDER_ROLE_HANDOFF.md` section 7.3, on PR #105's branch). **Done:** the spec
+  [`docs/routines/builder.md`](docs/routines/builder.md) (lifecycle, work-in-progress rule, scope, gates with the D2 shortcut, stop
+  conditions, shapes, tools, and the chaining design as section 9, "designed, not yet wired"); the inbox switch card `d-chain` (decision,
+  forward or off, **unanswered**); the full task prompt. **Blocked:** creating the scheduled task `citizens-builder` asks for a person's
+  approval, which an unattended run cannot get; not worked around. The prompt is in the primary checkout's gitignored
+  `.claude/sessions/builder-task-prompt.md`. **Not done (by design):** no task run, no task or spec of another role edited, no chaining
+  wired, nothing merged. Found: queue rows `q-pr98` and `q-agent-watcher` still say `in_review` although PR #98 merged (both `by: session`,
+  so the work-in-progress rule ignores them). This PR links to `reviewer.md` and the brief, which arrive with PR #105: merge #105 first.
+  **Next (supervised):** create the task (no cron), "Run now" on #102 with the founder approving its tools, read back, fix, then wire the chaining.
+
 - **2026-10-13 (night) — Map v2 is the default map for everyone (C19 Phase 1.5, PR #106).** From the start-up menu the founder chose C19, said
   yes to **D15** (default on, `?map=v1` as the escape hatch) and, going to bed, told me to merge wherever needed (I read that as: merge `main`
   into my own branch and merge my own PR once CI is green; nothing else, and no other session's PR). **What changed:** `app/map-v2-lib.jsx` reads the
@@ -522,26 +536,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   makes classes on marker children expensive (31 ms p95 per pan frame at 150 pins). **Not done:** the real-phone Back check, the screenshot sign-off,
   decision D12 (D11, D13, D14 accepted), the merge. No migration, no DB or auth change, no new dependency. Gates: workspace format, lint, build, typecheck, test and the
   full Connect e2e, plus a 120-check QA matrix (`docs/audit/phase1-qa.md`).
-- **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
-  dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
-  recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back
-  closes the sheet at once, D8 category glyph below about zoom 15 and the logo above it, D9 one sheet for all three pin types, D10 a
-  shared link keeps opening the full profile (D2 and D7 defaults stand). All of it is in tracker §10, §13.1 and its Decision Log, in the
-  runner prompt (a "decided" block at the top, so a fresh session starts with it) and in the C19 block. Also: PR #93 had already
-  merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
-  fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
-  may return if the tile provider has no dark style).
-- **2026-10-10 — Map v2: prompt and tracker reconciled with this file (docs only).** The founder pasted the Map v2
-  runner prompt and chose the light map (tracker D1; revised in the entry above). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
-  `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
-  protocol; its ids collide with ours (so item **C19**, project **P21**; C18 was already taken by #90's branch); v1 pins are shape-per-type
-  DOM markers under three zoom gates; Share and deep links already exist (C15); the sheet's Back behaviour is constrained by the history
-  rule; the founder's `map-layering.md` conflicts with 48 px photo pins at mid zoom (D8); live data has 0 upcoming events. Added:
-  `docs/MAP_V2_RUNNER_PROMPT.md`, the tracker (now tracked), Appendix E (26 tunable design values against the recording), and a root
-  `.gitignore` rule for the reference frames (the folder was untracked, so `git add docs/` would have committed third-party photos).
-  **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
-  contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
-  later merges `main` in first.
 
 ---
 
