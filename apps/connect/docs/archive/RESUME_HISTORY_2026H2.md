@@ -4030,3 +4030,21 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   makes classes on marker children expensive (31 ms p95 per pan frame at 150 pins). **Not done:** the real-phone Back check, the screenshot sign-off,
   decision D12 (D11, D13, D14 accepted), the merge. No migration, no DB or auth change, no new dependency. Gates: workspace format, lint, build, typecheck, test and the
   full Connect e2e, plus a 120-check QA matrix (`docs/audit/phase1-qa.md`).
+
+## Moved from RESUME_HERE §6 on 2026-10-14 (the two oldest session entries)
+
+- **2026-10-12 — Agent team kick-off: the Watcher and the Decision Inbox (docs only, branch `claude/agent-watcher`).** The founder asked for agents that help
+  build the Citizens network. Built and running: a **Decision Inbox** (a private artifact: cards with a recommendation and one-tap answers, a Queue with a
+  one-agent-PR limit, daily Reports with a runs timeline) and the **Watcher** (a local scheduled task, four runs a day, read-only, one email a day to the
+  founder). The first run succeeded and the email was confirmed. **Found:** CI runs on push only, so a red `main` from a new advisory goes unseen (the founder
+  approved a scheduled run as the Builder's first task, T4); the advisor result is about 59 KB (count it by script); the first run stamped its cards 45
+  minutes ahead (timestamps now come from the clock only); PRs #90 and #91 have been untouched since 4 Oct. **The founder answered:** the phone Back check on
+  PR #96 passed; close the 14 Dependabot PRs (done 2026-10-13 after a yes in chat: closed with a comment; T2 and H1 removed); run CI every morning (yes). **Not done:** the Dispatcher, Reviewer, Builder
+  and Reader; the inbox page was never checked on a phone; nothing merged. Handoff with the team design and paste-ready prompts:
+  [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). No app code, migration or database change.
+- **2026-10-12 — Map v2 Phase 1 finished and merged (C19, PR #96), C20 fixed (PR #97).** A continuation session validated the
+  first run's handoff against git, CI and the live preview; measured Lighthouse (landing screen: accessibility 92 with the flag on or
+  off because of the app-wide `maximum-scale`; flag-on blocking time +170 ms, JavaScript equal); removed the MapTiler key value from a
+  tracked doc (H11; the referrer restriction is still the founder's step). The founder passed the real-phone Back test, approved the
+  dark look, accepted D11, D13, D14, kept MapTiler on Free (D12) and revised D1: the look now follows the phone, and the Map look button
+  and the "map v2" badge are gone. Next-phase handoff with a paste-in prompt: `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`.
