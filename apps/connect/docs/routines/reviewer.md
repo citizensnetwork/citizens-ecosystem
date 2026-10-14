@@ -30,7 +30,7 @@ Vision link (VISION.md, "Connecting the Kingdom"): excellence as stewardship. Th
 | Source | Rule |
 |---|---|
 | **Open pull requests** | Same-repository, **not** by Dependabot, whose head commit differs from `rv-pr<number>.reviewedSha` (or that has no row yet). Drafts are included: the Builder opens drafts |
-| **Review requests** | A queue row `rv-pr<number>` in state `queued` with no `reviewedSha`. A session, the founder or the Dispatcher files one. It works for a **merged** pull request too (a post-merge audit), and it is how the first supervised run is pointed at something |
+| **Review requests** | A queue row `rv-pr<number>` in state `queued` with no `reviewedSha`. A session or the founder files one (the Dispatcher only creates issues; it cannot). It works for a **merged** pull request too (a post-merge audit), and it is how the first supervised run is pointed at something |
 
 Order: requests first (oldest first), then open pull requests by oldest update. Skip a pull request that is closed without merging unless it was requested.
 

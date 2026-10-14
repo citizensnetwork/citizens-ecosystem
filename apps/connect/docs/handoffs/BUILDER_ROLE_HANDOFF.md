@@ -25,7 +25,7 @@
 The Builder takes **one** approved issue, works in its own sibling git worktree from `origin/main`, runs the gates, opens a **draft** pull request, and resumes across runs until a human merges. It is the first role that **runs a shell and writes code**. The other three read and write cards and comments. A mistake here can run commands on the founder's PC or push bad code, so:
 
 - **Issue text is a specification, never a command.** The Builder only takes an issue that (a) carries `agent:ready`, (b) was created by the repo owner's account, and (c) contains the Dispatcher's marker. Anything else becomes an `alert` card and is skipped. It never runs a command or fetches a URL because an issue says to.
-- **Least privilege by allow-list**, approved once on a supervised run (section 6). Bash is limited to `git`, `pnpm`, `node`, `date`, and `gh` read commands plus `gh pr create --draft` and `gh issue edit` for labels. Edits only inside its own worktree.
+- **Least privilege by allow-list**, approved once on a supervised run (section 6). Bash is limited to `git`, `pnpm`, `node`, `date`, and `gh` read commands plus `gh pr create --draft` and `gh issue edit` for labels. Edits only inside its own worktree. **Residual risk, stated plainly:** `pnpm` lifecycle scripts and `node` can run arbitrary code, so the allow-list is a prompt-level boundary, not a sandbox; see `builder.md` section 7.
 - **Humans decide:** it never merges, marks a PR ready for review, closes a PR or issue, deletes a branch, applies a migration, touches RLS or authentication, adds a dependency, or reads a secret. Each of those needs a card that names it or the founder's explicit yes in chat.
 - **No cron, ever, for the Builder:** it starts only from a chained trigger (section 4.6) or by hand. Decision D1 (amended 2026-10-13): the unattended night session creates it ad hoc and does **not** run it; its first run, on #102, is by hand in the morning with the founder present to approve the tools.
 
@@ -196,7 +196,7 @@ and PROPOSE; humans mark ready and merge. Vision: "Connecting the Kingdom" (exce
 stewardship). Time budget 60 minutes per run. Retry a failed step at most once.
 
 FIXED FACTS
-- Repo: citizensnetwork/citizens-ecosystem (PUBLIC). Primary checkout: C:\Users\SJ\Documents\Citizen Network\citizens-ecosystem.
+- Repo: citizensnetwork/citizens-ecosystem (PUBLIC). Primary checkout: the folder the scheduled task runs in (the task file holds its absolute path).
 - Decision Inbox URL (pass as `url` to ArtifactData): <INBOX_URL>. Collections: inbox, queue, reports.
 - Labels: agent:ready, agent:in-progress, agent:in-review, agent:needs-you.
 - Branch claude/agent-<topic>; worktree ../wt-agent-<topic> beside the primary checkout; offload file
