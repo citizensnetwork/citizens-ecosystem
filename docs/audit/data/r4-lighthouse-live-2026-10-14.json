@@ -1,0 +1,34 @@
+{
+  "runs": 5,
+  "lighthouse": "12.8.2",
+  "chrome": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "variants": {
+    "default": {
+      "url": "https://www.citizenscentral.co.za/",
+      "completedRuns": 5,
+      "performance": 64,
+      "accessibility": 92,
+      "tbtMs": 48.5,
+      "tbtEachRun": [99.4, 40, 103, 48.5, 19],
+      "lcpMs": 5744.9,
+      "fcpMs": 5394.7,
+      "ttiMs": 5744.9,
+      "cls": 0.0005
+    },
+    "optout": {
+      "url": "https://www.citizenscentral.co.za/?map=v1",
+      "completedRuns": 5,
+      "performance": 64,
+      "accessibility": 92,
+      "tbtMs": 62.5,
+      "tbtEachRun": [66.5, 97.4, 49.4, 42, 62.5],
+      "lcpMs": 5950.5,
+      "fcpMs": 5397.8,
+      "ttiMs": 5950.5,
+      "cls": 0.0005
+    }
+  },
+  "measuredOn": "2026-10-14",
+  "site": "live production (www.citizenscentral.co.za), landing screen only",
+  "method": "Lighthouse default mobile profile (simulated slow 4G, CPU x4), 5 interleaved runs per variant, fresh Chrome profile each run; scripts/map-v2/lighthouse-batch.mjs"
+}
