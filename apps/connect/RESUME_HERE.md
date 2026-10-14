@@ -13,7 +13,7 @@
 > git, GitHub, Supabase and Vercel. The S, V, W and M items were last re-checked on 2026-09-27. **2026-10-10:** the founder signed off the
 > C15 live checks and re-entered the Resend key (nothing else was re-audited; `main` had not moved). **Later the same day:** the Map v2
 > runner prompt and tracker were reconciled against this file, `git`/GitHub and `map.jsx`, and the founder's Map v2 decisions were recorded
-> (docs only; item **C19**; `main` had moved by PR #94 meanwhile). **Later the same day, Map v2 Phase 1 was built** (PR #96; see §2 and §6). **2026-10-12:** PR #96 (Map v2 Phase 1, still behind `?map=v2`) and PR #97 (C20, the card's Share) merged. **Later the same day:** PR #91 (docs: H10, H2) and PR #90 (D-13, the owner welcome email) merged, and 43 merged remote branches were deleted (H2); see §6. **2026-10-13:** the agent-team docs PR #98 merged and the branch review cleared every old branch (H2, §6). **Later the same day: Map v2 became the default map for everyone** (PR #106, C19 Phase 1.5, founder decision D15; `?map=v1` opts a device out; see §2, §6, A12). **2026-10-14 (night, founder away): swipes (C22), a fixed tilt (C23) and the first Phase 2 items (P2-06 QR, P2-07, P2-08) were built and, with the founder's standing permission, merged (this PR; see §2, §6, A12); the real-phone pass is his.** Tags like `(§3AP)` point to the
+> (docs only; item **C19**; `main` had moved by PR #94 meanwhile). **Later the same day, Map v2 Phase 1 was built** (PR #96; see §2 and §6). **2026-10-12:** PR #96 (Map v2 Phase 1, still behind `?map=v2`) and PR #97 (C20, the card's Share) merged. **Later the same day:** PR #91 (docs: H10, H2) and PR #90 (D-13, the owner welcome email) merged, and 43 merged remote branches were deleted (H2); see §6. **2026-10-13:** the agent-team docs PR #98 merged and the branch review cleared every old branch (H2, §6). **Later the same day: Map v2 became the default map for everyone** (PR #106, C19 Phase 1.5, founder decision D15; `?map=v1` opts a device out; see §2, §6, A12). **2026-10-14 (night, founder away): swipes (C22), a fixed tilt (C23) and the first Phase 2 items (P2-06 QR, P2-07, P2-08) were built and, with the founder's standing permission, merged (PR #112; see §2, §6, A12); the real-phone pass is his.** Tags like `(§3AP)` point to the
 > archived section with the detail.
 
 ### How to update this file (end of every session)
@@ -77,7 +77,7 @@
   Vision: 1 organisation, 0 linked to a Connect Contributor. 14 cron jobs, all active.
 - **Tests (last full local run, the Map v2 rollout branch @ `735dc0a` + the PR #106 changes, 2026-10-13; format, lint, build, typecheck all green):** Connect **1358** unit
   (+36 live-only, skipped in CI) · Vision 734 · Wear 115 · `@citizens/db` 127 · frontend-build 55 · connect-client 21 · utils 7 ·
-  `braces-patched` 150 · **Connect Playwright e2e 253/253** (2026-10-14: +54 from this PR: 20 real-touch swipe tests, 13 tilt, 21 Phase 2) (the C15 routing suite, the 19
+  `braces-patched` 150 · **Connect Playwright e2e 253/253** (2026-10-14: +54 from PR #112: 20 real-touch swipe tests, 13 tilt, 21 Phase 2) (the C15 routing suite, the 19
   listing-automation tests, Map v2, the D-13 welcome specs; 18 tests about the old pins and preview card now pin the old map with
   `useOldMap()`, and a new sheet test records `navigator.userActivation` at every `pushState`). (Two suites used to hit vitest's 5 s default when every app's tests run
   in parallel on a busy machine: `frontend-build`'s end-to-end test now has an explicit 30 s, and the migration-lineage security
@@ -445,14 +445,14 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 | P18 | Figma-Make prototypes | Leftover tables and edge functions in prod from the June experiments. | H6 |
 | P19 | Address hygiene | Roadmap only: custom domains + a branded storage origin. | A6 |
 | P20 | **Listing Automation Phase 1** (C16) | Merged (#92) and migration 181 applied; dormant: every level is `off`, no `automation:*` key is minted (not needed until Phase 2), `RESEND_API_KEY` was re-entered 2026-10-10 and goes live with the next deployment. Phase 2 (the scheduled reader) is not started. | C16 |
-| P21 | **Map v2** (C19) | Phase 1 merged (PR #96), the default for everyone since PR #106; swipes, the fixed tilt, QR, Upcoming \| Recent and count buckets built 2026-10-14 (this PR, awaiting the phone pass). Next: the rest of Phase 2 (`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`). | C19 |
+| P21 | **Map v2** (C19) | Phase 1 merged (PR #96), the default for everyone since PR #106; swipes, the fixed tilt, QR, Upcoming \| Recent and count buckets built 2026-10-14 (PR #112, awaiting the phone pass). Next: the rest of Phase 2 (`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`). | C19 |
 | P22 | Contributor approval gate (D-12) + owner welcome email (D-13) | D-12 merged 2026-10-04 (PRs #86, #88; mig 180 applied); D-13 is PR #90. Not yet walked live: the sending env vars still need confirming in Vercel (§2). | A11, C18, S12 |
 
 ---
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
-- **2026-10-14 (night, founder away) — Swipes, a fixed tilt, a QR code, Upcoming | Recent and count buckets (C22, C23, P2-06 to P2-08; branch `claude/map-v2-swipe-tilt`, this PR).**
+- **2026-10-14 (night, founder away) — Swipes, a fixed tilt, a QR code, Upcoming | Recent and count buckets (C22, C23, P2-06 to P2-08; branch `claude/map-v2-swipe-tilt`, PR #112).**
   The founder said to continue without him and to merge on any of it. **Swipes:** I reproduced the report with real touch first (CDP
   `Input.dispatchTouchEvent`): a swipe that starts on the card's content at half or peek ends in `pointercancel` because the scroller
   (`overflow` hidden) ends the `touch-action` chain; at full nothing handed a swipe at the top to the sheet; at 768 px and up there
