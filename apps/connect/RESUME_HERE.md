@@ -53,7 +53,7 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` = the merge commit of PR #107** (2026-10-14: the Builder spec, docs only), on top of PR #105 (`d9ba496`: the Reviewer docs), PR #106 (`7a58d41`, 2026-10-13 night: Map v2 is the default map), PR #104 (`b7f78ea`: the Dispatcher docs), #103 (docs), PR #98 (`af6027f`: the agent-team docs), #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
+- **`main` = the merge commit of PR #109** (`06414c8`, 2026-10-14: CI also runs daily at 02:17 UTC and by hand), on top of PR #110 (docs: Lighthouse, the swipe request), **PR #107** (2026-10-14: the Builder spec, docs only), on top of PR #105 (`d9ba496`: the Reviewer docs), PR #106 (`7a58d41`, 2026-10-13 night: Map v2 is the default map), PR #104 (`b7f78ea`: the Dispatcher docs), #103 (docs), PR #98 (`af6027f`: the agent-team docs), #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
   Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
   (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs were
@@ -116,10 +116,7 @@
   [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Reviewer** (`citizens-reviewer`, 08:30, 12:30 and 16:30 local) reads open same-repo
   PRs (and any PR a `rv-pr<n>` queue row asks for, merged ones included) cold, against the repo's own rules, and posts ONE public advisory comment per PR per
   commit with file and line. It cannot approve, label, push or merge. Spec: [`docs/routines/reviewer.md`](docs/routines/reviewer.md).
-  **The Builder (T4)** is specified
-  ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14): one approved issue to one draft PR, no cron, never merges. Its scheduled task
-  `citizens-builder` is **not created yet** (the night session's create call needed an approval nobody could give; the prompt is saved locally) and it
-  has **never run**; the switch card `d-chain` (roles starting each other, builder.md section 9) is filed, unanswered and not wired.
+  **The Builder (T4)** (`citizens-builder`, no cron, started by hand with "Run now", saved in Auto permission mode) takes ONE approved `agent:ready` issue to ONE draft PR and never merges ([`docs/routines/builder.md`](docs/routines/builder.md)). Its first run, on #102, gave PR #109 (merged 2026-10-14 on the founder's permission in chat; section 10 of the spec has the record and the four defects it found). CI now also runs daily at 02:17 UTC and by hand (`workflow_dispatch`); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The next approved issue is #108 (keep the public API warm, `q-api-coldstart`). The switch card `d-chain` is answered **forward**, but chaining is **not wired**: the Auto-mode classifier denied `run_scheduled_task`, so it waits for the founder's decision on a permission rule (builder.md section 9). The Reviewer's task prompt still lacks checklist item 8 (workflow files).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -369,7 +366,7 @@ design session first.
 ### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the Builder is specified; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T4 | **Builder**: spec written ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14); **task `citizens-builder` still to create** (ad hoc, no cron, from the locally saved prompt) and **first run pending**, supervised, on issue #102 (`q-ci-schedule`: a daily `schedule:` trigger in `.github/workflows/ci.yml`). Then wire the chaining (builder.md section 9) once the founder answers `d-chain`. One agent PR open at a time. | P2 | M |
+| T4 | **Builder**: LIVE (2026-10-14; spec [`docs/routines/builder.md`](docs/routines/builder.md), record in its section 10). First task #102 done (PR #109 merged). **Left:** confirm the first scheduled CI run (due 02:17 UTC on 2026-10-15); the founder's decision on a permission rule for `run_scheduled_task`, then wire the chaining (builder.md section 9, one supervised "Run now" per changed role) and put checklist item 8 into the Reviewer's task prompt; then run the Builder on #108. One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
@@ -455,6 +452,16 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-14 (night, supervised) — The Builder (T4) is live: first run on #102, PR #109 merged; chaining decided, not wired (docs only, branch
+  `claude/builder-first-run`).** The task `citizens-builder` was created (manual only, Auto mode) and run once: draft PR #109, one file, CI green, the issue
+  relabelled, a card filed, no second task. The read-back found four defects with ONE root cause (the traps lived in the brief, not in the issue or the
+  task prompt): a shared concurrency group, no `workflow_dispatch`, a busy cron minute, an unfinalised offload file; the task prompt and `builder.md` now
+  carry an interaction check. The Reviewer's first look at a Builder PR had real line numbers (its re-test passed) but called the concurrency trap a nit
+  and missed the rest, so `reviewer.md` section 4 has item 8 (**its task prompt needs it too**). #109 was hand-fixed (7b3096a) and, on the founder's
+  permission in chat, merged (06414c8); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The first scheduled run is due 02:17 UTC on 2026-10-15. **Chaining:** `d-chain` is answered forward
+  but NOT wired (the classifier denied `run_scheduled_task`; a permission rule is the founder's call; the step text is prepared locally). Five decision cards
+  were filed (Dispatcher echo cards, a merge-trust ladder, Strategist and Scribe, the cloud runner, a no-reply commit email). The two oldest section 6
+  entries moved to the archive. **Next:** the founder's permission decision, then wire the chaining and run each changed role once; the Builder on #108.
 - **2026-10-14 — Lighthouse run on the live site; the swipe request recorded; a stateless prompt written (docs only, branch
   `claude/map-v2-lighthouse-and-next-prompt`).** The founder said the default map "is working great", approved the Lighthouse download (the one
   thing I had left unmeasured) and reported on his Android phone that the sheet cannot be swiped up, nor swiped back down after seen; he wants
@@ -537,21 +544,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   re-entered on 2026-10-10: confirm both in the dashboard (A11) or every email stays `skipped`. **Gotchas:** parallel sessions fetch into the shared refs,
   so `origin/main` moves under you (re-fetch before every push); PowerShell 5.1 splits `git commit -m` at a double quote (use `-F file`); two PRs that
   each add a §6 entry at the same spot conflict again once the first merges. The three oldest §6 entries moved to the archive.
-- **2026-10-12 — Agent team kick-off: the Watcher and the Decision Inbox (docs only, branch `claude/agent-watcher`).** The founder asked for agents that help
-  build the Citizens network. Built and running: a **Decision Inbox** (a private artifact: cards with a recommendation and one-tap answers, a Queue with a
-  one-agent-PR limit, daily Reports with a runs timeline) and the **Watcher** (a local scheduled task, four runs a day, read-only, one email a day to the
-  founder). The first run succeeded and the email was confirmed. **Found:** CI runs on push only, so a red `main` from a new advisory goes unseen (the founder
-  approved a scheduled run as the Builder's first task, T4); the advisor result is about 59 KB (count it by script); the first run stamped its cards 45
-  minutes ahead (timestamps now come from the clock only); PRs #90 and #91 have been untouched since 4 Oct. **The founder answered:** the phone Back check on
-  PR #96 passed; close the 14 Dependabot PRs (done 2026-10-13 after a yes in chat: closed with a comment; T2 and H1 removed); run CI every morning (yes). **Not done:** the Dispatcher, Reviewer, Builder
-  and Reader; the inbox page was never checked on a phone; nothing merged. Handoff with the team design and paste-ready prompts:
-  [`docs/handoffs/AGENT_TEAM_HANDOFF.md`](docs/handoffs/AGENT_TEAM_HANDOFF.md). No app code, migration or database change.
-- **2026-10-12 — Map v2 Phase 1 finished and merged (C19, PR #96), C20 fixed (PR #97).** A continuation session validated the
-  first run's handoff against git, CI and the live preview; measured Lighthouse (landing screen: accessibility 92 with the flag on or
-  off because of the app-wide `maximum-scale`; flag-on blocking time +170 ms, JavaScript equal); removed the MapTiler key value from a
-  tracked doc (H11; the referrer restriction is still the founder's step). The founder passed the real-phone Back test, approved the
-  dark look, accepted D11, D13, D14, kept MapTiler on Free (D12) and revised D1: the look now follows the phone, and the Map look button
-  and the "map v2" badge are gone. Next-phase handoff with a paste-in prompt: `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`.
 
 ---
 
