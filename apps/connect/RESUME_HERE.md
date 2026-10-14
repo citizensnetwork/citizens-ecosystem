@@ -53,7 +53,7 @@
 
 ## 2. Current state snapshot (verified 2026-10-04)
 
-- **`main` = the merge commit of PR #106** (`7a58d41`, 2026-10-13 night: Map v2 is the default map), on top of PR #104 (`b7f78ea`: the Dispatcher docs), #103 (docs), PR #98 (`af6027f`: the agent-team docs), #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
+- **`main` = the merge commit of PR #107** (2026-10-14: the Builder spec, docs only), on top of PR #105 (`d9ba496`: the Reviewer docs), PR #106 (`7a58d41`, 2026-10-13 night: Map v2 is the default map), PR #104 (`b7f78ea`: the Dispatcher docs), #103 (docs), PR #98 (`af6027f`: the agent-team docs), #100 (docs), #101 and #99 (the MapTiler logo; the map credit no longer slides under the zoom hint), PR #90 (`7f2e7dd`, 2026-10-12: D-13, admin-created listings email the owner a welcome), #91 (docs: H10, H2), #97 (C20), #96 (Map v2 Phase 1), PR #93 (docs: sign-off, Map v2 plan), PR #94 (`51c2fab`, the OSV fix: Next 15.5.27 / 16.3.8,
   Capacitor 8.4.3, sharp 0.35.5, source-map-js 1.2.2), PR #92 (C16, Listing Automation Phase 1; see its §6 entry), `6acbdcc` (PR #89, C15: a real URL
   for every screen), #88 (D-12 mig 180: self-serve applications wait for an admin), #86 (mig 179), #87 (the patched `braces` fork), #85
   (the repo's `intake.gs` is the corrected script), #84 (C1/C1b owner fetch), #83 (docs) and #82 (Wear's crown + splash). The 14 stale Dependabot PRs were
@@ -114,6 +114,10 @@
   [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Reviewer** (`citizens-reviewer`, 08:30, 12:30 and 16:30 local) reads open same-repo
   PRs (and any PR a `rv-pr<n>` queue row asks for, merged ones included) cold, against the repo's own rules, and posts ONE public advisory comment per PR per
   commit with file and line. It cannot approve, label, push or merge. Spec: [`docs/routines/reviewer.md`](docs/routines/reviewer.md).
+  **The Builder (T4)** is specified
+  ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14): one approved issue to one draft PR, no cron, never merges. Its scheduled task
+  `citizens-builder` is **not created yet** (the night session's create call needed an approval nobody could give; the prompt is saved locally) and it
+  has **never run**; the switch card `d-chain` (roles starting each other, builder.md section 9) is filed, unanswered and not wired.
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -359,10 +363,10 @@ design session first.
 - *Next step:* start a new session with the prompt in `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md` section 5: Phase 1.5 (R1 MapTiler logo with the founder's screenshot sign-off, R2 the flag on for everyone = new decision MAP:D15, R3 quota watch, R4 the flag-on landing blocking time, R5 close D14), then Phase 2 (P2-07, P2-08, P2-06 first; P2-01 needs D2; the G1 items need migrations and the founder's yes).
 - *Facts to keep:* production runs a custom MapTiler Dataviz-based style (not `streets-v2`); `dataviz-dark` loads with the existing key (+12 tile requests for a person who switches); live data has 0 upcoming events, 0 of 40 places with opening hours and a median stored image of 319 KB; headless Chromium needs GPU flags for frame times (software GL is about 10x slower); a marker's inner nodes must not carry `class` attributes (the Tailwind CDN observer cost 31 ms p95 per pan frame on 150 pins); measurement tools are in `apps/connect/scripts/map-v2/`. Lighthouse (2026-10-10, preview, landing screen only because guest mode is in `sessionStorage`): accessibility 92 with the flag on or off (the app-wide `maximum-scale` in the viewport meta blocks pinch zoom), flag-on blocking time about +170 ms (style work, JavaScript equal), `docs/audit/phase1-qa.md` section 4.
 
-### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the rest is to build)
+### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the Builder is specified; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T4 | **Builder** (handoff section 4, step 5; brief: [`docs/handoffs/BUILDER_ROLE_HANDOFF.md`](docs/handoffs/BUILDER_ROLE_HANDOFF.md); a night session creates it, the first run is supervised), first task GitHub issue **#102** (`agent:ready`, queue row `q-ci-schedule`): add a daily `schedule:` trigger to `.github/workflows/ci.yml` (the founder approved the idea 2026-10-12). One agent PR open at a time, a draft; the Reviewer comments on it; a human merges. | P2 | M |
+| T4 | **Builder**: spec written ([`docs/routines/builder.md`](docs/routines/builder.md), 2026-10-14); **task `citizens-builder` still to create** (ad hoc, no cron, from the locally saved prompt) and **first run pending**, supervised, on issue #102 (`q-ci-schedule`: a daily `schedule:` trigger in `.github/workflows/ci.yml`). Then wire the chaining (builder.md section 9) once the founder answers `d-chain`. One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
 
@@ -448,6 +452,17 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-14 (night, unattended) — The Builder (T4) specified; its task not yet created (docs only, branch `claude/builder-role`).** A one-time
+  scheduled session ran the founder's night prompt (`BUILDER_ROLE_HANDOFF.md` section 7.3). **Done:** the spec
+  [`docs/routines/builder.md`](docs/routines/builder.md) (lifecycle, work-in-progress rule, scope, gates with the D2 shortcut, stop
+  conditions, shapes, tools, and the chaining design as section 9, "designed, not yet wired"); the inbox switch card `d-chain` (decision,
+  forward or off, **unanswered**); the full task prompt. **Blocked:** creating the scheduled task `citizens-builder` asks for a person's
+  approval, which an unattended run cannot get; not worked around. The prompt is in the primary checkout's gitignored
+  `.claude/sessions/builder-task-prompt.md`. **Not done (by design):** no task run, no task or spec of another role edited, no chaining
+  wired, nothing merged. Found: queue rows `q-pr98` and `q-agent-watcher` still say `in_review` although PR #98 merged (both `by: session`,
+  so the work-in-progress rule ignores them). Later that morning, at the founder's request in chat, PR #105 (the Reviewer) and then this PR #107 were merged.
+  **Next (supervised):** create the task (no cron), "Run now" on #102 with the founder approving its tools, read back, fix, then wire the chaining.
+
 - **2026-10-13 (night) — Map v2 is the default map for everyone (C19 Phase 1.5, PR #106).** From the start-up menu the founder chose C19, said
   yes to **D15** (default on, `?map=v1` as the escape hatch) and, going to bed, told me to merge wherever needed (I read that as: merge `main`
   into my own branch and merge my own PR once CI is green; nothing else, and no other session's PR). **What changed:** `app/map-v2-lib.jsx` reads the
@@ -523,15 +538,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   tracked doc (H11; the referrer restriction is still the founder's step). The founder passed the real-phone Back test, approved the
   dark look, accepted D11, D13, D14, kept MapTiler on Free (D12) and revised D1: the look now follows the phone, and the Map look button
   and the "map v2" badge are gone. Next-phase handoff with a paste-in prompt: `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`.
-- **2026-10-10 — Map v2 Phase 1 built behind `?map=v2` (C19, draft PR #96).** One run took the plan from the tracker to working code: the Phase 0 audit
-  (`docs/audit/`), then tokens and the flag, logo/glyph pins (D8), the three-state sheet for Contributor, Place and Event (D6, D9), time labels,
-  skeleton and errors, a gallery with an uncropped viewer, one strings file, share (the real link), and the dark look with its Map look control.
-  **Flag off is pixel-identical to `main`** (0.0000 % on 9 shots, 23 requests equal); +13.7 KB gzipped in the one bundle (D14). **Found:** production
-  runs a custom MapTiler Dataviz style, not `streets-v2`; `dataviz-dark` loads with the existing key; the v1 `EntityCard` Share is a toast-only stub
-  (C20); a MapTiler key sits in a tracked doc (H11); headless Chromium measures frame time 10x too slow without GPU flags; the Tailwind CDN observer
-  makes classes on marker children expensive (31 ms p95 per pan frame at 150 pins). **Not done:** the real-phone Back check, the screenshot sign-off,
-  decision D12 (D11, D13, D14 accepted), the merge. No migration, no DB or auth change, no new dependency. Gates: workspace format, lint, build, typecheck, test and the
-  full Connect e2e, plus a 120-check QA matrix (`docs/audit/phase1-qa.md`).
 
 ---
 

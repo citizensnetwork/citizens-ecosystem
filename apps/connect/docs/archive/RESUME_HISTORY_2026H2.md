@@ -4018,3 +4018,15 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
   fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
   may return if the tile provider has no dark style).
+
+## Moved from RESUME_HERE §6 on 2026-10-14 (the oldest session entry)
+
+- **2026-10-10 — Map v2 Phase 1 built behind `?map=v2` (C19, draft PR #96).** One run took the plan from the tracker to working code: the Phase 0 audit
+  (`docs/audit/`), then tokens and the flag, logo/glyph pins (D8), the three-state sheet for Contributor, Place and Event (D6, D9), time labels,
+  skeleton and errors, a gallery with an uncropped viewer, one strings file, share (the real link), and the dark look with its Map look control.
+  **Flag off is pixel-identical to `main`** (0.0000 % on 9 shots, 23 requests equal); +13.7 KB gzipped in the one bundle (D14). **Found:** production
+  runs a custom MapTiler Dataviz style, not `streets-v2`; `dataviz-dark` loads with the existing key; the v1 `EntityCard` Share is a toast-only stub
+  (C20); a MapTiler key sits in a tracked doc (H11); headless Chromium measures frame time 10x too slow without GPU flags; the Tailwind CDN observer
+  makes classes on marker children expensive (31 ms p95 per pan frame at 150 pins). **Not done:** the real-phone Back check, the screenshot sign-off,
+  decision D12 (D11, D13, D14 accepted), the merge. No migration, no DB or auth change, no new dependency. Gates: workspace format, lint, build, typecheck, test and the
+  full Connect e2e, plus a 120-check QA matrix (`docs/audit/phase1-qa.md`).
