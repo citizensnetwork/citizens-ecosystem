@@ -5,16 +5,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # A schedule only fires from the default branch, so it cannot be tried from a
+  # PR branch; "Run workflow" (Actions tab, or `gh workflow run CI`) tests it.
+  workflow_dispatch:
   schedule:
-    # Daily, 04:00 UTC (06:00 in South Africa): a new dependency advisory
-    # turns main red the morning it appears, not when the next PR is blocked.
-    - cron: '0 4 * * *'
+    # Daily, 02:17 UTC (04:17 in South Africa, before the 05:00 morning check):
+    # a new dependency advisory turns main red the morning it appears, not when
+    # the next PR is blocked. The whole workflow runs, e2e included, as a daily
+    # regression check. Off the :00 minute, when scheduled runs queue longest.
+    - cron: '17 2 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Keyed on the event too, so a scheduled or manual run on main and a push to
+  # main do not cancel each other (they share the ref refs/heads/main).
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
