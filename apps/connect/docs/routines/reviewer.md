@@ -52,6 +52,11 @@ Read the diff cold. The standard is the repo's own: `apps/connect/VISION.md` (th
 5. **Public-repo safety.** No email address, phone number, private person's name, real organisation name or private URL in code, docs, tests, commit messages or the pull request text.
 6. **Documentation accuracy.** Relative links resolve; claims match the repo; `RESUME_HERE.md` entries, item ids and numbers do not collide with `main`.
 7. **Gates as evidence.** The state of the checks at this commit (Verify, E2E, CodeQL). It has no checkout, so it **cannot run tests**; a failing or missing check is stated, not guessed at.
+8. **Workflows** (added after the first Builder pull request, #109, 2026-10-14; a diff touching `.github/workflows/`). Read the **whole file at the head sha**, not only the hunk, and list every setting the change shares: the `concurrency` group and `cancel-in-progress`, the other triggers and branch filters, `permissions`, any `if:` on the event, and which jobs the new trigger starts. Then:
+   - A trigger change that lets two events share a concurrency group, so that one run cancels the other, is a **should-fix**, not a nit: it defeats the clear signal that is the point of the change. A `schedule` or `workflow_dispatch` run on `main` and a push to `main` share the ref, so they share the group. The fix is a group keyed on `github.event_name`; `cancel-in-progress` cannot be made conditional on the event, because the incoming run decides the cancel.
+   - A `schedule` without `workflow_dispatch` is a should-fix (a schedule fires only from the default branch, so it cannot be tried from a pull request). The cron should avoid the `:00` and `:30` minutes and finish before the Watcher's 05:00 local check (cron is UTC, so 03:00 UTC or earlier).
+   - A pull request text that calls a shared setting "unchanged" while the change interacts with it is a documentation-accuracy finding.
+   - New actions are pinned, and `permissions` is no wider than before.
 
 A very large diff (over about 40 files or 2,000 changed lines): review the riskiest files first (migrations, auth, API routes, workflows, package files, then the rest) and list what was not reviewed.
 
