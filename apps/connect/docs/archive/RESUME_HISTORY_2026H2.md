@@ -3993,17 +3993,8 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   1.2.2) through the root `pnpm.overrides` plus `apps/connect/package.json`; every gate and the 127 e2e tests passed before and in CI.
   The merge also redeploys all three apps on the patched versions. `main` had not moved before that; no migration or DB change.
 
-## Moved from RESUME_HERE §6 on 2026-10-14 (the two oldest session entries)
+## Moved from RESUME_HERE §6 on 2026-10-13, second batch (the oldest session entry)
 
-- **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
-  dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
-  recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back
-  closes the sheet at once, D8 category glyph below about zoom 15 and the logo above it, D9 one sheet for all three pin types, D10 a
-  shared link keeps opening the full profile (D2 and D7 defaults stand). All of it is in tracker §10, §13.1 and its Decision Log, in the
-  runner prompt (a "decided" block at the top, so a fresh session starts with it) and in the C19 block. Also: PR #93 had already
-  merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
-  fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
-  may return if the tile provider has no dark style).
 - **2026-10-10 — Map v2: prompt and tracker reconciled with this file (docs only).** The founder pasted the Map v2
   runner prompt and chose the light map (tracker D1; revised in the entry above). I compared the prompt and `docs/MAP_UX_TRACKER.md` with this file, `VISION.md`,
   `V1_SCOPE.md`, `git`/GitHub and `map.jsx`, and fixed 22 things (tracker §13): the prompt never mentioned `VISION.md` or the offload
@@ -4015,3 +4006,27 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   **Nothing built:** no app code, migration or DB change; Phase 0 not started. D3, D5, D6, D8, D9, D10 were answered later the same day (entry above). The gold
   contrast figures are calculated, not measured. These docs ride on PR #93's branch; #90, #91 and #93 all edit this file, so whoever merges
   later merges `main` in first.
+
+## Moved from RESUME_HERE §6 on 2026-10-13, third batch (the oldest session entry)
+
+- **2026-10-10 (later) — Map v2: the founder's decisions recorded (docs only).** The founder revised D1 to **light by default plus a
+  dark setting** (my "light only" reading was wrong; P1-12 is back in M4 and P1-02 builds both token sets) and accepted every
+  recommendation: D3 gold fill with a near-black label and dark gold for gold text, D5 contributor-supplied images only, D6 Back
+  closes the sheet at once, D8 category glyph below about zoom 15 and the logo above it, D9 one sheet for all three pin types, D10 a
+  shared link keeps opening the full profile (D2 and D7 defaults stand). All of it is in tracker §10, §13.1 and its Decision Log, in the
+  runner prompt (a "decided" block at the top, so a fresh session starts with it) and in the C19 block. Also: PR #93 had already
+  merged with my first docs commit (its branch was deleted, which is what "4 commits behind" was: `main` moved by #94's dependency
+  fix), so this work is on a fresh branch from `main`. Nothing built; Phase 0 not started; no founder decision blocks the run (D4
+  may return if the tile provider has no dark style).
+
+## Moved from RESUME_HERE §6 on 2026-10-14 (the oldest session entry)
+
+- **2026-10-10 — Map v2 Phase 1 built behind `?map=v2` (C19, draft PR #96).** One run took the plan from the tracker to working code: the Phase 0 audit
+  (`docs/audit/`), then tokens and the flag, logo/glyph pins (D8), the three-state sheet for Contributor, Place and Event (D6, D9), time labels,
+  skeleton and errors, a gallery with an uncropped viewer, one strings file, share (the real link), and the dark look with its Map look control.
+  **Flag off is pixel-identical to `main`** (0.0000 % on 9 shots, 23 requests equal); +13.7 KB gzipped in the one bundle (D14). **Found:** production
+  runs a custom MapTiler Dataviz style, not `streets-v2`; `dataviz-dark` loads with the existing key; the v1 `EntityCard` Share is a toast-only stub
+  (C20); a MapTiler key sits in a tracked doc (H11); headless Chromium measures frame time 10x too slow without GPU flags; the Tailwind CDN observer
+  makes classes on marker children expensive (31 ms p95 per pan frame at 150 pins). **Not done:** the real-phone Back check, the screenshot sign-off,
+  decision D12 (D11, D13, D14 accepted), the merge. No migration, no DB or auth change, no new dependency. Gates: workspace format, lint, build, typecheck, test and the
+  full Connect e2e, plus a 120-check QA matrix (`docs/audit/phase1-qa.md`).

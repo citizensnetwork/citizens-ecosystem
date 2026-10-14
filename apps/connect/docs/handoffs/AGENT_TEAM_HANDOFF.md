@@ -13,6 +13,7 @@
 | **Watcher** (role 1) | Local scheduled task `citizens-watcher-daily` (file in section 9) | **Live.** 05:00, 10:00, 15:00, 20:00 local time (the PC is on South Africa Standard Time). First supervised run succeeded 2026-10-12 17:13 UTC: health OK, report written, 2 stale-PR cards filed, email delivered to the founder (confirmed in Gmail). Tool approvals granted on that run are stored on the task |
 | **Decision Inbox** | Private artifact (URL in section 9), database capability | Version 2. Collections `inbox`, `queue`, `reports`. Tabs: Inbox, Queue, Reports (with a "Runs today" timeline), History. One-tap answers, optional note, "Ask me in 3 days", Undo, Reopen. Page source is in the artifact (read it back with the Artifact tool, `action: read`) and a local copy is in `.claude/sessions/decision-inbox.html` (gitignored). **Never checked visually on a phone**: only its script syntax and its data read-back were verified |
 | **Dispatcher** (role 2) | Local scheduled task `citizens-dispatcher` (file in section 9); spec [`../routines/dispatcher.md`](../routines/dispatcher.md) | **Live (2026-10-13).** 07:30 and 17:30 local. First supervised run: issue #102 created for the approved CI idea, 4 answers recorded, 2 action cards filed, nothing else touched. It misrouted one answer (trusted a stale count); the prompt now requires a live check |
+| **Reviewer** (role 3) | Local scheduled task `citizens-reviewer` (file in section 9); spec [`../routines/reviewer.md`](../routines/reviewer.md) | **Live (2026-10-13).** 08:30, 12:30 and 16:30 local. First supervised run reviewed #104 (open) and #101 (merged): comments posted, the two #101 nits were real, the #104 finding was weak; no line numbers and one rule too strict, both fixed in the prompt. Advisory comments only (`add_issue_comment`), under the repo owner's account |
 | **Specs** | `apps/connect/docs/routines/daily-routine.md` (Watcher v3) and `dispatcher.md` | On `main` (the Watcher's PR #98 merged 2026-10-13) |
 | **Queue** | `queue` collection | Holds the open pull requests and one approved task (`q-ci-schedule`, queued) |
 
@@ -40,7 +41,7 @@
 |---|---|---|---|---|
 | **Watcher** | 4x a day | Health checks, alerts, queue sync, report, daily email | Anything except write the inbox and email the founder | **Live** |
 | **Dispatcher** | After answers arrive (about 2x a day) | Reads answered cards. For answers inside the authority matrix (3.4) it creates or labels GitHub issues (`agent:ready`) and updates the queue. For anything else it files an `action` card "needs your yes in chat" | Merge, migrate, send, delete, publish; write code | **Live** (v1: only `idea` + yes becomes an issue) |
-| **Reviewer** | When an agent PR is opened or updated | Fresh-context review with the `code-review` and `security-review` skills (vibe-security: RLS, `service_role`, secrets, CSP); checks CI and the e2e result; posts findings as a PR comment and an inbox card | Edit code; approve or merge | **Next** |
+| **Reviewer** | When an agent PR is opened or updated | Fresh-context review with the `code-review` and `security-review` skills (vibe-security: RLS, `service_role`, secrets, CSP); checks CI and the e2e result; posts findings as a PR comment and an inbox card | Edit code; approve or merge | **Live** (v1: no checkout, so no test runs and no local skills; CI is its evidence) |
 | **Builder** | When `agent:ready` exists and no agent PR is open | Takes ONE issue; works in a sibling worktree from `origin/main`; keeps an offload file; runs the workspace gates; opens a **draft** PR; resumes across days | Merge; apply migrations (until a staging database exists); touch RLS or auth without a card that names it | After the Reviewer |
 | **Reader** | Daily | Listing Automation Phase 2 (C16): reads consented sources and posts suggestions to `/api/automation/suggestions` | Read Meta or TikTok; act without consent; contact anyone | Later; the founder must mint the two scoped keys first |
 | **Scribe** | Daily / weekly | Keeps `RESUME_HERE.md` and handoffs current in docs-only PRs; weekly digest | Anything but docs | Later |
@@ -80,7 +81,7 @@ Everything an agent reads (web pages, API JSON, advisor text, PR titles, inbox r
 1. **Merge the Watcher docs PR.** **Done 2026-10-13 (#98).**
 2. **Action the founder's answers:** close the 14 Dependabot PRs only after an explicit yes in chat (section 5). **Done 2026-10-13.**
 3. **Dispatcher.** **Done 2026-10-13**, see [`../routines/dispatcher.md`](../routines/dispatcher.md) (design, results and the one defect found). Tools: ArtifactData (inbox), GitHub issue create and reads, no `git`. Tested on real answers, not a dummy card (an answer must come from the founder; an agent must never write one). **Acceptance met:** an answer outside the matrix produced an `action` card, never an action.
-4. **Reviewer.** Scheduled task, tools: GitHub PR read, `gh` read, ArtifactData; no write to code. Test: point it at the Watcher's docs PR and one real draft PR. **Acceptance:** findings are specific (file and line), and it never approves.
+4. **Reviewer.** **Done 2026-10-13**, see [`../routines/reviewer.md`](../routines/reviewer.md). Tools: GitHub PR reads, `add_issue_comment` only, ArtifactData. Tested on an open docs PR and a merged code PR (a review request is a queue row `rv-pr<n>`; no draft PR existed). **Acceptance half met:** it never approved, but its findings lacked line numbers on the first run; the prompt was fixed and the fix is not yet re-tested (trigger in the spec).
 5. **Builder, first task `q-ci-schedule`** (add a daily `schedule:` trigger to `.github/workflows/ci.yml`; tiny and reversible). Run it supervised first. **Acceptance:** one draft PR, gates green, Reviewer comment present, WIP counter shows 1 of 1, and no second task starts. **Status 2026-10-14:** the spec is written, [`../routines/builder.md`](../routines/builder.md) (it supersedes the Builder sketch in section 7, adds reconcile, scope rules, stop conditions and the chaining design behind the switch card `d-chain`, which is filed and unanswered). The scheduled task `citizens-builder` (ad hoc, no cron) is **not created yet**: its create call needed an approval the unattended night session could not get; the prompt is saved locally. Its first run is supervised.
 6. **Reader.** Needs the founder to mint `automation:suggest` and `automation:digest` keys (RESUME_HERE C16). Supervised run against one consenting Contributor.
 7. **Cloud move** after 14 clean days: needs a read-only database role and a way to give the runner `gh` access without exposing a token.
@@ -90,7 +91,7 @@ Keep each role to one small scheduled task. Prefer many narrow prompts to one cl
 
 ## 5. Open items for the founder
 
-- **Answered:** `d-authority` = chores, `d-team-first` = Dispatcher and Reviewer first. The Dispatcher is built; the **Reviewer is next** (step 4).
+- **Answered:** `d-authority` = chores, `d-team-first` = Dispatcher and Reviewer first. The Dispatcher and the Reviewer are built; the **Builder is next** (step 5, first task issue #102).
 - **Drop the wrong card** the Dispatcher's first run filed (the Dependabot one); its next run records the answer.
 - **Dependabot: done 2026-10-13.** The founder answered "close all 14" in the inbox and confirmed in chat; all 14 (#9, #11 to #17, #24 to #27, #39, #43) were closed with a comment and Dependabot removed its own branches. A closed Dependabot PR is not recreated for the same version, only for a newer one; a human can reopen one if needed.
 - Still open: the MapTiler plan change itself (the founder's answer was "upgrade"; only the founder can do it), Supabase Pro, the branch-deletion ruleset (recommended: keep).
@@ -114,11 +115,11 @@ Keep each role to one small scheduled task. Prefer many narrow prompts to one cl
 You are continuing the Citizens agent-team build. Assume nothing from earlier chats.
 
 1. Read apps/connect/VISION.md, the root CLAUDE.md and apps/connect/RESUME_HERE.md. Then read
-   apps/connect/docs/handoffs/AGENT_TEAM_HANDOFF.md, apps/connect/docs/routines/daily-routine.md and
-   apps/connect/docs/routines/dispatcher.md.
+   apps/connect/docs/handoffs/AGENT_TEAM_HANDOFF.md and the role specs in apps/connect/docs/routines/
+   (daily-routine.md, dispatcher.md, reviewer.md).
 2. Read the local, gitignored offload file .claude/sessions/agent-system-watcher.md in the primary checkout
-   (it holds the private Decision Inbox URL), and the task files under
-   ~/.claude/scheduled-tasks/citizens-watcher-daily/SKILL.md and citizens-dispatcher/SKILL.md.
+   (it holds the private Decision Inbox URL), and the task files under ~/.claude/scheduled-tasks/
+   (citizens-watcher-daily, citizens-dispatcher, citizens-reviewer; each has a SKILL.md).
 3. Read the Decision Inbox with the ArtifactData tool: list the inbox, queue and reports collections.
    Tell me, in at most 10 lines: the last Watcher run and its health, every card I have answered since the
    handoff (and whether it has been actioned), what is still open, and which step of handoff section 4 is next
@@ -138,9 +139,9 @@ Shared header for every role: identity and Vision line; the fixed facts (repo, i
 
 **Dispatcher.** Built. The real instructions are in [`../routines/dispatcher.md`](../routines/dispatcher.md) (this draft is superseded: it had the issue body include the founder's note, which would publish private text in a public repo).
 
-**Reviewer.** Tools: GitHub PR read (diff, files, check runs, comments), `gh` read, ArtifactData; may post ONE comment per PR per push. Steps: find open PRs from `claude/agent-*` (and any PR the founder names in a card) that have a new head commit since your last review; read the diff cold, without the Builder's notes; check against VISION's alignment self-prompt, `RESUME_HERE.md` section 3 rules and the vibe-security list (RLS, `service_role`, secrets, CSP, SQL injection, open redirects); check CI and e2e results; post findings with file and line, severity and a concrete fix; file an inbox card only for a blocker. Never approve, never push, never merge.
+**Reviewer.** Built. The real instructions are in [`../routines/reviewer.md`](../routines/reviewer.md) (this draft is superseded: it reviewed only `claude/agent-*` PRs and named `gh` and the review skills, which need a checkout the Reviewer does not have).
 
-**Builder.** Tools: Bash (git and `pnpm` inside its own worktree only), file edit inside that worktree, `gh` (PR create as draft, issue comment), GitHub read, ArtifactData, the `code-review` and `security-review` skills, subagents `Explore` and `Plan`. Steps: (1) WIP check (section 3.3); exit if 1 or more; (2) take the oldest `agent:ready` issue, relabel `agent:in-progress`, add a queue row; (3) `git worktree add ../wt-agent-<topic> -b claude/agent-<topic> origin/main`, write the offload file; (4) implement the smallest change that meets the issue; run `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` (turbo build before typecheck) and, for Connect frontend or API changes, `pnpm --filter citizens-connect test:e2e`; (5) run your own `code-review` and `security-review`; (6) push, open a **draft** PR with the repo's template, relabel `agent:in-review`; (7) if out of time, commit, update the offload file and the queue note, and stop (the next run resumes). Never merge, never apply a migration, never touch RLS or auth without a card that names it, never add a dependency without a card.
+**Builder (the original sketch; superseded by [`BUILDER_ROLE_HANDOFF.md`](BUILDER_ROLE_HANDOFF.md) section 7.2, which adds the reconcile step, the scope rules and the stop conditions).** Tools: Bash (git and `pnpm` inside its own worktree only), file edit inside that worktree, `gh` (PR create as draft, issue comment), GitHub read, ArtifactData, the `code-review` and `security-review` skills, subagents `Explore` and `Plan`. Steps: (1) WIP check (section 3.3); exit if 1 or more; (2) take the oldest `agent:ready` issue, relabel `agent:in-progress`, add a queue row; (3) `git worktree add ../wt-agent-<topic> -b claude/agent-<topic> origin/main`, write the offload file; (4) implement the smallest change that meets the issue; run `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` (turbo build before typecheck) and, for Connect frontend or API changes, `pnpm --filter citizens-connect test:e2e`; (5) run your own `code-review` and `security-review`; (6) push, open a **draft** PR with the repo's template, relabel `agent:in-review`; (7) if out of time, commit, update the offload file and the queue note, and stop (the next run resumes). Never merge, never apply a migration, never touch RLS or auth without a card that names it, never add a dependency without a card.
 
 ## 8. Quality gates before calling a role done
 
@@ -149,6 +150,6 @@ Workspace gates (`pnpm format:check && pnpm lint && pnpm typecheck && pnpm test 
 ## 9. Where the private things live (not in this repo)
 
 - **Decision Inbox URL and the founder's email:** in the Watcher's task file `~/.claude/scheduled-tasks/citizens-watcher-daily/SKILL.md` and in `.claude/sessions/agent-system-watcher.md` in the primary checkout (gitignored).
-- **The Dispatcher's task file** (it also holds the inbox URL): `~/.claude/scheduled-tasks/citizens-dispatcher/SKILL.md`.
+- **The Dispatcher's and the Reviewer's task files** (each also holds the inbox URL): `~/.claude/scheduled-tasks/citizens-dispatcher/SKILL.md` and `~/.claude/scheduled-tasks/citizens-reviewer/SKILL.md`.
 - **Scheduler:** the Claude desktop app's "Scheduled" section, or the `mcp__scheduled-tasks__*` tools (list, update, run, list runs).
 - **Branch names:** `claude/agent-*` is reserved for the Builder's pull requests (its work-in-progress rule counts them); human-session role PRs use another prefix (this one used `claude/dispatcher-role`).
