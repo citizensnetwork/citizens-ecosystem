@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Daily, 04:00 UTC (06:00 in South Africa): a new dependency advisory
+    # turns main red the morning it appears, not when the next PR is blocked.
+    - cron: '0 4 * * *'
 
 permissions:
   contents: read
