@@ -1,0 +1,131 @@
+{
+  "when": "2026-10-14",
+  "note": "MapTiler requests (api.maptiler.com) per scenario, real style and tiles, fresh browser each run, 12 contributors + 20 places + 8 events around Pretoria",
+  "summary": {
+    "360x800 pitch 45": {
+      "runs": 1,
+      "firstViewRequests": 12,
+      "browseRequests": 9,
+      "pinRequests": 6,
+      "tilesFirst": 7,
+      "tilesBrowse": 8,
+      "tilesPin": 6
+    },
+    "390x844 pitch 45": {
+      "runs": 1,
+      "firstViewRequests": 12,
+      "browseRequests": 9,
+      "pinRequests": 6,
+      "tilesFirst": 7,
+      "tilesBrowse": 8,
+      "tilesPin": 6
+    },
+    "768x1024 pitch 45": {
+      "runs": 1,
+      "firstViewRequests": 12,
+      "browseRequests": 10,
+      "pinRequests": 8,
+      "tilesFirst": 7,
+      "tilesBrowse": 9,
+      "tilesPin": 8
+    }
+  },
+  "rows": [
+    {
+      "viewport": "360x800",
+      "requestedPitch": 45,
+      "actualPitch": 45,
+      "firstView": {
+        "style": 1,
+        "tiles": 7,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 12
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 8,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 9
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 27
+      }
+    },
+    {
+      "viewport": "390x844",
+      "requestedPitch": 45,
+      "actualPitch": 45,
+      "firstView": {
+        "style": 1,
+        "tiles": 7,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 12
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 8,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 9
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 27
+      }
+    },
+    {
+      "viewport": "768x1024",
+      "requestedPitch": 45,
+      "actualPitch": 45,
+      "firstView": {
+        "style": 1,
+        "tiles": 7,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 12
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 9,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 10
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 8,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 8
+      },
+      "statuses": {
+        "200": 30
+      }
+    }
+  ]
+}

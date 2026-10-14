@@ -182,3 +182,64 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
     expect(api.themeSetting).toBeUndefined();
   });
 });
+
+describe("the fixed tilt (tracker R8, founder decision D17)", () => {
+  const api = () => boot().api as unknown as { PITCH: number };
+
+  it("is one named constant: 60 degrees, MapLibre's own maximum", () => {
+    expect(api().PITCH).toBe(60);
+  });
+
+  it("is a whole number of degrees MapLibre accepts (0 turns it off; the cap is 60 so no sky shows)", () => {
+    const p = api().PITCH;
+    expect(Number.isInteger(p)).toBe(true);
+    expect(p).toBeGreaterThanOrEqual(0);
+    expect(p).toBeLessThanOrEqual(60);
+  });
+
+  it("the map reads it only for Map v2, and only when it is above 0 (the rollback is PITCH = 0)", () => {
+    const src = readFileSync(join(process.cwd(), "src/frontend/app/map.jsx"), "utf8");
+    expect(src).toContain("v2On() && window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0");
+    // all four options come from the one angle, and nothing else in the file sets a pitch
+    expect(src).toContain("pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false");
+    expect(src.match(/\bpitch\s*:/g)?.length).toBe(1);
+  });
+
+  it("the address-picker map is built without any pitch option (it stays flat)", () => {
+    const src = readFileSync(join(process.cwd(), "src/frontend/app/map.jsx"), "utf8");
+    const picker = src.slice(src.indexOf("function LocationPicker"));
+    expect(picker).not.toMatch(/pitch|PITCH|tilt/i);
+  });
+});
+
+describe("count buckets (tracker P2-08): shown only from 100, rounded down, never below", () => {
+  const bucket = () => boot().api as unknown as { countBucket: (n: unknown) => string };
+
+  it("shows nothing below 100, however small the number or odd the input", () => {
+    const { countBucket } = bucket();
+    for (const n of [0, 1, 7, 42, 99, 99.9, -5, "12", null, undefined, NaN, Infinity, "", "abc", {}]) expect(countBucket(n), String(n)).toBe("");
+  });
+
+  it("rounds down to the step: 100+, 250+, 500+, 1,000+, 2,500+, 5,000+, 10,000+ and up", () => {
+    const { countBucket } = bucket();
+    const cases: [number, string][] = [
+      [100, "100+"], [101, "100+"], [249, "100+"], [250, "250+"], [499, "250+"], [500, "500+"], [999, "500+"],
+      [1000, "1,000+"], [2499, "1,000+"], [2500, "2,500+"], [4999, "2,500+"], [5000, "5,000+"], [9999, "5,000+"],
+      [10000, "10,000+"], [24999, "10,000+"], [25000, "25,000+"], [50000, "50,000+"], [100000, "100,000+"], [5_000_000, "100,000+"],
+    ];
+    for (const [n, want] of cases) expect(countBucket(n), String(n)).toBe(want);
+  });
+
+  it("never prints a number higher than the real one (it only rounds down)", () => {
+    const { countBucket } = bucket();
+    for (let n = 100; n <= 120_000; n += 37) {
+      const shown = Number(countBucket(n).replace(/[^\d]/g, ""));
+      expect(shown, String(n)).toBeLessThanOrEqual(n);
+      expect(shown, String(n)).toBeGreaterThanOrEqual(100);
+    }
+  });
+
+  it("accepts a numeric string from the API", () => {
+    expect(bucket().countBucket("1234")).toBe("1,000+");
+  });
+});

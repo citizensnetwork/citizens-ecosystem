@@ -19,6 +19,15 @@
 //  simply follows the phone's own light/dark setting, live (founder, D1 as
 //  revised 2026-10-12: no in-app control).
 //
+//  The tilt (tracker R8, founder decision D17): Map v2's main map is drawn at ONE fixed
+//  oblique angle, PITCH degrees, whatever a person does with two fingers or a right-drag
+//  (zoom and rotation are untouched). PITCH = 0 is the rollback: MapLibre's own defaults
+//  (flat to start with, a person may tilt it), as before. It applies to the main map only
+//  and only while Map v2 is on; the old map and the address picker stay flat.
+//
+//  Also: countBucket(n), the rounded-down public count ("100+") that is never shown below 100
+//  (tracker P2-08: a small ministry is not shown with a low number).
+//
 //  Public surface: window.isMapV2(), window.MapV2.
 // ════════════════════════════════════════════════════════════════════
 (function () {
@@ -28,7 +37,7 @@
   const LEGACY_THEME_KEY = 'cc_map_theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files.
-  const CSS_HREF = '/assets/map-v2.css?v=20261012a';
+  const CSS_HREF = '/assets/map-v2.css?v=20261014a';
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -42,6 +51,24 @@
   const store = () => { try { return window.localStorage || null; } catch { return null; } };
   const read = (k) => { try { const s = store(); return s ? s.getItem(k) : null; } catch { return null; } };
   const write = (k, v) => { try { const s = store(); if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); } } catch { /* private mode or blocked storage: the setting lasts this page only */ } };
+
+  // ── The tilt ──────────────────────────────────────────────────────
+  // Degrees from straight down. 60 is MapLibre's own maximum and the closest thing to "fully tilted" (the founder's
+  // words, D17); at 60 the horizon stays off screen, so there is no empty sky. 0 = off (the one-line rollback).
+  const PITCH = 60;
+
+  // ── Count buckets (P2-08) ─────────────────────────────────────────
+  // A public count is shown only from 100 up, rounded DOWN to the nearest step: "100+", "250+", "1,000+". Below 100
+  // (or not a number) it is not shown at all, so no small ministry is put next to a low figure. Returns '' for
+  // "show nothing".
+  const COUNT_STEPS = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+  function countBucket(n) {
+    const v = Math.floor(Number(n));
+    if (!Number.isFinite(v) || v < COUNT_STEPS[0]) return '';
+    let step = COUNT_STEPS[0];
+    for (const s of COUNT_STEPS) if (v >= s) step = s;
+    return step.toLocaleString('en-US') + '+';
+  }
 
   // ── The flag ──────────────────────────────────────────────────────
   // Map v2 is the default (D15). Set false to take everyone back to the old map
@@ -84,7 +111,7 @@
 
   // ── Stylesheet (flag on only) ─────────────────────────────────────
   const api = {
-    isOn: isMapV2, motion: MOTION, dur, prefersReducedMotion, resolvedTheme,
+    isOn: isMapV2, motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
     // true once assets/map-v2.css has loaded (or failed: never block the map on it)
     styleReady: false,
     FLAG_KEY, CSS_HREF,

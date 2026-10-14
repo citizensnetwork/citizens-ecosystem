@@ -1,0 +1,446 @@
+{
+  "when": "2026-10-14",
+  "note": "MapTiler requests (api.maptiler.com) per scenario, real style and tiles, fresh browser each run, 12 contributors + 20 places + 8 events around Pretoria",
+  "summary": {
+    "360x800 pitch 0": {
+      "runs": 2,
+      "firstViewRequests": 10,
+      "browseRequests": 7,
+      "pinRequests": 4,
+      "tilesFirst": 5,
+      "tilesBrowse": 6,
+      "tilesPin": 4
+    },
+    "360x800 pitch 60": {
+      "runs": 2,
+      "firstViewRequests": 14,
+      "browseRequests": 15,
+      "pinRequests": 12,
+      "tilesFirst": 9,
+      "tilesBrowse": 14,
+      "tilesPin": 12
+    },
+    "390x844 pitch 0": {
+      "runs": 2,
+      "firstViewRequests": 10,
+      "browseRequests": 7,
+      "pinRequests": 6,
+      "tilesFirst": 5,
+      "tilesBrowse": 6,
+      "tilesPin": 6
+    },
+    "390x844 pitch 60": {
+      "runs": 2,
+      "firstViewRequests": 14,
+      "browseRequests": 15,
+      "pinRequests": 14,
+      "tilesFirst": 9,
+      "tilesBrowse": 14,
+      "tilesPin": 14
+    },
+    "768x1024 pitch 0": {
+      "runs": 2,
+      "firstViewRequests": 10,
+      "browseRequests": 9,
+      "pinRequests": 6,
+      "tilesFirst": 5,
+      "tilesBrowse": 8,
+      "tilesPin": 6
+    },
+    "768x1024 pitch 60": {
+      "runs": 2,
+      "firstViewRequests": 18,
+      "browseRequests": 20,
+      "pinRequests": 18,
+      "tilesFirst": 13,
+      "tilesBrowse": 19,
+      "tilesPin": 18
+    }
+  },
+  "rows": [
+    {
+      "viewport": "360x800",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 7
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 4,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 4
+      },
+      "statuses": {
+        "200": 21
+      }
+    },
+    {
+      "viewport": "360x800",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 9,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 14
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 15
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 12,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 12
+      },
+      "statuses": {
+        "200": 41
+      }
+    },
+    {
+      "viewport": "360x800",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 7
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 4,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 4
+      },
+      "statuses": {
+        "200": 21
+      }
+    },
+    {
+      "viewport": "360x800",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 9,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 14
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 15
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 12,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 12
+      },
+      "statuses": {
+        "200": 41
+      }
+    },
+    {
+      "viewport": "390x844",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 7
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 23
+      }
+    },
+    {
+      "viewport": "390x844",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 9,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 14
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 15
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 14
+      },
+      "statuses": {
+        "200": 43
+      }
+    },
+    {
+      "viewport": "390x844",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 7
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 23
+      }
+    },
+    {
+      "viewport": "390x844",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 9,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 14
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 15
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 14,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 14
+      },
+      "statuses": {
+        "200": 43
+      }
+    },
+    {
+      "viewport": "768x1024",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 8,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 9
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 25
+      }
+    },
+    {
+      "viewport": "768x1024",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 13,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 18
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 19,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 20
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 18,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 18
+      },
+      "statuses": {
+        "200": 56
+      }
+    },
+    {
+      "viewport": "768x1024",
+      "requestedPitch": 0,
+      "actualPitch": 0,
+      "firstView": {
+        "style": 1,
+        "tiles": 5,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 10
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 8,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 9
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 6,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 6
+      },
+      "statuses": {
+        "200": 25
+      }
+    },
+    {
+      "viewport": "768x1024",
+      "requestedPitch": 60,
+      "actualPitch": 60,
+      "firstView": {
+        "style": 1,
+        "tiles": 13,
+        "glyphs": 3,
+        "sprite": 0,
+        "other": 1,
+        "total": 18
+      },
+      "browse": {
+        "style": 0,
+        "tiles": 19,
+        "glyphs": 1,
+        "sprite": 0,
+        "other": 0,
+        "total": 20
+      },
+      "pin": {
+        "style": 0,
+        "tiles": 18,
+        "glyphs": 0,
+        "sprite": 0,
+        "other": 0,
+        "total": 18
+      },
+      "statuses": {
+        "200": 56
+      }
+    }
+  ]
+}
