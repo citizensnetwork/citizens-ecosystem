@@ -18,7 +18,7 @@ type Script = {
   columns_: (sheet: unknown) => Record<string, number>;
   buildPayload_: (str: (k: string) => string, notes: string[]) => Record<string, unknown>;
   autoUpdateLevel_: (answer: string, notes: string[]) => string;
-  sendWelcome_: (email: string, name: string, url: string) => void;
+  sendWelcome_: (email: string, name: string, url: string, onMap?: boolean) => void;
   Q: Record<string, string>;
 };
 
@@ -222,5 +222,25 @@ describe("intake.gs row handling", () => {
     expect(sentMail[0].htmlBody).toContain("&lt;script&gt;");
     expect(sentMail[0].htmlBody).toContain("https://www.citizenscentral.co.za/dashboard");
     expect(sentMail[0].to).toBe("a@b.co");
+  });
+
+  it("says 'on the map' in the welcome only when Connect reported a pin (C21); Kingdom Discovery always", () => {
+    const url = "https://www.citizenscentral.co.za/c/church";
+    load().sendWelcome_("a@b.co", "Grace Church", url, true);
+    expect(sentMail[0].htmlBody).toContain("you're now on the map and in Kingdom Discovery,");
+    sentMail.length = 0;
+    // no pin, or Connect did not say (an older server): never the map
+    for (const onMap of [false, undefined]) {
+      load().sendWelcome_("a@b.co", "Grace Church", url, onMap);
+      const mail = sentMail.pop()!;
+      expect(mail.htmlBody).toContain("you're now in Kingdom Discovery,");
+      expect(mail.htmlBody).not.toContain("on the map");
+      expect(mail.body).not.toContain("on the map");
+    }
+  });
+
+  it("passes the server's on_map answer to the welcome, and only an exact true counts", () => {
+    // the call site in processRow_ reads res.body.on_map === true (the Sheet cannot run here, so the source is pinned)
+    expect(SRC).toContain("sendWelcome_(payload.owner_email, payload.organisation_name, res.body.url, res.body.on_map === true);");
   });
 });

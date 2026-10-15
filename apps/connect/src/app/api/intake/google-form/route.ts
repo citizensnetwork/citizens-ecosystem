@@ -4,9 +4,10 @@
  * The Google Form → map Contributor intake. The founder ticks "Approve" on a
  * row of the Form's responses Sheet; the Sheet's Apps Script
  * (tools/google-forms/intake.gs) POSTs that row here; this route puts the
- * Contributor live on the map and in Kingdom Discovery under a placeholder
- * account for the owner's email, and returns the listing's slug + URL for the
- * script to write back to the row and put in the welcome email. When the owner
+ * Contributor live in Kingdom Discovery (and on the map when it has a pin)
+ * under a placeholder account for the owner's email, and returns the listing's
+ * slug + URL, and whether it is on the map, for the script to write back to the
+ * row and put in the welcome email. When the owner
  * signs in with Google using that email, Supabase links the sign-in to this
  * account and they land on their own dashboard (store.jsx bootstrap).
  *
@@ -29,7 +30,9 @@
  *     permission_to_publish: true, logo?: {mime, base64}, cover?: {mime, base64},
  *     auto_update?: 'off'|'suggest'|'events_auto' (Form "Keeping your listing up to date",
  *     mig 181: stored with a consent stamp, and the listed sources are saved) }
- * Response 200: { success, slug, url, warnings: string[] }
+ * Response 200: { success, slug, url, warnings: string[], on_map: boolean }
+ *   on_map is hasMapPin: the pin was found (maps link, the Sheet's geocode, or MapTiler) and the listing is not
+ *   "no fixed location". The script's welcome email says "on the map" only when it is true (tracker C21).
  * Errors: { error: <code>, message?: <human-readable, for the Sheet's Notes> }
  */
 
@@ -38,7 +41,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/v1Gate";
-import { parseListingFields } from "@/lib/contributorFields";
+import { hasMapPin, parseListingFields } from "@/lib/contributorFields";
 import { parseAutoUpdateLevel } from "@/lib/automation/suggestions";
 import { sourcesFromListing } from "@/lib/automation/sources";
 import {
@@ -351,5 +354,6 @@ export async function POST(request: Request) {
     slug: result.slug,
     url: `${origin}/c/${result.slug}`,
     warnings,
+    on_map: hasMapPin({ no_fixed_location: fields.noFixedLocation, physical_latitude: fields.latitude, physical_longitude: fields.longitude }),
   });
 }
