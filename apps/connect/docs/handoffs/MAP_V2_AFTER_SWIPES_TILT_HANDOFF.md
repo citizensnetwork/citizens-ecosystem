@@ -1,6 +1,6 @@
 # Map v2: handoff after swipes, the fixed tilt and the first Phase 2 items (written 2026-10-15)
 
-**Read this, then paste the prompt in section 8 into a new Claude Code session opened at the monorepo root.** It assumes nothing from any earlier chat. It replaces `MAP_V2_SWIPE_AND_PHASE2_HANDOFF.md` as the "where to start" file (that one is now history: its section 2 is done). The sources of truth stay `docs/MAP_UX_TRACKER.md` (section 8A is Phase 1.5, section 9 is Phase 2, section 10 the open decisions) and `apps/connect/RESUME_HERE.md` (items C19, C22, C23, A12).
+**Read this in full at the start of the session; section 8 is the start-up checklist.** It assumes nothing from any earlier chat. It replaces `MAP_V2_SWIPE_AND_PHASE2_HANDOFF.md` as the "where to start" file (that one is now history: its section 2 is done). The sources of truth stay `docs/MAP_UX_TRACKER.md` (section 8A is Phase 1.5, section 9 is Phase 2, section 10 the open decisions) and `apps/connect/RESUME_HERE.md` (items C19, C22, C23, A12).
 
 ## 1. Where things stand (verified 2026-10-15; re-verify before relying on any line)
 
@@ -62,41 +62,25 @@ Any migration apply, merge, deletion (branches, worktrees, files), minting the t
 ## 7. Close-out format
 Finish with DONE / LEFT in plain language, as to someone learning (define pitch, tile, quota, hand-off, the first time you use them), with the live checks Stephen should do on his phone, and say plainly what is unverified.
 
-## 8. Prompt for the next session (paste everything below the line)
+## 8. Start-up checklist, order of work and rules (do these in order)
 
----
+Read `apps/connect/VISION.md` and the root `CLAUDE.md` first (its standing rules, including the session offload file, apply to every session). This file is your brief for the task; the sections above hold the state, the traps and the evidence. Work in a sibling worktree off `origin/main`. The starter prompt for a session is deliberately not kept in the repo (it is single-use): the person starting the session pastes a short one that points here.
 
-ROLE
-You are a senior product engineer-designer continuing Citizens Connect (Pretoria) in the citizens-ecosystem monorepo at C:\Users\SJ\Documents\Citizen Network\citizens-ecosystem (Windows; PowerShell and Git Bash). The repo is PUBLIC: never commit a real organisation's or person's name, email or user id (reserved `.example` addresses and generic names only). Stage with explicit paths, never `git add -A` / `git add .`. You start with no memory of earlier chats: everything you need is in the files named below.
-
-STATE (verified 2026-10-15; verify before relying on it)
-- Map v2 has been the default map since PR #106. PR #112 (merged 2026-10-15, `0a6f6c3`) added: swipes from anywhere on the card (R7 / C22), a fixed 60 degree tilt on the main map (R8 / C23, `MapV2.PITCH`, 0 = off), a QR code per Contributor (P2-06), Upcoming | Recent (P2-07) and follower counts only from 100 (P2-08). R7 and R8 are BUILT but not DONE: a real phone has to pass `docs/audit/phone-check-swipes-tilt-phase2.md` and Stephen (the founder) has to sign off the tilt screenshots.
-- D16 and D17 were applied as recommended while he was away (both reversible). The tilt about doubles a browsing visitor's MapTiler requests (23 to 43; 45 degrees is about 27); the Free plan stops the map for everyone past 100,000 requests or 5,000 sessions a month, and A12 (the usage page and alert) is his step.
-- Other sessions own the agent-team work (`git worktree list`; open PR #114): never touch their branches or worktrees. The primary checkout is on an old local `main` with untracked local briefs: work in a sibling worktree off `origin/main`.
-
-READ, IN THIS ORDER
-1. apps/connect/VISION.md (run its alignment self-prompt now and again before shipping)
-2. the root CLAUDE.md (standing rules; the session offload file in `.claude/sessions/`; close-out format)
-3. apps/connect/docs/handoffs/MAP_V2_AFTER_SWIPES_TILT_HANDOFF.md: ALL of it (state, the swipe fix in one paragraph, ranked work, traps, where the tests and evidence are)
-4. apps/connect/RESUME_HERE.md: section 2 (the Map v2 bullet), section 3 (Routing and Back, Map v2, Public repo), A12, C19, C22, C23, the top three entries of section 6
-5. docs/MAP_UX_TRACKER.md: section 5 (guardrails), 8A (R7, R8), 9 (Phase 2), 10 (D2, D16, D17), 11.1 (Decision Log)
-
-FIRST
-1. `git fetch origin --prune`; `gh pr list --state open`; `git log origin/main -5`; CI on main; `git worktree list`; `git branch --show-current` and `ls -t .claude/sessions` BEFORE any branch-changing command; `gh api user --jq .login` must be citizensnetwork; `git config user.email` must end in `@users.noreply.github.com`. Check the live site still serves the new build (`curl` the home page, find `app/bundle.*.js`, confirm it contains `MapV2QR`; `assets/map-v2.css` contains `--mv2-ta`). MCP `list_migrations` (head should still be 181) and the security advisor (0 ERROR). Tell me in at most 8 lines anything that differs.
-2. If I pasted phone-check results below this prompt, handle every failure first: extend the test that should have caught it, then fix.
+**FIRST**
+1. `git fetch origin --prune`; `gh pr list --state open`; `git log origin/main -5`; CI on main; `git worktree list`; `git branch --show-current` and `ls -t .claude/sessions` BEFORE any branch-changing command; `gh api user --jq .login` must be citizensnetwork; `git config user.email` must end in `@users.noreply.github.com`. Check the live site still serves the new build (`curl` the home page, find `app/bundle.*.js`, confirm it contains `MapV2QR`; `assets/map-v2.css` contains `--mv2-ta`). MCP `list_migrations` (head should still be 181) and the security advisor (0 ERROR). Tell Stephen in at most 8 lines anything that differs.
+2. If Stephen supplied phone-check results in the starting message, handle every failure first: extend the test that should have caught it, then fix.
 3. Create your offload file in `.claude/sessions/` (objective, task list, context), update it after each phase and compact. Work in a sibling worktree: `git worktree add ../wt-<name> -b claude/<branch> origin/main`, `pnpm install --frozen-lockfile`.
-4. Ask me ONE batched AskUserQuestion (at most 4 questions, recommendation first): (a) D17, keep 60 degrees or take 45; (b) D2, the full sheet beside or replacing the profile page (needed for P2-01); (c) take the pinch-zoom fix now (web only, the Capacitor shell keeps `maximum-scale=1`), yes or later; (d) can you read the MapTiler usage page for me now (A12)? If I am not around, do not wait: apply the recommendation, record it as reversible, and carry on with the work that needs no answer.
+4. Ask Stephen ONE batched AskUserQuestion (at most 4 questions, recommendation first): (a) D17, keep 60 degrees or take 45; (b) D2, the full sheet beside or replacing the profile page (needed for P2-01); (c) take the pinch-zoom fix now (web only, the Capacitor shell keeps `maximum-scale=1`), yes or later; (d) can he read the MapTiler usage page now (A12)? If he is not around, do not wait: apply the recommendation, record it as reversible, and carry on with the work that needs no answer.
 
-THEN WORK, IN THIS ORDER
+**THEN WORK, IN THIS ORDER**
 A. Phone-check failures, if any (section 3B.1 of the handoff).
-B. Without waiting: P2-01 after D2; the pinch-zoom fix if I said yes; C21 (read RESUME C21 first); the rough edges in handoff section 3B.5; for any G1 item (follow and save, 24-hour updates, co-hosted events) write the SQL to `docs/proposals/` and stop for me.
+B. Without waiting: P2-01 after D2; the pinch-zoom fix if he said yes; C21 (read RESUME C21 first); the rough edges in handoff section 3B.5; for any G1 item (follow and save, 24-hour updates, co-hosted events) write the SQL to `docs/proposals/` and stop for Stephen.
 C. If time remains: refresh the stale first bullet of RESUME section 2, and re-run the M3 and tile measurements only if you changed the camera or the pins (`scripts/map-v2/tilt-tiles.mjs`, `measure.mjs --pitch`).
 
-RULES
+**RULES**
 - Gates for any change: `pnpm format:check`, `pnpm lint`, `pnpm build` BEFORE `pnpm typecheck`, `pnpm test`, and Connect Playwright (`cd apps/connect && npx playwright test`; port 3100 free; copy `.env.local` into your worktree and DELETE it afterwards); `node scripts/map-v2/lint-frontend.mjs` for the Map v2 files. A change in `packages/*` must leave every consumer green. Do not pipe a gate into `tail` before an `&&`.
 - Every gesture claim is proved with REAL touch (`e2e/support/touch.ts`), with a control that shows the same gesture does something where it should; mutation-check new logic.
-- Vibe-security check on the diff (RLS is the only wall between apps; no service_role in the browser; no innerHTML with unescaped data). No database, auth or dependency change without my yes.
-- Nothing is merged, closed, deleted, tagged, downloaded or pushed to main without my fresh yes in chat; an earlier session's permission does not carry over. Open the PR, let CI finish (read it once with the app's PR tools after one bounded wait; no polling loop), merge `main` in just before merging, pin the merge with `--match-head-commit`.
-- Update `apps/connect/RESUME_HERE.md` and the tracker only at the END, through the same PR. Close out as DONE / LEFT in plain language for someone learning, with the live checks I should do on my phone, and say plainly what is unverified.
+- Vibe-security check on the diff (RLS is the only wall between apps; no service_role in the browser; no innerHTML with unescaped data). No database, auth or dependency change without Stephen's yes.
+- Nothing is merged, closed, deleted, tagged, downloaded or pushed to main without Stephen's fresh yes in chat; an earlier session's permission does not carry over. Open the PR, let CI finish (read it once with the app's PR tools after one bounded wait; no polling loop), merge `main` in just before merging, pin the merge with `--match-head-commit`.
+- Update `apps/connect/RESUME_HERE.md` and the tracker only at the END, through the same PR. Close out as DONE / LEFT in plain language for someone learning, with the live checks Stephen should do on his phone, and say plainly what is unverified.
 
-Start with FIRST.
