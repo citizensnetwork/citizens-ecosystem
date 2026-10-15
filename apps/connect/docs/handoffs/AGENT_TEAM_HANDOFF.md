@@ -65,6 +65,7 @@ An inbox answer is **intent**. `A` = an answer is enough **if** the founder chos
 | Create, label and comment on GitHub issues; update inbox and queue | A |
 | Close stale Dependabot PRs (reversible: a human can reopen one; Dependabot itself only opens a new PR when a newer version appears) | A |
 | Open a **draft** PR from `claude/agent-*` | A |
+| Start another role's scheduled task (`run_scheduled_task`) | A, only the three forward arrows of `builder.md` section 9 (Dispatcher to Builder, Builder to Reviewer, Reviewer to Builder), behind the switch card `d-chain`; wired into the prompts 2026-10-15. The founder's permission rule covers the whole tool, so each prompt is the only scope limit |
 | Merge any PR | C (never auto-merge) |
 | Apply a migration or change any database, RLS or auth | C, and only with a staging database once Supabase Pro exists |
 | Send a message to anyone but the founder; publish, list or contact an organisation | C |
