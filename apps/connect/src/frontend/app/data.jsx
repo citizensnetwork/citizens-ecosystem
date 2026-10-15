@@ -71,6 +71,12 @@
     const id = item && item.category;
     return (item && item.type === 'contributor' && getContributorType(id)) || getCategory(id);
   };
+  // Where a Contributor's listing can be found (tracker C21: say "on the map" only when it is true). Everyone is in
+  // Kingdom Discovery; only a listing with a pin (BOTH coordinates, never "no fixed location") is also on the map.
+  // Same rule as hasMapPin in src/lib/contributorFields.ts, which the server's emails and admin toasts use.
+  const hasMapPin = (row) => !!row && !row.noFixedLocation
+    && typeof row.lat === 'number' && Number.isFinite(row.lat) && typeof row.lng === 'number' && Number.isFinite(row.lng);
+  const listedWhere = (onMap) => (onMap ? 'on the map and in Kingdom Discovery' : 'in Kingdom Discovery');
   // The map's single category pill row: events + places + the contributor
   // types no event/place already covers (reused slugs would duplicate a pill).
   const FILTER_CATEGORIES = EVENT_CATEGORIES.concat(
@@ -303,6 +309,8 @@
     getContributorType,
     getCategory,
     getItemCategory,
+    hasMapPin,
+    listedWhere,
     isPastEvent,
     isPubliclyListed,
     publicRows,
