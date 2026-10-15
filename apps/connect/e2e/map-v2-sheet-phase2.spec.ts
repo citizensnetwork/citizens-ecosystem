@@ -41,23 +41,23 @@ test.describe("P2-07 Upcoming | Recent", () => {
     const recent = page.getByRole("button", { name: "Recent" });
     await expect(upcoming).toHaveAttribute("aria-pressed", "true");
     await expect(recent).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator("[data-mv2='row-title']")).toHaveText(["Fixture Gathering 1"]);
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Fixture Gathering 1"]);
 
     await recent.click();
     await expect(recent).toHaveAttribute("aria-pressed", "true");
     await expect(upcoming).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator("[data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2", "Past gathering 3"]);
-    await expect(page.locator("[data-mv2='row-meta']").first()).toHaveText("3 days ago");
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2", "Past gathering 3"]);
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-meta']").first()).toHaveText("3 days ago");
 
     await upcoming.click();
-    await expect(page.locator("[data-mv2='row-title']")).toHaveText(["Fixture Gathering 1"]);
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Fixture Gathering 1"]);
   });
 
   test("a Contributor with nothing coming up but past events opens on Recent, and Upcoming says so plainly", async ({ page }) => {
     await openContributor(page, 2, { past: 2 });
     await expect(page.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Recent" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("[data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2"]);
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2"]);
     await page.getByRole("button", { name: "Upcoming" }).click();
     await expect(page.getByText("Nothing is coming up.")).toBeVisible();
   });
@@ -71,8 +71,8 @@ test.describe("P2-07 Upcoming | Recent", () => {
   test("a past event the app does not have loaded is listed but is not a link; the sort choice resets on another pin", async ({ page }) => {
     const { seed } = await openContributor(page, 0, { past: 1 });
     await page.getByRole("button", { name: "Recent" }).click();
-    await expect(page.locator("[data-mv2='row']")).toHaveCount(0); // not in the store: no button
-    await expect(page.locator("[data-mv2='row-title']")).toHaveText(["Past gathering 1"]);
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row']")).toHaveCount(0); // not in the store: no button
+    await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1"]);
     const other = seed.contributors[1];
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [other.physical_longitude, other.physical_latitude]);
     await page.locator(`.maplibregl-marker[data-cc-id="${other.id}"]`).click({ force: true });
