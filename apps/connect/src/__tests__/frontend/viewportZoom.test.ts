@@ -12,16 +12,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const html = readFileSync(join(process.cwd(), "src/frontend/index.html"), "utf8");
+// read by a real HTML parser (jsdom), never by a regular expression over the markup
+const page = new DOMParser().parseFromString(html, "text/html");
+const viewportTags = () => Array.from(page.querySelectorAll('meta[name="viewport"]'));
 
-const META = /<meta name="viewport" content="([^"]*)" \/>/;
 const WEB_CONTENT = "width=device-width, initial-scale=1, viewport-fit=cover";
 const NATIVE_CONTENT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
 
 /** The inline script that follows the viewport tag (the first script in the file with no src). */
 function nativeScript(): string {
-  const m = /<script>\s*([\s\S]*?)<\/script>/.exec(html);
-  if (!m) throw new Error("no inline script in index.html");
-  return m[1];
+  const inline = Array.from(page.scripts).find((sc) => !sc.hasAttribute("src"));
+  if (!inline || !inline.textContent) throw new Error("no inline script in index.html");
+  return inline.textContent;
 }
 
 /** Run the inline script against a stub page and return the viewport tag's content afterwards. */
@@ -36,21 +38,22 @@ function run(opts: { capacitor?: unknown; protocol?: string; noMeta?: boolean })
 }
 
 describe("the viewport tag (R9: the website can be pinch zoomed)", () => {
-  it("is the first thing in the file after charset, and carries no zoom block", () => {
-    const m = META.exec(html);
-    expect(m).not.toBeNull();
-    expect(m![1]).toBe(WEB_CONTENT);
-    expect(m![1]).not.toContain("maximum-scale");
-    expect(m![1]).not.toContain("user-scalable");
-    // exactly one viewport tag, and it comes before any script runs
-    expect(html.match(/<meta name="viewport"/g)).toHaveLength(1);
-    expect(html.indexOf("<meta name=\"viewport\"")).toBeLessThan(html.indexOf("<script"));
+  it("is the only viewport tag, and carries no zoom block", () => {
+    const tags = viewportTags();
+    expect(tags).toHaveLength(1);
+    const content = tags[0].getAttribute("content") ?? "";
+    expect(content).toBe(WEB_CONTENT);
+    expect(content).not.toContain("maximum-scale");
+    expect(content).not.toContain("user-scalable");
   });
 
-  it("the inline script runs before every other script (so the native block is in place before the page paints)", () => {
-    const inline = html.indexOf("<script>");
-    expect(inline).toBeGreaterThan(-1);
-    expect(inline).toBeLessThan(html.indexOf("<script src="));
+  it("the inline script is the first script on the page, after the tag (so the native block is in place before anything else runs)", () => {
+    const [tag] = viewportTags();
+    const first = page.scripts[0];
+    expect(first.hasAttribute("src")).toBe(false);
+    expect(first.textContent).toContain("isNativePlatform");
+    // the tag comes before it in the document
+    expect(tag.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
