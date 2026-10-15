@@ -23,7 +23,7 @@
 --  * Media comes from our own storage, never a third-party host (Wear's
 --    Content-Security-Policy `img-src` allows only our Supabase host and Google
 --    avatars): the posts/stories/concepts photos are objects in the public
---    `wear-media` bucket under `demo/` (the file list and where each came from
+--    `wear-media` bucket under `wear-demo-photos/` (the file list and where each came from
 --    is in README.md; upload them before seeding, or the pictures are broken).
 --    Brand logos and citizen avatars are left empty on purpose: the app draws
 --    the crown disc (brands) and an initials disc (people) when there is no URL.
@@ -32,7 +32,7 @@
 -- ============================================================================
 do $seed$
 declare
-  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/demo/';
+  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/';
   -- ── fixed seed identities (also the teardown key) ──
   o1 uuid := '5eed0001-0000-4000-a000-000000000001'; -- Cornerstone Apparel owner
   o2 uuid := '5eed0002-0000-4000-a000-000000000002'; -- Lily & Field owner
@@ -235,7 +235,7 @@ end $seed$;
 -- ============================================================================
 do $engage$
 declare
-  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/demo/';
+  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/';
   o1 uuid := '5eed0001-0000-4000-a000-000000000001'; -- Cornerstone owner
   o2 uuid := '5eed0002-0000-4000-a000-000000000002'; -- Lily & Field owner
   o3 uuid := '5eed0003-0000-4000-a000-000000000003'; -- Salt & Light owner

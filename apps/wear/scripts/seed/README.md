@@ -68,7 +68,7 @@ can approve them live.
 - **Media never points at a third-party host.** Wear's Content-Security-Policy
   (`apps/wear/next.config.js`) lets pictures load only from our Supabase host
   and Google avatars, so the seed uses our own storage: the 12 demo photos are
-  objects in the public `wear-media` bucket under `demo/` (see
+  objects in the public `wear-media` bucket under `wear-demo-photos/` (see
   [Demo photos](#demo-photos)), and brand logos / citizen avatars are left
   **empty** (the app draws the crown disc for a brand and an initials disc for
   a person). Replace the photos with real uploads once real brands post.
@@ -78,15 +78,15 @@ can approve them live.
 
 ## Demo photos
 
-The seed expects these 12 files in `wear-media/demo/` (a public bucket; the
-seed builds `https://<project>.supabase.co/storage/v1/object/public/wear-media/demo/<file>`).
+The seed expects these 12 files in `wear-media/wear-demo-photos/` (a public bucket; the
+seed builds `https://<project>.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/<file>`).
 They are free stock photos under the
 [Unsplash License](https://unsplash.com/license) (free to download, copy and
 use, commercial use included, no attribution needed; they may not be sold
 unmodified or compiled into a competing photo service). They were downloaded
 once on 2026-10-15 from `https://images.unsplash.com/<name>?auto=format&fit=crop&w=800&q=70`
 (the file name without `.jpg` is the `<name>`), then uploaded by hand in the
-Supabase dashboard (Storage → `wear-media` → `demo`):
+Supabase dashboard (Storage → `wear-media` → `wear-demo-photos`):
 
 `photo-1434389677669-e08b4cac3105.jpg`, `photo-1489987707025-afc232f7ea0f.jpg`,
 `photo-1503341504253-dff4815485f1.jpg`, `photo-1521572163474-6864f9cf17ab.jpg`,
@@ -97,7 +97,7 @@ Supabase dashboard (Storage → `wear-media` → `demo`):
 
 Re-seeding on a project without these objects gives broken pictures (the seed
 raises no error). `teardown-feed.sql` removes the rows but not the storage objects; delete
-the `demo/` folder in the dashboard if you want them gone too.
+the `wear-demo-photos/` folder in the dashboard if you want them gone too.
 
 ## Run / remove (via Supabase MCP `execute_sql`, or psql as a superuser/owner)
 

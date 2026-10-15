@@ -121,7 +121,7 @@ describe('Wear Content-Security-Policy header', () => {
     ]);
   });
 
-  it('no longer allows the demo-content hosts (the demo media lives in wear-media/demo/)', async () => {
+  it('no longer allows the demo-content hosts (the demo media lives in wear-media/wear-demo-photos/)', async () => {
     const img = (await policy('production')).get('img-src') ?? [];
     expect(img).not.toContain('https://ui-avatars.com');
     expect(img).not.toContain('https://images.unsplash.com');

@@ -12,7 +12,7 @@ const SUPABASE_HOST = 'xyiajtrvhlxaeplsiajj.supabase.co';
  * - `style-src` keeps `'unsafe-inline'`: the app styles elements with inline
  *   style attributes by design, and the page has one inline <style>.
  * - `img-src` lists what the live database actually references: our Supabase
- *   storage (uploads and the demo photos in `wear-media/demo/`) and Google
+ *   storage (uploads and the demo photos in `wear-media/wear-demo-photos/`) and Google
  *   profile pictures. The demo content used to sit on ui-avatars.com and
  *   images.unsplash.com; it was moved to storage on 2026-10-15 so neither host
  *   is allowed. A screen that renders a new image host must add it here, or
