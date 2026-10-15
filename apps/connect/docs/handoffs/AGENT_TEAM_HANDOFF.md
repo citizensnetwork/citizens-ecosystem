@@ -66,7 +66,7 @@ An inbox answer is **intent**. `A` = an answer is enough **if** the founder chos
 | Close stale Dependabot PRs (reversible: a human can reopen one; Dependabot itself only opens a new PR when a newer version appears) | A |
 | Open a **draft** PR from `claude/agent-*` | A |
 | Start another role's scheduled task (`run_scheduled_task`) | A, only the three forward arrows of `builder.md` section 9 (Dispatcher to Builder, Builder to Reviewer, Reviewer to Builder), behind the switch card `d-chain`; wired into the prompts 2026-10-15. The founder's permission rule covers the whole tool, so each prompt is the only scope limit |
-| Merge any PR | C (never auto-merge) |
+| Merge any PR | C (never auto-merge). One exception since 2026-10-15, **rung 1** (the founder's yes on card `d-merge-trust`): a docs-only pull request (Markdown under `docs/` or `apps/connect/docs/`, or `RESUME_HERE.md`) with every check green and a Reviewer comment on that exact head with no blocker, merged by a human-started session with a merge commit and a one-line report ([`../routines/reviewer.md`](../routines/reviewer.md) section 11). No scheduled role merges anything |
 | Apply a migration or change any database, RLS or auth | C, and only with a staging database once Supabase Pro exists |
 | Send a message to anyone but the founder; publish, list or contact an organisation | C |
 | Delete branches, files or data (the "Allow Claude" ruleset also blocks branch deletes) | C |
