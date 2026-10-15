@@ -418,21 +418,356 @@
     );
   }
 
-  // ── Insights · Timeline Map (flagship; MapLibre lands with live data)
+  // ── Insights · Timeline Map (flagship) ─────────────────────────────
+  // The org's geolocated activities on a map with a playback window: drag the
+  // slider (or press Play) and the dots for "the last N days up to that date"
+  // light up. A ring's size shows how many people the activity reached (size,
+  // not distance on the ground); "Compare" greys in the window just before.
+  // Live: GET /api/map/activities (RLS-gated, Bearer via authFetch). Demo:
+  // D.mapActivities. The pure maths lives in timeline-lib.jsx (window.CV_TIMELINE).
+  //
+  // MapLibre is the vendored v6.11.2 copy Connect also ships (v6 dropped its UMD
+  // build; GHSA-jrc7-96c5-q579) and is loaded on FIRST visit to this screen by
+  // maplibre-loader.mjs, so nobody pays ~1 MB for a map they never open.
+  let maplibreLoading = null;
+  function loadMapLibre() {
+    if (window.maplibregl) return Promise.resolve(window.maplibregl);
+    if (maplibreLoading) return maplibreLoading;
+    maplibreLoading = new Promise((resolve, reject) => {
+      if (!document.querySelector("link[data-cv-maplibre]")) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = new URL("vendor/maplibre-gl/maplibre-gl.css", document.baseURI).href;
+        link.setAttribute("data-cv-maplibre", "");
+        document.head.appendChild(link);
+      }
+      const done = () => { window.removeEventListener("cv-maplibre-ready", done); resolve(window.maplibregl); };
+      window.addEventListener("cv-maplibre-ready", done);
+      const script = document.createElement("script");
+      script.type = "module";
+      script.src = new URL("maplibre-loader.mjs?v=1", document.baseURI).href;
+      script.onerror = () => {
+        window.removeEventListener("cv-maplibre-ready", done);
+        reject(new Error("The map could not be loaded."));
+      };
+      document.head.appendChild(script);
+    }).catch((e) => { maplibreLoading = null; throw e; });
+    return maplibreLoading;
+  }
+
+  const EMPTY_FC = { type: "FeatureCollection", features: [] };
+  const fmtDay = (n) =>
+    new Date(n * window.CV_TIMELINE.DAY_MS).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const SPAN_LABEL = { 7: "7 days", 30: "30 days", 90: "90 days", 365: "1 year" };
+
   function TimelineMap() {
+    const TL = window.CV_TIMELINE;
+    const { isLive, authFetch } = liveCtx();
+    const env = window.__CV_ENV || {};
+    const hostRef = React.useRef(null);
+    const mapRef = React.useRef(null);
+    const pointsRef = React.useRef([]);
+    const [points, setPoints] = React.useState(() => (isLive ? [] : TL.toPoints(D.mapActivities)));
+    const [loading, setLoading] = React.useState(isLive);
+    const [loadErr, setLoadErr] = React.useState(null);
+    const [mapErr, setMapErr] = React.useState(null);
+    const [base, setBase] = React.useState("loading"); // loading | tiles | plain | refused
+    const [epoch, setEpoch] = React.useState(0); // bumps on every (re)loaded style so filters re-apply
+    const [span, setSpan] = React.useState(30);
+    const [cursor, setCursor] = React.useState(null);
+    const [playing, setPlaying] = React.useState(false);
+    const [compare, setCompare] = React.useState(false);
+    const [types, setTypes] = React.useState(() => new Set());
+    const [selId, setSelId] = React.useState(null);
+    const [noir, setNoir] = React.useState(() => document.documentElement.getAttribute("data-theme") === "noir");
+
+    pointsRef.current = points;
+    const hasPoints = points.length > 0;
+    const ex = React.useMemo(() => TL.extent(points), [points]);
+    const cur = !ex ? 0 : Math.min(Math.max(cursor === null ? ex.max : cursor, ex.min), ex.max);
+    const win = TL.windowAt(cur, span);
+    const prevWin = TL.previousWindow(win);
+    const typeList = React.useMemo(() => Array.from(new Set(points.map((p) => p.type))).sort(), [points]);
+    const sel = points.find((p) => p.id === selId) || null;
+
+    // Live rows.
+    React.useEffect(() => {
+      if (!isLive || !authFetch) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await authFetch("/api/map/activities?org_id=" + D.orgId);
+          if (!res.ok) throw new Error("Could not load your map (" + res.status + ").");
+          const j = await res.json();
+          if (!cancelled) setPoints(TL.toPoints(j.data));
+        } catch (e) {
+          if (!cancelled) setLoadErr(e.message || "Could not load your map.");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [isLive]);
+
+    // Follow the Light / Noir toggle (it only flips an attribute on <html>).
+    React.useEffect(() => {
+      const mo = new MutationObserver(() => setNoir(document.documentElement.getAttribute("data-theme") === "noir"));
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      return () => mo.disconnect();
+    }, []);
+
+    // Build the map once there is something to draw.
+    React.useEffect(() => {
+      if (loading || !hasPoints || !hostRef.current) return;
+      let cancelled = false;
+      let map = null;
+      let refused = false;
+      loadMapLibre().then((ml) => {
+        if (cancelled || !hostRef.current) return;
+        const url = TL.styleUrl(env, document.documentElement.getAttribute("data-theme") === "noir" ? "noir" : "light");
+        try {
+          map = new ml.Map({
+            container: hostRef.current,
+            style: url || TL.BLANK_STYLE,
+            center: [28.19, -25.75],
+            zoom: 9,
+            attributionControl: { compact: true },
+          });
+        } catch (e) {
+          setMapErr("This browser cannot draw the map; the list below shows the same activities.");
+          return;
+        }
+        mapRef.current = map;
+        window.__cvMap = map; // handle for specs and the live walk (as Connect's window.__ccMap)
+        setBase(url ? "tiles" : "plain");
+        map.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
+        const addLayers = () => {
+          if (!map.getSource("cv-points")) map.addSource("cv-points", { type: "geojson", data: TL.featureCollection(pointsRef.current) });
+          if (!map.getSource("cv-sel")) map.addSource("cv-sel", { type: "geojson", data: EMPTY_FC });
+          const add = (def) => { if (!map.getLayer(def.id)) map.addLayer(def); };
+          add({ id: "cv-prev", type: "circle", source: "cv-points", filter: TL.NOTHING,
+            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#8B8574", "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.75 } });
+          add({ id: "cv-ring", type: "circle", source: "cv-points", filter: TL.NOTHING,
+            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#D4AF37", "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.6 } });
+          add({ id: "cv-dot", type: "circle", source: "cv-points", filter: TL.NOTHING,
+            paint: { "circle-radius": TL.dotRadiusExpr(), "circle-color": "#D9A50C", "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1.5, "circle-opacity": 0.92 } });
+          add({ id: "cv-sel", type: "circle", source: "cv-sel",
+            paint: { "circle-radius": ["+", 4, TL.ringRadiusExpr()], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#141414", "circle-stroke-width": 2.5 } });
+        };
+        map.on("style.load", () => { addLayers(); setEpoch((n) => n + 1); });
+        map.on("error", (ev) => {
+          // A key MapTiler refuses for this origin (401/403): keep the activity, drop the tiles.
+          if (!refused && url && TL.isKeyRefusal(ev && ev.error)) {
+            refused = true;
+            setBase("refused");
+            map.setStyle(TL.BLANK_STYLE);
+          }
+        });
+        map.on("click", (ev) => {
+          const hit = map.getLayer("cv-dot") ? map.queryRenderedFeatures(ev.point, { layers: ["cv-dot"] }) : [];
+          setSelId(hit.length ? hit[0].properties.id : null);
+        });
+        map.on("mousemove", "cv-dot", () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", "cv-dot", () => { map.getCanvas().style.cursor = ""; });
+        const bb = TL.bounds(pointsRef.current);
+        if (bb) map.fitBounds(bb, { padding: 70, maxZoom: 12, duration: 0 });
+      }).catch((e) => { if (!cancelled) setMapErr((e && e.message) || "The map could not be loaded."); });
+      return () => {
+        cancelled = true;
+        if (map) map.remove();
+        if (window.__cvMap === map) window.__cvMap = null;
+        mapRef.current = null;
+      };
+    }, [hasPoints, loading]);
+
+    // Switching Light / Noir swaps the base style (a plain background has no Noir twin).
+    React.useEffect(() => {
+      const map = mapRef.current;
+      if (!map || base !== "tiles") return;
+      const url = TL.styleUrl(env, noir ? "noir" : "light");
+      if (url) map.setStyle(url);
+    }, [noir]);
+
+    // The playback window, the type filter and Compare drive three layer filters.
+    React.useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !map.getLayer("cv-dot")) return;
+      const f = TL.windowFilter(win, types);
+      map.setFilter("cv-dot", f);
+      map.setFilter("cv-ring", f);
+      map.setFilter("cv-prev", compare ? TL.windowFilter(prevWin, types) : TL.NOTHING);
+    }, [epoch, cur, span, types, compare]);
+
+    // The selected activity's outline.
+    React.useEffect(() => {
+      const map = mapRef.current;
+      const src = map && map.getSource && map.getSource("cv-sel");
+      if (!src) return;
+      src.setData(sel ? TL.featureCollection([sel]) : EMPTY_FC);
+    }, [epoch, selId, points]);
+
+    // Play: step the cursor to the end, then stop.
+    React.useEffect(() => {
+      if (!playing || !ex) return;
+      const id = setInterval(() => {
+        setCursor((c) => {
+          const next = (c === null ? ex.max : c) + TL.playStep(span);
+          if (next >= ex.max) { setPlaying(false); return ex.max; }
+          return next;
+        });
+      }, 650);
+      return () => clearInterval(id);
+    }, [playing, span, ex && ex.max]);
+
+    const togglePlay = () => {
+      if (playing) { setPlaying(false); return; }
+      if (ex && cur >= ex.max) setCursor(ex.min); // replay from the start
+      setPlaying(true);
+    };
+    const toggleType = (t) => {
+      setTypes((cur0) => {
+        const n = new Set(cur0);
+        if (n.has(t)) n.delete(t); else n.add(t);
+        return n;
+      });
+    };
+
+    const now = TL.summarise(points, win, types);
+    const before = TL.summarise(points, prevWin, types);
+    const inWindow = points
+      .filter((p) => p.t >= win.from && p.t <= win.to && (types.size === 0 || types.has(p.type)))
+      .sort((a, b) => b.t - a.t);
+    const note = base === "plain"
+      ? "The street map is switched off for this site, so your activities are shown on a plain background."
+      : base === "refused"
+        ? "The street-map provider did not accept this site, so your activities are shown on a plain background."
+        : null;
+
+    if (loading) {
+      return (
+        <div className="fade-in">
+          <SectionTitle>Timeline map</SectionTitle>
+          <Card><div style={{ color: "var(--text-secondary)", fontSize: 14 }}>Loading your map…</div></Card>
+        </div>
+      );
+    }
+    if (loadErr) {
+      return (
+        <div className="fade-in">
+          <SectionTitle>Timeline map</SectionTitle>
+          <div style={{ fontSize: 13, color: "var(--danger)", background: "var(--danger-bg)", borderRadius: 12, padding: "9px 14px" }}>{loadErr}</div>
+        </div>
+      );
+    }
+    if (!hasPoints) {
+      return (
+        <div className="fade-in">
+          <SectionTitle>Timeline map</SectionTitle>
+          <Card style={{ minHeight: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+            <span style={{ color: "var(--brand-ink)" }}><Icon name="map" size={36} /></span>
+            <div style={{ marginTop: 12, fontWeight: 800, fontSize: 16 }}>No activities with a place yet</div>
+            <div style={{ marginTop: 8, maxWidth: 460, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              The map plots every activity that has a latitude and longitude. When activities
+              come in with a place, they appear here and you can play them back through time.
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
+    const pillRow = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
     return (
       <div className="fade-in">
-        <SectionTitle>Timeline map</SectionTitle>
-        <Card style={{ minHeight: 320, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-          <span style={{ color: "var(--brand-ink)" }}><Icon name="map" size={40} /></span>
-          <div style={{ marginTop: 14, fontWeight: 800, fontSize: 16 }}>The living map of your Kingdom activity</div>
-          <div style={{ marginTop: 8, maxWidth: 460, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Single-event reach rings, period playback and stacked range comparison
-            arrive here with the live activity data (MapLibre + MapTiler —
-            set NEXT_PUBLIC_MAPTILER_KEY). The canvas prototype in the design
-            handoff carries the full interaction spec.
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <SectionTitle>Timeline map</SectionTitle>
+          {!isLive ? (
+            <span title="Sample activities for the demo organisation."
+              style={{ fontSize: 11, fontWeight: 800, color: "var(--text-secondary)", background: "var(--surface-sunk)", borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap" }}>
+              sample data
+            </span>
+          ) : null}
+        </div>
+
+        <div style={{ ...pillRow, marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>Window</span>
+          {TL.SPANS.map((s) => (
+            <Pill key={s} active={span === s} onClick={() => setSpan(s)}>{SPAN_LABEL[s]}</Pill>
+          ))}
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, marginLeft: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+            Compare with the window before
+          </label>
+        </div>
+        {typeList.length > 1 ? (
+          <div style={{ ...pillRow, marginBottom: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>Type</span>
+            <Pill active={types.size === 0} onClick={() => setTypes(new Set())}>All</Pill>
+            {typeList.map((t) => (
+              <Pill key={t} active={types.has(t)} onClick={() => toggleType(t)}>{cap(t)}</Pill>
+            ))}
+          </div>
+        ) : null}
+
+        <Card style={{ padding: 0, overflow: "hidden", position: "relative" }}>
+          <div ref={hostRef} role="img" aria-label="Map of your activities"
+            style={{ height: 440, width: "100%", background: "var(--surface-sunk)" }} />
+          {base === "tiles" ? (
+            <a href="https://www.maptiler.com" target="_blank" rel="noopener noreferrer" data-cv-maptiler-logo=""
+              style={{ position: "absolute", left: 10, bottom: 10, display: "inline-block", lineHeight: 0, padding: "3px 6px", borderRadius: 999, background: "rgba(23,19,16,0.62)" }}>
+              <img src="https://api.maptiler.com/resources/logo.svg" alt="MapTiler logo" width="67" height="20" decoding="async" />
+            </a>
+          ) : null}
+        </Card>
+        {note ? <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>{note}</div> : null}
+        {mapErr ? <div style={{ marginTop: 8, fontSize: 13, color: "var(--danger)" }}>{mapErr}</div> : null}
+
+        <Card style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <Btn kind="gold" onClick={togglePlay}>{playing ? "Pause" : "Play"}</Btn>
+            <input type="range" min={ex.min} max={ex.max} value={cur} step={1}
+              aria-label="Playback date"
+              onChange={(e) => { setPlaying(false); setCursor(Number(e.target.value)); }}
+              style={{ flex: 1, minWidth: 160 }} />
+          </div>
+          <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-secondary)" }}>
+            {fmtDay(win.from)} – {fmtDay(win.to)}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 15, fontWeight: 800 }} aria-live="polite">
+            {TL.summaryLine(now, before, compare)}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-tertiary)" }}>
+            A ring's size shows how many people the activity reached, not how far away it was.
+            Dates are the dates you logged; people are the participant counts you entered.
           </div>
         </Card>
+
+        {sel ? (
+          <Card style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>{sel.title}</div>
+            <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-secondary)" }}>
+              {cap(sel.type)} · {fmtDay(sel.t)}{sel.dept ? " · " + sel.dept : ""}{sel.place ? " · " + sel.place : ""}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13.5 }}>
+              {sel.people} {sel.people === 1 ? "person" : "people"} reached
+            </div>
+          </Card>
+        ) : null}
+
+        <details open={!!mapErr} style={{ marginTop: 12 }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+            Show the {inWindow.length} {inWindow.length === 1 ? "activity" : "activities"} in this window as a list
+          </summary>
+          <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+            {inWindow.slice(0, 60).map((p) => (
+              <li key={p.id}>
+                <button onClick={() => setSelId(p.id)}
+                  style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === p.id ? "var(--gold-50)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
+                  <strong>{p.title}</strong> · {fmtDay(p.t)} · {p.people} {p.people === 1 ? "person" : "people"}{p.place ? " · " + p.place : ""}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       </div>
     );
   }

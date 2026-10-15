@@ -253,9 +253,28 @@
     { org: "City Shelter Trust", status: "pending", sharing: "none", metrics: [] },
   ];
 
+  // §3.5 Timeline Map sample: rows in the exact shape of GET /api/map/activities
+  // (latitude, longitude, participant_count, location_name, department_name), so
+  // the live response drops in unchanged. Demo only; the live map never shows these.
+  const mapActivities = [
+    { id: "ma-1", title: "Community Food Drive", type: "outreach", date: "2026-06-28", latitude: -25.7118, longitude: 28.3995, location_name: "Mamelodi community hall", participant_count: 218, department_name: "Community Projects" },
+    { id: "ma-2", title: "Youth Mentorship intro night", type: "event", date: "2026-06-21", latitude: -25.7487, longitude: 28.238, location_name: "Hatfield", participant_count: 94, department_name: "Outreach" },
+    { id: "ma-3", title: "Soup Kitchen — Saturday shift", type: "service", date: "2026-06-20", latitude: -25.7461, longitude: 28.1881, location_name: "Pretoria CBD", participant_count: 42, department_name: "Volunteers" },
+    { id: "ma-4", title: "Winter Blanket Drive wrap-up", type: "outreach", date: "2026-06-14", latitude: -25.771, longitude: 28.088, location_name: "Atteridgeville", participant_count: 152, department_name: "Fundraising" },
+    { id: "ma-5", title: "Volunteer training day", type: "training", date: "2026-06-07", latitude: -25.8603, longitude: 28.1894, location_name: "Centurion", participant_count: 31, department_name: "Volunteers" },
+    { id: "ma-6", title: "Prayer & planning breakfast", type: "meeting", date: "2026-05-30", latitude: -25.7677, longitude: 28.2395, location_name: "Brooklyn", participant_count: 18, department_name: "Leadership" },
+    { id: "ma-7", title: "Warm Meals Wednesday", type: "service", date: "2026-05-27", latitude: -25.5351, longitude: 28.1032, location_name: "Soshanguve", participant_count: 76, department_name: "Community Projects" },
+    { id: "ma-8", title: "Back-to-school stationery drive", type: "outreach", date: "2026-05-16", latitude: -25.738, longitude: 28.305, location_name: "Silverton", participant_count: 124, department_name: "Fundraising" },
+    { id: "ma-9", title: "Skills workshop: CV writing", type: "workshop", date: "2026-05-09", latitude: -25.7907, longitude: 28.2326, location_name: "Waterkloof", participant_count: 27, department_name: "Outreach" },
+    { id: "ma-10", title: "Community clean-up morning", type: "event", date: "2026-04-26", latitude: -25.796, longitude: 28.319, location_name: "Garsfontein", participant_count: 58, department_name: "Community Projects" },
+    { id: "ma-11", title: "Food parcels packing", type: "service", date: "2026-04-18", latitude: -25.7461, longitude: 28.1881, location_name: "Pretoria CBD", participant_count: 36, department_name: "Volunteers" },
+    { id: "ma-12", title: "Easter family gathering", type: "event", date: "2026-04-05", latitude: -25.7118, longitude: 28.3995, location_name: "Mamelodi community hall", participant_count: 164, department_name: "Community Projects" },
+  ];
+
   window.CV_DATA = {
     fill,
     narrativeTemplates,
+    mapActivities,
     org: { name: "Hope Collective", type: "charity", health: 78, healthTrend: [72, 74, 73, 76, 77, 78] },
     pulse: [
       { label: "People reached", value: "476", delta: "+22%", tone: "good" },
