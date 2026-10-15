@@ -281,6 +281,9 @@
     const qr = useMemo(() => encode(url), [url]);
     if (!qr) return null;
     const p = pathData(qr, 4);
+    // Inside the Capacitor phone app a blob download does nothing (the web view has no download handler), and a button
+    // that silently does nothing is worse than none: there, no Save button, and a screenshot is the way to keep it.
+    const native = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
     return h('div', { 'data-mv2': 'qr', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mv2-qr-title' },
       h('div', { 'data-mv2': 'qr-card' },
         h('h2', { id: 'mv2-qr-title', 'data-mv2': 'qr-title' }, strings.title(name)),
@@ -289,9 +292,9 @@
           h('path', { d: p.d, fill: '#000000' })),
         h('p', { 'data-mv2': 'qr-url' }, url),
         h('p', { 'data-mv2': 'qr-hint' }, strings.hint),
-        h('p', { 'data-mv2': 'qr-hint' }, strings.printHint),
+        h('p', { 'data-mv2': 'qr-hint' }, native ? strings.screenshotHint : strings.printHint),
         h('div', { 'data-mv2': 'qr-actions' },
-          h('button', { type: 'button', 'data-mv2': 'action', 'data-primary': '', onClick: () => savePng(qr, strings.fileName(String(slug).replace(/[^a-zA-Z0-9-]/g, ''))) }, strings.save),
+          !native && h('button', { type: 'button', 'data-mv2': 'action', 'data-primary': '', onClick: () => savePng(qr, strings.fileName(String(slug).replace(/[^a-zA-Z0-9-]/g, ''))) }, strings.save),
           h('button', { type: 'button', ref: closeBtn, 'data-mv2': 'action', 'aria-label': strings.close, onClick: onClose }, 'Close'))));
   }
 

@@ -41,6 +41,8 @@
         title: (name) => 'QR code for ' + name,
         hint: "Scanning it opens this listing in your phone's browser.",
         printHint: 'Print it or show it at your venue.',
+        // inside the phone app there is no download: a screenshot keeps it
+        screenshotHint: 'To keep it, take a screenshot of this screen.',
         imageLabel: (name, url) => 'QR code that opens ' + name + ' at ' + url,
         save: 'Save image',
         close: 'Close QR code',

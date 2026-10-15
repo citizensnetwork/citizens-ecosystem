@@ -144,6 +144,24 @@ test.describe("P2-06 QR code per Contributor", () => {
     expect(bytes.length).toBeGreaterThan(800);
   });
 
+  test("inside the phone app there is no Save image button (a blob download does nothing there): a screenshot is offered instead", async ({ page }) => {
+    // the native bridge's answer, kept even when the page's own Capacitor module loads and assigns window.CapCore
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "CapCore", { get: () => ({ isNativePlatform: () => true }), set: () => {}, configurable: true });
+    });
+    await openContributor(page, 0);
+    await expand(page);
+    await page.getByRole("button", { name: "QR code", exact: true }).click();
+    const dlg = page.getByRole("dialog", { name: "QR code for Fixture Fellowship 1" });
+    await expect(dlg).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save image" })).toHaveCount(0);
+    await expect(dlg).toContainText("To keep it, take a screenshot of this screen.");
+    await expect(dlg).not.toContainText("Print it or show it at your venue.");
+    // the code itself, and Close, are still there
+    await expect(dlg.getByRole("img")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close QR code" })).toBeVisible();
+  });
+
   test("Escape, the close button and Back each close only the QR dialog; focus returns to the QR action; the sheet stays", async ({ page }) => {
     await openContributor(page, 0);
     await expand(page);
