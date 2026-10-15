@@ -772,6 +772,156 @@
     );
   }
 
+  // ── Insights · Community Network (spec §4.3, the network graph) ─────
+  // "Which organisations share your audience? Who could you serve alongside?"
+  // A star: your organisation in the middle, the others round it; closer and
+  // thicker = more community members shared, bigger = a bigger audience of its
+  // own. It shows ORGANISATIONS AND COUNTS ONLY. Never a person, and a pair
+  // only appears from 3 shared people (the reader, migration 182, enforces both).
+  // The numbers are an association ("your people also take part there"), not a
+  // cause, and the screen says so. Live: GET /api/metrics/shared-audience.
+  // Demo: D.networkSample. Pure maths: network-lib.jsx (window.CV_NETWORK).
+  const NET_DAYS = [30, 90, 365];
+  function Network() {
+    const NW = window.CV_NETWORK;
+    const { isLive, authFetch } = liveCtx();
+    const [days, setDays] = React.useState(90);
+    const [rows, setRows] = React.useState(() => (isLive ? [] : NW.mapRows(D.networkSample)));
+    const [loading, setLoading] = React.useState(isLive);
+    const [err, setErr] = React.useState(null);
+    const [selId, setSelId] = React.useState(null);
+
+    React.useEffect(() => {
+      if (!isLive || !authFetch) return;
+      let cancelled = false;
+      setLoading(true);
+      setErr(null);
+      (async () => {
+        try {
+          const res = await authFetch("/api/metrics/shared-audience?org_id=" + D.orgId + "&days=" + days);
+          if (!res.ok) throw new Error("Could not load your network (" + res.status + ").");
+          const j = await res.json();
+          if (!cancelled) { setRows(NW.mapRows(j.data)); setSelId(null); }
+        } catch (e) {
+          if (!cancelled) setErr(e.message || "Could not load your network.");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [isLive, days]);
+
+    const box = { width: 720, height: 460 };
+    const L = React.useMemo(() => NW.layout(rows, box), [rows]);
+    const sel = rows.find((r) => r.id === selId) || null;
+    const myName = (D.org && D.org.name) || "Your organisation";
+    const pick = (id) => setSelId((cur) => (cur === id ? null : id));
+
+    return (
+      <div className="fade-in">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <SectionTitle>Community network</SectionTitle>
+          {!isLive ? (
+            <span title="Sample organisations for the demo organisation."
+              style={{ fontSize: 11, fontWeight: 800, color: "var(--text-secondary)", background: "var(--surface-sunk)", borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap" }}>
+              sample data
+            </span>
+          ) : null}
+        </div>
+
+        {isLive ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>Window</span>
+            {NET_DAYS.map((d) => (
+              <Pill key={d} active={days === d} onClick={() => setDays(d)}>{d === 365 ? "1 year" : d + " days"}</Pill>
+            ))}
+          </div>
+        ) : null}
+
+        {loading ? (
+          <Card><div style={{ color: "var(--text-secondary)", fontSize: 14 }}>Loading your network…</div></Card>
+        ) : err ? (
+          <div style={{ fontSize: 13, color: "var(--danger)", background: "var(--danger-bg)", borderRadius: 12, padding: "9px 14px" }}>{err}</div>
+        ) : rows.length === 0 ? (
+          <Card style={{ minHeight: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+            <span style={{ color: "var(--brand-ink)" }}><Icon name="layers" size={36} /></span>
+            <div style={{ marginTop: 12, fontWeight: 800, fontSize: 16 }}>{NW.headline([], days)}</div>
+            <div style={{ marginTop: 8, maxWidth: 480, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Organisations appear here when the same people take part in your activities and in
+              theirs. Your organisation also needs to be linked to its Connect listing.
+            </div>
+          </Card>
+        ) : (
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }} aria-live="polite">
+              {NW.headline(rows, days)}
+            </div>
+            <Card style={{ padding: 8 }}>
+              <svg viewBox={(-box.width / 2) + " " + (-box.height / 2) + " " + box.width + " " + box.height}
+                role="group" aria-label="Organisations that share your community members"
+                style={{ width: "100%", height: "auto", display: "block" }}>
+                {L.nodes.map((n, i) => (
+                  <line key={"e" + n.id} x1="0" y1="0" x2={n.x} y2={n.y} strokeLinecap="round"
+                    style={{ stroke: "var(--gold-400)", strokeWidth: L.edges[i].w, opacity: selId && selId !== n.id ? 0.25 : 0.6 }} />
+                ))}
+                <circle cx="0" cy="0" r={L.center.r} style={{ fill: "var(--brand)", stroke: "var(--brand-strong)", strokeWidth: 2 }} />
+                <text x="0" y="5" textAnchor="middle" style={{ fontSize: 15, fontWeight: 800, fill: "var(--on-brand)" }}>{NW.initials(myName)}</text>
+                <text x="0" y={L.center.r + 16} textAnchor="middle" style={{ fontSize: 11.5, fontWeight: 700, fill: "var(--text-secondary)" }}>{NW.clip(myName, 24)}</text>
+                {L.nodes.map((n, i) => {
+                  const row = rows[i];
+                  const on = selId === n.id;
+                  return (
+                    <g key={n.id} role="button" tabIndex={0} style={{ cursor: "pointer", outline: "none" }}
+                      aria-pressed={on}
+                      aria-label={n.name + ": " + n.shared + " shared community members"}
+                      onClick={() => pick(n.id)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(n.id); } }}>
+                      <circle cx={n.x} cy={n.y} r={n.r + (on ? 5 : 0)}
+                        style={{ fill: "var(--surface-card)", stroke: on ? "var(--text-primary)" : "var(--gold-600)", strokeWidth: on ? 3 : 2 }} />
+                      <text x={n.x} y={n.y + 4} textAnchor="middle" style={{ fontSize: Math.max(10, n.r * 0.6), fontWeight: 800, fill: "var(--text-primary)", pointerEvents: "none" }}>{NW.initials(n.name)}</text>
+                      <text x={n.x} y={n.y + n.r + 15} textAnchor="middle" style={{ fontSize: 11.5, fontWeight: 700, fill: "var(--text-primary)", pointerEvents: "none" }}>{NW.clip(n.name, 20)}</text>
+                      <text x={n.x} y={n.y + n.r + 28} textAnchor="middle" style={{ fontSize: 11, fill: "var(--text-secondary)", pointerEvents: "none" }}>{row.shared} shared</text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </Card>
+
+            {sel ? (
+              <Card style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{sel.name}</div>
+                <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.6 }}>{NW.describe(sel, myName)}</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+                  A conversation could help you both serve these people well.
+                </div>
+              </Card>
+            ) : null}
+
+            <details open style={{ marginTop: 12 }}>
+              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700 }}>The same organisations as a list</summary>
+              <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+                {rows.map((r) => (
+                  <li key={r.id}>
+                    <button onClick={() => pick(r.id)}
+                      style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === r.id ? "var(--gold-50)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
+                      <strong>{r.name}</strong> · {r.shared} shared · {r.shared} of your {r.mine} ({NW.fmtPct(r.pctMine)}) · {r.shared} of their {r.theirs} ({NW.fmtPct(r.pctTheirs)})
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.6, maxWidth: 640 }}>
+          This shows organisations and counts only; it never names a person. A pair appears only
+          when at least {NW.MIN_SHARED} people are shared, so no individual can be picked out. It is an
+          association ("your community members also take part there"), not a cause.
+        </div>
+      </div>
+    );
+  }
+
   // ── Insights · Observation Feed (§3.7 advisory_outputs pattern) ────
   function Feed() {
     return (
@@ -1429,7 +1579,7 @@
   }
 
   window.Screens = Object.assign(window.Screens || {}, {
-    Spaces, ConfigureSpaces, Activities, TimelineMap, Feed, Analytics,
+    Spaces, ConfigureSpaces, Activities, TimelineMap, Network, Feed, Analytics,
     Coverage, Advisories, Reports, Objectives, Projects, VisionStatements, Settings,
   });
 })();

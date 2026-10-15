@@ -248,6 +248,16 @@
     { name: "L. Ndlovu", role: "org_member", dept: "Outreach" },
     { name: "R. Pillay", role: "org_viewer", dept: "Board" },
   ];
+  // §4.3 Community Network sample: rows in the exact shape of GET
+  // /api/metrics/shared-audience (migration 182), so the live response drops in
+  // unchanged. Organisations and counts only. Demo only; the live screen never shows these.
+  const networkSample = [
+    { other_id: "net-1", other_name: "Grace Fellowship", other_logo_url: null, shared_count: 23, my_audience: 120, other_audience: 90, shared_pct_of_mine: "19.2", shared_pct_of_other: "25.6" },
+    { other_id: "net-2", other_name: "City Shelter Trust", other_logo_url: null, shared_count: 14, my_audience: 120, other_audience: 60, shared_pct_of_mine: "11.7", shared_pct_of_other: "23.3" },
+    { other_id: "net-3", other_name: "Youth for Christ Pretoria", other_logo_url: null, shared_count: 9, my_audience: 120, other_audience: 210, shared_pct_of_mine: "7.5", shared_pct_of_other: "4.3" },
+    { other_id: "net-4", other_name: "Hatfield Community Church", other_logo_url: null, shared_count: 6, my_audience: 120, other_audience: 340, shared_pct_of_mine: "5.0", shared_pct_of_other: "1.8" },
+    { other_id: "net-5", other_name: "Mamelodi Food Network", other_logo_url: null, shared_count: 4, my_audience: 120, other_audience: 35, shared_pct_of_mine: "3.3", shared_pct_of_other: "11.4" },
+  ];
   const partnerships = [ // §3.8 org_partnerships + shared_metrics
     { org: "Grace Fellowship", status: "active", sharing: "summary", metrics: ["reach", "events"] },
     { org: "City Shelter Trust", status: "pending", sharing: "none", metrics: [] },
@@ -283,7 +293,7 @@
       { label: "Goal alignment", value: "58%", delta: "-3", tone: "warn" },
     ],
     observations, advisories, spaces, activities, analytics, coverage,
-    goalsList, projectsList, visionList, team, partnerships,
+    goalsList, projectsList, visionList, team, partnerships, networkSample,
     orgTypes: ["church", "charity", "business", "ministry", "education", "marketplace"],
     priorities: ["Community reach", "Volunteer retention", "Donor growth", "Event quality", "Geographic coverage"],
   };
