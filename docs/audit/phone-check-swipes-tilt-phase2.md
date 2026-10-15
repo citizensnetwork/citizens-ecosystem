@@ -1,4 +1,4 @@
-# Phone check: swipes, tilt, Upcoming | Recent, follower counts, QR code (written 2026-10-14)
+# Phone check: swipes, tilt, Upcoming | Recent, follower counts, QR code, Nearby, pinch zoom (written 2026-10-14, extended 2026-10-15)
 
 **Who:** Stephen, on the Android phone that showed the swipe problem. **Time:** about 10 minutes. **Why it is on a phone:** my tests drive Chrome with real touch events, which is the closest a computer gets, but Android Chrome has its own scroll engine, so this item (tracker R7, RESUME C22) is not done until a phone has passed it.
 
@@ -31,27 +31,56 @@ Tap any Contributor's pin. The card opens at "half" (about half the screen).
 
 ## B. The tilt (R8)
 
-| #   | Do this                                                               | You should see                                                          | Pass |
-| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---- |
-| B1  | Open the map                                                          | The map is tilted (the far streets look smaller), pins stand upright    |      |
-| B2  | Drag one finger                                                       | The map pans as before                                                  |      |
-| B3  | Pinch with two fingers                                                | It zooms as before                                                      |      |
-| B4  | Twist with two fingers                                                | The map rotates as before                                               |      |
-| B5  | Put two fingers on the map and drag them UP, then DOWN                | **Nothing tilts**: the angle stays the same                             |      |
-| B6  | Tap a pin                                                             | The pin lifts clear above the card (it is not hidden behind it)         |      |
-| B7  | Is the tilt too much, or hard to read in the busy middle of the city? | Tell me. The angle is one number (60); I can lower it                   |      |
-| B8  | Add `?map=v1` to the address, once                                    | The old flat map (this is the escape hatch; add `?map=v2` to come back) |      |
+| #   | Do this                                                               | You should see                                                                                            | Pass |
+| --- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---- |
+| B1  | Open the map                                                          | The map is tilted (the far streets look smaller), pins stand upright                                      |      |
+| B2  | Drag one finger                                                       | The map pans as before                                                                                    |      |
+| B3  | Pinch with two fingers                                                | It zooms as before                                                                                        |      |
+| B4  | Twist with two fingers                                                | The map rotates as before                                                                                 |      |
+| B5  | Put two fingers on the map and drag them UP, then DOWN                | **Nothing tilts**: the angle stays the same                                                               |      |
+| B6  | Tap a pin                                                             | The pin lifts clear above the card (it is not hidden behind it)                                           |      |
+| B7  | Is the tilt too much, or hard to read in the busy middle of the city? | Tell me. The angle is one number (now 45, your pick of 2026-10-15); 0 turns it off, 60 was the first pick |      |
+| B8  | Add `?map=v1` to the address, once                                    | The old flat map (this is the escape hatch; add `?map=v2` to come back)                                   |      |
 
 ## C. New in the card
 
-| #   | Do this                                                               | You should see                                                                               | Pass |
-| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---- |
-| C1  | Open a Contributor that has events, tap the Events tab                | Two buttons under the tab: Upcoming (selected) and Recent                                    |      |
-| C2  | Tap Recent                                                            | Past events, newest first, each with "3 days ago" style text                                 |      |
-| C3  | Look at the line under the name of a Contributor with many followers  | "100+ followers" (or 250+, 500+, 1,000+...). A Contributor with fewer than 100 shows nothing |      |
-| C4  | Go to full, scroll to the bottom of a Contributor card, tap "QR code" | A white card with a QR code and the link to the listing                                      |      |
-| C5  | Scan that QR code with another phone's camera                         | It opens that Contributor's listing on the public site                                       |      |
-| C6  | Tap "Save image"                                                      | A picture file is saved (it may land in Downloads); Back or Close closes the card            |      |
+| #   | Do this                                                               | You should see                                                                                                                                                                          | Pass |
+| --- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| C1  | Open a Contributor that has events, tap the Events tab                | Two buttons under the tab: Upcoming (selected) and Recent                                                                                                                               |      |
+| C2  | Tap Recent                                                            | Past events, newest first, each with "3 days ago" style text                                                                                                                            |      |
+| C3  | Look at the line under the name of a Contributor with many followers  | "100+ followers" (or 250+, 500+, 1,000+...). A Contributor with fewer than 100 shows nothing                                                                                            |      |
+| C4  | Go to full, scroll to the bottom of a Contributor card, tap "QR code" | A white card with a QR code and the link to the listing                                                                                                                                 |      |
+| C5  | Scan that QR code with another phone's camera                         | It opens that Contributor's listing on the public site                                                                                                                                  |      |
+| C6  | Tap "Save image"                                                      | A picture file is saved (it may land in Downloads); Back or Close closes the card. **In the phone app (not the website) there is no Save button: it says to take a screenshot instead** |      |
+
+## D. Nearby (P2-01, new 2026-10-15)
+
+| #   | Do this                                                         | You should see                                                                                                    | Pass |
+| --- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---- |
+| D1  | Open any pin, pull the card to full, scroll to the bottom       | A "Nearby" heading and up to 8 listings with how far away each is ("350 m away"), nearest first                   |      |
+| D2  | Look at the list                                                | Contributors, Places and Events are mixed by distance; it never puts a big ministry above a nearer small one      |      |
+| D3  | Swipe on the list (down, then up)                               | The content scrolls; no row opens by accident; the card does not collapse until you are at the top and swipe down |      |
+| D4  | Tap a row                                                       | The card shows that listing, back at half, and the map moves so its pin is clear above the card                   |      |
+| D5  | Press the phone's Back button once                              | The whole card closes (one press, however many listings you hopped through)                                       |      |
+| D6  | Is the QR code button (bottom of the card) easy enough to find? | Tell me. It only shows at full, below the content; I can move it up if it is hidden                               |      |
+
+## E. Pinch zoom (R9, new 2026-10-15)
+
+| #   | Do this                                                                 | You should see                                                                                                             | Pass |
+| --- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---- |
+| E1  | In Chrome on the website, open Settings or a profile page and pinch out | The page zooms in; pinch in or double-tap to come back                                                                     |      |
+| E2  | On the map, pinch out                                                   | The MAP zooms, the page around it does not                                                                                 |      |
+| E3  | With a card open (half, then full), pinch on the card                   | The page does not zoom and the card stays where it is                                                                      |      |
+| E4  | In the phone APP (not Chrome), pinch a profile page                     | It must NOT zoom (the app keeps the old behaviour until you have tested it). If it zooms, tell me: that part is unverified |      |
+
+## F. "On the map" only when true (C21, new 2026-10-15)
+
+| #   | Do this                                                                                                                              | You should see                                                                                                                          | Pass |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| F1  | Admin: Applications, open a pending application that has NO map pin (online-only), tap Approve                                       | The line says it puts them in Kingdom Discovery and that they have no map pin; the toast afterwards agrees                              |      |
+| F2  | Approve (or create) a listing that has a pin                                                                                         | It says on the map and in Kingdom Discovery                                                                                             |      |
+| F3  | The applicant's "being reviewed" banner, for an online-only application                                                              | "...goes into Kingdom Discovery once approved", not the map                                                                             |      |
+| F4  | **Your step:** paste the updated `tools/google-forms/intake.gs` into the live Apps Script, then approve one test row with no address | The welcome email says "in Kingdom Discovery" for it. Until you paste it, the Form's welcome email still says "on the map" for everyone |      |
 
 ## What to send me
 
