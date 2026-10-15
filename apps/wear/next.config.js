@@ -11,10 +11,12 @@ const SUPABASE_HOST = 'xyiajtrvhlxaeplsiajj.supabase.co';
  *   `'unsafe-eval'` is added in development only (Next's React Refresh).
  * - `style-src` keeps `'unsafe-inline'`: the app styles elements with inline
  *   style attributes by design, and the page has one inline <style>.
- * - `img-src` lists what the live database actually references (read 2026-10-15):
- *   our Supabase storage, Google profile pictures, and the demo content's
- *   ui-avatars.com and images.unsplash.com. A screen that renders a new image
- *   host must add it here, or the picture is blocked.
+ * - `img-src` lists what the live database actually references: our Supabase
+ *   storage (uploads and the demo photos in `wear-media/demo/`) and Google
+ *   profile pictures. The demo content used to sit on ui-avatars.com and
+ *   images.unsplash.com; it was moved to storage on 2026-10-15 so neither host
+ *   is allowed. A screen that renders a new image host must add it here, or
+ *   the picture is blocked.
  * - `connect-src` is Supabase (REST, auth, storage over https; realtime over
  *   wss) plus same-origin `/api`.
  * - `object-src`, `frame-ancestors`, `base-uri` and `form-action` close the
@@ -26,7 +28,7 @@ function contentSecurityPolicy() {
     "default-src 'self'",
     `script-src 'self' https://unpkg.com https://cdn.jsdelivr.net${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    `img-src 'self' data: blob: https://${SUPABASE_HOST} https://*.googleusercontent.com https://ui-avatars.com https://images.unsplash.com`,
+    `img-src 'self' data: blob: https://${SUPABASE_HOST} https://*.googleusercontent.com`,
     "font-src 'self' https://fonts.gstatic.com",
     `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
     "object-src 'none'",
