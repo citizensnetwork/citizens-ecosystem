@@ -57,7 +57,7 @@ describe("no component carries a string of its own", () => {
   // A string literal that starts with a capital letter, has a space and lower-case letters reads like
   // user-visible text. Icon names (Navigation, Share2, ChevronUp) have no space, so they pass.
   const looksLikeText = (lit: string) => /^[A-Z][^\n]*\s[^\n]*[a-z]/.test(lit);
-  for (const file of ["map-v2-sheet.jsx", "map-v2-gallery.jsx", "map-v2-pins.jsx", "map-v2-time.jsx"]) {
+  for (const file of ["map-v2-sheet.jsx", "map-v2-gallery.jsx", "map-v2-pins.jsx", "map-v2-time.jsx", "map-v2-nearby.jsx"]) {
     it(`${file} has no hard-coded label`, () => {
       const src = readFileSync(join(APP, file), "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "")

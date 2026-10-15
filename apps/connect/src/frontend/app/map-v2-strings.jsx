@@ -46,6 +46,14 @@
         close: 'Close QR code',
         fileName: (slug) => 'citizens-connect-' + slug + '.png',
       },
+      // P2-01: the closest listings to this one, at the bottom of the full sheet (distance only, never popularity)
+      nearby: {
+        title: 'Nearby',
+        hint: 'Closest first.',
+        under: 'Under 100 m away',
+        metres: (n) => n + ' m away',
+        km: (n) => n + ' km away',
+      },
       empty: {
         title: (name) => name + ' has not shared events, news or photos yet.',
         hint: 'Everything they have shared is on their full profile.',

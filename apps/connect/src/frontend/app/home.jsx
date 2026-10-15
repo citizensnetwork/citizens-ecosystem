@@ -181,7 +181,12 @@
 
       // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
       selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
-        ? React.createElement(window.MapV2Sheet, { id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); } })
+        ? React.createElement(window.MapV2Sheet, {
+          id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
+          // P2-01: the same markers the map draws; a pick in the Nearby list moves the selection (the sheet stays open, one history entry)
+          nearby: markers,
+          onPick: (id, t) => { setSelected(id); setSelType(t); if (t === 'event') trackImpression(id); },
+        })
         : React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) })));
   }
 

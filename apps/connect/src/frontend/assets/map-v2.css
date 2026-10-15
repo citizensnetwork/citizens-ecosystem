@@ -837,6 +837,36 @@
   line-height: var(--lh-1);
   color: var(--text-2);
 }
+/* P2-01: the Nearby list at the bottom of the content: a heading, a one-line hint, then rows that look like the
+   other rows with the listing's avatar in front (each at least 44 px tall, from [data-mv2='row']) */
+[data-mv2='nearby'] {
+  padding: var(--space-5) 0 0;
+}
+[data-mv2='near-title'] {
+  margin: 0;
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='near-hint'] {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='row'][data-near] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+[data-mv2='near-text'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 /* P2-07: Upcoming | Recent, two segments of one control (each at least 44 px tall) */
 [data-mv2='sort'] {
   display: flex;
