@@ -1,0 +1,222 @@
+{
+  "schema_version": 2,
+  "status": "DRAFT for review. Not wired into the wizard. No database changes required or applied. Platform facts re-verified 2026-10-15 against migrations 037, 173 and 180 and the live database.",
+  "owner_docs": ["apps/connect/docs/routines/daily-routine.md", "apps/connect/V1_SCOPE.md"],
+
+  "notes": [
+    "A preset is a bundle of wizard defaults. Adding a preset = one entry here, reviewed by PR.",
+    "Legal type is stored separately and never changes wizard steps.",
+    "Existing platform concepts stay as they are: Contributor, Place, Event. Presets do not add a fourth entity.",
+    "The wizard already asks for a primary category first. category_default_preset (below) picks the default preset from that answer; the user may override it.",
+    "Capabilities in deferred_capabilities are NOT built for v1. Presets reference them only under planned_capabilities.",
+    "Required fields stay minimal: name + category, plus a date for events."
+  ],
+
+  "existing_platform_facts_verified_2026_10_15": {
+    "contributor_go_live": "Self-serve apply since migration 164, but since D-12 (migration 180) an applicant waits for an admin to approve: their Dashboard works at once and nothing of theirs is public until approval. Founder can hide a listing via set_contributor_hidden.",
+    "contributor_kind_values": ["ministry", "organization", "business", "individual"],
+    "contributor_kind_gap": "'individual' has been allowed by the CHECK constraint since migration 173, but the Apply wizard does not ask for the kind yet (pipeline item C3).",
+    "events_columns_already_present": ["visibility (public|private)", "attendees_visible", "is_recurring", "recurring_pattern (jsonb)", "volunteer_openings", "max_attendees", "status", "community_contributor"],
+    "places_columns_already_present": ["open_hours", "volunteer_openings", "status"],
+    "citizen_events": "Migration 037 rate-limits citizen (non-contributor) public events to 1 per 30 days (app_settings community_event_rate_limit, read live 2026-10-15). Confirm the limit matches the intended 'citizens can post their own events'.",
+    "recurrence_in_prod": "0 recurring events exist (live 2026-10-15: 0 of 4 events); recurring_pattern jsonb shape is not yet defined. The create wizard's 'upcomingDates' field is marked DEFER TO V2."
+  },
+
+  "enums": {
+    "entity": ["contributor", "place", "event"],
+    "host_type": ["citizen", "contributor"],
+    "visibility_v1": ["public"],
+    "visibility_later": ["private (invite by username)", "unlisted"],
+    "location_mode": ["fixed", "roaming", "route", "online", "tba"],
+    "legal_type": ["npo_npc", "pbo", "religious_body", "company", "sole_proprietor", "informal_group", "individual"],
+    "capability_state": ["on", "optional", "off"]
+  },
+
+  "core_fields": {
+    "required_all": ["name", "category"],
+    "required_event_extra": ["date"],
+    "optional": ["description", "contact", "links", "cover_image", "tags", "legal_type", "location_mode"]
+  },
+
+  "day_one_capabilities": {
+    "news": "existing: news_posts table (migration 167)",
+    "events": "existing",
+    "hours": "existing: places.open_hours (text)",
+    "gallery": "existing: gallery_urls",
+    "registration_link": "no dedicated column. Options: reuse website_url, or add a details jsonb (proposal, not applied)",
+    "route_link": "no dedicated column. Same options as registration_link",
+    "recurrence": "existing columns is_recurring + recurring_pattern; wizard UI not yet built"
+  },
+
+  "deferred_capabilities": [
+    "volunteer_roles_and_requirements (a simple volunteer_openings toggle already exists)",
+    "booking",
+    "donate",
+    "products",
+    "vendors",
+    "schedule_multi_session",
+    "age_restriction",
+    "invites",
+    "attendee_visibility_controls_in_wizard"
+  ],
+
+  "listing_policy": {
+    "citizen_event": "Goes live immediately. Rate limit (migration 037) and report/flag path apply.",
+    "self_serve": "Contributor applies at once but waits for admin approval (D-12, migration 180); nothing is public until approved. Founder can hide.",
+    "self_serve_flagged": "Same approval gate as self_serve (D-12), so an admin sees these listings before they go public. OPEN DECISION for founder: whether Care/Recovery and child-facing Education need a further hold or review step beyond that approval. Safeguarding fields are required either way. Discovery routine must never auto-publish these."
+  },
+
+  "presets": {
+    "congregation_ministry": {
+      "label": "Congregation / Ministry",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed", "roaming", "online"],
+      "capabilities": { "news": "on", "events": "on", "hours": "optional", "gallery": "optional" },
+      "planned_capabilities": ["volunteers", "donate"],
+      "extra_fields": ["denomination", "service_times"],
+      "listing": "self_serve",
+      "wizard_steps": ["basics", "story", "location_hours", "links", "review"],
+      "examples": ["Churches", "Prayer groups", "Youth groups", "Men's and women's ministries"]
+    },
+
+    "business_retail": {
+      "label": "Business / Retail",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed", "online", "roaming"],
+      "capabilities": { "news": "on", "events": "optional", "hours": "on", "gallery": "on" },
+      "planned_capabilities": ["products"],
+      "extra_fields": ["offering_tags", "service_modes"],
+      "listing": "self_serve",
+      "wizard_steps": ["basics", "story", "location_hours", "links", "review"],
+      "examples": ["Christian clothing store", "Christian coffee shop", "Bookstores", "Businesses supporting the 219 initiative"]
+    },
+
+    "media_creative": {
+      "label": "Media / Creative",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed", "online", "roaming"],
+      "capabilities": { "news": "on", "events": "optional", "hours": "optional", "gallery": "on" },
+      "planned_capabilities": ["products"],
+      "extra_fields": ["media_type"],
+      "listing": "self_serve",
+      "wizard_steps": ["basics", "story", "links", "review"],
+      "examples": ["Radio stations", "Production companies", "Art houses", "Musicians and worship bands", "Publishers"]
+    },
+
+    "outreach_npo": {
+      "label": "Outreach / Non-profit",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed", "roaming", "online"],
+      "capabilities": { "news": "on", "events": "on", "hours": "optional", "gallery": "optional" },
+      "planned_capabilities": ["volunteers", "donate"],
+      "extra_fields": ["outreach_types", "areas_served"],
+      "listing": "self_serve",
+      "wizard_steps": ["basics", "story", "location_hours", "links", "review"],
+      "examples": ["Soup drives", "Mobile showers", "Clothing handouts", "Feeding schemes"]
+    },
+
+    "care_recovery": {
+      "label": "Care / Recovery",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed"],
+      "capabilities": { "news": "optional", "events": "optional", "hours": "on", "gallery": "optional" },
+      "planned_capabilities": ["booking"],
+      "extra_fields": ["programme_types", "capacity", "referral_required", "safeguarding_contact"],
+      "required_extra": ["safeguarding_contact"],
+      "listing": "self_serve_flagged",
+      "wizard_steps": ["basics", "story", "location_hours", "safeguarding", "links", "review"],
+      "gallery_rule": "No photos of identifiable clients or minors without documented consent.",
+      "examples": ["Healing retreats", "Retreat centres", "Mental health institutes", "Clinics"]
+    },
+
+    "education": {
+      "label": "Education",
+      "creates": { "contributor": true, "place": "optional" },
+      "allowed_hosts": ["contributor"],
+      "location_modes": ["fixed", "roaming", "online"],
+      "capabilities": { "news": "on", "events": "on", "hours": "optional", "gallery": "optional" },
+      "planned_capabilities": ["booking", "donate", "schedule_multi_session", "volunteers"],
+      "extra_fields": ["age_range_served", "registration_info", "safeguarding_contact"],
+      "required_extra_when": { "age_range_served_includes_under_18": ["safeguarding_contact"] },
+      "listing": "self_serve_flagged",
+      "wizard_steps": ["basics", "story", "location_hours", "safeguarding", "links", "review"],
+      "gallery_rule": "No photos of children without documented consent.",
+      "examples": ["Schools", "Early childhood centres", "Bible colleges", "Homeschool co-ops"]
+    },
+
+    "gathering_market": {
+      "label": "Gathering / Market",
+      "creates": { "event": true },
+      "allowed_hosts": ["citizen", "contributor"],
+      "location_modes": ["fixed", "online", "tba"],
+      "capabilities": { "registration_link": "optional", "recurrence": "optional", "gallery": "optional", "route_link": "off" },
+      "planned_capabilities": ["vendors", "invites", "age_restriction", "attendee_visibility_controls"],
+      "extra_fields": ["event_type", "venue", "cost_info"],
+      "event_type_suggestions": ["market", "play", "social", "worship_night", "conference", "seminar", "bible_course", "marriage_seminar", "other"],
+      "listing": "citizen_event",
+      "wizard_steps": ["basics", "when", "where", "repeat", "registration", "review"],
+      "deferred_subtypes": ["dating_event (waits for age_restriction and host verification)"],
+      "examples": ["Markets", "Plays", "Christian socials", "Worship nights", "Seminars", "Bible courses"]
+    },
+
+    "roaming_route_event": {
+      "label": "Roaming / Route Event",
+      "creates": { "event": true },
+      "allowed_hosts": ["citizen", "contributor"],
+      "location_modes": ["route", "roaming", "fixed"],
+      "capabilities": { "route_link": "on", "registration_link": "optional", "recurrence": "optional", "gallery": "optional" },
+      "planned_capabilities": ["volunteers", "invites", "schedule_multi_session"],
+      "extra_fields": ["distance_or_duration", "start_point", "finish_point", "cut_off_time"],
+      "listing": "citizen_event",
+      "wizard_steps": ["basics", "when", "route", "repeat", "registration", "review"],
+      "wizard_note": "Today's event wizard requires a venue address. This preset needs a start-point-only path so roaming and route events can be created.",
+      "examples": ["Run For Christ", "Car runs", "Evangelism outings", "Mobile outreach drives"]
+    }
+  },
+
+  "category_default_preset": {
+    "status": "PROPOSED - confirm before wiring",
+    "note": "Maps the existing categories (CATEGORIES.md) to a default preset so the wizard needs no separate 'pick a type' step.",
+    "event_categories": {
+      "worship-prayer": "congregation_ministry",
+      "church-services": "congregation_ministry",
+      "outreach-missions": "outreach_npo",
+      "markets-expos": "gathering_market",
+      "sport-recreation": "roaming_route_event",
+      "arts-culture": "media_creative",
+      "social-gatherings": "gathering_market",
+      "community-upliftment": "outreach_npo",
+      "education-equipping": "education",
+      "marriage-family": "gathering_market",
+      "mens-community": "congregation_ministry",
+      "womens-community": "congregation_ministry",
+      "youth-students": "congregation_ministry",
+      "kids": "education",
+      "care-recovery": "care_recovery",
+      "members-only": "gathering_market",
+      "conferences-summits": "gathering_market"
+    },
+    "place_categories": {
+      "churches-ministries": "congregation_ministry",
+      "hospitality-cafes": "business_retail",
+      "recreation-sport": "business_retail",
+      "media-broadcasting": "media_creative",
+      "retail-shopping": "business_retail",
+      "health-wellness": "care_recovery",
+      "education-training": "education",
+      "arts-creative": "media_creative",
+      "christian-businesses": "business_retail",
+      "safe-spaces": "care_recovery"
+    }
+  },
+
+  "fallback_preset": {
+    "preset": "other",
+    "note": "Used when nothing fits. Free tags only. The discovery routine logs these as gap candidates."
+  }
+}
