@@ -4096,3 +4096,27 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   "missing" claim, and a rule that banned harmless words; the prompt now demands real line numbers and a check before any "missing" claim. **Note:** comments appear
   under the repo owner's account (the connector's identity). **Not done:** the Builder (T4), Reader (T5); the Reviewer has never seen a Builder PR; the fixes are not
   re-tested. No app code, migration or database change.
+
+## Moved from RESUME_HERE §6 on 2026-10-15 (fourth batch, the oldest session entry)
+
+- **2026-10-13 (night) — Map v2 is the default map for everyone (C19 Phase 1.5, PR #106).** From the start-up menu the founder chose C19, said
+  yes to **D15** (default on, `?map=v1` as the escape hatch) and, going to bed, told me to merge wherever needed (I read that as: merge `main`
+  into my own branch and merge my own PR once CI is green; nothing else, and no other session's PR). **What changed:** `app/map-v2-lib.jsx` reads the
+  flag as default ON (one constant, `DEFAULT_ON`), a device stores only a non-default choice (`?map=v1` stores `v1`, `?map=v2` forgets it, a
+  stored `v2` from the review period stays on). No database, API, auth, dependency or CSP change. **Tests:** the first full e2e run after the flip
+  failed 22 tests, every one an assumption about the old default (no product bug): 18 about the old pins and preview card now pin the old map with
+  `useOldMap()` (`e2e/support/app-hooks.ts`), the `map-v2.spec.ts` flag block was rewritten (6 tests), the Kingdom Discovery flow ends on the
+  sheet, and a NEW sheet test records `navigator.userActivation` at every `pushState` (the C15 history rule on the map everyone now gets). Unit
+  `mapV2Lib.test.ts` (14) includes a test that `DEFAULT_ON = false` is the whole rollback. **Proof:** M7 the other way round (new build with
+  `?map=v1` against the old build) 0.0000 % on 9 shots, 24 = 24 requests; a default visitor adds only `/assets/map-v2.css` (28.5 KB, 6.7 KB
+  gzipped); bundle 108,316 → 108,340 B gzipped. **R4:** landing screen, CPU x4, 15 cold loads each (`scripts/map-v2/landing-blocking.mjs`,
+  `docs/audit/data/r4-landing-blocking.json`): long-task excess 1,621 / 1,649 / 1,665 ms (default / opted out / old), after first paint 6 / 3 / 6 ms,
+  style recalculation +7 to +10 ms, so the pass line (≤ 50 ms) holds with no code change; **Lighthouse was not re-run** (a download, not approved), so
+  its old +170 ms is neither confirmed nor refuted. **Found, not fixed:** (1) `map-v2.css` has two rules not scoped to the flag (`:root` tokens,
+  `.maplibregl-ctrl-group button`), so it cannot simply become an unconditional `<link>` without changing the old map; (2) the landing screen's
+  ~1.6 s of long-task excess at CPU x4 is existing cost (Tailwind's browser runtime, S3), the same with Map v2 on or off; (3) the sheet's gallery
+  call shares the anonymous 60-requests-a-minute limit per IP (A12); (4) the MapTiler key is referrer-restricted (H11), so no real tiles were
+  loaded in any run (hermetic fake network only). **Gotchas:** a `( cmd ) &` inside a background shell returns at once, so its "completed"
+  notification is not the end of the run (wait on the log's exit marker); `sed -i` on a file the editor has read invalidates its read state;
+  `prettier --check` covers the tracker's hand-written tables (run `--write` on them). **Left:** A12 / R3 (founder), R6 (delete the old map's
+  code, deferred), Phase 2 (`docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`), and an optional quick Back check on the live site.
