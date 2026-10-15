@@ -74,10 +74,11 @@ Health: <ok | look at> (<one phrase>) · Done: <n> merged (<#numbers>), <n> buil
 
 ## 8. Acceptance and the first run
 
-Acceptance: **a digest the founder can read in under a minute, every number matching a live read, with no private detail and no write outside the run record (and the one card).** The first run's record is added here after it has been read back.
+Acceptance: **a digest the founder can read in under a minute, every number matching a live read, with no private detail and no write outside the run record (and the one card).** **First run, 2026-10-15 (08:33 to 08:34 UTC, started by hand, 17 turns, succeeded).** The digest was appended to the day's report (status `warn`) and had every part in order: health, 10 pull requests merged, issue #108 built as draft PR #118, runs by role with the two usage-limit failures listed as "limit" rather than as defects, two denied chain attempts, no repeated question, clean days 0 of 14 since chaining and 3 since the Watcher. The numbers matched live reads (merged pull requests, run records, card states). **One flaw:** its "answers waiting for a live session" part listed four, but three were stale annotations (`d-chain-permission` and `d-noreply-email`, written by the Dispatcher before its v2.1 rule, both already done; `w-api-slow-categories`, whose follow-up card was answered "done"). A session tried to close them by updating only their `actioned` note and the auto-mode classifier refused the write, so they stand until the founder says in chat that a session may close them. Only the MapTiler upgrade in that list was real.
 
 ## 9. Known limits and follow-ups (propose-only)
 
 - **The digest lives in the Reports tab** (the "Runs today" table), because the inbox page reads only `inbox`, `queue` and `reports` and shows no other field. A small page change that shows the latest digest at the top of the Inbox tab would make it easier to find; it is a republish of the founder's own page and is offered as an idea, not done.
 - It cannot see a wrong merge or a leaked detail by itself (section 4).
+- **Its "waiting" list is only as good as the Dispatcher's notes.** A note that says "Only you can do this" stays until a session closes it; the Dispatcher cannot verify what the founder did. Until the three stale ones above are closed the digest over-counts by three.
 - Runs only while the Claude app is open and the PC is awake.
