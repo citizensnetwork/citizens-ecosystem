@@ -44,8 +44,8 @@
 | **Reviewer** | When an agent PR is opened or updated | Fresh-context review with the `code-review` and `security-review` skills (vibe-security: RLS, `service_role`, secrets, CSP); checks CI and the e2e result; posts findings as a PR comment and an inbox card | Edit code; approve or merge | **Live** (v1: no checkout, so no test runs and no local skills; CI is its evidence) |
 | **Builder** | When `agent:ready` exists and no agent PR is open | Takes ONE issue; works in a sibling worktree from `origin/main`; keeps an offload file; runs the workspace gates; opens a **draft** PR; resumes across days | Merge; apply migrations (until a staging database exists); touch RLS or auth without a card that names it | After the Reviewer |
 | **Reader** | Daily | Listing Automation Phase 2 (C16): reads consented sources and posts suggestions to `/api/automation/suggestions` | Read Meta or TikTok; act without consent; contact anyone | Later; the founder must mint the two scoped keys first |
-| **Scribe** | Daily / weekly | Keeps `RESUME_HERE.md` and handoffs current in docs-only PRs; weekly digest | Anything but docs | Later |
-| **Strategist** | Weekly | Runs the VISION alignment self-prompt over the week's work; files `idea` and `direction` cards | Implement anything | Later |
+| **Scribe** | Daily (proposed 06:15) | ONE short digest of what ran, merged, waits for the founder, is new and how the aim is going, plus the clean-day count toward the cloud runner. Its note goes into the day's report ([`../routines/scribe.md`](../routines/scribe.md)) | Anything but read and report: no code, no email, no GitHub write | **Built 2026-10-15, manual-only** (schedule awaiting the founder) |
+| **Strategist** | Weekly (proposed Mondays 09:15) | Runs the VISION alignment self-prompt over the Vision, the open work and the live public numbers; files at most two `idea` or `direction` cards, each tied to a litmus question and to evidence ([`../routines/strategist.md`](../routines/strategist.md)) | Implement anything | **Built 2026-10-15, manual-only** (schedule awaiting the founder) |
 
 ### 3.3 Coordination protocol
 
@@ -66,7 +66,7 @@ An inbox answer is **intent**. `A` = an answer is enough **if** the founder chos
 | Close stale Dependabot PRs (reversible: a human can reopen one; Dependabot itself only opens a new PR when a newer version appears) | A |
 | Open a **draft** PR from `claude/agent-*` | A |
 | Start another role's scheduled task (`run_scheduled_task`) | A, only the three forward arrows of `builder.md` section 9 (Dispatcher to Builder, Builder to Reviewer, Reviewer to Builder), behind the switch card `d-chain`; wired into the prompts 2026-10-15. The founder's permission rule covers the whole tool, so each prompt is the only scope limit |
-| Merge any PR | C (never auto-merge) |
+| Merge any PR | C (never auto-merge). One exception since 2026-10-15, **rung 1** (the founder's yes on card `d-merge-trust`): a docs-only pull request (Markdown under `docs/` or `apps/connect/docs/`, or `RESUME_HERE.md`) with every check green and a Reviewer comment on that exact head with no blocker, merged by a human-started session with a merge commit and a one-line report ([`../routines/reviewer.md`](../routines/reviewer.md) section 11). No scheduled role merges anything |
 | Apply a migration or change any database, RLS or auth | C, and only with a staging database once Supabase Pro exists |
 | Send a message to anyone but the founder; publish, list or contact an organisation | C |
 | Delete branches, files or data (the "Allow Claude" ruleset also blocks branch deletes) | C |
@@ -86,7 +86,7 @@ Everything an agent reads (web pages, API JSON, advisor text, PR titles, inbox r
 5. **Builder, first task `q-ci-schedule`** (add a daily `schedule:` trigger to `.github/workflows/ci.yml`; tiny and reversible). Run it supervised first. **Acceptance:** one draft PR, gates green, Reviewer comment present, WIP counter shows 1 of 1, and no second task starts. **Done 2026-10-14**, see [`../routines/builder.md`](../routines/builder.md) (it supersedes the Builder sketch in section 7; section 10 holds the record). The scheduled task `citizens-builder` (ad hoc, no cron, Auto mode) ran once, supervised: draft PR #109, one file, CI green, issue relabelled, card filed, no second task, nothing merged by an agent. **Acceptance met**, but the first draft had four defects (a shared concurrency group, no `workflow_dispatch`, a busy cron minute, an unfinalised offload file) because the traps lived in the brief, not in the issue or the task prompt; the prompt and spec now carry them, #109 was corrected by hand and merged on the founder's permission in chat. The switch card `d-chain` is answered **forward**, but chaining is **not wired**: the Auto-mode classifier denied `run_scheduled_task`, so it needs the founder's decision on a permission rule (builder.md section 9).
 6. **Reader.** Needs the founder to mint `automation:suggest` and `automation:digest` keys (RESUME_HERE C16). Supervised run against one consenting Contributor.
 7. **Cloud move** after 14 clean days: needs a read-only database role and a way to give the runner `gh` access without exposing a token.
-8. **Scribe and Strategist.**
+8. **Scribe and Strategist.** **Built 2026-10-15** as manual-only tasks (`citizens-scribe`, `citizens-strategist`), specs in [`../routines/scribe.md`](../routines/scribe.md) and [`../routines/strategist.md`](../routines/strategist.md). Each is run once by a supervised session; the schedule is proposed on one decision card and set only after the founder answers it.
 
 Keep each role to one small scheduled task. Prefer many narrow prompts to one clever one.
 
