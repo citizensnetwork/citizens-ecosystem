@@ -47,6 +47,7 @@
       view === "configureSpaces" ? <S.ConfigureSpaces /> :
       view === "activities" ? <S.Activities /> :
       view === "timeline" ? <S.TimelineMap /> :
+      view === "network" ? <S.Network /> :
       view === "feed" ? <S.Feed /> :
       view === "analytics" ? <S.Analytics metric={metric} goView={goView} /> :
       view === "coverage" ? <S.Coverage /> :

@@ -32,6 +32,7 @@
     {
       key: "insights", label: "Insights", icon: "eye", children: [
         { key: "insights.timeline", label: "Timeline Map", view: "timeline" },
+        { key: "insights.network", label: "Community Network", view: "network" },
         { key: "insights.feed", label: "Observation Feed", view: "feed" },
         {
           key: "insights.analytics", label: "Analytics", view: "analytics", children: [
@@ -60,7 +61,7 @@
 
   const TITLES = {
     home: "Org overview", spaces: "Spaces", activities: "Activities",
-    configureSpaces: "Configure spaces", timeline: "Timeline map",
+    configureSpaces: "Configure spaces", timeline: "Timeline map", network: "Community network",
     feed: "Observation feed", analytics: "Analytics", coverage: "Coverage",
     advisories: "Advisories", reports: "Reports & exports",
     objectives: "Objectives", projects: "Projects",
