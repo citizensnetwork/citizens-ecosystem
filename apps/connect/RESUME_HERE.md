@@ -114,7 +114,7 @@
   [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Reviewer** (`citizens-reviewer`, 08:30, 12:30 and 16:30 local) reads open same-repo
   PRs (and any PR a `rv-pr<n>` queue row asks for, merged ones included) cold, against the repo's own rules, and posts ONE public advisory comment per PR per
   commit with file and line. It cannot approve, label, push or merge. Spec: [`docs/routines/reviewer.md`](docs/routines/reviewer.md).
-  **The Builder (T4)** (`citizens-builder`, no cron, started by hand with "Run now", saved in Auto permission mode) takes ONE approved `agent:ready` issue to ONE draft PR and never merges ([`docs/routines/builder.md`](docs/routines/builder.md)). Its first run, on #102, gave PR #109 (merged 2026-10-14 on the founder's permission in chat; section 10 of the spec has the record and the four defects it found). CI now also runs daily at 02:17 UTC and by hand (`workflow_dispatch`); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The next approved issue is #108 (keep the public API warm, `q-api-coldstart`). The switch card `d-chain` is answered **forward** and the permission is in place (on 2026-10-15 the founder added an allow rule for `run_scheduled_task` to the project's local settings, after the Auto-mode classifier had denied that call; a test call passed), but chaining is **not wired**: the prompts still need the chain block and one supervised "Run now" each (builder.md section 9). The Reviewer's task prompt still lacks checklist item 8 (workflow files).
+  **The Builder (T4)** (`citizens-builder`, no cron, started by hand with "Run now", saved in Auto permission mode) takes ONE approved `agent:ready` issue to ONE draft PR and never merges ([`docs/routines/builder.md`](docs/routines/builder.md)). Its first run, on #102, gave PR #109 (merged 2026-10-14 on the founder's permission in chat; section 10 of the spec has the record and the four defects it found). CI now also runs daily at 02:17 UTC and by hand (`workflow_dispatch`); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The next approved issue is #108 (keep the public API warm, `q-api-coldstart`). The switch card `d-chain` is answered **forward**, the permission is in place (the founder's allow rule for `run_scheduled_task`, 2026-10-15), and **chaining is wired into the Dispatcher's, Builder's and Reviewer's task prompts (2026-10-15)**, together with the Reviewer's checklist item 8; the first supervised "Run now" of each changed role is still to do, and the first Dispatcher run will start the Builder on #108 if no agent task is active (builder.md section 9).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -365,7 +365,7 @@ design session first.
 ### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the Builder is specified; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T4 | **Builder**: LIVE (2026-10-14; spec [`docs/routines/builder.md`](docs/routines/builder.md), record in its section 10). First task #102 done (PR #109 merged); the first scheduled CI run fired on 2026-10-15 and passed. **Left:** wire the chaining (the permission is in place; builder.md section 9: the chain block in three prompts, one supervised "Run now" per changed role) and put checklist item 8 into the Reviewer's task prompt; then run the Builder on #108 (which probably needs a workflow file the issue does not name). One agent PR open at a time. | P2 | M |
+| T4 | **Builder**: LIVE (2026-10-14; spec [`docs/routines/builder.md`](docs/routines/builder.md), record in its section 10). First task #102 done (PR #109 merged); the first scheduled CI run fired on 2026-10-15 and passed. Chaining and the Reviewer's checklist item 8 are wired into the task prompts (2026-10-15). **Left:** one supervised "Run now" of the Dispatcher, the Builder and the Reviewer (the Dispatcher's will start the Builder on #108, which probably needs a workflow file the issue does not name, so expect a blocked card); the git no-reply email (T9) must be set before any agent push. One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
 | T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access); the founder said yes on 2026-10-14 to revisiting it then, and to the Scribe and the Strategist after it (a supervised session writes their specs). | Parked | M |
 | T7 | **Dispatcher echo fix**: the founder said yes (2026-10-14, card `d-dispatcher-echo`): every answered card ends as an issue, a recorded outcome, or ONE follow-up that is a different question, never a copy of the same question (`a-w-api-slow-categories` was one). A supervised edit of the Dispatcher's prompt and [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). | P2 | S |
@@ -454,6 +454,14 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-15 (morning) — Chaining wired into the three task prompts (docs only, branch `claude/chain-wired-docs`).** On the founder's yes in chat, the chain step
+  is now in the Dispatcher's, Builder's and Reviewer's task prompts, each as the last action before the run record, behind `d-chain` = forward, at most 6 chained
+  starts a day, a denial recorded and never retried; the Reviewer's prompt also has checklist item 8 (workflow files). Each change was checked three ways: the prompts
+  were built by a script with an assertion per replacement, the line diff against the previous prompt shows only the intended lines, and the live task file equals
+  the prepared text exactly (the previous prompts are saved in the primary checkout's gitignored `.claude/sessions/prepared/backup-2026-10-15/`). Settled while
+  wiring: the Dispatcher counts a queue row as an active agent task only while its pull request is open (a stale row for a merged PR would otherwise block the
+  Builder for ever), and the caller records `chained start: <target>`. **Expect:** the first Dispatcher run starts the Builder on #108, which probably stops with a
+  blocked card. **Not done:** one supervised "Run now" per changed role, and T7 to T9. No app code, migration or database change.
 - **2026-10-15 (early morning) — The `run_scheduled_task` permission is in place; the founder's six yes answers recorded (docs only, branch
   `claude/chain-permission-docs`).** The founder added an allow rule for `mcp__scheduled-tasks__run_scheduled_task` to the project's local settings (the
   Auto-mode classifier had denied that call on 2026-10-14); a test call against a disabled task passed the permission layer. **Found:** the first scheduled
@@ -535,25 +543,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   "missing" claim, and a rule that banned harmless words; the prompt now demands real line numbers and a check before any "missing" claim. **Note:** comments appear
   under the repo owner's account (the connector's identity). **Not done:** the Builder (T4), Reader (T5); the Reviewer has never seen a Builder PR; the fixes are not
   re-tested. No app code, migration or database change.
-- **2026-10-13 — The Dispatcher built and run once; the 14 Dependabot PRs closed; PR #98 unblocked (docs only, branch `claude/dispatcher-role`).** The founder's
-  scheduled "resume" run had finished unseen, so the state was re-checked live and the founder confirmed three things in chat. (1) Close the 14 Dependabot PRs:
-  done with a comment; Dependabot also removed its 14 branches, and a closed PR is replaced only when a newer version appears, it is not reopened. (2) Resolve
-  #98's conflict (`RESUME_HERE.md` only): `main` merged in and pushed; #98 was then merged by a parallel branch-review session with the founder's yes. (3) Build the Dispatcher: spec `docs/routines/dispatcher.md`,
-  four `agent:*` labels created on GitHub, task `citizens-dispatcher` (07:30 and 17:30 local). **First supervised run:** issue #102 created for the approved CI
-  idea, 4 answers recorded, 2 action cards filed, nothing else touched. **Found:** one misroute (it said 13 Dependabot PRs were open when all were closed: it
-  trusted the Watcher's stale count; the Watcher was also 1 low, 13 vs 14). The prompt now demands a live check; the original card was corrected by hand and the
-  wrong action card is left for the founder to drop. **Not done:** the Reviewer (T3), Builder (T4), Reader (T5); the inbox page was never checked on a phone or
-  for the new `dispatch` run kind; the Watcher still reports already-actioned answers as unactioned (propose-only follow-up, spec section 9). No app code, migration or database change.
-- **2026-10-13 — Branch and PR review (docs only).** Re-verified all 19 remote branches against GitHub, then asked the founder one group at a time.
-  **Done with the founder's yes in chat:** deleted the 3 squash-merged map branches (#60, #61, #62; tips recorded in H2); archived and deleted
-  `chore/phase-4-local-rewrite` (tag in H2); merged the agent-team docs PR #98 (T1, removed) once all its checks were green and its head was unchanged;
-  moved the founder's old untracked `daily-routine.md` draft (v1, 2026-09-21) into the gitignored `.claude/sessions/` so a `git pull` in the main checkout
-  does not collide with the tracked v3 file. A parallel session closed the 14 Dependabot PRs the same evening and brought #98 up to date with `main`
-  (closed without an ignore rule, so Dependabot opens a fresh PR when a newer version ships). **Found:** H2 had the old-branch list wrong (three of the four
-  were merged); `.github/DECISIONS.md` (Wear, May 2026) still names the deleted phase-4 branch as a cherry-pick source, and the archive tag keeps that trail
-  valid (H4 retires the file). **Gap noted, not a regression:** Wear's `POST /api/posts` passes `taggedProductIds` through unchecked because Wear has no
-  product catalog yet; add an ownership check when it gets one. **Left:** about 17 stale local branches and the sibling worktrees (H3); §6 is over its
-  8-entry guide, so the oldest entries can move to the archive. No app code, migration or database change.
 
 ---
 

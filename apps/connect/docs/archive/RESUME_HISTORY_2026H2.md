@@ -4062,3 +4062,25 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   re-entered on 2026-10-10: confirm both in the dashboard (A11) or every email stays `skipped`. **Gotchas:** parallel sessions fetch into the shared refs,
   so `origin/main` moves under you (re-fetch before every push); PowerShell 5.1 splits `git commit -m` at a double quote (use `-F file`); two PRs that
   each add a §6 entry at the same spot conflict again once the first merges. The three oldest §6 entries moved to the archive.
+
+## Moved from RESUME_HERE §6 on 2026-10-15 (two more oldest session entries)
+
+- **2026-10-13 — The Dispatcher built and run once; the 14 Dependabot PRs closed; PR #98 unblocked (docs only, branch `claude/dispatcher-role`).** The founder's
+  scheduled "resume" run had finished unseen, so the state was re-checked live and the founder confirmed three things in chat. (1) Close the 14 Dependabot PRs:
+  done with a comment; Dependabot also removed its 14 branches, and a closed PR is replaced only when a newer version appears, it is not reopened. (2) Resolve
+  #98's conflict (`RESUME_HERE.md` only): `main` merged in and pushed; #98 was then merged by a parallel branch-review session with the founder's yes. (3) Build the Dispatcher: spec `docs/routines/dispatcher.md`,
+  four `agent:*` labels created on GitHub, task `citizens-dispatcher` (07:30 and 17:30 local). **First supervised run:** issue #102 created for the approved CI
+  idea, 4 answers recorded, 2 action cards filed, nothing else touched. **Found:** one misroute (it said 13 Dependabot PRs were open when all were closed: it
+  trusted the Watcher's stale count; the Watcher was also 1 low, 13 vs 14). The prompt now demands a live check; the original card was corrected by hand and the
+  wrong action card is left for the founder to drop. **Not done:** the Reviewer (T3), Builder (T4), Reader (T5); the inbox page was never checked on a phone or
+  for the new `dispatch` run kind; the Watcher still reports already-actioned answers as unactioned (propose-only follow-up, spec section 9). No app code, migration or database change.
+- **2026-10-13 — Branch and PR review (docs only).** Re-verified all 19 remote branches against GitHub, then asked the founder one group at a time.
+  **Done with the founder's yes in chat:** deleted the 3 squash-merged map branches (#60, #61, #62; tips recorded in H2); archived and deleted
+  `chore/phase-4-local-rewrite` (tag in H2); merged the agent-team docs PR #98 (T1, removed) once all its checks were green and its head was unchanged;
+  moved the founder's old untracked `daily-routine.md` draft (v1, 2026-09-21) into the gitignored `.claude/sessions/` so a `git pull` in the main checkout
+  does not collide with the tracked v3 file. A parallel session closed the 14 Dependabot PRs the same evening and brought #98 up to date with `main`
+  (closed without an ignore rule, so Dependabot opens a fresh PR when a newer version ships). **Found:** H2 had the old-branch list wrong (three of the four
+  were merged); `.github/DECISIONS.md` (Wear, May 2026) still names the deleted phase-4 branch as a cherry-pick source, and the archive tag keeps that trail
+  valid (H4 retires the file). **Gap noted, not a regression:** Wear's `POST /api/posts` passes `taggedProductIds` through unchecked because Wear has no
+  product catalog yet; add an ownership check when it gets one. **Left:** about 17 stale local branches and the sibling worktrees (H3); §6 is over its
+  8-entry guide, so the oldest entries can move to the archive. No app code, migration or database change.

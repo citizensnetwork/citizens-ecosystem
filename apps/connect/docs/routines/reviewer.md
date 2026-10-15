@@ -22,6 +22,7 @@ Vision link (VISION.md, "Connecting the Kingdom"): excellence as stewardship. Th
 - [ ] **Same-repository pull requests only.** A pull request from a fork is skipped (counted in the run note), because its author is not a collaborator.
 - [ ] **No database writes outside the inbox**, no Supabase tool at all, no `execute_sql`.
 - [ ] Never edits its own instructions, schedule or permissions (**propose-only**: an `idea` card, and a human applies it).
+- [ ] **Never creates, edits, deletes, disables or starts a scheduled task, except the one chained start in section 5 step 8** (the Builder, only behind the switch card `d-chain`, only after a comment that lists a blocker or should-fix on a `claude/agent-*` pull request whose `fixRounds` is below 2; a nit-only comment never starts it).
 - [ ] Facts in a comment come from a live read in the same run (CI state, file contents, line numbers).
 - [ ] Caps per run: **2 pull requests**, **1 inbox card**. Anything over the cap waits for the next run.
 
@@ -71,8 +72,9 @@ All timestamps come from the clock (`date -u +%Y-%m-%dT%H:%M:%SZ`), never an est
 5. **Comment** once (section 6).
 6. **Queue.** Upsert `rv-pr<number>`: `{title, ref: "review PR #<n>", url: <PR url>, by, state: "done", reviewedSha, reviewedAt, note}`. Keep `by` if the row exists, else `"agent"`. Use only the states `queued` and `done` (so the work-in-progress counter never counts a review).
 7. **Blocker card.** Only if there is a blocker and no card yet for it: inbox doc `r-pr<n>-blocker` (`alert`, priority 2, status `open`, source `Reviewer`, options "Investigate it", "Expected, ignore", "Later").
-8. **Run record.** Append `{at, kind: "review", role: "reviewer", status, note}` to `reports/<today>.runs[]` (read, append, write pinned to its `version`; on a conflict read again and retry once). If the day's report does not exist, do not create it (the Watcher does).
-9. **Final message**, 5 lines at most: pull requests reviewed (numbers, verdict), comments posted, cards filed, anything skipped over a cap or because of a fork, anything that failed or needed a permission.
+8. **Chain** (wired 2026-10-15; the design is `builder.md` section 9). Read inbox doc `d-chain`: only the answer `forward` allows it, and anything else skips the step silently. Skip it after a failed run, or when today's run records already hold 6 notes containing `chained start:`. Only when this run commented on a `claude/agent-*` pull request with at least one blocker or should-fix, and that pull request's queue row has `fixRounds` below 2, call `run_scheduled_task` once with `citizens-builder`. A denial or refusal is written as `chain denied` in the run note and the final message, and is never retried or worked around; a success is written as `chained start: citizens-builder`. The run record comes after this step.
+9. **Run record.** Append `{at, kind: "review", role: "reviewer", status, note}` to `reports/<today>.runs[]` (read, append, write pinned to its `version`; on a conflict read again and retry once). If the day's report does not exist, do not create it (the Watcher does).
+10. **Final message**, 5 lines at most: pull requests reviewed (numbers, verdict), comments posted, cards filed, anything skipped over a cap or because of a fork, anything that failed or needed a permission, and any chained start or chain denial.
 
 ## 6. Shapes
 
@@ -98,7 +100,7 @@ All timestamps come from the clock (`date -u +%Y-%m-%dT%H:%M:%SZ`), never an est
 
 ## 7. Tools it may use (the task's allow-list; approve once on the supervised run)
 
-`ArtifactData` (the inbox URL only); GitHub reads: `list_pull_requests`, `pull_request_read` (the pull request, its files, diff, check runs and comments), `get_file_contents`; GitHub write: **`add_issue_comment` only**; Bash for `date` only. **Nothing else:** no review-writing tool, no `issue_write`, no Gmail, no push ping, no `git`, no Supabase, no Vercel, no file edits.
+`ArtifactData` (the inbox URL only); GitHub reads: `list_pull_requests`, `pull_request_read` (the pull request, its files, diff, check runs and comments), `get_file_contents`; GitHub write: **`add_issue_comment` only**; Bash for `date` only; and, in the chain step only, **`run_scheduled_task` with `citizens-builder`** (the permission rule covers the whole tool, so the prompt is the only scope limit). **Nothing else:** no review-writing tool, no `issue_write`, no Gmail, no push ping, no `git`, no Supabase, no Vercel, no file edits.
 
 **Residual risk, stated plainly:** `add_issue_comment` can comment on any issue or pull request, and a prompt cannot take that away. The boundary is this document and the task's approvals. A comment is public and cannot be retracted by the Reviewer; a human can edit or delete it.
 
@@ -107,6 +109,7 @@ All timestamps come from the clock (`date -u +%Y-%m-%dT%H:%M:%SZ`), never an est
 - [x] Schedule `30 8,12,16 * * *` (local time): at least an hour from the Watcher (05:00, 10:00, 15:00, 20:00) and the Dispatcher (07:30, 17:30). A missed run starts on the next launch and may overlap another role: every write to a shared document is pinned to its `version`.
 - [x] Branch names: this role's pull request uses `claude/reviewer-role`. The prefix `claude/agent-*` is reserved for the Builder's pull requests.
 - [x] First manual run done (2026-10-13) with no permission problems reported. A new tool in the prompt needs another supervised run, or an unattended run stalls on a prompt.
+- [ ] **Chaining (step 8) and checklist item 8 (workflow files) are in the task's prompt since 2026-10-15**, checked by line diff against the previous prompt (backup in the primary checkout's gitignored `.claude/sessions/prepared/`). One supervised "Run now" is still to do, to confirm it reads, comments and records as before.
 
 ## 9. Acceptance and the first supervised run
 
