@@ -2,7 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- Pinch zoom (tracker R9, founder yes 2026-10-15): the WEBSITE lets a citizen zoom the page, which
+     a low-vision believer needs and WCAG 1.4.4 asks for. The map and the Map v2 sheet still own their
+     own two-finger gestures (touch-action), so the page does not zoom under them. The Capacitor phone
+     app keeps the old block (maximum-scale=1) until it has been tested on a phone: the tag below puts
+     it back there only. The native bridge sets window.Capacitor at document start, before this runs;
+     if anything here fails the page stays zoomable. -->
+<script>
+(function () {
+  try {
+    var c = window.Capacitor;
+    var native = (c && typeof c.isNativePlatform === 'function' && c.isNativePlatform()) || location.protocol === 'capacitor:';
+    if (native) document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');
+  } catch (e) { /* stay zoomable */ }
+})();
+</script>
 <!-- Every screen has its own URL now (/discover, /e/<id>, /dashboard/events, ...), and the
      server serves this same file for all of them. Without a base, the relative script,
      style and vendor paths below would resolve under those paths (/e/app/store.jsx) and
