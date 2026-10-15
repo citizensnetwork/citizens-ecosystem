@@ -70,19 +70,33 @@ export function newApplicationAdminEmail(input: {
   };
 }
 
+// ── Where a listing shows ────────────────────────────────────────────────
+
+/**
+ * Where a Contributor's listing can be found (tracker C21: say "on the map" only when it is true).
+ * Everyone is in Kingdom Discovery; only a listing with a map pin (both coordinates) is also on the map.
+ * An online-only Contributor ("no fixed location") must never be promised a pin.
+ */
+function listedWhere(onMap: boolean): string {
+  return onMap ? "on the map and in Kingdom Discovery" : "in Kingdom Discovery";
+}
+
 // ── To the applicant: approved ───────────────────────────────────────────
 
 export function applicationApprovedEmail(input: {
   name: string;
   listingUrl: string;
   dashboardUrl: string;
+  /** Whether the approved listing has a map pin; false for an online-only Contributor (C21). */
+  onMap: boolean;
 }): Email {
+  const where = listedWhere(input.onMap);
   return {
     subject: subjectSafe(`You're live on Citizens Connect: ${input.name}`),
     html: layout(
       `${input.name} is live on Citizens Connect 🎉`,
       "<p>Thank you for joining the Body on Citizens Connect. Your application was approved: " +
-        "you're now on the map and in Kingdom Discovery, where citizens across the city can find, " +
+        `you're now ${where}, where citizens across the city can find, ` +
         "follow and connect with you.</p>" +
         `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View your listing</a></p>` +
         "<p>You can add events and places, post news and keep your profile up to date from your " +
@@ -91,8 +105,7 @@ export function applicationApprovedEmail(input: {
     ),
     text:
       `${input.name} is live on Citizens Connect.\n\n` +
-      "Thank you for joining the Body. Your application was approved: you're now on the map and in " +
-      "Kingdom Discovery.\n\n" +
+      `Thank you for joining the Body. Your application was approved: you're now ${where}.\n\n` +
       `View your listing: ${input.listingUrl}\n` +
       `Open your Contributor Portal: ${input.dashboardUrl}\n\n${SIGN_OFF_TEXT}`,
   };
@@ -151,7 +164,7 @@ export function ownerWelcomeEmail(input: {
   onMap: boolean;
 }): Email {
   const email = escapeHtml(input.ownerEmail);
-  const where = input.onMap ? "on the map and in Kingdom Discovery" : "in Kingdom Discovery";
+  const where = listedWhere(input.onMap);
   return {
     subject: subjectSafe(`You're live on Citizens Connect — ${input.name}`),
     html: layout(

@@ -117,6 +117,15 @@ describe("GET /api/admin/contributor-applications", () => {
     expect(data[0].hasPin).toBe(false);
   });
 
+  it("reports no pin for an applicant with only one coordinate, or stale coordinates under 'no fixed location'", async () => {
+    rows([
+      application({ physical_latitude: -25.7, physical_longitude: null }),
+      application({ id: "app-3", no_fixed_location: true, physical_latitude: -25.7, physical_longitude: 28.2 }),
+    ]);
+    const { data } = await (await GET(get())).json();
+    expect(data.map((a: { hasPin: boolean }) => a.hasPin)).toEqual([false, false]);
+  });
+
   it("carries the rejection reason as the card's admin note", async () => {
     rows([application({ status: "rejected", rejection_reason: "Please add a website", reviewed_at: "2026-10-04T08:00:00Z" })]);
     const { data } = await (await GET(get())).json();

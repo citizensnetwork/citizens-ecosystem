@@ -25,6 +25,9 @@
  * fail-soft: a mail problem never fails the create. The response carries
  * `email: "sent" | "failed" | "skipped"` ("skipped" = not requested, or no
  * sending key / usable address) so the success panel can say what happened.
+ * It also carries `onMap`: whether the new listing has a map pin (hasMapPin), so
+ * neither the owner's email nor the admin's toast promises the map to an
+ * online-only Contributor (tracker C21).
  *
  * Body: { display_name, claim_email, contributor_kind?, contributor_category,
  *   bio?, website_url?, instagram_handle?, facebook_url?, tiktok_handle?,
@@ -38,7 +41,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { coercePublicUrl } from "@/lib/publicUrl";
-import { MAX_URL, parseListingFields, trimOrNull } from "@/lib/contributorFields";
+import { MAX_URL, hasMapPin, parseListingFields, trimOrNull } from "@/lib/contributorFields";
 import { adminNotifyEmail, sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
 import { ownerWelcomeEmail } from "@/lib/email/templates";
 
@@ -154,6 +157,9 @@ export async function POST(request: NextRequest) {
   // The listing exists. Welcome the owner (on unless the admin unticked it).
   // Not rate-limited separately: only an admin reaches this route, which has its
   // own mutation limit, and there is deliberately no "resend" button.
+  // Whether the listing has a map pin (the one rule: hasMapPin). The owner's email and the admin's screen say
+  // "on the map" only when this is true (tracker C21).
+  const onMap = hasMapPin({ no_fixed_location: fields.noFixedLocation, physical_latitude: fields.latitude, physical_longitude: fields.longitude });
   let email: EmailOutcome = "skipped";
   if (payload.email_owner !== false) {
     const origin = siteOrigin(request);
@@ -165,8 +171,7 @@ export async function POST(request: NextRequest) {
         ownerEmail: fields.claimEmail,
         listingUrl: result.slug ? `${origin}/c/${encodeURIComponent(result.slug)}` : origin,
         signInUrl: `${origin}/dashboard`,
-        // A pin needs both coordinates; "no fixed location" nulls them (parseListingFields).
-        onMap: fields.latitude !== null && fields.longitude !== null,
+        onMap,
       }),
     });
   }
@@ -176,6 +181,7 @@ export async function POST(request: NextRequest) {
     contributor_id: newUserId,
     slug: result.slug,
     claim_email: fields.claimEmail,
+    onMap,
     email,
   });
 }
