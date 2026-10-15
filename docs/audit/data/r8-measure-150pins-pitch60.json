@@ -1,0 +1,501 @@
+{
+  "profile": {
+    "viewport": "390x844",
+    "dsf": 3,
+    "cpu": 4,
+    "network": {
+      "offline": false,
+      "downloadThroughput": 1012500,
+      "uploadThroughput": 168750,
+      "latency": 165
+    },
+    "tiles": "mock",
+    "flag": "v2",
+    "pitch": 60,
+    "fixedNow": "2026-10-10T08:00:00.000Z"
+  },
+  "m1_tap_to_header_ms": {
+    "runs": [421, 113, 99, 86, 102, 83, 92, 79, 84, 58],
+    "median": 86,
+    "worst": 421
+  },
+  "m4_cls": {
+    "runs": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "worst": 0
+  },
+  "m3_pan_frame_ms": {
+    "pins": 150,
+    "z13": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 136,
+        "p50": 78,
+        "p95": 114,
+        "p99": 121,
+        "above32ms": 119,
+        "max": 154
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 208,
+        "p50": 48,
+        "p95": 62,
+        "p99": 69,
+        "above32ms": 200,
+        "max": 71
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 574,
+        "p50": 17,
+        "p95": 25,
+        "p99": 28,
+        "above32ms": 1,
+        "max": 38
+      }
+    },
+    "z15.5": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 113,
+        "p50": 84,
+        "p95": 176,
+        "p99": 195,
+        "above32ms": 101,
+        "max": 624
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 218,
+        "p50": 46,
+        "p95": 70,
+        "p99": 86,
+        "above32ms": 171,
+        "max": 204
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 537,
+        "p50": 18,
+        "p95": 27,
+        "p99": 37,
+        "above32ms": 10,
+        "max": 114
+      }
+    }
+  },
+  "m6_tap_targets": {
+    "total_before_open": 53,
+    "under44_map_screen": [
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "INPUT",
+        "w": 253,
+        "h": 20
+      },
+      {
+        "el": "Scroll categories left",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "All categories",
+        "w": 41.4,
+        "h": 28.5
+      },
+      {
+        "el": "Worship",
+        "w": 83.5,
+        "h": 30.5
+      },
+      {
+        "el": "Church",
+        "w": 77.9,
+        "h": 30.5
+      },
+      {
+        "el": "Outreach",
+        "w": 90.1,
+        "h": 30.5
+      },
+      {
+        "el": "Markets",
+        "w": 82.5,
+        "h": 30.5
+      },
+      {
+        "el": "Sport",
+        "w": 69.5,
+        "h": 30.5
+      },
+      {
+        "el": "Arts",
+        "w": 61.3,
+        "h": 30.5
+      },
+      {
+        "el": "Social",
+        "w": 71.9,
+        "h": 30.5
+      },
+      {
+        "el": "Upliftment",
+        "w": 97.1,
+        "h": 30.5
+      },
+      {
+        "el": "Education",
+        "w": 93.4,
+        "h": 30.5
+      },
+      {
+        "el": "Family",
+        "w": 73.7,
+        "h": 30.5
+      },
+      {
+        "el": "Men's",
+        "w": 71.2,
+        "h": 30.5
+      },
+      {
+        "el": "Women's",
+        "w": 89.5,
+        "h": 30.5
+      },
+      {
+        "el": "Youth",
+        "w": 70,
+        "h": 30.5
+      },
+      {
+        "el": "Kids",
+        "w": 62.3,
+        "h": 30.5
+      },
+      {
+        "el": "Care",
+        "w": 64.6,
+        "h": 30.5
+      },
+      {
+        "el": "Members",
+        "w": 89.6,
+        "h": 30.5
+      },
+      {
+        "el": "Conferences",
+        "w": 108.6,
+        "h": 30.5
+      },
+      {
+        "el": "Churches",
+        "w": 90.3,
+        "h": 30.5
+      },
+      {
+        "el": "Cafés",
+        "w": 70.4,
+        "h": 30.5
+      },
+      {
+        "el": "Recreation",
+        "w": 97.5,
+        "h": 30.5
+      },
+      {
+        "el": "Media",
+        "w": 72.1,
+        "h": 30.5
+      },
+      {
+        "el": "Retail",
+        "w": 69.1,
+        "h": 30.5
+      },
+      {
+        "el": "Health",
+        "w": 74,
+        "h": 30.5
+      },
+      {
+        "el": "Training",
+        "w": 80.6,
+        "h": 30.5
+      },
+      {
+        "el": "Creative",
+        "w": 84.8,
+        "h": 30.5
+      },
+      {
+        "el": "Business",
+        "w": 86.1,
+        "h": 30.5
+      },
+      {
+        "el": "Safe",
+        "w": 63.4,
+        "h": 30.5
+      },
+      {
+        "el": "Retreat",
+        "w": 78.9,
+        "h": 30.5
+      },
+      {
+        "el": "Clinic",
+        "w": 69,
+        "h": 30.5
+      },
+      {
+        "el": "Rehab",
+        "w": 73,
+        "h": 30.5
+      },
+      {
+        "el": "Ideas",
+        "w": 66.2,
+        "h": 30.5
+      },
+      {
+        "el": "Scroll categories right",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "A",
+        "w": 79,
+        "h": 26
+      }
+    ],
+    "total_after_open": 64,
+    "under44_with_surface_open": [
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "pin:place",
+        "w": 36,
+        "h": 36,
+        "drawn": [36, 36]
+      },
+      {
+        "el": "INPUT",
+        "w": 253,
+        "h": 20
+      },
+      {
+        "el": "Scroll categories left",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "All categories",
+        "w": 41.4,
+        "h": 28.5
+      },
+      {
+        "el": "Worship",
+        "w": 83.5,
+        "h": 30.5
+      },
+      {
+        "el": "Church",
+        "w": 77.9,
+        "h": 30.5
+      },
+      {
+        "el": "Outreach",
+        "w": 90.1,
+        "h": 30.5
+      },
+      {
+        "el": "Markets",
+        "w": 82.5,
+        "h": 30.5
+      },
+      {
+        "el": "Sport",
+        "w": 69.5,
+        "h": 30.5
+      },
+      {
+        "el": "Arts",
+        "w": 61.3,
+        "h": 30.5
+      },
+      {
+        "el": "Social",
+        "w": 71.9,
+        "h": 30.5
+      },
+      {
+        "el": "Upliftment",
+        "w": 97.1,
+        "h": 30.5
+      },
+      {
+        "el": "Education",
+        "w": 93.4,
+        "h": 30.5
+      },
+      {
+        "el": "Family",
+        "w": 73.7,
+        "h": 30.5
+      },
+      {
+        "el": "Men's",
+        "w": 71.2,
+        "h": 30.5
+      },
+      {
+        "el": "Women's",
+        "w": 89.5,
+        "h": 30.5
+      },
+      {
+        "el": "Youth",
+        "w": 70,
+        "h": 30.5
+      },
+      {
+        "el": "Kids",
+        "w": 62.3,
+        "h": 30.5
+      },
+      {
+        "el": "Care",
+        "w": 64.6,
+        "h": 30.5
+      },
+      {
+        "el": "Members",
+        "w": 89.6,
+        "h": 30.5
+      },
+      {
+        "el": "Conferences",
+        "w": 108.6,
+        "h": 30.5
+      },
+      {
+        "el": "Churches",
+        "w": 90.3,
+        "h": 30.5
+      },
+      {
+        "el": "Cafés",
+        "w": 70.4,
+        "h": 30.5
+      },
+      {
+        "el": "Recreation",
+        "w": 97.5,
+        "h": 30.5
+      },
+      {
+        "el": "Media",
+        "w": 72.1,
+        "h": 30.5
+      },
+      {
+        "el": "Retail",
+        "w": 69.1,
+        "h": 30.5
+      },
+      {
+        "el": "Health",
+        "w": 74,
+        "h": 30.5
+      },
+      {
+        "el": "Training",
+        "w": 80.6,
+        "h": 30.5
+      },
+      {
+        "el": "Creative",
+        "w": 84.8,
+        "h": 30.5
+      },
+      {
+        "el": "Business",
+        "w": 86.1,
+        "h": 30.5
+      },
+      {
+        "el": "Safe",
+        "w": 63.4,
+        "h": 30.5
+      },
+      {
+        "el": "Retreat",
+        "w": 78.9,
+        "h": 30.5
+      },
+      {
+        "el": "Clinic",
+        "w": 69,
+        "h": 30.5
+      },
+      {
+        "el": "Rehab",
+        "w": 73,
+        "h": 30.5
+      },
+      {
+        "el": "Ideas",
+        "w": 66.2,
+        "h": 30.5
+      },
+      {
+        "el": "Scroll categories right",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "A",
+        "w": 79,
+        "h": 26
+      },
+      {
+        "el": "Show more details",
+        "w": 390,
+        "h": 24
+      },
+      {
+        "el": "Events",
+        "w": 69.6,
+        "h": 43
+      }
+    ]
+  }
+}

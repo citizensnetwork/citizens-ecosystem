@@ -1,0 +1,78 @@
+{
+  "profile": {
+    "viewport": "390x844",
+    "dsf": 3,
+    "cpu": 4,
+    "network": {
+      "offline": false,
+      "downloadThroughput": 1012500,
+      "uploadThroughput": 168750,
+      "latency": 165
+    },
+    "tiles": "mock",
+    "flag": "v2",
+    "pitch": 60,
+    "fixedNow": "2026-10-10T08:00:00.000Z"
+  },
+  "m3_pan_frame_ms": {
+    "pins": 50,
+    "z13": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 279,
+        "p50": 37,
+        "p95": 48,
+        "p99": 52,
+        "above32ms": 219,
+        "max": 56
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 538,
+        "p50": 18,
+        "p95": 29,
+        "p99": 39,
+        "above32ms": 14,
+        "max": 68
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 624,
+        "p50": 16,
+        "p95": 18,
+        "p99": 19,
+        "above32ms": 0,
+        "max": 20
+      }
+    },
+    "z15.5": {
+      "profile_cpu4": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 250,
+        "p50": 40,
+        "p95": 55,
+        "p99": 57,
+        "above32ms": 220,
+        "max": 64
+      },
+      "floor_cpu4_no_markers": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 362,
+        "p50": 28,
+        "p95": 38,
+        "p99": 40,
+        "above32ms": 77,
+        "max": 48
+      },
+      "cpu1": {
+        "gpu": "ANGLE (Intel, Intel(R) HD Graphics 5500 (0x00001616) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "frames": 624,
+        "p50": 16,
+        "p95": 18,
+        "p99": 19,
+        "above32ms": 0,
+        "max": 20
+      }
+    }
+  }
+}

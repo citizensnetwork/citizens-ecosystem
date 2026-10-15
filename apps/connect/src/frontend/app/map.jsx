@@ -499,12 +499,17 @@
         let styleTheme = v2On() ? window.MapV2.resolvedTheme() : 'light';
         const style = v2On() ? styleUrlFor(styleTheme) : styleUrl();
         if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
+        // Map v2's fixed tilt (R8, D17): ONE oblique angle, whatever the fingers do. min = max = the angle pins the camera,
+        // touchPitch is the two-finger vertical drag, pitchWithRotate the vertical part of a right-drag; zoom and rotation
+        // are untouched. MapV2.PITCH = 0 (or the old map) passes none of this: MapLibre's own defaults, as before.
+        const tilt = v2On() && window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0;
         const map = new window.maplibregl.Map({
           container: containerRef.current,
           style,
           center: PRETORIA,
           zoom: 11,
           attributionControl: { compact: true },
+          ...(tilt ? { pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false } : {}),
         });
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
         map.addControl(new window.maplibregl.GeolocateControl({

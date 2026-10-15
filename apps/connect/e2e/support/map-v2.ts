@@ -68,12 +68,13 @@ const fixtureSvg = (n: number) =>
 /**
  * Answers GET /api/v1/contributors/<slug> (the per-slug detail the sheet fetches for its photos) and
  * the fixture images. `failFirst` makes the first N detail requests fail with a 500; `delayMs` holds
- * every detail response back, so the skeleton can be seen and measured.
+ * every detail response back, so the skeleton can be seen and measured. `past` adds that many past events
+ * (newest first, as the API sorts them) and `followers` sets `counts.followers`.
  */
 export async function mockContributorDetail(
   page: Page,
   seed: MapSeed,
-  o: { gallery?: number; delayMs?: number; failFirst?: number; covers?: number } = {},
+  o: { gallery?: number; delayMs?: number; failFirst?: number; covers?: number; past?: number; followers?: number } = {},
 ) {
   let calls = 0;
   await page.route("**/fixture-img/*.svg", (route: Route) => {
@@ -90,7 +91,21 @@ export async function mockContributorDetail(
     const gallery = Array.from({ length: o.gallery ?? 0 }, (_, i) => fixtureImageUrl(i + 1));
     const covers = Array.from({ length: o.covers ?? 0 }, (_, i) => ({ url: fixtureImageUrl(100 + i), caption: `Cover ${i + 1}` }));
     return route.fulfill({
-      json: { data: { profile: { ...profile, gallery_urls: gallery, cover_photo_urls: covers }, upcoming_events: [], past_events: [], places: [], counts: {} } },
+      json: {
+        data: {
+          profile: { ...profile, gallery_urls: gallery, cover_photo_urls: covers },
+          upcoming_events: [],
+          past_events: Array.from({ length: o.past ?? 0 }, (_, i) => ({
+            id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+            title: `Past gathering ${i + 1}`,
+            date: new Date(FIXED_NOW - (i + 1) * 3 * 86_400_000).toISOString(),
+            end_time: null,
+            location: `${i + 1} Example Road, Pretoria`,
+          })),
+          places: [],
+          counts: o.followers === undefined ? {} : { followers: o.followers },
+        },
+      },
     });
   });
   return { calls: () => calls };

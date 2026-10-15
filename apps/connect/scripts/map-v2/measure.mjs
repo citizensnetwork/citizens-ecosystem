@@ -1,7 +1,8 @@
 // M1, M3, M4, M6 on the page as it stands (tracker Appendix C). Works for v1 and,
 // with --flag=v2, for the Map v2 sheet. Output is JSON on stdout.
 //
-//   node scripts/map-v2/measure.mjs [--flag=v2] [--tiles=mock|real] [--pins=150] [--runs=10] [--only=m1,m3,m4,m6]
+//   node scripts/map-v2/measure.mjs [--flag=v2] [--tiles=mock|real] [--pins=150] [--runs=10] [--only=m1,m3,m4,m6] [--pitch=0|60]
+//   --pitch overrides MapV2.PITCH with no rebuild (R8: the same page flat and tilted); omit it for the build as it is.
 //
 // Profile (Appendix C): Chromium via CDP, CPU x4, DevTools "Fast 4G" values,
 // 390x844, device scale factor 3, mobile touch. Mock tiles = the base map draws
@@ -18,13 +19,20 @@ const pins = Number(args.pins || 150);
 const runs = Number(args.runs || 10);
 const only = (args.only || 'm1,m3,m4,m6').split(',');
 const query = flag ? `/?map=${flag}` : '/';
+const pitchArg = args.pitch === undefined ? null : Number(args.pitch);
+// A setter on window.MapV2 (installed before any page script) sets MapV2.PITCH the moment map-v2-lib.jsx publishes it.
+const setPitch = (page) => (pitchArg === null ? Promise.resolve() : page.addInitScript((p) => {
+  let store;
+  Object.defineProperty(window, 'MapV2', { configurable: true, get() { return store; }, set(v) { store = v; if (v && typeof v === 'object') v.PITCH = p; } });
+}, pitchArg));
 
-const profile = { viewport: '390x844', dsf: 3, cpu: 4, network: FAST_4G, tiles, flag: flag || '(never set)', fixedNow: new Date(FIXED_NOW).toISOString() };
+const profile = { viewport: '390x844', dsf: 3, cpu: 4, network: FAST_4G, tiles, flag: flag || '(never set)', pitch: pitchArg === null ? '(the build)' : pitchArg, fixedNow: new Date(FIXED_NOW).toISOString() };
 const out = { profile };
 
 async function m1m4() {
   const seed = smallSeed(FIXED_NOW);
   const s = await openSession({ viewport: { width: 390, height: 844 }, dsf: 3, cpu: 4, network: true, tiles, seed });
+  await setPitch(s.page);
   try {
     await openMap(s.page, query, { minMarkers: 8 });
     const c0 = seed.contributors[0];
@@ -73,6 +81,7 @@ async function m1m4() {
 // What the pins add is the difference between the first two.
 async function pan(cpu, hideMarkers, seed, zoom) {
   const s = await openSession({ viewport: { width: 390, height: 844 }, dsf: 3, cpu, network: cpu > 1, tiles, seed });
+  await setPitch(s.page);
   try {
     await openMap(s.page, query, { minMarkers: pins });
     if (hideMarkers) await s.page.addStyleTag({ content: '.maplibregl-marker{display:none!important}' });
@@ -110,6 +119,7 @@ async function m3() {
 async function m6() {
   const seed = smallSeed(FIXED_NOW);
   const s = await openSession({ viewport: { width: 390, height: 844 }, dsf: 3, tiles, seed });
+  await setPitch(s.page);
   try {
     await openMap(s.page, query, { minMarkers: 8 });
     const c0 = seed.contributors[0];

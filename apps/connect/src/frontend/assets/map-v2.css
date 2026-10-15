@@ -116,6 +116,7 @@
   --sheet-half-h: 46dvh;
   --sheet-full-h: calc(90dvh - env(safe-area-inset-top, 0px));
   --sheet-panel-w: 380px;
+  --sheet-touch-max-w: 640px;
   --sheet-panel-top: 112px;          /* clears the v1 search and category row (measured: it ends at about 104 px) */
   --handle-w: 36px;
   --handle-h: 4px;
@@ -127,6 +128,9 @@
   --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
   --viewer-bg: rgba(10, 9, 8, 0.94);
   --viewer-fg: #f7f4ee;
+  --qr-paper: #ffffff;               /* a QR code is always black on white, in either look */
+  --qr-card-w: 360px;
+  --qr-size: 260px;
   --dim-opacity: 0.3;               /* a pin outside the chosen category filter */
 }
 
@@ -507,7 +511,13 @@
 [data-mv2='sheet'][data-snap='peek'] {
   transform: translateY(calc(var(--sheet-full-h) - var(--sheet-peek-h)));
 }
-/* wide screens: a side panel to the right of the sidebar, below the search row; no snap points */
+/* a touch screen wider than a phone (a tablet, a phone on its side): the same swipe sheet, kept to a readable width and
+   centred (no effect below that width, so it needs no media query) */
+[data-mv2='sheet']:not([data-wide]) {
+  max-width: var(--sheet-touch-max-w);
+  margin-inline: auto;
+}
+/* a wide screen with a fine pointer: a side panel to the right of the sidebar, below the search row; no snap points */
 [data-mv2='sheet'][data-wide] {
   left: var(--space-3);
   right: auto;
@@ -563,6 +573,7 @@
 [data-mv2='action']:focus-visible,
 [data-mv2='tab']:focus-visible,
 [data-mv2='row']:focus-visible,
+[data-mv2='sort-btn']:focus-visible,
 [data-mv2='tile-btn']:focus-visible,
 [data-mv2='view-full']:focus-visible,
 [data-mv2='more']:focus-visible,
@@ -662,6 +673,14 @@
   cursor: pointer;
 }
 
+/* The content's touch rule, one variable for the scroller and everything in it (an element that scrolls or
+   hides overflow ends the touch-action chain, so each child needs the value itself). Peek and half: the sheet
+   owns every swipe. Full: the content scrolls natively; at the top only an upward swipe (finger moving up = the viewport pans DOWN) is the browser's,
+   so a downward one reaches the sheet's drag (the scroll hand-off, see map-v2-sheet.jsx). */
+[data-mv2='scroller'],
+[data-mv2='scroller'] * {
+  touch-action: var(--mv2-ta, none);
+}
 [data-mv2='scroller'] {
   flex: 1 1 auto;
   min-height: 0;
@@ -673,7 +692,16 @@
 [data-mv2='sheet'][data-snap='full'] [data-mv2='scroller'],
 [data-mv2='sheet'][data-wide] [data-mv2='scroller'] {
   overflow-y: auto;
-  touch-action: pan-y;
+  --mv2-ta: pan-y;
+}
+[data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
+  --mv2-ta: pan-down;
+}
+/* a browser without pan-down (older iOS) keeps today's behaviour: the content scrolls, no hand-off */
+@supports not (touch-action: pan-down) {
+  [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
+    --mv2-ta: pan-y;
+  }
 }
 
 [data-mv2='actions'] {
@@ -706,6 +734,12 @@
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-contrast);
+}
+/* the QR code action under the content: centred, above View Full Profile */
+[data-mv2='actions-end'] {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 0;
 }
 [data-mv2='view-full'] {
   width: 100%;
@@ -802,6 +836,53 @@
   font-size: var(--fs-1);
   line-height: var(--lh-1);
   color: var(--text-2);
+}
+/* P2-07: Upcoming | Recent, two segments of one control (each at least 44 px tall) */
+[data-mv2='sort'] {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+}
+[data-mv2='sort-btn'] {
+  flex: 1 1 0;
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='sort-btn'][aria-pressed='true'] {
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+}
+[data-mv2='sort-none'] {
+  margin: 0;
+  padding: var(--space-4) 0;
+  text-align: center;
+  color: var(--text-2);
+}
+[data-mv2='row-static'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-1);
 }
 [data-mv2='post-img'] {
   width: 100%;
@@ -998,6 +1079,68 @@
   left: var(--space-3);
 }
 
+/* ── 4d. QR code dialog: one code on white (a code must be black on white to scan, in either theme) ── */
+[data-mv2='qr'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-viewer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  box-sizing: border-box;
+  background: var(--viewer-bg);
+  font-family: var(--font-body);
+}
+[data-mv2='qr-card'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--qr-card-w);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-radius: var(--sheet-radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  text-align: center;
+}
+[data-mv2='qr-title'] {
+  margin: 0;
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='qr-img'] {
+  display: block;
+  width: min(100%, var(--qr-size));
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  background: var(--qr-paper);
+}
+[data-mv2='qr-url'] {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='qr-hint'] {
+  margin: 0;
+  color: var(--text-2);
+}
+[data-mv2='qr-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
 [data-mv2='action'],
 [data-mv2='view-full'],
@@ -1005,6 +1148,7 @@
 [data-mv2='icon-btn'],
 [data-mv2='row'],
 [data-mv2='tab'],
+[data-mv2='sort-btn'],
 [data-mv2='tile-btn'] {
   transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
 }
@@ -1014,6 +1158,7 @@
 [data-mv2='icon-btn']:active,
 [data-mv2='row']:active,
 [data-mv2='tab']:active,
+[data-mv2='sort-btn']:active,
 [data-mv2='tile-btn']:active {
   transform: scale(0.97);
 }

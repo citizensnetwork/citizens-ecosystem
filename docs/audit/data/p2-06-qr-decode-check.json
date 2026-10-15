@@ -1,0 +1,38 @@
+{
+  "decoder": "jsQR 1.4.0",
+  "cases": 219,
+  "decodedCorrectly": 219,
+  "failures": [],
+  "casesByVersion": {
+    "1": 14,
+    "2": 12,
+    "3": 18,
+    "4": 21,
+    "5": 23,
+    "6": 23,
+    "7": 16,
+    "8": 30,
+    "9": 28,
+    "10": 34
+  },
+  "maxBytes": 213,
+  "oneTooLongReturnsNull": true,
+  "golden": {
+    "https://www.citizenscentral.co.za/c/example-fellowship": {
+      "version": 4,
+      "sha256": "ccc59b1f69b977a62eb5817a1859d106800eb2165a02c2280f4d935d13c692d0"
+    },
+    "https://www.citizenscentral.co.za/c/a": {
+      "version": 3,
+      "sha256": "ab6b0d17812995524178cd9a20590d6a1230e021767f2f7205bd5cee842c1d16"
+    },
+    "https://www.citizenscentral.co.za/c/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "version": 6,
+      "sha256": "c66e4bf6d122689d6373af9a82a341af24b64d8339a96d0a2449fc9a94ce247b"
+    },
+    "https://www.citizenscentral.co.za/c/12345678-1234-1234-1234-123456789abc": {
+      "version": 5,
+      "sha256": "8a63807b17f7398cd376ee16943ba9082ca0b9d3c260f1a33f34a52a299a6481"
+    }
+  }
+}

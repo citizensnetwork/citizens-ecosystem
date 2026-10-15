@@ -31,6 +31,21 @@
       retry: 'Try again',
       tabsLabel: 'More about this listing',
       tabs: { events: 'Events', news: 'News', gallery: 'Gallery' },
+      // P2-07: the Events tab shows what is coming first; "Recent" is what already happened, newest first
+      eventsSort: { label: 'Which events to show', upcoming: 'Upcoming', recent: 'Recent', noneUpcoming: 'Nothing is coming up.', noneRecent: 'No recent events.' },
+      // P2-08: shown only at 100 or more (MapV2.countBucket); never a low number
+      followers: (bucket) => bucket + ' followers',
+      // P2-06: a QR code for the listing's own link, to print or show at a venue
+      qr: {
+        action: 'QR code',
+        title: (name) => 'QR code for ' + name,
+        hint: "Scanning it opens this listing in your phone's browser.",
+        printHint: 'Print it or show it at your venue.',
+        imageLabel: (name, url) => 'QR code that opens ' + name + ' at ' + url,
+        save: 'Save image',
+        close: 'Close QR code',
+        fileName: (slug) => 'citizens-connect-' + slug + '.png',
+      },
       empty: {
         title: (name) => name + ' has not shared events, news or photos yet.',
         hint: 'Everything they have shared is on their full profile.',

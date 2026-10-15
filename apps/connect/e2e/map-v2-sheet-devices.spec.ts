@@ -28,6 +28,10 @@ test.describe("360 x 800", () => {
   test("the header, the actions and the close button fit; nothing scrolls sideways; every control is 44 px", async ({ page }) => {
     await open(page, seed0());
     await expect(page.locator("[data-mv2='sheet'] [data-mv2='name']")).toBeVisible();
+    // the sheet slides in over 200 ms (a transform): measure hit areas once it has settled at half, not mid-slide,
+    // where sub-pixel positions put the edge of a 43 px tab on the wrong side of a 21 px probe (seen on CI)
+    await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(800 * 0.54, -1);
+    await page.waitForFunction(() => document.getAnimations().filter((an) => (an as CSSAnimation).animationName === "mv2-sheet-in").every((an) => an.playState !== "running"));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const sheet = (await page.locator(SHEET).boundingBox())!;
     expect(sheet.x).toBe(0);

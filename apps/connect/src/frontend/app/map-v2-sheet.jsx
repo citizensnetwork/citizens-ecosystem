@@ -12,8 +12,20 @@
 //    full  90 % minus the top safe area: the content scrolls, and only here
 //  Opens at HALF (the reference's behaviour), drag is 1:1 with the pointer, and on
 //  release snaps by velocity (>= 0.5 px/ms) else to the nearest state; a flick down
-//  from peek, or a release past it, closes. At >= 768 px it is a 380 px side panel
-//  (no snap points).
+//  from peek, or a release past it, closes. A wide screen with a fine pointer
+//  (>= 768 px and a mouse or trackpad) gets a 380 px side panel (no snap points);
+//  a touch screen of ANY width keeps the swipe sheet (founder decision D16, R7).
+//
+//  SWIPES (R7, real touch): Chrome takes a swipe over for scrolling, and then ends the
+//  pointer stream with pointercancel, unless touch-action says the page keeps it. The
+//  rule is one CSS variable on the scroller and everything in it (assets/map-v2.css):
+//    peek, half   none     the sheet owns every swipe, wherever it starts
+//    full, content scrolled   pan-y    the content scrolls, the sheet never moves
+//    full, content at the top pan-down an upward swipe (finger up) scrolls the content;
+//                                      a downward swipe reaches us as pointer events and
+//                                      moves the sheet (the scroll hand-off)
+//  touch-action is read when a touch starts, so the scroller carries data-top while its
+//  scrollTop is 0 and a scroll listener keeps that current.
 //
 //  BACK (founder D6): one useBackGuard entry, registered by this component's
 //  mount (right after the tap or key press that opened it). Back, Escape and the
@@ -34,12 +46,15 @@
     const FLICK = 0.5;          // px/ms: a release faster than this moves one state in its direction
   const DRAG_START_PX = 6;    // travel before a press becomes a drag (so taps and clicks are untouched)
   const DISMISS_PX = 40;      // released this far below the peek position = close
-  const WIDE_MQ = '(min-width: 768px)';
+  // The side panel is for a wide screen with a fine pointer; any touch screen keeps the swipe sheet (D16).
+  const WIDE_MQ = '(min-width: 768px) and (pointer: fine)';
+  const RECENT_MAX = 10;      // past events listed under Recent
+  const TOP_PX = 1;           // the content counts as "at the top" below this scrollTop (fractional offsets on dense screens)
 
   const S = () => window.MapV2Strings.sheet;
   const T = () => window.MapV2Time;
   const navTarget = (type) => (type === 'contributor' ? 'profile' : type);
-  const DETAIL = new Map();   // slug -> { gallery, covers }: the per-slug fetch, once per session
+  const DETAIL = new Map();   // slug -> { gallery, covers, past, followers }: the per-slug fetch, once per session
 
   // ── helpers ──────────────────────────────────────────────────────
   // Any CSS length (dvh, calc(), env(), var()) in px, resolved by the browser itself with a throwaway probe.
@@ -87,7 +102,13 @@
         .then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
         .then((j) => {
           const p = (j && j.data && j.data.profile) || {};
-          const data = { gallery: Array.isArray(p.gallery_urls) ? p.gallery_urls : [], covers: Array.isArray(p.cover_photo_urls) ? p.cover_photo_urls : [] };
+          const counts = (j && j.data && j.data.counts) || {};
+          const data = {
+            gallery: Array.isArray(p.gallery_urls) ? p.gallery_urls : [],
+            covers: Array.isArray(p.cover_photo_urls) ? p.cover_photo_urls : [],
+            past: Array.isArray(j.data.past_events) ? j.data.past_events : [],     // newest first, as the API sorts them
+            followers: counts.followers == null || !Number.isFinite(Number(counts.followers)) ? null : Number(counts.followers),
+          };
           DETAIL.set(slug, data);
           if (live) setSt({ status: 'ok', data });
         })
@@ -154,6 +175,8 @@
     const [snap, setSnap] = useState('half');
     const [tab, setTab] = useState(null);
     const [viewer, setViewer] = useState(null);     // { index, from }
+    const [evSort, setEvSort] = useState(null);     // 'upcoming' | 'recent' | null (null = Upcoming when there is any, else Recent)
+    const [qr, setQr] = useState(null);             // { from }: the QR code dialog (Contributor only)
     const [announce, setAnnounce] = useState(Str.snapMessage.half);
     const dragState = useRef(null);
     const justDragged = useRef(false);
@@ -175,6 +198,17 @@
     const orgEvents = useMemo(() => (isContributor && item
       ? events.filter((e) => e.organizerId === item.id && !window.DATA.isPastEvent(e, now)).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
       : []), [events, item, isContributor]);
+    // P2-07 Recent: what already happened, newest first. The ones the app has loaded are links; the API's own list
+    // (the per-slug fetch that is already made for the photos) adds the rest as plain rows.
+    const recentEvents = useMemo(() => {
+      if (!isContributor || !item) return [];
+      const byId = new Map();
+      events.forEach((e) => { if (e.organizerId === item.id && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true }); });
+      ((detail.data && detail.data.past) || []).forEach((r) => {
+        if (r && r.id && r.title && !byId.has(r.id)) byId.set(r.id, { id: r.id, title: r.title, when: r.date, location: r.location, known: events.some((e) => e.id === r.id) });
+      });
+      return [...byId.values()].filter((e) => Number.isFinite(Date.parse(e.when))).sort((a, b) => Date.parse(b.when) - Date.parse(a.when)).slice(0, RECENT_MAX);
+    }, [events, item, isContributor, detail.data]);
     const posts = useMemo(() => (isContributor && item
       ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
       : []), [newsPosts, item, isContributor]);
@@ -200,9 +234,24 @@
     useEffect(() => {
       if (lastId.current === id) return;
       lastId.current = id;
-      setSnap('half'); setTab(null); setViewer(null);
+      setSnap('half'); setTab(null); setViewer(null); setEvSort(null); setQr(null);
       if (scroller.current) scroller.current.scrollTop = 0;
     }, [id]);
+
+    // The scroll hand-off (see the header): data-top is on the scroller while its content is at the top, so the
+    // stylesheet can let a downward swipe through to us. Set by hand, not through React: a scroll event must not re-render.
+    useEffect(() => {
+      const sc = scroller.current;
+      if (!sc) return undefined;
+      const sync = () => { if (sc.scrollTop < TOP_PX) sc.setAttribute('data-top', ''); else sc.removeAttribute('data-top'); };
+      sync();
+      sc.addEventListener('scroll', sync, { passive: true });
+      return () => sc.removeEventListener('scroll', sync);
+    }, [item ? 1 : 0]);
+    // Leaving full: the content cannot scroll any more, so show it from the top again.
+    useEffect(() => {
+      if (snap !== 'full' && scroller.current && scroller.current.scrollTop) scroller.current.scrollTop = 0;
+    }, [snap]);
 
     // Focus moves into the sheet; it goes back to the pin on close (keyboard users).
     const opener = useRef(null);
@@ -264,8 +313,8 @@
       try { el.releasePointerCapture(d.id); } catch { /* already released */ }
       const m = d.m;
       const y = Math.max(0, Math.min(m.fullH, d.baseY + (e.clientY - d.startY)));
-      // velocity over the last ~120 ms of movement
-      const last = d.samples[d.samples.length - 1];
+      // velocity over the last ~120 ms of movement (the release itself is the last sample)
+      const last = { t: e.timeStamp, y: e.clientY };
       const first = d.samples.find((s) => last.t - s.t <= 120) || d.samples[0];
       const v = last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;
       const order = ['full', 'half', 'peek'];     // top to bottom
@@ -288,9 +337,14 @@
       if (wide || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const t = e.target;
       const inScroller = scroller.current && scroller.current.contains(t);
-      // inside the content only while it cannot scroll (anything but full)
-      if (inScroller && snapRef.current === 'full') return;
-      dragState.current = { id: e.pointerId, startY: e.clientY, baseY: 0, active: false, from: snapRef.current, samples: [], m: null };
+      // Inside the content at full the content owns the swipe, except for a finger on content that is at its top:
+      // a downward move there is the hand-off that collapses the sheet (an upward one scrolls the content, and
+      // the stylesheet keeps only that one for the browser). A mouse never hands off: its drag selects text.
+      const handoff = !!inScroller && snapRef.current === 'full';
+      if (handoff && (e.pointerType === 'mouse' || scroller.current.scrollTop >= TOP_PX)) return;
+      // samples are the pointer's own y with its time, from the press on: a fast flick may reach us as one coalesced
+      // move, and a speed needs two points in time
+      dragState.current = { id: e.pointerId, startY: e.clientY, baseY: 0, active: false, handoff, from: snapRef.current, samples: [{ t: e.timeStamp, y: e.clientY }], m: null };
       // The pointer leaves the sheet the moment it moves up past its top edge, so the move / up / cancel
       // events are followed on the document for as long as this press lasts (not on the sheet itself, and
       // not with a pointer capture taken at press time: that would swallow the click on the buttons inside).
@@ -310,19 +364,21 @@
       const d = dragState.current;
       if (!d || d.id !== e.pointerId) return;
       if (!d.active) {
-        if (Math.abs(e.clientY - d.startY) < DRAG_START_PX) return;
+        const dy = e.clientY - d.startY;
+        // an upward move on content at its top belongs to the content (the browser scrolls it): let this press go
+        if (d.handoff && dy <= -DRAG_START_PX) { if (d.end) d.end(); dragState.current = null; return; }
+        if (Math.abs(dy) < DRAG_START_PX) return;
         d.active = true;
         d.m = metrics();
         d.baseY = currentY();
         // startY stays where the press began: the sheet follows the pointer 1:1 from the very first pixel
-        d.samples = [{ t: e.timeStamp, y: d.baseY }];
         const el = root.current;
         el.style.transition = 'none';
         try { el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
       }
       const y = Math.max(0, Math.min(d.m.fullH, d.baseY + (e.clientY - d.startY)));
       root.current.style.transform = 'translateY(' + y + 'px)';
-      d.samples.push({ t: e.timeStamp, y });
+      d.samples.push({ t: e.timeStamp, y: e.clientY });
       if (d.samples.length > 12) d.samples.shift();
     };
     const onPointerCancel = () => {
@@ -352,7 +408,7 @@
     const email = isContributor ? mailUrl(item.contactEmail) : '';
 
     const tabs = [];
-    if (orgEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
+    if (orgEvents.length || recentEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
     if (posts.length) tabs.push({ id: 'news', label: Str.tabs.news });
     if (images.length) tabs.push({ id: 'gallery', label: Str.tabs.gallery });
     const loadingMore = isContributor && detail.status === 'loading';
@@ -365,6 +421,13 @@
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
     if (tel) actions.push(h(Action, { key: 'tel', icon: 'Phone', label: Str.call, href: tel }));
     if (email && !site) actions.push(h(Action, { key: 'mail', icon: 'Mail', label: Str.email, href: email }));
+    // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
+    // action row stays at the height it had and half still shows the header, the actions and the first tab
+    // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
+    const qrOk = isContributor && window.MapV2QR && window.CC_ROUTES && window.CC_ROUTES.isSlug(item.slug);
+    const qrAction = qrOk
+      ? h('div', { 'data-mv2': 'actions-end' }, h(Action, { icon: 'QrCode', label: Str.qr.action, onClick: (e) => setQr({ from: e.currentTarget }) }))
+      : null;
     const openProfile = () => { go(navTarget(type), { id }); onClose(); };
 
     // ── body ────────────────────────────────────────────────────────
@@ -375,13 +438,20 @@
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;
       if (active === 'events') {
-        panel = h('ul', { 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => {
-          const when = T().eventStartsIn(e.startsAt, now, e.endsAt);
-          return h('li', { key: e.id }, h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } },
-            h('span', { 'data-mv2': 'row-title' }, e.title),
-            when && h('span', { 'data-mv2': 'row-meta' }, when),
-            e.location && h('span', { 'data-mv2': 'row-meta' }, e.location)));
-        }));
+        const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
+        const sortBar = h('div', { key: 'sort', 'data-mv2': 'sort', role: 'group', 'aria-label': Str.eventsSort.label },
+          ['upcoming', 'recent'].map((m) => h('button', { key: m, type: 'button', 'data-mv2': 'sort-btn', 'aria-pressed': mode === m, onClick: () => setEvSort(m) }, Str.eventsSort[m])));
+        const rowKids = (title, meta, where) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where)];
+        const list = mode === 'upcoming'
+          ? (orgEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => h('li', { key: e.id },
+              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location)))))
+            : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneUpcoming))
+          : (recentEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, recentEvents.map((e) => h('li', { key: e.id },
+              e.known
+                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location))
+                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location)))))
+            : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
+        panel = [sortBar, list];
       } else if (active === 'news') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, posts.map((p) => {
           const ago = T().postedAgo(p.createdAt || p.date, now);
@@ -411,6 +481,8 @@
     }
 
     const peek = snap === 'peek' && !wide;
+    // P2-08: the follower count, only from 100 up and rounded down ("100+"); nothing at all below that, nothing at peek
+    const followers = isContributor && !peek && detail.data && detail.data.followers != null ? window.MapV2.countBucket(detail.data.followers) : '';
     const Icon = window.Icon;
     return h('section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
@@ -426,14 +498,20 @@
           h('div', { 'data-mv2': 'titles' },
             h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
             h('p', { 'data-mv2': 'sub' }, catLabel,
-              state && h('span', { 'data-mv2': 'state', 'data-status': state.status }, ' · ' + state.text))),
+              state && h('span', { 'data-mv2': 'state', 'data-status': state.status }, ' · ' + state.text),
+              followers && h('span', { 'data-mv2': 'followers' }, ' · ' + Str.followers(followers)))),
           peek && h('button', { type: 'button', 'data-mv2': 'icon-btn', 'aria-label': Str.expand, onClick: cycle }, h(Icon, { name: 'ChevronUp', size: 20 })),
           h('button', { type: 'button', 'data-mv2': 'icon-btn', 'aria-label': Str.close, onClick: onClose }, h(Icon, { name: 'X', size: 20 })))),
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
+        qrAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
+      // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
+      qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
+        url: window.MapV2QR.PUBLIC_ORIGIN + '/c/' + item.slug, name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
+      }), document.body),
       // rendered into <body>: a position:fixed box inside the sheet would be fixed to the sheet's own transform
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {
         images, index: viewer.index, strings: Str.gallery, returnFocus: viewer.from,
