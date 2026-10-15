@@ -116,7 +116,7 @@
   [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). **The Reviewer** (`citizens-reviewer`, 08:30, 12:30 and 16:30 local) reads open same-repo
   PRs (and any PR a `rv-pr<n>` queue row asks for, merged ones included) cold, against the repo's own rules, and posts ONE public advisory comment per PR per
   commit with file and line. It cannot approve, label, push or merge. Spec: [`docs/routines/reviewer.md`](docs/routines/reviewer.md).
-  **The Builder (T4)** (`citizens-builder`, no cron, started by hand with "Run now", saved in Auto permission mode) takes ONE approved `agent:ready` issue to ONE draft PR and never merges ([`docs/routines/builder.md`](docs/routines/builder.md)). Its first run, on #102, gave PR #109 (merged 2026-10-14 on the founder's permission in chat; section 10 of the spec has the record and the four defects it found). CI now also runs daily at 02:17 UTC and by hand (`workflow_dispatch`); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The next approved issue is #108 (keep the public API warm, `q-api-coldstart`). The switch card `d-chain` is answered **forward**, but chaining is **not wired**: the Auto-mode classifier denied `run_scheduled_task`, so it waits for the founder's decision on a permission rule (builder.md section 9). The Reviewer's task prompt still lacks checklist item 8 (workflow files).
+  **The Builder (T4)** (`citizens-builder`, no cron, started by hand with "Run now", saved in Auto permission mode) takes ONE approved `agent:ready` issue to ONE draft PR and never merges ([`docs/routines/builder.md`](docs/routines/builder.md)). Its first run, on #102, gave PR #109 (merged 2026-10-14 on the founder's permission in chat; section 10 of the spec has the record and the four defects it found). CI now also runs daily at 02:17 UTC and by hand (`workflow_dispatch`); the first manual run (`gh workflow run CI`) finished green at 20:22Z alongside the push run on the same commit, and neither cancelled the other, so the concurrency split works. The next approved issue is #108 (keep the public API warm, `q-api-coldstart`). The switch card `d-chain` is answered **forward** and the permission is in place (on 2026-10-15 the founder added an allow rule for `run_scheduled_task` to the project's local settings, after the Auto-mode classifier had denied that call; a test call passed), but chaining is **not wired**: the prompts still need the chain block and one supervised "Run now" each (builder.md section 9). The Reviewer's task prompt still lacks checklist item 8 (workflow files).
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank
   `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*`
   values from Connect's `.env.local` into the local process env (never commit or print them).
@@ -366,9 +366,12 @@ design session first.
 ### T. Agent team (the Watcher, the Dispatcher and the Reviewer are live; the Builder is specified; the rest is to build)
 | ID | Item | Pri | Size |
 |---|---|---|---|
-| T4 | **Builder**: LIVE (2026-10-14; spec [`docs/routines/builder.md`](docs/routines/builder.md), record in its section 10). First task #102 done (PR #109 merged). **Left:** confirm the first scheduled CI run (due 02:17 UTC on 2026-10-15); the founder's decision on a permission rule for `run_scheduled_task`, then wire the chaining (builder.md section 9, one supervised "Run now" per changed role) and put checklist item 8 into the Reviewer's task prompt; then run the Builder on #108. One agent PR open at a time. | P2 | M |
+| T4 | **Builder**: LIVE (2026-10-14; spec [`docs/routines/builder.md`](docs/routines/builder.md), record in its section 10). First task #102 done (PR #109 merged); the first scheduled CI run fired on 2026-10-15 and passed. **Left:** wire the chaining (the permission is in place; builder.md section 9: the chain block in three prompts, one supervised "Run now" per changed role) and put checklist item 8 into the Reviewer's task prompt; then run the Builder on #108 (which probably needs a workflow file the issue does not name). One agent PR open at a time. | P2 | M |
 | T5 | **Reader** = Listing Automation Phase 2 (C16). Needs the founder to mint the `automation:suggest` and `automation:digest` keys first. | P2 | M |
-| T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access), then the Scribe and the Strategist. | Parked | M |
+| T6 | **Cloud move** after 14 clean daily reports (needs a read-only database role and a plan for `gh` access); the founder said yes on 2026-10-14 to revisiting it then, and to the Scribe and the Strategist after it (a supervised session writes their specs). | Parked | M |
+| T7 | **Dispatcher echo fix**: the founder said yes (2026-10-14, card `d-dispatcher-echo`): every answered card ends as an issue, a recorded outcome, or ONE follow-up that is a different question, never a copy of the same question (`a-w-api-slow-categories` was one). A supervised edit of the Dispatcher's prompt and [`docs/routines/dispatcher.md`](docs/routines/dispatcher.md). | P2 | S |
+| T8 | **Merge-trust ladder, rung 1**: the founder said yes (2026-10-14, card `d-merge-trust`) to docs-only pull requests skipping his review once CI is green and the Reviewer has no blocker, merged by a human-started session, never by an agent. **Not a rule yet:** a supervised session writes it into the specs first; until then every merge needs a yes in chat. | P2 | S |
+| T9 | **Git no-reply email** (the founder's step; card `d-noreply-email`, yes 2026-10-14): git's `user.email` (global and repo-local) was still the private address on 2026-10-15 and GitHub declines new pushes with it, so the Builder's next push fails until it is switched. | P1 | S |
 
 Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete ruleset, the API cold-start idea, and the Dispatcher's two action cards (the Dependabot one is wrong and should be dropped; the MapTiler one is real: only the founder can change that plan). Re-test triggers for the two roles' first fixes are in `docs/routines/dispatcher.md` and `docs/routines/reviewer.md` section 8/9.
 
@@ -452,6 +455,14 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
 
 ## 6. Recent sessions (newest first; full detail in the archive or the PR)
 
+- **2026-10-15 (early morning) — The `run_scheduled_task` permission is in place; the founder's six yes answers recorded (docs only, branch
+  `claude/chain-permission-docs`).** The founder added an allow rule for `mcp__scheduled-tasks__run_scheduled_task` to the project's local settings (the
+  Auto-mode classifier had denied that call on 2026-10-14); a test call against a disabled task passed the permission layer. **Found:** the first scheduled
+  CI run fired at 02:36 UTC and passed; the overnight follow-up task failed seven seconds in on the 5-hour usage limit (it fired at 01:40 SAST, the limit
+  reset at 02:10) and disabled itself, so a run meant for the next window must fire after the reset; git's `user.email` is still the private address and
+  GitHub declines pushes with it (T9). The founder answered "yes" on 2026-10-14 to the six cards filed that night (T4, T6 to T9, builder.md section 9);
+  answers are intent, not authority, and nothing was merged on their strength. **Not done:** the chaining is not wired (the chain block in three prompts and
+  one supervised "Run now" each), the Reviewer's prompt still lacks checklist item 8, and issue #108 was not started. No app code, migration or database change.
 - **2026-10-14 (night, supervised) — The Builder (T4) is live: first run on #102, PR #109 merged; chaining decided, not wired (docs only, branch
   `claude/builder-first-run`).** The task `citizens-builder` was created (manual only, Auto mode) and run once: draft PR #109, one file, CI green, the issue
   relabelled, a card filed, no second task. The read-back found four defects with ONE root cause (the traps lived in the brief, not in the issue or the
@@ -533,17 +544,6 @@ Open founder cards in the Decision Inbox: Supabase Pro, the branch-delete rulese
   valid (H4 retires the file). **Gap noted, not a regression:** Wear's `POST /api/posts` passes `taggedProductIds` through unchecked because Wear has no
   product catalog yet; add an ownership check when it gets one. **Left:** about 17 stale local branches and the sibling worktrees (H3); §6 is over its
   8-entry guide, so the oldest entries can move to the archive. No app code, migration or database change.
-- **2026-10-12 (later) — PRs #90 and #91 brought up to date and merged; 43 merged branches deleted (H2).** Both had sat open since 2026-10-04, 57 commits
-  behind `main` and conflicting. `main` was merged into each in a sibling worktree, then everything #91 asserted was re-checked live and two claims
-  were stale: **H10** (both upstream `braces` fix PRs, `micromatch/braces` #72 and #75, are now closed unmerged, so the founder's "don't post our draft"
-  call no longer rests on a pending upstream fix: flagged to revisit) and **H2** (the ruleset no longer has a `deletion` rule). #90 was reviewed (no
-  blocking defect: escaping, fail-soft, sent only after the create, links valid under C15) and, on the founder's call, one wording bug was fixed in it:
-  the owner welcome said "on the map" for a listing with no pin (required `onMap` input; the same claim elsewhere is **C21**). Gates on #90: format, lint,
-  typecheck, 1329 unit, 189 e2e, build; GitHub CI was green on each head before its merge (#91 `eabe13d`, #90 `7f2e7dd`). **Found, not fixed:** a read of
-  the Connect Vercel project's variable NAMES (never values) lists neither `RESEND_API_KEY` nor `ADMIN_NOTIFY_EMAIL`, though §2 says the key was
-  re-entered on 2026-10-10: confirm both in the dashboard (A11) or every email stays `skipped`. **Gotchas:** parallel sessions fetch into the shared refs,
-  so `origin/main` moves under you (re-fetch before every push); PowerShell 5.1 splits `git commit -m` at a double quote (use `-F file`); two PRs that
-  each add a §6 entry at the same spot conflict again once the first merges. The three oldest §6 entries moved to the archive.
 
 ---
 

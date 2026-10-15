@@ -4048,3 +4048,17 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   tracked doc (H11; the referrer restriction is still the founder's step). The founder passed the real-phone Back test, approved the
   dark look, accepted D11, D13, D14, kept MapTiler on Free (D12) and revised D1: the look now follows the phone, and the Map look button
   and the "map v2" badge are gone. Next-phase handoff with a paste-in prompt: `docs/handoffs/MAP_V2_NEXT_PHASE_HANDOFF.md`.
+
+## Moved from RESUME_HERE §6 on 2026-10-15 (the oldest session entry)
+
+- **2026-10-12 (later) — PRs #90 and #91 brought up to date and merged; 43 merged branches deleted (H2).** Both had sat open since 2026-10-04, 57 commits
+  behind `main` and conflicting. `main` was merged into each in a sibling worktree, then everything #91 asserted was re-checked live and two claims
+  were stale: **H10** (both upstream `braces` fix PRs, `micromatch/braces` #72 and #75, are now closed unmerged, so the founder's "don't post our draft"
+  call no longer rests on a pending upstream fix: flagged to revisit) and **H2** (the ruleset no longer has a `deletion` rule). #90 was reviewed (no
+  blocking defect: escaping, fail-soft, sent only after the create, links valid under C15) and, on the founder's call, one wording bug was fixed in it:
+  the owner welcome said "on the map" for a listing with no pin (required `onMap` input; the same claim elsewhere is **C21**). Gates on #90: format, lint,
+  typecheck, 1329 unit, 189 e2e, build; GitHub CI was green on each head before its merge (#91 `eabe13d`, #90 `7f2e7dd`). **Found, not fixed:** a read of
+  the Connect Vercel project's variable NAMES (never values) lists neither `RESEND_API_KEY` nor `ADMIN_NOTIFY_EMAIL`, though §2 says the key was
+  re-entered on 2026-10-10: confirm both in the dashboard (A11) or every email stays `skipped`. **Gotchas:** parallel sessions fetch into the shared refs,
+  so `origin/main` moves under you (re-fetch before every push); PowerShell 5.1 splits `git commit -m` at a double quote (use `-F file`); two PRs that
+  each add a §6 entry at the same spot conflict again once the first merges. The three oldest §6 entries moved to the archive.
