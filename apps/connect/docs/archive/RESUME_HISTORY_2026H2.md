@@ -4084,3 +4084,15 @@ npx tsc --noEmit; npx vitest run; npx next lint --dir src; node scripts/build-fr
   valid (H4 retires the file). **Gap noted, not a regression:** Wear's `POST /api/posts` passes `taggedProductIds` through unchecked because Wear has no
   product catalog yet; add an ownership check when it gets one. **Left:** about 17 stale local branches and the sibling worktrees (H3); §6 is over its
   8-entry guide, so the oldest entries can move to the archive. No app code, migration or database change.
+
+## Moved from RESUME_HERE §6 on 2026-10-15 (third batch, the oldest session entry)
+
+- **2026-10-13 (evening) — The Reviewer built and run once; the Dispatcher's PR #104 merged (docs only, branch `claude/reviewer-role`).** The founder asked for #104
+  to merge once the Reviewer had finished, and for the Reviewer next. #104 conflicted with #103 (`RESUME_HERE.md` only), `main` was merged in, CI went green, the
+  Reviewer's pre-merge comment on it had no blocker, and it merged (`b7f78ea`). **Reviewer:** spec `docs/routines/reviewer.md`, task `citizens-reviewer` (08:30,
+  12:30, 16:30 local), review requests are queue rows `rv-pr<n>`; it uses `add_issue_comment` only (never the review-writing tool, which can approve). **First run**
+  (founder-approved targets #104 and the merged code PR #101): both comments posted, findings checked against the repo: the two #101 nits are real (line 91 of
+  `e2e/map-attribution.spec.ts`; a garbled dash at line 167 of `index.html`), the #104 should-fix was weak. **Found and fixed:** no line numbers in findings, a false
+  "missing" claim, and a rule that banned harmless words; the prompt now demands real line numbers and a check before any "missing" claim. **Note:** comments appear
+  under the repo owner's account (the connector's identity). **Not done:** the Builder (T4), Reader (T5); the Reviewer has never seen a Builder PR; the fixes are not
+  re-tested. No app code, migration or database change.
