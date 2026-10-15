@@ -5,7 +5,7 @@ import { touchSession, twoFingerSwipe, pinch, rotateGesture, swipe } from "./sup
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2's fixed tilt (tracker R8 / RESUME C23, decision D17).
-//  The main map is always drawn at one oblique angle (MapV2.PITCH, 60 degrees);
+//  The main map is always drawn at one oblique angle (MapV2.PITCH, 45 degrees);
 //  zoom and rotation work as before. A pitch of 0 in map-v2-lib.jsx is the
 //  rollback (MapLibre's own defaults: flat, and a person may tilt it).
 //  The old map (?map=v1) and the address-picker map stay flat and untouched.
@@ -27,7 +27,7 @@ const cam = (page: Page): Promise<Cam> =>
     const m = (window as unknown as { __ccMap: MapApi }).__ccMap;
     return { pitch: m.getPitch(), bearing: m.getBearing(), zoom: m.getZoom(), minPitch: m.getMinPitch(), maxPitch: m.getMaxPitch(), touchPitch: m.touchPitch.isEnabled() };
   });
-const PITCH = 60;
+const PITCH = 45;
 const jump = (page: Page, lng: number, lat: number, zoom: number) =>
   page.evaluate(([lo, la, z]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: z }, { originalEvent: {} }), [lng, lat, zoom]);
 

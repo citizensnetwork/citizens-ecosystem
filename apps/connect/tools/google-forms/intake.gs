@@ -3,8 +3,8 @@
  *
  * Bound to the responses Sheet "New 219-Connect Contributor (Responses)".
  * Ticking "Approve" on a row is the ONLY manual step: this script sends the
- * row to Connect (HMAC-signed), Connect puts the Contributor live on the map
- * and in Kingdom Discovery, this script writes Status / Listing URL /
+ * row to Connect (HMAC-signed), Connect puts the Contributor live in Kingdom
+ * Discovery (and on the map when it has a pin), this script writes Status / Listing URL /
  * Processed at / Notes back to the row, then emails the owner a welcome
  * asking them to sign in with their owner email (a 6-digit emailed code, or
  * Google if that address is a Google account).
@@ -162,7 +162,8 @@ function processRow_(sheet, cols, row) {
       cell('Listing URL', res.body.url);
       cell('Processed at', new Date());
       try {
-        sendWelcome_(payload.owner_email, payload.organisation_name, res.body.url);
+        // on_map comes from Connect (it resolves the pin: maps link, geocode, MapTiler); anything but true is "no pin"
+        sendWelcome_(payload.owner_email, payload.organisation_name, res.body.url, res.body.on_map === true);
       } catch (mailErr) {
         notes.push('Listing is live, but the welcome email failed: ' + mailErr.message);
       }
@@ -314,7 +315,10 @@ function post_(payload) {
 
 // ── Welcome email ────────────────────────────────────────────────────────
 
-function sendWelcome_(ownerEmail, orgName, listingUrl) {
+// `onMap` is whether Connect gave the listing a map pin (tracker C21): everyone is in Kingdom Discovery, but an
+// online-only Contributor, or one whose address could not be placed, is not on the map and must not be told so.
+function sendWelcome_(ownerEmail, orgName, listingUrl, onMap) {
+  var where = onMap === true ? 'on the map and in Kingdom Discovery' : 'in Kingdom Discovery';
   var appUrl = PropertiesService.getScriptProperties().getProperty('INTAKE_URL').replace(/\/api\/.*$/, '');
   var signInUrl = escapeHtml_(appUrl + '/dashboard');
   var safeListingUrl = escapeHtml_(listingUrl);
@@ -324,7 +328,7 @@ function sendWelcome_(ownerEmail, orgName, listingUrl) {
   var html =
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#1f1f1f;line-height:1.55">' +
     '<h2 style="color:#A67C00;margin:0 0 12px">' + safeName + ' is live on Citizens Connect 🎉</h2>' +
-    '<p>Thank you for joining the Body on Citizens Connect — you\'re now on the map and in Kingdom Discovery, ' +
+    '<p>Thank you for joining the Body on Citizens Connect — you\'re now ' + where + ', ' +
     'where citizens across the city can find, follow and connect with you.</p>' +
     '<p><a href="' + safeListingUrl + '" style="color:#A67C00">View your listing</a></p>' +
     '<p><strong>To manage your profile</strong>, sign in with <strong>' + safeEmail + '</strong>. ' +

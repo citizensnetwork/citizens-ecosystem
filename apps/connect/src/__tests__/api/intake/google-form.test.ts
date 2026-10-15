@@ -149,6 +149,7 @@ describe("POST /api/intake/google-form — creating the listing", () => {
       slug: "grace-point-community-church",
       url: "http://localhost/c/grace-point-community-church",
       warnings: [],
+      on_map: true,
     });
     expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledWith(
       expect.objectContaining({ email: "daniel@gracepointchurch.org.za", email_confirm: true }),
@@ -226,6 +227,19 @@ describe("POST /api/intake/google-form — creating the listing", () => {
       _physical_longitude: null,
     });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("tells the Sheet whether the listing is on the map, so its welcome email never promises a pin that is not there (C21)", async () => {
+    // a pin from the Maps link
+    expect((await (await POST(signedReq(row))).json()).on_map).toBe(true);
+    // 'No' fixed location: online-only, no pin
+    vi.stubGlobal("fetch", vi.fn());
+    expect((await (await POST(signedReq({ ...row, fixed_location: "No" }))).json()).on_map).toBe(false);
+    // an address nothing could place: live in Kingdom Discovery with a warning, still no pin
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 403 })));
+    const unplaced = await (await POST(signedReq({ ...row, maps_link: "https://maps.google.com/?q=18+Oak+Avenue" }))).json();
+    expect(unplaced.on_map).toBe(false);
+    expect(unplaced.warnings[0]).toMatch(/No map pin/);
   });
 
   it("falls back to the script's geocode, then MapTiler, then a warning", async () => {

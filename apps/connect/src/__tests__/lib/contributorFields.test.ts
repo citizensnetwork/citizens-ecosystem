@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normaliseEmail, parseListingFields } from "@/lib/contributorFields";
+import { hasMapPin, normaliseEmail, parseListingFields } from "@/lib/contributorFields";
 
 const valid = {
   display_name: "Grace Point Community Church",
@@ -169,5 +169,33 @@ describe("normaliseEmail", () => {
     expect(normaliseEmail(" A@B.co ")).toBe("a@b.co");
     expect(normaliseEmail("")).toBeNull();
     expect(normaliseEmail(42)).toBeNull();
+  });
+});
+
+describe("hasMapPin (tracker C21: say 'on the map' only when it is true)", () => {
+  const pin = { no_fixed_location: false, physical_latitude: -25.7479, physical_longitude: 28.2293 };
+
+  it("is true with both coordinates, as numbers or as numeric strings", () => {
+    expect(hasMapPin(pin)).toBe(true);
+    expect(hasMapPin({ ...pin, physical_latitude: "-25.7479", physical_longitude: "28.2293" })).toBe(true);
+    expect(hasMapPin({ physical_latitude: 0, physical_longitude: 0 })).toBe(true); // 0,0 is a real (if odd) pin; a missing flag is not "no fixed location"
+  });
+
+  it("is false for a Contributor with no fixed location, even with stale coordinates on the row", () => {
+    expect(hasMapPin({ ...pin, no_fixed_location: true })).toBe(false);
+    expect(hasMapPin({ no_fixed_location: true, physical_latitude: null, physical_longitude: null })).toBe(false);
+  });
+
+  it("is false with one coordinate, none, or a column that is missing", () => {
+    expect(hasMapPin({ ...pin, physical_longitude: null })).toBe(false);
+    expect(hasMapPin({ ...pin, physical_latitude: undefined })).toBe(false);
+    expect(hasMapPin({})).toBe(false);
+  });
+
+  it("is false for values that are not coordinates (empty, text, booleans, NaN, out of range)", () => {
+    for (const bad of ["", "  ", "n/a", true, false, NaN, Infinity, {}, [], 91]) {
+      expect(hasMapPin({ ...pin, physical_latitude: bad }), String(bad)).toBe(false);
+    }
+    expect(hasMapPin({ ...pin, physical_longitude: 181 })).toBe(false);
   });
 });

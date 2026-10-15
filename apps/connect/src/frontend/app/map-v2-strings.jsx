@@ -41,10 +41,20 @@
         title: (name) => 'QR code for ' + name,
         hint: "Scanning it opens this listing in your phone's browser.",
         printHint: 'Print it or show it at your venue.',
+        // inside the phone app there is no download: a screenshot keeps it
+        screenshotHint: 'To keep it, take a screenshot of this screen.',
         imageLabel: (name, url) => 'QR code that opens ' + name + ' at ' + url,
         save: 'Save image',
         close: 'Close QR code',
         fileName: (slug) => 'citizens-connect-' + slug + '.png',
+      },
+      // P2-01: the closest listings to this one, at the bottom of the full sheet (distance only, never popularity)
+      nearby: {
+        title: 'Nearby',
+        hint: 'Closest first.',
+        under: 'Under 100 m away',
+        metres: (n) => n + ' m away',
+        km: (n) => n + ' km away',
       },
       empty: {
         title: (name) => name + ' has not shared events, news or photos yet.',

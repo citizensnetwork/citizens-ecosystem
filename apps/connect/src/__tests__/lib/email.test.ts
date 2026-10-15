@@ -196,6 +196,7 @@ describe("email templates", () => {
       name: hostile,
       listingUrl: 'https://www.citizens.example/c/hope"><script>',
       dashboardUrl: "https://www.citizens.example/dashboard",
+      onMap: true,
     });
     expect(e.html).not.toContain("<img");
     expect(e.html).not.toContain("<script>");
@@ -205,6 +206,22 @@ describe("email templates", () => {
     expect(e.text).toContain(hostile);
     expect(e.text).not.toContain("<p>");
     expect(e.subject).toContain("You're live");
+  });
+
+  it("approved email says 'on the map' only when the listing has a pin; it is always in Kingdom Discovery (C21)", () => {
+    const input = { name: "Hope Hub", listingUrl: "https://www.citizens.example/c/hope-hub", dashboardUrl: "https://www.citizens.example/dashboard" };
+    const pinned = applicationApprovedEmail({ ...input, onMap: true });
+    for (const part of [pinned.html, pinned.text]) expect(part).toContain("now on the map and in Kingdom Discovery");
+    const online = applicationApprovedEmail({ ...input, onMap: false });
+    for (const part of [online.html, online.text]) {
+      expect(part).toContain("now in Kingdom Discovery");
+      expect(part).not.toContain("on the map");
+    }
+    // the rest of the email is the same either way: the links and the thank-you
+    for (const e of [pinned, online]) {
+      expect(e.text).toContain("https://www.citizens.example/c/hope-hub");
+      expect(e.text).toContain("Thank you for joining the Body");
+    }
   });
 
   describe("owner welcome email (admin-created listings)", () => {

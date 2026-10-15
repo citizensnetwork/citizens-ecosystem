@@ -20,7 +20,10 @@
   const Icon = window.Icon;
 
   const MAX_BIO = 1000;
-  const REVIEW_BANNER = 'Thanks! Your listing is being reviewed. You can finish your profile meanwhile; it goes on the map once approved.';
+  // C21: "on the map" only for an application that has a pin; an online-only one goes into Kingdom Discovery; until the
+  // application has loaded (onMap null) it only says "live"
+  const reviewBanner = (onMap) => 'Thanks! Your listing is being reviewed. You can finish your profile meanwhile; it goes '
+    + (onMap === true ? 'on the map' : onMap === false ? 'into Kingdom Discovery' : 'live') + ' once approved.';
 
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 
@@ -63,12 +66,12 @@
     };
   }
 
-  function ReviewBanner({ submittedAt }) {
+  function ReviewBanner({ submittedAt, onMap }) {
     return h('div', { className: 'rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]/50 border border-[#D97706]/20 p-4 flex items-start gap-3', 'data-testid': 'pending-banner' },
       h('div', { className: 'w-10 h-10 rounded-2xl bg-[#D97706] flex items-center justify-center shrink-0' }, h(Icon, { name: 'Clock', size: 18, className: 'text-white' })),
       h('div', { className: 'min-w-0' },
         h('h1', { className: 'text-[#92400E] text-base leading-tight mb-1' }, 'Your application is being reviewed'),
-        h('p', { className: 'text-xs text-[#92400E]/90 leading-relaxed' }, REVIEW_BANNER),
+        h('p', { className: 'text-xs text-[#92400E]/90 leading-relaxed' }, reviewBanner(onMap)),
         h('p', { className: 'text-[11px] text-[#92400E]/70 mt-1.5 leading-relaxed' },
           'Nothing here is public until an admin approves it. You will get a notification and an email once it is decided.' + (submittedAt ? ' Submitted ' + fmtDate(submittedAt) + '.' : ''))));
   }
@@ -95,6 +98,9 @@
     const [submittedAt, setSubmittedAt] = useState(myApplication ? myApplication.submittedAt : null);
     const [f, setF] = useState(() => formFromRow(myApplication || {}));
     const [saving, setSaving] = useState(false);
+    // C21: whether the SAVED application has a map pin (what an approval will publish), not the unsaved form. null until
+    // it is known, so the banner never claims the map first and corrects itself.
+    const [savedPin, setSavedPin] = useState(() => (realUser ? null : window.DATA.hasMapPin(formFromRow(myApplication || {}))));
 
     // Real mode: load the staged application. If an admin has decided since the
     // last visit, say so (approved → reload so the new role is picked up).
@@ -112,6 +118,7 @@
             setDecided({ status: 'rejected', reason: data.rejection_reason || '' });
           } else if (data) {
             setF(formFromRow(data));
+            setSavedPin(window.DATA.hasMapPin(formFromRow(data)));
             setSubmittedAt(data.submitted_at);
           }
           setLoading(false);
@@ -147,6 +154,7 @@
           location: f.noFixedLocation ? '' : f.location, lat: f.noFixedLocation ? null : f.lat, lng: f.noFixedLocation ? null : f.lng,
           noFixedLocation: !!f.noFixedLocation,
         });
+        setSavedPin(window.DATA.hasMapPin(f));
         toast('Saved. It goes live once your application is approved.', 'green');
         setSaving(false);
         return;
@@ -155,6 +163,7 @@
         const res = await window.authedFetch('/api/contributor/application', { method: 'PATCH', body: JSON.stringify(payloadFromForm(f)) });
         const body = await res.json().catch(() => ({}));
         if (res.ok) {
+          setSavedPin(window.DATA.hasMapPin(f));
           toast('Saved. It goes live once your application is approved.', 'green');
         } else if (res.status === 409) {
           toast('Your application has just been decided. Refreshing…', 'gold');
@@ -177,7 +186,7 @@
         h('div', { className: 'max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-40 md:pb-10 space-y-4' },
           decided
             ? h(RejectedPanel, { reason: decided.reason, onApplyAgain: () => leaveRejected('apply'), onLeave: () => leaveRejected('home') })
-            : h(ReviewBanner, { submittedAt }),
+            : h(ReviewBanner, { submittedAt, onMap: loading ? null : savedPin }),
 
           !decided && loading && h('p', { className: 'text-xs text-muted-foreground text-center py-6' }, 'Loading your application…'),
           !decided && loadError && h('p', { className: 'text-xs text-destructive text-center py-4' }, "We couldn't load your saved profile. Refresh to try again."),

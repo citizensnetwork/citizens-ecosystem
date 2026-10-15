@@ -86,7 +86,11 @@
               h(Button, { variant: 'danger', className: 'flex-1', icon: 'XCircle', onClick: () => setMode('reject') }, 'Reject'))
           : h('div', { className: 'space-y-3 fade-in' },
               h('p', { className: 'text-xs font-bold text-foreground' }, (mode === 'approve' ? '✅ Approving' : '❌ Rejecting') + ' — ' + app.name),
-              mode === 'approve' && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, 'This puts them on the map and in Kingdom Discovery, and emails them.'),
+              // C21: "on the map" only when the application has a pin (both coordinates); an online-only applicant is in Kingdom Discovery alone
+              mode === 'approve' && h('p', { className: 'text-xs text-muted-foreground leading-relaxed', 'data-testid': 'approve-where' },
+                app.hasPin
+                  ? 'This puts them on the map and in Kingdom Discovery, and emails them.'
+                  : 'This puts them in Kingdom Discovery, and emails them. They have no map pin, so they will not be on the map.'),
               // Only a rejection carries words: the applicant is shown this reason (notification + email).
               mode === 'reject' && h('textarea', { value: note, onChange: (e) => setNote(e.target.value), rows: 3, maxLength: 1000, placeholder: 'Why not yet? The applicant will read this, so keep it kind and clear.', 'aria-label': 'Reason for the applicant', className: window.UI.inputCls + ' resize-none' }),
               error && h('p', { className: 'text-xs font-semibold text-[#DC2626]', role: 'alert' }, error),
@@ -164,7 +168,8 @@
           return;
         }
         setResult({ slug: body.slug, claimEmail: f.claimEmail.trim(), emailRequested: f.emailOwner, email: body.email });
-        toast('Contributor listing created — live on the map now.', 'green');
+        // C21: the server says whether the new listing has a pin; if it did not say, claim nothing about the map
+        toast('Contributor listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in Kingdom Discovery now. It has no map pin.' : 'live now.'), 'green');
         setF({ orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '', location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true });
       } catch (e) {
         toast('Could not create the listing — please check your connection.', 'red');
@@ -174,7 +179,7 @@
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        "Create a Contributor listing on their behalf — it goes live on the map and in Kingdom Discovery immediately. The real person or org signs in with the email below (a 6-digit code we email them, or Google) to see the listing and manage it themselves from their own Contributor Portal."),
+        "Create a Contributor listing on their behalf — it goes live in Kingdom Discovery immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) to see the listing and manage it themselves from their own Contributor Portal."),
 
       result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2', 'data-testid': 'create-result' },
         h(Icon, { name: 'CheckCircle2', size: 15, className: 'text-[#16A34A] shrink-0 mt-0.5' }),
@@ -278,8 +283,9 @@
           }, h(Icon, { name: 'Trash2', size: 13 }), 'Delete'))),
       confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
         h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
-          ? 'Put ' + name + ' back on the map and in Kingdom Discovery?'
-          : 'Hide ' + name + ' from the map and Kingdom Discovery? Nothing is deleted — you can unhide it any time.'),
+          // true for every listing: the map shows it only when it has a pin, Kingdom Discovery always (C21)
+          ? 'Put ' + name + ' back in Kingdom Discovery, and on the map if it has a pin?'
+          : 'Hide ' + name + ' from Kingdom Discovery, and from the map if it has a pin? Nothing is deleted — you can unhide it any time.'),
         h('div', { className: 'flex gap-2' },
           h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', className: 'flex-1', disabled: busy, onClick: onConfirm },
             busy ? 'Saving…' : hidden ? 'Confirm unhide' : 'Confirm hide'),
@@ -527,7 +533,8 @@
         const approved = reviewStatus === 'approved';
         const mailed = body.email === 'sent';
         toast(
-          (approved ? 'Approved. They are live on the map.' : 'Rejected. They can apply again.')
+          // C21: the server says whether the approved listing has a pin; if it did not say, claim nothing about the map
+          (approved ? 'Approved. They are live' + (body.onMap === true ? ' on the map.' : body.onMap === false ? ' in Kingdom Discovery (no map pin).' : '.') : 'Rejected. They can apply again.')
             + (mailed ? ' We emailed them.' : " We couldn't email them, so let them know yourself."),
           approved && mailed ? 'green' : 'gold',
         );

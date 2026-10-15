@@ -52,8 +52,9 @@ describe("POST /api/admin/contributors/review", () => {
       data: { user: { id: ADMIN_ID, email: "admin@citizens.example" } },
       error: null,
     });
+    // by default the applicant has a map pin (both coordinates)
     adminClient._chain.maybeSingle.mockResolvedValue({
-      data: { display_name: "Grace Hub", profiles: { email: APPLICANT_EMAIL } },
+      data: { display_name: "Grace Hub", no_fixed_location: false, physical_latitude: -25.7479, physical_longitude: 28.2293, profiles: { email: APPLICANT_EMAIL } },
       error: null,
     });
     mockSendEmail.mockResolvedValue("sent");
@@ -128,7 +129,7 @@ describe("POST /api/admin/contributors/review", () => {
       const res = await POST(req({ application_id: APP_ID, action: "approve" }));
       expect(res.status).toBe(200);
       expect(mockClient.rpc).toHaveBeenCalledWith("approve_contributor_application", { _application_id: APP_ID });
-      expect(await res.json()).toEqual({ success: true, action: "approved", slug: "grace-hub", email: "sent" });
+      expect(await res.json()).toEqual({ success: true, action: "approved", slug: "grace-hub", onMap: true, email: "sent" });
     });
 
     it("emails the applicant 'You're live' with their listing and portal links", async () => {
@@ -140,6 +141,79 @@ describe("POST /api/admin/contributors/review", () => {
       expect(mail.subject).toContain("You're live");
       expect(mail.text).toContain("/c/grace-hub");
       expect(mail.text).toContain("/dashboard");
+    });
+
+    describe("says 'on the map' only when the approved listing really has a pin (C21)", () => {
+      const approveAndRead = async (row: Record<string, unknown>) => {
+        adminClient._chain.maybeSingle.mockResolvedValue({
+          data: { display_name: "Grace Hub", profiles: { email: APPLICANT_EMAIL }, ...row },
+          error: null,
+        });
+        rpcReturns({ success: true, action: "approved", slug: "grace-hub", user_id: APPLICANT_ID });
+        await POST(req({ application_id: APP_ID, action: "approve" }));
+        return mockSendEmail.mock.calls[0][0] as { text: string; html: string };
+      };
+
+      it("a listing with both coordinates: on the map and in Kingdom Discovery", async () => {
+        const mail = await approveAndRead({ no_fixed_location: false, physical_latitude: -25.7479, physical_longitude: 28.2293 });
+        for (const part of [mail.text, mail.html]) expect(part).toContain("now on the map and in Kingdom Discovery");
+      });
+
+      it("coordinates that arrive as numeric strings still count", async () => {
+        const mail = await approveAndRead({ no_fixed_location: false, physical_latitude: "-25.7479", physical_longitude: "28.2293" });
+        expect(mail.text).toContain("on the map and in Kingdom Discovery");
+      });
+
+      for (const [label, row] of [
+        ["online-only (no fixed location, no coordinates)", { no_fixed_location: true, physical_latitude: null, physical_longitude: null }],
+        ["no fixed location with stale coordinates left on the row", { no_fixed_location: true, physical_latitude: -25.7, physical_longitude: 28.2 }],
+        ["no coordinates at all", { no_fixed_location: false, physical_latitude: null, physical_longitude: null }],
+        ["only a latitude", { no_fixed_location: false, physical_latitude: -25.7, physical_longitude: null }],
+        ["only a longitude", { no_fixed_location: false, physical_latitude: null, physical_longitude: 28.2 }],
+        ["coordinates that are not numbers", { no_fixed_location: false, physical_latitude: "n/a", physical_longitude: "" }],
+        ["columns missing from the row", {}],
+      ] as const) {
+        it(`${label}: in Kingdom Discovery only, never the map`, async () => {
+          const mail = await approveAndRead(row);
+          for (const part of [mail.text, mail.html]) {
+            expect(part).toContain("now in Kingdom Discovery");
+            expect(part).not.toContain("on the map");
+          }
+        });
+      }
+
+      it("the response tells the admin's screen whether the listing is on the map (false for online-only)", async () => {
+        adminClient._chain.maybeSingle.mockResolvedValue({
+          data: { display_name: "Grace Hub", no_fixed_location: true, physical_latitude: null, physical_longitude: null, profiles: { email: APPLICANT_EMAIL } },
+          error: null,
+        });
+        rpcReturns({ success: true, action: "approved", slug: "grace-hub", user_id: APPLICANT_ID });
+        const res = await POST(req({ application_id: APP_ID, action: "approve" }));
+        expect(await res.json()).toMatchObject({ success: true, onMap: false });
+      });
+
+      it("claims nothing about the map when the applicant lookup failed (no onMap in the response, no email)", async () => {
+        adminClient._chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+        rpcReturns({ success: true, action: "approved", slug: "grace-hub", user_id: APPLICANT_ID });
+        const res = await POST(req({ application_id: APP_ID, action: "approve" }));
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        expect(body).not.toHaveProperty("onMap");
+        expect(mockSendEmail).not.toHaveBeenCalled();
+      });
+
+      it("a rejection never carries onMap", async () => {
+        rpcReturns({ success: true, action: "rejected", user_id: APPLICANT_ID });
+        const res = await POST(req({ application_id: APP_ID, action: "reject", reason: "Please add your address." }));
+        expect(await res.json()).not.toHaveProperty("onMap");
+      });
+
+      it("asks the database for the three columns it needs to decide", async () => {
+        rpcReturns({ success: true, action: "approved", slug: "grace-hub", user_id: APPLICANT_ID });
+        await POST(req({ application_id: APP_ID, action: "approve" }));
+        const sel = String(adminClient._chain.select.mock.calls.at(-1)?.[0]);
+        for (const col of ["no_fixed_location", "physical_latitude", "physical_longitude"]) expect(sel).toContain(col);
+      });
     });
 
     it("reads the applicant's private email with the service-role client, by application id", async () => {

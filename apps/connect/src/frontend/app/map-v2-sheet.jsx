@@ -164,7 +164,7 @@
   }
 
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts } = app;
     const Str = S();
@@ -212,6 +212,18 @@
     const posts = useMemo(() => (isContributor && item
       ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
       : []), [newsPosts, item, isContributor]);
+    // P2-01 Nearby: the closest listings the map is drawing, nearest first. What is already on this sheet is left out:
+    // the listing itself, a Contributor's own upcoming events (its Events tab), and an Event's organiser (its header).
+    const near = useMemo(() => {
+      const N = window.MapV2Nearby;
+      if (!N || !item || !Array.isArray(nearby)) return [];
+      const own = isContributor ? new Set(orgEvents.map((e) => e.id)) : null;
+      return N.rank(item, nearby, {
+        skip: (m) => (m.id === id && m.type === type)
+          || (own && m.type === 'event' && own.has(m.id))
+          || (type === 'event' && m.type === 'contributor' && m.id === item.organizerId),
+      });
+    }, [item, nearby, id, type, isContributor, orgEvents]);
     const images = useMemo(() => {
       if (!isContributor || !item) return [];
       const seen = new Set();
@@ -480,6 +492,19 @@
           h('div', { 'data-mv2': 'actions' }, dir ? actions.filter((a) => a.key === 'dir') : (site ? actions.filter((a) => a.key === 'web') : (email ? actions.filter((a) => a.key === 'mail') : null)))));
     }
 
+    // P2-01: each nearby listing described the way its own sheet header would be (name, category, how far)
+    const N = window.MapV2Nearby;
+    const nearRows = N && near.length ? near.map(({ marker: m, meters }) => {
+      const mc = window.DATA.getItemCategory(m);
+      const label = mc ? mc.name : ((m.type === 'contributor' && window.MapV2Strings.pin.kind[m.kind]) || window.MapV2Strings.pin.type[m.type]);
+      const what = m.type === 'contributor' ? label : window.MapV2Strings.pin.type[m.type] + ' · ' + label;
+      return {
+        id: m.id, type: m.type, name: m.title || '', hex: mc ? mc.hex : '#C9A84C',
+        meta: what + ' · ' + N.distanceText(meters, Str.nearby),
+        glyph: h(window.Icon, { name: (mc && mc.icon) || 'MapPin', size: 18 }),
+        photo: m.type === 'contributor' ? m.profilePhoto : undefined,
+      };
+    }) : [];
     const peek = snap === 'peek' && !wide;
     // P2-08: the follower count, only from 100 up and rounded down ("100+"); nothing at all below that, nothing at peek
     const followers = isContributor && !peek && detail.data && detail.data.followers != null ? window.MapV2.countBucket(detail.data.followers) : '';
@@ -505,6 +530,7 @@
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
+        N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, Avatar, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),

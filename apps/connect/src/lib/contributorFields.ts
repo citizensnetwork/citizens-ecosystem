@@ -58,6 +58,21 @@ function coordOrNull(v: unknown, limit: number): number | null {
   return typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= limit ? v : null;
 }
 
+/**
+ * Whether a Contributor row has a map pin (tracker C21: say "on the map" only when it is true). The map draws a pin
+ * only with BOTH coordinates, and a "no fixed location" Contributor has none (parseListingFields nulls them), so a
+ * stale pair on such a row does not count. A database driver may hand a numeric column back as a number or as a
+ * numeric string; both are a coordinate. Anything else (null, "", "n/a", a missing column) is not.
+ */
+export function hasMapPin(row: { no_fixed_location?: unknown; physical_latitude?: unknown; physical_longitude?: unknown }): boolean {
+  const coord = (v: unknown, limit: number) => {
+    // only a number or a non-empty string can be a coordinate: Number(null), Number(""), Number([]) and Number(false) are all 0
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+    return Number.isFinite(n) && Math.abs(n) <= limit;
+  };
+  return row.no_fixed_location !== true && coord(row.physical_latitude, 90) && coord(row.physical_longitude, 180);
+}
+
 export type ListingFields = {
   displayName: string;
   claimEmail: string;
