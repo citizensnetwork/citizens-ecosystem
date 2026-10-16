@@ -1,7 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════
 --  PROPOSAL, NOT APPLIED. Tracker P2-05 ("Moments": 24-hour Contributor updates with a seen / unseen ring), gate G1.
---  Written 2026-10-15 against live head 181. Needs Stephen's yes in chat before anything is applied, and the tracker says
---  "Q4 review first" (the moderation question): do not build this before that review.
+--  Written 2026-10-15 against live head 181; the live head is now 182 (another session's Vision migration), so the
+--  number is NOT fixed: take the next free one after list_migrations at apply time. Needs Stephen's yes in chat first,
+--  and the tracker says "Q4 review first": Q4 is the ATTENTION test of tracker section 4 ("does it respect people's
+--  time? reject or defer if it relies on streaks, urgency, endless scroll or rankings"). A post that disappears in
+--  24 hours with an unseen ring is the urgency pattern Q4 warns about, so do not build this before that decision.
+--  (An earlier version of this header called Q4 the moderation question. That was wrong; corrected 2026-10-16.)
+--  If Stephen chooses ADAPT (a short note with no ring and no countdown), drop moment_views and its policies below.
 --
 --  A Moment is a short post (up to 280 characters and one image) that disappears after 24 hours. It is for the small,
 --  everyday thing a ministry would not write a news post for ("doors open early tonight", "the soup kitchen needs two more
@@ -15,8 +20,9 @@
 --    * At most 5 live Moments per Contributor, so one account cannot flood the map.
 --    * Only an approved Contributor (or an admin) can post; anyone, signed in or not, can read a LIVE Moment.
 --
---  If approved: pre-apply git tag, MCP apply_migration (184_moments), get_advisors (0 ERROR, 0 new findings),
---  move this file to supabase/migrations/184_moments.sql in the same PR.
+--  If approved: pre-apply git tag, MCP apply_migration (<next free number>_moments), get_advisors (0 ERROR,
+--  0 new findings), move this file to supabase/migrations/<number>_moments.sql in the same PR.
+--  Re-read the live reports_target_type_check before applying (five targets on 2026-10-16).
 -- ════════════════════════════════════════════════════════════════════
 
 begin;
