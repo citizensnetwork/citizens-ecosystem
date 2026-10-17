@@ -10,8 +10,8 @@ import { touchSession, tapTouch } from "./support/touch";
 //    - the invited Contributor's Accept / Decline (shown only while the invitation is open)
 //  The database half is covered by docs/audit/probes/184_event_cohosts.probe.sql (39 checks) and the route tests. The two
 //  components are PURE ON THEIR PROPS, so the panel and the Accept / Decline are also mounted on their own against a stand-in
-//  client and tapped with real touch. NOT driven here: the Notifications screen passing the right props to the Accept / Decline
-//  (it needs a signed-in session); see the PR.
+//  client and tapped with real touch. The SIGNED-IN wiring (the Notifications screen handing the right ids to Accept and
+//  Decline, the Dashboard opening the panel on the organiser's own events) is in e2e/signed-in-save-cohosts.spec.ts.
 // ════════════════════════════════════════════════════════════════════
 
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
