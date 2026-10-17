@@ -48,8 +48,9 @@ create policy event_cohosts_select on public.event_cohosts
   );
 -- deliberately NO insert / update / delete policy: default deny. The three functions below are the only way in.
 
-revoke all on public.event_cohosts from anon, public;
-revoke insert, update, delete on public.event_cohosts from authenticated;
+-- (Supabase grants every privilege on a new table to anon and authenticated by default, and TRUNCATE is not subject to
+-- RLS: take everything away from both, then give back read access only.)
+revoke all on public.event_cohosts from anon, authenticated, public;
 grant select on public.event_cohosts to authenticated, anon;
 
 -- Two new notification kinds. The check lists every existing type (read from the live constraint on 2026-10-15) plus two.
