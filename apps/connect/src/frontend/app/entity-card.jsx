@@ -196,7 +196,7 @@
     const stats = isEvent
       ? [stat('Users', (item.connectCount || 0).toLocaleString(), ' connected'),
          stat('Star', (item.considerCount || 0).toLocaleString(), ' considering')]
-      : [stat('Heart', (item.followerCount || 0).toLocaleString(), ' followers')];
+      : [window.UI.followerBucket(item.followerCount) && stat('Heart', window.UI.followerBucket(item.followerCount), ' followers')].filter(Boolean);
 
     // ── organiser line ────────────────────────────────────────────────
     //  Tappable when the organiser is a real directory profile; a plain
@@ -288,7 +288,7 @@
 
     const body = h('div', { className: cx('flex flex-col mt-2', isPanel ? 'px-4 pb-4 gap-3' : 'px-3 pb-3 gap-2') },
       meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground flex-wrap' }, meta),
-      h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
+      stats.length > 0 && h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
       h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn));

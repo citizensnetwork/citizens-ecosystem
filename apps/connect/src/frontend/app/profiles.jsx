@@ -127,7 +127,7 @@
           // when the event carries no organiser at all.
           org ? h('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
             h(Avatar, { src: org.profilePhoto, name: org.name, size: 40, rounded: 'xl', fit: logoFit(org.kind) }),
-            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, (org.followerCount || 0).toLocaleString() + ' followers')),
+            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), window.UI.followerBucket(org.followerCount) && h('p', { className: 'text-xs text-muted-foreground' }, window.UI.followerBucket(org.followerCount) + ' followers')),
             h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))
             : orgName ? h('div', { className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
               h('div', { className: 'w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center shrink-0' }, h(Icon, { name: 'Users', size: 18, className: 'text-gold-dark' })),
@@ -190,7 +190,11 @@
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
             safeUrl(pl.website) && h(Button, { variant: 'outline', icon: 'Globe', onClick: () => window.open(safeUrl(pl.website), '_blank', 'noopener,noreferrer') }),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => app.shareLink({ page: 'place', params: { id } }) })),
-          h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
+          (() => {
+            const fb = window.UI.followerBucket(pl.followerCount);
+            const bits = [fb && fb + ' followers', orgName && 'by ' + orgName].filter(Boolean);
+            return bits.length ? h('p', { className: 'text-xs text-muted-foreground' }, bits.join(' · ')) : null;
+          })(),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
             h(InfoRow, { icon: 'Clock', label: 'Opening hours', value: pl.openHours || 'Not specified' })),
@@ -281,7 +285,7 @@
             h('div', { className: 'flex items-center gap-2 mt-1 flex-wrap' },
               cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.name),
               c.kind && h('span', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap' }, c.kind),
-              h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, c.followerCount.toLocaleString() + ' followers'))),
+              window.UI.followerBucket(c.followerCount) && h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, window.UI.followerBucket(c.followerCount) + ' followers'))),
           h('div', { className: 'flex gap-2 mb-4' },
             h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true, c.id) }, 'Message'),

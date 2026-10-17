@@ -101,6 +101,34 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow$/ })).toHaveCount(1);
   });
 
+  // Real listings do not carry a follower count, so the card and the profile used to print "0 followers" under every
+  // small ministry and place (the very thing P2-08 exists to prevent). They now show the bucket, or nothing.
+  test("a Place card and the profile pages never print '0 followers'; the helper still shows the bucket from 100", async ({ page }) => {
+    const { seed, t } = await open(page, "place", 0);
+    await expect(page.locator("[data-mv2='card']")).toBeVisible();
+    await expect(page.locator("[data-mv2='card']")).not.toContainText("followers");
+
+    // control: the shared helper maps 0, 99 and nothing to "nothing", and 137 to the bucket
+    const mapped = await page.evaluate(() => {
+      const f = (window as unknown as { UI: { followerBucket: (n: unknown) => string } }).UI.followerBucket;
+      return [f(0), f(99), f(undefined), f(null), f("x"), f(137), f(26_000)];
+    });
+    expect(mapped).toEqual(["", "", "", "", "", "100+", "25,000+"]);
+
+    // the Place page and a Contributor's page (opened from its sheet)
+    await page.getByRole("button", { name: "View Full Profile" }).first().click();
+    await expect(page.getByText(seed.places[0].name).first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("0 followers");
+    expect(t.id).toBeTruthy();
+  });
+
+  test("a Contributor's full profile does not say '0 followers' either", async ({ page }) => {
+    await open(page, "contributor", 0);
+    await page.getByRole("button", { name: "View Full Profile" }).click();
+    await expect(page.getByRole("heading", { name: "Fixture Fellowship 1" })).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("followers");
+  });
+
   test("a signed-out visitor on the real site is asked to sign in, and nothing flips (control: demo mode flips)", async ({ page }) => {
     await open(page, "contributor", 0);
     // the real site has Supabase configured (window.CC_AUTH) and nobody signed in; the hermetic page has neither
