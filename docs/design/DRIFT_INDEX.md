@@ -72,7 +72,7 @@ function lines(text) {
 }
 const norm = (v) =>
   v.trim().replace(/[;,]+$/, '').replace(/_/g, ' ').replace(/\s+/g, '').toLowerCase()
-    .replace(/#([0-9a-f])([0-9a-f])([0-9a-f])$/, '#$1$1$2$2$3$3').replace(/([(,])\./g, '$10.');
+    .replace(/#([0-9a-f])([0-9a-f])([0-9a-f])$/, '#$1$1$2$2$3$3').replace(/([(,])\./g, (_, p) => p + '0.');
 const px = (v) => (/^\d+(\.\d+)?$/.test(v) ? v + 'px' : v);
 const RULES = {
   colours: [/(?<![\w&])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3})(?![\w-])/gi, /\b(?:rgba?|hsla?)\([^)]*\)/gi],
@@ -162,6 +162,7 @@ Across the whole platform (the three apps and `packages/ui`) the script finds **
 
 - **Connect's number is not Map v2's.** Map v2's stylesheet has no raw values outside its token blocks (a test enforces it); Connect's figure comes from the older screens, and the three apps are not on one footing: Wear and Vision write sizes inline, Connect mixes inline styles and Tailwind classes.
 - **It does not read Tailwind scale classes, images, icon artwork, copy or motion.** A screen can have a low index and still be hard to use; the parity checklist and the Designer's own judgement cover that.
+- **Server-side TypeScript** that carries colours (`apps/connect/src/lib/categories.ts`, `apps/connect/src/lib/map/markers.ts`) is outside the source sets, so Connect's index does not see its raw values (its golds repeat ones already counted).
 - **Dynamic values** (a colour built from data at run time) are not counted; a category colour list in `data.jsx` is counted once per literal.
 - **Parity** (how many of the 14 screens pass the nine-item checklist) is **not measured** in version 1: it needs the captures that phase 2 adds. **Findability** (the probe of public search terms) is **not measured** for the same reason.
 - The numbers belong to a commit. A Designer run that quotes a drift figure names the commit it measured.

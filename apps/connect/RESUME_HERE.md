@@ -433,7 +433,7 @@ Founder cards (2026-10-15): all five were answered yes and are enacted or runnin
 
 | # | Project | Where it stopped | Next |
 |---|---|---|---|
-| P2 | **Connect Daily Routine** (the Watcher; a design-consistency step could join it, C17) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets file is now tracked (`apps/connect/config/onboarding-presets.json`, platform facts re-verified 2026-10-15) but still not wired into the wizard. | T4 to T6 |
+| P2 | **Connect Daily Routine** (the Watcher; the design-consistency check is the Designer's, T12, not a Watcher step) | **Adopted 2026-10-12:** the v3 spec is committed (agent-team PR) and Phase 1, health checks only, runs four times a day as a local scheduled task, reporting to the Decision Inbox and a daily email (not Drive). Steps B to F are not enabled; the onboarding presets file is now tracked (`apps/connect/config/onboarding-presets.json`, platform facts re-verified 2026-10-15) but still not wired into the wizard. | T4 to T6 |
 | P4 | Wear CSP | **PR #117 is ready for review (2026-10-15):** the policy and its test are written and the signed-in screens were walked with 0 genuine violations. Waits for the founder's merge yes. | S1 |
 | P6 | Vision network graph + Phase D | **The network graph is built and merged (#131, migration 182).** Phase D (exports, partnerships, scheduled reports) is still only scoped and parked. | V3 |
 | P7 | Impersonation Phase 2 | Phase 1 is live; Phase 2 waits on a design session. | W1 |

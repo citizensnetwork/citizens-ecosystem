@@ -140,7 +140,7 @@ The frozen definition, the reference script and the baseline are in [`DRIFT_INDE
 
 ## 6. Per-screen parity checklist (tracker 12.3)
 
-A screen is at parity when it passes the nine items below (the tracker's checklist, section 12.3, which the Map v2 phase passed). N is the **14 screens** named in the route table at the top of `apps/connect/src/frontend/app/routes.jsx`: map, discover, community, event, place, contributor, me, messages, notifications, settings, apply, onboarding, dashboard, admin.
+A screen is at parity when it passes the nine items below (the tracker's checklist, section 12.3, which the Map v2 phase passed). N is the **14 screens** named in the route table at the top of `apps/connect/src/frontend/app/routes.jsx`: map, discover, community, event, place, contributor, me, messages, notifications, settings, apply, onboarding, dashboard, admin (counted by hand from that comment).
 
 | #   | Item                                                                       | How to check                                                                                    |
 | --- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
