@@ -1,4 +1,4 @@
-# Phone check: Follow, Save, co-hosts, "0 followers", zoom in the full card (written 2026-10-17)
+# Phone check: Follow, Save, co-hosts, "0 followers" (written 2026-10-17)
 
 **Who:** Stephen, on the Android phone, signed in. **Time:** about 12 minutes. **Why it is on a phone:** my tests drive Chrome with real touch events and a stand-in for the database, which is the closest a computer gets, but they cannot reproduce Android Chrome's own scroll engine, your real account, or the live database. Section C needs **two Contributor accounts** (an organiser and a guest); if you only have one, skip it and tell me, and I will say it was only tested against a stand-in.
 
@@ -58,19 +58,18 @@ Tap any **other** Contributor's pin. The card opens at half.
 | D2  | Open a Contributor's full profile                          | No "0 followers" beside the category                                            |      |
 | D3  | A big Contributor (100 or more followers), if you know one | The sheet says "100+ followers" (a rounded-down figure), never the exact number |      |
 
-## E. Zoom in the full card
+## E. Zoom inside the full card (a question, NOT a change)
 
-| #   | Do this                                                                 | You should see                                                                                             | Pass |
-| --- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---- |
-| E1  | Pull a card to full. Put two fingers on its text and spread them        | **The page zooms in** (it did not before: the card swallowed the pinch)                                    |      |
-| E2  | Pinch back out to normal                                                | The page returns to normal size and the card is still open at full                                         |      |
-| E3  | With the page at normal size, scroll the card's content with one finger | It scrolls as before                                                                                       |      |
-| E4  | At the top of the content, swipe down with one finger                   | The card still goes down to half (the hand-off from before is unchanged)                                   |      |
-| E5  | At half or peek, put two fingers on the card and spread them            | Nothing zooms (the card owns the gesture there; pull it to full to zoom). Tell me if you want this changed |      |
-| E6  | **Inside the phone app** (not Chrome), pinch anywhere                   | Still no page zoom in the app (E4 of the earlier check; this must be unchanged)                            |      |
+Today the card keeps every two-finger gesture, so the page does **not** zoom under it. That was decided with the pinch-zoom work (R9) and a test pins it. A person with poor eyesight who opens a card to full cannot enlarge its text by pinching. Changing it is one line of CSS (`touch-action: pan-y pinch-zoom` at full), but it is your decision, so I left it alone.
+
+| #   | Do this                                                          | You should see                                                        | Pass |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------- | ---- |
+| E1  | Pull a card to full. Put two fingers on its text and spread them | Nothing zooms (today's design). **Tell me: should it, at full only?** |      |
+| E2  | On a plain page (the Kingdom list), pinch                        | The page zooms (R9, unchanged)                                        |      |
+| E3  | **Inside the phone app** (not Chrome), pinch anywhere            | No page zoom in the app (unchanged)                                   |      |
 
 ## What I could not check, and why
 
 - **Your real account and the live database.** Everything above was tested against a stand-in for the database (the exact requests, the rollbacks, the 500-save ceiling, the invitation answers), and the two database changes were probed against the live tables with throwaway users that were rolled back. Nothing has been tried with your own account.
-- **Android Chrome's scroll engine and the Capacitor phone app** (E1 to E6 in particular).
+- **Android Chrome's scroll engine and the Capacitor phone app** (E3 in particular).
 - **The Notifications screen on a live invitation:** tested with a stand-in session, never with a live invitation. C4 and C5 are the first time that happens for real.
