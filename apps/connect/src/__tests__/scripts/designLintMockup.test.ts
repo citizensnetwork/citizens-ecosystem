@@ -142,6 +142,21 @@ describe("size", () => {
   });
 });
 
+describe("worst-case input stays fast", () => {
+  // A quadratic pattern turned the 24 KB size test into a 5 s timeout on CI: a long run of letters made the
+  // attribute scan restart at every character. These inputs would take far longer than the 1 s allowed here.
+  const timed = (html: string) => {
+    const start = performance.now();
+    lintMockup(html);
+    return performance.now() - start;
+  };
+  it("lints 24 KB of one long word, of repeated words and of repeated url( in under a second each", () => {
+    expect(timed("<p>" + "x".repeat(MAX_BYTES - 7) + "</p>")).toBeLessThan(1000);
+    expect(timed("<p>" + "ab-cd ".repeat(MAX_BYTES / 6 - 2) + "</p>")).toBeLessThan(1000);
+    expect(timed("<p>" + "url(".repeat(MAX_BYTES / 4 - 2) + "</p>")).toBeLessThan(1000);
+  });
+});
+
 describe("reporting", () => {
   it("lists each distinct violation once, with the rule that caught it", () => {
     const r = lintMockup('<script>1</script><script>2</script><div onclick="x" onfocus="y"><img src="https://a.test/x.png"></div>');

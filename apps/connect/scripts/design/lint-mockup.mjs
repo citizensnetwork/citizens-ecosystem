@@ -17,7 +17,9 @@ export const MAX_BYTES = 24 * 1024;
 export const MAX_DATA_IMAGE_BYTES = 60 * 1024;
 const FORBIDDEN_TAG = /<\/?(script|iframe|object|embed|link)(?=[\s/>]|$)/gi;
 const EVENT_ATTRIBUTE = /(?:^|[\s"'/])(on[a-z][a-z0-9_-]*)\s*=/gi;
-const ATTRIBUTE = /([a-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`=]+))/gi;
+// The lookbehind keeps this linear: a match can only start at the beginning of a word, so a long run of letters
+// (or a 20 KB base64 string) is scanned once, not once per character.
+const ATTRIBUTE = /(?<![\w:.-])([a-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`=]+))/gi;
 const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi;
 const CSS_IMPORT = /@import\s+(?:"([^"]*)"|'([^']*)')/gi;
 const WRITTEN_ADDRESS = /\b(?:https?|ftp|wss?):\/\/[^\s"'<>)]+/gi;
