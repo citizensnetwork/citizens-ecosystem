@@ -155,7 +155,7 @@
     volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#C9A84C'],
   };
   function NotificationsPage() {
-    const { notifications, markNotifsRead, readNotification, go } = window.useApp();
+    const { notifications, markNotifsRead, readNotification, go, user, toast } = window.useApp();
     const open = (n) => {
       readNotification(n.id);
       if (n.eventId) go('event', { id: n.eventId });
@@ -176,6 +176,8 @@
               h('div', { className: 'flex-1 min-w-0' },
                 h('p', { className: 'text-sm font-semibold text-foreground leading-snug' }, n.title),
                 h('p', { className: 'text-xs text-muted-foreground leading-relaxed mt-0.5' }, n.body),
+                // P2-09: a co-host invitation carries its own Accept / Decline (the database checks it is yours to answer)
+                n.kind === 'cohost_invite' && n.eventId && h(window.CohostInviteActions, { sb: window.CC_SUPABASE, me: user.id, eventId: n.eventId, toast, onAnswered: () => readNotification(n.id) }),
                 h('p', { className: 'text-[10px] text-muted-foreground mt-1' }, n.time)),
               !n.read && h('span', { className: 'w-2 h-2 rounded-full bg-gold shrink-0 mt-1.5' }));
           }))));

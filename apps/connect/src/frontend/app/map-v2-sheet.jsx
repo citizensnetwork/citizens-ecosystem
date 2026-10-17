@@ -195,20 +195,27 @@
     // Contributor content: events and news from memory, photos from the directory + one detail fetch.
     // (Hooks stay above the early return below, so their order never changes between renders.)
     const [detail, retry] = useDetail(isContributor && item ? item.slug : null, isContributor);
+    // P2-09: an event this Contributor organised OR co-hosts (an accepted invitation) is on their page; "With X" names the others.
+    const isHost = (e, id) => (window.CCCohosts ? window.CCCohosts.isHostOf(e, id) : e.organizerId === id);
+    const hostLine = (e) => {
+      const names = [e.organizerId].concat(e.coHostIds || []).filter((x, i, all) => x && x !== item.id && all.indexOf(x) === i)
+        .map((cid) => { const c = contributors.find((y) => y.id === cid); return c ? c.name : ''; }).filter(Boolean);
+      return names.length ? S().withHosts(names.join(', ')) : '';
+    };
     const orgEvents = useMemo(() => (isContributor && item
-      ? events.filter((e) => e.organizerId === item.id && !window.DATA.isPastEvent(e, now)).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+      ? events.filter((e) => isHost(e, item.id) && !window.DATA.isPastEvent(e, now)).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
       : []), [events, item, isContributor]);
     // P2-07 Recent: what already happened, newest first. The ones the app has loaded are links; the API's own list
     // (the per-slug fetch that is already made for the photos) adds the rest as plain rows.
     const recentEvents = useMemo(() => {
       if (!isContributor || !item) return [];
       const byId = new Map();
-      events.forEach((e) => { if (e.organizerId === item.id && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true }); });
+      events.forEach((e) => { if (isHost(e, item.id) && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true, host: hostLine(e) }); });
       ((detail.data && detail.data.past) || []).forEach((r) => {
         if (r && r.id && r.title && !byId.has(r.id)) byId.set(r.id, { id: r.id, title: r.title, when: r.date, location: r.location, known: events.some((e) => e.id === r.id) });
       });
       return [...byId.values()].filter((e) => Number.isFinite(Date.parse(e.when))).sort((a, b) => Date.parse(b.when) - Date.parse(a.when)).slice(0, RECENT_MAX);
-    }, [events, item, isContributor, detail.data]);
+    }, [events, item, isContributor, detail.data, contributors]);
     const posts = useMemo(() => (isContributor && item
       ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
       : []), [newsPosts, item, isContributor]);
@@ -465,15 +472,15 @@
         const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
         const sortBar = h('div', { key: 'sort', 'data-mv2': 'sort', role: 'group', 'aria-label': Str.eventsSort.label },
           ['upcoming', 'recent'].map((m) => h('button', { key: m, type: 'button', 'data-mv2': 'sort-btn', 'aria-pressed': mode === m, onClick: () => setEvSort(m) }, Str.eventsSort[m])));
-        const rowKids = (title, meta, where) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where)];
+        const rowKids = (title, meta, where, host) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where), host && h('span', { key: 'h', 'data-mv2': 'row-meta', 'data-host': '' }, host)];
         const list = mode === 'upcoming'
           ? (orgEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => h('li', { key: e.id },
-              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location)))))
+              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location, hostLine(e))))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneUpcoming))
           : (recentEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, recentEvents.map((e) => h('li', { key: e.id },
               e.known
-                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location))
-                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location)))))
+                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host))
+                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host)))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
         panel = [sortBar, list];
       } else if (active === 'news') {

@@ -34,6 +34,7 @@ vi.mock("@/lib/v1Gate", () => ({ gateV1: vi.fn().mockResolvedValue({ key: null, 
 
 const eventsMod = await import("@/app/api/v1/events/route");
 const contributorMod = await import("@/app/api/v1/contributors/[slug]/route");
+const eventDetailMod = await import("@/app/api/v1/events/[id]/route");
 
 const cohostCalls = () => calls.filter((c) => c.table === "event_cohosts");
 const op = (c: Call, name: string) => c.ops.filter(([n]) => n === name).map(([, a]) => a);
@@ -144,6 +145,26 @@ describe("GET /api/v1/contributors/<slug>: upcoming and past include co-hosted e
   it("an unknown slug is still a 404 and asks for no co-hosts", async () => {
     answers["profiles:single"] = { data: null, error: null };
     const res = await contributorMod.GET(new Request("http://localhost/api/v1/contributors/none"), { params: Promise.resolve({ slug: "none" }) });
+    expect(res.status).toBe(404);
+    expect(cohostCalls()).toHaveLength(0);
+  });
+});
+
+describe("GET /api/v1/events/<id>: co_host_ids", () => {
+  it("the single-event view lists its accepted co-hosts too, and asks only for ACCEPTED ones", async () => {
+    answers["events:single"] = { data: { id: E1, title: "One", created_by: A }, error: null };
+    answers.event_cohosts = { data: [{ event_id: E1, contributor_id: H1 }], error: null };
+    const res = await eventDetailMod.GET(new Request(`http://localhost/api/v1/events/${E1}`), { params: Promise.resolve({ id: E1 }) });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data).toMatchObject({ id: E1, created_by: A, co_host_ids: [H1] });
+    expect(j.data.stats).toBeDefined(); // the rest of the payload is untouched
+    expect(op(cohostCalls()[0], "eq")).toEqual([["status", "accepted"]]);
+  });
+
+  it("an unknown event is still a 404 and asks for no co-hosts", async () => {
+    answers["events:single"] = { data: null, error: null };
+    const res = await eventDetailMod.GET(new Request(`http://localhost/api/v1/events/${E1}`), { params: Promise.resolve({ id: E1 }) });
     expect(res.status).toBe(404);
     expect(cohostCalls()).toHaveLength(0);
   });

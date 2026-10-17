@@ -37,6 +37,8 @@
       retry: 'Try again',
       tabsLabel: 'More about this listing',
       tabs: { events: 'Events', news: 'News', gallery: 'Gallery' },
+      // P2-09: an event two Contributors run together lists the OTHER host(s) under its title
+      withHosts: (names) => 'With ' + names,
       // P2-07: the Events tab shows what is coming first; "Recent" is what already happened, newest first
       eventsSort: { label: 'Which events to show', upcoming: 'Upcoming', recent: 'Recent', noneUpcoming: 'Nothing is coming up.', noneRecent: 'No recent events.' },
       // P2-08: shown only at 100 or more (MapV2.countBucket); never a low number

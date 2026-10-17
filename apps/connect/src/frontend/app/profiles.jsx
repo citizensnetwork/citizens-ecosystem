@@ -102,6 +102,8 @@
     // misrepresent by linking to the wrong org.
     const org = contributors.find((c) => c.id === ev.organizerId) || null;
     const orgName = (org && org.name) || ev.organizerName || '';
+    // P2-09: Contributors who accepted an invitation to co-host, each a row like the organiser's.
+    const coHosts = (Array.isArray(ev.coHostIds) ? ev.coHostIds : []).map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean);
     const isC = connected.has(id), isCo = considering.has(id);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'event' },
       h(Scroll, null,
@@ -133,6 +135,10 @@
               h('div', { className: 'w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center shrink-0' }, h(Icon, { name: 'Users', size: 18, className: 'text-gold-dark' })),
               h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, orgName), h('p', { className: 'text-xs text-muted-foreground' }, 'Organiser')))
             : null,
+          coHosts.map((c) => h('button', { key: c.id, 'data-cohost-row': c.id, onClick: () => go('profile', { id: c.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
+            h(Avatar, { src: c.profilePhoto, name: c.name, size: 40, rounded: 'xl', fit: logoFit(c.kind) }),
+            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, c.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, 'Co-host')),
+            h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))),
           ev.status !== 'cancelled' && h('div', { className: 'grid grid-cols-2 gap-2' },
             h(Button, { variant: isC ? 'success' : 'gold', icon: isC ? 'Check' : 'CalendarCheck', onClick: () => toggleConnect(id) }, isC ? 'Connected' : 'Connect'),
             h(Button, { variant: isCo ? 'soft' : 'outline', icon: 'Star', onClick: () => toggleConsider(id) }, isCo ? 'Considering' : 'Consider')),

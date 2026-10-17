@@ -217,6 +217,14 @@
         : h('div', { className: 'flex items-center gap-1 text-[11px] min-w-0' }, inner);
     })() : null;
 
+    // P2-09: an event two Contributors run together names the others who ACCEPTED the invitation, each a link to their own profile.
+    const coHosts = isEvent && Array.isArray(item.coHostIds) ? item.coHostIds.map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean) : [];
+    const coHostLine = coHosts.length ? h('div', { 'data-cohosts': '', className: 'flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] min-w-0' },
+      h('span', { className: 'text-muted-foreground' }, 'with '),
+      coHosts.map((c, i) => h(F, { key: c.id },
+        i > 0 && h('span', { className: 'text-muted-foreground' }, ', '),
+        h('button', { type: 'button', 'data-cohost': c.id, onClick: stop(() => go('profile', { id: c.id })), className: 'font-bold text-foreground hover:opacity-80 transition-opacity min-w-0 truncate' }, c.name)))) : null;
+
     // ── actions ───────────────────────────────────────────────────────
     //  The SAME set, in the same order, on both layouts — only the sizing
     //  differs. A Place whose organiser isn't in the directory has nobody to
@@ -290,6 +298,7 @@
       meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground flex-wrap' }, meta),
       stats.length > 0 && h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
+      coHostLine,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
       h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn));
 

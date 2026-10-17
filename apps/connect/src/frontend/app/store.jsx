@@ -228,6 +228,9 @@
       // upstream shape ever sends a string; never render `true` as a name.
       organizerName: typeof r.community_contributor === 'string' ? r.community_contributor : '',
       organizerId: r.created_by || null,
+      // P2-09: Contributors who ACCEPTED an invitation to co-host (the API only ever lists accepted ones). The organiser is
+      // still organizerId; window.CCCohosts.isHostOf asks "organiser or accepted co-host".
+      coHostIds: Array.isArray(r.co_host_ids) ? r.co_host_ids.filter((x) => typeof x === 'string') : [],
       isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
       isBusy: false, connectCount: 0, considerCount: 0,
       volunteeringEnabled: !!r.volunteer_openings,
@@ -409,6 +412,7 @@
     event_cancelled: 'event', review_prompt: 'event',
     volunteer_application: 'volunteer', volunteer_application_response: 'volunteer',
     team_invite: 'team', team_invite_response: 'team', team_owner_transfer: 'team',
+    cohost_invite: 'team', cohost_invite_response: 'team',
     contributor_approved: 'admin', contributor_rejected: 'admin',
     admin_elevation_request: 'admin', spam_flag: 'admin', broadcast_flood: 'admin',
   };
@@ -420,6 +424,8 @@
     return {
       id: r.id,
       type: NOTIF_TYPE_MAP[r.type] || 'bell',
+      // The raw database kind, for the few that carry an action (a co-host invitation has Accept and Decline).
+      kind: r.type || '',
       title: r.title || 'Notification',
       body: r.body || '',
       time: timeAgo(r.created_at),
