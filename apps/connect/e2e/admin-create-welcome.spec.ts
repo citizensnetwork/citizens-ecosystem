@@ -18,7 +18,7 @@ test.use({ bypassCSP: true });
 const ADMIN = { id: "88888888-8888-4888-8888-888888888888", email: "admin@citizens.example", fullName: "Test Admin" };
 const OWNER_EMAIL = "owner@grace.example";
 
-type Reply = { email: "sent" | "failed" | "skipped" };
+type Reply = { email: "sent" | "failed" | "skipped"; onMap?: boolean };
 
 async function openCreateScreen(page: Page, reply: Reply = { email: "sent" }) {
   const requests: Record<string, unknown>[] = [];
@@ -88,6 +88,28 @@ test.describe("Admin → Create Contributor: welcome email (D-13)", () => {
     await openCreateScreen(page, { email: "skipped" });
     await fillAndCreate(page);
     await expect(page.getByTestId("create-email-status")).toContainText("Email isn't set up on the server yet");
+  });
+
+  test("C21: the intro and the toast say 'on the map' only when the new listing has a pin", async ({ page }) => {
+    await openCreateScreen(page, { email: "sent", onMap: true });
+    // the intro is true for every listing: Kingdom Discovery always, the map when there is a location
+    await expect(page.getByText(/live in Kingdom Discovery immediately, and on the map when you give it a location/)).toBeVisible();
+    await expect(page.getByText(/goes live on the map and in Kingdom Discovery immediately/)).toHaveCount(0);
+    await fillAndCreate(page);
+    await expect(page.getByText("Contributor listing created — live on the map now.")).toBeVisible();
+  });
+
+  test("C21: an online-only listing is announced as in Kingdom Discovery, with no map pin", async ({ page }) => {
+    await openCreateScreen(page, { email: "sent", onMap: false });
+    await fillAndCreate(page);
+    await expect(page.getByText("Contributor listing created — live in Kingdom Discovery now. It has no map pin.")).toBeVisible();
+    await expect(page.getByText(/live on the map now/)).toHaveCount(0);
+  });
+
+  test("C21: when the server does not say, the toast claims nothing about the map", async ({ page }) => {
+    await openCreateScreen(page, { email: "sent" });
+    await fillAndCreate(page);
+    await expect(page.getByText("Contributor listing created — live now.")).toBeVisible();
   });
 
   test("the checkbox goes back to ticked for the next listing", async ({ page }) => {

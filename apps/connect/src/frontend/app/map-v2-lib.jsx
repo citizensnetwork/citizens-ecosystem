@@ -37,7 +37,7 @@
   const LEGACY_THEME_KEY = 'cc_map_theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files.
-  const CSS_HREF = '/assets/map-v2.css?v=20261014a';
+  const CSS_HREF = '/assets/map-v2.css?v=20261015a';
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -53,9 +53,11 @@
   const write = (k, v) => { try { const s = store(); if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); } } catch { /* private mode or blocked storage: the setting lasts this page only */ } };
 
   // ── The tilt ──────────────────────────────────────────────────────
-  // Degrees from straight down. 60 is MapLibre's own maximum and the closest thing to "fully tilted" (the founder's
-  // words, D17); at 60 the horizon stays off screen, so there is no empty sky. 0 = off (the one-line rollback).
-  const PITCH = 60;
+  // Degrees from straight down. The founder chose 45 on 2026-10-15 (D17, after the tile cost was shown to him): about
+  // a fifth more MapTiler requests than a flat map, where 60 (MapLibre's own maximum, the "fully tilted" first pick)
+  // about doubled them. 45 keeps the horizon off screen, so there is no empty sky. 0 = off (the one-line rollback);
+  // 60 puts the first pick back.
+  const PITCH = 45;
 
   // ── Count buckets (P2-08) ─────────────────────────────────────────
   // A public count is shown only from 100 up, rounded DOWN to the nearest step: "100+", "250+", "1,000+". Below 100

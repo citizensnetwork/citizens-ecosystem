@@ -253,7 +253,7 @@
           // waiting for an admin → their Dashboard; turned down → apply again; otherwise → apply.
           isCitizen && isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]/50 border border-[#D97706]/20' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Clock', size: 16, className: 'text-[#92400E]' }), h('p', { className: 'text-sm font-bold text-[#92400E]' }, 'Your Contributor application is being reviewed')),
-            h('p', { className: 'text-xs text-[#92400E]/80 mb-3' }, 'You can finish your profile while you wait. It goes on the map once an admin approves it.'),
+            h('p', { className: 'text-xs text-[#92400E]/80 mb-3' }, 'You can finish your profile while you wait. It goes live once an admin approves it.'),
             h(Button, { variant: 'gold', size: 'sm', icon: 'LayoutDashboard', onClick: () => go('dashboard') }, 'Open my application')),
           isCitizen && !isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#F2E8CC] to-[#E8D48B]/40 border border-gold/30' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, contributorStatus === 'rejected' ? 'Your last application' : 'Weekly contribution')),

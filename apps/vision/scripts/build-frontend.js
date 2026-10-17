@@ -19,8 +19,9 @@
  *   NEXT_PUBLIC_SUPABASE_URL
  *   NEXT_PUBLIC_SUPABASE_ANON_KEY
  *   NEXT_PUBLIC_API_BASE_URL     (optional, defaults to '' = same origin)
- *   NEXT_PUBLIC_MAPTILER_KEY     (optional — Timeline Map falls back to a
- *                                 placeholder card without it)
+ *   NEXT_PUBLIC_MAPTILER_KEY     (optional — without it, or when MapTiler refuses
+ *                                 the key for this origin, the Timeline Map draws
+ *                                 the activity points on a plain background)
  */
 'use strict';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -37,7 +38,7 @@ buildFrontend({
   // Every screen module, in dependency order (later files reference
   // `window.*` globals set by earlier ones).
   appFileOrder: [
-    'data.jsx', 'store.jsx', 'live.jsx', 'ui.jsx', 'login.jsx',
+    'data.jsx', 'store.jsx', 'network-lib.jsx', 'live.jsx', 'ui.jsx', 'timeline-lib.jsx', 'login.jsx',
     'home.jsx', 'views.jsx', 'shell.jsx', 'app.jsx',
   ],
 

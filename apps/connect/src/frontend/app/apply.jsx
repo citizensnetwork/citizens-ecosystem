@@ -134,7 +134,8 @@
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
             h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5' }),
-            h('p', { className: 'text-xs leading-relaxed' }, "An admin reviews every application before it goes on the map. You can add your logo and contact details from your Dashboard while you wait."))),
+            h('p', { className: 'text-xs leading-relaxed' }, // C21: "on the map" only when the wizard has a pin (both coordinates); an online-only listing is in Kingdom Discovery
+              'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f)) + '. You can add your logo and contact details from your Dashboard while you wait.'))),
       },
     ];
 

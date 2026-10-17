@@ -38,7 +38,7 @@ test.describe("signed in: applying and waiting", () => {
    * and what the public feed would list. Applying flips them the way the real
    * route does; an admin approving (done by the test) flips them again.
    */
-  async function openAsApplicant(page: Page) {
+  async function openAsApplicant(page: Page, saved: Record<string, unknown> = {}) {
     const db = {
       profile: { role: "citizen", contributor_status: "not_applied" as string },
       calls: [] as { method: string; path: string; body: Record<string, unknown> | null }[],
@@ -82,6 +82,7 @@ test.describe("signed in: applying and waiting", () => {
           physical_longitude: PRETORIA.lng,
           logo_url: null,
           cover_photo_urls: [],
+          ...saved,
         },
       });
     });
@@ -168,6 +169,52 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.getByRole("button", { name: "Apply to become a Contributor" })).toHaveCount(0);
     await page.getByRole("button", { name: "Open my application" }).click();
     await expect(page.locator('[data-screen="pending-application"]')).toBeVisible();
+  });
+
+  test("C21: the last wizard step says an online-only listing goes live in Kingdom Discovery, never on the map", async ({ page }) => {
+    await openAsApplicant(page);
+    await bootAt(page);
+    await goTo(page, "apply");
+    await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
+    await page.getByRole("button", { name: /fixed physical location/ }).click();
+    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    const note = page.getByText(/admin reviews every application/i);
+    await expect(note).toContainText("before it goes live in Kingdom Discovery.");
+    await expect(note).not.toContainText("on the map");
+  });
+
+  test("C21: the 'being reviewed' banner says 'on the map' only for an application with a pin", async ({ page }) => {
+    const db = await openAsApplicant(page);
+    db.profile.contributor_status = "pending";
+    await bootAt(page, "/dashboard");
+    await expect(page.getByTestId("pending-banner")).toContainText("it goes on the map once approved");
+  });
+
+  test("C21: an online-only application is told it goes into Kingdom Discovery, never the map", async ({ page }) => {
+    const db = await openAsApplicant(page, { no_fixed_location: true, physical_address: null, physical_latitude: null, physical_longitude: null });
+    db.profile.contributor_status = "pending";
+    await bootAt(page, "/dashboard");
+    const banner = page.getByTestId("pending-banner");
+    await expect(banner).toContainText("it goes into Kingdom Discovery once approved");
+    await expect(banner).not.toContainText("on the map");
+  });
+
+  test("C21: an application with an address but no pin is not promised the map either", async ({ page }) => {
+    const db = await openAsApplicant(page, { physical_latitude: null, physical_longitude: null });
+    db.profile.contributor_status = "pending";
+    await bootAt(page, "/dashboard");
+    await expect(page.getByTestId("pending-banner")).toContainText("it goes into Kingdom Discovery once approved");
+  });
+
+  test("C21: Settings tells a pending applicant it 'goes live', which is true for everyone", async ({ page }) => {
+    const db = await openAsApplicant(page, { no_fixed_location: true, physical_address: null, physical_latitude: null, physical_longitude: null });
+    db.profile.contributor_status = "pending";
+    await bootAt(page, "/dashboard");
+    await goTo(page, "settings");
+    await expect(page.getByText("It goes live once an admin approves it.")).toBeVisible();
+    await expect(page.getByText(/It goes on the map once an admin approves it/)).toHaveCount(0);
   });
 
   test("once an admin has approved, the same person gets the real Contributor Dashboard", async ({ page }) => {
@@ -280,6 +327,44 @@ test.describe("signed in as the admin: Applications", () => {
       { application_id: PENDING_ID, action: "approve", reason: "" },
       { application_id: PENDING_ID, action: "approve", reason: "" },
     ]);
+  });
+
+  test("C21: the Approve step and the toast say 'on the map' only when the applicant has a pin", async ({ page }) => {
+    const ONLINE_ID = "d4444444-4444-4444-8444-444444444444";
+    await openApplications(page, [
+      application({}),
+      application({ id: ONLINE_ID, name: "Online Fixture Fellowship", noFixedLocation: true, hasPin: false, location: "Online / no fixed location" }),
+    ]);
+    const pinned = page.locator(`[data-application="${PENDING_ID}"]`);
+    const online = page.locator(`[data-application="${ONLINE_ID}"]`);
+
+    await pinned.getByRole("button", { name: "Approve" }).click();
+    await expect(pinned.getByTestId("approve-where")).toHaveText("This puts them on the map and in Kingdom Discovery, and emails them.");
+    await online.getByRole("button", { name: "Approve" }).click();
+    const where = online.getByTestId("approve-where");
+    await expect(where).toContainText("This puts them in Kingdom Discovery");
+    await expect(where).toContainText("no map pin");
+    await expect(where).not.toContainText("on the map and");
+
+    // the toast follows what the server says about the approved listing: pin, no pin, or nothing said
+    const answers: Record<string, unknown>[] = [
+      { success: true, action: "approved", slug: "online-fixture", onMap: false, email: "sent" },
+      { success: true, action: "approved", slug: "grace-test-ministry", onMap: true, email: "sent" },
+    ];
+    await page.route("**/api/admin/contributors/review", (route) => json(route, answers.shift() ?? {}));
+    await online.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText(/Approved\. They are live in Kingdom Discovery \(no map pin\)\./)).toBeVisible();
+    await pinned.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText(/Approved\. They are live on the map\./)).toBeVisible();
+  });
+
+  test("C21: when the server does not say, the toast claims nothing about the map", async ({ page }) => {
+    await openApplications(page, [application({})]);
+    await page.route("**/api/admin/contributors/review", (route) => json(route, { success: true, action: "approved", slug: "grace-test-ministry", email: "sent" }));
+    const card = page.locator(`[data-application="${PENDING_ID}"]`);
+    await card.getByRole("button", { name: "Approve" }).click();
+    await card.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText(/Approved\. They are live\. We emailed them\./)).toBeVisible();
   });
 
   test("a rejection needs a reason, sends it to the server, and says when the email could not go", async ({ page }) => {

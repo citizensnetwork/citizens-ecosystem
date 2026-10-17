@@ -22,6 +22,7 @@ import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/adminGuard";
+import { hasMapPin } from "@/lib/contributorFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,7 +109,8 @@ export async function GET(request: NextRequest) {
       website: r.website_url || "",
       location: r.no_fixed_location ? "Online / no fixed location" : r.physical_address || "",
       noFixedLocation: r.no_fixed_location === true,
-      hasPin: typeof r.physical_latitude === "number" && typeof r.physical_longitude === "number",
+      // the same rule everywhere (tracker C21): a pin needs both coordinates, and "no fixed location" has none
+      hasPin: hasMapPin(r),
       reason: r.motivation_text || "",
       socials: {
         ...(r.instagram_handle ? { instagram: r.instagram_handle } : {}),

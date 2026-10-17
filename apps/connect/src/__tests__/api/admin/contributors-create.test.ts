@@ -219,6 +219,21 @@ describe("POST /api/admin/contributors/create", () => {
       }
     });
 
+    it("tells the admin's screen whether the listing is on the map, even when no email is sent (C21)", async () => {
+      for (const [body, want] of [
+        [{ ...validBody, physical_address: "Church Square, Pretoria", physical_latitude: -25.7, physical_longitude: 28.2 }, true],
+        [validBody, false],
+        [{ ...validBody, no_fixed_location: true, physical_latitude: -25.7, physical_longitude: 28.2 }, false],
+        [{ ...validBody, physical_latitude: -25.7 }, false],
+        [{ ...validBody, physical_latitude: -25.7, physical_longitude: 28.2, email_owner: false }, true],
+        [{ ...validBody, email_owner: false }, false],
+      ] as const) {
+        created();
+        const json = await (await POST(req(body))).json();
+        expect(json.onMap, JSON.stringify(body)).toBe(want);
+      }
+    });
+
     it("carries the 6-digit sign-in steps, the listing link and 'sign in to see your listing' wording", async () => {
       created();
       await POST(req(validBody));

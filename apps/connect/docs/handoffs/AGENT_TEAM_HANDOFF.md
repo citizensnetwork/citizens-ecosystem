@@ -100,7 +100,7 @@ Keep each role to one small scheduled task. Prefer many narrow prompts to one cl
 
 ## 6. Gotchas learned
 
-- **The security advisor result is about 59 KB** and is saved to a file. Count it with a script (sum `findings.length` per `level`: 0 ERROR / 121 WARN / 3 INFO is the baseline); never read it inline.
+- **The security advisor result is about 59 KB** and is saved to a file. Count it with a script (sum `findings.length` per `level`: 0 ERROR / 122 WARN / 3 INFO is the baseline since migration 182); never read it inline.
 - **Timestamps must come from the clock** (`date -u +%Y-%m-%dT%H:%M:%SZ`). The first run invented `18:00Z` when it was 17:14Z.
 - **Permissions:** an unattended run stalls on an unapproved tool. Every new role needs one supervised "Run now" where the founder chooses "always allow"; approvals are stored on the task.
 - **Local runner:** only runs while the Claude desktop app is open; a missed run starts on the next launch. Cron is in local time. A cloud move needs secrets handed over; do not rush it.

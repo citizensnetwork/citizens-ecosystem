@@ -186,8 +186,8 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
 describe("the fixed tilt (tracker R8, founder decision D17)", () => {
   const api = () => boot().api as unknown as { PITCH: number };
 
-  it("is one named constant: 60 degrees, MapLibre's own maximum", () => {
-    expect(api().PITCH).toBe(60);
+  it("is one named constant: 45 degrees (the founder's pick on 2026-10-15; 60 about doubled the tile requests)", () => {
+    expect(api().PITCH).toBe(45);
   });
 
   it("is a whole number of degrees MapLibre accepts (0 turns it off; the cap is 60 so no sky shows)", () => {

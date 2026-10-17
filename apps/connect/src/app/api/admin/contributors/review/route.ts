@@ -35,6 +35,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 import { sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
 import { applicationApprovedEmail, applicationRejectedEmail } from "@/lib/email/templates";
+import { hasMapPin } from "@/lib/contributorFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,21 +52,32 @@ const REFUSALS: Record<string, { status: number; message: string }> = {
   reason_too_long: { status: 400, message: `Please keep the reason under ${MAX_REASON} characters.` },
 };
 
-/** The applicant's name and (private) email, for the verdict email. Never throws. */
-async function applicantContact(applicationId: string): Promise<{ name: string; email: string | null } | null> {
+/**
+ * The applicant's name, (private) email and whether the listing has a map pin, for the verdict email. Never throws.
+ * `onMap` is the map's own rule (hasMapPin: BOTH coordinates, and "no fixed location" has none): the email and the
+ * admin's toast may say "on the map" only when that is true (tracker C21). A failed lookup returns null: no email.
+ */
+async function applicantContact(applicationId: string): Promise<{ name: string; email: string | null; onMap: boolean } | null> {
   try {
     const { data, error } = await createAdminClient()
       .from("contributor_applications")
-      .select("display_name, profiles:contributor_applications_user_id_fkey(email)")
+      .select("display_name, no_fixed_location, physical_latitude, physical_longitude, profiles:contributor_applications_user_id_fkey(email)")
       .eq("id", applicationId)
       .maybeSingle();
     if (error || !data) return null;
     const row = data as {
       display_name?: string | null;
+      no_fixed_location?: boolean | null;
+      physical_latitude?: number | string | null;
+      physical_longitude?: number | string | null;
       profiles?: { email?: string | null } | { email?: string | null }[] | null;
     };
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    return { name: row.display_name || "there", email: profile?.email ?? null };
+    return {
+      name: row.display_name || "there",
+      email: profile?.email ?? null,
+      onMap: hasMapPin(row),
+    };
   } catch (err) {
     console.warn("[/api/admin/contributors/review] could not look up the applicant", err instanceof Error ? err.name : "error");
     return null;
@@ -144,6 +156,7 @@ export async function POST(request: NextRequest) {
             name: contact.name,
             listingUrl: result.slug ? `${origin}/c/${encodeURIComponent(result.slug)}` : origin,
             dashboardUrl: `${origin}/dashboard`,
+            onMap: contact.onMap,
           })
         : applicationRejectedEmail({ name: contact.name, reason, siteUrl: origin });
     email = await sendEmail({ to: contact.email, ...mail });
@@ -153,6 +166,9 @@ export async function POST(request: NextRequest) {
     success: true,
     action: action === "approve" ? "approved" : "rejected",
     ...(action === "approve" ? { slug: result.slug ?? null } : {}),
+    // Whether the approved listing has a map pin, so the admin's toast says "on the map" only when it is true (C21).
+    // Absent when the lookup failed: the screen then claims nothing about the map.
+    ...(action === "approve" && contact ? { onMap: contact.onMap } : {}),
     email,
   });
 }
