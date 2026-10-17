@@ -2,7 +2,7 @@
  * GET /api/v1/contributors/[slug]
  * ----------------------------------------------------------------
  * Full public view of a single approved Contributor by vanity slug.
- * Returns profile + upcoming events + owned places + counts, shaped
+ * Returns profile + upcoming events (created or co-hosted) + owned places + counts, shaped
  * for ecosystem consumers (Citizens Central) without forcing a
  * second round-trip.
  *
@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
+import { acceptedCohostEventIds, createdByOrIn } from "@/lib/events/cohosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,11 +95,14 @@ export async function GET(
 
   const now = new Date().toISOString();
 
+  // P2-09: the events they created PLUS the ones they co-host (an accepted invitation), in the same lists.
+  const hostFilter = createdByOrIn(profileRow.id, await acceptedCohostEventIds(supabase, profileRow.id));
+
   const [upcomingRes, pastRes, placesRes, followersRes] = await Promise.all([
     supabase
       .from("events")
       .select("id,title,date,end_time,location,category,image_url,visibility,status")
-      .eq("created_by", profileRow.id)
+      .or(hostFilter)
       .eq("status", "published")
       .eq("visibility", "public")
       .gte("date", now)
@@ -107,7 +111,7 @@ export async function GET(
     supabase
       .from("events")
       .select("id,title,date,end_time,location,category,image_url,visibility,status")
-      .eq("created_by", profileRow.id)
+      .or(hostFilter)
       .eq("status", "published")
       .eq("visibility", "public")
       .lt("date", now)
