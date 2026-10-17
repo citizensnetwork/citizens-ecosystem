@@ -931,6 +931,14 @@
   -webkit-line-clamp: 3;
   overflow: hidden;
 }
+/* P2-05 Moments: a note is short (280 characters), so it is shown in full, with its line breaks. No ring, no countdown. */
+[data-moment] [data-mv2='post-body'] {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 
 [data-mv2='grid'] {
   display: grid;

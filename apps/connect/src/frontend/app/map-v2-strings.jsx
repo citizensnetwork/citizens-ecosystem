@@ -36,7 +36,7 @@
       viewFull: 'View Full Profile',
       retry: 'Try again',
       tabsLabel: 'More about this listing',
-      tabs: { events: 'Events', news: 'News', gallery: 'Gallery' },
+      tabs: { events: 'Events', news: 'News', today: 'Today', gallery: 'Gallery' },
       // P2-09: an event two Contributors run together lists the OTHER host(s) under its title
       withHosts: (names) => 'With ' + names,
       // P2-07: the Events tab shows what is coming first; "Recent" is what already happened, newest first

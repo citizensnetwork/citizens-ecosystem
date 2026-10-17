@@ -54,7 +54,7 @@
   const S = () => window.MapV2Strings.sheet;
   const T = () => window.MapV2Time;
   const navTarget = (type) => (type === 'contributor' ? 'profile' : type);
-  const DETAIL = new Map();   // slug -> { gallery, covers, past, followers }: the per-slug fetch, once per session
+  const DETAIL = new Map();   // slug -> { gallery, covers, past, moments, followers }: the per-slug fetch, once per session
 
   // ── helpers ──────────────────────────────────────────────────────
   // Any CSS length (dvh, calc(), env(), var()) in px, resolved by the browser itself with a throwaway probe.
@@ -107,6 +107,7 @@
             gallery: Array.isArray(p.gallery_urls) ? p.gallery_urls : [],
             covers: Array.isArray(p.cover_photo_urls) ? p.cover_photo_urls : [],
             past: Array.isArray(j.data.past_events) ? j.data.past_events : [],     // newest first, as the API sorts them
+            moments: Array.isArray(j.data.moments) ? j.data.moments : [],          // P2-05: notes still live when the page was served
             followers: counts.followers == null || !Number.isFinite(Number(counts.followers)) ? null : Number(counts.followers),
           };
           DETAIL.set(slug, data);
@@ -231,6 +232,12 @@
           || (type === 'event' && m.type === 'contributor' && m.id === item.organizerId),
       });
     }, [item, nearby, id, type, isContributor, orgEvents]);
+    // P2-05 Moments: the short notes that are still live (a cached page can be a few minutes old, so the end time is
+    // checked again here). Shown under "Today", with "Posted 3 h ago" and nothing else about time: no countdown, no ring.
+    const moments = useMemo(
+      () => (isContributor && detail.data && window.CCMoments ? window.CCMoments.live(detail.data.moments, Date.now()) : []),
+      [detail.data, isContributor],
+    );
     const images = useMemo(() => {
       if (!isContributor || !item) return [];
       const seen = new Set();
@@ -429,6 +436,7 @@
     const tabs = [];
     if (orgEvents.length || recentEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
     if (posts.length) tabs.push({ id: 'news', label: Str.tabs.news });
+    if (moments.length) tabs.push({ id: 'today', label: Str.tabs.today });
     if (images.length) tabs.push({ id: 'gallery', label: Str.tabs.gallery });
     const loadingMore = isContributor && detail.status === 'loading';
     const active = tabs.some((t) => t.id === tab) ? tab : (tabs[0] && tabs[0].id);
@@ -491,6 +499,14 @@
             h('span', { 'data-mv2': 'row-title' }, p.title),
             ago && h('span', { 'data-mv2': 'row-meta' }, ago),
             p.body && h('span', { 'data-mv2': 'post-body' }, p.body));
+        }));
+      } else if (active === 'today') {
+        panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
+          const ago = T().postedAgo(m.created_at, now);
+          return h('li', { key: m.id, 'data-mv2': 'post', 'data-moment': '' },
+            m.image_url && window.UI.safeUrl(m.image_url) && h('img', { src: m.image_url, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
+            h('span', { 'data-mv2': 'post-body' }, m.body),
+            ago && h('span', { 'data-mv2': 'row-meta' }, ago));
         }));
       } else if (active === 'gallery') {
         panel = h(window.MapV2Gallery.Grid, { images, strings: Str.gallery, onOpen: (i, from) => setViewer({ index: i, from }) });
@@ -564,5 +580,7 @@
       }), document.body));
   }
 
+  // The Dashboard drops the cached copy of a Contributor's page after they post or take down a note, so the map shows it at once.
+  MapV2Sheet.forgetDetail = (slug) => { DETAIL.delete(slug); };
   window.MapV2Sheet = MapV2Sheet;
 })();

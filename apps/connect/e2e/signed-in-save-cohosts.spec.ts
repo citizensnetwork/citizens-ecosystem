@@ -21,6 +21,7 @@ const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; place
 type MapHook = { jumpTo: (o: object, d: object) => void };
 
 type SavedRow = { user_id: string; contributor_id?: string; place_id?: string };
+type MomentRow = { id: string; contributor_id: string; body: string; image_url: string | null; created_at: string; expires_at: string };
 type Db = {
   saved: SavedRow[];
   cohosts: { event_id: string; contributor_id: string; status: string }[];
@@ -28,11 +29,15 @@ type Db = {
   savedFail?: { status: number; body: Record<string, unknown> };
   ownEvents: Record<string, unknown>[];
   notifications: Record<string, unknown>[];
+  /** the moments table (migration 188); the stand-in answers like RLS would: live rows of the asked-for Contributor */
+  moments: MomentRow[];
+  /** what the next moments POST answers: undefined = success */
+  momentsFail?: { status: number; body: Record<string, unknown> };
   log: string[];
   bodies: { fn: string; body: Record<string, unknown> }[];
   patches: unknown[];
 };
-const newDb = (): Db => ({ saved: [], cohosts: [], ownEvents: [], notifications: [], log: [], bodies: [], patches: [] });
+const newDb = (): Db => ({ saved: [], cohosts: [], ownEvents: [], notifications: [], moments: [], log: [], bodies: [], patches: [] });
 
 /** Answers the fake project's REST tables like RLS would: the caller's own rows only. */
 async function openAs(page: Page, user: FakeUser, profile: { role: string; contributor_status: string }, db: Db, seed = seed0()) {
@@ -73,6 +78,29 @@ async function openAs(page: Page, user: FakeUser, profile: { role: string; contr
     if (m === "DELETE") {
       db.log.push(`DELETE saved_items ${url.search}`);
       db.saved = db.saved.filter((r) => !(r.user_id === eq("user_id") && (eq("contributor_id") ? r.contributor_id === eq("contributor_id") : r.place_id === eq("place_id"))));
+      return route.fulfill({ status: 204, headers: FAKE_PROJECT_CORS });
+    }
+    return route.fallback();
+  });
+  await rest("moments", async (route, url, m) => {
+    const eq = (k: string) => url.searchParams.get(k)?.replace(/^eq\./, "");
+    if (m === "GET") {
+      db.log.push(`GET moments ${url.search}`);
+      const live = db.moments.filter((r) => r.contributor_id === eq("contributor_id") && Date.parse(r.expires_at) > FIXED_NOW);
+      return ok(route, live.sort((a, b) => b.created_at.localeCompare(a.created_at)));
+    }
+    if (m === "POST") {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      db.log.push(`POST moments ${JSON.stringify(body)}`);
+      if (db.momentsFail) return ok(route, db.momentsFail.body, db.momentsFail.status);
+      const n = db.moments.length + 1;
+      const row = { id: `c0000000-0000-4000-8000-${String(n).padStart(12, "0")}`, image_url: null, ...body, created_at: new Date(FIXED_NOW + n * 1000).toISOString(), expires_at: new Date(FIXED_NOW + 24 * 3_600_000).toISOString() } as MomentRow;
+      db.moments.push(row);
+      return ok(route, row, 201);
+    }
+    if (m === "DELETE") {
+      db.log.push(`DELETE moments ${url.search}`);
+      db.moments = db.moments.filter((r) => r.id !== eq("id"));
       return route.fulfill({ status: 204, headers: FAKE_PROJECT_CORS });
     }
     return route.fallback();
@@ -295,6 +323,127 @@ test.describe("Co-hosted events, signed in", () => {
     expect(db.bodies[1]).toEqual({ fn: "remove_event_cohost", body: { p_event_id: EV, p_contributor_id: other.id } });
     await toggle.click();
     await expect(panel).toHaveCount(0);
+  });
+});
+
+// P2-05 (migration 188): the Contributor's own "Post a note" box. What the DATABASE allows is proved by
+// docs/audit/probes/188_moments.probe.sql; here the stand-in checks what the app sends and how it reads each answer.
+test.describe("Moments, signed in: Post a note", () => {
+  const OWNER = { role: "contributor", contributor_status: "approved" };
+  const live = (n: number, body: string, contributorId: string): MomentRow => ({
+    id: `d0000000-0000-4000-8000-${String(n).padStart(12, "0")}`, contributor_id: contributorId, body, image_url: null,
+    created_at: new Date(FIXED_NOW - n * 600_000).toISOString(), expires_at: new Date(FIXED_NOW + 20 * 3_600_000).toISOString(),
+  });
+  async function openBox(page: Page, db: Db) {
+    const seed = seed0();
+    const me = seed.contributors[0];
+    await openAs(page, { id: me.id, email: "owner@signedin.example", fullName: me.full_name }, OWNER, db, seed);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "dashboard");
+    await page.getByRole("button", { name: /^news$/i }).click();
+    await expect(page.locator("[data-moments-box]")).toBeVisible({ timeout: 15_000 });
+    return me;
+  }
+
+  test("the box is on the News tab, counts what is left, and Post stays off for an empty or too-long note", async ({ page }) => {
+    await openBox(page, newDb());
+    const text = page.locator("[data-moments-text]");
+    const post = page.locator("[data-moments-post]");
+    await expect(page.locator("[data-moments-count]")).toHaveText("280 left");
+    await expect(post).toBeDisabled();
+    await text.fill("   ");
+    await expect(post).toBeDisabled();
+    await text.fill("x".repeat(100));
+    await expect(page.locator("[data-moments-count]")).toHaveText("180 left");
+    await expect(post).toBeEnabled();
+    await text.fill("x".repeat(280));
+    await expect(page.locator("[data-moments-count]")).toHaveText("0 left");
+    await expect(post).toBeEnabled();
+    await text.fill("x".repeat(285));
+    await expect(page.locator("[data-moments-count]")).toHaveText("5 too many");
+    await expect(page.locator("[data-moments-count]")).toHaveAttribute("data-moments-count", "over");
+    await expect(post).toBeDisabled();
+  });
+
+  test("Post sends ONE row (my id, the text, no picture, no expiry), clears the box, lists the note and says it clears itself after a day", async ({ page }) => {
+    const db = newDb();
+    const me = await openBox(page, db);
+    await page.locator("[data-moments-text]").fill("  Prayer walk tonight at the north gate.  ");
+    await page.locator("[data-moments-post]").click();
+    await expect(page.locator("[data-moments-list] [data-moment-body]")).toHaveText(["Prayer walk tonight at the north gate."]);
+    await expect(page.locator("[data-moments-text]")).toHaveValue("");
+    expect(db.log.filter((l) => l.startsWith("POST moments"))).toEqual([`POST moments ${JSON.stringify({ contributor_id: me.id, body: "Prayer walk tonight at the north gate.", image_url: null })}`]);
+    await expect(page.getByText("Your note is up. It clears itself after a day.")).toBeVisible();
+  });
+
+  test("my own live notes are listed (only mine, only live), and Take down deletes exactly that one", async ({ page }) => {
+    const db = newDb();
+    const seed = seed0();
+    const me = seed.contributors[0];
+    db.moments = [
+      live(1, "Mine, newest", me.id), live(2, "Mine, older", me.id),
+      { ...live(3, "Mine, ended", me.id), expires_at: new Date(FIXED_NOW - 1000).toISOString() },
+      live(4, "Someone else's", seed.contributors[1].id),
+    ];
+    await openAs(page, { id: me.id, email: "owner@signedin.example", fullName: me.full_name }, OWNER, db, seed);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "dashboard");
+    await page.getByRole("button", { name: /^news$/i }).click();
+    await expect(page.locator("[data-moments-list] [data-moment-body]")).toHaveText(["Mine, newest", "Mine, older"]);
+    expect(db.log.some((l) => l.startsWith("GET moments") && l.includes(`contributor_id=eq.${me.id}`) && l.includes("expires_at=gt."))).toBe(true);
+    await page.locator(`[data-moment-takedown="${live(2, "", me.id).id}"]`).click();
+    await expect(page.locator("[data-moments-list] [data-moment-body]")).toHaveText(["Mine, newest"]);
+    expect(db.log.filter((l) => l.startsWith("DELETE moments"))).toEqual([`DELETE moments ?id=eq.${live(2, "", me.id).id}`]);
+    expect(db.moments.map((r) => r.id)).toContain(live(4, "", me.id).id);   // nobody else's note was touched
+  });
+
+  test("the ceiling: with five notes up the box is replaced by the reason; if the database refuses a sixth the person is told", async ({ page }) => {
+    const db = newDb();
+    const seed = seed0();
+    const me = seed.contributors[0];
+    db.moments = [1, 2, 3, 4].map((n) => live(n, `Note ${n}`, me.id));
+    await openAs(page, { id: me.id, email: "owner@signedin.example", fullName: me.full_name }, OWNER, db, seed);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "dashboard");
+    await page.getByRole("button", { name: /^news$/i }).click();
+    await expect(page.locator("[data-moments-list] li")).toHaveCount(4);
+    db.momentsFail = { status: 400, body: { code: "P0001", message: "moments_limit", details: null, hint: null } };   // another device filled the fifth slot meanwhile
+    await page.locator("[data-moments-text]").fill("A fifth note");
+    await page.locator("[data-moments-post]").click();
+    await expect(page.getByText("You already have 5 notes up. Take one down to post another.")).toBeVisible();
+    db.momentsFail = undefined;
+    db.moments.push(live(5, "Note 5", me.id));
+    await page.reload();                                         // the address is /dashboard/news: the Dashboard comes back
+    await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: /^news$/i }).click();
+    await expect(page.locator("[data-moments-full]")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-moments-text]")).toHaveCount(0);
+  });
+
+  test("any other failure is said plainly and the typed note is kept", async ({ page }) => {
+    const db = newDb();
+    await openBox(page, db);
+    db.momentsFail = { status: 500, body: { message: "boom" } };
+    await page.locator("[data-moments-text]").fill("Keep me");
+    await page.locator("[data-moments-post]").click();
+    await expect(page.getByText("We could not post your note. Please try again.")).toBeVisible();
+    await expect(page.locator("[data-moments-text]")).toHaveValue("Keep me");
+  });
+
+  test("the attention test: the box never shows a time left, a countdown, a view count or who saw a note", async ({ page }) => {
+    const db = newDb();
+    const seed = seed0();
+    const me = seed.contributors[0];
+    db.moments = [live(1, "Doors open at nine", me.id)];     // 20 hours of life left in the data; the screen must not say so
+    await openAs(page, { id: me.id, email: "owner@signedin.example", fullName: me.full_name }, OWNER, db, seed);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "dashboard");
+    await page.getByRole("button", { name: /^news$/i }).click();
+    const box = page.locator("[data-moments-box]");
+    await expect(box).toContainText("This clears itself after a day.");
+    const text = (await box.innerText()).toLowerCase().replace(/\d+ (left|too many)/g, "");   // the character counter is the one "left"
+    expect(text).not.toMatch(/expire|countdown|remaining|\bseen\b|\bviews?\b|viewed|reach|hours? (left|to go)|ends in/);
+    await expect(box.locator("[role='progressbar'], progress, time")).toHaveCount(0);
   });
 });
 

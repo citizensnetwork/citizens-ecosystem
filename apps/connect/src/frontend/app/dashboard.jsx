@@ -303,6 +303,7 @@
     const {
       activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, openCreate, go,
       setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
+      realUser, toast,
     } = app;
     // The tab is part of the address (/dashboard/events), so a refresh keeps it and a
     // link can point at it. Replaced rather than pushed: the tabs are views of ONE
@@ -400,6 +401,13 @@
               })))),
 
           tab === 'news' && h('div', { className: 'space-y-3 fade-in' },
+            // P2-05 Moments: only the Contributor themselves posts a note (an admin viewing on their behalf does not: the
+            // database requires the note to be posted AS the signed-in person). Dropping the sheet's cached copy of this
+            // Contributor's page lets the new note show on the map at once.
+            !newsComposing && window.MomentsBox && realUser && realUser.id === activeContributorId && h(window.MomentsBox, {
+              sb: window.CC_SUPABASE, me: realUser.id, toast,
+              onChanged: () => { if (window.MapV2Sheet && window.MapV2Sheet.forgetDetail && activeContributor.slug) window.MapV2Sheet.forgetDetail(activeContributor.slug); },
+            }),
             newsComposing
               ? h(NewsPostForm, {
                   initial: newsEditing,
