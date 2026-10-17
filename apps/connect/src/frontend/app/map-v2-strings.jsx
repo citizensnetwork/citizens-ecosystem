@@ -27,6 +27,9 @@
       // P2-04: the same Follow the profile page and the card have (a Contributor only; a Place or an Event keeps its card)
       follow: 'Follow',
       following: 'Following',
+      // P2-04: Save is a private bookmark (a Contributor or a Place); only the person sees it, in Settings
+      save: 'Save',
+      saved: 'Saved',
       website: 'Website',
       call: 'Call',
       email: 'Email',

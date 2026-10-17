@@ -611,6 +611,10 @@
     const [considering, setConsidering] = useState(() => new Set(['e3', 'e6']));
     const [followedOrgs, setFollowedOrgs] = useState(() => new Set());
     const [followedPlaces, setFollowedPlaces] = useState(() => new Set());
+    // P2-04 Save: a PRIVATE bookmark (public.saved_items, migration 183), read and written with the signed-in client under
+    // RLS (saved-lib.jsx). Nothing here is ever counted or shown to the listing.
+    const [savedContributors, setSavedContributors] = useState(() => new Set());
+    const [savedPlaces, setSavedPlaces] = useState(() => new Set());
 
     // toasts
     const [toasts, setToasts] = useState([]);
@@ -1852,16 +1856,16 @@
       })();
     }, [connected, considering, realUser, toast]);
 
-    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow: say so, instead of
-    // flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
-    const guestCannotFollow = useCallback(() => {
+    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow or a save: say so, instead
+    // of flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
+    const guestCannot = useCallback((message) => {
       if (realUser || !window.CC_AUTH) return false;
-      toast('Sign in to follow.', 'gold');
+      toast(message, 'gold');
       return true;
     }, [realUser, toast]);
 
     const toggleFollow = useCallback((orgId, name) => {
-      if (guestCannotFollow()) return;
+      if (guestCannot('Sign in to follow.')) return;
       const was = followedOrgs.has(orgId);
       setFollowedOrgs((prev) => { const n = new Set(prev); was ? n.delete(orgId) : n.add(orgId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1875,10 +1879,10 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedOrgs, realUser, toast, guestCannotFollow]);
+    }, [followedOrgs, realUser, toast, guestCannot]);
 
     const togglePlaceFollow = useCallback((placeId, name) => {
-      if (guestCannotFollow()) return;
+      if (guestCannot('Sign in to follow.')) return;
       const was = followedPlaces.has(placeId);
       setFollowedPlaces((prev) => { const n = new Set(prev); was ? n.delete(placeId) : n.add(placeId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1892,7 +1896,34 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedPlaces, realUser, toast, guestCannotFollow]);
+    }, [followedPlaces, realUser, toast, guestCannot]);
+
+    // P2-04 Save. kind: 'contributor' | 'place' (an Event keeps its Consider bookmark). Optimistic, then written with the
+    // signed-in client under RLS (saved-lib.jsx); a failure rolls the heart back and says why. Demo mode stays local.
+    const toggleSave = useCallback((kind, id, name) => {
+      if (guestCannot('Sign in to save.')) return;
+      const isPlace = kind === 'place';
+      const set = isPlace ? savedPlaces : savedContributors;
+      const setSet = isPlace ? setSavedPlaces : setSavedContributors;
+      const was = set.has(id);
+      const flip = (on) => setSet((prev) => { const n = new Set(prev); on ? n.add(id) : n.delete(id); return n; });
+      flip(!was);
+      toast(was ? ('Removed' + (name ? ' ' + name : '') + ' from your saved list') : ('Saved' + (name ? ' ' + name : '') + '. Only you can see this.'), 'gold');
+      const sb = window.CC_SUPABASE;
+      if (!realUser || !isRealId(id) || !sb || !window.CCSaved) return;
+      (async () => {
+        try {
+          if (was) await window.CCSaved.remove(sb, realUser.id, kind, id);
+          else if ((await window.CCSaved.add(sb, realUser.id, kind, id)) === 'limit') {
+            flip(false);
+            toast('You can save up to ' + window.CCSaved.MAX + ' listings. Remove one to save another.', 'red');
+          }
+        } catch (e) {
+          flip(was);
+          toast('Could not save — please try again.', 'red');
+        }
+      })();
+    }, [savedContributors, savedPlaces, realUser, toast, guestCannot]);
 
     // Dismiss a map broadcast bubble for this user only (per-user, ~24h).
     const dismissBubble = useCallback((bubbleId, eventId) => {
@@ -2251,6 +2282,22 @@
           if (placeRes.data) setFollowedPlaces(new Set(placeRes.data.map((p) => p.place_id)));
         } catch (e) { /* seeding is best-effort */ }
       })();
+      return () => { active = false; };
+    }, [realUser]);
+
+    // ── Seed the person's private saves (P2-04) ───────────────────────
+    //  Their own rows only (RLS). Signing out EMPTIES the lists, so the next person on a shared phone never sees them.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!realUser) {
+        if (window.CC_AUTH) { setSavedContributors(new Set()); setSavedPlaces(new Set()); }
+        return undefined;
+      }
+      if (!sb || !window.CCSaved) return undefined;
+      let active = true;
+      window.CCSaved.load(sb, realUser.id)
+        .then((s) => { if (active) { setSavedContributors(s.contributors); setSavedPlaces(s.places); } })
+        .catch(() => { /* seeding is best-effort */ });
       return () => { active = false; };
     }, [realUser]);
 
@@ -2934,7 +2981,7 @@
       assistMode, assistLoginAs, exitAssist,
       myApplication, myContributor, contributorDash,
       contributorStatus, setContributorStatus, updateMyApplication,
-      connected, considering, followedOrgs, followedPlaces,
+      connected, considering, followedOrgs, followedPlaces, savedContributors, savedPlaces,
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       // A citizen whose Contributor application is waiting for an admin (D-12): their Dashboard is the "being reviewed" page.
@@ -2949,7 +2996,7 @@
       submitApplication, reviewApplication, completeOnboarding, syncListingVisibility,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
       acceptRequest, rejectRequest, muteConversation, unmuteConversation, blockUser,
-      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
+      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, toggleSave, dismissBubble, markNotifsRead, readNotification,
       trackImpression,
     };
     return React.createElement(AppCtx.Provider, { value }, children);

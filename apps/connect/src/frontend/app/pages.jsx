@@ -191,6 +191,30 @@
     ['announcements', 'Announcements', 'Important platform announcements'],
     ['weekly_digest', 'Weekly digest', 'A weekly summary of Kingdom activity'],
   ];
+  // P2-04: the person's PRIVATE saved list. Only they see it; a listing is never told it was saved. Sorted by name (never by
+  // how popular a listing is). A save whose listing is not on the map right now stays saved and is counted in the note.
+  function SavedList() {
+    const { savedContributors, savedPlaces, contributors, places, toggleSave, go } = window.useApp();
+    const rows = [
+      ...contributors.filter((c) => savedContributors.has(c.id)).map((c) => ({ kind: 'contributor', page: 'profile', id: c.id, name: c.name, photo: c.profilePhoto, meta: 'Contributor' })),
+      ...places.filter((p) => savedPlaces.has(p.id)).map((p) => ({ kind: 'place', page: 'place', id: p.id, name: p.name, photo: '', meta: 'Place' })),
+    ].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const hidden = savedContributors.size + savedPlaces.size - rows.length;
+    if (!rows.length && !hidden) {
+      return h('p', { 'data-saved': 'empty', className: 'text-xs text-muted-foreground' }, 'Nothing saved yet. Tap Save on a Contributor or a Place on the map.');
+    }
+    return h(F, null,
+      h('ul', { 'data-saved': 'list', role: 'list', className: 'space-y-2' },
+        rows.map((r) => h('li', { key: r.kind + r.id, 'data-saved': 'row', className: 'flex items-center gap-2 p-2 rounded-xl bg-white/60 border border-border' },
+          h('button', { type: 'button', 'data-saved': 'open', onClick: () => go(r.page, { id: r.id }), className: 'flex-1 min-w-0 min-h-[44px] flex items-center gap-3 text-left' },
+            h(Avatar, { src: r.photo, name: r.name, size: 36, rounded: 'xl' }),
+            h('span', { className: 'min-w-0' }, h('span', { 'data-saved': 'name', className: 'block text-sm font-semibold text-foreground truncate' }, r.name), h('span', { className: 'block text-xs text-muted-foreground' }, r.meta))),
+          h('button', { type: 'button', 'data-saved': 'remove', 'aria-label': 'Remove ' + r.name + ' from your saved list', onClick: () => toggleSave(r.kind, r.id, r.name),
+            className: 'w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'X', size: 16 }))))),
+      hidden > 0 && h('p', { 'data-saved': 'hidden', className: 'text-xs text-muted-foreground mt-2' },
+        hidden === 1 ? '1 more saved listing is not on the map right now.' : hidden + ' more saved listings are not on the map right now.'));
+  }
+
   function SettingsPage() {
     const app = window.useApp();
     const { user, role, go, toast, isCitizen, isPendingApplicant, contributorStatus, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
@@ -243,6 +267,8 @@
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },
             h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
               h(Toggle, { checked: isPublic, onChange: setDiscoverable, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' }))),
+
+          h(Section, { title: 'Saved', sub: 'Only you can see this list. A listing is never told you saved it.' }, h(SavedList)),
 
           h(Section, { title: 'Notifications', sub: 'Choose what you hear about' },
             h('div', { className: 'space-y-3' },

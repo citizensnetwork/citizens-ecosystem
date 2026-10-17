@@ -166,7 +166,7 @@
   // ── the sheet ────────────────────────────────────────────────────
   function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick }) {
     const app = window.useApp();
-    const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, realUser } = app;
+    const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     const Str = S();
     const wide = useWide();
     const root = useRef(null);
@@ -433,6 +433,13 @@
     const following = isContributor && followedOrgs.has(item.id);
     if (isContributor && !(realUser && realUser.id === item.id)) {
       actions.push(h(Action, { key: 'follow', icon: 'Heart', label: following ? Str.following : Str.follow, on: following, onClick: () => toggleFollow(item.id, name) }));
+    }
+    // P2-04: Save, a PRIVATE bookmark for a Contributor (not you) or a Place; an Event keeps its Consider bookmark. Never counted,
+    // never shown to the listing: the only trace is the person's own list in Settings.
+    const saveKind = isContributor ? 'contributor' : type === 'place' ? 'place' : null;
+    if (saveKind && !(isContributor && realUser && realUser.id === item.id)) {
+      const saved = (saveKind === 'place' ? savedPlaces : savedContributors).has(item.id);
+      actions.push(h(Action, { key: 'save', icon: 'Bookmark', label: saved ? Str.saved : Str.save, on: saved, onClick: () => toggleSave(saveKind, item.id, name) }));
     }
     actions.push(h(Action, { key: 'share', icon: 'Share2', label: Str.share, onClick: () => shareLink({ page: navTarget(type), params: { id } }) }));
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
