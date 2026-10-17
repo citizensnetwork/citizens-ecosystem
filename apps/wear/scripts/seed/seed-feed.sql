@@ -20,14 +20,19 @@
 --    (award/advance) under an impersonated request.jwt.claims — same path the
 --    app uses — so triggers (milestone royalty, auto Completed-Concept post,
 --    media copy) fire exactly as in production.
---  * Media is URL-only (no upload pipeline yet): tasteful Unsplash CDN photos
---    for posts/concepts, ui-avatars for brand logos/citizen avatars. All were
---    HTTP-checked 200 at seed time.
+--  * Media comes from our own storage, never a third-party host (Wear's
+--    Content-Security-Policy `img-src` allows only our Supabase host and Google
+--    avatars): the posts/stories/concepts photos are objects in the public
+--    `wear-media` bucket under `wear-demo-photos/` (the file list and where each came from
+--    is in README.md; upload them before seeding, or the pictures are broken).
+--    Brand logos and citizen avatars are left empty on purpose: the app draws
+--    the crown disc (brands) and an initials disc (people) when there is no URL.
 --
 -- Run: MCP execute_sql (postgres/bypassrls) or psql. Re-runnable (no-op if seeded).
 -- ============================================================================
 do $seed$
 declare
+  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/';
   -- ── fixed seed identities (also the teardown key) ──
   o1 uuid := '5eed0001-0000-4000-a000-000000000001'; -- Cornerstone Apparel owner
   o2 uuid := '5eed0002-0000-4000-a000-000000000002'; -- Lily & Field owner
@@ -73,13 +78,13 @@ begin
 
   -- ── 3) wear.users mirror (handle + display name + avatar) ──
   insert into wear.users (id, handle, display_name, avatar_url, created_at) values
-    (o1,'cornerstoneapparel','Cornerstone Apparel','https://ui-avatars.com/api/?name=Cornerstone&background=1a1a1a&color=fff&size=256&bold=true', now()-interval '26 days'),
-    (o2,'lilyandfield','Lily & Field','https://ui-avatars.com/api/?name=Lily+Field&background=b8860b&color=fff&size=256&bold=true', now()-interval '24 days'),
-    (o3,'saltandlightthreads','Salt & Light Threads','https://ui-avatars.com/api/?name=Salt+Light&background=3f6f34&color=fff&size=256&bold=true', now()-interval '22 days'),
-    (o4,'ubuntukingdomco','Ubuntu Kingdom Co.','https://ui-avatars.com/api/?name=Ubuntu+Kingdom&background=8f4a2b&color=fff&size=256&bold=true', now()-interval '20 days'),
-    (o5,'anchorandcrown','Anchor & Crown','https://ui-avatars.com/api/?name=Anchor+Crown&background=1a1a1a&color=fff&size=256&bold=true', now()-interval '18 days'),
-    (c1,'gracelethabo','Grace Lethabo','https://ui-avatars.com/api/?name=Grace+Lethabo&background=b8860b&color=fff&size=256&bold=true', now()-interval '27 days'),
-    (c2,'thabo_m','Thabo M.','https://ui-avatars.com/api/?name=Thabo+M&background=3f6f34&color=fff&size=256&bold=true', now()-interval '25 days');
+    (o1,'cornerstoneapparel','Cornerstone Apparel',null, now()-interval '26 days'),
+    (o2,'lilyandfield','Lily & Field',null, now()-interval '24 days'),
+    (o3,'saltandlightthreads','Salt & Light Threads',null, now()-interval '22 days'),
+    (o4,'ubuntukingdomco','Ubuntu Kingdom Co.',null, now()-interval '20 days'),
+    (o5,'anchorandcrown','Anchor & Crown',null, now()-interval '18 days'),
+    (c1,'gracelethabo','Grace Lethabo',null, now()-interval '27 days'),
+    (c2,'thabo_m','Thabo M.',null, now()-interval '25 days');
 
   -- ── 4) wear.profiles (bio; visibility default public; verified stays false) ──
   insert into wear.profiles (user_id, bio) values
@@ -93,11 +98,11 @@ begin
 
   -- ── 5) wear.brands (verified=false; verification below flips 3) ──
   insert into wear.brands (id, slug, name, tagline, logo_url, owner_user_id, created_at) values
-    (br1,'cornerstone-apparel','Cornerstone Apparel',$t$Streetwear built on the Rock.$t$,'https://ui-avatars.com/api/?name=Cornerstone&background=1a1a1a&color=fff&size=256&bold=true',o1, now()-interval '26 days'),
-    (br2,'lily-and-field','Lily & Field',$t$Considered, modest womenswear.$t$,'https://ui-avatars.com/api/?name=Lily+Field&background=b8860b&color=fff&size=256&bold=true',o2, now()-interval '24 days'),
-    (br3,'salt-and-light-threads','Salt & Light Threads',$t$Tees that start conversations.$t$,'https://ui-avatars.com/api/?name=Salt+Light&background=3f6f34&color=fff&size=256&bold=true',o3, now()-interval '22 days'),
-    (br4,'ubuntu-kingdom-co','Ubuntu Kingdom Co.',$t$Community-woven knitwear.$t$,'https://ui-avatars.com/api/?name=Ubuntu+Kingdom&background=8f4a2b&color=fff&size=256&bold=true',o4, now()-interval '20 days'),
-    (br5,'anchor-and-crown','Anchor & Crown',$t$Hope as an anchor — caps & accessories.$t$,'https://ui-avatars.com/api/?name=Anchor+Crown&background=1a1a1a&color=fff&size=256&bold=true',o5, now()-interval '18 days');
+    (br1,'cornerstone-apparel','Cornerstone Apparel',$t$Streetwear built on the Rock.$t$,null,o1, now()-interval '26 days'),
+    (br2,'lily-and-field','Lily & Field',$t$Considered, modest womenswear.$t$,null,o2, now()-interval '24 days'),
+    (br3,'salt-and-light-threads','Salt & Light Threads',$t$Tees that start conversations.$t$,null,o3, now()-interval '22 days'),
+    (br4,'ubuntu-kingdom-co','Ubuntu Kingdom Co.',$t$Community-woven knitwear.$t$,null,o4, now()-interval '20 days'),
+    (br5,'anchor-and-crown','Anchor & Crown',$t$Hope as an anchor — caps & accessories.$t$,null,o5, now()-interval '18 days');
 
   -- ── 6) brand verification: 3 approved (sync trigger flips verified), 2 pending ──
   insert into wear.brand_verifications (brand_id, status, note, requested_by, reviewed_by, reviewed_at, review_note) values
@@ -125,13 +130,13 @@ begin
     (o5, br5, $t$The Anchor cap, embroidered in gold thread. Hebrews 6:19 — hope as an anchor for the soul. ⚓👑 Pre-orders open.$t$, now()-interval '3 days') returning id into pa1;
 
   insert into wear.post_media (post_id, url, alt_text) values
-    (pc1,'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=70',$t$Folded heavyweight tees$t$),
-    (pc2,'https://images.unsplash.com/photo-1503341504253-dff4815485f1?auto=format&fit=crop&w=800&q=70',$t$Streetwear portrait$t$),
-    (pl1,'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=800&q=70',$t$Considered womenswear piece$t$),
-    (ps1,'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=800&q=70',$t$Rack of printed tees$t$),
-    (ps2,'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?auto=format&fit=crop&w=800&q=70',$t$Give-back accessories flatlay$t$),
-    (pu1,'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=800&q=70',$t$Hand-knit jersey$t$),
-    (pa1,'https://images.unsplash.com/photo-1588099768523-f4e6a5679d88?auto=format&fit=crop&w=800&q=70',$t$Embroidered cap$t$);
+    (pc1,demo_media || 'photo-1521572163474-6864f9cf17ab.jpg',$t$Folded heavyweight tees$t$),
+    (pc2,demo_media || 'photo-1503341504253-dff4815485f1.jpg',$t$Streetwear portrait$t$),
+    (pl1,demo_media || 'photo-1523381210434-271e8be1f52b.jpg',$t$Considered womenswear piece$t$),
+    (ps1,demo_media || 'photo-1489987707025-afc232f7ea0f.jpg',$t$Rack of printed tees$t$),
+    (ps2,demo_media || 'photo-1576871337622-98d48d1cf531.jpg',$t$Give-back accessories flatlay$t$),
+    (pu1,demo_media || 'photo-1434389677669-e08b4cac3105.jpg',$t$Hand-knit jersey$t$),
+    (pa1,demo_media || 'photo-1588099768523-f4e6a5679d88.jpg',$t$Embroidered cap$t$);
 
   -- ── 8) follow graph (community follows brands; brands support each other; founder feeds alive) ──
   insert into wear.follows (actor_id, target_id) values
@@ -166,10 +171,10 @@ begin
 
   -- ── 10) stories (14-day expiry so the launch tray stays alive) ──
   insert into wear.stories (author_id, brand_id, media_url, caption, expires_at) values
-    (o1, br1, 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=800&q=70', $t$Drop 01 — live now.$t$,        now()+interval '14 days'),
-    (o3, br3, 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=800&q=70', $t$42 meals funded this month 🧂$t$, now()+interval '14 days'),
-    (o4, br4, 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=70',  $t$Winter run — hand-knit.$t$,      now()+interval '14 days'),
-    (c1, null,'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?auto=format&fit=crop&w=800&q=70', $t$Obsessed with my new Salt & Light tee ✨$t$, now()+interval '14 days');
+    (o1, br1, demo_media || 'photo-1618354691373-d851c5c3a990.jpg', $t$Drop 01 — live now.$t$,        now()+interval '14 days'),
+    (o3, br3, demo_media || 'photo-1489987707025-afc232f7ea0f.jpg', $t$42 meals funded this month 🧂$t$, now()+interval '14 days'),
+    (o4, br4, demo_media || 'photo-1556905055-8f358a7a47b2.jpg',  $t$Winter run — hand-knit.$t$,      now()+interval '14 days'),
+    (c1, null,demo_media || 'photo-1576871337622-98d48d1cf531.jpg', $t$Obsessed with my new Salt & Light tee ✨$t$, now()+interval '14 days');
 
   -- ── 11) Concepts marketplace: one realized item, driven via the real RPCs ──
   insert into wear.concepts (id, creator_id, title, description, created_at) values
@@ -177,7 +182,7 @@ begin
      $t$A heavyweight hoodie in deep river-blue, with "whoever drinks the water I give will never thirst" (John 4:14) embroidered small inside the hood. Ethically made, a numbered edition. Who can bring this to life for the Body?$t$,
      now()-interval '15 days');
   insert into wear.concept_media (concept_id, url, alt_text) values
-    (concept1,'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=800&q=70',$t$River-blue hoodie concept$t$);
+    (concept1,demo_media || 'photo-1620799140408-edc6dcb6d633.jpg',$t$River-blue hoodie concept$t$);
   insert into wear.concept_upvotes (concept_id, user_id) values
     (concept1,o1),(concept1,o3),(concept1,o4),(concept1,c2),(concept1,founder);
 
@@ -230,6 +235,7 @@ end $seed$;
 -- ============================================================================
 do $engage$
 declare
+  demo_media constant text := 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/';
   o1 uuid := '5eed0001-0000-4000-a000-000000000001'; -- Cornerstone owner
   o2 uuid := '5eed0002-0000-4000-a000-000000000002'; -- Lily & Field owner
   o3 uuid := '5eed0003-0000-4000-a000-000000000003'; -- Salt & Light owner
@@ -259,8 +265,8 @@ begin
     (concept3, c1, $t$Wait Upon the Lord windbreaker$t$,
      $t$A lightweight running windbreaker with "they shall mount up with wings as eagles" (Isaiah 40:31) across the shoulders. Reflective print for early-morning runs.$t$);
   insert into wear.concept_media (concept_id, url, alt_text) values
-    (concept2,'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=70',$t$Olive dad cap concept$t$),
-    (concept3,'https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=800&q=70',$t$Windbreaker concept$t$);
+    (concept2,demo_media || 'photo-1588850561407-ed78c282e89b.jpg',$t$Olive dad cap concept$t$),
+    (concept3,demo_media || 'photo-1539185441755-769473a23570.jpg',$t$Windbreaker concept$t$);
 
   -- ── engagement: likes (upvotes), comments (+one reply), shares ──
   insert into wear.concept_upvotes (concept_id, user_id) values
