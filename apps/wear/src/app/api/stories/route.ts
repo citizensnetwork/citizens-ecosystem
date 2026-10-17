@@ -1,7 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { toUserDto } from '@/lib/api/serializers';
 import { bodyString, readJsonBody } from '@/lib/api/params';
-import { safeUrl } from '@/lib/validators';
+import { bodyImageUrl } from '@/lib/api/image-urls';
 import type { StoryAudience, StoryMediaKind, WearUser } from '@citizens/db';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +37,7 @@ export const POST = handler(async (req, ctx) => {
   const mediaKindRaw = bodyString(body, 'mediaKind');
   const mediaKind: StoryMediaKind =
     mediaKindRaw === 'video' || mediaKindRaw === 'text' ? mediaKindRaw : 'image';
-  const mediaUrl = safeUrl(bodyString(body, 'mediaUrl'));
+  const mediaUrl = bodyImageUrl(body, 'mediaUrl');
   const caption = bodyString(body, 'caption').slice(0, MAX_STORY_CAPTION);
   const audience: StoryAudience =
     bodyString(body, 'audience') === 'followers' ? 'followers' : 'public';

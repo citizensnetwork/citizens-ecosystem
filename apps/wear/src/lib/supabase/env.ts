@@ -25,6 +25,15 @@ export function getSupabaseEnv(): SupabaseEnv | null {
   return { url, anonKey };
 }
 
+/**
+ * The Supabase project URL alone, or `null` when unset. Our Storage (the
+ * `wear-media` bucket) is served from this origin, so it is the one host user
+ * pictures may live on. Deliberately does not need the anon key.
+ */
+export function getSupabaseUrl(): string | null {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || null;
+}
+
 /** Like {@link getSupabaseEnv} but throws a clear error when unconfigured. */
 export function requireSupabaseEnv(): SupabaseEnv {
   const env = getSupabaseEnv();

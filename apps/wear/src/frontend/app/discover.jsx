@@ -6,7 +6,7 @@
   const { createElement: h, useState, useEffect, useCallback, useRef } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote } = window.CWUI;
+  const { GOLD, Avatar, BrandLogo, SafeImg, Spinner, EmptyState, ErrorNote } = window.CWUI;
 
   function DiscoverScreen() {
     const { openBrand, openUser, openConcepts } = useStore();
@@ -338,13 +338,12 @@
                                   gap: 8,
                                 },
                               },
-                              b.logoUrl
-                                ? h('img', {
-                                    src: b.logoUrl,
-                                    alt: b.name,
-                                    style: { width: '100%', height: '100%', objectFit: 'cover' },
-                                  })
-                                : h(Crown, { size: 44 }),
+                              h(SafeImg, {
+                                src: b.logoUrl,
+                                alt: b.name,
+                                style: { width: '100%', height: '100%', objectFit: 'cover' },
+                                fallback: h(Crown, { size: 44 }),
+                              }),
                             ),
                             h(
                               'div',
@@ -447,34 +446,33 @@
                               padding: '9px 18px',
                             },
                           },
-                          c.logoUrl || c.avatarUrl
-                            ? h('img', {
-                                src: c.logoUrl || c.avatarUrl,
-                                alt: c.name,
+                          h(SafeImg, {
+                            src: c.logoUrl || c.avatarUrl,
+                            alt: c.name,
+                            style: {
+                              width: 44,
+                              height: 44,
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              flex: 'none',
+                            },
+                            fallback: h(
+                              'div',
+                              {
                                 style: {
                                   width: 44,
                                   height: 44,
                                   borderRadius: '50%',
-                                  objectFit: 'cover',
+                                  background: '#0e0e0e',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   flex: 'none',
                                 },
-                              })
-                            : h(
-                                'div',
-                                {
-                                  style: {
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: '50%',
-                                    background: '#0e0e0e',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flex: 'none',
-                                  },
-                                },
-                                h(Crown, { size: 22 }),
-                              ),
+                              },
+                              h(Crown, { size: 22 }),
+                            ),
+                          }),
                           h(
                             'div',
                             { style: { flex: 1, minWidth: 0, lineHeight: 1.3 } },

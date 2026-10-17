@@ -1,7 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { hydrateConcept, hydrateConceptPage } from '@/lib/api/serializers';
-import { bodyString, bodyStringArray, readJsonBody, readPageParams } from '@/lib/api/params';
-import { safeUrl } from '@/lib/validators';
+import { bodyString, readJsonBody, readPageParams } from '@/lib/api/params';
+import { bodyImageUrls } from '@/lib/api/image-urls';
 import { CONCEPT_STAGES, type ConceptStage } from '@citizens/db';
 
 export const dynamic = 'force-dynamic';
@@ -39,10 +39,7 @@ export const POST = handler(async (req, ctx) => {
   const title = bodyString(body, 'title').slice(0, MAX_TITLE);
   if (!title) throw new ApiError(422, 'empty_concept', 'Concept title must not be empty.');
 
-  const mediaUrls = bodyStringArray(body, 'mediaUrls')
-    .map((u) => safeUrl(u))
-    .filter((u): u is string => !!u)
-    .slice(0, MAX_MEDIA);
+  const mediaUrls = bodyImageUrls(body, 'mediaUrls', MAX_MEDIA);
 
   const entry = await ctx.store.concepts.create({
     creatorId: userId,
