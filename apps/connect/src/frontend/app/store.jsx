@@ -1924,7 +1924,7 @@
             flip(false);
             toast('You can save up to ' + window.CCSaved.MAX + ' listings. Remove one to save another.', 'red');
           }
-        } catch (e) {
+        } catch {
           flip(was);
           toast('Could not save — please try again.', 'red');
         }

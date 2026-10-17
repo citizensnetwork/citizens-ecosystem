@@ -13,7 +13,6 @@
   const h = React.createElement;
   const { useState, useEffect, useCallback } = React;
   const { Avatar } = window.UI;
-  const Icon = window.Icon;
   const MAX_RESULTS = 6;
   const STATUS_LABEL = { invited: 'Invited', accepted: 'Co-host', declined: 'Declined' };
   const btn = 'min-h-[44px] px-3 rounded-full text-xs font-bold border border-border bg-card text-foreground hover:bg-accent/60 disabled:opacity-50';

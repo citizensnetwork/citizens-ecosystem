@@ -51,8 +51,11 @@ export function createdByOrIn(contributorId: string, eventIds: string[]): string
 }
 
 /** Adds `co_host_ids` (the accepted co-hosts, in a stable order) to each event row. A failed read adds empty lists. */
-export async function attachCoHostIds<T extends { id?: unknown }>(client: CohostClient, rows: T[]): Promise<(T & { co_host_ids: string[] })[]> {
-  const ids = rows.map((r) => r.id).filter((id): id is string => isValidUUID(id));
+export async function attachCoHostIds<T extends object>(client: CohostClient, rows: T[]): Promise<(T & { co_host_ids: string[] })[]> {
+  // `id` is read through a cast: a row type with an index signature and no `id` of its own (the events feed's) would
+  // otherwise fail TypeScript's weak-type check against `{ id?: unknown }`.
+  const idOf = (r: T) => (r as { id?: unknown }).id;
+  const ids = rows.map(idOf).filter((id): id is string => isValidUUID(id));
   const by = new Map<string, string[]>();
   if (ids.length) {
     const res = (await table(client).select("event_id,contributor_id").eq("status", "accepted").in("event_id", ids)) as {
@@ -68,5 +71,8 @@ export async function attachCoHostIds<T extends { id?: unknown }>(client: Cohost
       }
     }
   }
-  return rows.map((r) => ({ ...r, co_host_ids: (typeof r.id === "string" ? by.get(r.id) : undefined)?.slice().sort() ?? [] }));
+  return rows.map((r) => {
+    const id = idOf(r);
+    return { ...r, co_host_ids: (typeof id === "string" ? by.get(id) : undefined)?.slice().sort() ?? [] };
+  });
 }
