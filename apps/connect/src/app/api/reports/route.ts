@@ -1,5 +1,5 @@
 /**
- * POST /api/reports  — file a report against an event / user / place / comment.
+ * POST /api/reports  — file a report against an event / user / place / comment / conversation / moment.
  * GET  /api/reports  — list the caller's own submissions (their receipts).
  *
  * Admin review + resolution lives in /api/admin/reports/[id].
@@ -16,7 +16,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TARGET_TYPES = ["event", "user", "place", "comment", "conversation"] as const;
+// "moment" is a short daily note (migration 188 added it to the table's check).
+const TARGET_TYPES = ["event", "user", "place", "comment", "conversation", "moment"] as const;
 const REASONS = [
   "spam",
   "harassment",

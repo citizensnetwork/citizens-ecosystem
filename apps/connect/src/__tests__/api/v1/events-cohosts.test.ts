@@ -24,12 +24,13 @@ function from(table: string) {
   calls.push(call);
   const chain: Record<string, unknown> = {};
   const record = (op: string) => (...args: unknown[]) => { call.ops.push([op, args]); return chain; };
-  for (const op of ["select", "eq", "gte", "lt", "lte", "in", "or", "not", "order", "range", "limit"]) chain[op] = record(op);
+  for (const op of ["select", "eq", "gt", "gte", "lt", "lte", "in", "or", "not", "order", "range", "limit"]) chain[op] = record(op);
   chain.maybeSingle = () => Promise.resolve(answers[`${table}:single`] ?? { data: null, error: null });
   chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(answers[table] ?? { data: [], error: null, count: 0 }).then(res, rej);
   return chain;
 }
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn().mockResolvedValue({ from }) }));
+// rpc: the contributor route asks follower_count_public for the follower bucket (S13)
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn().mockResolvedValue({ from, rpc: () => Promise.resolve({ data: 0, error: null }) }) }));
 vi.mock("@/lib/v1Gate", () => ({ gateV1: vi.fn().mockResolvedValue({ key: null, identifier: "test" }) }));
 
 const eventsMod = await import("@/app/api/v1/events/route");

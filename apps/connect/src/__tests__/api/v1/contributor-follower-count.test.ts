@@ -19,7 +19,7 @@ function from(table: string) {
   calls.push(call);
   const chain: Record<string, unknown> = {};
   const record = (op: string) => (...args: unknown[]) => { call.ops.push([op, args]); return chain; };
-  for (const op of ["select", "eq", "gte", "lt", "lte", "in", "or", "not", "order", "range", "limit"]) chain[op] = record(op);
+  for (const op of ["select", "eq", "gt", "gte", "lt", "lte", "in", "or", "not", "order", "range", "limit"]) chain[op] = record(op);
   chain.maybeSingle = () => Promise.resolve(table === "profiles" ? { data: { id: A, full_name: "Probe Org" }, error: null } : { data: null, error: null });
   chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: [], error: null, count: 0 }).then(res, rej);
   return chain;

@@ -2,12 +2,12 @@
  * GET /api/v1/contributors/[slug]
  * ----------------------------------------------------------------
  * Full public view of a single approved Contributor by vanity slug.
- * Returns profile + upcoming events (created or co-hosted) + owned places + counts, shaped
+ * Returns profile + upcoming events (created or co-hosted) + owned places + live notes + counts, shaped
  * for ecosystem consumers (Citizens Central) without forcing a
  * second round-trip.
  *
  * Response envelope:
- *   { data: { profile, upcoming_events, past_events, places,
+ *   { data: { profile, upcoming_events, past_events, places, moments,
  *             counts: { followers, events_total, places_total } },
  *   `counts.followers` is a bucket: 0 below 100, otherwise rounded down to 100, 250, 500, 1000, ...
  *     meta: { generated_at } }
@@ -26,6 +26,8 @@ export const dynamic = "force-dynamic";
  *  rows can't cause a single call to return a huge payload. */
 const EVENTS_CAP = 100;
 const PLACES_CAP = 100;
+/** The database allows at most 5 live notes per Contributor (trigger moments_cap). */
+const MOMENTS_CAP = 5;
 
 export async function GET(
   request: Request,
@@ -99,7 +101,7 @@ export async function GET(
   // P2-09: the events they created PLUS the ones they co-host (an accepted invitation), in the same lists.
   const hostFilter = createdByOrIn(profileRow.id, await acceptedCohostEventIds(supabase, profileRow.id));
 
-  const [upcomingRes, pastRes, placesRes, followersRes] = await Promise.all([
+  const [upcomingRes, pastRes, placesRes, followersRes, momentsRes] = await Promise.all([
     supabase
       .from("events")
       .select("id,title,date,end_time,location,category,image_url,visibility,status")
@@ -129,6 +131,15 @@ export async function GET(
     // S13: the public number is a bucket (0 under 100, otherwise rounded down) and comes from a function:
     // the `follows` table itself is readable only by the person who follows, never by the public key.
     supabase.rpc("follower_count_public", { p_followee: profileRow.id }),
+    // P2-05 (migration 188): the notes (Moments) that are still live, newest first. The database refuses anyone else's
+    // ended notes to the public key; the filter is also here so a signed-in author never sees their own ended one.
+    supabase
+      .from("moments")
+      .select("id,body,image_url,created_at,expires_at")
+      .eq("contributor_id", profileRow.id)
+      .gt("expires_at", now)
+      .order("created_at", { ascending: false })
+      .limit(MOMENTS_CAP),
   ]);
 
   return NextResponse.json(
@@ -138,6 +149,8 @@ export async function GET(
         upcoming_events: upcomingRes.data ?? [],
         past_events: pastRes.data ?? [],
         places: placesRes.data ?? [],
+        // A failed read of the notes never fails the profile: it just has none to show.
+        moments: momentsRes.error ? [] : (momentsRes.data ?? []),
         counts: {
           followers: Number(followersRes.data ?? 0) || 0,
           events_total:
