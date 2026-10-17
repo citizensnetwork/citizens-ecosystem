@@ -11,6 +11,7 @@
   const { Card, SectionTitle, Pill, Btn, Ring, Spark, Icon, sevMeta } = window.UI;
   const D = window.CV_DATA;
   const ObservationCard = window.Screens.ObservationCard;
+  const PlaceField = window.Screens.PlaceField; // place-field.jsx (optional Place on Log an activity)
 
   // ── Live-collection helpers (increment 4, spec §3.2/§3.3) ──────────
   // The editable-collection screens below (Objectives / Projects / Vision
@@ -61,17 +62,24 @@
   // (one with a cc_event_claim → a metrics row); a manual/unclaimed activity has
   // none, so those cells render an honest em dash (spec §3.2b note). `claimed`
   // is derived from the presence of a metrics row.
-  const mapActivity = (a, metric) => ({
-    id: a.id,
-    title: a.title,
-    type: a.type || "other",
-    date: a.date,
-    reach: metric ? metric.reach : null,
-    engagement: metric ? metric.engagement_score : null,
-    rating: metric ? metric.avg_rating : null,
-    claimed: !!metric,
-    live: true,
-  });
+  // `place` is the saved location_name; `onMap` is whether the Timeline Map can
+  // plot the row (a real latitude + longitude — same test the map applies).
+  const mapActivity = (a, metric) => {
+    const pl = window.CV_PLACE.rowPlace(a);
+    return {
+      id: a.id,
+      title: a.title,
+      type: a.type || "other",
+      date: a.date,
+      place: pl.name,
+      onMap: pl.onMap,
+      reach: metric ? metric.reach : null,
+      engagement: metric ? metric.engagement_score : null,
+      rating: metric ? metric.avg_rating : null,
+      claimed: !!metric,
+      live: true,
+    };
+  };
   // vision.org_members row (mig 154 — user_org_roles joined to display-safe
   // public.profiles identity) → Team card shape. full_name is null-safe: a member
   // without a profile name degrades to a neutral label + initial, never a
@@ -307,6 +315,7 @@
     const [title, setTitle] = React.useState("");
     const [type, setType] = React.useState("event");
     const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+    const [place, setPlace] = React.useState(window.CV_PLACE.EMPTY); // optional; see place-field.jsx
     const [err, setErr] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
 
@@ -331,19 +340,34 @@
     const add = async () => {
       const t = title.trim();
       if (t.length < 2) { setErr("Give the activity a title (2+ characters)."); return; }
+      // The place is optional: no place sends exactly { title, type, date }; a
+      // place adds location_name, and latitude + longitude only when it has a real spot.
+      const PL = window.CV_PLACE;
+      const placeFields = PL.toPayload(place);
+      const hasPlace = Object.keys(placeFields).length > 0;
       if (!isLive) {
-        setRows([{ id: "act-" + Date.now(), title: t, space: "—", date, reach: null, engagement: null, rating: null, claimed: false, live: false }, ...rows]);
-        setTitle(""); setErr(null); return;
+        const id = "act-" + Date.now();
+        const pl = PL.normalise(place);
+        setRows([{ id, title: t, space: "—", date, place: pl ? pl.name : "", onMap: !!pl && pl.lat !== null, reach: null, engagement: null, rating: null, claimed: false, live: false }, ...rows]);
+        // The demo's Timeline Map reads D.mapActivities, so a demo activity with a
+        // real spot appears there too (in memory only; a reload starts clean).
+        const mapRow = PL.demoMapRow(id, t, type, date, place);
+        if (mapRow) D.mapActivities.unshift(mapRow);
+        setTitle(""); setPlace(PL.EMPTY); setErr(null); return;
       }
       setBusy(true); setErr(null);
       try {
         const res = await authFetch("/api/activities?org_id=" + D.orgId, {
-          method: "POST", body: JSON.stringify({ title: t, type, date }),
+          method: "POST", body: JSON.stringify({ title: t, type, date, ...placeFields }),
         });
-        if (!res.ok) throw new Error("Could not log activity");
+        if (!res.ok) {
+          throw new Error(res.status === 400 && hasPlace
+            ? "Could not log activity. Check the place, or clear it and log again."
+            : "Could not log activity");
+        }
         const j = await res.json();
         setRows((cur) => [mapActivity(j.data, null), ...cur]);
-        setTitle("");
+        setTitle(""); setPlace(PL.EMPTY);
       } catch (e) { setErr(e.message || "Could not log activity"); }
       finally { setBusy(false); }
     };
@@ -381,9 +405,22 @@
                 <tr><td colSpan={7} style={{ padding: "20px 12px", textAlign: "center", color: "var(--text-secondary)" }}>No activities yet. Log your first activity below.</td></tr>
               ) : rows.map((a) => (
                 <tr key={a.id} style={{ borderBottom: "1px solid var(--divider)" }}>
-                  <td style={{ ...td, fontWeight: 700 }}>{a.title}</td>
+                  <td style={{ ...td, fontWeight: 700, maxWidth: 360 }}>
+                    {a.title}
+                    {a.place ? (
+                      // The place sits under the title (no extra column to squeeze the table), and says
+                      // whether the Timeline Map can plot it: a name alone is text, not a position.
+                      <div title={a.place + (a.onMap ? " (on your Timeline Map)" : " (name only, not on your Timeline Map)")}
+                        style={{ display: "flex", gap: 8, alignItems: "baseline", marginTop: 2, fontSize: 12, fontWeight: 600 }}>
+                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{a.place}</span>
+                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: a.onMap ? "var(--gold-800)" : "var(--text-tertiary)" }}>
+                          {a.onMap ? "On the Timeline Map" : "Name only"}
+                        </span>
+                      </div>
+                    ) : null}
+                  </td>
                   <td style={{ ...td, color: "var(--text-secondary)" }}>{isLive ? cap(a.type) : a.space}</td>
-                  <td style={{ ...td, color: "var(--text-secondary)" }}>{a.date}</td>
+                  <td style={{ ...td, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{a.date}</td>
                   <td style={td}>{cell(a.reach)}</td>
                   <td style={td}>{cell(a.engagement)}</td>
                   <td style={td}>{a.rating === null || a.rating === undefined ? "—" : a.rating + "★"}</td>
@@ -412,6 +449,7 @@
           </select>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
             style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "9px 12px", fontSize: 14, background: "var(--surface-card)", color: "var(--text-primary)" }} />
+          <PlaceField value={place} onChange={setPlace} onSubmit={add} loadMap={loadMapLibre} env={window.__CV_ENV || {}} />
           <Btn kind="gold" onClick={add} disabled={busy}><Icon name="plus" size={15} /> Log</Btn>
         </div>
       </div>
@@ -667,8 +705,8 @@
             <span style={{ color: "var(--brand-ink)" }}><Icon name="map" size={36} /></span>
             <div style={{ marginTop: 12, fontWeight: 800, fontSize: 16 }}>No activities with a place yet</div>
             <div style={{ marginTop: 8, maxWidth: 460, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-              The map plots every activity that has a latitude and longitude. When activities
-              come in with a place, they appear here and you can play them back through time.
+              The map plots every activity that has a place on the map. Add a place when you log
+              an activity (Spaces, then Activities) and it appears here, where you can play it back through time.
             </div>
           </Card>
         </div>
