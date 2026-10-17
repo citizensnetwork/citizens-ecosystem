@@ -1,7 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { hydratePost } from '@/lib/api/serializers';
 import { bodyString, bodyStringArray, readJsonBody } from '@/lib/api/params';
-import { safeUrl } from '@/lib/validators';
+import { bodyImageUrls } from '@/lib/api/image-urls';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,10 +44,7 @@ export const POST = handler(async (req, ctx) => {
   const text = bodyString(body, 'body').slice(0, MAX_POST_BODY);
   if (!text) throw new ApiError(422, 'empty_post', 'Post body must not be empty.');
 
-  const mediaUrls = bodyStringArray(body, 'mediaUrls')
-    .map((u) => safeUrl(u))
-    .filter((u): u is string => !!u)
-    .slice(0, MAX_MEDIA);
+  const mediaUrls = bodyImageUrls(body, 'mediaUrls', MAX_MEDIA);
 
   const entry = await ctx.store.posts.create({
     authorId: userId,

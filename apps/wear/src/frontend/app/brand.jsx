@@ -5,7 +5,7 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, Avatar, Spinner, ErrorNote, ScreenHeader, FollowButton } = window.CWUI;
+  const { GOLD, Avatar, SafeImg, Spinner, ErrorNote, ScreenHeader, FollowButton } = window.CWUI;
   const PostCard = () => window.CWScreens.PostCard;
 
   /**
@@ -267,27 +267,26 @@
               gap: 8,
             },
           },
-          brand.logoUrl
-            ? h('img', {
-                src: brand.logoUrl,
-                alt: brand.name,
-                style: { width: 84, height: 84, borderRadius: '50%', objectFit: 'cover' },
-              })
-            : h(
-                'div',
-                {
-                  style: {
-                    width: 84,
-                    height: 84,
-                    borderRadius: '50%',
-                    background: '#0e0e0e',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  },
+          h(SafeImg, {
+            src: brand.logoUrl,
+            alt: brand.name,
+            style: { width: 84, height: 84, borderRadius: '50%', objectFit: 'cover' },
+            fallback: h(
+              'div',
+              {
+                style: {
+                  width: 84,
+                  height: 84,
+                  borderRadius: '50%',
+                  background: '#0e0e0e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 },
-                h(Crown, { size: 44 }),
-              ),
+              },
+              h(Crown, { size: 44 }),
+            ),
+          }),
           brand.tagline
             ? h(
                 'div',
