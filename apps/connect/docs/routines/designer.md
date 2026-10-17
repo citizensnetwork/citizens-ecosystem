@@ -93,7 +93,7 @@ Out of scope: <what stays as it is>
 
 ## 6. Measures
 
-- **Drift index (DI)**, per app and total, defined once in phase 1 and then frozen (a change to the formula is a card): for each app's frontend source, the count of **distinct raw colour values, font sizes, radii, shadows and z-index values that are outside the token blocks**, plus 5 points for each extra "gold" beyond one, divided by the thousands of lines of that source. Lower is better; the trend week to week is the headline.
+- **Drift index (DI)** (the frozen definition, reference script and baseline are in `docs/design/DRIFT_INDEX.md`; the paragraph here is the summary), per app and total, defined once in phase 1 and then frozen (a change to the formula is a card): for each app's frontend source, the count of **distinct raw colour values, font sizes, radii, shadows and z-index values that are outside the token blocks**, plus 5 points for each extra "gold" beyond one, divided by the thousands of lines of that source. Lower is better; the trend week to week is the headline.
 - **Parity**: of the routes in `routes.jsx`, how many pass the tracker's section 12.3 checklist (nine items) on the captures. Reported as `n of N`.
 - **Findability**: zero-result rate and median timing of the probe list.
 - Each is a number with a date, or "not measured" and why.
