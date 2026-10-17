@@ -155,6 +155,15 @@ describe("worst-case input stays fast", () => {
     expect(timed("<p>" + "ab-cd ".repeat(MAX_BYTES / 6 - 2) + "</p>")).toBeLessThan(1000);
     expect(timed("<p>" + "url(".repeat(MAX_BYTES / 4 - 2) + "</p>")).toBeLessThan(1000);
   });
+
+  it("stays fast when each url( is followed by a stray character or an unclosed quote, and still finds what follows", () => {
+    expect(timed("<p>" + "url(".repeat(MAX_BYTES / 4 - 4) + " z)</p>")).toBeLessThan(1000);
+    expect(timed("<p>" + 'url("'.repeat(MAX_BYTES / 5 - 2) + "</p>")).toBeLessThan(1000);
+    // input too repetitive to check quickly fails closed instead of passing or hanging
+    expect(rules("<p>" + "url(".repeat(MAX_BYTES / 4 - 4) + " z)</p>")).toContain("too-complex");
+    expect(rules('<p>url("never closed</p><div style="background: url(//example.test/a.png)"></div>')).toContain("external-url");
+    expect(rules("<p>url(</p><div style=\"background: url(javascript:x)\"></div>")).toContain("javascript-url");
+  });
 });
 
 describe("reporting", () => {

@@ -15,12 +15,12 @@ import { pathToFileURL } from 'node:url';
 
 export const MAX_BYTES = 24 * 1024;
 export const MAX_DATA_IMAGE_BYTES = 60 * 1024;
+const URL_WORK_LIMIT = 1024 * 1024; // characters of URL text examined in one lint (see checkUrl)
 const FORBIDDEN_TAG = /<\/?(script|iframe|object|embed|link)(?=[\s/>]|$)/gi;
 const EVENT_ATTRIBUTE = /(?:^|[\s"'/])(on[a-z][a-z0-9_-]*)\s*=/gi;
 // The lookbehind keeps this linear: a match can only start at the beginning of a word, so a long run of letters
 // (or a 20 KB base64 string) is scanned once, not once per character.
 const ATTRIBUTE = /(?<![\w:.-])([a-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`=]+))/gi;
-const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi;
 const CSS_IMPORT = /@import\s+(?:"([^"]*)"|'([^']*)')/gi;
 const WRITTEN_ADDRESS = /\b(?:https?|ftp|wss?):\/\/[^\s"'<>)]+/gi;
 const URL_ATTRIBUTES = new Set(['href', 'xlink:href', 'src', 'poster', 'action', 'formaction', 'data', 'cite', 'background', 'manifest', 'ping', 'codebase']);
@@ -49,6 +49,39 @@ function urlForm(value) {
 const clip = (s) => (s.length > 80 ? s.slice(0, 77) + '...' : s);
 
 /**
+ * Every url(...) body in `css`, in one linear pass. A regex that tries each `url(` against the rest of the text is
+ * quadratic when no closing bracket follows (24 KB of `url(` took over a second on the CI runner), so this walks the
+ * text once and remembers where the next `)` is.
+ */
+function* cssUrls(css) {
+  const open = /url\(/gi;
+  let close = -1; // the first ')' at or after the last position asked; -2 once none is left
+  const closeAfter = (from) => {
+    if (close !== -2 && close < from) close = css.indexOf(')', from);
+    if (close === -1) close = -2;
+    return close;
+  };
+  for (let m = open.exec(css); m; m = open.exec(css)) {
+    let i = m.index + m[0].length;
+    while (i < css.length && /\s/.test(css[i])) i++;
+    const quote = css[i];
+    let end;
+    if (quote === '"' || quote === "'") {
+      const stop = css.indexOf(quote, i + 1);
+      if (stop < 0) continue;
+      yield css.slice(i + 1, stop);
+      end = closeAfter(stop + 1);
+    } else {
+      end = closeAfter(i);
+      if (end !== -2) yield css.slice(i, end);
+    }
+    // no ')' is left anywhere, so no later url( can be complete. Otherwise the next url( is visited even when it sits
+    // inside the body just read: an unclosed quote must not be able to swallow a real url() that follows it.
+    if (end === -2) break;
+  }
+}
+
+/**
  * @param {string} html
  * @returns {{ok: boolean, bytes: number, dataImageBytes: number, violations: {rule: string, detail: string}[]}}
  */
@@ -70,7 +103,19 @@ export function lintMockup(html) {
   for (const m of text.matchAll(EVENT_ATTRIBUTE)) add('event-attribute', m[1].toLowerCase());
 
   let dataImageBytes = 0;
+  // A work budget keeps the check fast on hostile input: a snippet that repeats url( thousands of times hands the
+  // normaliser a huge body per start. Past the budget the check stops and the snippet fails as "too-complex" (it
+  // fails closed; a real mockup carries a handful of URLs and never gets near the limit).
+  let examined = 0;
+  let overBudget = false;
   const checkUrl = (raw, where) => {
+    if (overBudget) return;
+    examined += raw.length;
+    if (examined > URL_WORK_LIMIT) {
+      overBudget = true;
+      add('too-complex', 'so much URL text to examine that the snippet cannot be checked quickly; simplify it');
+      return;
+    }
     const url = urlForm(raw);
     if (!url || url.startsWith('#')) return;
     if (url.startsWith('javascript:') || url.startsWith('vbscript:')) return add('javascript-url', `${where}: ${raw}`);
@@ -85,6 +130,7 @@ export function lintMockup(html) {
   };
 
   for (const m of text.matchAll(ATTRIBUTE)) {
+    if (overBudget) break;
     const name = m[1].toLowerCase();
     const value = m[2] ?? m[3] ?? m[4] ?? '';
     if (URL_ATTRIBUTES.has(name)) checkUrl(value, name);
@@ -92,7 +138,10 @@ export function lintMockup(html) {
   }
   // url() in a <style> block and in a style attribute alike: one pass over the whole text, so a data: image is counted once
   const css = unescapeCss(text);
-  for (const m of css.matchAll(CSS_URL)) checkUrl(m[1] ?? m[2] ?? m[3] ?? '', 'url()');
+  for (const body of cssUrls(css)) {
+    if (overBudget) break;
+    checkUrl(body, 'url()');
+  }
   for (const m of css.matchAll(CSS_IMPORT)) add('external-url', `@import: ${m[1] ?? m[2]}`);
   for (const m of text.matchAll(WRITTEN_ADDRESS)) add('external-url', `text: ${m[0]}`);
 
