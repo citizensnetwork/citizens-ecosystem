@@ -175,6 +175,7 @@ export async function POST(
 
   // Insert in-app notifications for recipients synchronously. Notifications
   // are service-role inserted because their RLS INSERT policy is admin-only.
+  const admin = createAdminClient();
   const notifyPromise = entityType === "event"
     ? supabase
         .from("rsvps")
@@ -182,11 +183,15 @@ export async function POST(
         .eq("event_id", entityId)
         .in("status", ["attending", "considering"])
     : Promise.all([
-        supabase
+        // S13: `follows` and `place_follows` can be read only by the person who owns a row (and the
+        // server's admin key), so the follower lookups run as `admin`. The caller was already proven to
+        // own this Contributor and entity above; a Contributor still never learns WHO follows them
+        // outside this fan-out, which writes notifications and returns no list.
+        admin
           .from("place_follows")
           .select("user_id")
           .eq("place_id", entityId),
-        supabase
+        admin
           .from("follows")
           .select("follower_id")
           .eq("followee_id", contributorId),
@@ -203,7 +208,6 @@ export async function POST(
     console.error("[API broadcasts POST] recipient lookup failed", recipientError);
   }
   if (recipients && recipients.length > 0) {
-    const admin = createAdminClient();
     const entityPath = entityType === "event" ? `/events/${entityId}` : `/places/${entityId}`;
     const recipientIds = [
       ...new Set(

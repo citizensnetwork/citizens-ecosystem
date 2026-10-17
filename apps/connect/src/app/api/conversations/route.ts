@@ -199,18 +199,16 @@ export async function POST(request: NextRequest) {
   let convStatus: "pending" | "active" = "active";
 
   if (senderRole === "contributor" && recipientRole === "citizen") {
-    // Fetch events + places owned by this contributor so we can check citizen interactions
-    const [eventsResult, placesResult] = await Promise.all([
-      supabase.from("events").select("id").eq("created_by", user.id),
-      supabase.from("places").select("id").eq("created_by", user.id),
-    ]);
+    // Fetch the events owned by this contributor so we can check whether the citizen RSVP'd to one
+    const eventsResult = await supabase.from("events").select("id").eq("created_by", user.id);
 
     const eventIds = (eventsResult.data ?? []).map((e) => e.id);
-    const placeIds = (placesResult.data ?? []).map((p) => p.id);
 
     // Check if citizen has RSVP'd any of this contributor's events, directly follows them,
-    // or follows any of their places
-    const [rsvpResult, followResult, placeFollowResult] = await Promise.all([
+    // or follows any of their places. S13: `follows` and `place_follows` are readable only by their owner,
+    // so "does this person follow me or my places" is asked through recipient_follows_me (the caller is
+    // always the Contributor; nobody can ask about a pair that does not include themselves).
+    const [rsvpResult, followsMeResult] = await Promise.all([
       eventIds.length > 0
         ? supabase
             .from("rsvps")
@@ -218,24 +216,10 @@ export async function POST(request: NextRequest) {
             .eq("user_id", recipient_id)
             .in("event_id", eventIds)
         : Promise.resolve({ count: 0, error: null }),
-      supabase
-        .from("follows")
-        .select("followee_id", { count: "exact", head: true })
-        .eq("follower_id", recipient_id)
-        .eq("followee_id", user.id),
-      placeIds.length > 0
-        ? supabase
-            .from("place_follows")
-            .select("place_id", { count: "exact", head: true })
-            .eq("user_id", recipient_id)
-            .in("place_id", placeIds)
-        : Promise.resolve({ count: 0, error: null }),
+      supabase.rpc("recipient_follows_me", { p_recipient: recipient_id }),
     ]);
 
-    const hasInteracted =
-      (rsvpResult.count ?? 0) > 0 ||
-      (followResult.count ?? 0) > 0 ||
-      (placeFollowResult.count ?? 0) > 0;
+    const hasInteracted = (rsvpResult.count ?? 0) > 0 || followsMeResult.data === true;
 
     if (!hasInteracted) {
       return NextResponse.json(

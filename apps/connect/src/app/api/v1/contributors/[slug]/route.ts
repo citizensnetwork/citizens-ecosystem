@@ -9,6 +9,7 @@
  * Response envelope:
  *   { data: { profile, upcoming_events, past_events, places,
  *             counts: { followers, events_total, places_total } },
+ *   `counts.followers` is a bucket: 0 below 100, otherwise rounded down to 100, 250, 500, 1000, ...
  *     meta: { generated_at } }
  *   404 when slug does not resolve to an approved contributor.
  */
@@ -125,10 +126,9 @@ export async function GET(
       .eq("created_by", profileRow.id)
       .order("name", { ascending: true })
       .limit(PLACES_CAP),
-    supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("followee_id", profileRow.id),
+    // S13: the public number is a bucket (0 under 100, otherwise rounded down) and comes from a function:
+    // the `follows` table itself is readable only by the person who follows, never by the public key.
+    supabase.rpc("follower_count_public", { p_followee: profileRow.id }),
   ]);
 
   return NextResponse.json(
@@ -139,7 +139,7 @@ export async function GET(
         past_events: pastRes.data ?? [],
         places: placesRes.data ?? [],
         counts: {
-          followers: followersRes.count ?? 0,
+          followers: Number(followersRes.data ?? 0) || 0,
           events_total:
             (upcomingRes.data?.length ?? 0) + (pastRes.data?.length ?? 0),
           places_total: placesRes.data?.length ?? 0,
