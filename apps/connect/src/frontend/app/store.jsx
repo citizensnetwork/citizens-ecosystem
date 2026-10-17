@@ -1852,7 +1852,16 @@
       })();
     }, [connected, considering, realUser, toast]);
 
+    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow: say so, instead of
+    // flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
+    const guestCannotFollow = useCallback(() => {
+      if (realUser || !window.CC_AUTH) return false;
+      toast('Sign in to follow.', 'gold');
+      return true;
+    }, [realUser, toast]);
+
     const toggleFollow = useCallback((orgId, name) => {
+      if (guestCannotFollow()) return;
       const was = followedOrgs.has(orgId);
       setFollowedOrgs((prev) => { const n = new Set(prev); was ? n.delete(orgId) : n.add(orgId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1866,9 +1875,10 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedOrgs, realUser, toast]);
+    }, [followedOrgs, realUser, toast, guestCannotFollow]);
 
     const togglePlaceFollow = useCallback((placeId, name) => {
+      if (guestCannotFollow()) return;
       const was = followedPlaces.has(placeId);
       setFollowedPlaces((prev) => { const n = new Set(prev); was ? n.delete(placeId) : n.add(placeId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1882,7 +1892,7 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedPlaces, realUser, toast]);
+    }, [followedPlaces, realUser, toast, guestCannotFollow]);
 
     // Dismiss a map broadcast bubble for this user only (per-user, ~24h).
     const dismissBubble = useCallback((bubbleId, eventId) => {

@@ -24,6 +24,9 @@
       snapMessage: { peek: 'Showing a summary', half: 'Showing details', full: 'Showing everything' },
       directions: 'Directions',
       share: 'Share',
+      // P2-04: the same Follow the profile page and the card have (a Contributor only; a Place or an Event keeps its card)
+      follow: 'Follow',
+      following: 'Following',
       website: 'Website',
       call: 'Call',
       email: 'Email',

@@ -130,10 +130,10 @@
         : (initialsOf(name) || glyph));
   }
 
-  function Action({ icon, label, href, onClick, external, primary }) {
+  function Action({ icon, label, href, onClick, external, primary, on }) {
     const Icon = window.Icon;
-    const kids = [h(Icon, { key: 'i', name: icon, size: 16 }), h('span', { key: 't' }, label)];
-    const common = { 'data-mv2': 'action', 'data-primary': primary ? '' : undefined };
+    const kids = [h(Icon, { key: 'i', name: icon, size: 16, fill: on ? 'currentColor' : 'none' }), h('span', { key: 't' }, label)];
+    const common = { 'data-mv2': 'action', 'data-primary': primary ? '' : undefined, 'data-on': on ? '' : undefined };
     return href
       ? h('a', Object.assign({ href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined }, common), kids)
       : h('button', Object.assign({ type: 'button', onClick }, common), kids);
@@ -166,7 +166,7 @@
   // ── the sheet ────────────────────────────────────────────────────
   function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick }) {
     const app = window.useApp();
-    const { go, shareLink, contributors, events, places, newsPosts } = app;
+    const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, realUser } = app;
     const Str = S();
     const wide = useWide();
     const root = useRef(null);
@@ -429,6 +429,11 @@
     // ── actions ─────────────────────────────────────────────────────
     const actions = [];
     if (dir) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true, primary: true }));
+    // P2-04: Follow, for a Contributor that is not you (a Place and an Event show their card's own Follow / Consider)
+    const following = isContributor && followedOrgs.has(item.id);
+    if (isContributor && !(realUser && realUser.id === item.id)) {
+      actions.push(h(Action, { key: 'follow', icon: 'Heart', label: following ? Str.following : Str.follow, on: following, onClick: () => toggleFollow(item.id, name) }));
+    }
     actions.push(h(Action, { key: 'share', icon: 'Share2', label: Str.share, onClick: () => shareLink({ page: navTarget(type), params: { id } }) }));
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
     if (tel) actions.push(h(Action, { key: 'tel', icon: 'Phone', label: Str.call, href: tel }));

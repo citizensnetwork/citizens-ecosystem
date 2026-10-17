@@ -735,6 +735,10 @@
   background: var(--accent);
   color: var(--accent-contrast);
 }
+/* Follow, once followed: the label already says "Following"; the gold-ink ring and the filled heart say it a second way (never colour alone) */
+[data-mv2='action'][data-on] {
+  border-color: var(--accent-ink);
+}
 /* the QR code action under the content: centred, above View Full Profile */
 [data-mv2='actions-end'] {
   display: flex;
