@@ -1,6 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  PROPOSAL, NOT APPLIED. Tracker P2-09 (Co-hosted events: two Contributors on one event), gate G1.
---  Written 2026-10-15 against live head 181. Needs Stephen's yes in chat before anything is applied.
+--  Written 2026-10-15 against live head 181; the live head is now 182 (another session's Vision migration), so the
+--  number is NOT fixed: take the next free one after list_migrations at apply time. Needs Stephen's yes in chat first.
 --
 --  Today an event has ONE organiser (events.created_by). Two ministries who run a night together cannot both be on it,
 --  so one of them is unseen. Collaboration across sectors is the point of Citizens (VISION), so this lets the organiser
@@ -10,8 +11,10 @@
 --  who is asking (the organiser invites; only the invited Contributor answers), so RLS can stay "read only" and there is
 --  nothing to widen by mistake. search_path is pinned and EXECUTE is limited to signed-in users.
 --
---  If approved: pre-apply git tag, MCP apply_migration (183_event_cohosts), get_advisors (0 ERROR, 0 new findings),
---  move this file to supabase/migrations/183_event_cohosts.sql in the same PR.
+--  If approved: pre-apply git tag, MCP apply_migration (<next free number>_event_cohosts), get_advisors (0 ERROR,
+--  0 new findings), move this file to supabase/migrations/<number>_event_cohosts.sql in the same PR.
+--  Re-read the live notifications_type_check before applying: this file re-states the whole list (25 types on
+--  2026-10-16) and must be rebased if another migration has added a type since.
 -- ════════════════════════════════════════════════════════════════════
 
 begin;
