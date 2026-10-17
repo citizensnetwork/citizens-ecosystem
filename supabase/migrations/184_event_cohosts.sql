@@ -1,20 +1,16 @@
 -- ════════════════════════════════════════════════════════════════════
---  PROPOSAL, NOT APPLIED. Tracker P2-09 (Co-hosted events: two Contributors on one event), gate G1.
---  Written 2026-10-15 against live head 181; the live head is now 182 (another session's Vision migration), so the
---  number is NOT fixed: take the next free one after list_migrations at apply time. Needs Stephen's yes in chat first.
+--  184_event_cohosts: P2-09 Co-hosted events. APPLIED 2026-10-17 through MCP apply_migration as `184_event_cohosts`, on
+--  Stephen's yes in chat (pre-apply tag `connect-pre-mig184-event-cohosts`; rollback-only probe
+--  docs/audit/probes/184_event_cohosts.probe.sql, 39 of 39 PASS against the live objects). The live
+--  notifications_type_check was re-read first (25 kinds) and this file re-states it with the two new kinds (27).
+--  Security advisor: 0 ERROR; 3 new WARN, the three functions below, callable by signed-in users on purpose (each checks
+--  auth.uid() inside, like the 109 existing functions of that class).
 --
---  Today an event has ONE organiser (events.created_by). Two ministries who run a night together cannot both be on it,
---  so one of them is unseen. Collaboration across sectors is the point of Citizens (VISION), so this lets the organiser
---  invite up to 3 other approved Contributors, and the event then shows on each of their pages once they accept.
---
---  Design: no direct INSERT or UPDATE on the table. Every change goes through a SECURITY DEFINER function that checks
---  who is asking (the organiser invites; only the invited Contributor answers), so RLS can stay "read only" and there is
---  nothing to widen by mistake. search_path is pinned and EXECUTE is limited to signed-in users.
---
---  If approved: pre-apply git tag, MCP apply_migration (<next free number>_event_cohosts), get_advisors (0 ERROR,
---  0 new findings), move this file to supabase/migrations/<number>_event_cohosts.sql in the same PR.
---  Re-read the live notifications_type_check before applying: this file re-states the whole list (25 types on
---  2026-10-16) and must be rebased if another migration has added a type since.
+--  Today an event has ONE organiser (events.created_by). The organiser invites up to 3 other approved Contributors, and the
+--  event then shows on each of their pages once they accept. No direct INSERT / UPDATE / DELETE on the table: every change
+--  goes through a SECURITY DEFINER function that checks who is asking; search_path is pinned; EXECUTE is limited to
+--  signed-in users. Authored as proposals/p2-09-event-cohosts.sql (2026-10-15); this file is that proposal with one change:
+--  authenticated has its default privileges revoked first (TRUNCATE is not subject to RLS), not only anon.
 -- ════════════════════════════════════════════════════════════════════
 
 begin;
@@ -48,8 +44,9 @@ create policy event_cohosts_select on public.event_cohosts
   );
 -- deliberately NO insert / update / delete policy: default deny. The three functions below are the only way in.
 
-revoke all on public.event_cohosts from anon, public;
-revoke insert, update, delete on public.event_cohosts from authenticated;
+-- (Supabase grants every privilege on a new table to anon and authenticated by default, and TRUNCATE is not subject to
+-- RLS: take everything away from both, then give back read access only.)
+revoke all on public.event_cohosts from anon, authenticated, public;
 grant select on public.event_cohosts to authenticated, anon;
 
 -- Two new notification kinds. The check lists every existing type (read from the live constraint on 2026-10-15) plus two.
@@ -168,10 +165,3 @@ commit;
 
 -- Rollback: drop the three functions, drop table public.event_cohosts, and put the notifications check back to the
 -- 25-type list without the two new kinds (delete any cohost_* notification rows first, or the re-add will fail).
---
--- What follows in the front end, once approved (none of it is built): an "Invite a co-host" step in the organiser's event
--- form, an invitation card in the invited Contributor's notifications, and the Events tab and map pin listing an event for
--- every ACCEPTED co-host (the per-slug fetch needs "created_by = X OR accepted co-host" for the same event row, shown once).
--- Tests to write with the migration: policy tests (a stranger cannot insert, update or delete; a private event leaks no
--- co-host), the function refusals (not the owner, self, hidden or non-Contributor target, blocked, a 4th co-host,
--- a repeat invite, answering someone else's invitation), and both notifications.

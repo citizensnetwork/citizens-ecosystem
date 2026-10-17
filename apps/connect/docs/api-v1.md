@@ -120,7 +120,9 @@ email the platform holds for them.
 ## GET /api/v1/contributors/{slug}
 
 Full public view of a single contributor by vanity slug, with upcoming
-and past events plus places they own.
+and past events plus places they own. The event lists include the events
+the contributor **co-hosts** (an invitation they accepted) next to the ones
+they created; a pending or declined invitation is never exposed.
 
 ### Example response
 
@@ -199,12 +201,17 @@ a scheme.
 | `to`          | ISO-8601| —       | Latest event date (inclusive)                   |
 | `lat`, `lng`  | number  | —       | Centre point for proximity filter               |
 | `radius_km`   | integer | 25      | 1..500, only used when `lat`+`lng` present      |
-| `created_by`  | uuid    | —       | Filter to one contributor                       |
+| `created_by`  | uuid    | —       | Filter to one contributor: the events they created **plus the events they co-host** |
 | `limit`       | integer | 50      | 1..100                                          |
 | `offset`      | integer | 0       | 0..10000                                        |
 
 Only `status = 'published'` AND `visibility = 'public'` events are
 returned. Draft, private and cancelled events are never exposed.
+
+Every event carries `co_host_ids`: the UUIDs of the contributors who
+**accepted** an invitation to co-host it, sorted, usually an empty list.
+`created_by` is still the organiser. Pending and declined invitations are
+never exposed. (Additive: consumers that ignore the field are unaffected.)
 
 ### Example
 
@@ -226,6 +233,7 @@ curl "https://citizens-connect.app/api/v1/events?category=worship&lat=-25.7479&l
       "latitude": -25.7479,
       "longitude": 28.2293,
       "created_by": "…uuid…",
+      "co_host_ids": [],
       "community_contributor": false
     }
   ],
@@ -246,6 +254,7 @@ Full public view of a single event with aggregated stats.
     "title": "Night of Worship",
     "description": "…",
     "date": "2026-…",
+    "co_host_ids": [],
     "stats": {
       "going": 128,
       "considering": 34,
