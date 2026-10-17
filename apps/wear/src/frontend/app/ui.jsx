@@ -10,83 +10,91 @@
   const INK = '#1a1a1a';
   const MUTED = '#a09e97';
 
+  /**
+   * An <img> that shows `fallback` (an element, or nothing) instead of the
+   * browser's broken-picture icon when there is no `src` or it fails to load:
+   * a dead link, or one the Content-Security-Policy blocks. A new `src` gets a
+   * fresh try.
+   */
+  function SafeImg({ src, fallback, ...imgProps }) {
+    const [failedSrc, setFailedSrc] = useState(null);
+    if (!src || failedSrc === src) return fallback || null;
+    return h('img', { ...imgProps, src, onError: () => setFailedSrc(src) });
+  }
+
   /** Circular avatar: photo when available, else dark disc with initials. */
   function Avatar({ user, size = 40 }) {
     const name = (user && (user.displayName || user.handle)) || '?';
-    if (user && user.avatarUrl) {
-      return h('img', {
-        src: user.avatarUrl,
-        alt: name,
-        referrerPolicy: 'no-referrer',
-        style: {
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          flex: 'none',
-          display: 'block',
-        },
-      });
-    }
     const initials = name
       .split(' ')
       .map((w) => w[0])
       .slice(0, 2)
       .join('')
       .toUpperCase();
-    return h(
-      'div',
-      {
-        style: {
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg,#3a3a3a,#1a1a1a)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: GOLD,
-          fontWeight: 700,
-          fontSize: size * 0.34,
-          flex: 'none',
-        },
+    return h(SafeImg, {
+      src: user && user.avatarUrl,
+      alt: name,
+      referrerPolicy: 'no-referrer',
+      style: {
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        flex: 'none',
+        display: 'block',
       },
-      initials,
-    );
+      fallback: h(
+        'div',
+        {
+          style: {
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg,#3a3a3a,#1a1a1a)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: GOLD,
+            fontWeight: 700,
+            fontSize: size * 0.34,
+            flex: 'none',
+          },
+        },
+        initials,
+      ),
+    });
   }
 
   /** Brand mark: logo image when set, else dark disc with the crown. */
   function BrandLogo({ brand, size = 40 }) {
-    if (brand && brand.logoUrl) {
-      return h('img', {
-        src: brand.logoUrl,
-        alt: brand.name,
-        style: {
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          flex: 'none',
-          display: 'block',
-        },
-      });
-    }
-    return h(
-      'div',
-      {
-        style: {
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          background: '#0e0e0e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 'none',
-        },
+    return h(SafeImg, {
+      src: brand && brand.logoUrl,
+      alt: brand && brand.name,
+      style: {
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        flex: 'none',
+        display: 'block',
       },
-      h(Crown, { size: size * 0.52 }),
-    );
+      fallback: h(
+        'div',
+        {
+          style: {
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            background: '#0e0e0e',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 'none',
+          },
+        },
+        h(Crown, { size: size * 0.52 }),
+      ),
+    });
   }
 
   function GoldButton({ label, onClick, disabled, icon, style }) {
@@ -327,6 +335,10 @@
     // The manual URL input hides behind an "or paste a URL" toggle.
     const [uploaded, setUploaded] = useState(false);
     const [showPaste, setShowPaste] = useState(false);
+    // The value whose preview failed to load (a link to another website is
+    // blocked by the Content-Security-Policy), so we can say so instead of
+    // showing a broken-picture icon.
+    const [badPreview, setBadPreview] = useState(null);
     const inputRef = useRef(null);
 
     const onFile = async (e) => {
@@ -356,6 +368,11 @@
     };
 
     const previewSize = round ? 72 : 96;
+    const shownErr =
+      err ||
+      (value && badPreview === value
+        ? "This picture can't be shown here. Upload the image instead of pasting a link from another website."
+        : null);
     // Show the raw URL field only when it's actually needed: a pasted/preloaded
     // value (so it stays editable) or an explicit paste toggle. Never for a
     // fresh upload — that's the leak §3U-1a closes.
@@ -371,11 +388,12 @@
         onChange: onFile,
         style: { display: 'none' },
       }),
-      value
+      value && badPreview !== value
         ? h('img', {
             src: value,
             alt: 'preview',
             referrerPolicy: 'no-referrer',
+            onError: () => setBadPreview(value),
             style: {
               width: previewSize,
               height: previewSize,
@@ -447,11 +465,11 @@
             )
           : null,
       ),
-      err
+      shownErr
         ? h(
             'div',
             { style: { fontSize: 11.5, color: '#8f4a2b', fontWeight: 600, marginTop: 7 } },
-            err,
+            shownErr,
           )
         : null,
       showUrlField
@@ -711,6 +729,7 @@
     MUTED,
     Avatar,
     BrandLogo,
+    SafeImg,
     GoldButton,
     FollowButton,
     Spinner,
