@@ -1,6 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { hydrateFeed, toBrandDto, toUserDto } from '@/lib/api/serializers';
 import { bodyString, readJsonBody, readPageParams } from '@/lib/api/params';
+import { bodyImageUrl } from '@/lib/api/image-urls';
 import { safeUrl } from '@/lib/validators';
 import type { UpdateBrandInput } from '@citizens/db';
 
@@ -35,7 +36,7 @@ export const PATCH = handler(async (req, ctx, params) => {
     ...(has('name') ? { name: bodyString(body, 'name') } : {}),
     ...(has('tagline') ? { tagline: bodyString(body, 'tagline') || null } : {}),
     ...(has('websiteUrl') ? { websiteUrl: safeUrl(bodyString(body, 'websiteUrl')) } : {}),
-    ...(has('logoUrl') ? { logoUrl: safeUrl(bodyString(body, 'logoUrl')) } : {}),
+    ...(has('logoUrl') ? { logoUrl: bodyImageUrl(body, 'logoUrl') } : {}),
   };
   const updated = await ctx.store.brands.update(brand.id, userId, patch);
   return json(toBrandDto(updated));

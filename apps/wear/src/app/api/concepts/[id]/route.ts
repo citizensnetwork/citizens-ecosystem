@@ -1,7 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { hydrateConcept, toBrandDto } from '@/lib/api/serializers';
-import { bodyString, bodyStringArray, readJsonBody } from '@/lib/api/params';
-import { safeUrl } from '@/lib/validators';
+import { bodyString, readJsonBody } from '@/lib/api/params';
+import { bodyImageUrls } from '@/lib/api/image-urls';
 import type { WearBrand } from '@citizens/db';
 
 export const dynamic = 'force-dynamic';
@@ -77,11 +77,12 @@ export const PATCH = handler(async (req, ctx, params) => {
     patch.description = bodyString(body, 'description').slice(0, MAX_DESCRIPTION) || null;
   }
   if (body && typeof body === 'object' && 'mediaUrls' in body) {
-    patch.media = bodyStringArray(body, 'mediaUrls')
-      .map((u) => safeUrl(u))
-      .filter((u): u is string => !!u)
-      .slice(0, MAX_MEDIA)
-      .map((url, i) => ({ url, kind: 'image' as const, altText: null, orderIndex: i }));
+    patch.media = bodyImageUrls(body, 'mediaUrls', MAX_MEDIA).map((url, i) => ({
+      url,
+      kind: 'image' as const,
+      altText: null,
+      orderIndex: i,
+    }));
   }
 
   const entry = await ctx.store.concepts.update(params.id!, userId, patch);

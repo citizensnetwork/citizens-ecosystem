@@ -1,6 +1,7 @@
 import { ApiError, handler, json, requireUserId } from '@/lib/api/route-context';
 import { toBrandDto } from '@/lib/api/serializers';
 import { bodyString, readJsonBody, readPageParams } from '@/lib/api/params';
+import { bodyImageUrl } from '@/lib/api/image-urls';
 import { safeUrl } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ export const POST = handler(async (req, ctx) => {
     name,
     tagline: bodyString(body, 'tagline') || null,
     websiteUrl: safeUrl(bodyString(body, 'websiteUrl')),
-    logoUrl: safeUrl(bodyString(body, 'logoUrl')),
+    logoUrl: bodyImageUrl(body, 'logoUrl'),
   });
   return json(toBrandDto(brand), 201);
 });
