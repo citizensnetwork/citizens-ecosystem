@@ -115,7 +115,7 @@ git grep -ciE '#c9a84c\b' -- apps/connect/src apps/vision/src apps/wear/src pack
 | `#f2ba1b` |     7 | Wear: `--gold` in its `index.html`, and `app/home.jsx`, `app/profile.jsx`, `app/ui.jsx`                                                                                                     |
 | `#f0c024` |     1 | Vision: `--gold-500` (its `--brand`) in its `index.html`                                                                                                                                    |
 
-The Designer specification said three golds; its search covered three known values and missed the two that live in Vision's and Wear's own pages. The frozen script in [`DRIFT_INDEX.md`](DRIFT_INDEX.md) finds the same five by colour, not by value: **five fill golds across the platform**: two in Connect, two in Vision (`#d4af37` is in both), one in Wear and one in `packages/ui`.
+The Designer specification said three golds; its search covered three known values and missed the two that live in Vision's and Wear's own pages. The frozen counter in [`DRIFT_INDEX.md`](DRIFT_INDEX.md) finds the same five by colour, not by value: **five fill golds across the platform**: two in Connect, two in Vision (`#d4af37` is in both), one in Wear and one in `packages/ui`.
 
 ### 5.2 Fonts
 
@@ -136,25 +136,25 @@ The handoff's earlier note of "Inter in three `index.html` files" was wrong: the
 
 ### 5.3 Drift index
 
-The frozen definition, the reference script and the baseline are in [`DRIFT_INDEX.md`](DRIFT_INDEX.md). Baseline at `f14b0c8`: **Connect 9.94, Vision 10.50, Wear 13.91, total 10.08** (distinct raw values outside token blocks per thousand lines, plus 5 for each fill gold beyond the first; lower is better). Map v2's own stylesheet contributes none by construction.
+The frozen definition, the tested counter (`apps/connect/scripts/design/drift.mjs`) and the baseline are in [`DRIFT_INDEX.md`](DRIFT_INDEX.md). Baseline at `f14b0c8`: **Connect 9.94, Vision 10.50, Wear 13.91, total 10.08** (distinct raw values outside token blocks per thousand lines, plus 5 for each fill gold beyond the first; lower is better). Map v2's own stylesheet contributes none by construction.
 
 ## 6. Per-screen parity checklist (tracker 12.3)
 
 A screen is at parity when it passes the nine items below (the tracker's checklist, section 12.3, which the Map v2 phase passed). N is the **14 screens** named in the route table at the top of `apps/connect/src/frontend/app/routes.jsx`: map, discover, community, event, place, contributor, me, messages, notifications, settings, apply, onboarding, dashboard, admin (counted by hand from that comment).
 
-| #   | Item                                                                       | How to check                                                                                    |
-| --- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1   | Spacing only from the 4-pt scale                                           | no raw `px` outside token blocks (the drift script's counts; `mapV2Tokens.test.ts` for the map) |
-| 2   | At most three type sizes and two weights in the screen                     | the drift script's font-size values; a screen may use only `--fs-1` to `--fs-3`                 |
-| 3   | Radii only 8, 12, 20, 999                                                  | the drift script's radius values                                                                |
-| 4   | One icon family, one stroke weight                                         | all icons come from `app/icons.jsx`                                                             |
-| 5   | One accent colour in use                                                   | the drift script's fill golds: one                                                              |
-| 6   | Hover (pointer devices), focus-visible and pressed states on every control | the captures of phase 2, and a keyboard pass                                                    |
-| 7   | Loading, empty and error states on every list and grid                     | the captures of phase 2                                                                         |
-| 8   | Light and dark screenshots at 375, 768 and 1280 px                         | `capture.mjs` (phase 2)                                                                         |
-| 9   | The founder's sign-off recorded                                            | the tracker's decision log, section 11.1                                                        |
+| #   | Item                                                                       | How to check                                                                                                                       |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Spacing only from the 4-pt scale                                           | no raw `px` outside token blocks (`audit.mjs --surface <id>`; `mapV2Tokens.test.ts` for the map)                                   |
+| 2   | At most three type sizes and two weights in the screen                     | `audit.mjs --surface <id>` font-size values, and the capture manifest's computed sizes; a screen may use only `--fs-1` to `--fs-3` |
+| 3   | Radii only 8, 12, 20, 999                                                  | `audit.mjs --surface <id>` radius values, and the manifest's computed radii                                                        |
+| 4   | One icon family, one stroke weight                                         | all icons come from `app/icons.jsx`                                                                                                |
+| 5   | One accent colour in use                                                   | `audit.mjs` fill golds: one                                                                                                        |
+| 6   | Hover (pointer devices), focus-visible and pressed states on every control | the captures (`capture.mjs`) and a keyboard pass; the manifest counts the tap targets under 44 px                                  |
+| 7   | Loading, empty and error states on every list and grid                     | the captures (`capture.mjs`)                                                                                                       |
+| 8   | Light and dark screenshots at 375, 768 and 1280 px                         | `apps/connect/scripts/design/capture.mjs`                                                                                          |
+| 9   | The founder's sign-off recorded                                            | the tracker's decision log, section 11.1                                                                                           |
 
-**Baseline (2026-10-17): parity is not measured.** The map passes all nine (its tests, its audit and the founder's phone check); the other 13 screens have not been captured, so their result is **not measured**, not failed. Phase 2 adds the captures and the Designer reports `n of 14` from then on.
+**Baseline (2026-10-17): parity is not measured.** The map passes all nine (its tests, its audit and the founder's phone check); the other 13 screens have not been judged, so their result is **not measured**, not failed. Phase 2 (built the same day) adds the tools: `audit.mjs` and `capture.mjs`, whose manifest records for every screen the computed font sizes and radii and the tap targets under 44 px. The Designer reports `n of 14` from its first run (week 0).
 
 ## 7. Rules the Designer inherits (by link, not copy)
 
