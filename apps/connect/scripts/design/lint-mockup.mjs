@@ -23,20 +23,25 @@ const CSS_IMPORT = /@import\s+(?:"([^"]*)"|'([^']*)')/gi;
 const WRITTEN_ADDRESS = /\b(?:https?|ftp|wss?):\/\/[^\s"'<>)]+/gi;
 const URL_ATTRIBUTES = new Set(['href', 'xlink:href', 'src', 'poster', 'action', 'formaction', 'data', 'cite', 'background', 'manifest', 'ping', 'codebase']);
 
-const NAMED_ENTITIES = { colon: ':', tab: '\t', newline: '\n', sol: '/', lpar: '(', rpar: ')' };
+const NAMED_ENTITIES = { colon: ':', tab: '\t', newline: '\n', sol: '/', lpar: '(', rpar: ')', quot: '"', apos: "'", amp: '&' };
+
+const codePoint = (n) => (Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '');
 
 /** The attribute value as a browser reads it: character references decoded once. */
 function decodeEntities(value) {
-  const codePoint = (n) => (Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '');
   return value
     .replace(/&#x([0-9a-f]+);?/gi, (_, h) => codePoint(parseInt(h, 16)))
     .replace(/&#(\d+);?/g, (_, d) => codePoint(parseInt(d, 10)))
     .replace(/&([a-z]+);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
 }
 
+/** CSS reads `\68 ttps` as `https`: decode its escapes before looking for url() and @import. */
+const unescapeCss = (text) => text.replace(/\\([0-9a-f]{1,6})\s?/gi, (_, h) => codePoint(parseInt(h, 16)));
+
 /** What a URL parser sees: tabs, newlines and other control characters are dropped, leading blanks trimmed. */
 function urlForm(value) {
-  return decodeEntities(value).replace(/[\u0000- \u007f]+/g, '').toLowerCase();
+  // the quotes of a url("...") that was written with character references (&quot;) are part of the decoded text
+  return unescapeCss(decodeEntities(value)).replace(/[\x00-\x20\x7f]+/g, '').replace(/^["']+|["']+$/g, '').toLowerCase();
 }
 
 const clip = (s) => (s.length > 80 ? s.slice(0, 77) + '...' : s);
@@ -82,11 +87,11 @@ export function lintMockup(html) {
     const value = m[2] ?? m[3] ?? m[4] ?? '';
     if (URL_ATTRIBUTES.has(name)) checkUrl(value, name);
     else if (name === 'srcset') for (const part of value.split(',')) checkUrl(part.trim().split(/\s+/)[0] ?? '', 'srcset');
-    // a style attribute (or any attribute) can carry url(...)
-    for (const u of value.matchAll(CSS_URL)) checkUrl(u[1] ?? u[2] ?? u[3] ?? '', `${name} url()`);
   }
-  for (const m of text.matchAll(CSS_URL)) checkUrl(m[1] ?? m[2] ?? m[3] ?? '', 'url()');
-  for (const m of text.matchAll(CSS_IMPORT)) add('external-url', `@import: ${m[1] ?? m[2]}`);
+  // url() in a <style> block and in a style attribute alike: one pass over the whole text, so a data: image is counted once
+  const css = unescapeCss(text);
+  for (const m of css.matchAll(CSS_URL)) checkUrl(m[1] ?? m[2] ?? m[3] ?? '', 'url()');
+  for (const m of css.matchAll(CSS_IMPORT)) add('external-url', `@import: ${m[1] ?? m[2]}`);
   for (const m of text.matchAll(WRITTEN_ADDRESS)) add('external-url', `text: ${m[0]}`);
 
   if (dataImageBytes > MAX_DATA_IMAGE_BYTES) add('data-images-size', `${dataImageBytes} bytes of data: images, the limit is ${MAX_DATA_IMAGE_BYTES}`);

@@ -79,6 +79,9 @@ describe("external URLs", () => {
     ["a quoted url()", "<div style=\"background: url('//example.test/a.png')\"></div>"],
     ["a stylesheet url()", "<style>.a { background: url(https://example.test/a.png) }</style>"],
     ["an @import", '<style>@import "https://example.test/a.css";</style>'],
+    ["a url() written with CSS escapes", "<style>.a { background: url(\\68ttps://example.test/a.png) }</style>"],
+    ["an @import written with a CSS escape", '<style>@\\69mport "//example.test/a.css";</style>'],
+    ["a url() quoted with character references", '<div style="background: url(&quot;//example.test/a.png&quot;)"></div>'],
     ["an address written in the text", "<p>see https://example.test/page for more</p>"],
     ["a websocket address", "<p>ws://example.test/socket</p>"],
   ])("rejects %s", (_name, html) => {
@@ -99,6 +102,14 @@ describe("data: URLs", () => {
     const r = lintMockup('<img src="data:image/svg+xml;utf8,<svg xmlns=%27x%27/>">');
     expect(r.violations).toEqual([]);
     expect(r.dataImageBytes).toBeGreaterThan(0);
+  });
+
+  it("counts a data: image in a style attribute once (a 40 KB one is within the 60 KB limit)", () => {
+    const html = `<div style="background: url(data:image/png;base64,${"A".repeat(40 * 1024)})"></div>`;
+    const r = lintMockup(html);
+    expect(r.violations.map((v) => v.rule)).not.toContain("data-images-size");
+    expect(r.dataImageBytes).toBeLessThan(45 * 1024);
+    expect(r.dataImageBytes).toBeGreaterThan(40 * 1024);
   });
 
   it("rejects more than 60 KB of data: images in total, even when each one is small", () => {

@@ -130,6 +130,11 @@ describe("driftIndex", () => {
     expect(driftIndex(100, 3, 1000)).toBe(110);
     expect(driftIndex(50, 2, 500)).toBe(110);
   });
+
+  it("is 0, not NaN or Infinity, for an empty source set", () => {
+    expect(driftIndex(0, 0, 0)).toBe(0);
+    expect(driftIndex(5, 3, 0)).toBe(0);
+  });
 });
 
 describe("analyseRepo", () => {
@@ -162,9 +167,8 @@ describe("analyseRepo", () => {
 });
 
 describe("the real repository", () => {
-  const r = analyseRepo();
-
   it("reads the three frontends and returns finite numbers (the baseline itself lives in DRIFT_INDEX.md and moves with the code)", () => {
+    const r = analyseRepo(); // inside the test, so a missing git is a failing test and not a collection error
     for (const app of ["connect", "vision", "wear"] as const) {
       expect(r.apps[app].files, app).toBeGreaterThan(0);
       expect(Number.isFinite(r.apps[app].di), app).toBe(true);

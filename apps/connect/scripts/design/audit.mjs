@@ -36,8 +36,11 @@ export function surfaceFiles(surface, root = REPO_ROOT) {
   const read = (path) => ({ path, text: readFileSync(join(root, path), 'utf8') });
   if (surface === 'wear' || surface === 'vision') return listTracked(root, SETS[surface], /\.(jsx?|css|html)$/).map(read);
   const all = listTracked(root, [FRONT.slice(0, -1)], /\.(jsx?|css|html)$/);
-  const wanted = surface === 'map' ? all.filter((p) => MAP_FILES(p.slice(FRONT.length))) : (SURFACE_FILES[surface] ?? []).map((f) => FRONT + f).filter((p) => all.includes(p));
-  return wanted.map(read);
+  const listed = surface === 'map' ? all.filter((p) => MAP_FILES(p.slice(FRONT.length))) : (SURFACE_FILES[surface] ?? []).map((f) => FRONT + f);
+  const missing = listed.filter((p) => !all.includes(p));
+  // a renamed file must not silently shrink a surface's numbers
+  if (missing.length) console.warn(`warning: ${surface}: listed in SURFACE_FILES but not tracked: ${missing.join(', ')}`);
+  return listed.filter((p) => all.includes(p)).map(read);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -71,6 +74,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const m = await captureAll(opts);
     console.log(`captured ${m.count} screenshots (${m.notReady} not ready); manifest.json holds the survey of what rendered`);
     if (m.hosts.length) console.log(`hosts the pages asked for: ${m.hosts.join(', ')}`);
-    for (const s of m.shots.filter((x) => !x.ready)) console.log(`  not ready: ${s.file}: ${s.note}`);
+    for (const s of m.shots.filter((x) => !x.ready)) console.log(`  not ready: ${s.file ?? `${s.route}-${s.viewport}-${s.look}`}: ${s.note}`);
   }
 }

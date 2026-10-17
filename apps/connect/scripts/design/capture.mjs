@@ -1,4 +1,4 @@
-// Route sweep: screenshots of Connect's screens at 375, 768 and 1280 px in the light and the dark look, for the
+// Route sweep: screenshots of Connect's 14 screens (and the signed-out landing) at 375, 768 and 1280 px in the light and the dark look, for the
 // Designer's eyes (docs/routines/designer.md step 4). Hermetic on purpose: it reuses the Map v2 harness, which
 // answers config.js, MapTiler and every /api/** call locally with the synthetic fixture rows (fictional names, reserved
 // hosts), so a run reads no real database, signs in nowhere and writes nothing outside its output folder. The page is
@@ -33,7 +33,7 @@ const EVENT_ID = 'e0000000-0000-4000-8000-000000000001';
 const SCREEN = '[data-screen]';
 
 /**
- * The 14 screens of routes.jsx. `surface` is the id a Designer card uses (designer.md appendix A); `session` is the
+ * The 14 screens of routes.jsx plus the signed-out landing (15 states). `surface` is the id a Designer card uses (designer.md appendix A); `session` is the
  * demo session the page starts with ('none' shows the sign-in landing).
  */
 export const ROUTES = [
@@ -78,6 +78,7 @@ function surveyPage() {
 
 async function startServer(publicDir, port) {
   const child = spawn(process.execPath, [join(HERE, '..', 'map-v2', 'serve-static.mjs'), publicDir, String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderr = '';
   await new Promise((done, fail) => {
     const timer = setTimeout(() => fail(new Error(`the static server did not start on port ${port}`)), 15_000);
     child.stdout.on('data', (d) => {
@@ -86,13 +87,13 @@ async function startServer(publicDir, port) {
         done();
       }
     });
+    // a warning on stderr is not a failure; a server that cannot listen (a port in use) exits
     child.stderr.on('data', (d) => {
-      clearTimeout(timer);
-      fail(new Error(`the static server failed (is port ${port} in use?): ${String(d).trim().split('\n')[0]}`));
+      stderr += String(d);
     });
     child.on('exit', (code) => {
       clearTimeout(timer);
-      fail(new Error(`the static server exited with code ${code} (is port ${port} in use?)`));
+      fail(new Error(`the static server exited with code ${code} (is port ${port} in use?) ${stderr.trim().split('\n')[0]}`.trim()));
     });
   });
   return child;
@@ -120,6 +121,15 @@ export async function captureAll({ routes = ROUTES, viewports = VIEWPORTS, looks
   const { openSession, settle } = await import('../map-v2/harness.mjs');
   const { makeSeed } = await import('../map-v2/fixtures.mjs');
   const seed = makeSeed({ contributors: 6, places: 6, events: 5, spread: 0.03 });
+  // /c/<slug> asks /api/v1/contributors/<slug> for one profile (store.jsx); the harness's catch-all would answer with
+  // an empty list and the app would go back to the map. Answered from the same fixture rows, 404 for any other slug.
+  const profileRoute = async (page) => {
+    await page.route(/\/api\/v1\/contributors\/[a-z0-9-]+(?:\?.*)?$/, (route) => {
+      const slug = new URL(route.request().url()).pathname.split('/').pop();
+      const profile = seed.contributors.find((c) => c.contributor_slug === slug);
+      return profile ? route.fulfill({ json: { data: { profile } } }) : route.fulfill({ status: 404, json: { error: 'not found' } });
+    });
+  };
 
   const server = await startServer(publicDir, port);
   const shots = [];
@@ -129,7 +139,7 @@ export async function captureAll({ routes = ROUTES, viewports = VIEWPORTS, looks
     for (const session of sessions) {
       for (const vp of viewports) {
         for (const look of looks) {
-          const s = await openSession({ viewport: { width: vp.width, height: vp.height }, colorScheme: look, reducedMotion: true, seed });
+          const s = await openSession({ viewport: { width: vp.width, height: vp.height }, colorScheme: look, reducedMotion: true, seed, extraRoutes: profileRoute });
           try {
             await s.page.addInitScript((role) => {
               try {
@@ -154,10 +164,18 @@ export async function captureAll({ routes = ROUTES, viewports = VIEWPORTS, looks
                 ready = false;
                 note = String(e && e.message ? e.message : e).split('\n')[0];
               }
-              await s.page.screenshot({ path: join(outDir, file) });
+              let saved = true;
+              try {
+                await s.page.screenshot({ path: join(outDir, file) });
+              } catch (e) {
+                // one lost screenshot must not lose the run: it is recorded, and the manifest is still written
+                saved = false;
+                ready = false;
+                note = `screenshot failed: ${String(e && e.message ? e.message : e).split('\n')[0]}`;
+              }
               const survey = await s.page.evaluate(surveyPage).catch(() => null);
               shots.push({
-                route: route.id, surface: route.surface, path: route.path, session, viewport: vp.id, look, file, ready, note,
+                route: route.id, surface: route.surface, path: route.path, session, viewport: vp.id, look, file: saved ? file : null, ready, note,
                 survey, logged: s.log.console.length + s.log.pageErrors.length - seenBefore,
               });
             }
@@ -203,5 +221,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const opts = parseArgs(process.argv.slice(2));
   const m = await captureAll(opts);
   console.log(`captured ${m.count} screenshots into ${opts.outDir} (${m.notReady} not ready)`);
-  for (const s of m.shots.filter((x) => !x.ready)) console.log(`  not ready: ${s.file}: ${s.note}`);
+  for (const s of m.shots.filter((x) => !x.ready)) console.log(`  not ready: ${s.file ?? `${s.route}-${s.viewport}-${s.look}`}: ${s.note}`);
 }

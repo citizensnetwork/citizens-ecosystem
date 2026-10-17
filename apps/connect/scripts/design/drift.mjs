@@ -111,8 +111,8 @@ export function isFillGold(colour) {
   return x.h >= 38 && x.h <= 52 && x.s >= 0.45 && x.l >= 0.5 && x.l <= 0.56;
 }
 
-/** DI = (distinct values + 5 for each fill gold beyond the first) / (lines / 1000). */
-export const driftIndex = (distinct, golds, loc) => (distinct + 5 * Math.max(golds - 1, 0)) / (loc / 1000);
+/** DI = (distinct values + 5 for each fill gold beyond the first) / (lines / 1000); 0 for an empty source set. */
+export const driftIndex = (distinct, golds, loc) => (loc > 0 ? (distinct + 5 * Math.max(golds - 1, 0)) / (loc / 1000) : 0);
 
 /** @typedef {{files: number, loc: number, outside: Record<string, Set<string>>, golds: string[], distinct: number, di: number}} AppResult */
 
