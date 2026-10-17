@@ -413,6 +413,8 @@
     volunteer_application: 'volunteer', volunteer_application_response: 'volunteer',
     team_invite: 'team', team_invite_response: 'team', team_owner_transfer: 'team',
     cohost_invite: 'team', cohost_invite_response: 'team',
+    // P2-04: a Contributor you follow published an event (opens the event) or a news post (opens the Contributor)
+    followed_new_event: 'event', followed_new_news: 'news',
     contributor_approved: 'admin', contributor_rejected: 'admin',
     admin_elevation_request: 'admin', spam_flag: 'admin', broadcast_flood: 'admin',
   };
@@ -434,6 +436,8 @@
       // Deep-link targets for the in-app router (event profile / message thread).
       eventId: d.event_id || (evMatch ? evMatch[1] : null),
       convId: d.conversation_id || (msgMatch ? msgMatch[1] : null),
+      // The Contributor a followed-news notification points to (a UUID only; anything else is dropped).
+      contributorId: r.type === 'followed_new_news' && /^[0-9a-f-]{36}$/i.test(String(d.contributor_id || '')) ? d.contributor_id : null,
     };
   }
 

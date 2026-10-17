@@ -297,3 +297,50 @@ test.describe("Co-hosted events, signed in", () => {
     await expect(panel).toHaveCount(0);
   });
 });
+
+// P2-04 (migration 187): a Contributor you follow published an event or a news post. The rows are written by the database
+// (probe docs/audit/probes/187_*); this is the screen that reads them. No count, no streak, no "you missed".
+test.describe("Follower notifications, signed in", () => {
+  const note = (n: Record<string, unknown>) => ({ id: "b2000000-0000-4000-8000-000000000001", read: false, created_at: new Date(FIXED_NOW - 3_600_000).toISOString(), ...n });
+
+  test("a followed event opens that event; a followed news post opens that Contributor; both are tappable rows", async ({ page }) => {
+    const db = newDb();
+    const seed = seed0();
+    const ev = seed.events[0];
+    const c = seed.contributors[0];
+    db.notifications = [
+      note({ type: "followed_new_event", title: "New event from Alpha", body: ev.title, data: { event_id: ev.id, post_id: ev.id, contributor_id: c.id } }),
+      note({ id: "b2000000-0000-4000-8000-000000000002", type: "followed_new_news", title: "New update from Alpha", body: "A news title", data: { post_id: "p1", contributor_id: c.id } }),
+    ];
+    await openAs(page, CITIZEN, CITIZEN_PROFILE, db, seed);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "notifications");
+    const rows = page.locator("[data-screen='notifications'] [role='button']");
+    await expect(rows).toHaveCount(2, { timeout: 15_000 });
+    await expect(page.locator("[data-notif='news']")).toHaveCount(1);   // each kind lands in its own display bucket (icon)
+    await expect(page.locator("[data-notif='event']")).toHaveCount(1);
+    await page.getByText("New update from Alpha").click();
+    await expect(page).toHaveURL(new RegExp(`/c/${c.contributor_slug}`), { timeout: 15_000 });
+    await goTo(page, "notifications");
+    await page.getByText("New event from Alpha").click();
+    await expect(page).toHaveURL(new RegExp(`/e/${ev.id}`), { timeout: 15_000 });
+    expect(db.patches.length).toBeGreaterThan(0);       // opening a row marks it read
+  });
+
+  test("control: a news notification with a bad Contributor id is shown but not a button, and nothing else changes", async ({ page }) => {
+    const db = newDb();
+    db.notifications = [note({ type: "followed_new_news", title: "New update from Beta", body: "x", data: { post_id: "p2", contributor_id: "not-a-uuid" } })];
+    await openAs(page, CITIZEN, CITIZEN_PROFILE, db);
+    await openMapSignedIn(page, 1);
+    await goTo(page, "notifications");
+    await expect(page.getByText("New update from Beta")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-screen='notifications'] [role='button']")).toHaveCount(0);
+  });
+
+  test("Settings says the switch also covers new events and news from Contributors you follow", async ({ page }) => {
+    await openAs(page, CITIZEN, CITIZEN_PROFILE, newDb());
+    await openMapSignedIn(page, 1);
+    await goTo(page, "settings");
+    await expect(page.getByText("New events and news from Contributors you follow")).toBeVisible({ timeout: 15_000 });
+  });
+});
