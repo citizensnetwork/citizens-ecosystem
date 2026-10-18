@@ -366,7 +366,7 @@ describe("trends and the evidence rule", () => {
     expect(rules(trendCard([TREND, TREND, TREND, TREND, TREND, TREND]))).toEqual(["trends-items"]);
   });
   it("rejects a source that is not a public http(s) address", () => {
-    for (const url of ["javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "https://10.0.0.1/x", "not a url"]) {
+    for (const url of ["javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "https://10.0.0.1/x", "http://design.example.net/plain", "not a url"]) {
       const bad = { ...TREND, sources: [source(url), source("https://design.example.net/r")] };
       expect(rules(trendCard([bad]))).toContain("bad-url");
     }
@@ -380,6 +380,13 @@ describe("trends and the evidence rule", () => {
   it("belongs to the digest: a trends field elsewhere, or a digest without trends, fails", () => {
     expect(rules(surfaceCard({ trends: [TREND] }))).toContain("trends-wrong-lens");
     expect(rules(trendCard(undefined as unknown as unknown[]))).toContain("trends-missing");
+    expect(rules(trendCard([]))).toEqual(["trends-missing"]); // nothing qualified means no card, not an empty digest
+  });
+  it("needs real calendar dates, not just the right shape", () => {
+    const bad = (extra: Record<string, unknown>) => trendCard([{ ...TREND, sources: [source("https://developer.example.org/g", extra), source("https://design.example.net/r")] }]);
+    expect(rules(bad({ readAt: "2026-13-45" }))).toContain("shape");
+    expect(rules(bad({ publishedAt: "2026-02-30" }))).toContain("shape");
+    expect(rules(bad({ readAt: "2026-11-03T11:20:00Z", publishedAt: "2026-05-01" }))).toEqual([]);
   });
 });
 

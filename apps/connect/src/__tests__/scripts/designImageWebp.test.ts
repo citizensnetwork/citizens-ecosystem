@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { DEFAULT_MAX_CHARS, DEFAULT_MAX_WIDTH, parseCrop } from "../../../scripts/design/image-webp.mjs";
+import { DEFAULT_MAX_CHARS, DEFAULT_MAX_WIDTH, parseCrop, positiveInt } from "../../../scripts/design/image-webp.mjs";
 
 describe("parseCrop", () => {
   it("reads x,y,w,h as whole numbers", () => {
@@ -15,6 +15,16 @@ describe("parseCrop", () => {
   });
   it.each(["", "1,2,3", "1,2,3,4,5", "a,b,c,d", "1,2,0,4", "1,2,3,0", "-1,2,3,4", "1.5,2,3,4"])("rejects %j", (text) => {
     expect(() => parseCrop(text)).toThrow(/--crop/);
+  });
+});
+
+describe("positiveInt", () => {
+  it("reads a whole number, and passes an absent option through", () => {
+    expect(positiveInt("--max-width", "480")).toBe(480);
+    expect(positiveInt("--max-width", undefined)).toBeUndefined();
+  });
+  it.each(["0", "-3", "1.5", "abc", "", "99999999"])("rejects %j", (text) => {
+    expect(() => positiveInt("--max-chars", text)).toThrow(/--max-chars/);
   });
 });
 

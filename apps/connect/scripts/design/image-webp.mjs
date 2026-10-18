@@ -89,6 +89,13 @@ function option(args, name) {
   return at === -1 ? undefined : args[at + 1];
 }
 
+/** A whole number of at least 1, or undefined when the option was not given. */
+export function positiveInt(name, text) {
+  if (text === undefined) return undefined;
+  if (!/^\d{1,7}$/.test(text) || Number(text) < 1) throw new Error(`${name} wants a whole number of at least 1`);
+  return Number(text);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const input = args[0];
@@ -103,8 +110,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const chars = option(args, '--max-chars');
     const result = await encodeWebp(input, {
       crop: crop === undefined ? undefined : parseCrop(crop),
-      maxWidth: width === undefined ? undefined : Number(width),
-      maxChars: chars === undefined ? undefined : Number(chars),
+      maxWidth: positiveInt('--max-width', width),
+      maxChars: positiveInt('--max-chars', chars),
     });
     writeFileSync(out, result.dataUrl);
     console.log(`ok    ${out} (${result.chars} characters, ${result.bytes} bytes, ${result.width}x${result.height}, quality ${result.quality})`);

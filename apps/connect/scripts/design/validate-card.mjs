@@ -41,6 +41,14 @@ const CLAIM_LINE = /^\s*(?:[-*>]\s*)*(?:\*\*|__)?claim\b[^:\n]{0,40}:/i;
 const PHONE_PATTERNS = [/\+\d[\d ().-]{7,}\d/, /(?<![\w.])0\d{2}[ .-]?\d{3}[ .-]?\d{4}(?!\w)/, /\(\d{2,4}\)[ .-]?\d{3}[ .-]?\d{3,4}/, /\d{9,}/];
 const DATA_URL = /data:(?:[a-z0-9.+-]+\/[a-z0-9.+-]+)?[;,]/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/;
+
+/** A real calendar date written yyyy-mm-dd (a time after it is allowed): "2026-13-45" is not one. */
+function isDate(value) {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
+  const day = value.slice(0, 10);
+  const parsed = new Date(day + 'T00:00:00Z');
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day;
+}
 const SECOND_LEVEL_LABELS = new Set(['co', 'com', 'org', 'net', 'gov', 'edu', 'ac']);
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -74,7 +82,7 @@ export function publisherKey(host) {
   return labels.slice(tld.length === 2 && SECOND_LEVEL_LABELS.has(second) ? -3 : -2).join('.');
 }
 
-/** `{host, key}` of an http(s) URL naming a site, otherwise null (a script URL, an address, nonsense). */
+/** `{host, key}` of an https URL naming a site, otherwise null (a script URL, a plain http one, an IP address, nonsense). */
 function publicUrl(value) {
   if (typeof value !== 'string' || value.length > 2048) return null;
   let url;
@@ -83,7 +91,7 @@ function publicUrl(value) {
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (url.protocol !== 'https:') return null; // the inbox page links https addresses only
   const host = url.hostname.toLowerCase().replace(/^www\./, '');
   if (!host.includes('.') || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(':')) return null;
   return { host, key: publisherKey(host) };
@@ -181,7 +189,7 @@ export function validateCard(card, options = {}) {
         if (!isObject(ref)) return add('shape', `refs[${i}] must be an object`);
         if (isText(ref.name)) refNames.add(ref.name);
         else add('shape', `refs[${i}] needs a name`);
-        if (!publicUrl(ref.url)) add('bad-url', `refs[${i}].url must be a public http(s) address`);
+        if (!publicUrl(ref.url)) add('bad-url', `refs[${i}].url must be a public https address`);
       });
     }
   }
@@ -220,9 +228,9 @@ export function validateCard(card, options = {}) {
         }
         const evidence = row.evidence;
         if (isObject(evidence)) {
-          if (!publicUrl(evidence.url) || !ISO_DATE.test(String(evidence.readAt ?? ''))) add('comparison-evidence', `comparison[${i}].evidence needs a public link and the date read`);
+          if (!publicUrl(evidence.url) || !isDate(evidence.readAt)) add('comparison-evidence', `comparison[${i}].evidence needs a public link and the date read`);
         } else if (!isText(evidence)) add('comparison-cell', `comparison[${i}].evidence is empty`);
-        else if (!/https?:\/\/\S+/i.test(evidence) || !/\d{4}-\d{2}-\d{2}/.test(evidence)) {
+        else if (!/https:\/\/\S+/i.test(evidence) || !/\d{4}-\d{2}-\d{2}/.test(evidence)) {
           add('comparison-evidence', `comparison[${i}].evidence needs a public link and the date read`);
         }
       });
@@ -234,6 +242,7 @@ export function validateCard(card, options = {}) {
     if (card.lens !== 'trend') add('trends-wrong-lens', 'trends belongs to the trend digest only (lens "trend")');
     if (!Array.isArray(card.trends)) add('shape', 'trends must be a list');
     else {
+      if (card.trends.length === 0) add('trends-missing', 'a trend digest needs at least one qualified trend (if none qualified, file nothing)');
       if (card.trends.length > TRENDS_MAX_ITEMS) add('trends-items', `${card.trends.length} items, the limit is ${TRENDS_MAX_ITEMS}`);
       card.trends.forEach((item, i) => checkTrend(item, i, add));
     }
@@ -259,9 +268,9 @@ function checkTrend(item, i, add) {
   item.sources.forEach((source, j) => {
     const where = `${at}.sources[${j}]`;
     const site = isObject(source) ? publicUrl(source.url) : null;
-    if (!site) return add('bad-url', `${where}.url must be a public http(s) address`);
-    if (!ISO_DATE.test(String(source.readAt ?? ''))) return add('shape', `${where}.readAt must be the date read (yyyy-mm-dd)`);
-    if (source.publishedAt !== undefined && !ISO_DATE.test(String(source.publishedAt))) return add('shape', `${where}.publishedAt must be a date (yyyy-mm-dd)`);
+    if (!site) return add('bad-url', `${where}.url must be a public https address`);
+    if (!isDate(source.readAt)) return add('shape', `${where}.readAt must be the date read (yyyy-mm-dd)`);
+    if (source.publishedAt !== undefined && !isDate(source.publishedAt)) return add('shape', `${where}.publishedAt must be a date (yyyy-mm-dd)`);
     // a page dated more than 24 months before it was read is background, not evidence (designer.md appendix B)
     if (source.publishedAt !== undefined) {
       const cutoff = new Date(source.readAt.slice(0, 10) + 'T00:00:00Z');
