@@ -1,4 +1,4 @@
-# Phone check: Follow, Save, co-hosts, "0 followers" (written 2026-10-17)
+# Phone check: Follow, Save, co-hosts, "0 followers", follower notifications, Moments, zoom (written 2026-10-17; sections F to I added the same night)
 
 **Who:** Stephen, on the Android phone, signed in. **Time:** about 12 minutes. **Why it is on a phone:** my tests drive Chrome with real touch events and a stand-in for the database, which is the closest a computer gets, but they cannot reproduce Android Chrome's own scroll engine, your real account, or the live database. Section C needs **two Contributor accounts** (an organiser and a guest); if you only have one, skip it and tell me, and I will say it was only tested against a stand-in.
 
@@ -67,6 +67,46 @@ Today the card keeps every two-finger gesture, so the page does **not** zoom und
 | E1  | Pull a card to full. Put two fingers on its text and spread them | Nothing zooms (today's design). **Tell me: should it, at full only?** |      |
 | E2  | On a plain page (the Kingdom list), pinch                        | The page zooms (R9, unchanged)                                        |      |
 | E3  | **Inside the phone app** (not Chrome), pinch anywhere            | No page zoom in the app (unchanged)                                   |      |
+
+## F. Follower notifications (migration 187; needs a second account that follows you, or you following a Contributor who posts)
+
+| #   | Do this                                                           | You should see                                                                                              | Pass |
+| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---- |
+| F1  | Follow a Contributor. Have them publish a NEW event (not a draft) | Within a minute a notification "New event from ..." with the event's title                                  |      |
+| F2  | Tap it                                                            | The event opens                                                                                             |      |
+| F3  | Have the same Contributor post a news item                        | "New update from ..."; tapping it opens that Contributor                                                    |      |
+| F4  | Have them publish 3 events in a row within a day                  | You get **two** notifications from them, not three                                                          |      |
+| F5  | Settings, "Broadcasts & updates"                                  | It now says it also covers new events and news from Contributors you follow; switch it off, repeat F1: none |      |
+
+## G. Moments (migration 188; as an approved Contributor)
+
+| #   | Do this                                                      | You should see                                                                                                     | Pass |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---- |
+| G1  | Dashboard, the News tab                                      | A "Post a note" box at the top: "This clears itself after a day." and "280 left"                                   |      |
+| G2  | Type a note, add a photo (optional), tap Post                | "Your note is up." and the note is listed under the box with "Posted just now" and a Take down button              |      |
+| G3  | Open your own pin on the map                                 | A **Today** tab (after Events and News, before Gallery) with the note. Nothing says how long is left or who saw it |      |
+| G4  | Type 281 characters                                          | "1 too many" and Post is off                                                                                       |      |
+| G5  | Post 5 notes, then try a sixth                               | The box is replaced by "You have 5 notes up. Take one down to post another."                                       |      |
+| G6  | Tap Take down                                                | The note leaves the list and the Today tab (reload the map to be sure)                                             |      |
+| G7  | View another Contributor with a live note                    | The Today tab shows their note; no ring on their avatar, no countdown, no view number                              |      |
+| G8  | Check four tabs on your phone (Events, News, Today, Gallery) | All four fit on one row without scrolling sideways                                                                 |      |
+
+## H. Pinch zoom in the full card (your yes of 2026-10-17)
+
+| #   | Do this                                                         | You should see                                                                          | Pass |
+| --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---- |
+| H1  | Pull a card to **full**. Put two fingers on its text and spread | The page zooms in; the card stays at full                                               |      |
+| H2  | Zoom, then scroll and drag the card down                        | It still scrolls and still closes with a swipe down from the top (tell me if it fights) |      |
+| H3  | At **half** (not full), pinch                                   | Nothing zooms (unchanged)                                                               |      |
+| H4  | Inside the **phone app** (not Chrome), pinch anywhere           | Still no page zoom                                                                      |      |
+
+## I. Search and counts (migrations 185, 186)
+
+| #   | Do this                                                        | You should see                                                                                    | Pass |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---- |
+| I1  | Search for a ministry by name                                  | Results; a small ministry is **not** ranked last just because few people follow it (ties by name) |      |
+| I2  | Your Dashboard, "View Public Profile"                          | Your **exact** follower count (only you see it)                                                   |      |
+| I3  | As a Contributor, start a message to a citizen who follows you | It is allowed (it starts as a request); to one who has never interacted with you it is refused    |      |
 
 ## What I could not check, and why
 

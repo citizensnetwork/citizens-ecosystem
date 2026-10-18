@@ -53,12 +53,12 @@ Directory of approved contributors.
 
 ### Query parameters
 
-| Param    | Type    | Default | Notes                                     |
-| -------- | ------- | ------- | ----------------------------------------- |
+| Param    | Type    | Default | Notes                                                                |
+| -------- | ------- | ------- | -------------------------------------------------------------------- |
 | `kind`   | enum    | —       | `ministry` \| `organization` \| `business` \| `individual` (mig 173) |
-| `q`      | string  | —       | Case-insensitive match on name / bio      |
-| `limit`  | integer | 50      | 1..100                                    |
-| `offset` | integer | 0       | 0..10000                                  |
+| `q`      | string  | —       | Case-insensitive match on name / bio                                 |
+| `limit`  | integer | 50      | 1..100                                                               |
+| `offset` | integer | 0       | 0..10000                                                             |
 
 `category` (added migration 164) is the map/pin category. It is one of the 12 Contributor types for new
 listings (`CONTRIBUTOR_TYPES`, CATEGORIES.md); older rows may still carry an EVENT_CATEGORIES or
@@ -91,7 +91,7 @@ never exposed in this response.
       "physical_latitude": -25.7479,
       "physical_longitude": 28.2293,
       "no_fixed_location": false,
-      "cover_photo_urls": [ { "url": "https://…", "caption": "Sunday service" } ],
+      "cover_photo_urls": [{ "url": "https://…", "caption": "Sunday service" }],
       "contact_email": "hello@rootedpretoria.org",
       "created_at": "2026-…"
     }
@@ -133,8 +133,9 @@ they created; a pending or declined invitation is never exposed.
     "upcoming_events": [ { "id": "…", "title": "…", "date": "…", ... } ],
     "past_events":     [ ... ],
     "places":          [ { "id": "…", "name": "…", "latitude": -25.…, ... } ],
+    "moments":         [ { "id": "…", "body": "…", "image_url": null, "created_at": "…", "expires_at": "…" } ],
     "counts": {
-      "followers": 128,
+      "followers": 100,
       "events_total": 12,
       "places_total": 3
     }
@@ -144,6 +145,8 @@ they created; a pending or declined invitation is never exposed.
 ```
 
 404 when the slug does not resolve to an approved contributor.
+
+`counts.followers` is a **bucket**: `0` below 100, otherwise rounded down to 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000 or 100000. The exact number is never public (migration 185). `moments` are the short notes the contributor posted that have **not yet ended** (they clear themselves after a day), newest first, at most 5; a failed read of them never fails the profile.
 
 ### Fan-out caps
 
@@ -194,16 +197,16 @@ a scheme.
 
 ### Query parameters
 
-| Param         | Type    | Default | Notes                                           |
-| ------------- | ------- | ------- | ----------------------------------------------- |
-| `category`    | slug    | —       | Event category slug (e.g. `worship`)            |
-| `from`        | ISO-8601| —       | Earliest event date (inclusive)                 |
-| `to`          | ISO-8601| —       | Latest event date (inclusive)                   |
-| `lat`, `lng`  | number  | —       | Centre point for proximity filter               |
-| `radius_km`   | integer | 25      | 1..500, only used when `lat`+`lng` present      |
-| `created_by`  | uuid    | —       | Filter to one contributor: the events they created **plus the events they co-host** |
-| `limit`       | integer | 50      | 1..100                                          |
-| `offset`      | integer | 0       | 0..10000                                        |
+| Param        | Type     | Default | Notes                                                                               |
+| ------------ | -------- | ------- | ----------------------------------------------------------------------------------- |
+| `category`   | slug     | —       | Event category slug (e.g. `worship`)                                                |
+| `from`       | ISO-8601 | —       | Earliest event date (inclusive)                                                     |
+| `to`         | ISO-8601 | —       | Latest event date (inclusive)                                                       |
+| `lat`, `lng` | number   | —       | Centre point for proximity filter                                                   |
+| `radius_km`  | integer  | 25      | 1..500, only used when `lat`+`lng` present                                          |
+| `created_by` | uuid     | —       | Filter to one contributor: the events they created **plus the events they co-host** |
+| `limit`      | integer  | 50      | 1..100                                                                              |
+| `offset`     | integer  | 0       | 0..10000                                                                            |
 
 Only `status = 'published'` AND `visibility = 'public'` events are
 returned. Draft, private and cancelled events are never exposed.
@@ -281,12 +284,12 @@ cancelled (migration 167's reversible cancel) is therefore never public.
 
 ### Query parameters
 
-| Param        | Type    | Default | Notes                                       |
-| ------------ | ------- | ------- | ------------------------------------------- |
-| `created_by` | uuid    | —       | Owning contributor (`places.created_by`)    |
+| Param        | Type    | Default | Notes                                        |
+| ------------ | ------- | ------- | -------------------------------------------- |
+| `created_by` | uuid    | —       | Owning contributor (`places.created_by`)     |
 | `q`          | string  | —       | Case-insensitive match on name / description |
-| `limit`      | integer | 50      | 1..100                                      |
-| `offset`     | integer | 0       | 0..10000                                    |
+| `limit`      | integer | 50      | 1..100                                       |
+| `offset`     | integer | 0       | 0..10000                                     |
 
 Each row flattens its category into `category` (slug) +
 `category_emoji` / `category_color`, so a map can colour pins without a
@@ -343,9 +346,9 @@ Lists event/place categories plus a denormalised `event_count` per slug.
 
 ### Query parameters
 
-| Param        | Type | Default | Notes                                   |
-| ------------ | ---- | ------- | --------------------------------------- |
-| `applies_to` | enum | —       | `events` \| `places` \| `both`          |
+| Param        | Type | Default | Notes                          |
+| ------------ | ---- | ------- | ------------------------------ |
+| `applies_to` | enum | —       | `events` \| `places` \| `both` |
 
 ```json
 {
@@ -409,16 +412,14 @@ analytics stay private; only `org_id IS NULL` rows are returned here.
 
 ### Query parameters
 
-| Param    | Type    | Default | Notes                              |
-| -------- | ------- | ------- | ---------------------------------- |
-| `metric` | string  | —       | Filter to a single `metric_key`    |
-| `days`   | integer | 30      | Lookback window, 1..365            |
+| Param    | Type    | Default | Notes                           |
+| -------- | ------- | ------- | ------------------------------- |
+| `metric` | string  | —       | Filter to a single `metric_key` |
+| `days`   | integer | 30      | Lookback window, 1..365         |
 
 ```json
 {
-  "data": [
-    { "day": "2026-03-11", "metric_key": "events_published", "metric_value": 14 }
-  ],
+  "data": [{ "day": "2026-03-11", "metric_key": "events_published", "metric_value": 14 }],
   "meta": { "days": 30, "from": "2026-02-10", "to": "2026-03-12" }
 }
 ```
