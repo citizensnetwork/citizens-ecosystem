@@ -505,6 +505,11 @@
 [data-mv2='sheet'][data-snap='full'] {
   transform: translateY(0);
 }
+/* Zoom in the full card: Chrome resolves the zoom part of touch-action through EVERY ancestor up to the root (only the panning
+   part stops at a scroller), so the sheet itself must allow a pinch at full too. Panning stays the sheet's own (none). */
+[data-mv2='sheet'][data-snap='full']:not([data-wide]) {
+  touch-action: pinch-zoom;
+}
 [data-mv2='sheet'][data-snap='half'] {
   transform: translateY(calc(var(--sheet-full-h) - var(--sheet-half-h)));
 }
@@ -694,13 +699,19 @@
   overflow-y: auto;
   --mv2-ta: pan-y;
 }
+/* Zoom in the full card (founder, 2026-10-17, accessibility): at FULL a pinch on the content zooms the page, so a person with
+   poor eyesight can enlarge the text. Half and peek still keep every two-finger gesture, and the native shell blocks page
+   zoom through its viewport tag (R9). The side panel (a fine pointer) is unchanged. */
+[data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'] {
+  --mv2-ta: pan-y pinch-zoom;
+}
 [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
-  --mv2-ta: pan-down;
+  --mv2-ta: pan-down pinch-zoom;
 }
 /* a browser without pan-down (older iOS) keeps today's behaviour: the content scrolls, no hand-off */
 @supports not (touch-action: pan-down) {
   [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
-    --mv2-ta: pan-y;
+    --mv2-ta: pan-y pinch-zoom;
   }
 }
 
@@ -734,6 +745,10 @@
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-contrast);
+}
+/* Follow, once followed: the label already says "Following"; the gold-ink ring and the filled heart say it a second way (never colour alone) */
+[data-mv2='action'][data-on] {
+  border-color: var(--accent-ink);
 }
 /* the QR code action under the content: centred, above View Full Profile */
 [data-mv2='actions-end'] {
@@ -926,6 +941,14 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
+}
+/* P2-05 Moments: a note is short (280 characters), so it is shown in full, with its line breaks. No ring, no countdown. */
+[data-moment] [data-mv2='post-body'] {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 [data-mv2='grid'] {

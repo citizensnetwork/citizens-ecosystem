@@ -228,6 +228,9 @@
       // upstream shape ever sends a string; never render `true` as a name.
       organizerName: typeof r.community_contributor === 'string' ? r.community_contributor : '',
       organizerId: r.created_by || null,
+      // P2-09: Contributors who ACCEPTED an invitation to co-host (the API only ever lists accepted ones). The organiser is
+      // still organizerId; window.CCCohosts.isHostOf asks "organiser or accepted co-host".
+      coHostIds: Array.isArray(r.co_host_ids) ? r.co_host_ids.filter((x) => typeof x === 'string') : [],
       isLive: !!(validDt && validEnd && validDt <= now && now <= validEnd),
       isBusy: false, connectCount: 0, considerCount: 0,
       volunteeringEnabled: !!r.volunteer_openings,
@@ -409,6 +412,9 @@
     event_cancelled: 'event', review_prompt: 'event',
     volunteer_application: 'volunteer', volunteer_application_response: 'volunteer',
     team_invite: 'team', team_invite_response: 'team', team_owner_transfer: 'team',
+    cohost_invite: 'team', cohost_invite_response: 'team',
+    // P2-04: a Contributor you follow published an event (opens the event) or a news post (opens the Contributor)
+    followed_new_event: 'event', followed_new_news: 'news',
     contributor_approved: 'admin', contributor_rejected: 'admin',
     admin_elevation_request: 'admin', spam_flag: 'admin', broadcast_flood: 'admin',
   };
@@ -420,6 +426,8 @@
     return {
       id: r.id,
       type: NOTIF_TYPE_MAP[r.type] || 'bell',
+      // The raw database kind, for the few that carry an action (a co-host invitation has Accept and Decline).
+      kind: r.type || '',
       title: r.title || 'Notification',
       body: r.body || '',
       time: timeAgo(r.created_at),
@@ -428,6 +436,8 @@
       // Deep-link targets for the in-app router (event profile / message thread).
       eventId: d.event_id || (evMatch ? evMatch[1] : null),
       convId: d.conversation_id || (msgMatch ? msgMatch[1] : null),
+      // The Contributor a followed-news notification points to (a UUID only; anything else is dropped).
+      contributorId: r.type === 'followed_new_news' && /^[0-9a-f-]{36}$/i.test(String(d.contributor_id || '')) ? d.contributor_id : null,
     };
   }
 
@@ -611,6 +621,10 @@
     const [considering, setConsidering] = useState(() => new Set(['e3', 'e6']));
     const [followedOrgs, setFollowedOrgs] = useState(() => new Set());
     const [followedPlaces, setFollowedPlaces] = useState(() => new Set());
+    // P2-04 Save: a PRIVATE bookmark (public.saved_items, migration 183), read and written with the signed-in client under
+    // RLS (saved-lib.jsx). Nothing here is ever counted or shown to the listing.
+    const [savedContributors, setSavedContributors] = useState(() => new Set());
+    const [savedPlaces, setSavedPlaces] = useState(() => new Set());
 
     // toasts
     const [toasts, setToasts] = useState([]);
@@ -1852,7 +1866,16 @@
       })();
     }, [connected, considering, realUser, toast]);
 
+    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow or a save: say so, instead
+    // of flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
+    const guestCannot = useCallback((message) => {
+      if (realUser || !window.CC_AUTH) return false;
+      toast(message, 'gold');
+      return true;
+    }, [realUser, toast]);
+
     const toggleFollow = useCallback((orgId, name) => {
+      if (guestCannot('Sign in to follow.')) return;
       const was = followedOrgs.has(orgId);
       setFollowedOrgs((prev) => { const n = new Set(prev); was ? n.delete(orgId) : n.add(orgId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1866,9 +1889,10 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedOrgs, realUser, toast]);
+    }, [followedOrgs, realUser, toast, guestCannot]);
 
     const togglePlaceFollow = useCallback((placeId, name) => {
+      if (guestCannot('Sign in to follow.')) return;
       const was = followedPlaces.has(placeId);
       setFollowedPlaces((prev) => { const n = new Set(prev); was ? n.delete(placeId) : n.add(placeId); return n; });
       toast(was ? ('Unfollowed' + (name ? ' ' + name : '')) : ('Now following' + (name ? ' ' + name : '')), 'gold');
@@ -1882,7 +1906,34 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [followedPlaces, realUser, toast]);
+    }, [followedPlaces, realUser, toast, guestCannot]);
+
+    // P2-04 Save. kind: 'contributor' | 'place' (an Event keeps its Consider bookmark). Optimistic, then written with the
+    // signed-in client under RLS (saved-lib.jsx); a failure rolls the heart back and says why. Demo mode stays local.
+    const toggleSave = useCallback((kind, id, name) => {
+      if (guestCannot('Sign in to save.')) return;
+      const isPlace = kind === 'place';
+      const set = isPlace ? savedPlaces : savedContributors;
+      const setSet = isPlace ? setSavedPlaces : setSavedContributors;
+      const was = set.has(id);
+      const flip = (on) => setSet((prev) => { const n = new Set(prev); on ? n.add(id) : n.delete(id); return n; });
+      flip(!was);
+      toast(was ? ('Removed' + (name ? ' ' + name : '') + ' from your saved list') : ('Saved' + (name ? ' ' + name : '') + '. Only you can see this.'), 'gold');
+      const sb = window.CC_SUPABASE;
+      if (!realUser || !isRealId(id) || !sb || !window.CCSaved) return;
+      (async () => {
+        try {
+          if (was) await window.CCSaved.remove(sb, realUser.id, kind, id);
+          else if ((await window.CCSaved.add(sb, realUser.id, kind, id)) === 'limit') {
+            flip(false);
+            toast('You can save up to ' + window.CCSaved.MAX + ' listings. Remove one to save another.', 'red');
+          }
+        } catch {
+          flip(was);
+          toast('Could not save — please try again.', 'red');
+        }
+      })();
+    }, [savedContributors, savedPlaces, realUser, toast, guestCannot]);
 
     // Dismiss a map broadcast bubble for this user only (per-user, ~24h).
     const dismissBubble = useCallback((bubbleId, eventId) => {
@@ -2241,6 +2292,22 @@
           if (placeRes.data) setFollowedPlaces(new Set(placeRes.data.map((p) => p.place_id)));
         } catch (e) { /* seeding is best-effort */ }
       })();
+      return () => { active = false; };
+    }, [realUser]);
+
+    // ── Seed the person's private saves (P2-04) ───────────────────────
+    //  Their own rows only (RLS). Signing out EMPTIES the lists, so the next person on a shared phone never sees them.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!realUser) {
+        if (window.CC_AUTH) { setSavedContributors(new Set()); setSavedPlaces(new Set()); }
+        return undefined;
+      }
+      if (!sb || !window.CCSaved) return undefined;
+      let active = true;
+      window.CCSaved.load(sb, realUser.id)
+        .then((s) => { if (active) { setSavedContributors(s.contributors); setSavedPlaces(s.places); } })
+        .catch(() => { /* seeding is best-effort */ });
       return () => { active = false; };
     }, [realUser]);
 
@@ -2924,7 +2991,7 @@
       assistMode, assistLoginAs, exitAssist,
       myApplication, myContributor, contributorDash,
       contributorStatus, setContributorStatus, updateMyApplication,
-      connected, considering, followedOrgs, followedPlaces,
+      connected, considering, followedOrgs, followedPlaces, savedContributors, savedPlaces,
       realUser,
       isAdmin: role === 'admin', isContributor: role === 'contributor', isCitizen: role === 'citizen',
       // A citizen whose Contributor application is waiting for an admin (D-12): their Dashboard is the "being reviewed" page.
@@ -2939,7 +3006,7 @@
       submitApplication, reviewApplication, completeOnboarding, syncListingVisibility,
       createEvent, createPlace, sendBroadcast, sendMessage, openConversation, startConversationWith,
       acceptRequest, rejectRequest, muteConversation, unmuteConversation, blockUser,
-      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, dismissBubble, markNotifsRead, readNotification,
+      toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, toggleSave, dismissBubble, markNotifsRead, readNotification,
       trackImpression,
     };
     return React.createElement(AppCtx.Provider, { value }, children);

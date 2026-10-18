@@ -65,6 +65,9 @@
   function EventManageCard({ ev, onView, onEdit, onBroadcast, onToggleStatus }) {
     const cat = window.DATA.getEventCategory(ev.category);
     const cancelled = ev.status === 'cancelled';
+    // P2-09: the organiser's co-host panel opens under the card
+    const app = window.useApp();
+    const [coOpen, setCoOpen] = useState(false);
     return h('div', { 'data-manage-card': ev.id, 'data-status': ev.status || 'published', className: cx('bg-card rounded-2xl border border-border overflow-hidden', cancelled && 'opacity-60') },
       h('div', { className: 'relative h-28' },
         h(SmartImage, { src: ev.coverPhoto, cat, label: 'Event', alt: ev.title, className: 'w-full h-full' }),
@@ -88,7 +91,12 @@
           h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Eye', onClick: onView }, 'View'),
           h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
           h(Button, { variant: 'soft', size: 'sm', className: 'flex-1', icon: 'Radio', onClick: onBroadcast }, 'Broadcast'),
-          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: cancelled ? 'RotateCcw' : 'Ban', onClick: onToggleStatus }, cancelled ? 'Restore' : 'Cancel'))));
+          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: cancelled ? 'RotateCcw' : 'Ban', onClick: onToggleStatus }, cancelled ? 'Restore' : 'Cancel'),
+          // P2-09: a cancelled event is not hosted any more, so nobody is invited to it
+          !cancelled && h('button', { type: 'button', 'data-cohosts-toggle': ev.id, 'aria-expanded': coOpen, onClick: () => setCoOpen((o) => !o),
+            className: 'flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-xs font-bold text-foreground hover:bg-accent/60' },
+            h(Icon, { name: 'Users', size: 14 }), 'Co-hosts'))),
+      !cancelled && coOpen && h(window.CohostPanel, { sb: window.CC_SUPABASE, event: ev, contributors: app.contributors, selfId: app.user.id, toast: app.toast }));
   }
   const Stat = ({ icon, text }) => h('div', { className: 'flex items-center gap-1.5' }, h(Icon, { name: icon, size: 11, className: 'text-gold' }), h('span', null, text));
 
@@ -295,6 +303,7 @@
     const {
       activeContributor, activeContributorId, ownEvents, ownPlaces, conversations, contributorDash, openCreate, go,
       setEventStatus, setPlaceStatus, updateContributorProfile, newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,
+      realUser, toast,
     } = app;
     // The tab is part of the address (/dashboard/events), so a refresh keeps it and a
     // link can point at it. Replaced rather than pushed: the tabs are views of ONE
@@ -392,6 +401,13 @@
               })))),
 
           tab === 'news' && h('div', { className: 'space-y-3 fade-in' },
+            // P2-05 Moments: only the Contributor themselves posts a note (an admin viewing on their behalf does not: the
+            // database requires the note to be posted AS the signed-in person). Dropping the sheet's cached copy of this
+            // Contributor's page lets the new note show on the map at once.
+            !newsComposing && window.MomentsBox && realUser && realUser.id === activeContributorId && h(window.MomentsBox, {
+              sb: window.CC_SUPABASE, me: realUser.id, toast,
+              onChanged: () => { if (window.MapV2Sheet && window.MapV2Sheet.forgetDetail && activeContributor.slug) window.MapV2Sheet.forgetDetail(activeContributor.slug); },
+            }),
             newsComposing
               ? h(NewsPostForm, {
                   initial: newsEditing,

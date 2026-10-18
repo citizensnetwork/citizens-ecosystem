@@ -12,18 +12,24 @@
  *   from, to    - ISO-8601 start window (events.date >= from, <= to)
  *   lat, lng    - numeric, used with `radius_km` for proximity filter
  *   radius_km   - default 25, max 500 when lat/lng provided
- *   created_by  - UUID of contributor (events.created_by)
+ *   created_by  - UUID of contributor: the events they created PLUS the ones
+ *                 they co-host (an accepted co-host invitation, P2-09)
  *   limit       - 1..100, default 50
  *   offset      - default 0
  *
  * Response envelope:
  *   { data: Event[], meta: { count, limit, offset } }
+ *
+ * Each event carries `co_host_ids`: the UUIDs of the Contributors who accepted
+ * an invitation to co-host it (an empty list for most events). `created_by` is
+ * still the organiser. Pending and declined invitations are never exposed.
  */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
 import { isValidUUID } from "@/lib/validation";
+import { acceptedCohostEventIds, attachCoHostIds, createdByOrIn } from "@/lib/events/cohosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,6 +124,9 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
+  // A Contributor's list includes the events they co-host (accepted invitations only).
+  const cohostedIds = createdBy ? await acceptedCohostEventIds(supabase, createdBy) : [];
+
   // Proximity pre-filter: if lat/lng are provided, expand limit so we
   // can post-filter by haversine without losing rows. This keeps the
   // implementation simple without requiring PostGIS. For production
@@ -168,7 +177,7 @@ export async function GET(request: Request) {
   if (category) query = query.eq("category", category);
   if (from) query = query.gte("date", from);
   if (to) query = query.lte("date", to);
-  if (createdBy) query = query.eq("created_by", createdBy);
+  if (createdBy) query = query.or(createdByOrIn(createdBy, cohostedIds));
   if (hasProximity) {
     query = query
       .not("latitude", "is", null)
@@ -207,9 +216,11 @@ export async function GET(request: Request) {
     hasMore = within.length > effectiveOffset + limit;
   }
 
+  const withCoHosts = await attachCoHostIds(supabase, rows);
+
   return NextResponse.json(
     {
-      data: rows,
+      data: withCoHosts,
       // `count` intentionally omitted — see M1/M2. `has_more` is cheap
       // and sufficient for cursor-style pagination by consumers.
       meta: {

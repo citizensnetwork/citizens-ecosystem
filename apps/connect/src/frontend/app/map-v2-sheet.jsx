@@ -54,7 +54,7 @@
   const S = () => window.MapV2Strings.sheet;
   const T = () => window.MapV2Time;
   const navTarget = (type) => (type === 'contributor' ? 'profile' : type);
-  const DETAIL = new Map();   // slug -> { gallery, covers, past, followers }: the per-slug fetch, once per session
+  const DETAIL = new Map();   // slug -> { gallery, covers, past, moments, followers }: the per-slug fetch, once per session
 
   // ── helpers ──────────────────────────────────────────────────────
   // Any CSS length (dvh, calc(), env(), var()) in px, resolved by the browser itself with a throwaway probe.
@@ -107,6 +107,7 @@
             gallery: Array.isArray(p.gallery_urls) ? p.gallery_urls : [],
             covers: Array.isArray(p.cover_photo_urls) ? p.cover_photo_urls : [],
             past: Array.isArray(j.data.past_events) ? j.data.past_events : [],     // newest first, as the API sorts them
+            moments: Array.isArray(j.data.moments) ? j.data.moments : [],          // P2-05: notes still live when the page was served
             followers: counts.followers == null || !Number.isFinite(Number(counts.followers)) ? null : Number(counts.followers),
           };
           DETAIL.set(slug, data);
@@ -130,10 +131,10 @@
         : (initialsOf(name) || glyph));
   }
 
-  function Action({ icon, label, href, onClick, external, primary }) {
+  function Action({ icon, label, href, onClick, external, primary, on }) {
     const Icon = window.Icon;
-    const kids = [h(Icon, { key: 'i', name: icon, size: 16 }), h('span', { key: 't' }, label)];
-    const common = { 'data-mv2': 'action', 'data-primary': primary ? '' : undefined };
+    const kids = [h(Icon, { key: 'i', name: icon, size: 16, fill: on ? 'currentColor' : 'none' }), h('span', { key: 't' }, label)];
+    const common = { 'data-mv2': 'action', 'data-primary': primary ? '' : undefined, 'data-on': on ? '' : undefined };
     return href
       ? h('a', Object.assign({ href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined }, common), kids)
       : h('button', Object.assign({ type: 'button', onClick }, common), kids);
@@ -166,7 +167,7 @@
   // ── the sheet ────────────────────────────────────────────────────
   function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick }) {
     const app = window.useApp();
-    const { go, shareLink, contributors, events, places, newsPosts } = app;
+    const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     const Str = S();
     const wide = useWide();
     const root = useRef(null);
@@ -195,20 +196,27 @@
     // Contributor content: events and news from memory, photos from the directory + one detail fetch.
     // (Hooks stay above the early return below, so their order never changes between renders.)
     const [detail, retry] = useDetail(isContributor && item ? item.slug : null, isContributor);
+    // P2-09: an event this Contributor organised OR co-hosts (an accepted invitation) is on their page; "With X" names the others.
+    const isHost = (e, id) => (window.CCCohosts ? window.CCCohosts.isHostOf(e, id) : e.organizerId === id);
+    const hostLine = (e) => {
+      const names = [e.organizerId].concat(e.coHostIds || []).filter((x, i, all) => x && x !== item.id && all.indexOf(x) === i)
+        .map((cid) => { const c = contributors.find((y) => y.id === cid); return c ? c.name : ''; }).filter(Boolean);
+      return names.length ? S().withHosts(names.join(', ')) : '';
+    };
     const orgEvents = useMemo(() => (isContributor && item
-      ? events.filter((e) => e.organizerId === item.id && !window.DATA.isPastEvent(e, now)).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+      ? events.filter((e) => isHost(e, item.id) && !window.DATA.isPastEvent(e, now)).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
       : []), [events, item, isContributor]);
     // P2-07 Recent: what already happened, newest first. The ones the app has loaded are links; the API's own list
     // (the per-slug fetch that is already made for the photos) adds the rest as plain rows.
     const recentEvents = useMemo(() => {
       if (!isContributor || !item) return [];
       const byId = new Map();
-      events.forEach((e) => { if (e.organizerId === item.id && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true }); });
+      events.forEach((e) => { if (isHost(e, item.id) && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true, host: hostLine(e) }); });
       ((detail.data && detail.data.past) || []).forEach((r) => {
         if (r && r.id && r.title && !byId.has(r.id)) byId.set(r.id, { id: r.id, title: r.title, when: r.date, location: r.location, known: events.some((e) => e.id === r.id) });
       });
       return [...byId.values()].filter((e) => Number.isFinite(Date.parse(e.when))).sort((a, b) => Date.parse(b.when) - Date.parse(a.when)).slice(0, RECENT_MAX);
-    }, [events, item, isContributor, detail.data]);
+    }, [events, item, isContributor, detail.data, contributors]);
     const posts = useMemo(() => (isContributor && item
       ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
       : []), [newsPosts, item, isContributor]);
@@ -224,6 +232,12 @@
           || (type === 'event' && m.type === 'contributor' && m.id === item.organizerId),
       });
     }, [item, nearby, id, type, isContributor, orgEvents]);
+    // P2-05 Moments: the short notes that are still live (a cached page can be a few minutes old, so the end time is
+    // checked again here). Shown under "Today", with "Posted 3 h ago" and nothing else about time: no countdown, no ring.
+    const moments = useMemo(
+      () => (isContributor && detail.data && window.CCMoments ? window.CCMoments.live(detail.data.moments, Date.now()) : []),
+      [detail.data, isContributor],
+    );
     const images = useMemo(() => {
       if (!isContributor || !item) return [];
       const seen = new Set();
@@ -422,6 +436,7 @@
     const tabs = [];
     if (orgEvents.length || recentEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
     if (posts.length) tabs.push({ id: 'news', label: Str.tabs.news });
+    if (moments.length) tabs.push({ id: 'today', label: Str.tabs.today });
     if (images.length) tabs.push({ id: 'gallery', label: Str.tabs.gallery });
     const loadingMore = isContributor && detail.status === 'loading';
     const active = tabs.some((t) => t.id === tab) ? tab : (tabs[0] && tabs[0].id);
@@ -429,6 +444,18 @@
     // ── actions ─────────────────────────────────────────────────────
     const actions = [];
     if (dir) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true, primary: true }));
+    // P2-04: Follow, for a Contributor that is not you (a Place and an Event show their card's own Follow / Consider)
+    const following = isContributor && followedOrgs.has(item.id);
+    if (isContributor && !(realUser && realUser.id === item.id)) {
+      actions.push(h(Action, { key: 'follow', icon: 'Heart', label: following ? Str.following : Str.follow, on: following, onClick: () => toggleFollow(item.id, name) }));
+    }
+    // P2-04: Save, a PRIVATE bookmark for a Contributor (not you) or a Place; an Event keeps its Consider bookmark. Never counted,
+    // never shown to the listing: the only trace is the person's own list in Settings.
+    const saveKind = isContributor ? 'contributor' : type === 'place' ? 'place' : null;
+    if (saveKind && !(isContributor && realUser && realUser.id === item.id)) {
+      const saved = (saveKind === 'place' ? savedPlaces : savedContributors).has(item.id);
+      actions.push(h(Action, { key: 'save', icon: 'Bookmark', label: saved ? Str.saved : Str.save, on: saved, onClick: () => toggleSave(saveKind, item.id, name) }));
+    }
     actions.push(h(Action, { key: 'share', icon: 'Share2', label: Str.share, onClick: () => shareLink({ page: navTarget(type), params: { id } }) }));
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
     if (tel) actions.push(h(Action, { key: 'tel', icon: 'Phone', label: Str.call, href: tel }));
@@ -453,15 +480,15 @@
         const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
         const sortBar = h('div', { key: 'sort', 'data-mv2': 'sort', role: 'group', 'aria-label': Str.eventsSort.label },
           ['upcoming', 'recent'].map((m) => h('button', { key: m, type: 'button', 'data-mv2': 'sort-btn', 'aria-pressed': mode === m, onClick: () => setEvSort(m) }, Str.eventsSort[m])));
-        const rowKids = (title, meta, where) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where)];
+        const rowKids = (title, meta, where, host) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where), host && h('span', { key: 'h', 'data-mv2': 'row-meta', 'data-host': '' }, host)];
         const list = mode === 'upcoming'
           ? (orgEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => h('li', { key: e.id },
-              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location)))))
+              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location, hostLine(e))))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneUpcoming))
           : (recentEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, recentEvents.map((e) => h('li', { key: e.id },
               e.known
-                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location))
-                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location)))))
+                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host))
+                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host)))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
         panel = [sortBar, list];
       } else if (active === 'news') {
@@ -472,6 +499,14 @@
             h('span', { 'data-mv2': 'row-title' }, p.title),
             ago && h('span', { 'data-mv2': 'row-meta' }, ago),
             p.body && h('span', { 'data-mv2': 'post-body' }, p.body));
+        }));
+      } else if (active === 'today') {
+        panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
+          const ago = T().postedAgo(m.created_at, now);
+          return h('li', { key: m.id, 'data-mv2': 'post', 'data-moment': '' },
+            m.image_url && window.UI.safeUrl(m.image_url) && h('img', { src: m.image_url, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
+            h('span', { 'data-mv2': 'post-body' }, m.body),
+            ago && h('span', { 'data-mv2': 'row-meta' }, ago));
         }));
       } else if (active === 'gallery') {
         panel = h(window.MapV2Gallery.Grid, { images, strings: Str.gallery, onOpen: (i, from) => setViewer({ index: i, from }) });
@@ -545,5 +580,7 @@
       }), document.body));
   }
 
+  // The Dashboard drops the cached copy of a Contributor's page after they post or take down a note, so the map shows it at once.
+  MapV2Sheet.forgetDetail = (slug) => { DETAIL.delete(slug); };
   window.MapV2Sheet = MapV2Sheet;
 })();
