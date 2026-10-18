@@ -1,11 +1,11 @@
 -- ════════════════════════════════════════════════════════════════════
 --  PROPOSAL (not applied): friends_considering, the read side of Convince (FEAT-04) and the one switch that goes with it.
---  NO MIGRATION NUMBER on purpose: take the next free one at apply time (the live head was 20261018115907, the Convince fix, on 2026-10-18).
+--  NO MIGRATION NUMBER on purpose: take the next free one at apply time (the live head on 2026-10-18 was 190_convince_fix, version 20261018115907, so this would be 191).
 --  Authored 2026-10-18. Needs a fresh yes from Stephen for THIS file, then the usual steps: pre-apply git tag, MCP apply_migration, the
 --  rollback-only probe docs/audit/probes/friends_considering.probe.sql, the security advisor, and move this file to supabase/migrations/ in the
 --  same PR. ROLLBACK at the foot.
 --
---  WHY: the Convince fix (policy + public.is_considering_for_friend) lets a person nudge a mutual friend who is considering an event, but
+--  WHY: the Convince fix (migration 190: policy + public.is_considering_for_friend) lets a person nudge a mutual friend who is considering an event, but
 --  nothing lets a person LIST which of their friends that is: `rsvps` is readable only by its owner and the event's organiser, so the
 --  Convince row on the event screen has nothing to read. This file adds that read, and the privacy switch Stephen ruled on 2026-10-18:
 --  a person's "considering" is SHOWN to mutual, unblocked friends BY DEFAULT, and a switch in Settings hides it.
@@ -37,7 +37,7 @@
 --
 --  Evidence: rollback-only dry run docs/audit/probes/friends_considering.probe.sql (synthetic users, the proposal body spliced in, then the
 --  checks; it ends with RAISE EXCEPTION so nothing persists). Expected advisor change: +1 WARN, `friends_considering_event` (SECURITY DEFINER,
---  executable by signed-in users, on purpose, like is_considering_for_friend); 0 ERROR; the baseline 131 becomes 132.
+--  executable by signed-in users, on purpose, like is_considering_for_friend); 0 ERROR; the baseline 132 (after migration 190) becomes 133.
 -- ════════════════════════════════════════════════════════════════════
 
 begin;

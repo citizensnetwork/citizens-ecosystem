@@ -30,8 +30,14 @@ function load(file: string) {
 beforeAll(() => {
   const w = window as unknown as Record<string, unknown>;
   w.DATA = { isPastEvent: () => false };
-  w.Icon = ({ name }: { name: string }) => React.createElement("i", { "data-icon": name });
-  w.UI = { Avatar: ({ name }: { name: string }) => React.createElement("span", { "data-avatar": name }) };
+  function Icon({ name }: { name: string }) {
+    return React.createElement("i", { "data-icon": name });
+  }
+  function Avatar({ name }: { name: string }) {
+    return React.createElement("span", { "data-avatar": name });
+  }
+  w.Icon = Icon;
+  w.UI = { Avatar };
   load("convince-lib.jsx");
   load("convince.jsx");
   W = window as unknown as Win;

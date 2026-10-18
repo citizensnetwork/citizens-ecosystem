@@ -69,6 +69,9 @@ exists:
   friends-considering, convince-from-map. VISION-relevant (cit↔cit connection); the old
   `useBurgerMenuData` logic is recoverable from git. Fits naturally beside Phase 4 #6
   (convince mechanic).
+  **Update 2026-10-18:** friends-considering and convince-from-the-event are BUILT (a "Friends considering" row with Nudge and
+  Undo on the event page and the Map v2 sheet, a note under Consider, a Settings switch; draft PR `claude/convince-ui`, waiting
+  on the SQL proposal `docs/proposals/friends-considering.sql`). Trending events and favourite orgs are still open.
 - **Strip `SHOW_DEMO` / `signInDemo`** (§2c): remove the demo fallback from `auth.jsx` /
   `store.jsx` before launch — demo mode must not ship inside the store builds.
 
