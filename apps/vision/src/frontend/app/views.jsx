@@ -12,6 +12,7 @@
   const D = window.CV_DATA;
   const ObservationCard = window.Screens.ObservationCard;
   const PlaceField = window.Screens.PlaceField; // place-field.jsx (optional Place on Log an activity)
+  const PlaceEditor = window.Screens.PlaceEditor; // the same field under an activity already logged (V7)
 
   // ── Live-collection helpers (increment 4, spec §3.2/§3.3) ──────────
   // The editable-collection screens below (Objectives / Projects / Vision
@@ -62,24 +63,22 @@
   // (one with a cc_event_claim → a metrics row); a manual/unclaimed activity has
   // none, so those cells render an honest em dash (spec §3.2b note). `claimed`
   // is derived from the presence of a metrics row.
-  // `place` is the saved location_name; `onMap` is whether the Timeline Map can
-  // plot the row (a real latitude + longitude — same test the map applies).
-  const mapActivity = (a, metric) => {
-    const pl = window.CV_PLACE.rowPlace(a);
-    return {
-      id: a.id,
-      title: a.title,
-      type: a.type || "other",
-      date: a.date,
-      place: pl.name,
-      onMap: pl.onMap,
-      reach: metric ? metric.reach : null,
-      engagement: metric ? metric.engagement_score : null,
-      rating: metric ? metric.avg_rating : null,
-      claimed: !!metric,
-      live: true,
-    };
-  };
+  // The place fields (CV_PLACE.rowFields): `place` is the saved location_name (a
+  // spot saved without a name reads as its coordinates), `onMap` is whether the
+  // Timeline Map can plot the row (a real latitude + longitude — same test the
+  // map applies), and `lat` / `lng` are that spot, so "Change place" starts there.
+  const mapActivity = (a, metric) => ({
+    id: a.id,
+    title: a.title,
+    type: a.type || "other",
+    date: a.date,
+    ...window.CV_PLACE.rowFields(a),
+    reach: metric ? metric.reach : null,
+    engagement: metric ? metric.engagement_score : null,
+    rating: metric ? metric.avg_rating : null,
+    claimed: !!metric,
+    live: true,
+  });
   // vision.org_members row (mig 154 — user_org_roles joined to display-safe
   // public.profiles identity) → Team card shape. full_name is null-safe: a member
   // without a profile name degrades to a neutral label + initial, never a
@@ -309,15 +308,47 @@
   // a sparse live log never reads worse than the demo. Demo stays local-only.
   const ACTIVITY_TYPES = ["event", "meeting", "outreach", "workshop", "service", "training", "other"];
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+  // A row's place the way the editor holds it (CV_PLACE.fieldsOfPlace is the way back).
+  const placeOf = (a) => ({ name: a.place || "", lat: a.lat == null ? null : a.lat, lng: a.lng == null ? null : a.lng });
+  const placeLinkBtn = {
+    border: "none", background: "transparent", padding: 0, margin: 0, cursor: "pointer",
+    color: "var(--brand-ink)", fontSize: 12, fontWeight: 700, textDecoration: "underline", whiteSpace: "nowrap",
+  };
   function Activities() {
     const { isLive, authFetch } = liveCtx();
-    const [rows, setRows] = React.useState(D.activities.map((a) => ({ ...a })));
+    // The demo's Activities and its Timeline Map tell one story: a seeded activity takes its
+    // place from its twin on the map (D.mapActivities, linked by mapId), and what is logged or
+    // edited below is written back (see the effect), so the map and a return to this screen agree.
+    const [rows, setRows] = React.useState(() => D.activities.map((a) => {
+      const twin = a.mapId ? D.mapActivities.find((m) => m.id === a.mapId) : null;
+      return twin ? { ...a, ...window.CV_PLACE.rowFields(twin) } : { ...a };
+    }));
     const [title, setTitle] = React.useState("");
     const [type, setType] = React.useState("event");
     const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
     const [place, setPlace] = React.useState(window.CV_PLACE.EMPTY); // optional; see place-field.jsx
     const [err, setErr] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
+    // Add / change / remove the place of a row already in the list (V7).
+    const [editId, setEditId] = React.useState(null); // the row whose place editor is open
+    const [savingId, setSavingId] = React.useState(null); // the row whose place is being saved
+    const [placeErr, setPlaceErr] = React.useState(null); // { id, message } of the last failed save
+    const focusBack = React.useRef(null);
+
+    // Demo only: keep what was logged or edited when this screen is left and re-entered.
+    React.useEffect(() => {
+      if (!isLive) D.activities.splice(0, D.activities.length, ...rows);
+    }, [rows, isLive]);
+
+    // After the editor closes, return keyboard focus to the button that opened it. Not in the
+    // same task as the key press that closed it (see CV_PLACE.focusSoon): Enter to save would
+    // otherwise click the button it had just focused, and open the editor again.
+    React.useEffect(() => {
+      if (editId !== null || focusBack.current === null) return undefined;
+      const id = focusBack.current;
+      focusBack.current = null;
+      return window.CV_PLACE.focusSoon(() => document.querySelector('[data-cv-place-trigger="' + id + '"]'));
+    }, [editId]);
 
     React.useEffect(() => {
       if (!isLive || !authFetch) return;
@@ -347,12 +378,10 @@
       const hasPlace = Object.keys(placeFields).length > 0;
       if (!isLive) {
         const id = "act-" + Date.now();
-        const pl = PL.normalise(place);
-        setRows([{ id, title: t, space: "—", date, place: pl ? pl.name : "", onMap: !!pl && pl.lat !== null, reach: null, engagement: null, rating: null, claimed: false, live: false }, ...rows]);
+        setRows([{ id, title: t, type, space: "—", date, ...PL.fieldsOfPlace(place), reach: null, engagement: null, rating: null, claimed: false, live: false }, ...rows]);
         // The demo's Timeline Map reads D.mapActivities, so a demo activity with a
         // real spot appears there too (in memory only; a reload starts clean).
-        const mapRow = PL.demoMapRow(id, t, type, date, place);
-        if (mapRow) D.mapActivities.unshift(mapRow);
+        PL.syncDemoMap(D.mapActivities, id, { title: t, type, date }, place);
         setTitle(""); setPlace(PL.EMPTY); setErr(null); return;
       }
       setBusy(true); setErr(null);
@@ -372,8 +401,45 @@
       finally { setBusy(false); }
     };
 
+    const openEditor = (id) => {
+      if (savingId) return;
+      if (editId === id) { closeEditor(); return; }
+      setPlaceErr(null);
+      setEditId(id);
+    };
+    const closeEditor = () => {
+      focusBack.current = editId;
+      setEditId(null);
+      setPlaceErr(null);
+    };
+
+    // Save the place of one row. Live: the list changes at once and the editor stays open
+    // while the PATCH is in flight; if it fails the row goes back to what it was and the
+    // editor still holds what was typed. Demo: local only, and the demo Timeline Map's list
+    // (D.mapActivities) is updated in step.
+    const savePlace = async (a, next) => {
+      if (savingId) return;
+      const PL = window.CV_PLACE;
+      const apply = (fields) => setRows((cur) => cur.map((r) => (r.id === a.id ? { ...r, ...fields } : r)));
+      setPlaceErr(null);
+      if (!isLive) {
+        PL.syncDemoMap(D.mapActivities, a.mapId || a.id, a, next);
+        apply(PL.fieldsOfPlace(next));
+        closeEditor();
+        return;
+      }
+      const before = { place: a.place, onMap: a.onMap, lat: a.lat, lng: a.lng };
+      apply(PL.fieldsOfPlace(next)); // optimistic
+      setSavingId(a.id);
+      const out = await PL.savePlace(authFetch, a.id, next);
+      setSavingId(null);
+      if (out.ok) { apply(out.fields); closeEditor(); }
+      else { apply(before); setPlaceErr({ id: a.id, message: out.message }); }
+    };
+
     const remove = async (id) => {
       const prev = rows;
+      if (editId === id) closeEditor();
       setRows(rows.filter((x) => x.id !== id)); // optimistic
       if (!isLive) return;
       try {
@@ -404,7 +470,8 @@
               {rows.length === 0 ? (
                 <tr><td colSpan={7} style={{ padding: "20px 12px", textAlign: "center", color: "var(--text-secondary)" }}>No activities yet. Log your first activity below.</td></tr>
               ) : rows.map((a) => (
-                <tr key={a.id} style={{ borderBottom: "1px solid var(--divider)" }}>
+                <React.Fragment key={a.id}>
+                <tr style={{ borderBottom: "1px solid var(--divider)" }}>
                   <td style={{ ...td, fontWeight: 700, maxWidth: 360 }}>
                     {a.title}
                     {a.place ? (
@@ -418,6 +485,16 @@
                         </span>
                       </div>
                     ) : null}
+                    {/* An activity logged before the Place field, or saved as a name only, can be given a
+                        position here (and any place changed or removed): that is what puts it on the map. */}
+                    <div style={{ marginTop: 3 }}>
+                      <button type="button" data-cv-place-trigger={a.id} onClick={() => openEditor(a.id)}
+                        aria-expanded={editId === a.id} disabled={!!savingId && savingId !== a.id}
+                        aria-label={(a.place ? "Change the place of " : "Add a place to ") + a.title}
+                        style={placeLinkBtn}>
+                        {a.place ? "Change place" : "Add a place"}
+                      </button>
+                    </div>
                   </td>
                   <td style={{ ...td, color: "var(--text-secondary)" }}>{isLive ? cap(a.type) : a.space}</td>
                   <td style={{ ...td, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{a.date}</td>
@@ -435,6 +512,17 @@
                     </button>
                   </td>
                 </tr>
+                {editId === a.id ? (
+                  <tr style={{ borderBottom: "1px solid var(--divider)", background: "var(--surface-sunk)" }}>
+                    <td colSpan={7} style={{ padding: "8px 12px 16px" }}>
+                      <PlaceEditor initial={placeOf(a)} saving={savingId === a.id}
+                        error={placeErr && placeErr.id === a.id ? placeErr.message : null}
+                        label={a.title} loadMap={loadMapLibre} env={window.__CV_ENV || {}}
+                        onSave={(next) => savePlace(a, next)} onCancel={closeEditor} />
+                    </td>
+                  </tr>
+                ) : null}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

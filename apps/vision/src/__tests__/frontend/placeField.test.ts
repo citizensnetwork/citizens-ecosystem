@@ -39,13 +39,15 @@ const EMPTY: Place = { name: "", lat: null, lng: null };
 const LIVE: Env = { MAPTILER_KEY: "test-key" };
 
 // Fresh module state per test: the field remembers a refused key for the page.
-function loadField() {
+type Comp = React.ComponentType<Record<string, unknown>>;
+function loadScreens() {
   const win: Record<string, unknown> = {};
   new Function("window", compiled["src/frontend/app/timeline-lib.jsx"]!)(win);
   new Function("window", compiled["src/frontend/app/place-lib.jsx"]!)(win);
   new Function("window", "React", compiled["src/frontend/app/place-field.jsx"]!)(win, React);
-  return (win.Screens as { PlaceField: React.ComponentType<Record<string, unknown>> }).PlaceField;
+  return win.Screens as { PlaceField: Comp; PlaceEditor: Comp };
 }
+const loadField = () => loadScreens().PlaceField;
 
 let root: Root;
 let host: HTMLDivElement;
@@ -340,6 +342,181 @@ describe("when MapTiler cannot be used", () => {
     await settle();
     expect(text()).toContain("isn't answering right now");
     expect(changes.at(-1)).toEqual({ name: "Hatfield", lat: null, lng: null });
+  });
+});
+
+describe("PlaceEditor (add, change or remove the place of an activity already logged)", () => {
+  const HATFIELD_PLACE: Place = { name: "Hatfield", lat: -25.7508, lng: 28.2431 };
+  const NAME_ONLY: Place = { name: "Mamelodi community hall", lat: null, lng: null };
+
+  type EditorProps = {
+    initial: Place;
+    saving?: boolean;
+    error?: string | null;
+    env?: Env;
+  };
+  let saved: Place[];
+  let cancels: number;
+
+  function props(p: EditorProps) {
+    return {
+      initial: p.initial,
+      saving: !!p.saving,
+      error: p.error ?? null,
+      label: "Food drive",
+      onSave: (n: Place) => { saved.push(n); },
+      onCancel: () => { cancels += 1; },
+      loadMap: () => Promise.reject(new Error("no map in unit tests")),
+      env: p.env ?? {},
+    };
+  }
+  function mountEditor(p: EditorProps) {
+    const { PlaceEditor } = loadScreens();
+    act(() => { root.render(React.createElement(PlaceEditor, props(p))); });
+    return {
+      rerender: (next: EditorProps) => { act(() => { root.render(React.createElement(PlaceEditor, props(next))); }); },
+    };
+  }
+  const button = (label: string) => Array.from(host.querySelectorAll("button")).find((b) => b.textContent === label) as HTMLButtonElement | undefined;
+
+  beforeEach(() => { saved = []; cancels = 0; });
+
+  it("opens on the saved place with the cursor in the field, and Save waits for a change", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    expect(input().value).toBe("Hatfield");
+    expect(document.activeElement).toBe(input());
+    expect(text()).toContain("On the Timeline Map at -25.75080, 28.24310");
+    expect(button("Save place")!.disabled).toBe(true);
+    click(button("Save place")!);
+    expect(saved).toEqual([]);
+  });
+
+  it("an activity with no place yet starts empty and offers to add one", () => {
+    mountEditor({ initial: EMPTY });
+    expect(input().value).toBe("");
+    expect(button("Save place")!.disabled).toBe(true);
+    expect(buttons()).not.toContain("Clear");
+  });
+
+  it("names the group for a screen reader with the activity's title", () => {
+    mountEditor({ initial: EMPTY });
+    const group = host.querySelector("[data-cv-place-editor]")!;
+    expect(group.getAttribute("role")).toBe("group");
+    expect(group.getAttribute("aria-label")).toBe("Place for Food drive");
+  });
+
+  it("a pasted coordinate pair, picked, enables Save and saves the spot (no MapTiler key needed)", () => {
+    mountEditor({ initial: EMPTY });
+    type("-25.7461, 28.1881");
+    click(host.querySelector('[role="option"]')!);
+    expect(button("Save place")!.disabled).toBe(false);
+    click(button("Save place")!);
+    expect(saved).toEqual([{ name: "Coordinates -25.74610, 28.18810", lat: -25.7461, lng: 28.1881 }]);
+  });
+
+  it("a typed name alone can be saved as text, with the honest note that it is not on the map", () => {
+    mountEditor({ initial: EMPTY });
+    type("Mamelodi community hall");
+    expect(text()).toContain("won't appear on the Timeline Map");
+    click(button("Save place")!);
+    expect(saved).toEqual([NAME_ONLY]);
+  });
+
+  it("Enter in the field saves when there is something to save, and does nothing when there is not", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    key("Enter");
+    expect(saved).toEqual([]);
+    type("Hatfield Baptist hall");
+    key("Enter");
+    expect(saved).toEqual([{ name: "Hatfield Baptist hall", lat: -25.7508, lng: 28.2431 }]);
+  });
+
+  it("Remove pin keeps the name and saves a text-only place", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    click(button("Remove pin")!);
+    click(button("Save place")!);
+    expect(saved).toEqual([{ name: "Hatfield", lat: null, lng: null }]);
+  });
+
+  it("Clear turns Save into Remove place and says a pinned activity leaves the map; it saves an empty place", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    click(button("Clear")!);
+    expect(button("Save place")).toBeUndefined();
+    expect(text()).toContain("This takes the activity off your Timeline Map.");
+    click(button("Remove place")!);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toEqual(EMPTY);
+  });
+
+  it("removing a name-only place does not claim the map changes", () => {
+    mountEditor({ initial: NAME_ONLY });
+    click(button("Clear")!);
+    expect(button("Remove place")).toBeDefined();
+    expect(text()).not.toContain("takes the activity off your Timeline Map");
+  });
+
+  it("Cancel and Escape close it without saving", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    type("Something else");
+    click(button("Cancel")!);
+    expect(cancels).toBe(1);
+    key("Escape");
+    expect(cancels).toBe(2);
+    expect(saved).toEqual([]);
+  });
+
+  it("Escape with the list of choices open only closes the list", async () => {
+    fetchMock.mockReturnValue(answer([HATFIELD]));
+    mountEditor({ initial: EMPTY, env: LIVE });
+    type("Hatfield");
+    await settle();
+    expect(options()).toHaveLength(1);
+    key("Escape");
+    expect(options()).toEqual([]);
+    expect(cancels).toBe(0);
+    key("Escape");
+    expect(cancels).toBe(1);
+  });
+
+  it("while saving it says so, locks the buttons and ignores Escape and Enter", () => {
+    const view = mountEditor({ initial: HATFIELD_PLACE });
+    type("Hatfield Baptist hall");
+    view.rerender({ initial: HATFIELD_PLACE, saving: true });
+    expect(button("Saving…")!.disabled).toBe(true);
+    expect(button("Cancel")!.disabled).toBe(true);
+    key("Escape");
+    key("Enter");
+    expect(cancels).toBe(0);
+    expect(saved).toEqual([]);
+  });
+
+  it("a failed save shows its message and keeps everything the person typed, ready to try again", () => {
+    const view = mountEditor({ initial: HATFIELD_PLACE });
+    type("Hatfield Baptist hall");
+    view.rerender({ initial: HATFIELD_PLACE, saving: true });
+    view.rerender({ initial: HATFIELD_PLACE, error: "Could not save the place. Check your connection and try again." });
+    const alert = host.querySelector('[role="alert"]')!;
+    expect(alert.textContent).toContain("Check your connection");
+    expect(input().value).toBe("Hatfield Baptist hall");
+    expect(button("Save place")!.disabled).toBe(false);
+    click(button("Save place")!);
+    expect(saved).toEqual([{ name: "Hatfield Baptist hall", lat: -25.7508, lng: 28.2431 }]);
+  });
+
+  it("shows no error box when there is no error", () => {
+    mountEditor({ initial: HATFIELD_PLACE });
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("when MapTiler refuses the key it still works as text, and says so", async () => {
+    fetchMock.mockReturnValue(answer([], 403));
+    mountEditor({ initial: EMPTY, env: LIVE });
+    type("Hatfield");
+    await settle();
+    expect(text()).toContain("did not accept this site");
+    expect(buttons()).not.toContain("Drop a pin");
+    click(button("Save place")!);
+    expect(saved).toEqual([{ name: "Hatfield", lat: null, lng: null }]);
   });
 });
 

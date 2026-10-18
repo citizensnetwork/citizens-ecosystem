@@ -175,11 +175,13 @@
     { id: "sp-5", name: "Events", icon: "calendar", color: "var(--danger)", activities: 15, people: 120, reach: 610, trend: [11, 12, 12, 14, 15, 15] },
   ];
 
+  // mapId links each demo activity to its twin in mapActivities below (same title), so the
+  // Activities screen shows the place the Timeline Map already plots and an edit moves one dot.
   const activities = [
-    { id: "act-1", title: "Community Food Drive", space: "Community Projects", date: "2026-06-28", reach: 218, engagement: 72, rating: 4.7, claimed: true },
-    { id: "act-2", title: "Youth Mentorship intro night", space: "Outreach", date: "2026-06-21", reach: 94, engagement: 61, rating: 4.5, claimed: true },
-    { id: "act-3", title: "Soup Kitchen — Saturday shift", space: "Volunteers", date: "2026-06-20", reach: 42, engagement: 55, rating: 4.8, claimed: false },
-    { id: "act-4", title: "Winter Blanket Drive wrap-up", space: "Fundraising", date: "2026-06-14", reach: 152, engagement: 48, rating: 4.2, claimed: true },
+    { id: "act-1", mapId: "ma-1", title: "Community Food Drive", space: "Community Projects", date: "2026-06-28", reach: 218, engagement: 72, rating: 4.7, claimed: true },
+    { id: "act-2", mapId: "ma-2", title: "Youth Mentorship intro night", space: "Outreach", date: "2026-06-21", reach: 94, engagement: 61, rating: 4.5, claimed: true },
+    { id: "act-3", mapId: "ma-3", title: "Soup Kitchen — Saturday shift", space: "Volunteers", date: "2026-06-20", reach: 42, engagement: 55, rating: 4.8, claimed: false },
+    { id: "act-4", mapId: "ma-4", title: "Winter Blanket Drive wrap-up", space: "Fundraising", date: "2026-06-14", reach: 152, engagement: 48, rating: 4.2, claimed: true },
   ];
 
   // Analytics series (metric → conclusion narrative + series + evidence).

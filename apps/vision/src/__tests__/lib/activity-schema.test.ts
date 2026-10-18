@@ -173,6 +173,15 @@ describe("createActivitySchema", () => {
   });
 });
 
+describe("createActivitySchema place", () => {
+  const base = { title: "Food drive", type: "outreach" as const, date: "2026-10-17" };
+
+  it("does not accept null for the place: a new activity either has one or leaves it out", () => {
+    expect(createActivitySchema.safeParse({ ...base, latitude: null, longitude: null }).success).toBe(false);
+    expect(createActivitySchema.safeParse({ ...base, location_name: null }).success).toBe(false);
+  });
+});
+
 describe("updateActivitySchema", () => {
   it("allows partial updates", () => {
     const result = updateActivitySchema.safeParse({ title: "Updated" });
@@ -187,5 +196,62 @@ describe("updateActivitySchema", () => {
   it("validates fields that are provided", () => {
     const result = updateActivitySchema.safeParse({ type: "invalid" });
     expect(result.success).toBe(false);
+  });
+
+  it("leaves out whatever was left out: no default is added to a partial update", () => {
+    // Zod 4 applies a .default() inside .partial(); this is the regression guard for that.
+    expect(updateActivitySchema.parse({})).toEqual({});
+    expect(updateActivitySchema.parse({ title: "Renamed" })).toEqual({ title: "Renamed" });
+    expect(updateActivitySchema.parse({ location_name: "Hatfield" })).toEqual({ location_name: "Hatfield" });
+  });
+
+  it("reads null as 'clear this column' for the three place fields", () => {
+    const cleared = { latitude: null, longitude: null, location_name: null };
+    expect(updateActivitySchema.parse(cleared)).toEqual(cleared);
+  });
+
+  it("does not read null as 'clear' for anything else", () => {
+    for (const k of ["title", "type", "date", "participant_count", "tags", "department_id", "description"]) {
+      expect(updateActivitySchema.safeParse({ [k]: null }).success, k).toBe(false);
+    }
+  });
+
+  it("takes the position as a pair: both numbers, or both null, or neither", () => {
+    expect(updateActivitySchema.safeParse({ latitude: -25.7, longitude: 28.2 }).success).toBe(true);
+    expect(updateActivitySchema.safeParse({ latitude: null, longitude: null }).success).toBe(true);
+    expect(updateActivitySchema.safeParse({}).success).toBe(true);
+    const halves = [
+      { latitude: -25.7 },
+      { longitude: 28.2 },
+      { latitude: null },
+      { longitude: null },
+      { latitude: -25.7, longitude: null },
+      { latitude: null, longitude: 28.2 },
+    ];
+    for (const half of halves) {
+      const r = updateActivitySchema.safeParse(half);
+      expect(r.success, JSON.stringify(half)).toBe(false);
+      if (!r.success) expect(r.error.issues[0]!.path).toContain("latitude");
+    }
+  });
+
+  it("keeps the create schema's limits on the place", () => {
+    expect(updateActivitySchema.safeParse({ latitude: 90.1, longitude: 0 }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ latitude: 0, longitude: -180.1 }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ location_name: "x".repeat(301) }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ location_name: "x".repeat(300) }).success).toBe(true);
+  });
+
+  it("keeps the create schema's limits on the count and the tags when they are sent", () => {
+    expect(updateActivitySchema.safeParse({ participant_count: -1 }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ participant_count: 1.5 }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ participant_count: 40 }).success).toBe(true);
+    expect(updateActivitySchema.safeParse({ tags: Array.from({ length: 21 }, (_, i) => "t" + i) }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ tags: [""] }).success).toBe(false);
+  });
+
+  it("drops fields a client has no business changing", () => {
+    const r = updateActivitySchema.parse({ title: "Renamed", org_id: "someone-else", created_by: "x", source_type: "api" });
+    expect(r).toEqual({ title: "Renamed" });
   });
 });

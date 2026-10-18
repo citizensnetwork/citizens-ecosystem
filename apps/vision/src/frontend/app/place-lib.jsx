@@ -6,9 +6,11 @@
 //  what a person typed, reading a pasted coordinate pair, building the
 //  MapTiler geocoding URLs, turning their answers into a short result list,
 //  and turning the chosen place into the three fields POST /api/activities
-//  already accepts (latitude, longitude, location_name). Pure (no DOM, no
-//  fetch, no React) so a unit test can run it directly — see
-//  src/__tests__/frontend/placeLib.test.ts.
+//  already accepts (latitude, longitude, location_name), and the same place
+//  into a PATCH that can also clear it (V7: add, change or remove the place of
+//  an activity that is already logged). Pure (no DOM, no React; the one network
+//  call, savePlace, takes its fetch as an argument) so a unit test can run it
+//  directly — see src/__tests__/frontend/placeLib.test.ts.
 //
 //  A coordinate is only ever sent when it passes the Timeline Map's own rule
 //  (window.CV_TIMELINE.validCoord: a real number pair in range, never 0,0
@@ -136,11 +138,89 @@
     return { latitude: p.lat, longitude: p.lng, location_name: p.name };
   }
 
-  // A saved activity row → what the list shows: the name, and whether the
-  // Timeline Map can plot it (the same test the map applies to every row).
-  function rowPlace(row) {
-    const name = cleanName(row && row.location_name);
-    return { name, onMap: !!row && validCoord(row.latitude, row.longitude) };
+  // The fields to send in a PATCH. Unlike a create, an edit has to be able to
+  // CLEAR: an omitted field means "leave it as it is", so the three place columns
+  // are always named, and `null` (what PATCH /api/activities/:id reads as "empty
+  // this column") fills whatever the place does not have. A place with no spot
+  // takes the activity off the Timeline Map but keeps its name; no place at all
+  // clears all three.
+  function toPatch(place) {
+    return { latitude: null, longitude: null, location_name: null, ...toPayload(place) };
+  }
+
+  // Do two places say the same thing once cleaned (name, spot, rounding)? Two
+  // "no place" values are the same.
+  function samePlace(a, b) {
+    const x = normalise(a);
+    const y = normalise(b);
+    if (!x || !y) return x === y;
+    return x.name === y.name && x.lat === y.lat && x.lng === y.lng;
+  }
+
+  // A saved activity row → the place as the editor holds it ({ name, lat, lng }).
+  // The spot is kept only if the Timeline Map would plot it, and a spot saved
+  // without a name is named by its coordinates, as the Log form would have done.
+  function fromRow(row) {
+    const spot = !!row && validCoord(row.latitude, row.longitude);
+    return (
+      normalise({
+        name: row && row.location_name,
+        lat: spot ? row.latitude : null,
+        lng: spot ? row.longitude : null,
+      }) || EMPTY
+    );
+  }
+
+  // A place → the fields of a row in the Activities list: the name shown under
+  // the title, whether the Timeline Map can plot it, and the spot (so the next
+  // edit starts where this one ended).
+  function fieldsOfPlace(place) {
+    const p = normalise(place) || EMPTY;
+    return { place: p.name, onMap: p.lat !== null, lat: p.lat, lng: p.lng };
+  }
+
+  // A saved activity row (GET / PATCH /api/activities) → those same fields.
+  function rowFields(row) {
+    return fieldsOfPlace(fromRow(row));
+  }
+
+  // The message for a place that could not be saved, by HTTP status (0 = the
+  // request never got an answer). Every one says what to do next.
+  function failureMessage(status) {
+    if (status === 0) return "Could not save the place. Check your connection and try again.";
+    if (status === 400) return "Could not save the place. Check it, or remove it and try again.";
+    if (status === 401) return "Your session has ended. Sign in again to save the place.";
+    if (status === 403 || status === 404) {
+      return "Could not save the place. The activity may have been removed, or you may not be allowed to change it (the person who logged it and organisation admins can).";
+    }
+    return "Could not save the place. Try again in a moment.";
+  }
+
+  // Save one activity's place: PATCH it, then trust the ANSWER over our own
+  // intent. Resolves { ok: true, fields } with the row fields the server now
+  // holds, or { ok: false, message }. A 200 whose echo does not match what we
+  // sent counts as a failure: a server that quietly changed nothing must never
+  // leave the list claiming the activity is on the map.
+  async function savePlace(authFetch, id, place) {
+    let res;
+    try {
+      res = await authFetch("/api/activities/" + encodeURIComponent(id), {
+        method: "PATCH",
+        body: JSON.stringify(toPatch(place)),
+      });
+    } catch (e) {
+      return { ok: false, status: 0, message: failureMessage(0) };
+    }
+    if (!res.ok) return { ok: false, status: res.status, message: failureMessage(res.status) };
+    let row = null;
+    try {
+      const json = await res.json();
+      row = json && json.data ? json.data : null;
+    } catch (e) { /* saved, but no echo to check: the sent place stands */ }
+    if (row && !samePlace(fromRow(row), place)) {
+      return { ok: false, status: res.status, message: "The place was not saved. Try again, or ask an organisation admin." };
+    }
+    return { ok: true, fields: row ? rowFields(row) : fieldsOfPlace(place) };
   }
 
   // A just-logged demo activity in the shape GET /api/map/activities returns, so
@@ -156,9 +236,47 @@
     };
   }
 
+  // Move keyboard focus once the key press that caused it has finished. Focusing
+  // inside a keydown handler makes Chrome deliver that same press's keypress to
+  // the NEW element, and Enter on a button is a click: pressing Enter to save a
+  // place closed the editor, focused "Change place" and so opened it again.
+  // `find()` returns the element to focus (or nothing); returns a cancel function.
+  function focusSoon(find) {
+    const t = setTimeout(() => {
+      const el = find();
+      if (el && typeof el.focus === "function") el.focus();
+    }, 0);
+    return () => clearTimeout(t);
+  }
+
+  // Keep the demo's Timeline Map list (D.mapActivities, the array the map reads)
+  // in step with a place that was added, changed or cleared. `key` is the map
+  // row's id, `meta` is { title, type, date } for a row that has to be created.
+  // A cleared spot does what the database does: the row stays, with no position,
+  // and the map skips it. So its reach and department survive a later re-add.
+  // Mutates and returns `list`.
+  function syncDemoMap(list, key, meta, place) {
+    const p = normalise(place);
+    const i = list.findIndex((m) => m.id === key);
+    if (!p || p.lat === null) {
+      if (i >= 0) {
+        list[i] = { ...list[i], latitude: null, longitude: null, location_name: p ? p.name : null };
+      }
+      return list;
+    }
+    if (i >= 0) {
+      list[i] = { ...list[i], latitude: p.lat, longitude: p.lng, location_name: p.name };
+    } else {
+      const row = demoMapRow(key, meta.title, meta.type || "other", meta.date, p);
+      if (row) list.unshift(row);
+    }
+    return list;
+  }
+
   window.CV_PLACE = {
     NAME_MAX, MIN_QUERY, MAX_RESULTS, HOME, EMPTY,
     cleanName, coordLabel, parseCoordPair, searchUrl, reverseUrl, parseResults, parseReverse,
-    normalise, kind, toPayload, rowPlace, demoMapRow,
+    normalise, kind, toPayload, toPatch, samePlace, fromRow, fieldsOfPlace, rowFields,
+    failureMessage, savePlace, focusSoon, demoMapRow, syncDemoMap,
   };
 })();

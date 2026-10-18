@@ -1,7 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Vision — the optional "Place" field (window.Screens.PlaceField)
 //  ------------------------------------------------------------------
-//  Lives on the Log-an-activity form. A person can:
+//  Lives on the Log-an-activity form, and (as PlaceEditor, below) under an
+//  activity that is already logged, to add, change or remove its place. A
+//  person can:
 //    · type a place and pick a MapTiler geocoding result  → name + coordinates
 //    · paste a coordinate pair ("-25.7461, 28.1881")        → name + coordinates
 //    · drop a pin on a small map (centre pin, "Use this spot") → coordinates
@@ -350,5 +352,43 @@
     );
   }
 
-  window.Screens = Object.assign(window.Screens || {}, { PlaceField });
+  // The inline editor under an activity that is already logged (V7): the same
+  // field, prefilled with its place, and Save / Cancel. It keeps its draft until
+  // the parent closes it, so a failed save loses nothing the person typed.
+  //   initial: { name, lat, lng } of the saved row · saving: a save is in flight
+  //   error: the last save's message · onSave(place) · onCancel()
+  //   label: the activity's title (for the screen reader) · loadMap, env as PlaceField
+  function PlaceEditor({ initial, saving, error, onSave, onCancel, loadMap, env, label }) {
+    const [draft, setDraft] = useState(initial);
+    const hostRef = useRef(null);
+    useEffect(() => {
+      const el = hostRef.current && hostRef.current.querySelector("input");
+      if (el) el.focus();
+    }, []);
+    const changed = !P.samePlace(initial, draft);
+    // Emptying a place that was there is a removal (and says so); an empty box over no place is just not saved yet.
+    const removing = P.kind(initial) !== "empty" && P.kind(draft) === "empty";
+    const save = () => { if (changed && !saving) onSave(draft); };
+    return (
+      <div ref={hostRef} data-cv-place-editor="" role="group" aria-label={"Place for " + label}
+        onKeyDown={(e) => { if (e.key === "Escape" && !saving) { e.stopPropagation(); onCancel(); } }}>
+        <PlaceField value={draft} onChange={setDraft} onSubmit={save} loadMap={loadMap} env={env} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+          <button type="button" onClick={save} disabled={!changed || saving}
+            style={{ ...smallBtn, background: "var(--brand)", color: "var(--on-brand)", border: "1px solid var(--brand-strong)", opacity: changed && !saving ? 1 : 0.55, cursor: changed && !saving ? "pointer" : "default" }}>
+            {saving ? "Saving…" : removing ? "Remove place" : "Save place"}
+          </button>
+          <button type="button" onClick={onCancel} disabled={saving} style={smallBtn}>Cancel</button>
+          {removing && changed && !saving && P.kind(initial) === "pinned" ? (
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>This takes the activity off your Timeline Map.</span>
+          ) : null}
+        </div>
+        {error ? (
+          <div role="alert" style={{ marginTop: 10, fontSize: 13, color: "var(--danger)", background: "var(--danger-bg)", borderRadius: 12, padding: "9px 14px" }}>{error}</div>
+        ) : null}
+      </div>
+    );
+  }
+
+  window.Screens = Object.assign(window.Screens || {}, { PlaceField, PlaceEditor });
 })();

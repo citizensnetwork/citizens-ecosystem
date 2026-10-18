@@ -79,15 +79,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   // Update activity fields
   if (Object.keys(activityData).length > 0) {
-    const { error: updateError } = await supabase
+    // RLS lets only the person who logged an activity, an organisation admin or
+    // the department's manager update it, and a row it hides from the UPDATE is
+    // skipped without an error. Ask for the row back, so "nothing changed" is a
+    // 404 here and not a 200 that returns the old values.
+    const { data: updated, error: updateError } = await supabase
       .from("activities")
       .update(activityData)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
 
     if (updateError) {
       return NextResponse.json(
         { error: updateError.message },
         { status: 500 }
+      );
+    }
+
+    if (!updated || updated.length === 0) {
+      return NextResponse.json(
+        { error: "Activity not found, or you cannot change it" },
+        { status: 404 }
       );
     }
   }

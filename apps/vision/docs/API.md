@@ -64,16 +64,33 @@ None — returns all orgs the authenticated user is a member of.
   "org_id": "UUID (required)",
   "title": "string (required, 2-200 chars)",
   "description": "string (optional)",
-  "type": "meeting | workshop | outreach | survey | training | report | event | other",
+  "type": "event | meeting | outreach | workshop | service | training | other (required)",
   "date": "YYYY-MM-DD (required)",
   "department_id": "UUID (optional)",
-  "latitude": "number (optional, -90 to 90)",
-  "longitude": "number (optional, -180 to 180)",
-  "impact_score": "number (optional, 0-100)",
-  "participants": "number (optional, >= 0)",
-  "tags": "string[] (optional)"
+  "latitude": "number (optional, -90 to 90; send with longitude)",
+  "longitude": "number (optional, -180 to 180; send with latitude)",
+  "location_name": "string (optional, up to 300 chars)",
+  "participant_count": "integer (optional, >= 0, default 0)",
+  "tags": "string[] (optional, up to 20, default [])"
 }
 ```
+
+### Request Body (PATCH /api/activities/[id])
+Send only the fields to change; every field of the POST body is accepted, none is required.
+An omitted field is left exactly as it is (a PATCH that sends only a place never resets
+`participant_count` or the tags).
+
+The place is `latitude`, `longitude` and `location_name`:
+- `{ "latitude": -25.7508, "longitude": 28.2431, "location_name": "Hatfield" }` sets it, and puts the
+  activity on the Timeline Map.
+- `{ "latitude": null, "longitude": null, "location_name": "Hatfield" }` keeps the name and takes the
+  activity off the map.
+- `{ "latitude": null, "longitude": null, "location_name": null }` clears the place.
+- `null` clears these three fields only. `latitude` and `longitude` are sent together (both numbers,
+  or both `null`); one without the other is a 400.
+
+Answers 404 when the activity does not exist or the caller may not change it (only the person who
+logged an activity, an organisation admin and the department's manager can).
 
 ---
 
