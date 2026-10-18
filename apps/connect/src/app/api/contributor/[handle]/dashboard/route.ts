@@ -68,11 +68,9 @@ export async function GET(
       .eq("status", "published")
       .gte("date", new Date().toISOString()),
 
-    // Total followers
-    supabase
-      .from("follows")
-      .select("id", { count: "exact", head: true })
-      .eq("followee_id", contributorId),
+    // Total followers (S13: the `follows` table is readable only by the person who follows, so the
+    // Contributor's own EXACT number comes from a function; they learn how many, never who)
+    supabase.rpc("follower_count_exact", { p_followee: contributorId }),
 
     // RSVPs in period
     supabase
@@ -133,7 +131,7 @@ export async function GET(
     stats: {
       active_places: placesResult.count ?? 0,
       upcoming_events: eventsResult.count ?? 0,
-      total_followers: followersResult.count ?? 0,
+      total_followers: Number(followersResult.data ?? 0) || 0,
       rsvps_in_period: rsvpsResult.count ?? 0,
       active_team_members: teamResult.count ?? 0,
       unread_inbox: unreadInboxResult.count ?? 0,

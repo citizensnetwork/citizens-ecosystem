@@ -153,13 +153,15 @@
     broadcast: ['Radio', '#C9A84C'], friend: ['UserPlus', '#3498DB'], convince: ['Sparkles', '#9B59B6'],
     message: ['MessageCircle', '#2563EB'], idea: ['Lightbulb', '#16A34A'], event: ['Calendar', '#E67E22'],
     volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#C9A84C'],
+    news: ['Newspaper', '#C9A84C'],
   };
   function NotificationsPage() {
-    const { notifications, markNotifsRead, readNotification, go } = window.useApp();
+    const { notifications, markNotifsRead, readNotification, go, user, toast } = window.useApp();
     const open = (n) => {
       readNotification(n.id);
       if (n.eventId) go('event', { id: n.eventId });
       else if (n.convId) go('messages', { convId: n.convId });
+      else if (n.contributorId) go('profile', { id: n.contributorId });
     };
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'notifications' },
       h(Header, { icon: 'Bell', title: 'Notifications', right: h(Button, { variant: 'ghost', size: 'sm', onClick: markNotifsRead }, 'Mark all read') }),
@@ -168,14 +170,16 @@
           notifications.length === 0 && h(Empty, { icon: 'Bell', title: 'No notifications yet', sub: 'Broadcasts, messages and event updates land here.' }),
           notifications.map((n) => {
             const [ic, c] = NOTIF_ICON[n.type] || ['Bell', '#C9A84C'];
-            const linked = !!(n.eventId || n.convId);
-            return h('div', { key: n.id, onClick: () => open(n), role: linked ? 'button' : undefined,
+            const linked = !!(n.eventId || n.convId || n.contributorId);
+            return h('div', { key: n.id, onClick: () => open(n), role: linked ? 'button' : undefined, 'data-notif': n.type,
               className: cx('flex items-start gap-3 px-4 sm:px-5 py-3.5 border-b border-border/50 transition-colors', !n.read && 'bg-accent/30', linked && 'cursor-pointer hover:bg-accent/40') },
               n.photo ? h('div', { className: 'relative shrink-0' }, h(Avatar, { src: n.photo, size: 42, rounded: 'xl' }), h('span', { className: 'absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background flex items-center justify-center', style: { background: c } }, h(Icon, { name: ic, size: 9, className: 'text-white' })))
                 : h('div', { className: 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0', style: { background: c + '20', color: c } }, h(Icon, { name: ic, size: 17 })),
               h('div', { className: 'flex-1 min-w-0' },
                 h('p', { className: 'text-sm font-semibold text-foreground leading-snug' }, n.title),
                 h('p', { className: 'text-xs text-muted-foreground leading-relaxed mt-0.5' }, n.body),
+                // P2-09: a co-host invitation carries its own Accept / Decline (the database checks it is yours to answer)
+                n.kind === 'cohost_invite' && n.eventId && h(window.CohostInviteActions, { sb: window.CC_SUPABASE, me: user.id, eventId: n.eventId, toast, onAnswered: () => readNotification(n.id) }),
                 h('p', { className: 'text-[10px] text-muted-foreground mt-1' }, n.time)),
               !n.read && h('span', { className: 'w-2 h-2 rounded-full bg-gold shrink-0 mt-1.5' }));
           }))));
@@ -186,11 +190,35 @@
   // allowlist); demo mode toggles the same keys locally.
   const NOTIF_PREFS = [
     ['event_reminders', 'Event reminders', 'Upcoming events you connected to'],
-    ['contributor_updates', 'Broadcasts & updates', 'Updates from places, events & orgs you follow'],
+    ['contributor_updates', 'Broadcasts & updates', 'New events and news from Contributors you follow, and updates from places & events you follow'],
     ['friends_activity', 'Friends', 'Friend requests & friend activity'],
     ['announcements', 'Announcements', 'Important platform announcements'],
     ['weekly_digest', 'Weekly digest', 'A weekly summary of Kingdom activity'],
   ];
+  // P2-04: the person's PRIVATE saved list. Only they see it; a listing is never told it was saved. Sorted by name (never by
+  // how popular a listing is). A save whose listing is not on the map right now stays saved and is counted in the note.
+  function SavedList() {
+    const { savedContributors, savedPlaces, contributors, places, toggleSave, go } = window.useApp();
+    const rows = [
+      ...contributors.filter((c) => savedContributors.has(c.id)).map((c) => ({ kind: 'contributor', page: 'profile', id: c.id, name: c.name, photo: c.profilePhoto, meta: 'Contributor' })),
+      ...places.filter((p) => savedPlaces.has(p.id)).map((p) => ({ kind: 'place', page: 'place', id: p.id, name: p.name, photo: '', meta: 'Place' })),
+    ].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const hidden = savedContributors.size + savedPlaces.size - rows.length;
+    if (!rows.length && !hidden) {
+      return h('p', { 'data-saved': 'empty', className: 'text-xs text-muted-foreground' }, 'Nothing saved yet. Tap Save on a Contributor or a Place on the map.');
+    }
+    return h(F, null,
+      h('ul', { 'data-saved': 'list', role: 'list', className: 'space-y-2' },
+        rows.map((r) => h('li', { key: r.kind + r.id, 'data-saved': 'row', className: 'flex items-center gap-2 p-2 rounded-xl bg-white/60 border border-border' },
+          h('button', { type: 'button', 'data-saved': 'open', onClick: () => go(r.page, { id: r.id }), className: 'flex-1 min-w-0 min-h-[44px] flex items-center gap-3 text-left' },
+            h(Avatar, { src: r.photo, name: r.name, size: 36, rounded: 'xl' }),
+            h('span', { className: 'min-w-0' }, h('span', { 'data-saved': 'name', className: 'block text-sm font-semibold text-foreground truncate' }, r.name), h('span', { className: 'block text-xs text-muted-foreground' }, r.meta))),
+          h('button', { type: 'button', 'data-saved': 'remove', 'aria-label': 'Remove ' + r.name + ' from your saved list', onClick: () => toggleSave(r.kind, r.id, r.name),
+            className: 'w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'X', size: 16 }))))),
+      hidden > 0 && h('p', { 'data-saved': 'hidden', className: 'text-xs text-muted-foreground mt-2' },
+        hidden === 1 ? '1 more saved listing is not on the map right now.' : hidden + ' more saved listings are not on the map right now.'));
+  }
+
   function SettingsPage() {
     const app = window.useApp();
     const { user, role, go, toast, isCitizen, isPendingApplicant, contributorStatus, signOut, updateAvatar, realUser, myProfileMeta, saveProfile, setDiscoverable, saveNotificationPref } = app;
@@ -243,6 +271,8 @@
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },
             h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
               h(Toggle, { checked: isPublic, onChange: setDiscoverable, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' }))),
+
+          h(Section, { title: 'Saved', sub: 'Only you can see this list. A listing is never told you saved it.' }, h(SavedList)),
 
           h(Section, { title: 'Notifications', sub: 'Choose what you hear about' },
             h('div', { className: 'space-y-3' },

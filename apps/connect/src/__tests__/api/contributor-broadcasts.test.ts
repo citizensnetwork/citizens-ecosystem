@@ -33,10 +33,13 @@ const mockClient = vi.hoisted(() => ({
 }));
 
 const mockAdminNotifications = vi.hoisted(() => chain({ data: null, error: null }));
+// Tables the admin (service-role) client hands back, set per test. S13: `follows` and `place_follows` are
+// readable only by their owner and the server's admin key, so the fan-out must ask the ADMIN client for them.
+const adminTables = vi.hoisted(() => ({}) as Record<string, ReturnType<typeof chain>>);
 const mockAdmin = vi.hoisted(() => ({
   from: vi.fn((table: string) => {
     if (table === "notifications") return mockAdminNotifications;
-    return chain();
+    return adminTables[table] ?? chain();
   }),
 }));
 
@@ -133,12 +136,9 @@ describe("POST /api/contributor/[handle]/broadcasts notification fan-out", () =>
       data: [{ follower_id: USER_ID }, { follower_id: "66666666-6666-4666-8666-666666666666" }],
       error: null,
     });
-    setupBase({
-      places: placeChain,
-      broadcast_messages: broadcastChain,
-      place_follows: placeFollowChain,
-      follows: contributorFollowChain,
-    });
+    setupBase({ places: placeChain, broadcast_messages: broadcastChain });
+    adminTables.place_follows = placeFollowChain;
+    adminTables.follows = contributorFollowChain;
 
     const res = await POST(
       req({ entity_type: "place", entity_id: PLACE_ID, body: "Place update" }),
@@ -148,6 +148,11 @@ describe("POST /api/contributor/[handle]/broadcasts notification fan-out", () =>
     expect(res.status).toBe(201);
     expect(placeFollowChain.eq).toHaveBeenCalledWith("place_id", PLACE_ID);
     expect(contributorFollowChain.eq).toHaveBeenCalledWith("followee_id", CONTRIBUTOR_ID);
+    // S13: both follower lookups run as the admin client; on the Contributor's own client the closed tables read empty.
+    expect(mockAdmin.from).toHaveBeenCalledWith("follows");
+    expect(mockAdmin.from).toHaveBeenCalledWith("place_follows");
+    expect(mockClient.from).not.toHaveBeenCalledWith("follows");
+    expect(mockClient.from).not.toHaveBeenCalledWith("place_follows");
     expect(mockAdminNotifications.insert).toHaveBeenCalledWith([
       expect.objectContaining({ user_id: USER_ID }),
       expect.objectContaining({ user_id: "66666666-6666-4666-8666-666666666666" }),

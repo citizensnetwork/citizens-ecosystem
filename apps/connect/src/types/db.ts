@@ -550,7 +550,15 @@ export type NotificationType =
   | "volunteer_application_response"
   | "team_invite"
   | "team_invite_response"
-  | "team_owner_transfer";
+  | "team_owner_transfer"
+  // Kept in step with notifications_type_check (migrations 184 and 187 added the last four).
+  | "contributor_type_change_request"
+  | "admin_on_behalf_action"
+  | "broadcast_sent"
+  | "cohost_invite"
+  | "cohost_invite_response"
+  | "followed_new_event"
+  | "followed_new_news";
 
 /**
  * FEAT-04 Convince row — one per (from, to, event); permanent UNIQUE.

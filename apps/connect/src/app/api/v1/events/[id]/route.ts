@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
 import { isValidUUID } from "@/lib/validation";
+import { attachCoHostIds } from "@/lib/events/cohosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,7 +117,8 @@ export async function GET(
     }
   }
 
-  const eventData = event as unknown as Record<string, unknown>;
+  // P2-09: who accepted an invitation to co-host this event (additive; `created_by` is still the organiser).
+  const [eventData] = await attachCoHostIds(supabase, [event as unknown as Record<string, unknown>]);
   return NextResponse.json(
     {
       data: {

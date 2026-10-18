@@ -69,12 +69,12 @@ const fixtureSvg = (n: number) =>
  * Answers GET /api/v1/contributors/<slug> (the per-slug detail the sheet fetches for its photos) and
  * the fixture images. `failFirst` makes the first N detail requests fail with a 500; `delayMs` holds
  * every detail response back, so the skeleton can be seen and measured. `past` adds that many past events
- * (newest first, as the API sorts them) and `followers` sets `counts.followers`.
+ * (newest first, as the API sorts them), `followers` sets `counts.followers` and `moments` is the list of live notes.
  */
 export async function mockContributorDetail(
   page: Page,
   seed: MapSeed,
-  o: { gallery?: number; delayMs?: number; failFirst?: number; covers?: number; past?: number; followers?: number } = {},
+  o: { gallery?: number; delayMs?: number; failFirst?: number; covers?: number; past?: number; followers?: number; moments?: Record<string, unknown>[] } = {},
 ) {
   let calls = 0;
   await page.route("**/fixture-img/*.svg", (route: Route) => {
@@ -103,6 +103,7 @@ export async function mockContributorDetail(
             location: `${i + 1} Example Road, Pretoria`,
           })),
           places: [],
+          moments: o.moments ?? [],
           counts: o.followers === undefined ? {} : { followers: o.followers },
         },
       },

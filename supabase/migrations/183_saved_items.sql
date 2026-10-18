@@ -1,26 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════
---  PROPOSAL, NOT APPLIED. Tracker P2-04 (Follow and Save), gates G1 and G6.
---  Written 2026-10-15 against live head 181; the live head is now 182 (another session's Vision migration), so the
---  number is NOT fixed: take the next free one after list_migrations at apply time. Needs Stephen's yes in chat first.
+--  183_saved_items: P2-04 Save. APPLIED 2026-10-17 through MCP apply_migration as `183_saved_items`, on Stephen's yes in chat
+--  (pre-apply tag `connect-pre-mig183-saved-items`; security advisor unchanged: 0 ERROR, no new finding; rollback-only probe
+--  docs/audit/probes/183_saved_items.probe.sql: 21 of 21 PASS before and after the apply).
 --
---  What exists today (read from the live database and the app, 2026-10-15 and 2026-10-16):
---    follows        profile -> profile (a Contributor is a profile, so "follow a Contributor" already has a table)
---    place_follows  user -> place
---    Events         already have BOTH Connect (going) and Consider (a bookmark), two states of one rsvps row (store.jsx
---                   toggleConnect and toggleConsider; the card's bookmark button). An Event needs no Save table.
---  The app folds "save" into Follow for Contributors and Places on purpose (entity-card.jsx: "places and contributors
---  fold saving into the primary Follow button"). So Follow needs no new table, and Events have their bookmark.
---
---  What is missing is a PRIVATE bookmark for a Contributor or a Place: Follow is a public signal (and today the
---  follows tables are readable by anyone, RESUME S13), so a believer who only wants to remember a ministry cannot do it
---  without being listed as its follower. This file is that table, for Contributors and Places only. Whether the app
---  wants a second concept next to Follow at all is the first question for Stephen (docs/proposals/README.md, question 1).
---
---  This file is the Save table only. Follow notifications are a separate sketch (docs/proposals/README.md, item 2),
---  because they need a decision about preferences first.
---
---  If approved: pre-apply git tag, MCP apply_migration (name it <next free number>_saved_items), then get_advisors
---  (0 ERROR, 0 new findings), then move this file to supabase/migrations/<number>_saved_items.sql in the same PR.
+--  A PRIVATE bookmark for a Contributor or a Place (an Event keeps Consider, a state of its rsvps row). Follow is a public
+--  signal; a believer who only wants to remember a ministry can save it without being listed as its follower. Own rows only,
+--  never counted, never shown to the listing. No UPDATE (a save is made or removed). At most 500 per person.
+--  Authored as proposals/p2-04-saved-items.sql (2026-10-15, README question 1); this file is that proposal with one change:
+--  authenticated has its default privileges revoked first (TRUNCATE is not subject to RLS), not only anon.
 -- ════════════════════════════════════════════════════════════════════
 
 begin;
@@ -57,7 +44,9 @@ create policy saved_items_insert_own on public.saved_items
 create policy saved_items_delete_own on public.saved_items
   for delete to authenticated using (user_id = (select auth.uid()));
 
-revoke all on public.saved_items from anon, public;
+-- (Supabase grants every privilege on a new table to anon and authenticated by default, and TRUNCATE is not subject to
+-- RLS: so take everything away first, from authenticated as well, and give back only what a save needs.)
+revoke all on public.saved_items from anon, authenticated, public;
 grant select, insert, delete on public.saved_items to authenticated;
 
 -- A ceiling, so one account cannot grow the table without bound: 500 saves each (adjustable here, in one place).
@@ -84,9 +73,3 @@ commit;
 
 -- Rollback (the table holds only private bookmarks, nothing else depends on it):
 --   drop table public.saved_items; drop function public.saved_items_cap();
---
--- What follows in the front end, once approved (none of it is built): a "Save" button on a Contributor's and a Place's
--- sheet next to Follow (an Event keeps its Consider bookmark), a saved list under the account, and the saved state read
--- with one SELECT for the signed-in person, the same pattern as place_follows in store.jsx. Tests to write with the
--- migration: a policy test that user A cannot read, insert or delete user B's saves and anon gets nothing, the
--- one-target check, the unique indexes, the 500 cap, and cascade on listing delete.

@@ -102,6 +102,8 @@
     // misrepresent by linking to the wrong org.
     const org = contributors.find((c) => c.id === ev.organizerId) || null;
     const orgName = (org && org.name) || ev.organizerName || '';
+    // P2-09: Contributors who accepted an invitation to co-host, each a row like the organiser's.
+    const coHosts = (Array.isArray(ev.coHostIds) ? ev.coHostIds : []).map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean);
     const isC = connected.has(id), isCo = considering.has(id);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'event' },
       h(Scroll, null,
@@ -127,12 +129,16 @@
           // when the event carries no organiser at all.
           org ? h('button', { onClick: () => go('profile', { id: org.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
             h(Avatar, { src: org.profilePhoto, name: org.name, size: 40, rounded: 'xl', fit: logoFit(org.kind) }),
-            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, (org.followerCount || 0).toLocaleString() + ' followers')),
+            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, org.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), window.UI.followerBucket(org.followerCount) && h('p', { className: 'text-xs text-muted-foreground' }, window.UI.followerBucket(org.followerCount) + ' followers')),
             h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))
             : orgName ? h('div', { className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border' },
               h('div', { className: 'w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center shrink-0' }, h(Icon, { name: 'Users', size: 18, className: 'text-gold-dark' })),
               h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, orgName), h('p', { className: 'text-xs text-muted-foreground' }, 'Organiser')))
             : null,
+          coHosts.map((c) => h('button', { key: c.id, 'data-cohost-row': c.id, onClick: () => go('profile', { id: c.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all' },
+            h(Avatar, { src: c.profilePhoto, name: c.name, size: 40, rounded: 'xl', fit: logoFit(c.kind) }),
+            h('div', { className: 'flex-1 text-left min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-1' }, c.name, h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })), h('p', { className: 'text-xs text-muted-foreground' }, 'Co-host')),
+            h(Icon, { name: 'ChevronRight', size: 16, className: 'text-muted-foreground' }))),
           ev.status !== 'cancelled' && h('div', { className: 'grid grid-cols-2 gap-2' },
             h(Button, { variant: isC ? 'success' : 'gold', icon: isC ? 'Check' : 'CalendarCheck', onClick: () => toggleConnect(id) }, isC ? 'Connected' : 'Connect'),
             h(Button, { variant: isCo ? 'soft' : 'outline', icon: 'Star', onClick: () => toggleConsider(id) }, isCo ? 'Considering' : 'Consider')),
@@ -190,7 +196,11 @@
             h(Button, { variant: 'outline', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || pl.organizerId) }, 'Message'),
             safeUrl(pl.website) && h(Button, { variant: 'outline', icon: 'Globe', onClick: () => window.open(safeUrl(pl.website), '_blank', 'noopener,noreferrer') }),
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => app.shareLink({ page: 'place', params: { id } }) })),
-          h('p', { className: 'text-xs text-muted-foreground' }, (pl.followerCount || 0).toLocaleString() + ' followers' + (orgName ? ' · by ' + orgName : '')),
+          (() => {
+            const fb = window.UI.followerBucket(pl.followerCount);
+            const bits = [fb && fb + ' followers', orgName && 'by ' + orgName].filter(Boolean);
+            return bits.length ? h('p', { className: 'text-xs text-muted-foreground' }, bits.join(' · ')) : null;
+          })(),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'MapPin', label: 'Address', value: pl.address }),
             h(InfoRow, { icon: 'Clock', label: 'Opening hours', value: pl.openHours || 'Not specified' })),
@@ -281,7 +291,7 @@
             h('div', { className: 'flex items-center gap-2 mt-1 flex-wrap' },
               cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap', style: { background: cat.hex + '1c', color: cat.hex } }, h(Icon, { name: cat.icon, size: 9 }), cat.name),
               c.kind && h('span', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap' }, c.kind),
-              h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, c.followerCount.toLocaleString() + ' followers'))),
+              window.UI.followerBucket(c.followerCount) && h('span', { className: 'text-xs text-muted-foreground whitespace-nowrap' }, window.UI.followerBucket(c.followerCount) + ' followers'))),
           h('div', { className: 'flex gap-2 mb-4' },
             h(Button, { variant: isFollowing ? 'soft' : 'gold', className: 'flex-1', icon: 'Heart', onClick: () => toggleFollow(id, c.name) }, isFollowing ? 'Following' : 'Follow'),
             h(Button, { variant: 'outline', className: 'flex-1', icon: 'MessageCircle', onClick: () => startConversationWith(c.name, c.profilePhoto, true, c.id) }, 'Message'),

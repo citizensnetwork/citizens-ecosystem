@@ -200,3 +200,63 @@ describe("POST /api/conversations", () => {
     expect(json.conversation_id).toBe(CONV_ID);
   });
 });
+
+// --- POST: a Contributor writing first to a citizen (S13) ---
+// A Contributor may message a citizen who has interacted with them. The follow half of that rule is asked
+// through the recipient_follows_me function; the follow tables are readable only by their owner.
+describe("POST /api/conversations: Contributor to citizen", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function arrange(followsMe: { data: unknown; error?: unknown }) {
+    mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
+    mockClient.rpc.mockResolvedValueOnce({ data: null, error: null }); // find_conversation
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({ data: { id: USER_ID, role: "contributor" }, error: null });
+    mockClient._chain.maybeSingle.mockResolvedValueOnce({ data: { id: RECIPIENT_ID, role: "citizen" }, error: null });
+    mockClient.rpc.mockResolvedValueOnce({ data: false, error: null }); // is_blocked
+    mockClient.rpc.mockResolvedValueOnce({ data: followsMe.data, error: followsMe.error ?? null }); // recipient_follows_me
+  }
+
+  it("starts a pending conversation with a citizen who follows them", async () => {
+    arrange({ data: true });
+    mockClient.rpc.mockResolvedValueOnce({ data: CONV_ID, error: null }); // find_or_create_conversation
+
+    const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
+
+    expect(response.status).toBe(201);
+    expect(mockClient.rpc).toHaveBeenCalledWith("recipient_follows_me", { p_recipient: RECIPIENT_ID });
+    expect(mockClient.rpc).toHaveBeenCalledWith("find_or_create_conversation", {
+      user_a: USER_ID,
+      user_b: RECIPIENT_ID,
+      p_status: "pending",
+    });
+  });
+
+  it("does not read the follow tables itself", async () => {
+    arrange({ data: true });
+    mockClient.rpc.mockResolvedValueOnce({ data: CONV_ID, error: null });
+
+    await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
+
+    // If either read comes back, the closed tables answer nothing and every Contributor message is refused.
+    expect(mockClient.from).not.toHaveBeenCalledWith("follows");
+    expect(mockClient.from).not.toHaveBeenCalledWith("place_follows");
+  });
+
+  it("refuses with 403 when the citizen has not interacted with them", async () => {
+    arrange({ data: false });
+
+    const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
+
+    expect(response.status).toBe(403);
+    expect(mockClient.rpc).not.toHaveBeenCalledWith("find_or_create_conversation", expect.anything());
+  });
+
+  it("refuses with 403 when the follow check itself errors", async () => {
+    arrange({ data: null, error: { message: "boom" } });
+
+    const response = await POST(makePostRequest({ recipient_id: RECIPIENT_ID }));
+
+    expect(response.status).toBe(403);
+    expect(mockClient.rpc).not.toHaveBeenCalledWith("find_or_create_conversation", expect.anything());
+  });
+});

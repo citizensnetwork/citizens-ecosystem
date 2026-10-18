@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
   // profiles). Conversations and unknown types keep a generic label.
   const idsBy = (t: string) =>
     [...new Set(rows.filter((r) => r.target_type === t).map((r) => r.target_id))];
-  const [eventIds, placeIds, userIds] = [idsBy("event"), idsBy("place"), idsBy("user")];
+  const [eventIds, placeIds, userIds, momentIds] = [idsBy("event"), idsBy("place"), idsBy("user"), idsBy("moment")];
 
-  const [eventsRes, placesRes, usersRes] = await Promise.all([
+  const [eventsRes, placesRes, usersRes, momentsRes] = await Promise.all([
     eventIds.length
       ? supabase.from("events").select("id, title").in("id", eventIds)
       : Promise.resolve({ data: [] as { id: string; title: string }[] }),
@@ -58,12 +58,17 @@ export async function GET(request: NextRequest) {
     userIds.length
       ? supabase.from("profiles").select("id, full_name").in("id", userIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+    // A reported note (migration 188) is named by its first words; a moderator can read an ended one too.
+    momentIds.length
+      ? supabase.from("moments").select("id, body").in("id", momentIds)
+      : Promise.resolve({ data: [] as { id: string; body: string }[] }),
   ]);
 
   const nameMap = new Map<string, string>();
   for (const e of eventsRes.data ?? []) nameMap.set(`event:${e.id}`, e.title);
   for (const p of placesRes.data ?? []) nameMap.set(`place:${p.id}`, p.name);
   for (const u of usersRes.data ?? []) nameMap.set(`user:${u.id}`, u.full_name ?? "A citizen");
+  for (const m of momentsRes.data ?? []) nameMap.set(`moment:${m.id}`, `Note: ${String(m.body ?? "").slice(0, 80)}`);
 
   const reports = rows.map((r) => {
     const rep = (Array.isArray(r.reporter) ? r.reporter[0] : r.reporter) as ProfileLite;

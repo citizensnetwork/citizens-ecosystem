@@ -101,6 +101,16 @@ describe("POST /api/reports", () => {
     expect(json.id).toBe(NEW_REPORT_ID);
   });
 
+  it("accepts a report about a moment (migration 188)", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
+    mockClient._chain._result.data = { id: NEW_REPORT_ID };
+    const res = await POST(makeReq({ target_type: "moment", target_id: VALID_TARGET, reason: "spam" }));
+    expect(res.status).toBe(201);
+    expect(mockClient._chain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ target_type: "moment", target_id: VALID_TARGET, reporter_id: USER_ID }),
+    );
+  });
+
   it("returns 409 on duplicate open report", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
     mockClient._chain._result.data = null;

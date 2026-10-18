@@ -364,5 +364,10 @@
         }))));
   }
 
-  window.UI = { cx, safeUrl, SocialLinks, Avatar, logoFit, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
+  // The follower count a PUBLIC card or profile may show: the rounded-down bucket ("100+"), or '' for nothing.
+  // Never "0 followers" and never a low number (tracker P2-08). A real listing does not carry a count yet, so
+  // today this is '' everywhere; it starts showing the moment one does.
+  const followerBucket = (n) => (window.MapV2 && window.MapV2.countBucket ? window.MapV2.countBucket(n) : '');
+
+  window.UI = { followerBucket, cx, safeUrl, SocialLinks, Avatar, logoFit, SmartImage, Button, Field, Input, Textarea, Toggle, Segmented, CategoryBadge, Overlay, MediaPicker, Toasts, Empty, Stepper, inputCls, STOCK, initials };
 })();

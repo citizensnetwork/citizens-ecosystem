@@ -110,7 +110,9 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     expect(await scale(page)).toBe(1);
   });
 
-  for (const snap of ["peek", "half", "full"] as const) {
+  // At FULL a pinch on the card's content zooms the page (the founder's yes of 2026-10-17, for poor eyesight); at peek and half the
+  // sheet still keeps every two-finger gesture. The full case has its own test below.
+  for (const snap of ["peek", "half"] as const) {
     test(`a pinch on the sheet at ${snap} leaves the page scale at 1 and the sheet on its snap state`, async ({ page }) => {
       const seed = await openOnMap(page);
       const c = seed.contributors[0];
@@ -141,4 +143,52 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
       expect(await sheet.getAttribute("data-snap")).toBe(snap);
     });
   }
+
+  test("at FULL a pinch on the card's content zooms the page, so small text can be enlarged, and the sheet stays at full", async ({ page }) => {
+    const seed = await openOnMap(page);
+    const c = seed.contributors[0];
+    await page.evaluate(
+      ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
+      [c.physical_longitude, c.physical_latitude],
+    );
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+    const sheet = page.locator(SHEET);
+    await expect(sheet).toBeVisible();
+    await page.waitForTimeout(400);
+    await goTo(page, "full");
+    await page.waitForTimeout(400);
+    expect(await scale(page)).toBe(1);
+    const sb = (await page.locator("[data-mv2='scroller']").boundingBox())!;
+    const vh = await page.evaluate(() => window.innerHeight);
+    const mid = { x: sb.x + sb.width / 2, y: sb.y + Math.min(sb.height, vh - sb.y) / 2 };
+    const cdp = await touchSession(page);
+    await pinch(cdp, mid, 50, 200, { ms: 500, steps: 16 });
+    await expect.poll(() => scale(page), { timeout: 4000 }).toBeGreaterThan(1.2);
+    expect(await sheet.getAttribute("data-snap")).toBe("full");
+  });
+
+  test("the rule itself: no zoom allowed on the sheet or its content at peek and half, zoom allowed at full", async ({ page }) => {
+    const seed = await openOnMap(page);
+    const c = seed.contributors[0];
+    await page.evaluate(
+      ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
+      [c.physical_longitude, c.physical_latitude],
+    );
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+    await expect(page.locator(SHEET)).toBeVisible();
+    await page.waitForTimeout(400);
+    const rule = () => page.evaluate(() => {
+      const ta = (sel: string) => getComputedStyle(document.querySelector(sel) as Element).touchAction;
+      return { sheet: ta("[data-mv2='sheet']"), scroller: ta("[data-mv2='scroller']") };
+    });
+    expect(await rule()).toEqual({ sheet: "none", scroller: "none" });          // half
+    await goTo(page, "full");
+    await page.waitForTimeout(400);
+    const full = await rule();
+    expect(full.sheet).toBe("pinch-zoom");
+    expect(full.scroller).toMatch(/pinch-zoom/);                                 // pan-down pinch-zoom at the top, pan-y pinch-zoom once scrolled
+    await goTo(page, "half");
+    await page.waitForTimeout(400);
+    expect(await rule()).toEqual({ sheet: "none", scroller: "none" });          // and back
+  });
 });
