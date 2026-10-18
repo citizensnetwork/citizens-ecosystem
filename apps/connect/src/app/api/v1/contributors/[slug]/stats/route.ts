@@ -9,7 +9,10 @@
  *   - followers
  *
  * Never exposes demographic data, event_views, or private events.
- * The underlying RPC returns null for non-approved contributors.
+ * The underlying RPC returns null for anyone who is not an approved,
+ * visible Contributor (hidden, pending, rejected, deleted). `followers`
+ * is the public bucket from follower_count_public: 0 below 100,
+ * otherwise rounded down. The exact count is never returned.
  */
 
 import { NextResponse } from "next/server";
@@ -46,6 +49,8 @@ export async function GET(
     .eq("contributor_slug", slug)
     .eq("role", "contributor")
     .eq("contributor_status", "approved")
+    .eq("contributor_hidden", false)
+    .is("deleted_at", null)
     .maybeSingle<{ id: string }>();
 
   if (!profile) {
@@ -65,6 +70,16 @@ export async function GET(
     return NextResponse.json(
       { error: "Failed to load stats" },
       { status: 500 },
+    );
+  }
+
+  // The RPC is also callable with the anon key. Null means "not a public
+  // listing" (hidden, unapproved, deleted). Same 404 as a missing slug,
+  // so the two doors cannot disagree about who is visible.
+  if (stats == null) {
+    return NextResponse.json(
+      { error: "Contributor not found" },
+      { status: 404 },
     );
   }
 

@@ -159,10 +159,16 @@ a future `/api/v1/contributors/{slug}/events?before=…` endpoint.
 
 ## GET /api/v1/contributors/{slug}/stats
 
-Public counts for a single approved contributor, derived only from
-public data. Never exposes demographics, `event_views`, or private
-events. Backed by the `get_contributor_public_stats` RPC, which returns
-`null` for non-approved contributors.
+Public counts for a single approved, visible contributor, derived only
+from public data. Never exposes demographics, `event_views`, private
+events, or a hidden listing. Backed by the `get_contributor_public_stats`
+RPC, which returns `null` unless the profile is an approved Contributor,
+not hidden, and not deleted.
+
+`followers` is a **bucket**, the same one as `counts.followers` on
+`GET /api/v1/contributors/{slug}`: `0` below 100, otherwise rounded down
+to 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000 or 100000.
+The exact number is never returned.
 
 ```json
 {
@@ -170,15 +176,16 @@ events. Backed by the `get_contributor_public_stats` RPC, which returns
     "total_events": 12,
     "upcoming_events": 4,
     "total_rsvps": 318,
-    "followers": 128
+    "followers": 100
   },
   "meta": { "generated_at": "2026-…" }
 }
 ```
 
 `400` when the slug is missing, `404` when it does not resolve to an
-approved contributor. A per-slug secondary rate cap applies (anonymous
-tier) so a rotating-IP client cannot single out one contributor.
+approved, visible contributor (including when the RPC returns null).
+A per-slug secondary rate cap applies (anonymous tier) so a rotating-IP
+client cannot single out one contributor.
 Cached `s-maxage=60, stale-while-revalidate=120`.
 
 ---
