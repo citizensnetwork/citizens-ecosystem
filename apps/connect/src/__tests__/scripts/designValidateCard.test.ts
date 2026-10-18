@@ -217,6 +217,11 @@ describe("brief", () => {
     expect(detail(surfaceCard({ why: "Call 082 000 0000" }), "public-phone")).toContain("why");
     expect(rules(surfaceCard({ evidence: ["capture 1", "see claude.ai/artifact/x"] }))).toContain("public-private-link");
     expect(rules(surfaceCard({ links: ["https://claude.ai/artifact/x"] }))).toContain("public-private-link");
+    // the object form {label, url} that the inbox page reads: both parts are scanned
+    expect(detail(surfaceCard({ links: [{ label: "the card", url: "https://claude.ai/artifact/x" }] }), "public-private-link")).toContain("links[0]");
+    expect(rules(surfaceCard({ links: [{ label: "mail jane@example.org", url: "https://example.org/a" }] }))).toContain("public-email");
+    expect(rules(surfaceCard({ links: [{ label: "Call 082 000 0000", url: "https://example.org/a" }] }))).toContain("public-phone");
+    expect(rules(surfaceCard({ links: [{ label: "the pattern", url: "https://example.org/a" }, "https://example.org/b"] }))).toEqual([]);
     expect(rules(surfaceCard({ title: 42 }))).toEqual([]); // a non-text title is the page's problem, not a leak
   });
 });

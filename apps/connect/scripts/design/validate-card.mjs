@@ -136,17 +136,19 @@ export function validateCard(card, options = {}) {
   }
 
   // --- public text: copied into a public issue ----------------------------------------------------------------------
-  for (const field of PUBLIC_TEXT_FIELDS) {
-    for (const text of textsOf(card[field])) {
-      const email = findEmail(text);
-      if (email) add('public-email', `${field} carries an e-mail address: ${email}`);
-      if (PHONE_PATTERNS.some((re) => re.test(text))) add('public-phone', `${field} carries a phone-like number`);
-      if (/claude\.ai/i.test(text)) add('public-private-link', `${field} carries a claude.ai link`);
-      if (DATA_URL.test(text)) add('public-data-url', `${field} carries a data: URL`);
-    }
-  }
-  if (Array.isArray(card.links) && card.links.some((l) => typeof l === 'string' && /claude\.ai/i.test(l))) {
-    add('public-private-link', 'links carries a claude.ai link');
+  const scanPublic = (where, text) => {
+    const email = findEmail(text);
+    if (email) add('public-email', `${where} carries an e-mail address: ${email}`);
+    if (PHONE_PATTERNS.some((re) => re.test(text))) add('public-phone', `${where} carries a phone-like number`);
+    if (/claude\.ai/i.test(text)) add('public-private-link', `${where} carries a claude.ai link`);
+    if (DATA_URL.test(text)) add('public-data-url', `${where} carries a data: URL`);
+  };
+  for (const field of PUBLIC_TEXT_FIELDS) for (const text of textsOf(card[field])) scanPublic(field, text);
+  // links are plain strings or {label, url} objects (the inbox page reads the object form): scan both parts
+  if (Array.isArray(card.links)) {
+    card.links.forEach((link, i) => {
+      for (const text of isObject(link) ? textsOf([link.label, link.url]) : textsOf(link)) scanPublic(`links[${i}]`, text);
+    });
   }
 
   // --- brief ---------------------------------------------------------------------------------------------------------
