@@ -12,6 +12,9 @@ const ALLOWED_PREF_KEYS = [
   "contributor_updates",
   "announcements",
   "weekly_digest",
+  // Convince (FEAT-04): false hides "considering" from mutual friends. Not a notification: it lives here because this is the one
+  // private, atomically merged, boolean-only own-row store (update_notification_prefs). A missing key means shown.
+  "share_considering",
 ] as const;
 type PrefKey = (typeof ALLOWED_PREF_KEYS)[number];
 

@@ -2,13 +2,21 @@
  * FEAT-04 Convince API.
  *
  * POST  /api/convince  { event_id, to_user_id }
- *   → Insert a row in `convinces`. RLS enforces:
+ *   → Insert a row in `convinces`. RLS enforces (policy "Mutual friends can
+ *     send convinces"; the friend-side checks live in the SECURITY DEFINER
+ *     helpers is_mutual_follow / is_considering_for_friend, because the sender
+ *     cannot read the friend's follows or rsvps rows):
  *     • sender = auth.uid()
  *     • sender ≠ target
  *     • mutual follow exists in both directions
+ *     • neither has blocked the other, and the target account is not deleted
+ *     • the event is published and has not ended
  *     • target currently has an rsvps row with status='considering'
+ *   The route never says WHICH condition failed (that would reveal a block or
+ *   a friend's RSVP): every refusal is the same 403.
  *   Duplicates collide with the permanent UNIQUE constraint and are
- *   surfaced as 409.
+ *   surfaced as 409. A withdrawn-then-resent convince is accepted but does
+ *   not notify the friend a second time (notify_on_convince guard).
  *
  * DELETE /api/convince  { event_id, to_user_id }
  *   → Withdraw a convince previously sent. RLS limits delete to sender.
@@ -78,10 +86,11 @@ export async function POST(request: NextRequest) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "Already convinced", code: "already" }, { status: 409 });
     }
-    // 42501 / 23514 / RLS denial → not mutual or target not considering.
+    // 42501 / RLS denial → not mutual, blocked, event over, or target not considering.
+    // One neutral message for all of them: it must not reveal a block or a friend's RSVP.
     if (error.code === "42501" || error.message?.toLowerCase().includes("row-level security")) {
       return NextResponse.json(
-        { error: "Not allowed — friend must be considering this event", code: "forbidden" },
+        { error: "Not allowed — you can only nudge a friend who is considering an upcoming event", code: "forbidden" },
         { status: 403 },
       );
     }

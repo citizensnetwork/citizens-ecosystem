@@ -89,7 +89,7 @@
   // ── Event ──
   function EventProfilePage({ id }) {
     const app = window.useApp();
-    const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, trackImpression } = app;
+    const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, trackImpression, realUser, myProfileMeta, user, toast } = app;
     // findEvent also finds a cancelled event (the public `events` list never holds
     // one), so its owner can still open it from the Dashboard.
     const ev = app.findEvent(id);
@@ -105,6 +105,10 @@
     // P2-09: Contributors who accepted an invitation to co-host, each a row like the organiser's.
     const coHosts = (Array.isArray(ev.coHostIds) ? ev.coHostIds : []).map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean);
     const isC = connected.has(id), isCo = considering.has(id);
+    // Convince (FEAT-04): a signed-in person on a real, upcoming event sees which mutual friends are considering it (and may nudge them),
+    // and is told under Consider that those friends can see theirs. The note goes quiet once they switch sharing off in Settings.
+    const nudgeable = !!realUser && window.CCConvince.eligibleEvent(ev);
+    const sharesConsidering = !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'event' },
       h(Scroll, null,
         h('div', { className: 'relative h-56 sm:h-64' },
@@ -142,9 +146,11 @@
           ev.status !== 'cancelled' && h('div', { className: 'grid grid-cols-2 gap-2' },
             h(Button, { variant: isC ? 'success' : 'gold', icon: isC ? 'Check' : 'CalendarCheck', onClick: () => toggleConnect(id) }, isC ? 'Connected' : 'Connect'),
             h(Button, { variant: isCo ? 'soft' : 'outline', icon: 'Star', onClick: () => toggleConsider(id) }, isCo ? 'Considering' : 'Consider')),
+          nudgeable && h('div', { className: '-mt-2' }, h(window.ConsiderNote, { shared: sharesConsidering, onOpenSettings: () => go('settings') })),
           h('div', { className: 'flex items-center gap-4 text-xs text-muted-foreground' },
             h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Users', size: 12, className: 'text-gold' }), h('b', { className: 'text-foreground' }, ev.connectCount), 'connected'),
             h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Star', size: 12, className: 'text-gold' }), h('b', { className: 'text-foreground' }, ev.considerCount), 'considering')),
+          nudgeable && h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: id, eventTitle: ev.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }),
           h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
             h(InfoRow, { icon: 'Calendar', label: 'Date & time', value: fmt(ev.date) + ' · ' + ev.time + ' – ' + ev.endTime }),
             h(InfoRow, { icon: ev.isMobile ? 'Route' : 'MapPin', label: ev.isMobile ? 'Route' : 'Location', value: ev.location }),
