@@ -9,14 +9,21 @@
 // for a `before`). The string goes to `--out` (it is too long to print); the line printed is its size. A reference
 // picture is a CROP of the relevant part of another product's public screen, never a full screen: pass `--crop`.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { extname } from 'node:path';
+import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseWebpDataUrl } from './webp.mjs';
 
 export const DEFAULT_MAX_CHARS = 40 * 1024;
+/** The encode loop stops shrinking below this width, so a crop narrower than it could never be encoded. */
+const MIN_SIDE = 16;
 export const DEFAULT_MAX_WIDTH = 480;
 const QUALITIES = [0.8, 0.65, 0.5, 0.4, 0.3, 0.2];
-const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+const MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+};
 
 /**
  * "x,y,w,h" in source pixels.
@@ -26,8 +33,10 @@ const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
 export function parseCrop(text) {
   const parts = String(text).split(',');
   const [x, y, w, h] = parts.map((p) => (/^\d{1,5}$/.test(p.trim()) ? Number(p.trim()) : NaN));
-  if (parts.length !== 4 || [x, y, w, h].some(Number.isNaN) || w < 1 || h < 1) {
-    throw new Error('--crop wants four whole numbers x,y,w,h (source pixels), with a width and height of at least 1');
+  if (parts.length !== 4 || [x, y, w, h].some(Number.isNaN) || w < MIN_SIDE || h < MIN_SIDE) {
+    throw new Error(
+      `--crop wants four whole numbers x,y,w,h (source pixels), with a width and height of at least ${MIN_SIDE}`,
+    );
   }
   return { x, y, w, h };
 }
@@ -55,7 +64,9 @@ export async function encodeWebp(inputPath, options = {}) {
         await image.decode();
         const box = crop ?? { x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight };
         if (box.x + box.w > image.naturalWidth || box.y + box.h > image.naturalHeight) {
-          throw new Error(`the crop reaches outside the ${image.naturalWidth}x${image.naturalHeight} image`);
+          throw new Error(
+            `the crop reaches outside the ${image.naturalWidth}x${image.naturalHeight} image`,
+          );
         }
         let width = Math.min(maxWidth, box.w);
         for (let step = 0; step < 14 && width >= 16; step++) {
@@ -66,7 +77,8 @@ export async function encodeWebp(inputPath, options = {}) {
           canvas.getContext('2d').drawImage(image, box.x, box.y, box.w, box.h, 0, 0, width, height);
           for (const quality of qualities) {
             const dataUrl = canvas.toDataURL('image/webp', quality);
-            if (!dataUrl.startsWith('data:image/webp')) throw new Error('this browser cannot encode WebP');
+            if (!dataUrl.startsWith('data:image/webp'))
+              throw new Error('this browser cannot encode WebP');
             if (dataUrl.length <= maxChars) return { dataUrl, quality };
           }
           width = Math.floor(width * 0.8);
@@ -75,10 +87,19 @@ export async function encodeWebp(inputPath, options = {}) {
       },
       { source, crop: options.crop ?? null, maxWidth, maxChars, qualities: QUALITIES },
     );
-    if (!found) throw new Error(`could not get the image under ${maxChars} characters; crop a smaller part`);
+    if (!found)
+      throw new Error(`could not get the image under ${maxChars} characters; crop a smaller part`);
     const parsed = parseWebpDataUrl(found.dataUrl);
-    if (!parsed.ok) throw new Error(`the browser wrote something that is not a WebP: ${parsed.reason}`);
-    return { dataUrl: found.dataUrl, chars: parsed.chars, bytes: parsed.bytes, width: parsed.width, height: parsed.height, quality: found.quality };
+    if (!parsed.ok)
+      throw new Error(`the browser wrote something that is not a WebP: ${parsed.reason}`);
+    return {
+      dataUrl: found.dataUrl,
+      chars: parsed.chars,
+      bytes: parsed.bytes,
+      width: parsed.width,
+      height: parsed.height,
+      quality: found.quality,
+    };
   } finally {
     await browser.close();
   }
@@ -89,10 +110,16 @@ function option(args, name) {
   return at === -1 ? undefined : args[at + 1];
 }
 
+/** Where the helper may write: under a `.claude/design/` folder (the Designer's gitignored scratch space), never elsewhere. */
+export function isScratchPath(path) {
+  return resolve(path).replace(/\\/g, '/').includes('/.claude/design/');
+}
+
 /** A whole number of at least 1, or undefined when the option was not given. */
 export function positiveInt(name, text) {
   if (text === undefined) return undefined;
-  if (!/^\d{1,7}$/.test(text) || Number(text) < 1) throw new Error(`${name} wants a whole number of at least 1`);
+  if (!/^\d{1,7}$/.test(text) || Number(text) < 1)
+    throw new Error(`${name} wants a whole number of at least 1`);
   return Number(text);
 }
 
@@ -101,8 +128,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const input = args[0];
   const out = option(args, '--out');
   if (!input || input.startsWith('--') || !out) {
-    console.error('usage: node scripts/design/image-webp.mjs <image.png|jpg|webp> --out <file.txt> [--crop x,y,w,h] [--max-width 480] [--max-chars 40960]');
+    console.error(
+      'usage: node scripts/design/image-webp.mjs <image.png|jpg|webp> --out <file.txt> [--crop x,y,w,h] [--max-width 480] [--max-chars 40960]',
+    );
     process.exit(2);
+  }
+  if (!isScratchPath(out)) {
+    console.error('FAIL  --out must be a file under a .claude/design/ folder');
+    process.exit(1);
   }
   try {
     const crop = option(args, '--crop');
@@ -114,7 +147,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       maxChars: positiveInt('--max-chars', chars),
     });
     writeFileSync(out, result.dataUrl);
-    console.log(`ok    ${out} (${result.chars} characters, ${result.bytes} bytes, ${result.width}x${result.height}, quality ${result.quality})`);
+    console.log(
+      `ok    ${out} (${result.chars} characters, ${result.bytes} bytes, ${result.width}x${result.height}, quality ${result.quality})`,
+    );
   } catch (error) {
     console.error(`FAIL  ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

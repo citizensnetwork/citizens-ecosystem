@@ -34,15 +34,53 @@ const OUTCOMES = new Set(['adapt', 'watch', 'dropped']);
 // size, risk, evidence, links and, for a design card, its brief). They carry no contact detail and no private link.
 const PUBLIC_TEXT_FIELDS = ['title', 'summary', 'why', 'risk', 'evidence', 'brief'];
 
-const ENGAGEMENT_WORDS = /\b(?:engag\w*|addict\w*|streaks?|urgen\w*|scarc\w*|countdowns?)\b/i;
-const CLAIM_LINE = /^\s*(?:[-*>]\s*)*(?:\*\*|__)?claim\b[^:\n]{0,40}:/i;
-// Phone-like: an international number, a South African national number (0xx xxx xxxx), a bracketed area code, or a
-// run of nine or more digits. Dates (2026-10-17), sizes (375, 768, 1280) and ids do not look like any of these.
-const PHONE_PATTERNS = [/\+\d[\d ().-]{7,}\d/, /(?<![\w.])0\d{2}[ .-]?\d{3}[ .-]?\d{4}(?!\w)/, /\(\d{2,4}\)[ .-]?\d{3}[ .-]?\d{3,4}/, /\d{9,}/];
-const DATA_URL = /data:(?:[a-z0-9.+-]+\/[a-z0-9.+-]+)?[;,]/i;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/;
+// The surface ids of designer.md appendix A, and "all" (the style charter, its amendments and the trend digest).
+export const SURFACES = new Set([
+  'discovery',
+  'profile',
+  'landing-auth',
+  'apply',
+  'dashboard',
+  'admin',
+  'wear',
+  'vision',
+  'messages-notifications',
+  'map',
+  'all',
+]);
+const SIZES = new Set(['S', 'M', 'L']);
+// The publishers whose own pages count as "a platform's own guideline" (designer.md section 4a, T2). A source marked
+// `guideline: true` on any other site does not count; it then needs a second independent publisher instead.
+export const GUIDELINE_PUBLISHERS = new Set([
+  'android.com',
+  'apple.com',
+  'material.io',
+  'w3.org',
+  'microsoft.com',
+]);
+// The "Yes" option the Dispatcher routes on, per kind (designer.md section 5): "Yes, queue it" is the exact label it turns into an issue.
+const YES_LABEL = { idea: 'Yes, queue it', direction: 'Yes: take this direction' };
 
-/** A real calendar date written yyyy-mm-dd (a time after it is allowed): "2026-13-45" is not one. */
+const ENGAGEMENT_WORDS = /\b(?:engag\w*|addict\w*|streaks?|urgen\w*|scarc\w*|countdowns?)\b/i;
+// Any line that starts with the word "Claim" (after a bullet or bold marker) is a claim; no colon is needed, so the
+// rule cannot be dodged by wording. "Claim ownership of a listing" is caught too: a false alarm costs a rewrite.
+const CLAIM_LINE = /^\s*(?:[-*>]\s*)*(?:\*\*|__)?claim\b/i;
+// Phone-like (a heuristic, with known limits): an international number with a plus, a South African national number
+// (0xx xxx xxxx), a bracketed area code, or any run of nine or more digits (so a timestamp or a long id is reported
+// too, and a number written like "27 82 000 0000" with no plus or leading 0 is not). Dates (2026-10-17) and sizes
+// (375, 768, 1280) do not look like any of these.
+const PHONE_PATTERNS = [
+  /\+\d[\d ().-]{7,}\d/,
+  /(?<![\w.])0\d{2}[ .-]?\d{3}[ .-]?\d{4}(?!\w)/,
+  /\(\d{2,4}\)[ .-]?\d{3}[ .-]?\d{3,4}/,
+  /\d{9,}/,
+];
+const DATA_URL = /data:(?:[a-z0-9.+-]+\/[a-z0-9.+-]+)?[;,]/i;
+// yyyy-mm-dd, optionally followed by a well-formed time and zone (what `date -u +%Y-%m-%dT%H:%M:%SZ` prints)
+const ISO_DATE =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+/** A real calendar date written yyyy-mm-dd (a well-formed time after it is allowed): "2026-13-45" is not one. */
 function isDate(value) {
   if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
   const day = value.slice(0, 10);
@@ -66,9 +104,17 @@ function findEmail(text) {
     let end = at + 1;
     while (end < text.length && domainChar.test(text[end])) end++;
     if (start === at) continue;
-    const labels = text.slice(at + 1, end).replace(/[.-]+$/, '').split('.');
+    const labels = text
+      .slice(at + 1, end)
+      .replace(/[.-]+$/, '')
+      .split('.');
     const last = labels[labels.length - 1];
-    if (labels.length >= 2 && labels.every((l) => /^[A-Za-z0-9-]+$/.test(l)) && /^[A-Za-z]{2,}$/.test(last)) return text.slice(start, end);
+    if (
+      labels.length >= 2 &&
+      labels.every((l) => /^[A-Za-z0-9-]+$/.test(l)) &&
+      /^[A-Za-z]{2,}$/.test(last)
+    )
+      return text.slice(start, end);
   }
   return null;
 }
@@ -92,6 +138,7 @@ function publicUrl(value) {
     return null;
   }
   if (url.protocol !== 'https:') return null; // the inbox page links https addresses only
+  if (url.username || url.password) return null; // no credentials inside an address that is shown and may be copied
   const host = url.hostname.toLowerCase().replace(/^www\./, '');
   if (!host.includes('.') || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(':')) return null;
   return { host, key: publisherKey(host) };
@@ -125,29 +172,41 @@ export function validateCard(card, options = {}) {
   }
 
   const bytes = bytesOf(card);
-  if (bytes > CARD_MAX_BYTES) add('card-size', `${bytes} bytes, the limit is ${CARD_MAX_BYTES} (the inbox refuses a document over ${DOCUMENT_LIMIT_BYTES})`);
+  if (bytes > CARD_MAX_BYTES)
+    add(
+      'card-size',
+      `${bytes} bytes, the limit is ${CARD_MAX_BYTES} (the inbox refuses a document over ${DOCUMENT_LIMIT_BYTES})`,
+    );
 
   // --- shape: the few fields the other rules, the inbox page and the Dispatcher depend on ---------------------------
   if (card.area !== 'design') add('shape', 'area must be "design"');
   if (!KINDS.has(card.kind)) add('shape', 'kind must be "idea" or "direction"');
-  if (!LENSES.has(card.lens)) add('shape', 'lens must be consistency, relevance, findability, reference, craft or trend');
+  if (!LENSES.has(card.lens))
+    add('shape', 'lens must be consistency, relevance, findability, reference, craft or trend');
   if ((card.lens === 'trend' || card.surface === 'all') && card.kind !== 'direction') {
-    add('direction-only', 'a trend digest, or a card for surface "all" (the style charter), must be a direction');
+    add(
+      'direction-only',
+      'a trend digest, or a card for surface "all" (the style charter), must be a direction',
+    );
   }
+  checkRequired(card, add);
 
   // --- public text: copied into a public issue ----------------------------------------------------------------------
   const scanPublic = (where, text) => {
     const email = findEmail(text);
     if (email) add('public-email', `${where} carries an e-mail address: ${email}`);
-    if (PHONE_PATTERNS.some((re) => re.test(text))) add('public-phone', `${where} carries a phone-like number`);
+    if (PHONE_PATTERNS.some((re) => re.test(text)))
+      add('public-phone', `${where} carries a phone-like number`);
     if (/claude\.ai/i.test(text)) add('public-private-link', `${where} carries a claude.ai link`);
     if (DATA_URL.test(text)) add('public-data-url', `${where} carries a data: URL`);
   };
-  for (const field of PUBLIC_TEXT_FIELDS) for (const text of textsOf(card[field])) scanPublic(field, text);
+  for (const field of PUBLIC_TEXT_FIELDS)
+    for (const text of textsOf(card[field])) scanPublic(field, text);
   // links are plain strings or {label, url} objects (the inbox page reads the object form): scan both parts
   if (Array.isArray(card.links)) {
     card.links.forEach((link, i) => {
-      for (const text of isObject(link) ? textsOf([link.label, link.url]) : textsOf(link)) scanPublic(`links[${i}]`, text);
+      for (const text of isObject(link) ? textsOf([link.label, link.url]) : textsOf(link))
+        scanPublic(`links[${i}]`, text);
     });
   }
 
@@ -156,15 +215,21 @@ export function validateCard(card, options = {}) {
     if (typeof card.brief !== 'string') add('shape', 'brief must be text');
     else {
       const chars = Array.from(card.brief).length;
-      if (chars > BRIEF_MAX_CHARS) add('brief-length', `${chars} characters, the limit is ${BRIEF_MAX_CHARS}`);
+      if (chars > BRIEF_MAX_CHARS)
+        add('brief-length', `${chars} characters, the limit is ${BRIEF_MAX_CHARS}`);
       const lines = card.brief.split(/\r?\n/);
       for (let i = 0; i < lines.length; i++) {
         if (!CLAIM_LINE.test(lines[i])) continue;
         let claim = lines[i];
         while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) claim += '\n' + lines[++i]; // the template's indented continuation
-        if (!/hypothesis/i.test(claim)) add('claim-not-hypothesis', `a Claim line must say "hypothesis": ${claim}`);
+        if (!/hypothesis/i.test(claim))
+          add('claim-not-hypothesis', `a Claim line must say "hypothesis": ${claim}`);
         const word = ENGAGEMENT_WORDS.exec(claim);
-        if (word) add('claim-engagement', `a Claim is about findability, legibility or effort, not "${word[0]}"`);
+        if (word)
+          add(
+            'claim-engagement',
+            `a Claim is about findability, legibility or effort, not "${word[0]}"`,
+          );
       }
     }
   }
@@ -179,7 +244,8 @@ export function validateCard(card, options = {}) {
   if (card.before !== undefined) {
     const image = parseWebpDataUrl(card.before);
     if (!image.ok) add('before-not-webp', image.reason);
-    else if (image.chars > BEFORE_MAX_CHARS) add('before-size', `${image.chars} characters, the limit is ${BEFORE_MAX_CHARS}`);
+    else if (image.chars > BEFORE_MAX_CHARS)
+      add('before-size', `${image.chars} characters, the limit is ${BEFORE_MAX_CHARS}`);
   }
 
   // --- refs: public sources, no images ---------------------------------------------------------------------------------
@@ -198,22 +264,39 @@ export function validateCard(card, options = {}) {
 
   // --- refImage: private reference crops, off unless the switch is on ------------------------------------------------
   const refImage = card.refImage;
-  const hasRefImage = Array.isArray(refImage) ? refImage.length > 0 : refImage !== undefined && refImage !== null;
+  const hasRefImage = Array.isArray(refImage)
+    ? refImage.length > 0
+    : refImage !== undefined && refImage !== null;
   if (hasRefImage) {
-    if (!refImages) add('ref-image-switch-off', 'refImage is present but the switch is off (inbox card d-design-reference-images is not answered "yes"); omit the field');
+    if (!refImages)
+      add(
+        'ref-image-switch-off',
+        'refImage is present but the switch is off (inbox card d-design-reference-images is not answered "yes"); omit the field',
+      );
     else if (!Array.isArray(refImage)) add('shape', 'refImage must be a list');
     else {
-      if (refImage.length > REF_IMAGE_MAX_COUNT) add('ref-image-count', `${refImage.length} reference pictures, the limit is ${REF_IMAGE_MAX_COUNT}`);
+      if (refImage.length > REF_IMAGE_MAX_COUNT)
+        add(
+          'ref-image-count',
+          `${refImage.length} reference pictures, the limit is ${REF_IMAGE_MAX_COUNT}`,
+        );
       const used = new Set();
       refImage.forEach((item, i) => {
         if (!isObject(item)) return add('shape', `refImage[${i}] must be an object`);
-        if (item.label !== REF_IMAGE_LABEL) add('ref-image-label', `refImage[${i}].label must be exactly "${REF_IMAGE_LABEL}"`);
-        if (!refNames.has(item.ref)) add('ref-image-ref', `refImage[${i}].ref must be the name of one of the card's refs`);
-        else if (used.has(item.ref)) add('ref-image-per-reference', `more than one reference picture for "${item.ref}"`);
+        if (item.label !== REF_IMAGE_LABEL)
+          add('ref-image-label', `refImage[${i}].label must be exactly "${REF_IMAGE_LABEL}"`);
+        if (!refNames.has(item.ref))
+          add('ref-image-ref', `refImage[${i}].ref must be the name of one of the card's refs`);
+        else if (used.has(item.ref))
+          add('ref-image-per-reference', `more than one reference picture for "${item.ref}"`);
         else used.add(item.ref);
         const image = parseWebpDataUrl(item.image);
         if (!image.ok) add('ref-image-not-webp', `refImage[${i}]: ${image.reason}`);
-        else if (image.chars > REF_IMAGE_MAX_CHARS) add('ref-image-size', `refImage[${i}] is ${image.chars} characters, the limit is ${REF_IMAGE_MAX_CHARS}`);
+        else if (image.chars > REF_IMAGE_MAX_CHARS)
+          add(
+            'ref-image-size',
+            `refImage[${i}] is ${image.chars} characters, the limit is ${REF_IMAGE_MAX_CHARS}`,
+          );
       });
     }
   }
@@ -222,18 +305,33 @@ export function validateCard(card, options = {}) {
   if (card.comparison !== undefined) {
     if (!Array.isArray(card.comparison)) add('shape', 'comparison must be a list');
     else {
-      if (card.comparison.length > COMPARISON_MAX_ROWS) add('comparison-rows', `${card.comparison.length} rows, the limit is ${COMPARISON_MAX_ROWS}`);
+      if (card.comparison.length > COMPARISON_MAX_ROWS)
+        add(
+          'comparison-rows',
+          `${card.comparison.length} rows, the limit is ${COMPARISON_MAX_ROWS}`,
+        );
       card.comparison.forEach((row, i) => {
         if (!isObject(row)) return add('shape', `comparison[${i}] must be an object`);
         for (const cell of ['task', 'them', 'us']) {
-          if (!isText(row[cell])) add('comparison-cell', `comparison[${i}].${cell} is empty (write "not shown" or "not measured" where it was not seen or measured)`);
+          if (!isText(row[cell]))
+            add(
+              'comparison-cell',
+              `comparison[${i}].${cell} is empty (write "not shown" or "not measured" where it was not seen or measured)`,
+            );
         }
         const evidence = row.evidence;
         if (isObject(evidence)) {
-          if (!publicUrl(evidence.url) || !isDate(evidence.readAt)) add('comparison-evidence', `comparison[${i}].evidence needs a public link and the date read`);
+          if (!publicUrl(evidence.url) || !isDate(evidence.readAt))
+            add(
+              'comparison-evidence',
+              `comparison[${i}].evidence needs a public link and the date read`,
+            );
         } else if (!isText(evidence)) add('comparison-cell', `comparison[${i}].evidence is empty`);
         else if (!/https:\/\/\S+/i.test(evidence) || !/\d{4}-\d{2}-\d{2}/.test(evidence)) {
-          add('comparison-evidence', `comparison[${i}].evidence needs a public link and the date read`);
+          add(
+            'comparison-evidence',
+            `comparison[${i}].evidence needs a public link and the date read`,
+          );
         }
       });
     }
@@ -241,29 +339,108 @@ export function validateCard(card, options = {}) {
 
   // --- trends: the digest only; the evidence rule ---------------------------------------------------------------------
   if (card.trends !== undefined) {
-    if (card.lens !== 'trend') add('trends-wrong-lens', 'trends belongs to the trend digest only (lens "trend")');
+    if (card.lens !== 'trend')
+      add('trends-wrong-lens', 'trends belongs to the trend digest only (lens "trend")');
     if (!Array.isArray(card.trends)) add('shape', 'trends must be a list');
     else {
-      if (card.trends.length === 0) add('trends-missing', 'a trend digest needs at least one qualified trend (if none qualified, file nothing)');
-      if (card.trends.length > TRENDS_MAX_ITEMS) add('trends-items', `${card.trends.length} items, the limit is ${TRENDS_MAX_ITEMS}`);
+      if (card.trends.length === 0)
+        add(
+          'trends-missing',
+          'a trend digest needs at least one qualified trend (if none qualified, file nothing)',
+        );
+      if (card.trends.length > TRENDS_MAX_ITEMS)
+        add('trends-items', `${card.trends.length} items, the limit is ${TRENDS_MAX_ITEMS}`);
       card.trends.forEach((item, i) => checkTrend(item, i, add));
     }
-  } else if (card.lens === 'trend') add('trends-missing', 'a trend digest needs its trends list (if no trend qualified, file nothing)');
+  } else if (card.lens === 'trend')
+    add(
+      'trends-missing',
+      'a trend digest needs its trends list (if no trend qualified, file nothing)',
+    );
 
   return { ok: violations.length === 0, bytes, violations };
+}
+
+/**
+ * What every card carries (designer.md sections 2 and 5): the plain-words fields, the one litmus question, the size, the
+ * options the inbox page and the Dispatcher read, and the untouched state of a new card (an agent never writes an answer).
+ */
+function checkRequired(card, add) {
+  for (const field of ['title', 'summary', 'why', 'risk', 'rollout', 'recommendation']) {
+    if (!isText(card[field])) add('missing-field', `${field} is missing or empty`);
+  }
+  const evidence = card.evidence;
+  if (!isText(evidence) && !(Array.isArray(evidence) && evidence.some(isText))) {
+    add(
+      'missing-field',
+      'evidence is missing or empty (a number with its date, a capture id, an item id or an issue number read in this run)',
+    );
+  }
+  if (isText(card.why) && !/^Litmus [1-6]\b/.test(card.why))
+    add(
+      'why-litmus',
+      'why must start with "Litmus <1 to 6>:", the one litmus question the card serves',
+    );
+  if (!SIZES.has(card.size)) add('shape', 'size must be S, M or L');
+  if (!SURFACES.has(card.surface)) add('shape', 'surface must be an appendix A id or "all"');
+  if (card.lens === 'trend' && card.surface !== 'all')
+    add('shape', 'a trend digest has surface "all"');
+
+  if (!Array.isArray(card.options) || card.options.length < 2)
+    add('options', 'options must list the answers (at least two)');
+  else {
+    const keys = new Set();
+    card.options.forEach((option, i) => {
+      if (isObject(option) && isText(option.key) && isText(option.label)) keys.add(option.key);
+      else add('options', `options[${i}] needs a key and a label`);
+    });
+    const yes = card.options.find((option) => isObject(option) && option.key === 'yes');
+    if (KINDS.has(card.kind) && yes?.label !== YES_LABEL[card.kind]) {
+      add(
+        'options',
+        `a ${card.kind} needs the option {key:"yes", label:"${YES_LABEL[card.kind]}"} that the Dispatcher routes on`,
+      );
+    }
+    if (isText(card.recommendation) && !keys.has(card.recommendation))
+      add('options', 'recommendation must be the key of one of the options');
+  }
+
+  if (card.status !== 'open') add('new-card-state', 'a new card has status "open"');
+  const answer = card.answer;
+  if (!isObject(answer) || answer.choice !== '' || answer.note !== '' || answer.at !== '') {
+    add(
+      'new-card-state',
+      'a new card carries the empty answer {choice:"", note:"", at:""}; an agent never writes an answer',
+    );
+  }
+  if (card.source !== 'Designer') add('shape', 'source must be "Designer"');
+  if (card.priority !== 3) add('shape', 'priority must be 3');
+  if (!isDate(card.createdAt))
+    add('shape', 'createdAt must be the clock time (yyyy-mm-ddThh:mm:ssZ)');
 }
 
 /** One trend item: its shape, and the evidence rule for `adapt` and `watch` (designer.md section 4a, T2). */
 function checkTrend(item, i, add) {
   const at = `trends[${i}]`;
   if (!isObject(item)) return add('shape', `${at} must be an object`);
-  for (const field of ['name', 'what', 'why']) if (!isText(item[field])) add('shape', `${at}.${field} is empty`);
+  for (const field of ['name', 'what', 'why'])
+    if (!isText(item[field])) add('shape', `${at}.${field} is empty`);
   if (!OUTCOMES.has(item.outcome)) add('shape', `${at}.outcome must be adapt, watch or dropped`);
   const fit = item.fit;
-  if (!isObject(fit) || !VERDICTS.has(fit.verdict) || !Number.isInteger(fit.litmus) || fit.litmus < 1 || fit.litmus > 6) {
-    add('shape', `${at}.fit needs a verdict (ADOPT, ADAPT, DEFER or REJECT) and the litmus question number 1 to 6`);
+  if (
+    !isObject(fit) ||
+    !VERDICTS.has(fit.verdict) ||
+    !Number.isInteger(fit.litmus) ||
+    fit.litmus < 1 ||
+    fit.litmus > 6
+  ) {
+    add(
+      'shape',
+      `${at}.fit needs a verdict (ADOPT, ADAPT, DEFER or REJECT) and the litmus question number 1 to 6`,
+    );
   }
-  if (!Array.isArray(item.sources) || item.sources.length === 0) return add('trend-evidence', `${at} lists no source`);
+  if (!Array.isArray(item.sources) || item.sources.length === 0)
+    return add('trend-evidence', `${at} lists no source`);
 
   const publishers = new Set();
   let guideline = false;
@@ -271,8 +448,10 @@ function checkTrend(item, i, add) {
     const where = `${at}.sources[${j}]`;
     const site = isObject(source) ? publicUrl(source.url) : null;
     if (!site) return add('bad-url', `${where}.url must be a public https address`);
-    if (!isDate(source.readAt)) return add('shape', `${where}.readAt must be the date read (yyyy-mm-dd)`);
-    if (source.publishedAt !== undefined && !isDate(source.publishedAt)) return add('shape', `${where}.publishedAt must be a date (yyyy-mm-dd)`);
+    if (!isDate(source.readAt))
+      return add('shape', `${where}.readAt must be the date read (yyyy-mm-dd)`);
+    if (source.publishedAt !== undefined && !isDate(source.publishedAt))
+      return add('shape', `${where}.publishedAt must be a date (yyyy-mm-dd)`);
     // a page dated more than 24 months before it was read is background, not evidence (designer.md appendix B)
     if (source.publishedAt !== undefined) {
       const cutoff = new Date(source.readAt.slice(0, 10) + 'T00:00:00Z');
@@ -280,10 +459,20 @@ function checkTrend(item, i, add) {
       if (new Date(source.publishedAt.slice(0, 10) + 'T00:00:00Z') < cutoff) return;
     }
     publishers.add(site.key);
-    if (source.guideline === true) guideline = true;
+    if (source.guideline === true) {
+      if (GUIDELINE_PUBLISHERS.has(site.key)) guideline = true;
+      else
+        add(
+          'guideline-host',
+          `${where} is marked guideline but ${site.key} is not a platform guideline publisher (${[...GUIDELINE_PUBLISHERS].join(', ')}); cite a second independent publisher instead`,
+        );
+    }
   });
   if ((item.outcome === 'adapt' || item.outcome === 'watch') && publishers.size < 2 && !guideline) {
-    add('trend-evidence', `${at} is "${item.outcome}" but rests on ${publishers.size} publisher(s) and no platform guideline; a trend needs two independent public sources or a platform's own guideline`);
+    add(
+      'trend-evidence',
+      `${at} is "${item.outcome}" but rests on ${publishers.size} publisher(s) and no platform guideline; a trend needs two independent public sources or a platform's own guideline`,
+    );
   }
 }
 
@@ -292,7 +481,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const refImages = args.includes('--ref-images');
   const files = args.filter((a) => a !== '--ref-images');
   if (!files.length) {
-    console.error('usage: node scripts/design/validate-card.mjs [--ref-images] <card.json> [more files]');
+    console.error(
+      'usage: node scripts/design/validate-card.mjs [--ref-images] <card.json> [more files]',
+    );
     process.exit(2);
   }
   let failed = false;
