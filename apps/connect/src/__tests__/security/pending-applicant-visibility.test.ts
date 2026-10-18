@@ -58,7 +58,7 @@ describe("a pending applicant is not reachable through the public API", () => {
     expect(mockClient.from).toHaveBeenCalledWith("profiles");
   });
 
-  it("GET /api/v1/contributors/<slug>/stats requires an approved Contributor", async () => {
+  it("GET /api/v1/contributors/<slug>/stats requires an approved, visible Contributor", async () => {
     const res = await stats.GET(new Request("http://localhost/api/v1/contributors/grace-hub/stats"), {
       params: Promise.resolve({ slug: "grace-hub" }),
     });
@@ -66,6 +66,8 @@ describe("a pending applicant is not reachable through the public API", () => {
     const eqs = eqCalls();
     expect(eqs).toContain("role=contributor");
     expect(eqs).toContain("contributor_status=approved");
+    expect(eqs).toContain("contributor_hidden=false");
+    expect(chain.is as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("deleted_at", null);
   });
 
   it("GET /api/v1/contributors (the feed behind the map and Kingdom Discovery) lists approved, visible Contributors only", async () => {
