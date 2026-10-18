@@ -1,9 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════
---  PROPOSAL (not applied): friends_considering, the read side of Convince (FEAT-04) and the one switch that goes with it.
---  NO MIGRATION NUMBER on purpose: take the next free one at apply time (the live head on 2026-10-18 was 190_convince_fix, version 20261018115907, so this would be 191).
---  Authored 2026-10-18. Needs a fresh yes from Stephen for THIS file, then the usual steps: pre-apply git tag, MCP apply_migration, the
---  rollback-only probe docs/audit/probes/friends_considering.probe.sql, the security advisor, and move this file to supabase/migrations/ in the
---  same PR. ROLLBACK at the foot.
+--  191_friends_considering: the read side of Convince (FEAT-04) and the one switch that goes with it. Authored 2026-10-18 as
+--  docs/proposals/friends-considering.sql; APPLIED 2026-10-18 through MCP apply_migration as `191_friends_considering` (version
+--  20261018131800) on the founder's yes in chat for this file (pre-apply tag `connect-pre-mig191-friends-considering`, on origin/main
+--  1525287). The stored migration statement is byte-for-byte this file's body (md5 880e213f4cf2db23000087f7c86c245f, 6727 characters).
+--  Evidence: the rollback-only dry run docs/audit/probes/friends_considering.probe.sql, 41 of 41 PASS before the apply (its first two
+--  lines reproduced the two gaps on the live objects); after the apply docs/audit/probes/191_friends_considering.probe.sql, 39 of 39
+--  PASS against the live objects, rolled back, nothing left behind (no probe users, profiles, events, convinces or notifications).
+--  Security advisor after the apply: 0 ERROR; WARN 132 -> 133, the +1 is friends_considering_event (signed-in only, on purpose); every
+--  other finding count is as before (counts only: no fingerprint diff was run). Production smoke: the events, places, contributors and categories APIs answer 200. ROLLBACK at the foot.
 --
 --  WHY: the Convince fix (migration 190: policy + public.is_considering_for_friend) lets a person nudge a mutual friend who is considering an event, but
 --  nothing lets a person LIST which of their friends that is: `rsvps` is readable only by its owner and the event's organiser, so the

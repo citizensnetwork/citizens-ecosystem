@@ -1,16 +1,15 @@
 // @vitest-environment node
 /**
- * Convince reader and the "considering" switch (docs/proposals/friends-considering.sql): the static twin of the rollback-only probe.
- * A real database cannot run in CI, so this pins the promises the proposal's own comments make, and that the probe the founder is
- * asked to trust really runs the proposal's text (not a copy that drifted). It cannot replace the dry run; it keeps the file honest
- * between the dry run and the apply.
+ * Convince reader and the "considering" switch (supabase/migrations/191_friends_considering.sql, applied 2026-10-18): the static twin of the rollback-only probe.
+ * A real database cannot run in CI, so this pins the promises the migration's own comments make, and that the dry-run probe really
+ * ran this file's text (not a copy that drifted). It cannot replace the probes; it keeps the file honest after the apply.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(process.cwd(), "../..");
-const raw = readFileSync(join(ROOT, "docs/proposals/friends-considering.sql"), "utf8").replace(/\r\n/g, "\n");
+const raw = readFileSync(join(ROOT, "supabase/migrations/191_friends_considering.sql"), "utf8").replace(/\r\n/g, "\n");
 const probe = readFileSync(join(ROOT, "docs/audit/probes/friends_considering.probe.sql"), "utf8").replace(/\r\n/g, "\n");
 const route = readFileSync(join(process.cwd(), "src/app/api/notifications/preferences/route.ts"), "utf8");
 const dbTypes = readFileSync(join(process.cwd(), "src/types/db.ts"), "utf8");
@@ -36,14 +35,14 @@ function fn(name: string): { header: string; text: string } {
 }
 const flat = code.replace(/\s+/g, " ").toLowerCase();
 
-describe("the proposal is one transaction with no number and a way back", () => {
+describe("the migration is one transaction with a way back", () => {
   it("begins and commits once, and carries a ROLLBACK block", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(raw).toMatch(/-- ── ROLLBACK/);
-    expect(raw).toMatch(/NO MIGRATION NUMBER on purpose/);
+    expect(raw).toMatch(/191_friends_considering/);
   });
-  it("is the text the dry run executed: the probe splices the body in unchanged", () => {
+  it("is the text the dry run executed: the dry-run probe splices the body in unchanged", () => {
     const a = probe.indexOf("execute $mig$\n");
     const b = probe.indexOf("\n  $mig$;", a);
     expect(a).toBeGreaterThan(0);

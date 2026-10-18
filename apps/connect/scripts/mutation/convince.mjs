@@ -28,8 +28,8 @@ const MANIFEST = join(RECOVERY, "manifest.json");
 
 const UNIT_LIB = ["src/__tests__/frontend/convinceLib.test.ts", "src/__tests__/frontend/convinceRow.test.tsx"];
 const UNIT_ROW = ["src/__tests__/frontend/convinceRow.test.tsx"];
-const UNIT_SQL = ["src/__tests__/security/friends-considering-proposal.test.ts"];
-const UNIT_ROUTE = ["src/__tests__/api/notifications/preferences/route.test.ts", "src/__tests__/security/friends-considering-proposal.test.ts"];
+const UNIT_SQL = ["src/__tests__/security/friends-considering-migration.test.ts"];
+const UNIT_ROUTE = ["src/__tests__/api/notifications/preferences/route.test.ts", "src/__tests__/security/friends-considering-migration.test.ts"];
 const E2E = ["e2e/convince.spec.ts"];
 
 const LIB = "src/frontend/app/convince-lib.jsx";
@@ -39,7 +39,7 @@ const PAGES = "src/frontend/app/pages.jsx";
 const CARD = "src/frontend/app/entity-card.jsx";
 const ROUTE = "src/app/api/notifications/preferences/route.ts";
 const TYPES = "src/types/db.ts";
-const SQL = "../../docs/proposals/friends-considering.sql";
+const SQL = "../../supabase/migrations/191_friends_considering.sql";
 const PROBE = "../../docs/audit/probes/friends_considering.probe.sql";
 
 // edits: [{ file, find, replace, count = 1 }]. `equivalent` marks a mutant that SHOULD survive (a second layer covers it).

@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════
---  Rollback-only DRY RUN for the proposal docs/proposals/friends-considering.sql (the Convince reader and the "considering" switch).
+--  Rollback-only DRY RUN for the proposal docs/proposals/friends-considering.sql, now supabase/migrations/191_friends_considering.sql (the Convince reader and the "considering" switch).
 --  HOW: paste the whole file (friends_considering.probe.sql, the generated one) into the Supabase SQL runner / MCP execute_sql. It builds synthetic
 --  people and events, shows the two gaps on the LIVE objects (the reader does not exist; a friend who switched "considering" off can still be
 --  probed through the nudge policy), then runs the proposal's own body (the block between the markers, spliced in unchanged by the generator
@@ -85,7 +85,7 @@ begin
   execute 'reset role';
   delete from public.notifications where user_id = c and type = 'friend_convince';
 
-  -- ══ BEGIN PROPOSAL BODY (spliced unchanged from docs/proposals/friends-considering.sql by the generator) ══
+  -- ══ BEGIN PROPOSAL BODY (spliced unchanged from the proposal, now supabase/migrations/191_friends_considering.sql, by the generator) ══
   execute $mig$
 -- A. one more key in the whitelist. Everything else is the live body, word for word (CREATE OR REPLACE would drop search_path and the ACL
 --    guarantees, so they are restated).
