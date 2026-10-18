@@ -190,15 +190,15 @@ describe("brief", () => {
 
   it.each([
     ["an e-mail address", "Ask the owner at jane.doe@example.org about it"],
-    ["an e-mail address with a plus tag", "write to a+b@mail.example.co.za"],
+    ["an e-mail address with a plus tag", "write to a+b@mail.example.org"],
   ])("rejects %s", (_name, brief) => {
     expect(rules(surfaceCard({ brief }))).toContain("public-email");
   });
   it.each([
-    ["an international number", "Call +27 82 123 4567 today"],
-    ["a national number", "Phone 082 123 4567"],
-    ["a national number without spaces", "Phone 0821234567"],
-    ["a bracketed area code", "Office (012) 345 6789"],
+    ["an international number", "Call +27 82 000 0000 today"],
+    ["a national number", "Phone 082 000 0000"],
+    ["a national number without spaces", "Phone 0820000000"],
+    ["a bracketed area code", "Office (012) 000 0000"],
     ["a long run of digits", "Account 12345678901"],
   ])("rejects %s", (_name, brief) => {
     expect(rules(surfaceCard({ brief }))).toContain("public-phone");
@@ -214,7 +214,7 @@ describe("brief", () => {
   });
   it("applies the same rule to the other text that becomes a public issue", () => {
     expect(detail(surfaceCard({ summary: "Mail jane@example.org" }), "public-email")).toContain("summary");
-    expect(detail(surfaceCard({ why: "Call 082 123 4567" }), "public-phone")).toContain("why");
+    expect(detail(surfaceCard({ why: "Call 082 000 0000" }), "public-phone")).toContain("why");
     expect(rules(surfaceCard({ evidence: ["capture 1", "see claude.ai/artifact/x"] }))).toContain("public-private-link");
     expect(rules(surfaceCard({ links: ["https://claude.ai/artifact/x"] }))).toContain("public-private-link");
     expect(rules(surfaceCard({ title: 42 }))).toEqual([]); // a non-text title is the page's problem, not a leak
