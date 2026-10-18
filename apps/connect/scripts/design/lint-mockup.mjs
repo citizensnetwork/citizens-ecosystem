@@ -5,7 +5,7 @@
 //
 //   node scripts/design/lint-mockup.mjs <snippet.html> [more files]      (exit 1 when any file has a violation)
 //
-// The rules: at most 24 KB; no <script>, <iframe>, <object>, <embed> or <link>; no on* attribute; no javascript:
+// The rules: at most 24 KB; no <script>, <iframe>, <object>, <embed>, <link>, <meta> or <base>; no on* attribute; no javascript:
 // URL; no external URL of any kind (a scheme other than data:, or a protocol-relative //host, in an attribute,
 // url(), @import or srcset, or an http(s)/ftp/ws address written anywhere in the text); data: images only, at most
 // 60 KB in total. The check is deliberately stricter than a browser (a false alarm costs a rewrite; a miss costs a
@@ -16,7 +16,9 @@ import { pathToFileURL } from 'node:url';
 export const MAX_BYTES = 24 * 1024;
 export const MAX_DATA_IMAGE_BYTES = 60 * 1024;
 const URL_WORK_LIMIT = 1024 * 1024; // characters of URL text examined in one lint (see checkUrl)
-const FORBIDDEN_TAG = /<\/?(script|iframe|object|embed|link)(?=[\s/>]|$)/gi;
+// meta and base are forbidden too: `<meta http-equiv="refresh" content="0;url=//host">` would send the frame to another
+// site without any attribute the URL rules read, and `<base>` rewrites every relative address in the snippet.
+const FORBIDDEN_TAG = /<\/?(script|iframe|object|embed|link|meta|base)(?=[\s/>]|$)/gi;
 const EVENT_ATTRIBUTE = /(?:^|[\s"'/])(on[a-z][a-z0-9_-]*)\s*=/gi;
 // The lookbehind keeps this linear: a match can only start at the beginning of a word, so a long run of letters
 // (or a 20 KB base64 string) is scanned once, not once per character.
