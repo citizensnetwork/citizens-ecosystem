@@ -30,3 +30,10 @@ Read apps/connect/docs/handoffs/AGENT_TEAM_SELFOP_KICKOFF.md, then apps/connect/
 Do the four steps of the kickoff file in order. Ask me ONE batched question at the start: may you label the three issues (P12, P14, P16) agent:ready yourself, or should they go to the Decision Inbox as cards for my tap?
 Report DONE / LEFT in plain language, with what the morning roles did and what is unverified.
 ```
+
+## What happened (2026-10-18)
+
+1. **Last night's runs checked.** No role did anything wrong. The only failure since the limit reset was the Watcher's 20:00 run on the 5-hour limit (a long session shared the window). The morning of the 18th: Watcher 05:02, Scribe 06:27, Dispatcher 07:31, Builder 07:55 and Reviewer 08:42 all succeeded.
+2. **The Builder was fed.** Issues #143 (P12), #144 (P14) and #145 (P16) were written and filed as idea cards, and P11 and P15 as direction cards (they need a supervised session, so a Yes must not hand them to the Builder). The founder tapped yes on the first three and Later on the other two. The label `agent:ready` was added at about 11:30, after the founder's yes in chat naming the three issues (the Dispatcher never labels an existing issue, and the classifier refused a session's write until then): see RESUME_HERE T13.
+3. **Designer phase 3** was already running in another session (PR #147), so it was not started here.
+4. **This trail** is the docs-only pull request that changed AGENT_TEAM_HANDOFF.md sections 1, 3.2 and 7.1 and RESUME_HERE.md items T4, T10 (deleted), T13 to T15 and the section 6 entry.
