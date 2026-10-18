@@ -64,7 +64,7 @@
     const {
       go, contributors, connected, considering, followedPlaces, followedOrgs,
       toggleConnect, toggleConsider, togglePlaceFollow, toggleFollow,
-      startConversationWith, shareLink,
+      startConversationWith, shareLink, realUser, myProfileMeta, user, toast,
     } = app;
 
     // 'sheet' (Map v2, flag ?map=v2) is the panel body inside the Map v2 bottom sheet; every other layout is unchanged.
@@ -294,13 +294,22 @@
       ? h('div', null, band, titleBlock)
       : h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
 
+    // Convince (FEAT-04), the Map v2 sheet only (the old map's cards stay as they were): the note under Consider and, when a mutual friend
+    // is considering this event, the Friends considering row. Both need a signed-in person and a real, upcoming event.
+    const convince = isSheet && isEvent && realUser && window.CCConvince.eligibleEvent(item)
+      ? h(F, null,
+          h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
+          h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
+      : null;
+
     const body = h('div', { className: cx('flex flex-col mt-2', isPanel ? 'px-4 pb-4 gap-3' : 'px-3 pb-3 gap-2') },
       meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground flex-wrap' }, meta),
       stats.length > 0 && h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
       coHostLine,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
-      h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn));
+      h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn),
+      convince);
 
     return h('div', {
       className: cx(isSheet ? 'overflow-hidden flex flex-col' : 'bg-card overflow-hidden flex flex-col',

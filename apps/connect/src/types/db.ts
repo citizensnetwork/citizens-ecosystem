@@ -635,13 +635,16 @@ export type NotificationSourceMute = {
  * Per-type notification toggles stored in `profiles.notification_prefs`
  * (jsonb). All keys are optional — missing keys default to `true` (opt-out
  * model). See migration 049. Cancellation notices are never gated.
+ * `share_considering` is the one key that is not a notification: `false` hides a person's "considering" from their mutual friends
+ * (Convince, FEAT-04); a missing key means shown.
  */
 export type NotificationPrefKey =
   | "friends_activity"
   | "event_reminders"
   | "contributor_updates"
   | "announcements"
-  | "weekly_digest";
+  | "weekly_digest"
+  | "share_considering";
 
 export type NotificationPrefs = Partial<Record<NotificationPrefKey, boolean>>;
 
@@ -651,6 +654,7 @@ export const NOTIFICATION_PREF_DEFAULTS: Required<NotificationPrefs> = {
   contributor_updates: true,
   announcements: true,
   weekly_digest: true,
+  share_considering: true,
 };
 
 export type Notification = {

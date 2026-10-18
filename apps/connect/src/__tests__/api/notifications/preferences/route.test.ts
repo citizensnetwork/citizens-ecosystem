@@ -159,6 +159,22 @@ describe("PATCH /api/notifications/preferences", () => {
     });
   });
 
+  it("accepts share_considering (Convince) and hands it to the RPC as sent", async () => {
+    authed();
+    mockClient.rpc.mockResolvedValueOnce({ data: { share_considering: false }, error: null });
+    const response = await PATCH(makeRequest({ notification_prefs: { share_considering: false } }));
+    expect(response.status).toBe(200);
+    expect(mockClient.rpc).toHaveBeenCalledWith("update_notification_prefs", { delta: { share_considering: false } });
+    expect((await response.json()).updated.notification_prefs).toEqual({ share_considering: false });
+  });
+
+  it("rejects a non-boolean share_considering before it reaches the database", async () => {
+    authed();
+    const response = await PATCH(makeRequest({ notification_prefs: { share_considering: "no" } }));
+    expect(response.status).toBe(400);
+    expect(mockClient.rpc).not.toHaveBeenCalled();
+  });
+
   it("accepts digest and prefs simultaneously", async () => {
     authed();
     mockClient.rpc.mockResolvedValueOnce({

@@ -269,8 +269,12 @@
             } }, saving ? 'Saving…' : 'Save Profile')),
 
           h(Section, { title: 'Privacy', sub: 'Control your discoverability' },
-            h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
-              h(Toggle, { checked: isPublic, onChange: setDiscoverable, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' }))),
+            h('div', { className: 'space-y-3' },
+              h('div', { className: 'p-3 rounded-xl bg-white/60 border border-border' },
+                h(Toggle, { checked: isPublic, onChange: setDiscoverable, label: 'Public profile', desc: 'Allow other citizens to discover, befriend & message you.' })),
+              // Convince (FEAT-04): shown by default; this keeps a person's Considering to themselves. Stored as notification_prefs.share_considering.
+              h('div', { 'data-setting': 'share-considering', className: 'p-3 rounded-xl bg-white/60 border border-border' },
+                h(Toggle, { checked: notifOn('share_considering'), onChange: (v) => toggleNotif('share_considering', v), label: window.CCConvince.COPY.shareLabel, desc: window.CCConvince.COPY.shareDesc })))),
 
           h(Section, { title: 'Saved', sub: 'Only you can see this list. A listing is never told you saved it.' }, h(SavedList)),
 
