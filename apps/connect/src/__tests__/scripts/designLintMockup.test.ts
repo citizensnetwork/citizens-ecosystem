@@ -33,6 +33,8 @@ describe("forbidden tags", () => {
     ["object", "<object data=x></object>"],
     ["embed", "<embed src=x>"],
     ["link", '<link rel="stylesheet" href="#x">'],
+    ["a meta refresh that no URL rule would read", '<meta http-equiv="refresh" content="0;url=//example.org/x">'],
+    ["a base element", '<base href="#x">'],
   ])("rejects %s", (_name, html) => {
     expect(rules(html)).toContain("forbidden-tag");
   });
