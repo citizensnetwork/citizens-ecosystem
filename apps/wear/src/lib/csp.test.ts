@@ -111,16 +111,20 @@ describe('Wear Content-Security-Policy header', () => {
     }
   });
 
-  it('draws pictures from storage, Google avatars and the demo-content hosts only', async () => {
+  it('draws pictures from our storage and Google avatars only', async () => {
     expect((await policy('production')).get('img-src')).toEqual([
       "'self'",
       'data:',
       'blob:',
       'https://xyiajtrvhlxaeplsiajj.supabase.co',
       'https://*.googleusercontent.com',
-      'https://ui-avatars.com',
-      'https://images.unsplash.com',
     ]);
+  });
+
+  it('no longer allows the demo-content hosts (the demo media lives in wear-media/wear-demo-photos/)', async () => {
+    const img = (await policy('production')).get('img-src') ?? [];
+    expect(img).not.toContain('https://ui-avatars.com');
+    expect(img).not.toContain('https://images.unsplash.com');
   });
 });
 

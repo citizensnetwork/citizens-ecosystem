@@ -65,12 +65,39 @@ can approve them live.
   `wear.award_concept_claim` / `wear.advance_concept_status` SECURITY DEFINER
   RPCs under an impersonated `request.jwt.claims`, so the milestone-royalty,
   auto Completed-Concept post, and media-copy triggers fire exactly as in prod.
-- **Media is URL-only** (no upload pipeline yet): Unsplash CDN photos for
-  posts/concepts, ui-avatars for logos/avatars. Replace with real uploads once
-  the storage pipeline ships.
+- **Media never points at a third-party host.** Wear's Content-Security-Policy
+  (`apps/wear/next.config.js`) lets pictures load only from our Supabase host
+  and Google avatars, so the seed uses our own storage: the 12 demo photos are
+  objects in the public `wear-media` bucket under `wear-demo-photos/` (see
+  [Demo photos](#demo-photos)), and brand logos / citizen avatars are left
+  **empty** (the app draws the crown disc for a brand and an initials disc for
+  a person). Replace the photos with real uploads once real brands post.
 - **Seed accounts have no password** → they cannot sign in; they exist purely to
   own the seeded content. Reassign `wear.brands.owner_user_id` to a real user to
   hand a brand over later.
+
+## Demo photos
+
+The seed expects these 12 files in `wear-media/wear-demo-photos/` (a public bucket; the
+seed builds `https://<project>.supabase.co/storage/v1/object/public/wear-media/wear-demo-photos/<file>`).
+They are free stock photos under the
+[Unsplash License](https://unsplash.com/license) (free to download, copy and
+use, commercial use included, no attribution needed; they may not be sold
+unmodified or compiled into a competing photo service). They were downloaded
+once on 2026-10-15 from `https://images.unsplash.com/<name>?auto=format&fit=crop&w=800&q=70`
+(the file name without `.jpg` is the `<name>`), then uploaded by hand in the
+Supabase dashboard (Storage → `wear-media` → `wear-demo-photos`):
+
+`photo-1434389677669-e08b4cac3105.jpg`, `photo-1489987707025-afc232f7ea0f.jpg`,
+`photo-1503341504253-dff4815485f1.jpg`, `photo-1521572163474-6864f9cf17ab.jpg`,
+`photo-1523381210434-271e8be1f52b.jpg`, `photo-1539185441755-769473a23570.jpg`,
+`photo-1556905055-8f358a7a47b2.jpg`, `photo-1576871337622-98d48d1cf531.jpg`,
+`photo-1588099768523-f4e6a5679d88.jpg`, `photo-1588850561407-ed78c282e89b.jpg`,
+`photo-1618354691373-d851c5c3a990.jpg`, `photo-1620799140408-edc6dcb6d633.jpg`.
+
+Re-seeding on a project without these objects gives broken pictures (the seed
+raises no error). `teardown-feed.sql` removes the rows but not the storage objects; delete
+the `wear-demo-photos/` folder in the dashboard if you want them gone too.
 
 ## Run / remove (via Supabase MCP `execute_sql`, or psql as a superuser/owner)
 
