@@ -8,20 +8,20 @@
 
 Component CSS reads `var(--…)` only. Raw colours and px values live in the token blocks; 0 and 1 px borders are the only exception (`mapV2Tokens.test.ts` enforces this). You can propose a new token only in an issue spec, by name, and only when nothing below fits.
 
-| Group | Tokens |
-|---|---|
-| Surfaces | `--surface-0` (app), `--surface-1` (sheet, card), `--surface-2` (raised, placeholder), `--logo-bg` (white in both looks) |
-| Text | `--text-1`, `--text-2` |
-| Gold | `--accent` (fill) with `--accent-contrast` (its label), `--accent-ink` (gold text, rings, icons). Never plain gold text on white |
-| Status | `--ok`, `--closed`, `--error`, `--live`: always with words, never colour alone |
-| Lines, focus, dim | `--divider`, `--focus-ring`, `--focus-w`, `--focus-offset`, `--scrim`, `--viewer-bg`, `--viewer-fg` |
-| Spacing (4-pt) | `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16 · `--space-5` 20 · `--space-6` 24 · `--space-7` 32 · `--space-8` 48 |
-| Radii | `--radius-sm` 8 · `--radius-md` 12 · `--radius-lg` 20 (`--sheet-radius`) · `--radius-full` |
-| Type | `--fs-1/--lh-1` 12/16 · `--fs-2/--lh-2` 14/20 · `--fs-3/--lh-3` 18/24 · `--fw-regular`, `--fw-semibold` · `--font-display`, `--font-body` |
-| Elevation | `--elev-1` (controls), `--elev-2` (sheets, dialogs) |
-| Z-index | `--z-pin` 10 · `--z-controls` 20 · `--z-sheet` 120 · `--z-viewer` 300 (dialogs, viewer) · `--z-toast` 400 |
-| Motion | `--dur-fast` 120 · `--dur-base` 200 · `--dur-slow` 320 ms · `--ease-enter`, `--ease-exit`. JS twins: `MapV2.motion`, `MapV2.dur()` |
-| Sizes | `--hit` 44 px (minimum target), `--avatar-peek`, `--avatar-half`, `--sheet-*`, `--pin-*` |
+| Group             | Tokens                                                                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Surfaces          | `--surface-0` (app), `--surface-1` (sheet, card), `--surface-2` (raised, placeholder), `--logo-bg` (white in both looks)                  |
+| Text              | `--text-1`, `--text-2`                                                                                                                    |
+| Gold              | `--accent` (fill) with `--accent-contrast` (its label), `--accent-ink` (gold text, rings, icons). Never plain gold text on white          |
+| Status            | `--ok`, `--closed`, `--error`, `--live`: always with words, never colour alone                                                            |
+| Lines, focus, dim | `--divider`, `--focus-ring`, `--focus-w`, `--focus-offset`, `--scrim`, `--viewer-bg`, `--viewer-fg`                                       |
+| Spacing (4-pt)    | `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16 · `--space-5` 20 · `--space-6` 24 · `--space-7` 32 · `--space-8` 48       |
+| Radii             | `--radius-sm` 8 · `--radius-md` 12 · `--radius-lg` 20 (`--sheet-radius`) · `--radius-full`                                                |
+| Type              | `--fs-1/--lh-1` 12/16 · `--fs-2/--lh-2` 14/20 · `--fs-3/--lh-3` 18/24 · `--fw-regular`, `--fw-semibold` · `--font-display`, `--font-body` |
+| Elevation         | `--elev-1` (controls), `--elev-2` (sheets, dialogs)                                                                                       |
+| Z-index           | `--z-pin` 10 · `--z-controls` 20 · `--z-sheet` 120 · `--z-viewer` 300 (dialogs, viewer) · `--z-toast` 400                                 |
+| Motion            | `--dur-fast` 120 · `--dur-base` 200 · `--dur-slow` 320 ms · `--ease-enter`, `--ease-exit`. JS twins: `MapV2.motion`, `MapV2.dur()`        |
+| Sizes             | `--hit` 44 px (minimum target), `--avatar-peek`, `--avatar-half`, `--sheet-*`, `--pin-*`                                                  |
 
 Light is `:root` and dark is `[data-theme='dark']`. Dark is set from the phone's own setting by `app/map-v2-lib.jsx`.
 
@@ -42,14 +42,14 @@ There is one anatomy everywhere (#222): **media → category chip → title → 
 - **Category:** an 8 px dot in the category's `hex` (decorative) plus its **label** in `--fs-1` / `--text-2`. The label carries the meaning, so no category colour has to pass contrast. Use the category icon only in an avatar disc or on a pin. With no category, show the `kind` label.
 - **Variants:**
 
-  | Variant | Media and meta |
-  |---|---|
-  | `text` (news) | optional 16:9 image; "posted ago" |
-  | `image` | 16:9 `cover` |
-  | `video` | 16:9 poster + 44 px play disc on `--scrim`; never autoplay |
-  | `audio` / radio | 56 px artwork + "Listen"; "Live" in words with `--live` |
-  | `event` | 56 px date block on `--surface-2`; starts-in, place, hosts |
-  | `listing` | 56 px logo on `--logo-bg`; category, open state in words, distance |
+  | Variant         | Media and meta                                                     |
+  | --------------- | ------------------------------------------------------------------ |
+  | `text` (news)   | optional 16:9 image; "posted ago"                                  |
+  | `image`         | 16:9 `cover`                                                       |
+  | `video`         | 16:9 poster + 44 px play disc on `--scrim`; never autoplay         |
+  | `audio` / radio | 56 px artwork + "Listen"; "Live" in words with `--live`            |
+  | `event`         | 56 px date block on `--surface-2`; starts-in, place, hosts         |
+  | `listing`       | 56 px logo on `--logo-bg`; category, open state in words, distance |
 
 - **Whole-card tap:** when there is one destination, make the card a `<button>` or `<a>` named by the title plus meta. Hover `--surface-2`, pressed `scale(0.97)`, shared focus ring. Inner actions sit in an action row outside it.
 - **Images:** keep the aspect ratio in the box (`aspect-ratio`) so nothing shifts. If an image fails, drop it or show a neutral tile. Never show a broken-image icon.
