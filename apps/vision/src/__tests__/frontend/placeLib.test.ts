@@ -33,7 +33,17 @@ interface Lib {
   normalise(place: unknown): Place | null;
   kind(place: unknown): "empty" | "text" | "pinned";
   toPayload(place: unknown): Record<string, unknown>;
-  toPatch(place: unknown): { location_name: string; latitude: number | null; longitude: number | null } | null;
+  commitPlace(place: unknown, previous?: { name?: string; lat?: number | null; lng?: number | null } | null): {
+    name: string;
+    lat: number | null;
+    lng: number | null;
+    patch: { location_name: string; latitude?: number | null; longitude?: number | null };
+  } | null;
+  toPatch(place: unknown, previous?: { name?: string; lat?: number | null; lng?: number | null } | null): {
+    location_name: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
   rowPlace(row: unknown): { name: string; onMap: boolean };
   demoMapRow(id: string, title: string, type: string, date: string, place: unknown): Record<string, unknown> | null;
 }
@@ -252,16 +262,49 @@ describe("normalise, kind and toPayload", () => {
       location_name: "Somewhere", latitude: null, longitude: null,
     });
   });
+  it("keeps the saved pin when the name is unchanged, and does not send null", () => {
+    const previous = { name: "Hatfield", lat: -25.7487, lng: 28.238 };
+    const kept = {
+      location_name: "Hatfield", latitude: -25.7487, longitude: 28.238,
+    };
+    expect(P.toPatch({ name: "Hatfield", lat: null, lng: null }, previous)).toEqual(kept);
+    expect(P.toPatch({ name: "  Hatfield  ", lat: null, lng: null }, previous)).toEqual(kept);
+    expect(P.commitPlace({ name: "Hatfield", lat: null, lng: null }, previous)).toMatchObject({
+      name: "Hatfield", lat: -25.7487, lng: 28.238, patch: kept,
+    });
+    // No pin was saved: an unchanged name omits coordinates rather than nulling them.
+    expect(P.toPatch(
+      { name: "Name only hall", lat: null, lng: null },
+      { name: "Name only hall", lat: null, lng: null },
+    )).toEqual({ location_name: "Name only hall" });
+    expect(JSON.stringify(P.toPatch(
+      { name: "Hatfield", lat: null, lng: null },
+      { name: "Hatfield", lat: 0, lng: 0 },
+    ))).not.toContain("null");
+  });
+  it("clears the pin only when the name changes to one with no map location", () => {
+    const previous = { name: "Hatfield", lat: -25.7487, lng: 28.238 };
+    expect(P.toPatch({ name: "Mamelodi hall", lat: null, lng: null }, previous)).toEqual({
+      location_name: "Mamelodi hall", latitude: null, longitude: null,
+    });
+    // A newly chosen spot is a map location, so the pin moves instead of clearing.
+    expect(P.toPatch({ name: "Brooklyn", lat: -25.77, lng: 28.24 }, previous)).toEqual({
+      location_name: "Brooklyn", latitude: -25.77, longitude: 28.24,
+    });
+  });
   it("toPatch is accepted by PATCH /api/activities/:id, including a cleared pin", () => {
-    for (const p of [
-      { name: "Plain name", lat: null, lng: null },
-      { name: "Hatfield", lat: -25.7508, lng: 28.2431 },
-      { name: "", lat: -25.7508, lng: 28.2431 },
-      { name: "z", lat: 0, lng: 0 },
-    ]) {
-      const body = P.toPatch(p);
+    const bodies = [
+      P.toPatch({ name: "Plain name", lat: null, lng: null }),
+      P.toPatch({ name: "Hatfield", lat: -25.7508, lng: 28.2431 }),
+      P.toPatch({ name: "", lat: -25.7508, lng: 28.2431 }),
+      P.toPatch({ name: "z", lat: 0, lng: 0 }),
+      P.toPatch({ name: "Hatfield", lat: null, lng: null }, { name: "Hatfield", lat: -25.7487, lng: 28.238 }),
+      P.toPatch({ name: "Hatfield", lat: null, lng: null }, { name: "Hatfield", lat: null, lng: null }),
+      P.toPatch({ name: "Other hall", lat: null, lng: null }, { name: "Hatfield", lat: -25.7487, lng: 28.238 }),
+    ];
+    for (const body of bodies) {
       expect(body).not.toBeNull();
-      expect(updateActivitySchema.safeParse(body).success, JSON.stringify(p)).toBe(true);
+      expect(updateActivitySchema.safeParse(body).success, JSON.stringify(body)).toBe(true);
     }
   });
   it("is always accepted by the real POST /api/activities schema", () => {

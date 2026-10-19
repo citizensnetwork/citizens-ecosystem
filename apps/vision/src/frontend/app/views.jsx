@@ -347,10 +347,13 @@
   // A row with no place offers "Add a place". A row that has one shows the
   // name, and that button edits it. Both open the Log form's PlaceField under
   // the row. Save sends PATCH /api/activities/:id (latitude, longitude,
-  // location_name). A name with no coordinates is kept and says so; a real
-  // spot is what the Timeline Map plots. The Spaces directory does not render
-  // activity rows — this list is the only one.
+  // location_name). A name with no coordinates is kept and says so. An earlier
+  // pin is cleared only when that name actually changes to one with no map
+  // location; the same name keeps its latitude and longitude. A real spot is
+  // what the Timeline Map plots. The Spaces directory does not render activity
+  // rows — this list is the only one.
   const ACTIVITY_TYPES = ["event", "meeting", "outreach", "workshop", "service", "training", "other"];
+  const PLACE_NAME_ERROR = "Add a place name";
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
   function Activities() {
     const { isLive, authFetch } = liveCtx();
@@ -469,14 +472,24 @@
       setDraft(draftFromRow(a));
       setPlaceErr(null);
     };
+    const focusPlaceField = (id) => {
+      const root = document.getElementById("cv-place-editor-" + id);
+      const input = root && root.querySelector('[role="combobox"]');
+      if (input) input.focus();
+    };
     const savePlace = async () => {
       if (savingPlaceRef.current || !editingId) return;
       const PL = window.CV_PLACE;
-      const patch = PL.toPatch(draft);
       const id = editingId;
       const row = rows.find((r) => r.id === id);
-      if (!patch || !row) {
-        setPlaceErr("Type a place name, or cancel.");
+      const committed = row ? PL.commitPlace(draft, {
+        name: row.place || "",
+        lat: row.onMap ? row.lat : null,
+        lng: row.onMap ? row.lng : null,
+      }) : null;
+      if (!committed || !row) {
+        setPlaceErr(PLACE_NAME_ERROR);
+        focusPlaceField(id);
         return;
       }
       savingPlaceRef.current = true;
@@ -484,15 +497,15 @@
       setPlaceErr(null);
       try {
         if (!isLive) {
-          setRows((cur) => cur.map((r) => (r.id === id ? withPlace(r, draft) : r)));
-          syncDemoMap(row, draft);
+          setRows((cur) => cur.map((r) => (r.id === id ? withPlace(r, committed) : r)));
+          syncDemoMap(row, committed);
           returnFocusId.current = id;
           setEditingId(null);
           return;
         }
         const res = await authFetch("/api/activities/" + id, {
           method: "PATCH",
-          body: JSON.stringify(patch),
+          body: JSON.stringify(committed.patch),
         });
         const j = res.ok ? await res.json().catch(() => null) : null;
         if (!res.ok || !j || !j.data) throw new Error("Could not save this place. Try again.");
@@ -589,14 +602,32 @@
                             e.preventDefault();
                             closeEditor();
                           }}>
-                          <PlaceField autoFocus value={draft} onChange={setDraft} onSubmit={savePlace} loadMap={loadMapLibre} env={window.__CV_ENV || {}} />
+                          <PlaceField
+                            autoFocus
+                            value={draft}
+                            onChange={(next) => {
+                              setDraft(next);
+                              if (window.CV_PLACE.cleanName(next && next.name)) {
+                                setPlaceErr((cur) => (cur === PLACE_NAME_ERROR ? null : cur));
+                              }
+                            }}
+                            onSubmit={savePlace}
+                            error={placeErr === PLACE_NAME_ERROR ? placeErr : null}
+                            loadMap={loadMapLibre}
+                            env={window.__CV_ENV || {}}
+                          />
                           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-                            <Btn kind="gold" onClick={savePlace} disabled={savingPlace} style={{ minHeight: 44 }}>
+                            <Btn
+                              kind="gold"
+                              onClick={savePlace}
+                              disabled={savingPlace || !window.CV_PLACE.cleanName(draft.name)}
+                              style={{ minHeight: 44 }}
+                            >
                               {savingPlace ? "Saving…" : "Save"}
                             </Btn>
                             <Btn kind="ghost" onClick={closeEditor} disabled={savingPlace} style={{ minHeight: 44 }}>Cancel</Btn>
                           </div>
-                          {placeErr ? (
+                          {placeErr && placeErr !== PLACE_NAME_ERROR ? (
                             <div role="alert" style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--danger)" }}>{placeErr}</div>
                           ) : null}
                         </td>

@@ -160,14 +160,34 @@ describe("Add a place on a logged activity", () => {
     expect(document.activeElement).toBe(btn("act-1"));
   });
 
-  it("refuses an empty place and leaves the row open", () => {
+  it("disables Save while the place is empty, and Enter shows an error on the field", () => {
     mount();
     click(btn("act-1"));
-    click(press(editorOf("act-1")!, "Save"));
-    const alert = editorOf("act-1")!.querySelector('[role="alert"]')!;
-    expect(alert.textContent).toContain("Type a place name");
-    expect(alert.getAttribute("style")).toContain("var(--danger)");
+    const save = press(editorOf("act-1")!, "Save");
+    expect(save.disabled).toBe(true);
+    expect(save.textContent).toBe("Save");
+    typeInto(field("act-1"), "   ");
+    expect(field("act-1").value).toBe("");
+    expect(press(editorOf("act-1")!, "Save").disabled).toBe(true);
+
+    key(field("act-1"), "Enter");
+    const input = field("act-1");
+    const described = (input.getAttribute("aria-describedby") || "").split(/\s+/);
+    const errorEl = described
+      .map((id) => document.getElementById(id))
+      .find((el) => el && el.textContent === "Add a place name");
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.getAttribute("style")).toContain("var(--danger)");
+    expect(errorEl!.getAttribute("role")).not.toBe("alert");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(input);
     expect(editorOf("act-1")).not.toBeNull();
+    expect(editorOf("act-1")!.querySelector('[role="alert"]')).toBeNull();
+
+    typeInto(input, "Hall");
+    expect(press(editorOf("act-1")!, "Save").disabled).toBe(false);
+    expect(input.getAttribute("aria-invalid")).toBeNull();
+    expect(editorOf("act-1")!.textContent).not.toContain("Add a place name");
   });
 
   it("saves a name with no coordinates and says it has no map position", () => {
@@ -199,7 +219,35 @@ describe("Add a place on a logged activity", () => {
     expect(TL.toPoints(mapActivities)).toEqual([]);
   });
 
-  it("edits a saved place, and removing the pin takes it off the map", () => {
+  it("keeps a saved pin when the name is unchanged, even if the pin was removed in the field", () => {
+    const win = mount();
+    click(btn("act-2"));
+    expect(field("act-2").value).toBe("Hatfield");
+    click(press(editorOf("act-2")!, "Remove pin"));
+    click(press(editorOf("act-2")!, "Save"));
+    expect(btn("act-2").textContent).toContain("Hatfield");
+    expect(host.textContent).toContain("On the Timeline Map");
+    expect(host.textContent).not.toContain("Saved without a map position");
+    const TL = win.CV_TIMELINE as { toPoints(rows: Row[]): { id: string; lat: number; lng: number }[] };
+    expect(TL.toPoints(mapActivities)).toEqual([
+      expect.objectContaining({ id: "act-2", lat: -25.7487, lng: 28.238 }),
+    ]);
+  });
+
+  it("clears the pin when the name changes to one with no map location", () => {
+    const win = mount();
+    click(btn("act-2"));
+    typeInto(field("act-2"), "");
+    typeInto(field("act-2"), "Mamelodi hall");
+    click(press(editorOf("act-2")!, "Save"));
+    expect(btn("act-2").textContent).toContain("Mamelodi hall");
+    expect(host.textContent).toContain("Saved without a map position");
+    expect(host.textContent).not.toContain("On the Timeline Map");
+    const TL = win.CV_TIMELINE as { toPoints(rows: Row[]): { id: string }[] };
+    expect(TL.toPoints(mapActivities)).toEqual([]);
+  });
+
+  it("edits a saved place and keeps the spot when the new name still has one", () => {
     const win = mount();
     click(btn("act-2"));
     expect(field("act-2").value).toBe("Hatfield");
@@ -208,13 +256,7 @@ describe("Add a place on a logged activity", () => {
     expect(btn("act-2").textContent).toContain("Hatfield hall");
     const TL = win.CV_TIMELINE as { toPoints(rows: Row[]): { id: string }[] };
     expect(TL.toPoints(mapActivities).map((p) => p.id)).toEqual(["act-2"]);
-
-    click(btn("act-2"));
-    click(press(editorOf("act-2")!, "Remove pin"));
-    click(press(editorOf("act-2")!, "Save"));
-    expect(host.textContent).toContain("Saved without a map position");
-    expect(TL.toPoints(mapActivities)).toEqual([]);
-    expect(btn("act-2").textContent).toContain("Hatfield hall");
+    expect(host.textContent).toContain("On the Timeline Map");
   });
 
   it("opens one editor at a time", () => {
@@ -305,6 +347,68 @@ describe("Add a place against the live API", () => {
     expect(editorOf("act-1")).toBeNull();
     expect(btn("act-1").textContent).toContain("E2e Hall");
     expect(host.textContent).toContain("On the Timeline Map");
+  });
+
+  it("keeps the saved coordinates when the name is unchanged, and does not send null", async () => {
+    const { authFetch, hold } = liveFetch();
+    mount(true, authFetch);
+    await settled();
+    click(btn("act-2"));
+    click(press(editorOf("act-2")!, "Remove pin"));
+    click(press(editorOf("act-2")!, "Save"));
+    await settled();
+    const patch = calls.find((c) => c.opts?.method === "PATCH")!;
+    expect(patch.path).toBe("/api/activities/act-2");
+    const body = JSON.parse(patch.opts!.body!);
+    expect(body).toEqual({
+      location_name: "Hatfield", latitude: -25.7487, longitude: 28.238,
+    });
+    expect(body.latitude).not.toBeNull();
+    expect(body.longitude).not.toBeNull();
+    await act(async () => {
+      hold()!({
+        ok: true,
+        json: async () => ({
+          data: {
+            id: "act-2", title: "Youth night", type: "event", date: "2026-06-21",
+            location_name: "Hatfield", latitude: -25.7487, longitude: 28.238,
+          },
+        }),
+      });
+      await Promise.resolve();
+    });
+    expect(host.textContent).toContain("On the Timeline Map");
+    expect(editorOf("act-2")).toBeNull();
+  });
+
+  it("sends null coordinates only when the name changes to one with no map location", async () => {
+    const { authFetch, hold } = liveFetch();
+    mount(true, authFetch);
+    await settled();
+    click(btn("act-2"));
+    typeInto(field("act-2"), "");
+    typeInto(field("act-2"), "Other hall");
+    click(press(editorOf("act-2")!, "Save"));
+    await settled();
+    const patch = calls.find((c) => c.opts?.method === "PATCH")!;
+    expect(JSON.parse(patch.opts!.body!)).toEqual({
+      location_name: "Other hall", latitude: null, longitude: null,
+    });
+    await act(async () => {
+      hold()!({
+        ok: true,
+        json: async () => ({
+          data: {
+            id: "act-2", title: "Youth night", type: "event", date: "2026-06-21",
+            location_name: "Other hall", latitude: null, longitude: null,
+          },
+        }),
+      });
+      await Promise.resolve();
+    });
+    expect(host.textContent).toContain("Saved without a map position");
+    expect(host.textContent).not.toContain("On the Timeline Map");
+    expect(editorOf("act-2")).toBeNull();
   });
 
   it("saves a name only as null coordinates", async () => {
