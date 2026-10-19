@@ -172,6 +172,7 @@
     const wide = useWide();
     const root = useRef(null);
     const scroller = useRef(null);
+    const tabbed = useRef(null);
     const title = useRef(null);
     const [snap, setSnap] = useState('half');
     const [tab, setTab] = useState(null);
@@ -440,6 +441,15 @@
     if (images.length) tabs.push({ id: 'gallery', label: Str.tabs.gallery });
     const loadingMore = isContributor && detail.status === 'loading';
     const active = tabs.some((t) => t.id === tab) ? tab : (tabs[0] && tabs[0].id);
+    // A different tab, while the bar is stuck: pull the block back to the top of the scroller before the new
+    // panel renders (instant, so a shorter panel cannot leave you looking at what follows). The same tab leaves the scroll.
+    const pickTab = (next) => {
+      if (next !== active && tabbed.current && scroller.current) {
+        const d = tabbed.current.getBoundingClientRect().top - scroller.current.getBoundingClientRect().top;
+        if (d < 0) scroller.current.scrollTop += d;
+      }
+      setTab(next);
+    };
 
     // ── actions ─────────────────────────────────────────────────────
     const actions = [];
@@ -512,12 +522,17 @@
         panel = h(window.MapV2Gallery.Grid, { images, strings: Str.gallery, onOpen: (i, from) => setViewer({ index: i, from }) });
       }
       const noContent = !tabs.length && !loadingMore;
+      // The bar and the panel are one block. The bar sticks inside it; the hairline is the block's end.
+      // Bio stays above. A notice or the empty state stays outside, so a listing with no tabs has no hairline.
+      const tabBlock = (tabs.length > 0 || loadingMore) && h('div', { 'data-mv2': 'tabbed', ref: tabbed },
+        h(Tabs, { tabs, active, onPick: pickTab, loadingMore, label: Str.tabsLabel }),
+        tabs.length > 0 && h('div', {
+          id: 'mv2-panel', role: 'tabpanel', 'aria-labelledby': 'mv2-tab-' + active, tabIndex: 0, 'data-mv2': 'panel',
+        }, panel),
+        loadingMore && !tabs.length && h(window.MapV2Gallery.GridSkeleton, { label: Str.gallery.loading }));
       body = h('div', null,
         bio,
-        (tabs.length > 0 || loadingMore) && h(Tabs, { tabs, active, onPick: setTab, loadingMore, label: Str.tabsLabel }),
-        tabs.length > 0 && h('div', { id: 'mv2-panel', role: 'tabpanel', 'aria-labelledby': 'mv2-tab-' + active, 'data-mv2': 'panel' }, panel),
-        // photos still on their way and nothing else to show yet: the same grid, as a skeleton
-        loadingMore && !tabs.length && h(window.MapV2Gallery.GridSkeleton, { label: Str.gallery.loading }),
+        tabBlock,
         detail.status === 'error' && !images.length && h('div', { 'data-mv2': 'notice', role: 'alert' },
           h('p', null, Str.gallery.error),
           h('button', { type: 'button', 'data-mv2': 'action', onClick: retry }, Str.retry)),
