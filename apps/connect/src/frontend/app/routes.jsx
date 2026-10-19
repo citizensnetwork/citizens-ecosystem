@@ -29,7 +29,9 @@
 
   // First entry is each screen's default tab (it gets the short URL).
   const DASHBOARD_TABS = ['overview', 'events', 'news', 'suggestions', 'profile', 'messages', 'tools'];
-  const ADMIN_TABS = ['applications', 'overview', 'listings', 'create', 'reports'];
+  const ADMIN_TABS = ['applications', 'overview', 'contributors', 'citizens', 'reports'];
+  // Old bookmarks. Replaced (legacy) with Contributors; Create also asks the screen to open its form.
+  const ADMIN_LEGACY = { listings: false, create: true };
 
   // page → path, for the screens that are one fixed path.
   const STATIC_PATHS = {
@@ -103,6 +105,11 @@
 
     if (head === 'dashboard' || head === 'admin') {
       if (seg.length > 2) return fallback();
+      if (head === 'admin' && seg.length === 2 && Object.prototype.hasOwnProperty.call(ADMIN_LEGACY, seg[1])) {
+        const params = { tab: 'contributors' };
+        if (ADMIN_LEGACY[seg[1]]) params.openCreate = true;
+        return resolved({ page: 'admin', params: params }, '/admin/contributors', true);
+      }
       const dash = head === 'dashboard';
       const t = tabbed(head, '/' + head, dash ? DASHBOARD_TABS : ADMIN_TABS, seg[1]);
       return resolved(t.nav, t.canonical, trimmed || !t.clean);

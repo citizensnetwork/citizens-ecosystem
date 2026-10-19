@@ -341,7 +341,10 @@
     const { toasts } = window.useApp();
     const tone = { gold: 'bg-gold-dark', green: 'bg-[#16A34A]', red: 'bg-[#DC2626]' };
     const ic = { gold: 'Sparkles', green: 'CheckCircle2', red: 'XCircle' };
-    return React.createElement('div', { className: 'fixed top-4 left-1/2 -translate-x-1/2 z-[400] flex flex-col items-center gap-2 pointer-events-none w-full px-4' },
+    return React.createElement('div', {
+      className: 'fixed top-4 left-1/2 -translate-x-1/2 z-[400] flex flex-col items-center gap-2 pointer-events-none w-full px-4',
+      role: 'status', 'aria-live': 'polite',
+    },
       toasts.map((t) => React.createElement('div', {
         key: t.id,
         className: cx('flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white text-xs font-semibold shadow-2xl slide-up max-w-sm', tone[t.kind] || tone.gold),
