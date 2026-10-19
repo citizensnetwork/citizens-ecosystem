@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { canAdministerListing } from "@/lib/dashboard/permissions";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -25,7 +26,9 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const access = await checkDashboardAccess(handle, req);
-  if (!access.hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!access.hasAccess || !canAdministerListing(access)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const url = new URL(req.url);
   const entityType = url.searchParams.get("entity_type");
@@ -142,7 +145,9 @@ export async function POST(
   if (action === "update_status") {
     // Contributor updates application status
     const access = await checkDashboardAccess(handle, req);
-    if (!access.hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!access.hasAccess || !canAdministerListing(access)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { application_id, status: newStatus } = body as Record<string, unknown>;
     if (!application_id || !isValidUUID(String(application_id))) {

@@ -11,6 +11,9 @@
 // Admin path  → delegates to `logAdminOnBehalfAction` (activity_log row with
 //               actor_role='admin' + admin_on_behalf_action notification with
 //               a `data.url` deep-link to the settings page).
+// Editor path → no row here. Migration 193's log_team_editor_write trigger
+//               (and update_contributor_public_profile / decide_listing_suggestion)
+//               records actor_role='team_editor'. Skipping avoids a second row.
 //
 // Best-effort: errors are logged and swallowed so the calling mutation is not
 // rolled back if the audit insert fails (mirrors `logAdminOnBehalfAction`).
@@ -41,6 +44,8 @@ export async function recordContributorMutation(
   input: ContributorMutationInput,
 ): Promise<void> {
   const { handle, access, actorId, action, entityType, entityId, metadata } = input;
+
+  if (access.teamRole === "editor") return;
 
   if (access.isAdminWithAccess) {
     await logAdminOnBehalfAction(supabase, {

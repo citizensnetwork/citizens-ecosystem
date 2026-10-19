@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { canAdministerListing } from "@/lib/dashboard/permissions";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 
@@ -42,7 +43,9 @@ export async function PATCH(
   const { handle } = await params;
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  // Slug stays with the owner, plus the existing admin-with-grant override.
+  // Editors and viewers cannot change it.
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 

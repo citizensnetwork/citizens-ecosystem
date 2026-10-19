@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { isDashboardViewer } from "@/lib/dashboard/permissions";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -30,7 +31,7 @@ export async function GET(
 ) {
   const { handle } = await params;
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || isDashboardViewer(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
   const { contributorId } = access;
