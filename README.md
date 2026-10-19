@@ -59,11 +59,25 @@ sequentially across all apps. Cross-app data flows through Connect's `/api/v1`
 
 ## Deploys (Vercel — one project per app)
 
-Each app deploys independently. Per project, set:
+Each app deploys independently. Per project, set **Root Directory** to
+`apps/connect`, `apps/vision` or `apps/wear`.
 
-- **Root Directory** = `apps/connect` | `apps/vision` | `apps/wear`
-- **Ignored Build Step** = `npx turbo-ignore` (skips builds when the app + its
-  workspace deps are unaffected)
+Each app's `vercel.json` sets `ignoreCommand` to
+[`scripts/vercel-ignore.mjs`](scripts/vercel-ignore.mjs). That command overrides
+the dashboard Ignored Build Step. Exit 0 cancels the deployment before the
+build; exit 1 builds.
+
+Vercel skips an app when the commit only changes documentation, or when it does
+not touch that app or a shared package the app depends on. Documentation is any
+`*.md` file, anything under `docs/` or `apps/<app>/docs/`, and
+`.github/ISSUE_TEMPLATE/`. A change in one app builds that app. A shared
+package builds every app that depends on it. GitHub Actions is separate and
+always runs.
+
+The script builds whenever it cannot be sure. That includes no previous
+deployment SHA, a checkout too shallow to contain that commit, a git error, or
+a path it does not recognise (the lockfile, root config, a workflow, a
+migration). A production deploy of real code is never skipped by mistake.
 
 Deploy-gate env values per app are listed in
 [`apps/connect/RESUME_HERE.md`](apps/connect/RESUME_HERE.md) (§2 env snapshot + §4A founder actions).
