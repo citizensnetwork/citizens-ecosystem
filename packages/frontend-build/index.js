@@ -32,7 +32,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 
 /** Files the pipeline compiles/generates itself — excluded from the generic copy. */
 const DEFAULT_SPECIAL_FILES = Object.freeze([
@@ -61,12 +61,12 @@ const DEVELOPMENT_BUILD_RE = /\.development\.(?:min\.)?js(?:[?#]|$)/;
 
 /** First 10 hex chars of the content's SHA-256 — the content-hash used in filenames. */
 function hashOf(content) {
-  return crypto.createHash('sha256').update(content).digest('hex').slice(0, 10);
+  return nodeCrypto.createHash('sha256').update(content).digest('hex').slice(0, 10);
 }
 
 /** Subresource Integrity value (sha384, base64) of a file's exact bytes. */
 function sriOf(content) {
-  return `sha384-${crypto.createHash('sha384').update(content).digest('base64')}`;
+  return `sha384-${nodeCrypto.createHash('sha384').update(content).digest('base64')}`;
 }
 
 /** Parse an attribute string into ordered [name, value] pairs (value undefined for booleans). */
