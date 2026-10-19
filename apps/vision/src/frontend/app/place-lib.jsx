@@ -136,6 +136,17 @@
     return { latitude: p.lat, longitude: p.lng, location_name: p.name };
   }
 
+  // The body for PATCH /api/activities/:id when a logged activity gains or
+  // changes its place. Always the three place fields. A name with no real spot
+  // sends null coordinates so a pin that was saved earlier is cleared and the
+  // Timeline Map drops the row. null (not {}) when there is nothing to save.
+  function toPatch(place) {
+    const p = normalise(place);
+    if (!p) return null;
+    if (p.lat === null) return { location_name: p.name, latitude: null, longitude: null };
+    return { latitude: p.lat, longitude: p.lng, location_name: p.name };
+  }
+
   // A saved activity row → what the list shows: the name, and whether the
   // Timeline Map can plot it (the same test the map applies to every row).
   function rowPlace(row) {
@@ -159,6 +170,6 @@
   window.CV_PLACE = {
     NAME_MAX, MIN_QUERY, MAX_RESULTS, HOME, EMPTY,
     cleanName, coordLabel, parseCoordPair, searchUrl, reverseUrl, parseResults, parseReverse,
-    normalise, kind, toPayload, rowPlace, demoMapRow,
+    normalise, kind, toPayload, toPatch, rowPlace, demoMapRow,
   };
 })();

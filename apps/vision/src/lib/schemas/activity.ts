@@ -25,7 +25,13 @@ export const createActivitySchema = z.object({
   tags: z.array(z.string().min(1).max(50)).max(20).default([]),
 });
 
-export const updateActivitySchema = createActivitySchema.partial();
+// A place edit can clear a pin: null latitude/longitude means "no map position".
+// Create still rejects null (omit the fields instead) so a new row cannot store
+// an explicit null that would look different from "not set" to a caller.
+export const updateActivitySchema = createActivitySchema.partial().extend({
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+});
 
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 export type UpdateActivityInput = z.infer<typeof updateActivitySchema>;

@@ -136,7 +136,8 @@
   // value: { name, lat, lng }  (raw form state — normalised only when sent)
   // onChange(next) · onSubmit() logs the activity (Enter on a closed list)
   // loadMap() → Promise<maplibregl> · env: window.__CV_ENV
-  function PlaceField({ value, onChange, onSubmit, loadMap, env }) {
+  // autoFocus moves the caret into the box on mount (the activity-row editor).
+  function PlaceField({ value, onChange, onSubmit, loadMap, env, autoFocus }) {
     const uid = useId();
     const listId = uid + "-list";
     const statusId = uid + "-status";
@@ -151,6 +152,10 @@
     const [net, setNet] = useState("idle"); // idle | searching | done | down
     const [refused, setRefused] = useState(geo.refused);
     const [pinOpen, setPinOpen] = useState(false);
+
+    useEffect(() => {
+      if (autoFocus && inputRef.current) inputRef.current.focus();
+    }, [autoFocus]);
 
     const keyed = TL.hasKey(env);
     const canSearch = keyed && !refused;
