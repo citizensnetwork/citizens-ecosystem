@@ -157,6 +157,93 @@ describe("POST /api/admin/contributors/create", () => {
     );
   });
 
+  it("stores contact email, X, LinkedIn, WhatsApp and the cover, and still sends the original socials to the RPC", async () => {
+    mockClient._chain._result.data = { role: "admin", id: NEW_USER_ID };
+    mockClient.rpc.mockResolvedValueOnce({
+      data: { success: true, slug: "grace-outreach" },
+      error: null,
+    });
+    const res = await POST(
+      req({
+        ...validBody,
+        contact_email: "Hello@Example.org",
+        instagram_handle: "@graceexample",
+        facebook_url: "facebook.com/graceexample",
+        x_handle: "@graceexample",
+        linkedin_url: "linkedin.com/company/example",
+        whatsapp_number: "+27 82 000 0000",
+        cover_photo_urls: ["https://images.example.org/cover.jpg"],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      "admin_create_contributor_profile",
+      expect.objectContaining({
+        _instagram_handle: "@graceexample",
+        _facebook_url: "https://facebook.com/graceexample",
+      }),
+    );
+    const rpcArgs = mockClient.rpc.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(rpcArgs).not.toHaveProperty("_x_handle");
+    expect(rpcArgs).not.toHaveProperty("_contact_email");
+    expect(rpcArgs).not.toHaveProperty("_cover_photo_urls");
+
+    expect(mockClient._chain.update).toHaveBeenCalledWith({
+      contributor_contact_email: "hello@example.org",
+      x_handle: "@graceexample",
+      linkedin_url: "https://linkedin.com/company/example",
+      whatsapp_number: "27820000000",
+      cover_photo_urls: [{ url: "https://images.example.org/cover.jpg", caption: null }],
+    });
+    expect(mockClient._chain.eq).toHaveBeenCalledWith("id", NEW_USER_ID);
+    expect(mockAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("does not write the extra columns when contact, the new socials and the cover are left blank", async () => {
+    mockClient.rpc.mockResolvedValueOnce({
+      data: { success: true, slug: "grace-outreach" },
+      error: null,
+    });
+    const res = await POST(req({ ...validBody, instagram_handle: "@graceexample" }));
+    expect(res.status).toBe(200);
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      "admin_create_contributor_profile",
+      expect.objectContaining({ _instagram_handle: "@graceexample" }),
+    );
+    expect(mockClient._chain.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid public contact email, social link or cover before creating a user", async () => {
+    for (const extra of [
+      { contact_email: "not-an-email" },
+      { x_handle: "Grace Radio" },
+      { linkedin_url: "javascript:alert(1)" },
+      { whatsapp_number: "call the office" },
+      { cover_photo_urls: ["javascript:alert(1)"] },
+      { cover_photo_urls: ["not a url"] },
+      { cover_photo_urls: "https://images.example.org/cover.jpg" },
+    ]) {
+      mockAdmin.auth.admin.createUser.mockClear();
+      const res = await POST(req({ ...validBody, ...extra }));
+      expect(res.status, JSON.stringify(extra)).toBe(400);
+      expect(mockAdmin.auth.admin.createUser).not.toHaveBeenCalled();
+    }
+  });
+
+  it("deletes the new auth user when the extra columns cannot be saved", async () => {
+    mockClient._chain._result.data = { role: "admin", id: NEW_USER_ID };
+    mockClient._chain._result.error = { message: "update refused" };
+    mockClient.rpc.mockResolvedValueOnce({
+      data: { success: true, slug: "grace-outreach" },
+      error: null,
+    });
+    const res = await POST(req({ ...validBody, contact_email: "hello@example.org" }));
+    expect(res.status).toBe(500);
+    expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it("cleans up the auth user when the profile RPC fails", async () => {
     mockClient.rpc.mockResolvedValueOnce({
       data: { success: false, reason: "target_not_found" },
