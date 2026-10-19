@@ -265,9 +265,17 @@
   function ContributorProfilePage({ id }) {
     const app = window.useApp();
     const { contributors, events, places, newsPosts, followedOrgs, toggleFollow, go, startConversationWith } = app;
+    const [reading, setReading] = useState(null); // { id, from }: the shared news reader, map v2 only
     // Honest not-found rather than silently showing the first (wrong) org —
     // misrepresenting identity would violate the vision's integrity.
     const c = contributors.find((x) => x.id === id);
+    // Hooks stay above the not-found return. A post that disappears while open closes the reader.
+    useEffect(() => {
+      if (!reading) return undefined;
+      const still = (newsPosts || []).some((n) => n.id === reading.id && c && n.contributorId === c.id);
+      if (!still) setReading(null);
+      return undefined;
+    }, [reading, newsPosts, c]);
     if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: 'Contributor not found' });
     const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
@@ -334,12 +342,30 @@
                 h(Avatar, { src: p.coverPhoto, name: p.name, size: 44, rounded: 'xl' }), h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, p.name), h('p', { className: 'text-xs text-muted-foreground truncate' }, p.address)), h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground' }))))),
             cNews.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'News'),
-              h('div', { className: 'space-y-3' }, cNews.map((n) => h('div', { key: n.id, className: 'bg-card rounded-2xl border border-border p-3' },
-                h('div', { className: 'flex items-start justify-between gap-2 mb-1' },
-                  h('p', { className: 'text-sm font-bold text-foreground' }, n.title),
-                  h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, n.date ? new Date(n.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
-                n.image && h('img', { src: n.image, className: 'w-full h-32 object-cover rounded-xl mb-2' }),
-                h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, n.body))))),
+              h('div', { className: 'space-y-3' }, cNews.map((n) => {
+                // Map v2 loads the reader and its tokens. With the flag off the card stays a div;
+                // the body keeps its line breaks either way.
+                const mapV2News = !!(window.isMapV2 && window.isMapV2() && window.MapV2News);
+                const kids = [
+                  h('div', { key: 'h', className: 'flex items-start justify-between gap-2 mb-1' },
+                    h('p', { className: 'text-sm font-bold text-foreground' }, n.title),
+                    h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, n.date ? new Date(n.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
+                  n.image && h('img', { key: 'i', src: n.image, alt: '', className: 'w-full h-32 object-cover rounded-xl mb-2' }),
+                  h('p', { key: 'b', className: 'text-xs text-muted-foreground leading-relaxed whitespace-pre-line' + (mapV2News ? ' line-clamp-3' : '') }, n.body),
+                ];
+                return mapV2News
+                  ? h('button', {
+                    key: n.id, type: 'button', 'aria-haspopup': 'dialog',
+                    className: 'bg-card rounded-2xl border border-border p-3 w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                    onClick: (e) => setReading({ id: n.id, from: e.currentTarget }),
+                  }, kids)
+                  : h('div', { key: n.id, className: 'bg-card rounded-2xl border border-border p-3' }, kids);
+              })),
+              // the same dialog the map sheet opens, over the page
+              reading && window.MapV2News && window.isMapV2 && window.isMapV2() && cNews.some((n) => n.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
+                post: cNews.find((n) => n.id === reading.id), sourceName: c.name,
+                strings: window.MapV2Strings.sheet.news, returnFocus: reading.from, onClose: () => setReading(null),
+              }), document.body)),
             c.members && c.members.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Team'),
               h('div', { className: 'flex flex-wrap gap-1.5' }, c.members.map((m, i) => h('span', { key: i, className: 'px-3 py-1.5 rounded-full bg-card border border-border text-xs font-semibold text-foreground' }, m)))),
