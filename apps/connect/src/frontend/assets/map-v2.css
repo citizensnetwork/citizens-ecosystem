@@ -132,6 +132,8 @@
   --qr-paper: #ffffff;               /* a QR code is always black on white, in either look */
   --qr-card-w: 360px;
   --qr-size: 260px;
+  --reader-w: 560px;             /* the news reader's reading width; UI.Overlay's default maxWidth */
+  --scrim-blur: 4px;             /* the dim behind the news reader; the same blur UI.Overlay already uses */
   --dim-opacity: 0.3;               /* a pin outside the chosen category filter */
 }
 
@@ -584,6 +586,8 @@
 [data-mv2='view-full']:focus-visible,
 [data-mv2='more']:focus-visible,
 [data-mv2='bubble-x']:focus-visible,
+[data-mv2='post'][data-news]:focus-visible,
+[data-mv2='news-link']:focus-visible,
 [data-mv2^='viewer-']:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
@@ -960,6 +964,19 @@
   -webkit-line-clamp: 3;
   overflow: hidden;
 }
+/* a news card is a real button: at least a thumb tall, and it inherits the sheet's type */
+[data-mv2='post'][data-news] {
+  min-height: var(--hit);
+  cursor: pointer;
+  font-size: inherit;
+  line-height: inherit;
+}
+[data-mv2='post-more'] {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  color: var(--accent-ink);
+}
 /* P2-05 Moments: a note is short (280 characters), so it is shown in full, with its line breaks. No ring, no countdown. */
 [data-moment] [data-mv2='post-body'] {
   display: block;
@@ -1212,6 +1229,119 @@
   gap: var(--space-2);
 }
 
+/* ── 4f. News reader: one centred card over a dimmed, lightly blurred scrim (issue #216) ── */
+@keyframes mv2-news-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes mv2-news-in {
+  from { opacity: 0; transform: translateY(var(--space-3)); }
+  to { opacity: 1; transform: none; }
+}
+[data-mv2='news'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-viewer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+  touch-action: none;
+  font-family: var(--font-body);
+  animation: mv2-news-scrim-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='news-card'] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--reader-w);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+  animation: mv2-news-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='news-head'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='news-from'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='news-scroll'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+}
+[data-mv2='news-img'] {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+[data-mv2='news-title'] {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+#mv2-news-title:focus {
+  outline: none;
+}
+[data-mv2='news-meta'] {
+  margin: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='news-body'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+[data-mv2='news-link'] {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: var(--focus-offset);
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-mv2='news'] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
 [data-mv2='action'],
 [data-mv2='view-full'],
@@ -1220,7 +1350,8 @@
 [data-mv2='row'],
 [data-mv2='tab'],
 [data-mv2='sort-btn'],
-[data-mv2='tile-btn'] {
+[data-mv2='tile-btn'],
+[data-mv2='post'][data-news] {
   transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
 }
 [data-mv2='action']:active,
@@ -1230,7 +1361,8 @@
 [data-mv2='row']:active,
 [data-mv2='tab']:active,
 [data-mv2='sort-btn']:active,
-[data-mv2='tile-btn']:active {
+[data-mv2='tile-btn']:active,
+[data-mv2='post'][data-news]:active {
   transform: scale(0.97);
 }
 @media (hover: hover) {
@@ -1243,7 +1375,8 @@
   [data-mv2='view-full']:hover,
   [data-mv2='more']:hover,
   [data-mv2='icon-btn']:hover,
-  [data-mv2='row']:hover {
+  [data-mv2='row']:hover,
+  [data-mv2='post'][data-news]:hover {
     background: var(--surface-2);
   }
   [data-mv2='tab']:hover {
