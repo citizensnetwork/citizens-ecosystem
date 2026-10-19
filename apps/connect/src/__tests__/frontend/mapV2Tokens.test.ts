@@ -39,7 +39,8 @@ describe("Map v2 visual consistency (tracker section 12.3)", () => {
     const sp = [...css.matchAll(/--space-\d:\s*(\d+)px;/g)].map((m) => Number(m[1]));
     expect(sp).toEqual([4, 8, 12, 16, 20, 24, 32, 48]);
     // padding, margin and gap in components read tokens (or 0)
-    const strip = (v: string) => v.replace(/var\(--[a-z0-9-]+\)|calc\([^;]*\)|env\([^)]*\)|\b0\b|auto/g, "").trim();
+    // max() is a token-or-safe-area padding (the news reader). It carries no raw length of its own.
+    const strip = (v: string) => v.replace(/max\([^;]*\)|var\(--[a-z0-9-]+\)|calc\([^;]*\)|env\([^)]*\)|\b0\b|auto/g, "").trim();
     for (const prop of ["padding", "margin", "gap", "padding-top", "padding-bottom", "margin-top", "margin-bottom"]) {
       for (const v of valuesOf(prop)) expect(strip(v), `${prop}: ${v}`).toBe("");
     }

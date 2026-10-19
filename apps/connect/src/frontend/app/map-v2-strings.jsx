@@ -68,6 +68,8 @@
         title: (name) => name + ' has not shared events, news or photos yet.',
         hint: 'Everything they have shared is on their full profile.',
       },
+      // Issue #216: the centred reader a news card opens. The post itself is data.
+      news: { readMore: 'Read more', close: 'Close news post' },
       gallery: {
         loading: 'Loading photos',
         error: 'We could not load the photos.',
