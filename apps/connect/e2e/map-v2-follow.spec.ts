@@ -34,6 +34,16 @@ async function open(page: Page, kind: "contributor" | "place", index: number, fo
 
 const followBtn = (page: Page) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: /^Follow(ing)?$/ });
 
+/** The sheet slides up after it becomes visible. A tap taken mid-slide misses the button. */
+async function waitUntilStill(page: Page, locator: ReturnType<Page["locator"]>) {
+  await expect.poll(async () => {
+    const a = await locator.boundingBox();
+    await page.waitForTimeout(50);
+    const b = await locator.boundingBox();
+    return a && b ? Math.abs(a.y - b.y) + Math.abs(a.x - b.x) : 99;
+  }).toBeLessThan(1);
+}
+
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 test.describe("P2-04 Follow on the Contributor sheet", () => {
@@ -43,6 +53,7 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await expect(btn).toHaveCount(1);
     await expect(btn).toHaveText("Follow");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
+    await waitUntilStill(page, btn);
     const box = (await btn.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeGreaterThanOrEqual(44);

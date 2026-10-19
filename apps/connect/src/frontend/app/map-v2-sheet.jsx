@@ -179,6 +179,7 @@
     const [viewer, setViewer] = useState(null);     // { index, from }
     const [evSort, setEvSort] = useState(null);     // 'upcoming' | 'recent' | null (null = Upcoming when there is any, else Recent)
     const [qr, setQr] = useState(null);             // { from }: the QR code dialog (Contributor only)
+    const [reading, setReading] = useState(null);   // { id, from }: the news reader (one post, one dialog)
     const [announce, setAnnounce] = useState(Str.snapMessage.half);
     const dragState = useRef(null);
     const justDragged = useRef(false);
@@ -221,6 +222,10 @@
     const posts = useMemo(() => (isContributor && item
       ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
       : []), [newsPosts, item, isContributor]);
+    // The owner deleted the post while it was open (Dashboard writes straight into newsPosts).
+    useEffect(() => {
+      if (reading && !posts.some((p) => p.id === reading.id)) setReading(null);
+    }, [reading, posts]);
     // P2-01 Nearby: the closest listings the map is drawing, nearest first. What is already on this sheet is left out:
     // the listing itself, a Contributor's own upcoming events (its Events tab), and an Event's organiser (its header).
     const near = useMemo(() => {
@@ -261,7 +266,7 @@
     useEffect(() => {
       if (lastId.current === id) return;
       lastId.current = id;
-      setSnap('half'); setTab(null); setViewer(null); setEvSort(null); setQr(null);
+      setSnap('half'); setTab(null); setViewer(null); setEvSort(null); setQr(null); setReading(null);
       if (scroller.current) scroller.current.scrollTop = 0;
     }, [id]);
 
@@ -295,7 +300,7 @@
     // A press that is still going when the sheet unmounts must not leave listeners on the document.
     useEffect(() => () => { const d = dragState.current; if (d && d.end) d.end(); }, []);
 
-    // Escape closes at once (an open photo viewer takes the key first: it listens in the capture phase).
+    // Escape closes at once (an open photo viewer or news reader takes the key first: it listens in the capture phase).
     useEffect(() => {
       const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
       document.addEventListener('keydown', onKey);
@@ -477,6 +482,14 @@
     const qrAction = qrOk
       ? h('div', { 'data-mv2': 'actions-end' }, h(Action, { icon: 'QrCode', label: Str.qr.action, onClick: (e) => setQr({ from: e.currentTarget }) }))
       : null;
+    const reportOwner = isContributor ? item.id : item.organizerId;
+    const reportType = isContributor ? 'user' : type;
+    const reportAction = window.CCReport
+      ? h(window.CCReport.Action, {
+        key: id, variant: 'sheet', targetType: reportType, targetId: id, ownerId: reportOwner,
+        strings: window.MapV2Strings.report,
+      })
+      : null;
     const openProfile = () => { go(navTarget(type), { id }); onClose(); };
 
     // ── body ────────────────────────────────────────────────────────
@@ -504,19 +517,34 @@
       } else if (active === 'news') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, posts.map((p) => {
           const ago = T().postedAgo(p.createdAt || p.date, now);
-          return h('li', { key: p.id, 'data-mv2': 'post' },
-            p.image && window.UI.safeUrl(p.image) && h('img', { src: p.image, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
-            h('span', { 'data-mv2': 'row-title' }, p.title),
-            ago && h('span', { 'data-mv2': 'row-meta' }, ago),
-            p.body && h('span', { 'data-mv2': 'post-body' }, p.body));
+          const titleId = 'mv2-post-' + p.id + '-t';
+          const metaId = 'mv2-post-' + p.id + '-m';
+          return h('li', { key: p.id },
+            h('button', {
+              type: 'button', 'data-mv2': 'post', 'data-news': '',
+              'aria-haspopup': 'dialog',
+              'aria-labelledby': ago ? titleId + ' ' + metaId : titleId,
+              onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
+            },
+              p.image && window.UI.safeUrl(p.image) && h('img', { src: p.image, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
+              h('span', { id: titleId, 'data-mv2': 'row-title' }, p.title),
+              ago && h('span', { id: metaId, 'data-mv2': 'row-meta' }, ago),
+              p.body && h('span', { 'data-mv2': 'post-body' }, p.body),
+              h('span', { 'data-mv2': 'post-more' }, Str.news.readMore)));
         }));
       } else if (active === 'today') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
           const ago = T().postedAgo(m.created_at, now);
+          const Rep = window.CCReport;
           return h('li', { key: m.id, 'data-mv2': 'post', 'data-moment': '' },
             m.image_url && window.UI.safeUrl(m.image_url) && h('img', { src: m.image_url, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
             h('span', { 'data-mv2': 'post-body' }, m.body),
-            ago && h('span', { 'data-mv2': 'row-meta' }, ago));
+            h('div', { 'data-mv2': 'moment-foot' },
+              ago && h('span', { 'data-mv2': 'row-meta' }, ago),
+              Rep && h(Rep.Action, {
+                variant: 'moment', targetType: 'moment', targetId: m.id, ownerId: item.id,
+                strings: window.MapV2Strings.report,
+              })));
         }));
       } else if (active === 'gallery') {
         panel = h(window.MapV2Gallery.Grid, { images, strings: Str.gallery, onOpen: (i, from) => setViewer({ index: i, from }) });
@@ -582,6 +610,7 @@
         body,
         N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, Avatar, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
+        reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
@@ -592,6 +621,11 @@
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {
         images, index: viewer.index, strings: Str.gallery, returnFocus: viewer.from,
         onClose: () => setViewer(null), onIndex: (i) => setViewer((v) => ({ index: i, from: v && v.from })),
+      }), document.body),
+      // the open news post: same centred dialog the profile page uses, over the whole viewport
+      reading && window.MapV2News && posts.some((p) => p.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
+        post: posts.find((p) => p.id === reading.id), sourceName: name, strings: Str.news,
+        returnFocus: reading.from, onClose: () => setReading(null),
       }), document.body));
   }
 

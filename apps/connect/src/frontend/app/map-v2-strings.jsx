@@ -68,6 +68,8 @@
         title: (name) => name + ' has not shared events, news or photos yet.',
         hint: 'Everything they have shared is on their full profile.',
       },
+      // Issue #216: the centred reader a news card opens. The post itself is data.
+      news: { readMore: 'Read more', close: 'Close news post' },
       gallery: {
         loading: 'Loading photos',
         error: 'We could not load the photos.',
@@ -103,6 +105,45 @@
       daysAgo: (n) => n + ' days ago',
       dayShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       monthShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    },
+
+    // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).
+    // Map surfaces pass this object in; other screens use STR.
+    report: {
+      action: 'Report',
+      menu: 'Report',
+      more: 'More options',
+      close: 'Close report',
+      title: (noun) => 'Report this ' + noun,
+      why: 'Why are you reporting it?',
+      reasons: {
+        spam: 'Spam',
+        harassment: 'Harassment',
+        hate_speech: 'Hate speech',
+        sexual_content: 'Sexual content',
+        violence: 'Violence',
+        misinformation: 'Misinformation',
+        impersonation: 'Impersonation',
+        illegal: 'Something illegal',
+        other: 'Something else',
+      },
+      nouns: {
+        event: 'event',
+        user: 'person',
+        place: 'place',
+        comment: 'comment',
+        conversation: 'conversation',
+        moment: 'moment',
+      },
+      details: 'Tell us more (optional, 1000 max)',
+      counter: (n) => n + '/1000',
+      cancel: 'Cancel',
+      send: 'Send report',
+      sending: 'Sending…',
+      thanks: 'Thanks. An admin will look at it.',
+      already: "You've already reported this. Thanks, we're looking into it.",
+      rate: "You've sent a few reports already. Please try again later.",
+      fail: 'Could not send. Please try again.',
     },
   };
 })();

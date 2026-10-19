@@ -74,7 +74,10 @@
           const showDate = i === 0 || conv.messages[i - 1].date !== m.date;
           return h(F, { key: m.id },
             showDate && h('div', { className: 'flex justify-center my-2' }, h('span', { className: 'text-[10px] font-semibold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full' }, m.date)),
-            h('div', { className: cx('flex', mine ? 'justify-end' : 'justify-start') },
+            h('div', { className: cx('flex items-end gap-1', mine ? 'justify-end' : 'justify-start'), 'data-message': m.id },
+              !mine && window.CCReport && h(window.CCReport.Action, {
+                variant: 'overflow', targetType: 'conversation', targetId: conv.id, ownerId: m.senderId || null,
+              }),
               h('div', { className: cx('max-w-[78%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed', mine ? 'gold-gradient text-white rounded-br-sm' : 'bg-card border border-border text-foreground rounded-bl-sm') },
                 m.text,
                 h('span', { className: cx('block text-[9px] mt-0.5', mine ? 'text-white/70' : 'text-muted-foreground') }, m.time))));

@@ -136,6 +136,37 @@
     return { latitude: p.lat, longitude: p.lng, location_name: p.name };
   }
 
+  // What a place edit actually saves, given the place already on the row
+  // (`previous` is { name, lat, lng }, or omitted when nothing was saved).
+  // A name with no real spot clears an earlier pin ONLY when the name itself
+  // changed: the PATCH then sends null coordinates and the Timeline Map drops
+  // the row. When the name is unchanged, the saved latitude and longitude are
+  // kept and null is not sent. null when there is nothing to save.
+  function commitPlace(place, previous) {
+    const p = normalise(place);
+    if (!p) return null;
+    const prevName = cleanName(previous && previous.name);
+    const unchanged = prevName.length > 0 && prevName === p.name;
+    let kept = p;
+    if (p.lat === null && unchanged && previous && validCoord(previous.lat, previous.lng)) {
+      kept = { name: p.name, lat: round6(Number(previous.lat)), lng: round6(Number(previous.lng)) };
+    }
+    let patch;
+    if (kept.lat !== null) {
+      patch = { latitude: kept.lat, longitude: kept.lng, location_name: kept.name };
+    } else if (unchanged) {
+      patch = { location_name: kept.name };
+    } else {
+      patch = { location_name: kept.name, latitude: null, longitude: null };
+    }
+    return { name: kept.name, lat: kept.lat, lng: kept.lng, patch };
+  }
+
+  function toPatch(place, previous) {
+    const committed = commitPlace(place, previous);
+    return committed ? committed.patch : null;
+  }
+
   // A saved activity row → what the list shows: the name, and whether the
   // Timeline Map can plot it (the same test the map applies to every row).
   function rowPlace(row) {
@@ -159,6 +190,6 @@
   window.CV_PLACE = {
     NAME_MAX, MIN_QUERY, MAX_RESULTS, HOME, EMPTY,
     cleanName, coordLabel, parseCoordPair, searchUrl, reverseUrl, parseResults, parseReverse,
-    normalise, kind, toPayload, rowPlace, demoMapRow,
+    normalise, kind, toPayload, commitPlace, toPatch, rowPlace, demoMapRow,
   };
 })();

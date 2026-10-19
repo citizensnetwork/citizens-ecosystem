@@ -5,7 +5,7 @@
   const h = React.createElement;
   const F = React.Fragment;
   const { useState, useEffect } = React;
-  const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle, Overlay } = window.UI;
+  const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle, Overlay, MediaPicker } = window.UI;
   const Icon = window.Icon;
 
   const STATUS = {
@@ -120,15 +120,40 @@
   // quick-entry tool, not the citizen-facing apply flow. "Email the owner a
   // welcome" (D-13, on by default) has the SERVER mail them the sign-in steps;
   // the result says whether it was sent, failed, or skipped.
+  const EMPTY_CREATE = {
+    orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '',
+    contactEmail: '', socials: {}, cover: '',
+    location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true,
+  };
+
+  // The server answers with a stable code. The box under the form says it in
+  // plain words and stays until the next try (a toast alone disappears).
+  function createErrorMessage(code) {
+    if (code === 'email_already_registered') return 'That email already has an account on Citizens.';
+    if (code === 'invalid_contact_email') return 'The public contact email is not a valid email address.';
+    if (code === 'invalid_cover_url') return 'The cover photo must be an https or http image link.';
+    if (code === 'invalid_whatsapp_number') return 'WhatsApp needs a phone number (for example 071 234 5678) or a wa.me link.';
+    if (code === 'invalid_website_url') return 'The website needs to be a real web address.';
+    if (typeof code === 'string' && code.indexOf('invalid_') === 0) return 'Check the highlighted social link and try again.';
+    return 'Could not create the listing — please try again.';
+  }
+
+  // Same rule the public chips use: a value is usable only when the platform
+  // can turn it into an http(s) link. Empty is fine (the field is optional).
+  function socialHref(platform, value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return window.UI.safeUrl(platform.urlFor(raw));
+  }
+
   function AdminCreateContributor() {
     const { toast } = window.useApp();
-    const [f, setF] = useState({
-      orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '',
-      location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true,
-    });
+    const [f, setF] = useState({ ...EMPTY_CREATE, socials: {} });
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
     const [result, setResult] = useState(null); // { slug, claimEmail, emailRequested, email } once created
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
     const setLoc = (patch) => setF((s) => ({
       ...s,
       location: patch.address !== undefined ? patch.address : s.location,
@@ -137,11 +162,15 @@
     }));
     const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const canSubmit = f.orgName.trim() && EMAIL_RE.test(f.claimEmail.trim()) && f.category && (f.noFixedLocation || f.location.trim()) && !submitting;
+    const platforms = window.DATA.SOCIAL_PLATFORMS;
+    const badSocial = platforms.some((p) => String(f.socials[p.key] || '').trim() && !socialHref(p, f.socials[p.key]));
+    const canSubmit = f.orgName.trim() && EMAIL_RE.test(f.claimEmail.trim()) && f.category && (f.noFixedLocation || f.location.trim()) && !badSocial && !submitting;
 
-    const submit = async () => {
+    const submit = async (e) => {
+      if (e && e.preventDefault) e.preventDefault();
       if (!canSubmit) return;
       setSubmitting(true);
+      setError('');
       try {
         const res = await window.authedFetch('/api/admin/contributors/create', {
           method: 'POST',
@@ -152,6 +181,9 @@
             contributor_category: f.category,
             bio: f.bio || null,
             website_url: f.website || null,
+            contact_email: f.contactEmail.trim() || null,
+            ...window.DATA.socialsToRow(f.socials, 'contributor'),
+            cover_photo_urls: f.cover ? [f.cover] : [],
             no_fixed_location: f.noFixedLocation,
             physical_address: f.noFixedLocation ? null : f.location,
             physical_latitude: f.noFixedLocation ? null : f.lat,
@@ -161,23 +193,26 @@
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast(body.error === 'email_already_registered'
-            ? 'That email already has an account on Citizens.'
-            : 'Could not create the listing — please try again.', 'red');
-          setSubmitting(false);
+          const message = createErrorMessage(body.error);
+          setError(message);
+          toast(message, 'red');
           return;
         }
         setResult({ slug: body.slug, claimEmail: f.claimEmail.trim(), emailRequested: f.emailOwner, email: body.email });
         // C21: the server says whether the new listing has a pin; if it did not say, claim nothing about the map
         toast('Contributor listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in Kingdom Discovery now. It has no map pin.' : 'live now.'), 'green');
-        setF({ orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '', location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true });
-      } catch (e) {
-        toast('Could not create the listing — please check your connection.', 'red');
+        setF({ ...EMPTY_CREATE, socials: {} });
+        setError('');
+      } catch (err) {
+        const message = 'Could not create the listing — please check your connection.';
+        setError(message);
+        toast(message, 'red');
+      } finally {
+        setSubmitting(false);
       }
-      setSubmitting(false);
     };
 
-    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl' },
+    return h('form', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl', 'data-testid': 'admin-create-form', onSubmit: submit },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
         "Create a Contributor listing on their behalf — it goes live in Kingdom Discovery immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) to see the listing and manage it themselves from their own Contributor Portal."),
 
@@ -198,9 +233,42 @@
       h(Field, { label: "Owner's email", required: true, hint: 'The email they sign in with (a 6-digit code we email them, or Google) to see this listing.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
 
       h('div', { className: 'grid grid-cols-2 gap-3' },
-        h(Field, { label: 'Type' }, h('select', { value: f.kind, onChange: (e) => up('kind', e.target.value), className: window.UI.inputCls },
+        h(Field, { label: 'Type', htmlFor: 'admin-create-kind' }, h('select', { id: 'admin-create-kind', value: f.kind, onChange: (e) => up('kind', e.target.value), className: window.UI.inputCls },
           CONTRIBUTOR_KINDS.map((k) => h('option', { key: k.value, value: k.value }, k.label)))),
-        h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' }))),
+        h(Field, { label: 'Website', htmlFor: 'admin-create-website' }, h(Input, { id: 'admin-create-website', value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' }))),
+
+      // Same fields, same order, same pieces as the Contributor portal's
+      // listing editor (dashboard ProfileTab): contact email, then every
+      // social the public chips know about, then one cover.
+      h(Field, {
+        label: 'Public contact email', htmlFor: 'admin-create-contact-email',
+        hint: 'Shown to citizens — different from your sign-in email.',
+      }, h(Input, { id: 'admin-create-contact-email', type: 'email', value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' })),
+
+      h(Field, {
+        label: 'Social media',
+        hint: 'A link or just the handle — either works. Shown publicly on your listing.',
+        invalid: badSocial,
+        hintId: 'social-hint',
+      }, h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2', 'data-testid': 'admin-create-socials' },
+        platforms.map((p) => {
+          const raw = f.socials[p.key] || '';
+          const invalid = !!String(raw).trim() && !socialHref(p, raw);
+          return h('div', {
+            key: p.key, 'data-social': p.key, 'data-invalid': invalid ? 'true' : undefined,
+            className: cx('flex items-center gap-2 px-3 py-2 bg-white/70 border rounded-xl focus-within:border-gold/60', invalid ? 'border-destructive' : 'border-border'),
+          },
+            h('span', { className: 'w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0' },
+              h(Icon, { name: p.icon, size: 14, className: 'text-gold-dark' })),
+            h('input', {
+              value: raw, onChange: (e) => ups(p.key, e.target.value),
+              placeholder: p.placeholder || p.label, 'aria-label': p.label, 'aria-invalid': invalid || undefined,
+              className: 'flex-1 min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/70',
+            }));
+        }))),
+
+      h(Field, { label: 'Cover photo', hint: 'The first photo is the public cover image.' },
+        h(MediaPicker, { value: f.cover, onChange: (v) => up('cover', v), aspect: '3/1', label: 'cover photo', scope: 'event-cover' })),
 
       h(Field, { label: 'Area / location served', required: !f.noFixedLocation },
         h('div', { className: 'space-y-2' },
@@ -231,7 +299,9 @@
           h('span', { className: 'block text-sm font-semibold text-foreground' }, 'Email the owner a welcome'),
           h('span', { className: 'block text-xs text-muted-foreground leading-relaxed' }, 'Sends the sign-in steps (a 6-digit code) from no-reply@citizenscentral.co.za. Untick it if you would rather tell them yourself.'))),
 
-      h(Button, { variant: 'gold', icon: 'Plus', disabled: !canSubmit, onClick: submit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
+      error && h('div', { role: 'alert', 'data-testid': 'create-error', className: 'p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-xs font-semibold text-destructive' }, error),
+
+      h(Button, { type: 'submit', variant: 'gold', icon: 'Plus', disabled: !canSubmit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
   }
 
   // ── Admin: every Contributor listing — hide / unhide ──

@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createActivitySchema } from "../../lib/schemas/activity";
+import { createActivitySchema, updateActivitySchema } from "../../lib/schemas/activity";
 
 const root = process.cwd(); // apps/vision when run through its own vitest
 const read = (rel: string) => readFileSync(join(root, rel), "utf8");
@@ -33,6 +33,17 @@ interface Lib {
   normalise(place: unknown): Place | null;
   kind(place: unknown): "empty" | "text" | "pinned";
   toPayload(place: unknown): Record<string, unknown>;
+  commitPlace(place: unknown, previous?: { name?: string; lat?: number | null; lng?: number | null } | null): {
+    name: string;
+    lat: number | null;
+    lng: number | null;
+    patch: { location_name: string; latitude?: number | null; longitude?: number | null };
+  } | null;
+  toPatch(place: unknown, previous?: { name?: string; lat?: number | null; lng?: number | null } | null): {
+    location_name: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
   rowPlace(row: unknown): { name: string; onMap: boolean };
   demoMapRow(id: string, title: string, type: string, date: string, place: unknown): Record<string, unknown> | null;
 }
@@ -236,6 +247,65 @@ describe("normalise, kind and toPayload", () => {
   it("caps the name at what the API accepts", () => {
     const out = P.toPayload({ name: "x".repeat(400), lat: null, lng: null });
     expect((out.location_name as string).length).toBe(300);
+  });
+  it("toPatch sends all three place fields, and null coordinates when there is no spot", () => {
+    expect(P.toPatch(null)).toBeNull();
+    expect(P.toPatch(P.EMPTY)).toBeNull();
+    expect(P.toPatch({ name: "  Mamelodi hall ", lat: null, lng: null })).toEqual({
+      location_name: "Mamelodi hall", latitude: null, longitude: null,
+    });
+    expect(P.toPatch({ name: "Hatfield", lat: -25.750833114, lng: 28.243055418 })).toEqual({
+      latitude: -25.750833, longitude: 28.243055, location_name: "Hatfield",
+    });
+    // A pin that fails the map's rule is a name only, and the old spot is cleared.
+    expect(P.toPatch({ name: "Somewhere", lat: 0, lng: 0 })).toEqual({
+      location_name: "Somewhere", latitude: null, longitude: null,
+    });
+  });
+  it("keeps the saved pin when the name is unchanged, and does not send null", () => {
+    const previous = { name: "Hatfield", lat: -25.7487, lng: 28.238 };
+    const kept = {
+      location_name: "Hatfield", latitude: -25.7487, longitude: 28.238,
+    };
+    expect(P.toPatch({ name: "Hatfield", lat: null, lng: null }, previous)).toEqual(kept);
+    expect(P.toPatch({ name: "  Hatfield  ", lat: null, lng: null }, previous)).toEqual(kept);
+    expect(P.commitPlace({ name: "Hatfield", lat: null, lng: null }, previous)).toMatchObject({
+      name: "Hatfield", lat: -25.7487, lng: 28.238, patch: kept,
+    });
+    // No pin was saved: an unchanged name omits coordinates rather than nulling them.
+    expect(P.toPatch(
+      { name: "Name only hall", lat: null, lng: null },
+      { name: "Name only hall", lat: null, lng: null },
+    )).toEqual({ location_name: "Name only hall" });
+    expect(JSON.stringify(P.toPatch(
+      { name: "Hatfield", lat: null, lng: null },
+      { name: "Hatfield", lat: 0, lng: 0 },
+    ))).not.toContain("null");
+  });
+  it("clears the pin only when the name changes to one with no map location", () => {
+    const previous = { name: "Hatfield", lat: -25.7487, lng: 28.238 };
+    expect(P.toPatch({ name: "Mamelodi hall", lat: null, lng: null }, previous)).toEqual({
+      location_name: "Mamelodi hall", latitude: null, longitude: null,
+    });
+    // A newly chosen spot is a map location, so the pin moves instead of clearing.
+    expect(P.toPatch({ name: "Brooklyn", lat: -25.77, lng: 28.24 }, previous)).toEqual({
+      location_name: "Brooklyn", latitude: -25.77, longitude: 28.24,
+    });
+  });
+  it("toPatch is accepted by PATCH /api/activities/:id, including a cleared pin", () => {
+    const bodies = [
+      P.toPatch({ name: "Plain name", lat: null, lng: null }),
+      P.toPatch({ name: "Hatfield", lat: -25.7508, lng: 28.2431 }),
+      P.toPatch({ name: "", lat: -25.7508, lng: 28.2431 }),
+      P.toPatch({ name: "z", lat: 0, lng: 0 }),
+      P.toPatch({ name: "Hatfield", lat: null, lng: null }, { name: "Hatfield", lat: -25.7487, lng: 28.238 }),
+      P.toPatch({ name: "Hatfield", lat: null, lng: null }, { name: "Hatfield", lat: null, lng: null }),
+      P.toPatch({ name: "Other hall", lat: null, lng: null }, { name: "Hatfield", lat: -25.7487, lng: 28.238 }),
+    ];
+    for (const body of bodies) {
+      expect(body).not.toBeNull();
+      expect(updateActivitySchema.safeParse(body).success, JSON.stringify(body)).toBe(true);
+    }
   });
   it("is always accepted by the real POST /api/activities schema", () => {
     const base = { title: "Food drive", type: "outreach" as const, date: "2026-10-16" };

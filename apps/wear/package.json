@@ -21,7 +21,7 @@
     "@citizens/connect-client": "workspace:*",
     "@citizens/db": "workspace:*",
     "@citizens/utils": "workspace:*",
-    "@supabase/ssr": "^0.10.0",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.102.1",
     "next": "15.5.18",
     "react": "18.3.1",
