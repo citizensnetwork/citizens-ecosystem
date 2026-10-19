@@ -29,7 +29,7 @@ describe("recordContributorMutation", () => {
 
     await recordContributorMutation(client, {
       handle: "test-slug",
-      access: { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: CONTRIB },
+      access: { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: CONTRIB, teamRole: "owner" },
       actorId: ACTOR,
       action: "broadcast_sent",
       entityType: "broadcast",
@@ -65,7 +65,7 @@ describe("recordContributorMutation", () => {
 
     await recordContributorMutation(client, {
       handle: "test-slug",
-      access: { hasAccess: true, isOwner: false, isAdminWithAccess: true, contributorId: CONTRIB },
+      access: { hasAccess: true, isOwner: false, isAdminWithAccess: true, contributorId: CONTRIB, teamRole: null },
       actorId: ACTOR,
       action: "keyword_added",
       entityType: "keyword",
@@ -99,7 +99,7 @@ describe("recordContributorMutation", () => {
     await expect(
       recordContributorMutation(errClient, {
         handle: "test-slug",
-        access: { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: CONTRIB },
+        access: { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: CONTRIB, teamRole: "owner" },
         actorId: ACTOR,
         action: "task_created",
         entityType: "planning_task",
@@ -108,5 +108,18 @@ describe("recordContributorMutation", () => {
     ).resolves.toBeUndefined();
 
     expect(errSpy).toHaveBeenCalled();
+  });
+
+  it("does not insert a client activity row for an editor (the trigger records it)", async () => {
+    const { client, from } = makeSupabase();
+    await recordContributorMutation(client, {
+      handle: "test-slug",
+      access: { hasAccess: true, isOwner: false, isAdminWithAccess: false, contributorId: CONTRIB, teamRole: "editor" },
+      actorId: ACTOR,
+      action: "news_post_created",
+      entityType: "news_post",
+      entityId: ENTITY,
+    });
+    expect(from).not.toHaveBeenCalled();
   });
 });

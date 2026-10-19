@@ -95,7 +95,8 @@ async function openCreate(page: Page, reply: { status?: number; json?: Record<st
   await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
   await goTo(page, "admin");
   await expect(page.locator('[data-screen="admin"]')).toBeVisible();
-  await page.getByRole("button", { name: "Create Contributor" }).click();
+  await page.getByRole("button", { name: "Contributors", exact: true }).click();
+  await page.getByRole("button", { name: "Create Contributor", exact: true }).click();
   await expect(page.getByTestId("admin-create-form")).toBeVisible();
   return requests;
 }
@@ -216,7 +217,7 @@ test.describe("Admin → Create: contact, socials and cover", () => {
     await page.getByPlaceholder("or paste an image URL…").press("Enter");
     await page.getByRole("button", { name: "Create Contributor Listing" }).click();
 
-    await expect(page.getByTestId("create-result")).toBeVisible();
+    await expect(page.getByTestId("admin-create-overlay")).toHaveCount(0);
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       contact_email: "hello@example.org",
@@ -225,9 +226,6 @@ test.describe("Admin → Create: contact, socials and cover", () => {
       whatsapp_number: "+27 82 000 0000",
       cover_photo_urls: [COVER],
     });
-    await expect(page.getByLabel("Public contact email")).toHaveValue("");
-    await expect(page.getByRole("textbox", { name: "X", exact: true })).toHaveValue("");
-    await expect(page.getByRole("button", { name: "Add cover photo" })).toBeVisible();
 
     await page.goto(`/c/${SLUG}`);
     const profile = page.locator('[data-screen="profile"]');

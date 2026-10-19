@@ -1,19 +1,50 @@
-// Helper: check if a user has active dashboard access to a contributor profile
-// Returns: { isOwner, isAdminWithAccess, hasAccess, contributorId }
+// Helper: check if a user has active dashboard access to a contributor profile.
+// Returns: { isOwner, isAdminWithAccess, hasAccess, contributorId, teamRole }
 //
 // Ownership is sourced from `team_memberships.role='owner' AND status='active'`
 // (Stage G.2). The legacy `user.id === contributor.id` check is retained as a
 // defensive fallback for the rare case where migration 111's backfill missed a
 // row — the trigger covers all new approvals so this should be unreachable in
 // steady state.
+//
+// An active editor or viewer (migration 193) is granted access only when the
+// listing is an approved contributor that is not hidden and not deleted.
+// Pending, declined and removed memberships grant nothing. Hidden and deleted
+// listings stay with the owner and with admins, as before.
 
 import { createClient } from "@/lib/supabase/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { CONTRIBUTOR_ROLES } from "@/types/db";
 
+export type TeamDashboardRole = "owner" | "editor" | "viewer";
+
 export type DashboardAccessResult =
-  | { hasAccess: true; isOwner: boolean; isAdminWithAccess: boolean; contributorId: string }
+  | {
+      hasAccess: true;
+      isOwner: boolean;
+      isAdminWithAccess: boolean;
+      contributorId: string;
+      /** 'owner' | 'editor' | 'viewer', or null when the only grant is an admin session. */
+      teamRole: TeamDashboardRole | null;
+    }
   | { hasAccess: false };
+
+type ContributorRow = {
+  id: string;
+  role: string;
+  contributor_status: string | null;
+  contributor_hidden: boolean | null;
+  deleted_at: string | null;
+};
+
+function listingIsOpen(contributor: ContributorRow): boolean {
+  return (
+    CONTRIBUTOR_ROLES.includes(contributor.role as (typeof CONTRIBUTOR_ROLES)[number]) &&
+    contributor.contributor_status === "approved" &&
+    contributor.contributor_hidden !== true &&
+    !contributor.deleted_at
+  );
+}
 
 export async function checkDashboardAccess(
   handle: string,
@@ -34,45 +65,63 @@ export async function checkDashboardAccess(
   }
   if (!user) return { hasAccess: false };
 
-  // Resolve handle → contributor profile
+  // Resolve handle → contributor profile. contributor_hidden and deleted_at
+  // are public columns (mig 176); editors of a hidden or deleted listing get nothing.
   const { data: contributor } = await supabase
     .from("profiles")
-    .select("id, role, contributor_status")
+    .select("id, role, contributor_status, contributor_hidden, deleted_at")
     .eq("contributor_slug", handle)
-    .maybeSingle<{ id: string; role: string; contributor_status: string | null }>();
+    .maybeSingle<ContributorRow>();
 
   if (!contributor) return { hasAccess: false };
-  if (
-    !CONTRIBUTOR_ROLES.includes(contributor.role as (typeof CONTRIBUTOR_ROLES)[number]) ||
-    contributor.contributor_status !== "approved"
-  ) {
-    // Admins can still access unapproved contributors (for review)
-    const { data: viewerProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle<{ role: string }>();
-    if (viewerProfile?.role !== "admin") return { hasAccess: false };
+
+  const open = listingIsOpen(contributor);
+  if (!open) {
+    // Admins can still access unapproved contributors (for review). A hidden
+    // or deleted listing is not "unapproved": owners of those still pass the
+    // membership check below, and editors do not.
+    const blockedFromReview =
+      !CONTRIBUTOR_ROLES.includes(contributor.role as (typeof CONTRIBUTOR_ROLES)[number]) ||
+      contributor.contributor_status !== "approved";
+    if (blockedFromReview) {
+      const { data: viewerProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle<{ role: string }>();
+      if (viewerProfile?.role !== "admin") return { hasAccess: false };
+    }
   }
 
-  // Owner check — team_memberships is the source of truth post Stage G.2.
-  const { data: ownerRow } = await supabase
+  // One active membership row per person (unique contributor_id, member_id).
+  const { data: membership } = await supabase
     .from("team_memberships")
-    .select("id")
+    .select("role")
     .eq("contributor_id", contributor.id)
     .eq("member_id", user.id)
-    .eq("role", "owner")
     .eq("status", "active")
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ role: string }>();
 
-  if (ownerRow) {
-    return { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: contributor.id };
+  const owner =
+    membership?.role === "owner" || user.id === contributor.id;
+  if (owner) {
+    return {
+      hasAccess: true,
+      isOwner: true,
+      isAdminWithAccess: false,
+      contributorId: contributor.id,
+      teamRole: "owner",
+    };
   }
 
-  // Defensive fallback for contributors created before migration 111's backfill
-  // or where the trigger hasn't fired yet. Same self-id check as before.
-  if (user.id === contributor.id) {
-    return { hasAccess: true, isOwner: true, isAdminWithAccess: false, contributorId: contributor.id };
+  if ((membership?.role === "editor" || membership?.role === "viewer") && open) {
+    return {
+      hasAccess: true,
+      isOwner: false,
+      isAdminWithAccess: false,
+      contributorId: contributor.id,
+      teamRole: membership.role === "editor" ? "editor" : "viewer",
+    };
   }
 
   // Admin with granted access check
@@ -99,6 +148,7 @@ export async function checkDashboardAccess(
         isOwner: false,
         isAdminWithAccess: true,
         contributorId: contributor.id,
+        teamRole: null,
       };
     }
   }
