@@ -103,8 +103,8 @@ describe("map sheet tabbed block (issue 217)", () => {
     expect(sheet).toContain("tabIndex: 0");
     expect(sheet).toContain("scrollTop += d");
     expect(sheet).not.toContain("role: 'separator'");
-    expect(lib).toContain("/assets/map-v2.css?v=20261019b");
-    expect(html).toContain("app/map-v2-sheet.jsx?v=20261019a");
-    expect(html).toContain("app/map-v2-lib.jsx?v=20261019b");
+    expect(lib).toContain("/assets/map-v2.css?v=20261019c");
+    expect(html).toContain("app/map-v2-sheet.jsx?v=20261019c");
+    expect(html).toContain("app/map-v2-lib.jsx?v=20261019c");
   });
 });
