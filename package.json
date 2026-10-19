@@ -19,7 +19,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\""
   },
   "devDependencies": {
-    "@types/node": "20.19.0",
+    "@types/node": "26.6.5",
     "prettier": "3.3.3",
     "turbo": "2.9.14",
     "typescript": "5.5.4"
@@ -30,9 +30,9 @@
       "postcss": "8.5.23",
       "eslint-config-next>@typescript-eslint/parser": "^8.58.0",
       "eslint-config-next>@typescript-eslint/eslint-plugin": "^8.58.0",
-      "vitest@<4.1.11": ">=4.1.11",
-      "@vitest/coverage-v8@<4.1.11": ">=4.1.11",
-      "@vitest/mocker@<4.1.11": ">=4.1.11",
+      "vitest@<5.0.5": ">=5.0.5",
+      "@vitest/coverage-v8@<5.0.5": ">=5.0.5",
+      "@vitest/mocker@<5.0.5": ">=5.0.5",
       "brace-expansion@>=5.0.0 <5.0.12": "^5.0.12",
       "brace-expansion@>=1.0.0 <1.1.21": "^1.1.21",
       "brace-expansion@>=2.0.0 <2.1.7": "^2.1.7",
@@ -46,6 +46,7 @@
       "source-map-js@<1.2.2": "^1.2.2",
       "tar@<7.5.21": "^7.5.21",
       "undici@<7.29.1": "^7.29.1",
+      "uuid@<11.1.1": "11.1.1",
       "@xmldom/xmldom@0.9.10": ">=0.9.12",
       "browserslist@4.28.4": ">=4.28.7",
       "baseline-browser-mapping@2.10.41": ">=2.11.0",
