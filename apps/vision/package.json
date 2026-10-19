@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@citizens/frontend-build": "workspace:*",
+    "@citizens/utils": "workspace:*",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.102.1",
     "next": "16.2.6",
