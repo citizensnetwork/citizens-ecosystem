@@ -104,12 +104,16 @@
   }
 
   // ── Field (label + control) ──
-  function Field({ label, hint, required, children, className }) {
+  function Field({ label, hint, required, children, className, htmlFor, invalid, hintId }) {
     return React.createElement('div', { className: cx('space-y-1.5', className) },
-      label && React.createElement('label', { className: 'flex items-center gap-1 text-xs font-semibold text-foreground/80' },
+      label && React.createElement('label', { htmlFor: htmlFor || undefined, className: 'flex items-center gap-1 text-xs font-semibold text-foreground/80' },
         label, required && React.createElement('span', { className: 'text-gold' }, '*')),
       children,
-      hint && React.createElement('p', { className: 'text-[11px] text-muted-foreground' }, hint));
+      hint && React.createElement('p', {
+        'data-testid': hintId || undefined,
+        role: invalid ? 'alert' : undefined,
+        className: cx('text-[11px]', invalid ? 'font-semibold text-destructive' : 'text-muted-foreground'),
+      }, hint));
   }
 
   const inputCls = 'w-full px-3.5 py-2.5 bg-white/70 border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-gold/60 focus:bg-white transition-all';
@@ -328,7 +332,7 @@
           React.createElement('input', {
             placeholder: 'or paste an image URL…',
             className: inputCls + ' text-xs py-2',
-            onKeyDown: (e) => { if (e.key === 'Enter' && e.target.value) { onChange(e.target.value); setOpen(false); } },
+            onKeyDown: (e) => { if (e.key === 'Enter' && e.target.value) { e.preventDefault(); onChange(e.target.value); setOpen(false); } },
           }))));
   }
 
