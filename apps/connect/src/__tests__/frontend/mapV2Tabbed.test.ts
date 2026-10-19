@@ -66,7 +66,8 @@ describe("map sheet tabbed block (issue 217)", () => {
     const stuck = sliceBetween(css, "[data-mv2='tabbed'] [data-mv2='tabs'] {", "[data-mv2='panel'] {");
     expect(decl(stuck, "position")).toBe("sticky");
     expect(decl(stuck, "top")).toBe("0");
-    expect(decl(stuck, "z-index")).toBe("1");
+    expect(decl(stuck, "z-index")).toBe("var(--z-sticky)");
+    expect(decl(sliceBetween(css, "/* z-index:", "/* motion:"), "--z-sticky")).toBe("1");
     expect(decl(stuck, "background")).toBe("var(--surface-1)");
 
     const panel = sliceBetween(css, "[data-mv2='panel'] {", "[data-mv2='panel']:focus-visible");
@@ -102,8 +103,8 @@ describe("map sheet tabbed block (issue 217)", () => {
     expect(sheet).toContain("tabIndex: 0");
     expect(sheet).toContain("scrollTop += d");
     expect(sheet).not.toContain("role: 'separator'");
-    expect(lib).toContain("/assets/map-v2.css?v=20261019a");
+    expect(lib).toContain("/assets/map-v2.css?v=20261019b");
     expect(html).toContain("app/map-v2-sheet.jsx?v=20261019a");
-    expect(html).toContain("app/map-v2-lib.jsx?v=20261019a");
+    expect(html).toContain("app/map-v2-lib.jsx?v=20261019b");
   });
 });

@@ -84,6 +84,7 @@
   --fw-regular: 400;
   --fw-semibold: 600;
   /* z-index: the app's real stacking (bottom nav 50, the v1 preview 120, modals 200, toasts 400) */
+  --z-sticky: 1;             /* local lift: a sticky bar paints above the content in its own block */
   --z-pin: 10;
   --z-controls: 20;
   --z-sheet: 120;
@@ -822,7 +823,7 @@
 [data-mv2='tabbed'] [data-mv2='tabs'] {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
   background: var(--surface-1);
 }
 [data-mv2='panel'] {
