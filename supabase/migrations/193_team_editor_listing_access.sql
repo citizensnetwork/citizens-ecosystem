@@ -123,35 +123,65 @@ declare
   v_id uuid;
 begin
   if v_uid is null then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
   end if;
 
-  -- An editor must not move a row onto another owner. Owners are not editors
-  -- of their own listing, so this does not apply to them.
-  if tg_op = 'UPDATE' and tg_table_name in ('events', 'places')
-     and new.created_by is distinct from old.created_by
-     and public.is_active_team_member(old.created_by, array['editor']) then
-    raise exception 'owner_change_forbidden' using errcode = '42501';
-  end if;
-  if tg_op = 'UPDATE' and tg_table_name not in ('events', 'places')
-     and new.contributor_id is distinct from old.contributor_id
-     and public.is_active_team_member(old.contributor_id, array['editor']) then
-    raise exception 'owner_change_forbidden' using errcode = '42501';
-  end if;
-
+  -- events and places are owned by created_by. news_posts, listing_sources
+  -- and specialised_services are owned by contributor_id. The column has to
+  -- be read in a statement that only runs for tables which have it. PL/pgSQL
+  -- plans a whole IF expression at once, so "tg_table_name in (...) and
+  -- new.created_by ..." still raises "record new has no field created_by"
+  -- on news_posts (and the contributor_id twin on events and places), for
+  -- insert, update and delete, including the owner's own writes.
   if tg_table_name in ('events', 'places') then
-    v_owner := case when tg_op = 'DELETE' then old.created_by else new.created_by end;
+    if tg_op = 'DELETE' then
+      v_owner := old.created_by;
+      v_id := old.id;
+    else
+      -- An editor must not move a row onto another owner. Owners are not
+      -- editors of their own listing (their membership role is owner), so
+      -- this does not apply to them. The comparison is its own statement,
+      -- reached only on UPDATE, so INSERT never touches OLD.
+      if tg_op = 'UPDATE' then
+        if new.created_by is distinct from old.created_by
+           and public.is_active_team_member(old.created_by, array['editor']) then
+          raise exception 'owner_change_forbidden' using errcode = '42501';
+        end if;
+      end if;
+      v_owner := new.created_by;
+      v_id := new.id;
+    end if;
   else
-    v_owner := case when tg_op = 'DELETE' then old.contributor_id else new.contributor_id end;
+    if tg_op = 'DELETE' then
+      v_owner := old.contributor_id;
+      v_id := old.id;
+    else
+      if tg_op = 'UPDATE' then
+        if new.contributor_id is distinct from old.contributor_id
+           and public.is_active_team_member(old.contributor_id, array['editor']) then
+          raise exception 'owner_change_forbidden' using errcode = '42501';
+        end if;
+      end if;
+      v_owner := new.contributor_id;
+      v_id := new.id;
+    end if;
   end if;
-  v_id := case when tg_op = 'DELETE' then old.id else new.id end;
 
   -- The owner writing their own row is the existing path. Do not add a log.
   if v_owner is null or v_owner = v_uid then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
   end if;
   if not public.is_active_team_member(v_owner, array['editor']) then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
   end if;
 
   insert into public.activity_log (
@@ -166,7 +196,10 @@ begin
     jsonb_build_object('op', tg_op)
   );
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 
