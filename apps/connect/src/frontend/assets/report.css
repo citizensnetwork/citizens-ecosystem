@@ -1,0 +1,307 @@
+/* ════════════════════════════════════════════════════════════════════
+   Citizens Connect — Report dialog (issue #160)
+   ------------------------------------------------------------------
+   Loaded from index.html on every visit, including ?map=v1. Map v2's own
+   stylesheet stays behind the flag (app/map-v2-lib.jsx).
+
+   The dialog reads the Map v2 tokens (--surface-1, --sheet-radius, --elev-2,
+   --z-viewer, --scrim, and the type, space and radius scales). While Map v2
+   is on it sets data-theme, and assets/map-v2.css owns those tokens, light
+   and dark. On the old map data-theme is never set, so the block below
+   supplies the same values. It is html:not([data-theme]) on purpose: a
+   :root copy would override Map v2's dark set, because both match <html>.
+
+   Bump the ?v= on the index.html <link> when this file changes.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens for the old map only (the same values as assets/map-v2.css) ── */
+html:not([data-theme]) {
+  --surface-1: #ffffff;
+  --surface-2: #f5f1e8;
+  --text-1: #0a0908;
+  --text-2: #5c5444;
+  --accent: #c9a84c;
+  --accent-contrast: #0a0908;
+  --accent-ink: #8b6914;
+  --error: #a32d22;
+  --focus-ring: #8b6914;
+  --divider: rgba(10, 9, 8, 0.12);
+  --scrim: rgba(10, 9, 8, 0.4);
+  --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-8: 48px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+  --fs-1: 12px;
+  --lh-1: 16px;
+  --fs-2: 14px;
+  --lh-2: 20px;
+  --fs-3: 18px;
+  --lh-3: 24px;
+  --fw-semibold: 600;
+  --z-viewer: 300;
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hit: 44px;
+  --focus-w: 2px;
+  --focus-offset: 2px;
+  --sheet-radius: var(--radius-lg);
+  --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+  --reader-w: 560px;
+  --scrim-blur: 4px;
+}
+
+/* The phone is dark and Map v2 is off: the dialog follows the phone. The page
+   behind keeps its own light chrome, because these tokens are only read here. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --surface-1: #1a1714;
+    --surface-2: #26221d;
+    --text-1: #f7f4ee;
+    --text-2: #b9ae9a;
+    --accent: #c9a84c;
+    --accent-contrast: #0a0908;
+    --accent-ink: #e8d48b;
+    --error: #ff8f80;
+    --focus-ring: #e8d48b;
+    --divider: rgba(247, 244, 238, 0.14);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-theme]) {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+  }
+}
+
+/* ── Dialog. Tokens only below this line. ── */
+@keyframes cc-report-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cc-report-in {
+  from { opacity: 0; transform: translateY(var(--space-3)); }
+  to { opacity: 1; transform: none; }
+}
+[data-mv2='report'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-viewer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+  touch-action: none;
+  font-family: var(--font-body);
+  animation: cc-report-scrim-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='report-card'] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--reader-w);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+  animation: cc-report-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='report-head'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='report-title'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+[data-mv2='report-scroll'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  padding: var(--space-4);
+}
+[data-mv2='report-why'],
+[data-mv2='report-field-label'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='report-reasons'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+[data-mv2='report-reason'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--hit);
+  margin: 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  cursor: pointer;
+}
+[data-mv2='report-reason']:focus-within {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='report-reason'] input {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  margin: 0;
+  accent-color: var(--accent);
+}
+[data-mv2='report-reason'] input:focus {
+  outline: none;
+}
+[data-mv2='report-field'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+[data-mv2='report-input'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--space-8) + var(--space-8));
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  resize: vertical;
+}
+[data-mv2='report-count'] {
+  align-self: flex-end;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='report-alert'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  color: var(--error);
+}
+[data-mv2='report-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+/* Close, Cancel and Send live in this card. Scoped so the old map does not
+   need the Map v2 sheet rules, and so those sheet rules stay flag-only. */
+[data-mv2='report'] [data-mv2='icon-btn'] {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='report'] [data-mv2='action'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  cursor: pointer;
+}
+[data-mv2='report'] [data-mv2='action'][data-primary] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+[data-mv2='report'] [data-mv2='icon-btn']:focus-visible,
+[data-mv2='report'] [data-mv2='action']:focus-visible,
+[data-mv2='report-input']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='report'] [data-mv2='action'],
+[data-mv2='report'] [data-mv2='icon-btn'],
+[data-mv2='report-reason'] {
+  transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
+}
+[data-mv2='report'] [data-mv2='action']:active,
+[data-mv2='report'] [data-mv2='icon-btn']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='report'] [data-mv2='action']:hover {
+    border-color: var(--accent-ink);
+  }
+  [data-mv2='report'] [data-mv2='action'][data-primary]:hover {
+    opacity: 0.9;
+  }
+  [data-mv2='report'] [data-mv2='icon-btn']:hover,
+  [data-mv2='report-reason']:hover {
+    background: var(--surface-2);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-mv2='report'] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
