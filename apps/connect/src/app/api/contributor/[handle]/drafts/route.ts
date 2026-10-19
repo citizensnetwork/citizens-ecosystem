@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { canAdministerListing, isDashboardViewer } from "@/lib/dashboard/permissions";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -16,7 +17,7 @@ export async function GET(
   const { searchParams } = new URL(request.url);
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || isDashboardViewer(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
@@ -51,7 +52,7 @@ export async function POST(
   const { handle } = await params;
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
@@ -126,7 +127,7 @@ export async function PATCH(
   const { handle } = await params;
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
@@ -197,7 +198,7 @@ export async function DELETE(
   }
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 

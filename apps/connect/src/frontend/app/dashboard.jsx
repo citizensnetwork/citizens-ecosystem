@@ -62,7 +62,7 @@
       h('p', { className: 'text-[10px] text-muted-foreground leading-tight mt-0.5' }, label));
   }
 
-  function EventManageCard({ ev, onView, onEdit, onBroadcast, onToggleStatus }) {
+  function EventManageCard({ ev, onView, onEdit, onBroadcast, onToggleStatus, canEdit = true, isOwner = true }) {
     const cat = window.DATA.getEventCategory(ev.category);
     const cancelled = ev.status === 'cancelled';
     // P2-09: the organiser's co-host panel opens under the card
@@ -89,18 +89,19 @@
           h(Stat, { icon: 'Calendar', text: new Date(ev.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) })),
         h('div', { className: 'flex gap-2 flex-wrap' },
           h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Eye', onClick: onView }, 'View'),
-          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
-          h(Button, { variant: 'soft', size: 'sm', className: 'flex-1', icon: 'Radio', onClick: onBroadcast }, 'Broadcast'),
-          h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: cancelled ? 'RotateCcw' : 'Ban', onClick: onToggleStatus }, cancelled ? 'Restore' : 'Cancel'),
-          // P2-09: a cancelled event is not hosted any more, so nobody is invited to it
-          !cancelled && h('button', { type: 'button', 'data-cohosts-toggle': ev.id, 'aria-expanded': coOpen, onClick: () => setCoOpen((o) => !o),
+          canEdit && h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
+          isOwner && h(Button, { variant: 'soft', size: 'sm', className: 'flex-1', icon: 'Radio', onClick: onBroadcast }, 'Broadcast'),
+          canEdit && h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: cancelled ? 'RotateCcw' : 'Ban', onClick: onToggleStatus }, cancelled ? 'Restore' : 'Cancel'),
+          // P2-09: a cancelled event is not hosted any more, so nobody is invited to it.
+          // Co-hosts stay with the owner.
+          isOwner && !cancelled && h('button', { type: 'button', 'data-cohosts-toggle': ev.id, 'aria-expanded': coOpen, onClick: () => setCoOpen((o) => !o),
             className: 'flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-xs font-bold text-foreground hover:bg-accent/60' },
             h(Icon, { name: 'Users', size: 14 }), 'Co-hosts'))),
-      !cancelled && coOpen && h(window.CohostPanel, { sb: window.CC_SUPABASE, event: ev, contributors: app.contributors, selfId: app.user.id, toast: app.toast }));
+      isOwner && !cancelled && coOpen && h(window.CohostPanel, { sb: window.CC_SUPABASE, event: ev, contributors: app.contributors, selfId: app.user.id, toast: app.toast }));
   }
   const Stat = ({ icon, text }) => h('div', { className: 'flex items-center gap-1.5' }, h(Icon, { name: icon, size: 11, className: 'text-gold' }), h('span', null, text));
 
-  function PlaceManageRow({ p, onView, onEdit, onToggleStatus }) {
+  function PlaceManageRow({ p, onView, onEdit, onToggleStatus, canEdit = true }) {
     const cancelled = p.status === 'cancelled';
     return h('div', { 'data-manage-card': p.id, 'data-status': p.status || 'published', className: cx('flex items-center gap-3 p-3 bg-card rounded-2xl border border-border', cancelled && 'opacity-60') },
       h(Avatar, { src: p.coverPhoto, name: p.name, size: 56, rounded: 'xl' }),
@@ -110,8 +111,8 @@
           cancelled && h('span', { className: 'text-[9px] font-bold text-white bg-neutral-700 px-1.5 py-0.5 rounded shrink-0' }, 'CANCELLED')),
         h('p', { className: 'text-xs text-muted-foreground truncate flex items-center gap-1' }, h(Icon, { name: 'MapPin', size: 10 }), p.address),
         h('p', { className: 'text-xs text-gold-dark font-semibold' }, p.followerCount.toLocaleString() + ' followers')),
-      h('button', { onClick: onEdit, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: 'Edit' }, h(Icon, { name: 'Pencil', size: 14, className: 'text-muted-foreground' })),
-      h('button', { onClick: onToggleStatus, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: cancelled ? 'Restore' : 'Cancel' }, h(Icon, { name: cancelled ? 'RotateCcw' : 'Ban', size: 14, className: 'text-muted-foreground' })),
+      canEdit && h('button', { onClick: onEdit, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: 'Edit' }, h(Icon, { name: 'Pencil', size: 14, className: 'text-muted-foreground' })),
+      canEdit && h('button', { onClick: onToggleStatus, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: cancelled ? 'Restore' : 'Cancel' }, h(Icon, { name: cancelled ? 'RotateCcw' : 'Ban', size: 14, className: 'text-muted-foreground' })),
       h('button', { onClick: onView, className: 'w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0', title: 'View' }, h(Icon, { name: 'ChevronRight', size: 14, className: 'text-muted-foreground' })));
   }
 
@@ -205,7 +206,8 @@
   // ── Profile tab — the missing "edit later" surface. Every field here is
   // already accepted and validated by POST /api/contributor/profile; that
   // route just had no UI calling it after the one-time onboarding wizard.
-  function ProfileTab({ contributor, onSave }) {
+  function ProfileTab({ contributor, onSave, mode = 'owner' }) {
+    const locked = mode === 'viewer';
     const [f, setF] = useState({
       profilePhoto: contributor.profilePhoto || '',
       bio: contributor.bio || '',
@@ -215,6 +217,7 @@
       noFixedLocation: !!contributor.noFixedLocation,
       socials: contributor.socials || {},
       gallery: contributor.gallery || [],
+      category: contributor.category || '',
     });
     const [saving, setSaving] = useState(false);
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -224,18 +227,22 @@
     return h('div', { className: 'space-y-4 fade-in' },
       h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-4' },
         h('div', { className: 'flex gap-4 items-start' },
-          h('div', { className: 'w-24 shrink-0' }, h(Field, { label: 'Logo' }, h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
+          h('div', { className: 'w-24 shrink-0' }, h(Field, { label: 'Logo' }, locked
+            ? h(Avatar, { src: f.profilePhoto, name: contributor.name, size: 72, rounded: 'xl' })
+            : h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
           h('div', { className: 'flex-1 space-y-1' },
-            h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
-        h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on Kingdom Discovery cards.' },
+            h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, readOnly: locked, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
+        mode === 'owner' && h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on Kingdom Discovery cards.' },
           h(CoverPhotoManager, { photos: contributor.coverPhotos })),
+        mode === 'editor' && h(Field, { label: 'Category', hint: 'Shown on the public listing.' },
+          h(Input, { value: f.category, onChange: (e) => up('category', e.target.value), placeholder: 'e.g. Church' })),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
-          h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
-          h(Field, { label: 'Public contact email', hint: 'Shown to citizens — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
+          h(Field, { label: 'Website' }, h(Input, { value: f.website, readOnly: locked, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
+          h(Field, { label: 'Public contact email', hint: 'Shown to citizens — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, readOnly: locked, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
-          !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
+          !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, readOnly: locked, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
         h(Toggle, {
-          checked: f.noFixedLocation, onChange: setNoFixedLocation,
+          checked: f.noFixedLocation, onChange: locked ? () => {} : setNoFixedLocation,
           label: "No fixed physical location",
           desc: "We're online, mobile, or serve without a permanent office — no map pin.",
         }),
@@ -253,12 +260,13 @@
               h('span', { className: 'w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0' },
                 h(Icon, { name: p.icon, size: 14, className: 'text-gold-dark' })),
               h('input', {
-                value: f.socials[p.key] || '', onChange: (e) => ups(p.key, e.target.value),
+                value: f.socials[p.key] || '', onChange: (e) => ups(p.key, e.target.value), readOnly: locked,
                 placeholder: p.placeholder || p.label, 'aria-label': p.label,
                 className: 'flex-1 min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/70',
               }))))),
-        h(Field, { label: 'Gallery', hint: 'Shown on your public listing.' }, h(GalleryEditor, { value: f.gallery, onChange: (v) => up('gallery', v), max: 6 })),
-        h(Button, { variant: 'gold', icon: 'Check', disabled: saving, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save Profile')));
+        !locked && h(Field, { label: 'Gallery', hint: 'Shown on your public listing.' }, h(GalleryEditor, { value: f.gallery, onChange: (v) => up('gallery', v), max: 6 })),
+        !locked && h(Button, { variant: 'gold', icon: 'Check', disabled: saving, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save Profile'),
+        locked && h('p', { className: 'text-xs text-muted-foreground' }, 'You can view this listing. Only an editor or the owner can change it.')));
   }
 
   // ── News — a contributor-authored update feed on their own public listing.
@@ -286,14 +294,14 @@
         h(Button, { variant: 'gold', className: 'flex-1', disabled: !canSave || saving, icon: 'Check', onClick: save }, saving ? 'Saving…' : 'Publish')));
   }
 
-  function NewsPostRow({ post, onEdit, onDelete }) {
+  function NewsPostRow({ post, onEdit, onDelete, canEdit = true }) {
     return h('div', { className: 'bg-card rounded-2xl border border-border p-4' },
       h('div', { className: 'flex items-start justify-between gap-2 mb-1' },
         h('p', { className: 'text-sm font-bold text-foreground' }, post.title),
         h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, post.date ? new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '')),
       post.image && h('img', { src: post.image, className: 'w-full h-32 object-cover rounded-xl my-2' }),
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-3' }, post.body),
-      h('div', { className: 'flex gap-2' },
+      canEdit && h('div', { className: 'flex gap-2' },
         h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Pencil', onClick: onEdit }, 'Edit'),
         h(Button, { variant: 'outline', size: 'sm', className: 'flex-1', icon: 'Trash2', onClick: onDelete }, 'Remove')));
   }
@@ -326,8 +334,14 @@
     const liveEvents = myEvents.filter(isLive);
     const livePlaces = myPlaces.filter(isLive);
     const myNews = newsPosts.filter((n) => n.contributorId === activeContributorId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const listingRole = app.listingRole || 'owner';
+    const canEdit = listingRole === 'owner' || listingRole === 'editor';
+    const isOwnerUi = listingRole === 'owner';
+    const dashTabs = ['overview', 'events', 'news', { value: 'suggestions', label: 'suggestions' + (auto.pending.length ? ' (' + auto.pending.length + ')' : '') }, 'profile'];
+    if (isOwnerUi) dashTabs.push('messages');
+    dashTabs.push('tools');
     const renderEventCard = (ev) => h(EventManageCard, {
-      key: ev.id, ev, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
+      key: ev.id, ev, canEdit, isOwner: isOwnerUi, onView: () => go('event', { id: ev.id }), onEdit: () => openCreate('event', ev),
       onBroadcast: () => { setBcTarget(ev.id); setTab('tools'); },
       onToggleStatus: () => setEventStatus(ev.id, ev.status === 'cancelled' ? 'published' : 'cancelled'),
     });
@@ -346,7 +360,17 @@
             h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(201,168,76,0.4)', fit: logoFit(activeContributor.kind) }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
-              h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name))),
+              h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name),
+              listingRole === 'editor' && h('span', { className: 'inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent text-gold-dark' }, 'Editor'),
+              listingRole === 'viewer' && h('span', { className: 'inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground' }, 'Viewer'),
+              (app.teamListings || []).length > 0 && h('select', {
+                'aria-label': 'Listing to manage',
+                value: listingRole === 'owner' ? '' : activeContributorId,
+                onChange: (e) => app.pickTeamListing && app.pickTeamListing(e.target.value || null),
+                className: 'mt-1 max-w-[14rem] text-[11px] bg-transparent text-muted-foreground',
+              },
+                app.role === 'contributor' && h('option', { value: '' }, 'My listing'),
+                (app.teamListings || []).map((t) => h('option', { key: t.id, value: t.id }, ((t.contributor && t.contributor.name) || 'Listing') + (t.role === 'viewer' ? ' (view)' : '')))))),
           h('div', { className: 'flex items-center gap-2' },
             h('span', { className: 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, h(Icon, { name: 'Crown', size: 11 }), activeContributor.involvementLevel),
             h('button', { onClick: () => go('settings'), className: 'w-9 h-9 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'Settings', size: 16 }))))),
@@ -358,7 +382,7 @@
           h(StatCard, { label: 'Events', value: liveEvents.length, color: '#16A34A' }),
           h(StatCard, { label: 'Places', value: livePlaces.length, color: '#2563EB' })),
 
-        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: ['overview', 'events', 'news', { value: 'suggestions', label: 'suggestions' + (auto.pending.length ? ' (' + auto.pending.length + ')' : '') }, 'profile', 'messages', 'tools'], value: tab, onChange: setTab })),
+        h('div', { className: 'px-4 sm:px-5 mb-4' }, h(Segmented, { options: dashTabs, value: tab, onChange: setTab })),
 
         h('div', { className: 'px-4 sm:px-5' },
           tab === 'overview' && h('div', { className: 'space-y-4 fade-in' },
@@ -383,7 +407,7 @@
               h(Icon, { name: 'ChevronRight', size: 16, className: 'text-gold' }))),
 
           tab === 'events' && h('div', { className: 'space-y-4 fade-in' },
-            h('div', { className: 'grid grid-cols-2 gap-2' },
+            canEdit && h('div', { className: 'grid grid-cols-2 gap-2' },
               h(Button, { variant: 'primary', icon: 'CalendarPlus', onClick: () => openCreate('event') }, 'Create Event'),
               h(Button, { variant: 'outline', icon: 'MapPin', onClick: () => openCreate('place') }, 'Add Place')),
             myEvents.length === 0 && h(Empty, { icon: 'Calendar', title: 'No events yet', sub: 'Create your first event to appear on the map.' }),
@@ -396,7 +420,7 @@
             myPlaces.length > 0 && h(F, null,
               h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Your Places'),
               myPlaces.map((p) => h(PlaceManageRow, {
-                key: p.id, p, onView: () => go('place', { id: p.id }), onEdit: () => openCreate('place', p),
+                key: p.id, p, canEdit, onView: () => go('place', { id: p.id }), onEdit: () => openCreate('place', p),
                 onToggleStatus: () => setPlaceStatus(p.id, p.status === 'cancelled' ? 'published' : 'cancelled'),
               })))),
 
@@ -417,10 +441,10 @@
                     if (newsEditing) updateNewsPost(newsEditing.id, form, done); else createNewsPost(form, done);
                   },
                 })
-              : h(Button, { variant: 'primary', icon: 'PenSquare', className: 'w-full', onClick: () => { setNewsEditing(null); setNewsComposing(true); } }, '+ New post'),
+              : canEdit && h(Button, { variant: 'primary', icon: 'PenSquare', className: 'w-full', onClick: () => { setNewsEditing(null); setNewsComposing(true); } }, '+ New post'),
             !newsComposing && myNews.length === 0 && h(Empty, { icon: 'Newspaper', title: 'No news posts yet', sub: 'Share updates, projects and stories on your public listing.' }),
             !newsComposing && myNews.map((post) => h(NewsPostRow, {
-              key: post.id, post,
+              key: post.id, post, canEdit,
               onEdit: () => { setNewsEditing(post); setNewsComposing(true); },
               onDelete: () => deleteNewsPost(post.id),
             }))),
@@ -428,10 +452,10 @@
           tab === 'suggestions' && h(window.SuggestionsTab, { auto, onOpenSettings: () => setTab('profile'), onViewEvent: (id) => go('event', { id }) }),
 
           tab === 'profile' && h('div', { className: 'space-y-4' },
-            h(ProfileTab, { contributor: activeContributor, onSave: (fields, cb) => updateContributorProfile(fields, cb) }),
-            h(window.AutomaticUpdatesCard, { auto })),
+            h(ProfileTab, { contributor: activeContributor, mode: listingRole, onSave: (fields, cb) => updateContributorProfile(fields, cb) }),
+            listingRole !== 'viewer' && h(window.AutomaticUpdatesCard, { auto })),
 
-          tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
+          isOwnerUi && tab === 'messages' && h('div', { className: 'space-y-3 fade-in' },
             h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1' }, 'Recent Conversations'),
             conversations.slice(0, 3).map((c) => h('button', { key: c.id, onClick: () => go('messages', { convId: c.id }), className: 'w-full flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all text-left' },
               h('div', { className: 'relative' }, h(Avatar, { src: c.participantPhoto, name: c.participantName, size: 40, rounded: 'xl' }), c.unread > 0 && h('span', { className: 'absolute -top-1 -right-1 w-4 h-4 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, c.unread)),
@@ -451,11 +475,12 @@
                     h('p', { className: 'text-[11px] text-muted-foreground' }, tool === 'volunteer' ? 'Review applicants & build your team' : 'Reach, engagement & growth'))),
                 tool === 'volunteer' ? h(window.VolunteerManager, null) : h(window.AnalyticsPanel, null))
             : h('div', { className: 'space-y-4 fade-in' },
-                h(BroadcastTool, { myEvents, myPlaces, preselect: bcTarget }),
-                [['Create Event', 'CalendarPlus', '#C9A84C', 'Post a new event on the map', () => openCreate('event')],
-                 ['Add Place', 'MapPin', '#2563EB', 'Register a venue or community space', () => openCreate('place')],
-                 ['Volunteer Manager', 'HandHeart', '#16A34A', 'Review volunteer applications', () => setTool('volunteer')],
+                isOwnerUi && h(BroadcastTool, { myEvents, myPlaces, preselect: bcTarget }),
+                [canEdit && ['Create Event', 'CalendarPlus', '#C9A84C', 'Post a new event on the map', () => openCreate('event')],
+                 canEdit && ['Add Place', 'MapPin', '#2563EB', 'Register a venue or community space', () => openCreate('place')],
+                 isOwnerUi && ['Volunteer Manager', 'HandHeart', '#16A34A', 'Review volunteer applications', () => setTool('volunteer')],
                  ['Analytics', 'TrendingUp', '#7C3AED', 'Detailed insights and reach data', () => setTool('analytics')]]
+                  .filter(Boolean)
                   .map(([l, ic, c, d, fn]) => h('button', { key: l, onClick: fn || (() => app.toast('Coming soon')), className: 'w-full flex items-center gap-3 p-4 bg-card rounded-2xl border border-border hover:border-gold/40 transition-all text-left' },
                     h('div', { className: 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0', style: { background: c + '18', color: c } }, h(Icon, { name: ic, size: 18 })),
                     h('div', null, h('p', { className: 'text-sm font-bold text-foreground' }, l), h('p', { className: 'text-xs text-muted-foreground' }, d)),

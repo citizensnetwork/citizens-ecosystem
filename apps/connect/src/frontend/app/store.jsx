@@ -467,6 +467,7 @@
   function adaptMessage(m, myId) {
     return {
       id: m.id,
+      senderId: m.sender_id || null,
       from: m.sender_id === myId ? 'me' : 'them',
       text: m.body,
       time: fmtTime(new Date(m.created_at)),
@@ -614,6 +615,11 @@
     const [contributorStatus, setContributorStatus] = useState('not_applied');
     const [myContributor, setMyContributor] = useState(null); // contributor obj once onboarded
     const [assistMode, setAssistMode] = useState(false); // admin assisting as a contributor
+    // Active editor/viewer memberships on someone else's live listing (mig 193).
+    // A contributor's own dashboard stays theirs until they pick one of these.
+    const [teamListings, setTeamListings] = useState([]);
+    const [pickedTeamId, setPickedTeamId] = useState(null);
+    const [teamPortalKnown, setTeamPortalKnown] = useState(false);
     const [realUser, setRealUser] = useState(null); // {id,name,avatarUrl,email} from Supabase (null in demo mode)
     const [contributorDash, setContributorDash] = useState(null); // real dashboard stats/activity/week (null in demo)
     const [adminStats, setAdminStats] = useState(null); // {totalUsers} for the real admin overview
@@ -825,8 +831,8 @@
     //      an applicant whose application is pending keeps it: their Dashboard is the "being reviewed" page)
     //    /admin, not an admin              -> the map
     const gatePending = useRef(ROUTES.accessFor(boot.current.nav) !== 'public');
-    const authRef = useRef({ authed, role, contributorStatus, guest: guestMode });
-    authRef.current = { authed, role, contributorStatus, guest: guestMode };
+    const authRef = useRef({ authed, role, contributorStatus, guest: guestMode, teamPortalKnown, hasTeamPortal: false });
+    authRef.current = { authed, role, contributorStatus, guest: guestMode, teamPortalKnown, hasTeamPortal: teamListings.length > 0 };
     const settleRoute = useCallback((facts) => {
       if (!gatePending.current || !window.CC_AUTH) return;
       const n = navRef.current;
@@ -836,9 +842,13 @@
         if (facts.guest) showSignIn();
         return; // keep waiting: the landing is showing and the screen is kept
       }
+      // A citizen editor's memberships load after the session. Don't send them
+      // to "Become a Contributor" before that answer is in.
+      if (need === 'contributor' && facts.role !== 'contributor' && facts.teamPortalKnown !== true) return;
       gatePending.current = false;
       if (need === 'contributor' && facts.role !== 'contributor') {
-        if (facts.role === 'admin') resetNav('admin');
+        if (facts.hasTeamPortal) { /* editor or viewer of a live listing: keep the dashboard */ }
+        else if (facts.role === 'admin') resetNav('admin');
         else if (facts.role === 'citizen' && facts.contributorStatus === 'pending') { /* their pending Dashboard */ }
         else { resetNav('apply'); toast('Become a Contributor to unlock your portal.', 'gold'); }
       } else if (need === 'admin' && facts.role !== 'admin') {
@@ -858,12 +868,21 @@
       gatePending.current = ROUTES.accessFor(r.nav) !== 'public';
     }, [commitNav]);
 
+    // A picked team listing, or (for someone who is not themselves a
+    // contributor) the first live editor/viewer membership. A contributor's
+    // own dashboard is unchanged until they pick another listing.
+    const managedListing = (pickedTeamId && teamListings.find((t) => t.id === pickedTeamId))
+      || (role !== 'contributor' && teamListings[0])
+      || null;
+    const listingRole = managedListing ? managedListing.role : (role === 'contributor' ? 'owner' : null);
     // active org the contributor manages: their real org (signed-in
-    // contributor), an assist-mode/freshly-onboarded org, else demo Grace City.
-    // Crash-safe: always resolves to SOME contributor object.
-    const activeContributorId = myContributor
-      ? myContributor.id
-      : (realUser && role === 'contributor' ? realUser.id : 'c1');
+    // contributor), a listing they edit, an assist-mode/freshly-onboarded org,
+    // else demo Grace City. Crash-safe: always resolves to SOME contributor object.
+    const activeContributorId = managedListing
+      ? managedListing.id
+      : myContributor
+        ? myContributor.id
+        : (realUser && role === 'contributor' ? realUser.id : 'c1');
     // The active Contributor's own events / places, whatever their status
     // (cancelled ones stay listed, with Restore). Dashboard only; never a public list.
     const ownEvents = useMemo(() => DATA.ownedRows(eventRows, activeContributorId), [eventRows, activeContributorId]);
@@ -874,7 +893,8 @@
     const findEvent = useCallback((id) => eventRows.find((e) => e.id === id) || null, [eventRows]);
     const findPlace = useCallback((id) => placeRows.find((p) => p.id === id) || null, [placeRows]);
     const activeContributor =
-      (myContributor && myContributor.id === activeContributorId ? myContributor : null)
+      (managedListing && managedListing.contributor)
+      || (myContributor && myContributor.id === activeContributorId ? myContributor : null)
       || contributors.find((c) => c.id === activeContributorId)
       || contributors[0]
       || { id: 'c1', name: 'My Ministry', profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
@@ -1138,6 +1158,7 @@
     const createEvent = useCallback((form, done) => {
       // done(ok, row): the created row comes back too (the Suggestions tab links a suggestion to it).
       const finish = (ok, row) => { if (done) done(ok, row); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       if (!realUser || !window.CC_SUPABASE) {
         const ev = {
           id: uid('e'), title: form.title, category: form.category, description: form.description,
@@ -1173,7 +1194,7 @@
             date: start.toISOString(),
             end_time: end && !isNaN(end.getTime()) ? end.toISOString() : null,
             location: [form.location, form.address].filter(Boolean).join(', '),
-            created_by: realUser.id,
+            created_by: listingRole === 'editor' ? activeContributorId : realUser.id,
             image_url: form.coverPhoto || null,
             volunteer_openings: !!form.volunteeringEnabled,
             latitude: geo ? geo.lat : null,
@@ -1192,7 +1213,7 @@
           finish(false);
         }
       })();
-    }, [activeContributor, activeContributorId, realUser, role, sendBroadcast, toast]);
+    }, [activeContributor, activeContributorId, realUser, role, listingRole, sendBroadcast, toast]);
 
     // Update event: same field mapping as createEvent, targeted with .eq('id').
     // RLS already grants UPDATE to the owner (or admin) — no server route needed.
@@ -1200,6 +1221,7 @@
     // "fix a typo in the description" edit doesn't cost a network round-trip.
     const updateEvent = useCallback((id, form, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       if (!realUser || !window.CC_SUPABASE) {
         setEvents((prev) => prev.map((e) => (e.id === id ? {
           ...e, title: form.title, category: form.category, description: form.description,
@@ -1243,13 +1265,14 @@
           finish(false);
         }
       })();
-    }, [eventRows, realUser, toast]);
+    }, [eventRows, realUser, listingRole, toast]);
 
     // Cancel/restore: a status flip only, never a delete — a cancelled event
     // stays in the DB and remains directly viewable (RLS explicitly allows
     // status='cancelled' reads), it just drops off primary discovery surfaces.
     const setEventStatus = useCallback((id, status, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
       if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
       (async () => {
@@ -1265,13 +1288,14 @@
           finish(false);
         }
       })();
-    }, [realUser, toast]);
+    }, [realUser, listingRole, toast]);
 
     // Create place: places.latitude/longitude are NOT NULL, so a real place
     // needs a geocodable address — we refuse (with guidance) rather than
     // fabricate coordinates.
     const createPlace = useCallback((form, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       if (!realUser || !window.CC_SUPABASE) {
         const pl = {
           id: uid('p'), name: form.name, category: form.category, description: form.description,
@@ -1300,7 +1324,7 @@
             image_url: form.coverPhoto || null,
             latitude: geo.lat,
             longitude: geo.lng,
-            created_by: realUser.id,
+            created_by: listingRole === 'editor' ? activeContributorId : realUser.id,
             volunteer_openings: !!form.volunteeringEnabled,
             ...window.DATA.socialsToRow(form.socials || {}, 'place'),
           };
@@ -1316,13 +1340,14 @@
           finish(false);
         }
       })();
-    }, [activeContributor, activeContributorId, realUser, toast]);
+    }, [activeContributor, activeContributorId, realUser, listingRole, toast]);
 
     // Update place: same field mapping as createPlace. Re-geocodes only when
     // the address text actually changed. open_hours/status are new v1 columns
     // (migration 167 — supabase/migrations/167_place_status_open_hours_news_posts.sql).
     const updatePlace = useCallback((id, form, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       if (!realUser || !window.CC_SUPABASE) {
         setPlaces((prev) => prev.map((p) => (p.id === id ? {
           ...p, name: form.name, category: form.category, description: form.description,
@@ -1363,10 +1388,11 @@
           finish(false);
         }
       })();
-    }, [placeRows, realUser, toast]);
+    }, [placeRows, realUser, listingRole, toast]);
 
     const setPlaceStatus = useCallback((id, status, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
       if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
       (async () => {
@@ -1382,7 +1408,7 @@
           finish(false);
         }
       })();
-    }, [realUser, toast]);
+    }, [realUser, listingRole, toast]);
 
     // Onboarding: for a real (admin-approved) contributor this persists the
     // profile via /api/contributor/setup (+ the contributor-profile route for
@@ -1513,10 +1539,23 @@
         gallery_urls: fields.gallery ?? undefined,
         contributor_contact_email: fields.contactEmail !== undefined ? (fields.contactEmail || null) : undefined,
       };
+      if (listingRole === 'editor' && fields.category !== undefined) payload.contributor_category = fields.category || null;
       if (!realUser) {
         setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, contactEmail: fields.contactEmail !== undefined ? fields.contactEmail : prev.contactEmail, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
         toast('Profile updated.', 'green');
         finish(true);
+        return;
+      }
+      if (listingRole === 'viewer') {
+        toast('You can view this listing, not change it.', 'gold');
+        finish(false);
+        return;
+      }
+      const editorSave = listingRole === 'editor';
+      const slug = activeContributor && activeContributor.slug;
+      if (editorSave && !slug) {
+        toast('Could not save this listing — please try again.', 'red');
+        finish(false);
         return;
       }
       (async () => {
@@ -1529,7 +1568,7 @@
             payload.physical_latitude = null;
             payload.physical_longitude = null;
           }
-          const res = await authedFetch('/api/contributor/profile', { method: 'POST', body: JSON.stringify(payload) });
+          const res = await authedFetch(editorSave ? '/api/contributor/' + encodeURIComponent(slug) + '/profile' : '/api/contributor/profile', { method: 'POST', body: JSON.stringify(payload) });
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
             toast(body.error || 'Could not save your profile — please try again.', 'red');
@@ -1539,12 +1578,13 @@
           const { data: prof } = await window.CC_SUPABASE
             .from('profiles')
             .select(CONTRIBUTOR_SELECT)
-            .eq('id', realUser.id)
+            .eq('id', editorSave ? activeContributorId : realUser.id)
             .maybeSingle();
           if (prof) {
-            const org = { ...adaptContributor(prof), isMine: true };
+            const org = { ...adaptContributor(prof), isMine: !editorSave };
             setContributors((prev) => { const byId = new Map(prev.map((c) => [c.id, c])); byId.set(org.id, org); return [...byId.values()]; });
-            setMyContributor(org);
+            if (editorSave) setTeamListings((prev) => prev.map((t) => (t.id === org.id ? { ...t, contributor: org } : t)));
+            else setMyContributor(org);
           }
           toast('Profile updated.', 'green');
           finish(true);
@@ -1554,7 +1594,7 @@
           finish(false);
         }
       })();
-    }, [activeContributor, realUser, toast]);
+    }, [activeContributor, activeContributorId, listingRole, realUser, toast]);
 
     // ── Cover photos ── consumes the already-built, tested multi-photo store
     // (/api/contributor/cover-photos: POST upload+append, PATCH reorder/
@@ -1622,6 +1662,7 @@
     // Requires migration 167 (supabase/migrations/167_place_status_open_hours_news_posts.sql).
     const createNewsPost = useCallback((form, done) => {
       const finish = (ok, row) => { if (done) done(ok, row); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       if (!realUser || !window.CC_SUPABASE) {
         setNewsPosts((prev) => [{ id: uid('n'), contributorId: activeContributorId, title: form.title, body: form.body, image: form.image || '', date: form.date || today(), createdAt: new Date().toISOString() }, ...prev]);
         toast('News post published.', 'green');
@@ -1630,7 +1671,7 @@
       }
       (async () => {
         try {
-          const row = { contributor_id: realUser.id, title: form.title, body: form.body, image_url: form.image || null, post_date: form.date || today() };
+          const row = { contributor_id: listingRole === 'editor' ? activeContributorId : realUser.id, title: form.title, body: form.body, image_url: form.image || null, post_date: form.date || today() };
           const { data, error } = await window.CC_SUPABASE.from('news_posts').insert(row).select('*').single();
           if (error) throw error;
           setNewsPosts((prev) => [adaptNewsPost(data), ...prev]);
@@ -1642,10 +1683,11 @@
           finish(false);
         }
       })();
-    }, [activeContributorId, realUser, toast]);
+    }, [activeContributorId, realUser, listingRole, toast]);
 
     const updateNewsPost = useCallback((id, form, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       setNewsPosts((prev) => prev.map((n) => (n.id === id ? { ...n, title: form.title, body: form.body, image: form.image || n.image, date: form.date || n.date } : n)));
       if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
       (async () => {
@@ -1661,10 +1703,11 @@
           finish(false);
         }
       })();
-    }, [realUser, toast]);
+    }, [realUser, listingRole, toast]);
 
     const deleteNewsPost = useCallback((id, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      if (realUser && listingRole === 'viewer') { toast('You can view this listing, not change it.', 'gold'); finish(false); return; }
       const prevPosts = newsPosts;
       setNewsPosts((prev) => prev.filter((n) => n.id !== id));
       if (!realUser || !window.CC_SUPABASE) { finish(true); return; }
@@ -1681,7 +1724,7 @@
           finish(false);
         }
       })();
-    }, [newsPosts, realUser, toast]);
+    }, [newsPosts, realUser, listingRole, toast]);
 
     // Send: optimistic append, then write through for real conversations. The
     // temp id is swapped for the DB id on success so realtime dedup works.
@@ -2177,6 +2220,9 @@
       setMyApplication(null);
       setContributorStatus('not_applied');
       setAssistMode(false);
+      setTeamListings([]);
+      setPickedTeamId(null);
+      setTeamPortalKnown(false);
       resetNav('home');
       try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
       try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
@@ -2400,11 +2446,59 @@
       return () => { active = false; };
     }, [realUser, role, assistMode]);
 
+    // Active editor/viewer seats on someone else's live listing (mig 193).
+    // The person's own contributor row is skipped: that dashboard stays theirs.
+    useEffect(() => {
+      const sb = window.CC_SUPABASE;
+      if (!sb || !realUser) {
+        setTeamListings([]);
+        setTeamPortalKnown(true);
+        return undefined;
+      }
+      let active = true;
+      setTeamPortalKnown(false);
+      (async () => {
+        try {
+          const { data: rows, error } = await sb
+            .from('team_memberships')
+            .select('contributor_id, role')
+            .eq('member_id', realUser.id)
+            .eq('status', 'active')
+            .in('role', ['editor', 'viewer']);
+          if (!active) return;
+          const ids = !error && rows
+            ? [...new Set(rows.map((r) => r.contributor_id).filter((id) => id && id !== realUser.id))]
+            : [];
+          if (!ids.length) { setTeamListings([]); return; }
+          const { data: profs } = await sb
+            .from('profiles')
+            .select(CONTRIBUTOR_SELECT + ', role, contributor_status, contributor_hidden, deleted_at')
+            .in('id', ids);
+          if (!active) return;
+          const byId = new Map((profs || []).map((p) => [p.id, p]));
+          const listings = (rows || []).map((r) => {
+            const p = byId.get(r.contributor_id);
+            if (!p || p.id === realUser.id) return null;
+            if (p.role !== 'contributor' && p.role !== 'admin') return null;
+            if (p.contributor_status !== 'approved' || p.contributor_hidden === true || p.deleted_at) return null;
+            return { id: p.id, role: r.role, contributor: adaptContributor(p) };
+          }).filter(Boolean);
+          setTeamListings(listings);
+        } catch (e) {
+          if (active) setTeamListings([]);
+        } finally {
+          if (active) setTeamPortalKnown(true);
+        }
+      })();
+      return () => { active = false; };
+    }, [realUser]);
+
     // ── Real contributor dashboard data (Phase 3) ─────────────────────
     //  1. /api/manage/events → real per-event connect/consider/view counts.
     //  2. /api/contributor/<slug>/dashboard + analytics → stats, activity, week.
     useEffect(() => {
-      if (!realUser || role !== 'contributor') { setContributorDash(null); return; }
+      const teamPortal = listingRole === 'editor' || listingRole === 'viewer';
+      if (!realUser || (!teamPortal && role !== 'contributor')) { setContributorDash(null); return; }
       let active = true;
       (async () => {
         try {
@@ -2427,7 +2521,7 @@
           const { data } = await sb
             .from('rsvps')
             .select('location_snapshot, events!inner(created_by)')
-            .eq('events.created_by', realUser.id)
+            .eq('events.created_by', teamPortal ? activeContributorId : realUser.id)
             .not('location_snapshot', 'is', null);
           if (!active || !Array.isArray(data)) return;
           const counts = {};
@@ -2435,8 +2529,10 @@
           setCityReach(Object.entries(counts).map(([area, count]) => ({ area, count })).sort((a, b) => b.count - a.count));
         } catch (e) { /* reach card shows honest empty */ }
       })();
-      const slug = myContributor && myContributor.slug;
-      if (slug) {
+      const slug = teamPortal
+        ? (activeContributor && activeContributor.slug)
+        : (myContributor && myContributor.slug);
+      if (slug && !teamPortal) {
         (async () => {
           try {
             const res = await authedFetch('/api/contributor/' + slug + '/volunteers');
@@ -2445,6 +2541,8 @@
             if (active && Array.isArray(json.volunteers)) setVolunteerApps(json.volunteers.map(adaptVolunteer));
           } catch (e) { /* manager shows demo seeds */ }
         })();
+      }
+      if (slug) {
         (async () => {
           try {
             const [dashRes, weekRes] = await Promise.all([
@@ -2465,7 +2563,7 @@
         })();
       }
       return () => { active = false; };
-    }, [realUser, role, myContributor]);
+    }, [realUser, role, myContributor, listingRole, activeContributorId, activeContributor]);
 
     // ── Real Impact Ideas (Phase 3) ───────────────────────────────────
     //  Re-runs after sign-in so voted_by_me reflects the real user.
@@ -2635,10 +2733,14 @@
       setOwnerRowsSettled(false);
       (async () => {
         try {
-          const [ev, pl] = await Promise.all([
+          const teamNews = listingRole === 'editor' || listingRole === 'viewer';
+          const [ev, pl, news] = await Promise.all([
             sb.from('events').select('*').eq('created_by', ownerId).limit(500),
             // A raw places row carries category_id, not the slug the API embeds.
             sb.from('places').select('*, categories(slug)').eq('created_by', ownerId).limit(500),
+            teamNews
+              ? sb.from('news_posts').select('*').eq('contributor_id', ownerId).order('post_date', { ascending: false }).limit(100)
+              : Promise.resolve({ data: null, error: null }),
           ]);
           if (!active) return;
           if (ev.error) console.warn('[owner events] read failed', ev.error);
@@ -2648,10 +2750,17 @@
             setPlaces((prev) => DATA.mergeRowsById(prev, (pl.data || []).map((r) =>
               adaptPlace({ ...r, category: r.categories ? r.categories.slug : null }))));
           }
+          if (!news.error && Array.isArray(news.data)) {
+            setNewsPosts((prev) => {
+              const incoming = news.data.map(adaptNewsPost);
+              const ids = new Set(incoming.map((n) => n.id));
+              return [...incoming, ...prev.filter((n) => !ids.has(n.id))];
+            });
+          }
         } catch (e) { console.warn('[owner rows] read failed', e); } finally { if (active) setOwnerRowsSettled(true); }
       })();
       return () => { active = false; };
-    }, [ownerId]);
+    }, [ownerId, listingRole]);
 
     // Admin Listings tab: reflect a hide/unhide on this admin's own map and
     // Kingdom Discovery straight away (everyone else's next
@@ -2895,8 +3004,8 @@
     // The screen the address named is checked against who the person is as soon as
     // that is known (and again if they sign in later from the landing).
     useEffect(() => {
-      if (authResolved) settleRoute({ authed, role, contributorStatus, guest: guestMode });
-    }, [authResolved, authed, role, contributorStatus, guestMode, settleRoute]);
+      if (authResolved) settleRoute({ authed, role, contributorStatus, guest: guestMode, teamPortalKnown, hasTeamPortal: teamListings.length > 0 });
+    }, [authResolved, authed, role, contributorStatus, guestMode, teamPortalKnown, teamListings, settleRoute]);
 
     // ── A Contributor listing link: /c/<slug> (and the old /index.html?c=<slug>) ──
     //  The route carries a slug until we know whose it is. Resolve it directly (so it
@@ -2991,6 +3100,7 @@
       guestMode, browseAsGuest, showSignIn, authResolved,
       role, setRole, nav, go, resetNav, handleBack, registerBackGuard,
       user, activeContributor, activeContributorId,
+      listingRole, teamListings, pickTeamListing: (id) => setPickedTeamId(id || null),
       events, places, ownEvents, ownPlaces, findEvent, findPlace, entityStatus, shareLink,
       contributors, applications, conversations, notifications,
       ideas, toggleIdeaVote, submitIdea, scheduleKingdomProject, confirmIdea,

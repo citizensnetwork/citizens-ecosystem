@@ -65,6 +65,75 @@ export async function GET(request: NextRequest) {
   const role = url.searchParams.get("role");
 
   const offset = (page - 1) * PAGE_SIZE;
+
+  // Citizens tab. The list runs on the admin's own session (migration 194).
+  // Search may match an email inside the function; the response never has one.
+  // Contributors and the unfiltered admin list keep the service-role read below.
+  if (role === "citizen") {
+    const signedIn = url.searchParams.get("signedIn") ?? "any";
+    const joined = url.searchParams.get("joined") ?? "any";
+    const application = url.searchParams.get("application") ?? "any";
+    if (
+      !["any", "once", "never"].includes(signedIn) ||
+      !["any", "7d", "30d", "older"].includes(joined) ||
+      !["any", "pending", "rejected", "none"].includes(application)
+    ) {
+      return NextResponse.json({ error: "bad_filter" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase.rpc("admin_list_citizens", {
+      // The function escapes LIKE wildcards itself. `q` is already escaped for PostgREST.
+      _q: allowlisted || null,
+      _signed_in: signedIn,
+      _joined: joined,
+      _application: application,
+      _page: page,
+    });
+    const rpcError = error as { message?: string; code?: string } | null;
+    if (rpcError && (rpcError.code === "42501" || rpcError.message === "not_admin")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (error) {
+      console.error("[admin/users GET citizens]", error);
+      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    }
+    const result = (data ?? {}) as {
+      success?: boolean;
+      reason?: string;
+      data?: unknown[];
+      total?: number;
+    };
+    if (!result.success) {
+      if (result.reason === "not_admin") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.json({ error: result.reason ?? "Query failed" }, { status: 400 });
+    }
+    const rows = (Array.isArray(result.data) ? result.data : []).map((row) => {
+      const r = row as {
+        id?: string;
+        full_name?: string | null;
+        avatar_url?: string | null;
+        contributor_status?: string | null;
+        created_at?: string;
+        last_sign_in_at?: string | null;
+      };
+      return {
+        id: r.id,
+        full_name: r.full_name ?? null,
+        avatar_url: r.avatar_url ?? null,
+        role: "citizen" as const,
+        contributor_status: r.contributor_status ?? null,
+        created_at: r.created_at ?? null,
+        last_sign_in_at: r.last_sign_in_at ?? null,
+      };
+    });
+    return NextResponse.json({
+      data: rows,
+      meta: { page, pageSize: PAGE_SIZE, total: result.total ?? 0 },
+    });
+  }
+
   // `email` and the claim columns are private profiles columns (mig 176) —
   // not readable by the caller's own client. requireAdmin() above is the
   // authorisation; the service-role client only performs this admin-gated

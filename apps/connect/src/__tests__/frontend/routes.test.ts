@@ -52,9 +52,9 @@ describe("pathFor ↔ navFromPath: every row of the route table", () => {
     [nav("dashboard", { tab: "messages" }), "/dashboard/messages"],
     [nav("dashboard", { tab: "tools" }), "/dashboard/tools"],
     [nav("admin"), "/admin"],
-    [nav("admin", { tab: "listings" }), "/admin/listings"],
+    [nav("admin", { tab: "contributors" }), "/admin/contributors"],
     [nav("admin", { tab: "overview" }), "/admin/overview"],
-    [nav("admin", { tab: "create" }), "/admin/create"],
+    [nav("admin", { tab: "citizens" }), "/admin/citizens"],
     [nav("admin", { tab: "reports" }), "/admin/reports"],
     [nav("event", { id: ID }), `/e/${ID}`],
     [nav("place", { id: ID }), `/p/${ID}`],
@@ -99,7 +99,7 @@ describe("pathFor ↔ navFromPath: every row of the route table", () => {
 
   it("covers every tab the screens offer", () => {
     expect(R.DASHBOARD_TABS).toEqual(["overview", "events", "news", "suggestions", "profile", "messages", "tools"]);
-    expect(R.ADMIN_TABS).toEqual(["applications", "overview", "listings", "create", "reports"]);
+    expect(R.ADMIN_TABS).toEqual(["applications", "overview", "contributors", "citizens", "reports"]);
   });
 });
 
@@ -116,6 +116,24 @@ describe("navFromPath: tidy-ups that keep one canonical URL per screen", () => {
   it("/dashboard/overview and /admin/applications collapse to the short URL", () => {
     expect(R.navFromPath("/dashboard/overview")).toMatchObject({ ok: true, legacy: true, canonical: "/dashboard" });
     expect(R.navFromPath("/admin/applications")).toMatchObject({ ok: true, legacy: true, canonical: "/admin" });
+  });
+
+  it("old Admin addresses replace onto Contributors (/admin/create also asks for the form)", () => {
+    expect(R.navFromPath("/admin/listings")).toMatchObject({
+      ok: true,
+      legacy: true,
+      canonical: "/admin/contributors",
+      nav: nav("admin", { tab: "contributors" }),
+    });
+    expect(R.navFromPath("/admin/create")).toMatchObject({
+      ok: true,
+      legacy: true,
+      canonical: "/admin/contributors",
+      nav: nav("admin", { tab: "contributors", openCreate: true }),
+    });
+    expect(R.pathFor(nav("admin", { tab: "contributors", openCreate: true }))).toBe("/admin/contributors");
+    expect(R.safeReturnPath("/admin/listings")).toBe("/admin/contributors");
+    expect(R.safeReturnPath("/admin/create")).toBe("/admin/contributors");
   });
 
   it("an unknown tab opens the screen on its default tab rather than failing (the old /dashboard/<anything> rewrite did)", () => {
@@ -200,7 +218,8 @@ describe("accessFor: the URL never grants access, it only says what the screen n
   });
   it("role screens", () => {
     expect(R.accessFor(nav("dashboard", { tab: "events" }))).toBe("contributor");
-    expect(R.accessFor(nav("admin", { tab: "listings" }))).toBe("admin");
+    expect(R.accessFor(nav("admin", { tab: "contributors" }))).toBe("admin");
+    expect(R.accessFor(nav("admin", { tab: "citizens" }))).toBe("admin");
   });
   it("an unknown page is treated as signed-in-only, never as public", () => {
     expect(R.accessFor(nav("mystery"))).toBe("auth");

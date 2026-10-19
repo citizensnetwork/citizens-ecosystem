@@ -15,9 +15,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@capacitor/app": "^6.0.0",
-    "@capacitor/browser": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
+    "@capacitor/app": "~8.1.0",
+    "@capacitor/browser": "~8.0.3",
+    "@capacitor/core": "~8.5.3",
     "@citizens/connect-client": "workspace:*",
     "@citizens/db": "workspace:*",
     "@citizens/utils": "workspace:*",
@@ -30,17 +30,17 @@
   "devDependencies": {
     "@citizens/config": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
-    "@types/node": "20.19.0",
+    "@types/node": "26.6.5",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "8.71.2",
     "@typescript-eslint/parser": "8.71.2",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.5",
     "esbuild": "^0.25.0",
     "eslint": "10.12.0",
     "eslint-config-next": "15.5.15",
     "eslint-config-prettier": "10.1.8",
     "typescript": "5.5.4",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

@@ -44,6 +44,16 @@ async function open(page: Page, kind: Kind, index: number, tweak?: (seed: Return
 }
 
 const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
+
+/** The sheet slides up after it becomes visible. A tap taken mid-slide misses the button. */
+async function waitUntilStill(page: Page, locator: ReturnType<Page["locator"]>) {
+  await expect.poll(async () => {
+    const a = await locator.boundingBox();
+    await page.waitForTimeout(50);
+    const b = await locator.boundingBox();
+    return a && b ? Math.abs(a.y - b.y) + Math.abs(a.x - b.x) : 99;
+  }).toBeLessThan(1);
+}
 const saveBtn = (page: Page) => actionBtn(page, /^Saved?$/);
 const followBtn = (page: Page) => actionBtn(page, /^Follow(ing)?$/);
 const goTo = (page: Page, p: string) => page.evaluate((x) => (window as unknown as { __cc: { go: (p: string) => void } }).__cc.go(x), p);
@@ -57,6 +67,7 @@ test.describe("P2-04 Save on the sheet", () => {
     await expect(btn).toHaveCount(1);
     await expect(btn).toHaveText("Save");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
+    await waitUntilStill(page, btn);
     const box = (await btn.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeGreaterThanOrEqual(44);

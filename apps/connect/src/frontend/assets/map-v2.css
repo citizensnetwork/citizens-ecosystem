@@ -588,6 +588,7 @@
 [data-mv2='bubble-x']:focus-visible,
 [data-mv2='post'][data-news]:focus-visible,
 [data-mv2='news-link']:focus-visible,
+[data-mv2='menu-item']:focus-visible,
 [data-mv2^='viewer-']:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
@@ -1342,6 +1343,49 @@
   }
 }
 
+/* ── 4g. The Moment menu on the sheet. The report dialog itself is assets/report.css,
+      which loads on both maps, so a report on ?map=v1 is not an unstyled card. ── */
+[data-mv2='menu-wrap'] {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+}
+[data-mv2='menu'] {
+  position: absolute;
+  z-index: var(--z-viewer);
+  right: 0;
+  bottom: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: calc(var(--space-8) * 3);
+  padding: var(--space-1);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--elev-2);
+}
+[data-mv2='menu-item'] {
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+[data-mv2='moment-foot'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
 [data-mv2='action'],
 [data-mv2='view-full'],
@@ -1351,7 +1395,8 @@
 [data-mv2='tab'],
 [data-mv2='sort-btn'],
 [data-mv2='tile-btn'],
-[data-mv2='post'][data-news] {
+[data-mv2='post'][data-news],
+[data-mv2='menu-item'] {
   transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
 }
 [data-mv2='action']:active,
@@ -1362,7 +1407,8 @@
 [data-mv2='tab']:active,
 [data-mv2='sort-btn']:active,
 [data-mv2='tile-btn']:active,
-[data-mv2='post'][data-news]:active {
+[data-mv2='post'][data-news]:active,
+[data-mv2='menu-item']:active {
   transform: scale(0.97);
 }
 @media (hover: hover) {
@@ -1376,7 +1422,8 @@
   [data-mv2='more']:hover,
   [data-mv2='icon-btn']:hover,
   [data-mv2='row']:hover,
-  [data-mv2='post'][data-news]:hover {
+  [data-mv2='post'][data-news]:hover,
+  [data-mv2='menu-item']:hover {
     background: var(--surface-2);
   }
   [data-mv2='tab']:hover {

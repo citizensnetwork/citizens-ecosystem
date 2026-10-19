@@ -598,8 +598,8 @@ test.describe("Dashboard and Admin tabs live in the URL", () => {
     await page.reload();
     await expect(page.locator('[data-screen="admin"]')).toBeVisible({ timeout: 15_000 });
     expect(path(page)).toBe("/admin/reports");
-    await page.getByRole("button", { name: "Listings", exact: true }).click();
-    await expect.poll(() => path(page)).toBe("/admin/listings");
+    await page.getByRole("button", { name: "Contributors", exact: true }).click();
+    await expect.poll(() => path(page)).toBe("/admin/contributors");
   });
 });
 
@@ -707,7 +707,7 @@ test.describe("Signed-in-only screens reached by link", () => {
     await signInToFakeProject(page, { user: ADMIN, profile: { role: "admin", contributor_status: "not_applied" } });
     await page.goto("/admin/listings");
     await expect(page.locator('[data-screen="admin"]')).toBeVisible({ timeout: 15_000 });
-    expect(path(page)).toBe("/admin/listings");
+    await expect.poll(() => path(page)).toBe("/admin/contributors");
   });
 });
 
@@ -839,7 +839,7 @@ test.describe("Sharing a link", () => {
 
 test.describe("The server serves exactly the route table", () => {
   test("every route returns the app shell with <base href>, and unknown paths keep Next's 404", async ({ request }) => {
-    for (const p of ["/", "/discover", "/map", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/listings", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
+    for (const p of ["/", "/discover", "/map", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/listings", "/admin/contributors", "/admin/citizens", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
       const res = await request.get(p);
       expect(res.status(), p).toBe(200);
       expect(await res.text(), p).toContain('<base href="/"');
