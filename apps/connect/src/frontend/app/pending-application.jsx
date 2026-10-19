@@ -46,12 +46,17 @@
       lng: row.physical_longitude != null ? row.physical_longitude : (row.lng != null ? row.lng : null),
       noFixedLocation: !!(row.no_fixed_location != null ? row.no_fixed_location : row.noFixedLocation),
       socials,
+      // A missing or unknown kind displays as ministry (today's default) and
+      // is what a save writes. ApplyParts owns the allow-list.
+      kind: (window.ApplyParts && window.ApplyParts.contributorKind(row.contributor_kind || row.kind)) || 'ministry',
     };
   }
 
   function payloadFromForm(f) {
+    const kind = (window.ApplyParts && window.ApplyParts.contributorKind(f.kind)) || 'ministry';
     return {
       display_name: f.name.trim(),
+      contributor_kind: kind,
       bio: f.bio,
       website_url: f.website,
       contributor_contact_email: f.contactEmail,
@@ -149,7 +154,7 @@
       if (!realUser) {
         // Demo mode: stays in the local application; the demo admin's Approve promotes it.
         updateMyApplication({
-          name: f.name.trim(), bio: f.bio, website: f.website, contactEmail: f.contactEmail,
+          name: f.name.trim(), kind: f.kind, bio: f.bio, website: f.website, contactEmail: f.contactEmail,
           photo: f.logo, coverPhoto: f.cover, socials: f.socials,
           location: f.noFixedLocation ? '' : f.location, lat: f.noFixedLocation ? null : f.lat, lng: f.noFixedLocation ? null : f.lng,
           noFixedLocation: !!f.noFixedLocation,
@@ -180,6 +185,7 @@
     };
 
     const leaveRejected = (page) => { setContributorStatus('rejected'); go(page); };
+    const nameLabel = (window.ApplyParts && window.ApplyParts.aboutCopy(f.kind).nameLabel) || 'Organisation / ministry name';
 
     return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'pending-application' },
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto' },
@@ -196,10 +202,11 @@
               h('h2', { className: 'text-lg text-foreground' }, 'Finish your profile'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, 'This is what citizens will see once you are approved. Only you and our admins can see it until then.')),
             h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: f.cover, onChange: (v) => up('cover', v), aspect: '16/6', label: 'cover', scope: 'event-cover' })),
+            window.ApplyParts && window.ApplyParts.KindSelect && h(Field, { label: 'Type' }, h(window.ApplyParts.KindSelect, { value: f.kind, onChange: (v) => up('kind', v) })),
             h('div', { className: 'flex gap-4 items-start' },
               h('div', { className: 'w-24 shrink-0' }, h(Field, { label: 'Logo' }, h(MediaPicker, { value: f.logo, onChange: (v) => up('logo', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
               h('div', { className: 'flex-1 min-w-0' },
-                h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.name, onChange: (e) => up('name', e.target.value) })))),
+                h(Field, { label: nameLabel, required: true }, h(Input, { value: f.name, onChange: (e) => up('name', e.target.value), 'aria-label': nameLabel })))),
             h(Field, { label: 'Bio', hint: f.bio.length + '/' + MAX_BIO }, h(Textarea, { value: f.bio, rows: 3, maxLength: MAX_BIO, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })),
             h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
               h(Field, { label: 'Website' }, h(Input, { value: f.website, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
