@@ -467,6 +467,7 @@
   function adaptMessage(m, myId) {
     return {
       id: m.id,
+      senderId: m.sender_id || null,
       from: m.sender_id === myId ? 'me' : 'them',
       text: m.body,
       time: fmtTime(new Date(m.created_at)),
