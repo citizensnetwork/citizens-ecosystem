@@ -136,10 +136,13 @@
   // value: { name, lat, lng }  (raw form state — normalised only when sent)
   // onChange(next) · onSubmit() logs the activity (Enter on a closed list)
   // loadMap() → Promise<maplibregl> · env: window.__CV_ENV
-  function PlaceField({ value, onChange, onSubmit, loadMap, env }) {
+  // autoFocus moves the caret into the box on mount (the activity-row editor).
+  // error: an inline message under the field, linked with aria-describedby.
+  function PlaceField({ value, onChange, onSubmit, loadMap, env, autoFocus, error }) {
     const uid = useId();
     const listId = uid + "-list";
     const statusId = uid + "-status";
+    const errorId = uid + "-error";
     const inputRef = useRef(null);
     const valueRef = useRef(value);
     valueRef.current = value;
@@ -151,6 +154,16 @@
     const [net, setNet] = useState("idle"); // idle | searching | done | down
     const [refused, setRefused] = useState(geo.refused);
     const [pinOpen, setPinOpen] = useState(false);
+
+    useEffect(() => {
+      if (autoFocus && inputRef.current) inputRef.current.focus();
+    }, [autoFocus]);
+
+    // A failed empty save must leave the caret in the field, including when
+    // the message was already showing and they try again.
+    useEffect(() => {
+      if (error && inputRef.current) inputRef.current.focus();
+    }, [error]);
 
     const keyed = TL.hasKey(env);
     const canSearch = keyed && !refused;
@@ -296,6 +309,7 @@
     }
 
     const listOpen = open && shown.length > 0;
+    const describedBy = error ? errorId + " " + statusId : statusId;
     return (
       <div style={{ flex: "1 1 100%", minWidth: 0 }}>
         <label htmlFor={uid + "-input"} style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", margin: "0 2px 5px" }}>
@@ -306,7 +320,7 @@
             <input id={uid + "-input"} ref={inputRef} type="text" autoComplete="off" spellCheck={false}
               role="combobox" aria-autocomplete="list" aria-expanded={listOpen} aria-controls={listId}
               aria-activedescendant={listOpen && active >= 0 ? uid + "-opt-" + active : undefined}
-              aria-describedby={statusId} maxLength={P.NAME_MAX}
+              aria-describedby={describedBy} aria-invalid={error ? "true" : undefined} maxLength={P.NAME_MAX}
               value={value.name} placeholder={kind === "pinned" ? "Name this place" : "Search a place, or type a name"}
               onChange={(e) => edit(e.target.value)} onKeyDown={onKeyDown}
               onFocus={() => { if (shown.length > 0) setOpen(true); }} onBlur={() => setOpen(false)}
@@ -339,6 +353,9 @@
             <button type="button" onClick={clearAll} style={smallBtn}>Clear</button>
           ) : null}
         </div>
+        {error ? (
+          <div id={errorId} style={{ margin: "6px 2px 0", fontSize: 13, fontWeight: 600, color: "var(--danger)" }}>{error}</div>
+        ) : null}
         <div id={statusId} role="status" aria-live="polite" style={{ margin: "6px 2px 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
           {helper}{" "}
           {kind === "pinned" ? <button type="button" onClick={removePin} style={linkBtn}>Remove pin</button> : null}
