@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — Admin panel (applications, listings, create, reports)
+//  Citizens Connect — Admin panel (applications, overview, contributors, citizens, reports)
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle, Overlay, MediaPicker } = window.UI;
   const Icon = window.Icon;
 
@@ -146,7 +146,14 @@
     return window.UI.safeUrl(platform.urlFor(raw));
   }
 
-  function AdminCreateContributor() {
+  function welcomeEmailLine(emailRequested, email, claimEmail) {
+    if (!emailRequested) return 'No welcome email was sent (you chose not to). Let them know yourself.';
+    if (email === 'sent') return 'Welcome email sent to ' + claimEmail + '. They may need to check their junk folder.';
+    if (email === 'failed') return "The welcome email couldn't be sent. Let them know yourself.";
+    return "Email isn't set up on the server yet, so no welcome was sent. Let them know yourself.";
+  }
+
+  function AdminCreateContributor({ onCreated }) {
     const { toast } = window.useApp();
     const [f, setF] = useState({ ...EMPTY_CREATE, socials: {} });
     const [submitting, setSubmitting] = useState(false);
@@ -198,11 +205,15 @@
           toast(message, 'red');
           return;
         }
-        setResult({ slug: body.slug, claimEmail: f.claimEmail.trim(), emailRequested: f.emailOwner, email: body.email });
+        const claimEmail = f.claimEmail.trim();
+        const emailRequested = f.emailOwner;
         // C21: the server says whether the new listing has a pin; if it did not say, claim nothing about the map
         toast('Contributor listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in Kingdom Discovery now. It has no map pin.' : 'live now.'), 'green');
+        toast(welcomeEmailLine(emailRequested, body.email, claimEmail), emailRequested && body.email === 'sent' ? 'green' : 'gold');
         setF({ ...EMPTY_CREATE, socials: {} });
         setError('');
+        if (onCreated) onCreated({ slug: body.slug });
+        else setResult({ slug: body.slug, claimEmail, emailRequested, email: body.email });
       } catch (err) {
         const message = 'Could not create the listing — please check your connection.';
         setError(message);
@@ -464,7 +475,7 @@
             h(Button, { variant: 'outline', disabled: busy, onClick: onClose }, 'Cancel')))));
   }
 
-  function AdminListings() {
+  function AdminListings({ createOpen, onCreateOpenChange }) {
     const { toast, realUser, syncListingVisibility } = window.useApp();
     const [q, setQ] = useState('');
     const [page, setPage] = useState(1);
@@ -475,6 +486,7 @@
     const [confirmId, setConfirmId] = useState(null);
     const [busyId, setBusyId] = useState(null);
     const [deleting, setDeleting] = useState(null); // the row whose Delete modal is open
+    const [reload, setReload] = useState(0);
 
     // GET /api/admin/users?role=contributor (admin-gated, service-role read —
     // it carries the claim columns). Page 1 replaces, later pages append;
@@ -500,7 +512,7 @@
         if (active) setLoading(false);
       }, term ? 300 : 0);
       return () => { active = false; clearTimeout(timer); };
-    }, [realUser, q, page]);
+    }, [realUser, q, page, reload]);
 
     const setHidden = async (row, hidden) => {
       setBusyId(row.id);
@@ -542,16 +554,22 @@
       return h(Empty, { icon: 'Store', title: 'Sign in as an admin to manage live listings' });
     }
 
-    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-listings': '' },
+    const wideCreate = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-listings': '', 'data-admin-contributors': '' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
         'Every Contributor listing. Hide takes one off the map and Kingdom Discovery for everyone — nothing is deleted, and Unhide puts it straight back. Delete removes a listing for good; if its owner has an account, only the listing goes and they stay as a citizen.'),
-      h('div', { className: 'flex items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl' },
-        h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
-        h('input', {
-          value: q, onChange: (e) => { setQ(e.target.value); setPage(1); },
-          placeholder: 'Search listings by name or email…', 'aria-label': 'Search listings',
-          className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
-        })),
+      h('div', { className: 'flex flex-col gap-2 sm:flex-row sm:items-center' },
+        h('div', { className: 'flex flex-1 items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl min-h-[44px]' },
+          h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
+          h('input', {
+            value: q, onChange: (e) => { setQ(e.target.value); setPage(1); },
+            placeholder: 'Search listings…', 'aria-label': 'Search listings',
+            className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
+          })),
+        h(Button, {
+          variant: 'gold', icon: 'Plus', className: 'w-full sm:w-auto min-h-[44px]',
+          onClick: () => onCreateOpenChange(true),
+        }, 'Create Contributor')),
       failed
         ? h(Empty, { icon: 'WifiOff', title: 'Could not load listings', sub: 'Check your connection, then reopen this tab.' })
         : rows.length === 0 && !loading
@@ -566,14 +584,277 @@
             })),
       loading && h('p', { className: 'text-xs text-muted-foreground text-center py-2' }, 'Loading…'),
       !loading && !failed && rows.length < total && h(Button, { variant: 'outline', className: 'w-full', onClick: () => setPage((n) => n + 1) }, 'Load more'),
-      deleting && h(DeleteListingModal, { row: deleting, onClose: () => setDeleting(null), onDone: (result) => handleDeleted(deleting, result) }));
+      deleting && h(DeleteListingModal, { row: deleting, onClose: () => setDeleting(null), onDone: (result) => handleDeleted(deleting, result) }),
+      createOpen && h(Overlay, {
+        variant: wideCreate ? 'side' : 'sheet',
+        title: 'Create Contributor',
+        onClose: () => onCreateOpenChange(false),
+      },
+        h('div', { className: 'overflow-y-auto', 'data-testid': 'admin-create-overlay', 'data-overlay': wideCreate ? 'side' : 'sheet' },
+          h(AdminCreateContributor, {
+            onCreated: () => {
+              onCreateOpenChange(false);
+              setPage(1);
+              setReload((n) => n + 1);
+            },
+          }))));
+  }
+
+  // ── Admin: Citizen accounts ──
+  // GET /api/admin/users?role=citizen (admin session, migration 194). The
+  // response has display names and dates, never an email. Delete is a
+  // separate confirm modal (GET/POST /api/admin/citizens/delete).
+  function joinedLabel(iso) {
+    if (!iso) return 'joined';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return 'joined';
+    return 'joined ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+  function lastActiveLabel(iso) {
+    if (!iso) return 'Never signed in';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return 'Never signed in';
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days <= 0) return 'last active today';
+    if (days === 1) return 'last active yesterday';
+    return 'last active ' + days + ' days ago';
+  }
+
+  function CitizenSkeleton() {
+    return h('div', { className: 'bg-card rounded-2xl border border-border p-3 flex items-center gap-3', 'data-skeleton': '' },
+      h('div', { className: 'w-10 h-10 rounded-xl bg-muted animate-pulse shrink-0' }),
+      h('div', { className: 'flex-1 space-y-2' },
+        h('div', { className: 'h-3 w-32 rounded bg-muted animate-pulse' }),
+        h('div', { className: 'h-2 w-48 max-w-full rounded bg-muted animate-pulse' })));
+  }
+
+  function citizenCountLine(preview) {
+    const parts = [
+      preview.follows > 0 && plural(preview.follows, 'follow'),
+      preview.placeFollows > 0 && plural(preview.placeFollows, 'place follow'),
+      preview.saves > 0 && plural(preview.saves, 'save'),
+      preview.rsvps > 0 && plural(preview.rsvps, 'RSVP'),
+      preview.comments > 0 && plural(preview.comments, 'comment'),
+      preview.moments > 0 && plural(preview.moments, 'Moment'),
+      preview.messages > 0 && plural(preview.messages, 'message'),
+      preview.notifications > 0 && plural(preview.notifications, 'notification'),
+    ].filter(Boolean);
+    return parts.length ? 'Removes: ' + parts.join(', ') + '.' : '';
+  }
+
+  function DeleteCitizenModal({ row, onClose, onDone }) {
+    const [preview, setPreview] = useState(null);
+    const [problem, setProblem] = useState('');
+    const [typed, setTyped] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+      let active = true;
+      (async () => {
+        try {
+          const res = await window.authedFetch('/api/admin/citizens/delete?id=' + encodeURIComponent(row.id));
+          const json = await res.json().catch(() => ({}));
+          if (!active) return;
+          if (!res.ok) { setProblem(json.message || 'Could not check this account — please try again.'); return; }
+          if (Array.isArray(json.blockers) && json.blockers.length > 0) { setProblem(json.message); return; }
+          setPreview(json);
+        } catch (e) {
+          if (active) setProblem('Could not check this account — please try again.');
+        }
+      })();
+      return () => { active = false; };
+    }, [row.id]);
+
+    const display = (preview && preview.name) || row.full_name || '';
+    const expected = display || 'delete';
+    const matches = !!preview && normName(typed) === normName(expected);
+    const counts = preview ? citizenCountLine(preview) : '';
+
+    const confirmDelete = async () => {
+      if (!matches || busy) return;
+      setBusy(true);
+      setError('');
+      try {
+        const res = await window.authedFetch('/api/admin/citizens/delete', {
+          method: 'POST',
+          body: JSON.stringify({ id: row.id, confirmName: typed }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) { setError(json.message || 'Could not delete that account — please try again.'); setBusy(false); return; }
+        onDone(json);
+      } catch (e) {
+        setError('Could not delete that account — please try again.');
+        setBusy(false);
+      }
+    };
+
+    return h(Overlay, { onClose, title: 'Delete account', maxWidth: 480 },
+      h('div', { className: 'p-5 space-y-4 overflow-y-auto', 'data-delete-citizen': row.id },
+        !preview && !problem && h('p', { className: 'text-sm text-muted-foreground' }, 'Checking what this will remove…'),
+
+        problem && h('div', { className: 'space-y-3' },
+          h('p', { role: 'alert', className: 'text-sm text-[#B91C1C] bg-[#FEE2E2] rounded-xl p-3 leading-relaxed' }, problem),
+          h(Button, { variant: 'outline', className: 'w-full', onClick: onClose }, 'Close')),
+
+        preview && h(F, null,
+          h('p', { className: 'text-sm text-foreground leading-relaxed' },
+            display
+              ? h(F, null, 'This permanently removes ', h('strong', null, display), '\'s sign-in, follows, saves and RSVPs.')
+              : 'This permanently removes this account\'s sign-in, follows, saves and RSVPs.'),
+          counts && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, counts),
+          h(Field, { label: 'Type the display name to confirm' },
+            h(Input, {
+              value: typed, onChange: (e) => setTyped(e.target.value), autoFocus: true,
+              autoComplete: 'off', spellCheck: false, 'aria-label': 'Type the display name to confirm',
+              onKeyDown: (e) => { if (e.key === 'Enter') confirmDelete(); },
+            })),
+          error && h('p', { role: 'alert', className: 'text-xs font-semibold text-[#B91C1C] leading-relaxed' }, error),
+          h('div', { className: 'flex gap-2' },
+            h('button', {
+              type: 'button', disabled: !matches || busy, onClick: confirmDelete,
+              className: 'flex-1 inline-flex items-center justify-center gap-2 font-bold rounded-xl text-sm px-4 py-2.5 min-h-[44px] bg-[#DC2626] text-white hover:bg-[#B91C1C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+            }, h(Icon, { name: 'Trash2', size: 14 }), busy ? 'Deleting…' : 'Delete account'),
+            h(Button, { variant: 'outline', disabled: busy, onClick: onClose }, 'Cancel')))));
+  }
+
+  function AdminCitizens() {
+    const { toast, realUser } = window.useApp();
+    const [q, setQ] = useState('');
+    const [signedIn, setSignedIn] = useState('any');
+    const [joined, setJoined] = useState('any');
+    const [application, setApplication] = useState('any');
+    const [page, setPage] = useState(1);
+    const [rows, setRows] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [reload, setReload] = useState(0);
+    const [deleting, setDeleting] = useState(null);
+    const searchRef = useRef(null);
+
+    useEffect(() => {
+      if (!realUser) return undefined;
+      let active = true;
+      const term = q.trim();
+      const timer = setTimeout(async () => {
+        setLoading(true);
+        setFailed(false);
+        try {
+          const params = new URLSearchParams({ role: 'citizen', page: String(page), signedIn, joined, application });
+          if (term) params.set('q', term);
+          const res = await window.authedFetch('/api/admin/users?' + params.toString());
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const json = await res.json();
+          if (!active) return;
+          const data = Array.isArray(json.data) ? json.data : [];
+          setRows((prev) => (page === 1 ? data : [...prev, ...data]));
+          setTotal((json.meta && json.meta.total) || 0);
+        } catch (e) {
+          if (active) setFailed(true);
+        }
+        if (active) setLoading(false);
+      }, term ? 300 : 0);
+      return () => { active = false; clearTimeout(timer); };
+    }, [realUser, q, page, signedIn, joined, application, reload]);
+
+    const focusAfter = (id, current) => {
+      const idx = current.findIndex((r) => r.id === id);
+      const next = current[idx + 1] || current[idx - 1];
+      setTimeout(() => {
+        const btn = next && document.querySelector('[data-citizen="' + next.id + '"] [data-citizen-delete]');
+        if (btn && btn.focus) btn.focus();
+        else if (searchRef.current) searchRef.current.focus();
+      }, 0);
+    };
+
+    const handleDeleted = (row) => {
+      const current = rows;
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((n) => Math.max(0, n - 1));
+      toast('Account deleted', 'green');
+      setDeleting(null);
+      focusAfter(row.id, current);
+    };
+
+    const setFilter = (setter) => (e) => { setter(e.target.value); setPage(1); };
+    const selectCls = window.UI.inputCls + ' h-11 min-h-[44px] w-full sm:w-auto';
+
+    if (!realUser) {
+      return h(Empty, { icon: 'Users', title: 'Sign in as an admin to manage citizens' });
+    }
+
+    return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-citizens': '' },
+      h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+        'Citizen accounts. Delete removes a person\'s sign-in for good. Contributor listings stay on the Contributors tab.'),
+      h('div', { className: 'flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center' },
+        h('div', { className: 'flex flex-1 items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl min-h-[44px] min-w-[12rem]' },
+          h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
+          h('input', {
+            ref: (node) => { searchRef.current = node; },
+            id: 'admin-citizen-search', value: q, onChange: (e) => { setQ(e.target.value); setPage(1); },
+            placeholder: 'Search name…', 'aria-label': 'Search citizens',
+            className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
+          })),
+        h('select', { 'aria-label': 'Signed in', value: signedIn, onChange: setFilter(setSignedIn), className: selectCls },
+          h('option', { value: 'any' }, 'Any'),
+          h('option', { value: 'once' }, 'At least once'),
+          h('option', { value: 'never' }, 'Never')),
+        h('select', { 'aria-label': 'Joined', value: joined, onChange: setFilter(setJoined), className: selectCls },
+          h('option', { value: 'any' }, 'Any'),
+          h('option', { value: '7d' }, 'Last 7 days'),
+          h('option', { value: '30d' }, 'Last 30 days'),
+          h('option', { value: 'older' }, 'Older')),
+        h('select', { 'aria-label': 'Application', value: application, onChange: setFilter(setApplication), className: selectCls },
+          h('option', { value: 'any' }, 'Any'),
+          h('option', { value: 'pending' }, 'Pending'),
+          h('option', { value: 'rejected' }, 'Rejected'),
+          h('option', { value: 'none' }, 'None'))),
+      failed
+        ? h('div', { role: 'alert', className: 'p-4 rounded-xl border border-destructive/30 bg-destructive/10 space-y-3' },
+            h('p', { className: 'text-sm font-semibold text-destructive' }, 'Could not load citizens.'),
+            h(Button, { variant: 'outline', onClick: () => setReload((n) => n + 1) }, 'Try again'))
+        : loading && rows.length === 0
+          ? h('div', { className: 'space-y-3', 'aria-busy': 'true' }, h(CitizenSkeleton), h(CitizenSkeleton), h(CitizenSkeleton))
+          : rows.length === 0
+            ? h(Empty, { icon: 'Users', title: 'No citizens match these filters' })
+            : rows.map((r) => {
+                const name = r.full_name || 'Unnamed citizen';
+                const appLabel = r.contributor_status === 'pending' ? 'Pending application' : r.contributor_status === 'rejected' ? 'Application rejected' : '';
+                return h('div', { key: r.id, className: 'bg-card rounded-2xl border border-border p-3', 'data-citizen': r.id },
+                  h('div', { className: 'flex items-center gap-3 flex-wrap sm:flex-nowrap' },
+                    h(Avatar, { src: r.avatar_url, name: r.full_name, size: 40, rounded: 'xl' }),
+                    h('div', { className: 'flex-1 min-w-[10rem]' },
+                      h('p', { className: 'text-sm font-bold text-foreground truncate' }, name),
+                      h('p', { className: 'text-[11px] text-muted-foreground mt-0.5' },
+                        joinedLabel(r.created_at) + ' · ' + lastActiveLabel(r.last_sign_in_at) + (appLabel ? ' · ' + appLabel : ''))),
+                    h('button', {
+                      type: 'button', 'data-citizen-delete': '', onClick: () => setDeleting(r),
+                      'aria-label': 'Delete ' + name,
+                      className: 'inline-flex items-center gap-1 px-2.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-[#DC2626] hover:bg-[#FEE2E2] transition-colors ml-auto',
+                    }, h(Icon, { name: 'Trash2', size: 13 }), 'Delete')));
+              }),
+      loading && rows.length > 0 && h('p', { className: 'text-xs text-muted-foreground text-center py-2' }, 'Loading…'),
+      !loading && !failed && rows.length < total && h(Button, { variant: 'outline', className: 'w-full', onClick: () => setPage((n) => n + 1) }, 'Load more'),
+      deleting && h(DeleteCitizenModal, { row: deleting, onClose: () => setDeleting(null), onDone: () => handleDeleted(deleting) }));
   }
 
   function AdminPage() {
     const { isAdmin, applications, reviewApplication, go, realUser, nav, toast } = window.useApp();
-    // The tab is part of the address (/admin/listings); replaced rather than pushed (see DashboardPage).
+    // The tab is part of the address (/admin/contributors); replaced rather than pushed (see DashboardPage).
     const tab = window.CC_ROUTES.ADMIN_TABS.indexOf(nav.params.tab) !== -1 ? nav.params.tab : 'applications';
-    const setTab = (t) => go('admin', t === 'applications' ? {} : { tab: t }, { replace: true, keepScroll: true });
+    const [createOpen, setCreateOpen] = useState(false);
+    const openedFromUrl = useRef(false);
+    useEffect(() => {
+      if (nav.params && nav.params.openCreate && !openedFromUrl.current) {
+        openedFromUrl.current = true;
+        setCreateOpen(true);
+      }
+    }, [nav]);
+    const setTab = (t) => {
+      if (t !== 'contributors') setCreateOpen(false);
+      go('admin', t === 'applications' ? {} : { tab: t }, { replace: true, keepScroll: true });
+    };
     const [status, setStatus] = useState('all');
     const [search, setSearch] = useState('');
 
@@ -641,7 +922,7 @@
             .map(([l, v, c]) => h('div', { key: l, className: 'bg-card rounded-xl p-2.5 border border-border text-center' },
               h('p', { className: 'text-base font-bold', style: { color: c } }, v),
               h('p', { className: 'text-[9px] text-muted-foreground' }, l)))),
-        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'listings', label: 'Listings' }, { value: 'create', label: 'Create Contributor' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
+        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'contributors', label: 'Contributors' }, { value: 'citizens', label: 'Citizens' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         tab === 'applications' && h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
@@ -656,9 +937,9 @@
 
         tab === 'overview' && h(window.AdminOverview, { setTab }),
 
-        tab === 'listings' && h(AdminListings),
+        tab === 'contributors' && h(AdminListings, { createOpen: createOpen, onCreateOpenChange: setCreateOpen }),
 
-        tab === 'create' && h(AdminCreateContributor),
+        tab === 'citizens' && h(AdminCitizens),
 
         tab === 'reports' && h(window.AdminReports, null)));
   }

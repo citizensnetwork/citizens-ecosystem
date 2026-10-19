@@ -578,7 +578,7 @@ test.describe("Admin → Listings shows each listing's automation", () => {
       return route.fulfill({ json: { data, meta: { page: 1, pageSize: 20, total: data.length } } });
     });
 
-    await page.goto("/admin/listings");
+    await page.goto("/admin/contributors");
     await expect(page.locator('[data-listing="auto-org"]')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('[data-listing="auto-org"]').getByText("Automatic updates: Auto events · 3 pending")).toBeVisible();
     await expect(page.locator('[data-listing="quiet-org"]').getByText("Automatic updates: Off", { exact: true })).toBeVisible();

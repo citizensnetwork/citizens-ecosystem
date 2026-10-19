@@ -87,7 +87,7 @@ test.describe("Admin → Listings", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /Admin Panel/ }).first().click({ timeout: 15_000 });
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
-    await page.getByRole("button", { name: "Listings", exact: true }).click();
+    await page.getByRole("button", { name: "Contributors", exact: true }).click();
 
     const form = page.locator('[data-listing="hope-harvest-outreach"]');
     const hidden = page.locator('[data-listing="kingdom-table-coffee"]');
@@ -169,7 +169,7 @@ test.describe("Admin → Listings", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /Admin Panel/ }).first().click({ timeout: 15_000 });
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
-    await page.getByRole("button", { name: "Listings", exact: true }).click();
+    await page.getByRole("button", { name: "Contributors", exact: true }).click();
   }
 
   type Answer = { status?: number; json: unknown };

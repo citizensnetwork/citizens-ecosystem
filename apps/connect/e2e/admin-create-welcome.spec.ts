@@ -6,10 +6,10 @@ import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-
 //  D-13: Admin → Create Contributor emails the owner a welcome.
 //
 //  What is under test is the BROWSER: the "Email the owner a welcome" checkbox
-//  (on by default), what the Create request carries, how the success panel
-//  reports the server's answer (sent / failed / skipped), and that the screen
-//  no longer tells the admin the owner must use Google. The email itself is
-//  sent by the server (unit-tested with a faked network; no real mail here).
+//  (on by default), what the Create request carries, how the toasts report the
+//  server's answer (sent / failed / skipped), and that the screen no longer
+//  tells the admin the owner must use Google. Success closes the overlay.
+//  The email itself is sent by the server (unit-tested; no real mail here).
 //  Hermetic: a signed-in admin against the fake Supabase project.
 // ════════════════════════════════════════════════════════════════════
 
@@ -36,7 +36,9 @@ async function openCreateScreen(page: Page, reply: Reply = { email: "sent" }) {
   await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
   await goTo(page, "admin");
   await expect(page.locator('[data-screen="admin"]')).toBeVisible();
-  await page.getByRole("button", { name: "Create Contributor" }).click();
+  await page.getByRole("button", { name: "Contributors", exact: true }).click();
+  await page.getByRole("button", { name: "Create Contributor", exact: true }).click();
+  await expect(page.getByTestId("admin-create-form")).toBeVisible();
   return requests;
 }
 
@@ -58,36 +60,37 @@ test.describe("Admin → Create Contributor: welcome email (D-13)", () => {
     await expect(page.getByText(/signs in with Google using the email below/)).toHaveCount(0);
   });
 
-  test("ticked: the request asks for the email, and the panel says it was sent", async ({ page }) => {
+  test("ticked: the request asks for the email, and a toast says it was sent", async ({ page }) => {
     const requests = await openCreateScreen(page, { email: "sent" });
     await fillAndCreate(page);
 
-    await expect(page.getByTestId("create-result")).toBeVisible();
-    await expect(page.getByTestId("create-email-status")).toContainText(`Welcome email sent to ${OWNER_EMAIL}`);
+    await expect(page.getByTestId("admin-create-form")).toHaveCount(0);
+    await expect(page.getByText(`Welcome email sent to ${OWNER_EMAIL}`)).toBeVisible();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ display_name: "Grace Outreach", claim_email: OWNER_EMAIL, email_owner: true });
   });
 
-  test("unticked: the request says not to, and the panel tells the admin to let them know", async ({ page }) => {
+  test("unticked: the request says not to, and a toast tells the admin to let them know", async ({ page }) => {
     const requests = await openCreateScreen(page, { email: "skipped" });
     await page.getByLabel("Email the owner a welcome").uncheck();
     await fillAndCreate(page);
 
-    await expect(page.getByTestId("create-email-status")).toContainText("No welcome email was sent (you chose not to)");
+    await expect(page.getByText("No welcome email was sent (you chose not to)")).toBeVisible();
     expect(requests[0]).toMatchObject({ email_owner: false });
   });
 
-  test("a failed send does not undo the listing, and the panel says so", async ({ page }) => {
+  test("a failed send does not undo the listing, and a toast says so", async ({ page }) => {
     await openCreateScreen(page, { email: "failed" });
     await fillAndCreate(page);
-    await expect(page.getByText(/Live: \/grace-outreach/)).toBeVisible();
-    await expect(page.getByTestId("create-email-status")).toContainText("couldn't be sent");
+    await expect(page.getByTestId("admin-create-form")).toHaveCount(0);
+    await expect(page.getByText("Contributor listing created — live now.")).toBeVisible();
+    await expect(page.getByText("couldn't be sent")).toBeVisible();
   });
 
-  test("email not configured on the server: the panel says no welcome was sent", async ({ page }) => {
+  test("email not configured on the server: a toast says no welcome was sent", async ({ page }) => {
     await openCreateScreen(page, { email: "skipped" });
     await fillAndCreate(page);
-    await expect(page.getByTestId("create-email-status")).toContainText("Email isn't set up on the server yet");
+    await expect(page.getByText("Email isn't set up on the server yet")).toBeVisible();
   });
 
   test("C21: the intro and the toast say 'on the map' only when the new listing has a pin", async ({ page }) => {
@@ -116,7 +119,8 @@ test.describe("Admin → Create Contributor: welcome email (D-13)", () => {
     await openCreateScreen(page);
     await page.getByLabel("Email the owner a welcome").uncheck();
     await fillAndCreate(page);
-    await expect(page.getByTestId("create-result")).toBeVisible();
+    await expect(page.getByTestId("admin-create-form")).toHaveCount(0);
+    await page.getByRole("button", { name: "Create Contributor", exact: true }).click();
     await expect(page.getByLabel("Email the owner a welcome")).toBeChecked();
   });
 });

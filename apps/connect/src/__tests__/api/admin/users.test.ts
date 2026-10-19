@@ -116,4 +116,75 @@ describe("/api/admin/users", () => {
     const res = await PATCH(makeReq({ user_id: OTHER_ID }));
     expect(res.status).toBe(400);
   });
+
+  it("GET ?role=citizen is 401 without a session and 403 for a non-admin, and does not read with service role", async () => {
+    // getRouteAuth and requireAdmin each call getUser.
+    mockClient.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    expect((await GET(makeReq(null, "GET", "?role=citizen"))).status).toBe(401);
+
+    mockClient.auth.getUser.mockResolvedValue({
+      data: { user: { id: ADMIN_ID, email: "a@example.com" } },
+      error: null,
+    });
+    mockClient._chain._result.data = { role: "citizen" };
+    const res = await GET(makeReq(null, "GET", "?role=citizen"));
+    expect(res.status).toBe(403);
+    expect(mockClient.rpc).not.toHaveBeenCalled();
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("GET ?role=citizen returns names and dates only, even if the function echoed an email", async () => {
+    mockClient._chain._result.data = { role: "admin" };
+    mockClient.rpc.mockResolvedValueOnce({
+      data: {
+        success: true,
+        total: 1,
+        data: [
+          {
+            id: OTHER_ID,
+            full_name: "Ada Citizen",
+            avatar_url: null,
+            contributor_status: "not_applied",
+            created_at: "2026-10-01T00:00:00.000Z",
+            last_sign_in_at: null,
+            email: "ada@example.com",
+          },
+        ],
+      },
+      error: null,
+    });
+    const res = await GET(
+      makeReq(null, "GET", "?role=citizen&q=ada&signedIn=never&joined=30d&application=none"),
+    );
+    expect(res.status).toBe(200);
+    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(mockClient.rpc).toHaveBeenCalledWith("admin_list_citizens", {
+      _q: "ada",
+      _signed_in: "never",
+      _joined: "30d",
+      _application: "none",
+      _page: 1,
+    });
+    const json = await res.json();
+    expect(json.data).toEqual([
+      {
+        id: OTHER_ID,
+        full_name: "Ada Citizen",
+        avatar_url: null,
+        role: "citizen",
+        contributor_status: "not_applied",
+        created_at: "2026-10-01T00:00:00.000Z",
+        last_sign_in_at: null,
+      },
+    ]);
+    expect(JSON.stringify(json)).not.toMatch(/email/i);
+    expect(json.meta).toEqual({ page: 1, pageSize: 20, total: 1 });
+  });
+
+  it("GET ?role=citizen rejects an unknown filter before calling the function", async () => {
+    mockClient._chain._result.data = { role: "admin" };
+    const res = await GET(makeReq(null, "GET", "?role=citizen&signedIn=sometimes"));
+    expect(res.status).toBe(400);
+    expect(mockClient.rpc).not.toHaveBeenCalled();
+  });
 });
