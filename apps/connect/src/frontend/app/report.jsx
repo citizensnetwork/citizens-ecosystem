@@ -13,7 +13,7 @@
 //
 //  Public surface: window.CCReport = { Action, Dialog, REASONS, STR, signedIn }.
 //  Map v2 copy is MapV2Strings.report (kept equal to STR by a test).
-//  Styles: assets/map-v2.css section 4g (tokens only).
+//  Styles: assets/report.css (loaded on v1 and v2; Map v2 tokens only).
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -47,7 +47,7 @@
       place: 'place',
       comment: 'comment',
       conversation: 'conversation',
-      moment: 'note',
+      moment: 'moment',
     },
     details: 'Tell us more (optional, 1000 max)',
     counter: (n) => n + '/1000',
@@ -55,6 +55,7 @@
     send: 'Send report',
     sending: 'Sending…',
     thanks: 'Thanks. An admin will look at it.',
+    already: "You've already reported this. Thanks, we're looking into it.",
     rate: "You've sent a few reports already. Please try again later.",
     fail: 'Could not send. Please try again.',
   };
@@ -156,6 +157,14 @@
         });
         if (res && res.ok) {
           if (sentRef.current) sentRef.current();
+          else closeRef.current();
+          return;
+        }
+        // One open report per person and target is a 409. That is already in
+        // hand, so it closes like a success with its own calm line. The server's
+        // sentence is never shown. 429 stays open; every other failure does too.
+        if (res && res.status === 409) {
+          if (sentRef.current) sentRef.current(S.already);
           else closeRef.current();
           return;
         }
@@ -292,8 +301,8 @@
       }
       setOpen(true);
     };
-    const onSent = () => {
-      if (app.toast) app.toast(S.thanks, 'gold');
+    const onSent = (message) => {
+      if (app.toast) app.toast(message || S.thanks, 'gold');
       setOpen(false);
     };
     if (mine || !targetId) return null;

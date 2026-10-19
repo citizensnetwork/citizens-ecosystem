@@ -18,7 +18,7 @@ type DialogProps = {
   targetId: string;
   strings?: Record<string, unknown>;
   onClose: () => void;
-  onSent?: () => void;
+  onSent?: (message?: string) => void;
   returnFocus?: HTMLElement | null;
   submit?: (path: string, opts: { method: string; body: string }) => Promise<{ ok: boolean; status: number }>;
 };
@@ -38,8 +38,10 @@ type Api = {
     counter: (n: number) => string;
     reasons: Record<string, string>;
     thanks: string;
+    already: string;
     rate: string;
     fail: string;
+    nouns: Record<string, string>;
     [key: string]: unknown;
   };
   signedIn: (app: { realUser?: { id: string } | null; authed?: boolean } | null) => boolean;
@@ -145,6 +147,9 @@ describe("reasons and copy", () => {
     expect(flat(api.STR)).toEqual(flat(strings.report));
     expect(api.STR.counter(3)).toBe("3/1000");
     expect(api.STR.title("note")).toBe("Report this note");
+    expect(api.STR.nouns.moment).toBe("moment");
+    expect(api.STR.title(api.STR.nouns.moment)).toBe("Report this moment");
+    expect(api.STR.already).toBe("You've already reported this. Thanks, we're looking into it.");
     expect(strings.report.counter(3)).toBe("3/1000");
   });
 });
@@ -216,13 +221,35 @@ describe("the dialog", () => {
     expect(screen.getByRole("button", { name: "Send report" })).toBeEnabled();
   });
 
-  it("shows the generic sentence for any other failure, including 409, and not the server text", async () => {
+  it("closes a duplicate open report the same way as a success, with its own line", async () => {
     const submit = vi.fn(async () => ({ ok: false, status: 409 }));
+    const onSent = vi.fn();
+    render(React.createElement(Host, { submit, onSent }));
+    fireEvent.click(screen.getByRole("radio", { name: "Something else" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send report" })); });
+    expect(onSent).toHaveBeenCalledTimes(1);
+    expect(onSent).toHaveBeenCalledWith(api.STR.already);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/our team is reviewing/i)).toBeNull();
+    expect(screen.queryByText(api.STR.fail)).toBeNull();
+  });
+
+  it("closes a duplicate when nothing else handles the send", async () => {
+    const submit = vi.fn(async () => ({ ok: false, status: 409 }));
+    render(React.createElement(Host, { submit }));
+    fireEvent.click(screen.getByRole("radio", { name: "Spam" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send report" })); });
+    expect(document.querySelector("[data-mv2='report']")).toBeNull();
+  });
+
+  it("shows the generic sentence for any other failure, and not the server text", async () => {
+    const submit = vi.fn(async () => ({ ok: false, status: 500 }));
     render(React.createElement(Host, { submit }));
     fireEvent.click(screen.getByRole("radio", { name: "Something else" }));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send report" })); });
     expect(screen.getByRole("alert")).toHaveTextContent(api.STR.fail);
-    expect(screen.queryByText(/already reported/i)).toBeNull();
+    expect(screen.queryByText(api.STR.already)).toBeNull();
+    expect(document.querySelector("[data-mv2='report']")).not.toBeNull();
     submit.mockRejectedValueOnce(new Error("secret server detail"));
     fireEvent.click(screen.getByRole("radio", { name: "Spam" }));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send report" })); });
@@ -325,7 +352,20 @@ describe("the button", () => {
     expect(document.querySelector("[data-mv2='report']")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "More options" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Report" }));
-    expect(screen.getByRole("heading", { name: "Report this note" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Report this moment" })).toBeInTheDocument();
+  });
+
+  it("toasts the duplicate line and closes, the same way as a success", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: false, status: 409 }));
+    (window as unknown as { authedFetch: typeof fetchMock }).authedFetch = fetchMock;
+    render(React.createElement(api.Action, { targetType: "event", targetId: EVENT, ownerId: "org-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Report" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Spam" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send report" })); });
+    expect(toast).toHaveBeenCalledWith(api.STR.already, "gold");
+    expect(toast).not.toHaveBeenCalledWith(api.STR.fail, expect.anything());
+    expect(document.querySelector("[data-mv2='report']")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 
@@ -339,7 +379,9 @@ describe("where the button is wired", () => {
     expect(html.indexOf("app/report.jsx")).toBeLessThan(html.indexOf("app/auth.jsx"));
     expect(build.indexOf("'ui.jsx'")).toBeLessThan(build.indexOf("'report.jsx'"));
     expect(build.indexOf("'report.jsx'")).toBeLessThan(build.indexOf("'auth.jsx'"));
-    expect(html).toContain("app/report.jsx?v=20261019d");
+    expect(html).toContain("app/report.jsx?v=20261019e");
+    expect(html).toContain('href="assets/report.css?v=20261019e"');
+    expect(html).not.toContain("map-v2.css");
   });
 
   it("places the button on the sheet, the event, the place, the profile, a moment and a message", () => {
@@ -357,5 +399,46 @@ describe("where the button is wired", () => {
     expect(messages).toContain("variant: 'overflow'");
     expect(messages).toContain("targetType: 'conversation'");
     expect(messages).toContain("m.from === 'me'");
+  });
+});
+
+describe("the dialog stylesheet", () => {
+  const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
+  const decls = (block: string) => {
+    const out = new Map<string, string>();
+    for (const m of block.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) out.set(m[1], m[2].trim());
+    return out;
+  };
+  const between = (text: string, start: string, end: string) => {
+    const i = text.indexOf(start);
+    const j = text.indexOf(end, i + start.length);
+    expect(i, start).toBeGreaterThanOrEqual(0);
+    expect(j, end).toBeGreaterThan(i);
+    return text.slice(i, j);
+  };
+
+  it("uses the Map v2 tokens, and only supplies them when the old map has set no theme", () => {
+    const report = read("src/frontend/assets/report.css");
+    const map = read("src/frontend/assets/map-v2.css");
+    expect(report).not.toMatch(/:root\s*\{/);
+    expect(map).not.toContain("[data-mv2='report']");
+    expect(map).not.toContain("[data-mv2='report-reason']");
+    const light = decls(between(report, "html:not([data-theme]) {", "@media (prefers-color-scheme: dark)"));
+    const dark = decls(between(report, "@media (prefers-color-scheme: dark)", "@media (prefers-reduced-motion"));
+    const mapLight = decls(between(map, ":root {", "/* ── 2. Tokens: dark"));
+    const mapDark = decls(between(map, "[data-theme='dark'] {", "/* ── 3. Reduced motion"));
+    expect(light.size).toBeGreaterThan(10);
+    expect(dark.size).toBeGreaterThan(5);
+    for (const [name, value] of light) expect(mapLight.get(name), name).toBe(value);
+    for (const [name, value] of dark) expect(mapDark.get(name), name).toBe(value);
+    const components = report.slice(report.indexOf("/* ── Dialog"));
+    expect(components).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    const px = [...components.matchAll(/(?<![\w.-])(\d+(?:\.\d+)?)px\b/g)].map((m) => m[1]).filter((n) => n !== "0" && n !== "1");
+    expect(px).toEqual([]);
+    expect(components).toContain("var(--surface-1)");
+    expect(components).toContain("var(--sheet-radius)");
+    expect(components).toContain("var(--z-viewer)");
+    expect(components).toContain("var(--scrim)");
+    expect(components).toContain("var(--hit)");
   });
 });
