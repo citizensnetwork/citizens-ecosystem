@@ -135,23 +135,29 @@
   // ── the hook ─────────────────────────────────────────────────────────────
 
   function useAutomation(app) {
-    const { realUser, role, toast } = app;
+    const { realUser, role, toast, activeContributorId, listingRole: givenRole } = app;
     const sb = window.CC_SUPABASE;
-    const enabled = !!(sb && realUser && role === 'contributor');
+    const listingRole = givenRole || (role === 'contributor' ? 'owner' : null);
+    const canManageConsent = listingRole === 'owner';
+    const viewOnly = listingRole === 'viewer';
+    const enabled = !!(sb && realUser && (listingRole === 'owner' || listingRole === 'editor'));
     // status: 'idle' (not applicable) | 'loading' | 'ready' | 'unavailable'
     const [data, setData] = useState({ status: 'idle', settings: null, sources: [], suggestions: [] });
     const [busy, setBusy] = useState(false);
-    const uid = realUser ? realUser.id : null;
+    // An editor writes sources against the listing, not their own profile.
+    const uid = listingRole === 'editor' ? activeContributorId : (realUser ? realUser.id : null);
 
     const load = useCallback(async () => {
-      if (!enabled) { setData({ status: 'idle', settings: null, sources: [], suggestions: [] }); return; }
+      if (!enabled || !uid) { setData({ status: 'idle', settings: null, sources: [], suggestions: [] }); return; }
       try {
         const [settings, sources, suggestions] = await Promise.all([
-          sb.rpc('get_my_automation_settings'),
+          canManageConsent
+            ? sb.rpc('get_my_automation_settings')
+            : Promise.resolve({ data: { success: true, level: 'suggest' }, error: null }),
           sb.from('listing_sources').select('id, kind, url, enabled, last_checked_at, last_status, created_at').eq('contributor_id', uid).order('created_at', { ascending: true }),
           sb.from('listing_suggestions').select('id, kind, payload, source_url, status, published_ref, created_at, decided_at').eq('contributor_id', uid).order('created_at', { ascending: false }).limit(200),
         ]);
-        if (settings.error || !settings.data || !settings.data.success || sources.error || suggestions.error) {
+        if ((canManageConsent && (settings.error || !settings.data || !settings.data.success)) || sources.error || suggestions.error) {
           setData({ status: 'unavailable', settings: null, sources: [], suggestions: [] });
           return;
         }
@@ -159,7 +165,7 @@
       } catch (e) {
         setData({ status: 'unavailable', settings: null, sources: [], suggestions: [] });
       }
-    }, [enabled, uid]);
+    }, [enabled, uid, canManageConsent]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -259,7 +265,7 @@
 
     const pending = data.suggestions.filter((s) => s.status === 'pending');
     const autoPublished = data.suggestions.filter((s) => s.status === 'auto_published');
-    return Object.assign({}, data, { enabled, busy, pending, autoPublished, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, publish, unpublish });
+    return Object.assign({}, data, { enabled, busy, pending, autoPublished, canManageConsent, viewOnly, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, publish, unpublish });
   }
 
   // ── Profile tab: the card ────────────────────────────────────────────────
@@ -268,7 +274,7 @@
     const [kind, setKind] = useState('website');
     const [url, setUrl] = useState('');
     const [confirmPause, setConfirmPause] = useState(false);
-    if (!auto || auto.status === 'idle') return null;
+    if (!auto || auto.status === 'idle' || auto.viewOnly) return null;
     const shell = (children) => h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-4 fade-in', 'data-card': 'automatic-updates' }, children);
     const title = h('div', { className: 'flex items-start gap-2.5' },
       h('div', { className: 'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-accent text-gold-dark' }, h(Icon, { name: 'Sparkles', size: 17 })),
@@ -282,7 +288,7 @@
     }
 
     const level = auto.settings.level;
-    const on = level !== 'off';
+    const on = !auto.canManageConsent || level !== 'off';
     const consentLine = auto.settings.consent_at
       ? 'Your choice was recorded on ' + new Date(auto.settings.consent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
         ' (from ' + (CONSENT_FROM[auto.settings.consent_source] || 'your dashboard') + ').'
@@ -291,7 +297,7 @@
 
     return shell([
       h(F, { key: 'head' }, title),
-      h('div', { key: 'levels', role: 'radiogroup', 'aria-label': 'Automatic updates level', className: 'space-y-2' },
+      auto.canManageConsent && h('div', { key: 'levels', role: 'radiogroup', 'aria-label': 'Automatic updates level', className: 'space-y-2' },
         LEVELS.map((l) => h('button', {
           key: l.value, type: 'button', role: 'radio', 'aria-checked': level === l.value, disabled: auto.busy,
           onClick: () => { if (level !== l.value) auto.setLevel(l.value); },
@@ -301,7 +307,7 @@
             h('span', { className: cx('w-4 h-4 rounded-full border-2 shrink-0', level === l.value ? 'border-gold bg-gold' : 'border-muted-foreground/40') }),
             h('span', { className: 'text-sm font-bold text-foreground' }, l.title)),
           h('span', { className: 'block text-xs text-muted-foreground mt-1 ml-6 leading-relaxed' }, l.desc)))),
-      consentLine && h('p', { key: 'consent', className: 'text-[11px] text-muted-foreground' }, consentLine),
+      auto.canManageConsent && consentLine && h('p', { key: 'consent', className: 'text-[11px] text-muted-foreground' }, consentLine),
       h('p', { key: 'privacy', className: 'text-[11px] text-muted-foreground leading-relaxed' },
         'We only read what your organisation has already made public. We never import personal phone numbers or email addresses, and you can pause everything at any time.'),
 
@@ -328,7 +334,7 @@
           h(Input, { value: url, onChange: (e) => setUrl(e.target.value), placeholder: info.placeholder, 'aria-label': 'Source link', className: 'flex-1' }),
           h(Button, { variant: 'outline', size: 'sm', icon: 'Plus', disabled: auto.busy || !url.trim(), onClick: async () => { if (await auto.addSource(kind, url)) setUrl(''); } }, 'Add'))),
 
-      on && h('div', { key: 'pause', className: 'pt-1' },
+      auto.canManageConsent && on && h('div', { key: 'pause', className: 'pt-1' },
         confirmPause
           ? h('div', { className: 'p-3 rounded-xl border border-border bg-white/60 space-y-2' },
               h('p', { className: 'text-xs text-foreground leading-relaxed' }, 'Pausing switches off every source and clears the suggestions waiting for you. Pause now?'),
@@ -385,13 +391,16 @@
         s.kind === 'news' && h(Field, { label: 'Post' }, h(Textarea, { value: draft.body, onChange: set('body'), rows: 5, maxLength: 4000, 'aria-label': 'Post' })),
         s.kind === 'profile' && h(Field, { label: FIELD_LABEL[p.field] || 'New value' }, h(Textarea, { value: draft.value, onChange: set('value'), rows: 3, maxLength: 1000, 'aria-label': FIELD_LABEL[p.field] || 'New value' }))),
       h(SourceLine, { url: s.source_url }),
-      h('div', { className: 'flex flex-wrap gap-2' },
+      !auto.viewOnly && h('div', { className: 'flex flex-wrap gap-2' },
         h(Button, { variant: 'primary', size: 'sm', icon: 'Check', disabled: auto.busy, onClick: () => auto.publish(s, edited) }, s.kind === 'profile' ? 'Apply' : 'Publish'),
         h(Button, { variant: 'outline', size: 'sm', icon: 'Pencil', disabled: auto.busy, onClick: () => setEditing((v) => !v) }, editing ? 'Stop editing' : 'Edit'),
         h(Button, { variant: 'ghost', size: 'sm', icon: 'X', disabled: auto.busy, onClick: () => auto.dismiss(s.id) }, 'Dismiss')));
   }
 
   function SuggestionsTab({ auto, onOpenSettings, onViewEvent }) {
+    if (auto && auto.viewOnly) {
+      return h(Empty, { icon: 'Sparkles', title: 'View only', sub: 'You can look at this listing. Suggesting and publishing updates stays with an editor or the owner.' });
+    }
     if (!auto || auto.status === 'idle') {
       return h(Empty, { icon: 'Sparkles', title: 'Suggestions appear here', sub: 'Sign in with your Contributor account to see updates suggested from your public website, YouTube channel and calendar.' });
     }

@@ -28,7 +28,7 @@
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
-    const { user, role, go, isAdmin, isContributor, isPendingApplicant, signOut, showSignIn, authed, toast, realUser } = app;
+    const { user, role, go, isAdmin, isContributor, isPendingApplicant, listingRole, signOut, showSignIn, authed, toast, realUser } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
@@ -75,7 +75,8 @@
     // contributor. "Become a Contributor" itself deliberately lives only in
     // Settings now, not this everyday menu — founder ask: stop advertising
     // it everywhere and let a citizen find it in their own profile management.
-    if (isContributor) links.push({ p: 'dashboard', label: 'Contributor Portal', icon: 'LayoutDashboard' });
+    const teamPortal = listingRole === 'editor' || listingRole === 'viewer';
+    if (isContributor || teamPortal) links.push({ p: 'dashboard', label: 'Contributor Portal', icon: 'LayoutDashboard' });
     // Someone whose application is waiting for an admin has a Dashboard too (D-12).
     else if (isPendingApplicant) links.push({ p: 'dashboard', label: 'My Application', icon: 'Clock' });
     if (isAdmin) links.push({ p: 'admin', label: 'Admin Panel', icon: 'Shield' });
@@ -160,12 +161,13 @@
   // ── Desktop sidebar ──
   function Sidebar() {
     const app = window.useApp();
-    const { role, nav, go, user, isAdmin, isContributor, isPendingApplicant, unreadNotifs, unreadMsgs } = app;
+    const { role, nav, go, user, isAdmin, isContributor, isPendingApplicant, listingRole, unreadNotifs, unreadMsgs } = app;
     const [collapsed, setCollapsed] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
 
     const tabs = [...BASE_TABS];
-    if (isContributor) tabs.push({ page: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
+    const teamPortal = listingRole === 'editor' || listingRole === 'viewer';
+    if (isContributor || teamPortal) tabs.push({ page: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
     else if (isPendingApplicant) tabs.push({ page: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' });
     if (isAdmin) tabs.push({ page: 'admin', label: 'Admin Panel', icon: 'Shield' });
     tabs.push({ page: 'settings', label: 'Settings', icon: 'Settings' });
@@ -283,9 +285,9 @@
 
   // ── Floating create FAB (contributors) ──
   function CreateFab() {
-    const { isContributor, nav, openCreate } = window.useApp();
+    const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
-    if (!isContributor || ['messages', 'settings'].includes(nav.page)) return null;
+    if (!(isContributor || listingRole === 'editor') || ['messages', 'settings'].includes(nav.page)) return null;
     return React.createElement('div', { className: 'fixed right-4 bottom-20 md:bottom-6 z-40 flex flex-col items-end gap-2' },
       open && React.createElement(React.Fragment, null,
         React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
@@ -301,7 +303,7 @@
 
   // ── Page router ──
   function CurrentPage() {
-    const { nav, isPendingApplicant } = window.useApp();
+    const { nav, isPendingApplicant, listingRole } = window.useApp();
     const p = nav.page;
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
@@ -309,7 +311,7 @@
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
-      case 'dashboard': return React.createElement(isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage);
+      case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
       case 'settings': return React.createElement(window.SettingsPage);
       case 'apply': return React.createElement(window.ApplyPage);
