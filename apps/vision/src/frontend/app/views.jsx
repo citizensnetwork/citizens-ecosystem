@@ -73,12 +73,48 @@
       date: a.date,
       place: pl.name,
       onMap: pl.onMap,
+      // Kept so "edit this place" can put the pin back in the field. A name
+      // with no real spot stores null, never a leftover coordinate.
+      lat: pl.onMap ? Number(a.latitude) : null,
+      lng: pl.onMap ? Number(a.longitude) : null,
       reach: metric ? metric.reach : null,
       engagement: metric ? metric.engagement_score : null,
       rating: metric ? metric.avg_rating : null,
       claimed: !!metric,
       live: true,
     };
+  };
+  // The Place field's value for a row that is about to be edited.
+  const draftFromRow = (a) => {
+    const PL = window.CV_PLACE;
+    if (!a || !a.place) return PL.EMPTY;
+    return {
+      name: a.place,
+      lat: a.onMap && a.lat != null ? a.lat : null,
+      lng: a.onMap && a.lng != null ? a.lng : null,
+    };
+  };
+  // Row after a place is saved (demo and the optimistic shape of a live save).
+  const withPlace = (row, place) => {
+    const p = window.CV_PLACE.normalise(place);
+    if (!p) return row;
+    return { ...row, place: p.name, onMap: p.lat !== null, lat: p.lat, lng: p.lng };
+  };
+  // Demo only: the Timeline Map reads D.mapActivities. A real spot is added or
+  // replaced; a name with no spot is taken off the map.
+  const syncDemoMap = (activity, place) => {
+    const list = D.mapActivities;
+    if (!list) return;
+    const i = list.findIndex((r) => r && r.id === activity.id);
+    const mapRow = window.CV_PLACE.demoMapRow(
+      activity.id, activity.title, activity.type || "other", activity.date, place,
+    );
+    if (mapRow) {
+      if (i >= 0) list[i] = mapRow;
+      else list.unshift(mapRow);
+    } else if (i >= 0) {
+      list.splice(i, 1);
+    }
   };
   // vision.org_members row (mig 154 — user_org_roles joined to display-safe
   // public.profiles identity) → Team card shape. full_name is null-safe: a member
@@ -307,7 +343,17 @@
   // DELETE removes it (optimistic + revert). A CLAIMED activity shows its real
   // Connect metrics; a manual one shows honest em dashes — never fabricated, so
   // a sparse live log never reads worse than the demo. Demo stays local-only.
+  //
+  // A row with no place offers "Add a place". A row that has one shows the
+  // name, and that button edits it. Both open the Log form's PlaceField under
+  // the row. Save sends PATCH /api/activities/:id (latitude, longitude,
+  // location_name). A name with no coordinates is kept and says so. An earlier
+  // pin is cleared only when that name actually changes to one with no map
+  // location; the same name keeps its latitude and longitude. A real spot is
+  // what the Timeline Map plots. The Spaces directory does not render activity
+  // rows — this list is the only one.
   const ACTIVITY_TYPES = ["event", "meeting", "outreach", "workshop", "service", "training", "other"];
+  const PLACE_NAME_ERROR = "Add a place name";
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
   function Activities() {
     const { isLive, authFetch } = liveCtx();
@@ -318,6 +364,15 @@
     const [place, setPlace] = React.useState(window.CV_PLACE.EMPTY); // optional; see place-field.jsx
     const [err, setErr] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
+    // One row's place editor at a time. `draft` is the PlaceField value.
+    const [editingId, setEditingId] = React.useState(null);
+    const [draft, setDraft] = React.useState(window.CV_PLACE.EMPTY);
+    const [placeErr, setPlaceErr] = React.useState(null);
+    const [savingPlace, setSavingPlace] = React.useState(false);
+    const savingPlaceRef = React.useRef(false);
+    // Set just before the editor closes, so focus returns to that row's button
+    // after it has painted (Escape, Cancel, and a successful save).
+    const returnFocusId = React.useRef(null);
 
     React.useEffect(() => {
       if (!isLive || !authFetch) return;
@@ -348,7 +403,14 @@
       if (!isLive) {
         const id = "act-" + Date.now();
         const pl = PL.normalise(place);
-        setRows([{ id, title: t, space: "—", date, place: pl ? pl.name : "", onMap: !!pl && pl.lat !== null, reach: null, engagement: null, rating: null, claimed: false, live: false }, ...rows]);
+        setRows([{
+          id, title: t, type, space: "—", date,
+          place: pl ? pl.name : "",
+          onMap: !!(pl && pl.lat !== null),
+          lat: pl ? pl.lat : null,
+          lng: pl ? pl.lng : null,
+          reach: null, engagement: null, rating: null, claimed: false, live: false,
+        }, ...rows]);
         // The demo's Timeline Map reads D.mapActivities, so a demo activity with a
         // real spot appears there too (in memory only; a reload starts clean).
         const mapRow = PL.demoMapRow(id, t, type, date, place);
@@ -375,16 +437,96 @@
     const remove = async (id) => {
       const prev = rows;
       setRows(rows.filter((x) => x.id !== id)); // optimistic
-      if (!isLive) return;
+      if (editingId === id) { setEditingId(null); setPlaceErr(null); }
+      if (!isLive) {
+        const list = D.mapActivities;
+        if (list) {
+          const i = list.findIndex((r) => r && r.id === id);
+          if (i >= 0) list.splice(i, 1);
+        }
+        return;
+      }
       try {
         const res = await authFetch("/api/activities/" + id, { method: "DELETE" });
         if (!res.ok) throw new Error("Could not delete activity");
       } catch (e) { setErr(e.message || "Could not delete activity"); setRows(prev); }
     };
 
+    React.useEffect(() => {
+      const id = returnFocusId.current;
+      if (!id || editingId === id) return;
+      returnFocusId.current = null;
+      const el = document.getElementById("cv-place-" + id);
+      if (el) el.focus();
+    }, [editingId]);
+    const closeEditor = () => {
+      if (savingPlaceRef.current) return;
+      returnFocusId.current = editingId;
+      setEditingId(null);
+      setPlaceErr(null);
+    };
+    const openEditor = (a) => {
+      if (savingPlaceRef.current) return;
+      if (editingId === a.id) return;
+      setEditingId(a.id);
+      setDraft(draftFromRow(a));
+      setPlaceErr(null);
+    };
+    const focusPlaceField = (id) => {
+      const root = document.getElementById("cv-place-editor-" + id);
+      const input = root && root.querySelector('[role="combobox"]');
+      if (input) input.focus();
+    };
+    const savePlace = async () => {
+      if (savingPlaceRef.current || !editingId) return;
+      const PL = window.CV_PLACE;
+      const id = editingId;
+      const row = rows.find((r) => r.id === id);
+      const committed = row ? PL.commitPlace(draft, {
+        name: row.place || "",
+        lat: row.onMap ? row.lat : null,
+        lng: row.onMap ? row.lng : null,
+      }) : null;
+      if (!committed || !row) {
+        setPlaceErr(PLACE_NAME_ERROR);
+        focusPlaceField(id);
+        return;
+      }
+      savingPlaceRef.current = true;
+      setSavingPlace(true);
+      setPlaceErr(null);
+      try {
+        if (!isLive) {
+          setRows((cur) => cur.map((r) => (r.id === id ? withPlace(r, committed) : r)));
+          syncDemoMap(row, committed);
+          returnFocusId.current = id;
+          setEditingId(null);
+          return;
+        }
+        const res = await authFetch("/api/activities/" + id, {
+          method: "PATCH",
+          body: JSON.stringify(committed.patch),
+        });
+        const j = res.ok ? await res.json().catch(() => null) : null;
+        if (!res.ok || !j || !j.data) throw new Error("Could not save this place. Try again.");
+        const saved = mapActivity(j.data, null);
+        setRows((cur) => cur.map((r) => (r.id === id ? {
+          ...r, place: saved.place, onMap: saved.onMap, lat: saved.lat, lng: saved.lng,
+        } : r)));
+        returnFocusId.current = id;
+        setEditingId(null);
+      } catch (e) {
+        setPlaceErr((e && e.message) || "Could not save this place. Try again.");
+      } finally {
+        savingPlaceRef.current = false;
+        setSavingPlace(false);
+      }
+    };
+
     const cell = (v) => (v === null || v === undefined ? "—" : v);
     const col2 = isLive ? "Type" : "Space";
     const td = { padding: "11px 12px" };
+    const headers = ["Activity", col2, "Date", "Reach", "Engagement", "Rating", ""];
     return (
       <div className="fade-in">
         <SectionTitle>Activity log</SectionTitle>
@@ -395,47 +537,105 @@
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "var(--text-secondary)", fontSize: 12 }}>
-                {["Activity", col2, "Date", "Reach", "Engagement", "Rating", ""].map((h) => (
+                {headers.map((h) => (
                   <th key={h} style={{ padding: "10px 12px", fontWeight: 700, borderBottom: "1px solid var(--divider)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: "20px 12px", textAlign: "center", color: "var(--text-secondary)" }}>No activities yet. Log your first activity below.</td></tr>
-              ) : rows.map((a) => (
-                <tr key={a.id} style={{ borderBottom: "1px solid var(--divider)" }}>
-                  <td style={{ ...td, fontWeight: 700, maxWidth: 360 }}>
-                    {a.title}
-                    {a.place ? (
-                      // The place sits under the title (no extra column to squeeze the table), and says
-                      // whether the Timeline Map can plot it: a name alone is text, not a position.
-                      <div title={a.place + (a.onMap ? " (on your Timeline Map)" : " (name only, not on your Timeline Map)")}
-                        style={{ display: "flex", gap: 8, alignItems: "baseline", marginTop: 2, fontSize: 12, fontWeight: 600 }}>
-                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{a.place}</span>
-                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: a.onMap ? "var(--gold-800)" : "var(--text-tertiary)" }}>
-                          {a.onMap ? "On the Timeline Map" : "Name only"}
-                        </span>
-                      </div>
+                <tr><td colSpan={headers.length} style={{ padding: "20px 12px", textAlign: "center", color: "var(--text-secondary)" }}>No activities yet. Log your first activity below.</td></tr>
+              ) : rows.map((a) => {
+                const editing = editingId === a.id;
+                return (
+                  <React.Fragment key={a.id}>
+                    <tr style={{ borderBottom: editing ? "none" : "1px solid var(--divider)" }}>
+                      <td style={{ ...td, fontWeight: 700, maxWidth: 360 }}>
+                        {a.title}
+                        {/* The place control sits under the title so a 375px screen still
+                            shows it: the metric columns scroll, this column does not have to. */}
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, fontWeight: 700 }}>
+                          <Btn
+                            id={"cv-place-" + a.id}
+                            kind="ghost"
+                            aria-expanded={editing}
+                            aria-controls={editing ? "cv-place-editor-" + a.id : undefined}
+                            onClick={() => openEditor(a)}
+                            style={{ color: "var(--brand-ink)", minHeight: 44, maxWidth: "100%", minWidth: 0 }}
+                          >
+                            <Icon name="map-pin" size={15} />
+                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {a.place ? a.place : "Add a place"}
+                            </span>
+                            {a.place ? <Icon name="pencil" size={15} /> : null}
+                          </Btn>
+                          {a.place && !a.onMap ? (
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Saved without a map position</div>
+                          ) : null}
+                          {a.place && a.onMap ? (
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>On the Timeline Map</div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }}>{isLive ? cap(a.type) : a.space}</td>
+                      <td style={{ ...td, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{a.date}</td>
+                      <td style={td}>{cell(a.reach)}</td>
+                      <td style={td}>{cell(a.engagement)}</td>
+                      <td style={td}>{a.rating === null || a.rating === undefined ? "—" : a.rating + "★"}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>
+                        {a.claimed ? (
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "var(--gold-800)", background: "var(--gold-100)", borderRadius: 999, padding: "3px 9px", marginRight: 8 }}>
+                            Claimed from Connect
+                          </span>
+                        ) : null}
+                        <button type="button" onClick={() => remove(a.id)} aria-label={"Delete " + a.title} style={{ border: "none", background: "transparent", color: "var(--text-tertiary)", cursor: "pointer", verticalAlign: "middle" }}>
+                          <Icon name="x" size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                    {editing ? (
+                      <tr style={{ borderBottom: "1px solid var(--divider)" }}>
+                        <td id={"cv-place-editor-" + a.id} colSpan={headers.length}
+                          style={{ padding: "4px 12px 14px", background: "var(--surface-card)", borderBottom: "1px solid var(--border)" }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Escape" || savingPlaceRef.current) return;
+                            e.preventDefault();
+                            closeEditor();
+                          }}>
+                          <PlaceField
+                            autoFocus
+                            value={draft}
+                            onChange={(next) => {
+                              setDraft(next);
+                              if (window.CV_PLACE.cleanName(next && next.name)) {
+                                setPlaceErr((cur) => (cur === PLACE_NAME_ERROR ? null : cur));
+                              }
+                            }}
+                            onSubmit={savePlace}
+                            error={placeErr === PLACE_NAME_ERROR ? placeErr : null}
+                            loadMap={loadMapLibre}
+                            env={window.__CV_ENV || {}}
+                          />
+                          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                            <Btn
+                              kind="gold"
+                              onClick={savePlace}
+                              disabled={savingPlace || !window.CV_PLACE.cleanName(draft.name)}
+                              style={{ minHeight: 44 }}
+                            >
+                              {savingPlace ? "Saving…" : "Save"}
+                            </Btn>
+                            <Btn kind="ghost" onClick={closeEditor} disabled={savingPlace} style={{ minHeight: 44 }}>Cancel</Btn>
+                          </div>
+                          {placeErr && placeErr !== PLACE_NAME_ERROR ? (
+                            <div role="alert" style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--danger)" }}>{placeErr}</div>
+                          ) : null}
+                        </td>
+                      </tr>
                     ) : null}
-                  </td>
-                  <td style={{ ...td, color: "var(--text-secondary)" }}>{isLive ? cap(a.type) : a.space}</td>
-                  <td style={{ ...td, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{a.date}</td>
-                  <td style={td}>{cell(a.reach)}</td>
-                  <td style={td}>{cell(a.engagement)}</td>
-                  <td style={td}>{a.rating === null || a.rating === undefined ? "—" : a.rating + "★"}</td>
-                  <td style={{ ...td, whiteSpace: "nowrap" }}>
-                    {a.claimed ? (
-                      <span style={{ fontSize: 11, fontWeight: 800, color: "var(--gold-800)", background: "var(--gold-100)", borderRadius: 999, padding: "3px 9px", marginRight: 8 }}>
-                        Claimed from Connect
-                      </span>
-                    ) : null}
-                    <button onClick={() => remove(a.id)} aria-label="Delete activity" style={{ border: "none", background: "transparent", color: "var(--text-tertiary)", cursor: "pointer", verticalAlign: "middle" }}>
-                      <Icon name="x" size={15} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </Card>
@@ -706,7 +906,7 @@
             <div style={{ marginTop: 12, fontWeight: 800, fontSize: 16 }}>No activities with a place yet</div>
             <div style={{ marginTop: 8, maxWidth: 460, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
               The map plots every activity that has a place on the map. Add a place when you log
-              an activity (Spaces, then Activities) and it appears here, where you can play it back through time.
+              an activity, or on one already in the log (Spaces, then Activities), and it appears here.
             </div>
           </Card>
         </div>

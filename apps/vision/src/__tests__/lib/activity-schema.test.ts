@@ -188,4 +188,39 @@ describe("updateActivitySchema", () => {
     const result = updateActivitySchema.safeParse({ type: "invalid" });
     expect(result.success).toBe(false);
   });
+
+  it("accepts null coordinates so a place edit can clear a pin", () => {
+    const result = updateActivitySchema.safeParse({
+      location_name: "Hatfield",
+      latitude: null,
+      longitude: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toMatchObject({
+        location_name: "Hatfield",
+        latitude: null,
+        longitude: null,
+      });
+    }
+  });
+
+  it("rejects an out-of-range coordinate on update", () => {
+    expect(updateActivitySchema.safeParse({ latitude: 91 }).success).toBe(false);
+    expect(updateActivitySchema.safeParse({ longitude: 181 }).success).toBe(false);
+  });
+});
+
+describe("createActivitySchema coordinates", () => {
+  it("rejects null coordinates on create", () => {
+    const result = createActivitySchema.safeParse({
+      title: "Food drive",
+      type: "outreach",
+      date: "2026-06-28",
+      latitude: null,
+      longitude: null,
+      location_name: "Hatfield",
+    });
+    expect(result.success).toBe(false);
+  });
 });

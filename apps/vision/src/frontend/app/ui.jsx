@@ -23,17 +23,30 @@
     logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
     plus: "M12 5v14 M5 12h14",
     x: "M18 6 6 18 M6 6l12 12",
+    // Lucide map-pin and pencil, as a stroke pair (the pin's dot is a second path).
+    "map-pin": [
+      "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0z",
+      "M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
+    ],
+    pencil: [
+      "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+      "m15 5 4 4",
+    ],
     alert: "M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
     compass: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z m4.2-14.2-2.1 6.3-6.3 2.1 2.1-6.3z",
     layers: "m12 2 10 6-10 6L2 8z m10 10-10 6-10-6 m20-4-10 6-10-6",
   };
 
-  const Icon = ({ name, size = 18, style }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
-      {paths[name] ? <path d={paths[name]} /> : null}
-    </svg>
-  );
+  const Icon = ({ name, size = 18, style }) => {
+    const d = paths[name];
+    const list = Array.isArray(d) ? d : d ? [d] : [];
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
+        {list.map((p, i) => <path key={name + "-" + i} d={p} />)}
+      </svg>
+    );
+  };
 
   const Crown = ({ size = 34, color = "var(--gold-500)" }) => (
     <svg width={size} height={size * 0.72} viewBox="0 0 100 72" fill="none" aria-label="Citizens crown">
@@ -67,7 +80,7 @@
     }}>{children}</button>
   );
 
-  const Btn = ({ children, onClick, kind = "ghost", style, disabled }) => {
+  const Btn = ({ children, onClick, kind = "ghost", style, disabled, ...rest }) => {
     const kinds = {
       gold: { background: "var(--brand)", color: "var(--on-brand)", border: "1px solid var(--brand-strong)" },
       ink: { background: "var(--surface-inverse)", color: "var(--text-on-inverse)", border: "1px solid transparent" },
@@ -75,7 +88,7 @@
       danger: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid transparent" },
     };
     return (
-      <button onClick={onClick} disabled={disabled} style={{
+      <button type="button" onClick={onClick} disabled={disabled} {...rest} style={{
         ...kinds[kind], borderRadius: 12, padding: "9px 16px", fontSize: 14, fontWeight: 700,
         cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.55 : 1,
         display: "inline-flex", alignItems: "center", gap: 8, ...style,
