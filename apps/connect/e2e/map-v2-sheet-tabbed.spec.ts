@@ -402,7 +402,7 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
 test.describe("tabbed block keyboard and dark look", () => {
   test.use({ viewport: phone });
 
-  test("Tab reaches a panel that has no buttons, and the focus ring uses the focus tokens", async ({ page }) => {
+  test("Tab reaches the panel before the note's report control, and the focus ring uses the focus tokens", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, {
@@ -420,7 +420,7 @@ test.describe("tabbed block keyboard and dark look", () => {
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab")).toHaveText(["Today"]);
     await expect(page.locator("#mv2-panel")).toContainText("A note from today");
-    await expect(page.locator("#mv2-panel button")).toHaveCount(0);
+    await expect(page.locator("#mv2-panel").getByRole("button", { name: "More options" })).toHaveCount(1);
     await page.getByRole("tab", { name: "Today" }).focus();
     await page.keyboard.press("Tab");
     await expect(page.locator("#mv2-panel")).toBeFocused();
