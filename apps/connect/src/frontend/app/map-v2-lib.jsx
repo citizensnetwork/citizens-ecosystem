@@ -28,6 +28,9 @@
 //  Also: countBucket(n), the rounded-down public count ("100+") that is never shown below 100
 //  (tracker P2-08: a small ministry is not shown with a low number).
 //
+//  Also: trapFocus(root) and lockBehind(), shared by the QR dialog and the photo
+//  viewer (issue #223). The news reader keeps its own copy until it moves over.
+//
 //  Public surface: window.isMapV2(), window.MapV2.
 // ════════════════════════════════════════════════════════════════════
 (function () {
@@ -92,6 +95,78 @@
   resolveFlag();
   const isMapV2 = () => on;
 
+  // ── Dialogs over the sheet (issue #223) ───────────────────────────
+  // The news reader's trap stays inside MapV2News.Reader. These two are the
+  // shared copy for the QR dialog and the photo viewer, which can be open
+  // together: only the topmost dialog wraps Tab, and the page behind (#root
+  // inert, and the scroll lock) comes back when the LAST dialog closes.
+  const TAB_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const focusTraps = [];
+  let overlayDepth = 0;
+  let overlayInert = false;
+  let overlayOverflow = '';
+
+  function onTrapKey(e) {
+    if (!doc || e.key !== 'Tab' || !focusTraps.length) return;
+    const root = focusTraps[focusTraps.length - 1];
+    if (!root || !root.isConnected) return;
+    const nodes = Array.prototype.slice.call(root.querySelectorAll(TAB_SELECTOR));
+    if (!nodes.length) { e.preventDefault(); e.stopPropagation(); return; }
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    const active = doc.activeElement;
+    const inside = !!(active && root.contains(active));
+    const idx = active ? nodes.indexOf(active) : -1;
+    if (e.shiftKey) {
+      if (!inside || idx <= 0) { e.preventDefault(); e.stopPropagation(); last.focus(); }
+    } else if (!inside || idx === -1 || idx === nodes.length - 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      first.focus();
+    }
+  }
+  // Capture-phase Tab wrap. Returns the unbind. A dialog opened over another
+  // pushes again; only the latest root wraps, until it unbinds.
+  function trapFocus(root) {
+    if (!doc || !root) return function () {};
+    focusTraps.push(root);
+    if (focusTraps.length === 1) doc.addEventListener('keydown', onTrapKey, true);
+    let released = false;
+    return function release() {
+      if (released) return;
+      released = true;
+      const i = focusTraps.lastIndexOf(root);
+      if (i >= 0) focusTraps.splice(i, 1);
+      if (!focusTraps.length) doc.removeEventListener('keydown', onTrapKey, true);
+    };
+  }
+  // inert on #root, and overflow:hidden on <html>. One counter for both, so a
+  // nested dialog restores the values from BEFORE the first one, and only when
+  // it was the last. Returns the release. Call it before returning focus: the
+  // opener sits inside #root, and a browser will not focus an inert button.
+  function lockBehind() {
+    if (!doc || !doc.documentElement) return function () {};
+    if (overlayDepth === 0) {
+      const page = doc.getElementById('root');
+      overlayInert = !!(page && page.inert);
+      overlayOverflow = doc.documentElement.style.overflow;
+      if (page) page.inert = true;
+      doc.documentElement.style.overflow = 'hidden';
+    }
+    overlayDepth += 1;
+    let released = false;
+    return function release() {
+      if (released) return;
+      released = true;
+      overlayDepth -= 1;
+      if (overlayDepth > 0) return;
+      overlayDepth = 0;
+      const page = doc.getElementById('root');
+      if (page) page.inert = overlayInert;
+      doc.documentElement.style.overflow = overlayOverflow;
+    };
+  }
+
   // ── Reduced motion ────────────────────────────────────────────────
   function prefersReducedMotion() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch { return false; }
@@ -114,6 +189,7 @@
   // ── Stylesheet (flag on only) ─────────────────────────────────────
   const api = {
     isOn: isMapV2, motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
+    trapFocus, lockBehind,
     // true once assets/map-v2.css has loaded (or failed: never block the map on it)
     styleReady: false,
     FLAG_KEY, CSS_HREF,
