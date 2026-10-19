@@ -17,7 +17,7 @@
   "dependencies": {
     "@capacitor/app": "^6.0.0",
     "@capacitor/browser": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
+    "@capacitor/core": "^8.5.3",
     "@citizens/connect-client": "workspace:*",
     "@citizens/db": "workspace:*",
     "@citizens/utils": "workspace:*",
