@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkDashboardAccess } from "@/lib/dashboard/access";
+import { canAdministerListing } from "@/lib/dashboard/permissions";
 import { recordContributorMutation } from "@/lib/dashboard/activity";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
@@ -87,7 +88,7 @@ export async function POST(
   const { handle } = await params;
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
@@ -290,7 +291,7 @@ export async function DELETE(
   }
 
   const access = await checkDashboardAccess(handle, request);
-  if (!access.hasAccess) {
+  if (!access.hasAccess || !canAdministerListing(access)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
