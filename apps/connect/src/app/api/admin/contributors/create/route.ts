@@ -30,9 +30,18 @@
  * online-only Contributor (tracker C21).
  *
  * Body: { display_name, claim_email, contributor_kind?, contributor_category,
- *   bio?, website_url?, instagram_handle?, facebook_url?, tiktok_handle?,
- *   youtube_url?, no_fixed_location?, physical_address?, physical_latitude?,
- *   physical_longitude?, logo_url?, gallery_urls?, email_owner? }
+ *   bio?, website_url?, contact_email?, instagram_handle?, facebook_url?,
+ *   tiktok_handle?, youtube_url?, x_handle?, linkedin_url?, whatsapp_number?,
+ *   no_fixed_location?, physical_address?, physical_latitude?,
+ *   physical_longitude?, logo_url?, gallery_urls?, cover_photo_urls?, email_owner? }
+ *
+ * Contact email, X, LinkedIn, WhatsApp and the cover are columns the listing
+ * already has, and parseListingFields already checks the first four. The
+ * create RPC (migration 170) still has no arguments for them, so once it
+ * succeeds this route writes just those columns through the admin's own
+ * session. "Admins can update any profile" allows it, and is_admin() passes
+ * the server-column guard. A failed write deletes the new auth user, the
+ * same rollback as a failed RPC, so a listing is never left half-filled.
  */
 
 import { getRouteAuth } from "@/lib/supabase/route";
@@ -40,7 +49,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { coercePublicUrl } from "@/lib/publicUrl";
+import { coercePublicUrl, normalisePublicUrl } from "@/lib/publicUrl";
 import { MAX_URL, hasMapPin, parseListingFields, trimOrNull } from "@/lib/contributorFields";
 import { adminNotifyEmail, sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
 import { ownerWelcomeEmail } from "@/lib/email/templates";
@@ -49,6 +58,29 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_GALLERY_URLS = 6;
+
+type CoverPhoto = { url: string; caption: null };
+
+/**
+ * One cover, the shape profiles.cover_photo_urls already stores.
+ * Empty means none. Anything that is not a single http(s) image link is refused.
+ */
+function oneCover(value: unknown): CoverPhoto[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > 1) return "invalid";
+  if (value.length === 0) return null;
+  const item = value[0];
+  const raw =
+    typeof item === "string"
+      ? item
+      : item && typeof item === "object"
+        ? (item as { url?: unknown }).url
+        : null;
+  if (raw === null || raw === undefined || (typeof raw === "string" && raw.trim() === "")) return null;
+  const url = normalisePublicUrl(raw, MAX_URL);
+  if (!url) return "invalid";
+  return [{ url, caption: null }];
+}
 
 export async function POST(request: NextRequest) {
   const { supabase } = await getRouteAuth(request);
@@ -87,6 +119,11 @@ export async function POST(request: NextRequest) {
     galleryUrls = payload.gallery_urls
       .filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u))
       .slice(0, MAX_GALLERY_URLS);
+  }
+
+  const covers = oneCover(payload.cover_photo_urls);
+  if (covers === "invalid") {
+    return NextResponse.json({ error: "invalid_cover_url" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -144,6 +181,29 @@ export async function POST(request: NextRequest) {
       { error: result?.reason ?? "create_failed" },
       { status: result?.reason === "not_admin" ? 403 : 500 },
     );
+  }
+
+  // Columns migration 170's RPC does not take. Written as the admin, and only
+  // when there is something to store, so a create that leaves them blank
+  // stays a single RPC call.
+  const extras: Record<string, unknown> = {};
+  if (fields.contactEmail) extras.contributor_contact_email = fields.contactEmail;
+  if (fields.socials.x_handle) extras.x_handle = fields.socials.x_handle;
+  if (fields.socials.linkedin_url) extras.linkedin_url = fields.socials.linkedin_url;
+  if (fields.socials.whatsapp_number) extras.whatsapp_number = fields.socials.whatsapp_number;
+  if (covers) extras.cover_photo_urls = covers;
+  if (Object.keys(extras).length > 0) {
+    const { data: updated, error: updateErr } = await supabase
+      .from("profiles")
+      .update(extras)
+      .eq("id", newUserId)
+      .select("id")
+      .maybeSingle();
+    if (updateErr || !updated || updated.id !== newUserId) {
+      await admin.auth.admin.deleteUser(newUserId).catch(() => {});
+      console.error("[/api/admin/contributors/create] listing extras", updateErr);
+      return NextResponse.json({ error: "create_failed" }, { status: 500 });
+    }
   }
 
   await logAdminAction(supabase, {
