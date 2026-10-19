@@ -354,14 +354,20 @@
             movedToOwner
               ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))
               : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
-        !confirming && h('div', { className: 'flex items-center gap-1 shrink-0 ml-auto' },
-          !movedToOwner && h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk }, hidden ? 'Unhide' : 'Hide'),
+        // One visibility action: Hide while it is live, Unhide while it is hidden.
+        // Delete is the danger button, last, with a gap so it is not next to Hide.
+        !confirming && h('div', { className: 'flex items-center shrink-0 ml-auto', 'data-listing-actions': '' },
+          !movedToOwner && h(Button, {
+            type: 'button', size: 'sm', variant: hidden ? 'success' : 'danger',
+            icon: hidden ? 'Eye' : 'EyeOff', disabled: busy, onClick: onAsk,
+          }, hidden ? 'Unhide' : 'Hide'),
           // Delete is allowed on every row, including a placeholder that moved to
           // its owner (the way to clear the empty shell) — the server decides what it does.
-          h('button', {
-            type: 'button', onClick: onDelete, disabled: busy, 'aria-label': 'Delete ' + name,
-            className: 'inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-[#DC2626] hover:bg-[#FEE2E2] transition-colors disabled:opacity-40',
-          }, h(Icon, { name: 'Trash2', size: 13 }), 'Delete'))),
+          h(Button, {
+            type: 'button', size: 'sm', variant: 'danger', icon: 'Trash2', disabled: busy, onClick: onDelete,
+            'aria-label': 'Delete ' + name,
+            className: movedToOwner ? undefined : 'ml-4',
+          }, 'Delete'))),
       confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
         h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
           // true for every listing: the map shows it only when it has a pin, Kingdom Discovery always (C21)
@@ -410,9 +416,11 @@
       return () => { active = false; };
     }, [row.id]);
 
-    const name = (preview && preview.name) || row.full_name || 'this listing';
+    const confirmedName = preview ? String(preview.name || '').replace(/\s+/g, ' ').trim() : '';
+    const name = confirmedName || row.full_name || 'this listing';
     // A listing with no name is confirmed by typing "delete" (mirrors the database).
-    const expected = (preview && preview.name) || 'delete';
+    // Matching is case-insensitive and ignores spaces around the word.
+    const expected = confirmedName || 'delete';
     const matches = !!preview && normName(typed) === normName(expected);
     const placeholder = !!preview && preview.case === 'placeholder';
     const touched = preview ? [
@@ -487,6 +495,17 @@
     const [busyId, setBusyId] = useState(null);
     const [deleting, setDeleting] = useState(null); // the row whose Delete modal is open
     const [reload, setReload] = useState(0);
+    const createWasOpen = useRef(false);
+
+    // The create overlay does not restore focus itself. When it closes, put
+    // focus back on the button that opened it (after the panel has unmounted).
+    useEffect(() => {
+      if (createWasOpen.current && !createOpen) {
+        const trigger = document.getElementById('admin-create-contributor');
+        if (trigger) trigger.focus();
+      }
+      createWasOpen.current = !!createOpen;
+    }, [createOpen]);
 
     // GET /api/admin/users?role=contributor (admin-gated, service-role read —
     // it carries the claim columns). Page 1 replaces, later pages append;
@@ -567,6 +586,7 @@
             className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
           })),
         h(Button, {
+          id: 'admin-create-contributor', type: 'button',
           variant: 'gold', icon: 'Plus', className: 'w-full sm:w-auto min-h-[44px]',
           onClick: () => onCreateOpenChange(true),
         }, 'Create Contributor')),
@@ -666,7 +686,13 @@
       return () => { active = false; };
     }, [row.id]);
 
-    const display = (preview && preview.name) || row.full_name || '';
+    // A blank display name is confirmed by typing "delete". The comparison
+    // trims and ignores case, the same way the database does. The words on
+    // screen keep the name's own capitals.
+    const rawName = !preview
+      ? (row.full_name || '')
+      : (typeof preview.name === 'string' ? preview.name : (row.full_name || ''));
+    const display = String(rawName).replace(/\s+/g, ' ').trim();
     const expected = display || 'delete';
     const matches = !!preview && normName(typed) === normName(expected);
     const counts = preview ? citizenCountLine(preview) : '';
@@ -793,7 +819,7 @@
           h('input', {
             ref: (node) => { searchRef.current = node; },
             id: 'admin-citizen-search', value: q, onChange: (e) => { setQ(e.target.value); setPage(1); },
-            placeholder: 'Search name…', 'aria-label': 'Search citizens',
+            placeholder: 'Search name or email…', 'aria-label': 'Search citizens',
             className: 'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground',
           })),
         h('select', { 'aria-label': 'Signed in', value: signedIn, onChange: setFilter(setSignedIn), className: selectCls },
@@ -820,14 +846,25 @@
             ? h(Empty, { icon: 'Users', title: 'No citizens match these filters' })
             : rows.map((r) => {
                 const name = r.full_name || 'Unnamed citizen';
-                const appLabel = r.contributor_status === 'pending' ? 'Pending application' : r.contributor_status === 'rejected' ? 'Application rejected' : '';
+                // Same chip as an application card: words plus colour. The text is the status.
+                const chip = r.contributor_status === 'pending'
+                  ? { label: 'Pending application', color: '#D97706', bg: '#FEF3C7', icon: 'Clock' }
+                  : r.contributor_status === 'rejected'
+                    ? { label: 'Application rejected', color: '#DC2626', bg: '#FEE2E2', icon: 'XCircle' }
+                    : null;
                 return h('div', { key: r.id, className: 'bg-card rounded-2xl border border-border p-3', 'data-citizen': r.id },
                   h('div', { className: 'flex items-center gap-3 flex-wrap sm:flex-nowrap' },
                     h(Avatar, { src: r.avatar_url, name: r.full_name, size: 40, rounded: 'xl' }),
                     h('div', { className: 'flex-1 min-w-[10rem]' },
-                      h('p', { className: 'text-sm font-bold text-foreground truncate' }, name),
+                      h('div', { className: 'flex items-center gap-2 flex-wrap' },
+                        h('p', { className: 'text-sm font-bold text-foreground truncate' }, name),
+                        chip && h('span', {
+                          className: 'px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1',
+                          style: { background: chip.bg, color: chip.color },
+                          'data-status-chip': chip.label,
+                        }, h(Icon, { name: chip.icon, size: 9, 'aria-hidden': true }), chip.label)),
                       h('p', { className: 'text-[11px] text-muted-foreground mt-0.5' },
-                        joinedLabel(r.created_at) + ' · ' + lastActiveLabel(r.last_sign_in_at) + (appLabel ? ' · ' + appLabel : ''))),
+                        joinedLabel(r.created_at) + ' · ' + lastActiveLabel(r.last_sign_in_at))),
                     h('button', {
                       type: 'button', 'data-citizen-delete': '', onClick: () => setDeleting(r),
                       'aria-label': 'Delete ' + name,

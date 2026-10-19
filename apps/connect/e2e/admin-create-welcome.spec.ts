@@ -65,7 +65,10 @@ test.describe("Admin → Create Contributor: welcome email (D-13)", () => {
     await fillAndCreate(page);
 
     await expect(page.getByTestId("admin-create-form")).toHaveCount(0);
-    await expect(page.getByText(`Welcome email sent to ${OWNER_EMAIL}`)).toBeVisible();
+    const welcome = page.getByText(`Welcome email sent to ${OWNER_EMAIL}`);
+    await expect(welcome).toBeVisible();
+    await expect(page.locator('[aria-live="polite"]').filter({ hasText: `Welcome email sent to ${OWNER_EMAIL}` })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create Contributor", exact: true })).toBeFocused();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ display_name: "Grace Outreach", claim_email: OWNER_EMAIL, email_owner: true });
   });

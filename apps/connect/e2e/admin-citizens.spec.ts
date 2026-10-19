@@ -36,6 +36,26 @@ const BEN = {
   last_sign_in_at: null,
   email: "ben@secret.example",
 };
+const CARA = {
+  id: "cccccccc-cccc-4ccc-8ccc-ccccccccccc3",
+  full_name: "Cara Neighbour",
+  avatar_url: null,
+  role: "citizen",
+  contributor_status: "rejected",
+  created_at: "2026-07-01T08:00:00.000Z",
+  last_sign_in_at: "2026-10-01T08:00:00.000Z",
+  email: "cara@secret.example",
+};
+const NO_NAME = {
+  id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd4",
+  full_name: null,
+  avatar_url: null,
+  role: "citizen",
+  contributor_status: "not_applied",
+  created_at: "2026-08-01T08:00:00.000Z",
+  last_sign_in_at: null,
+  email: "noname@secret.example",
+};
 
 function path(page: Page) {
   return new URL(page.url()).pathname;
@@ -115,15 +135,22 @@ test.describe("Admin → Citizens", () => {
   }
 
   test("lists names and dates, filters on the server, and never shows an email", async ({ page }) => {
-    const queries = await openCitizens(page);
+    const queries = await openCitizens(page, [ADA, BEN, CARA]);
     const ada = page.locator(`[data-citizen="${ADA.id}"]`);
     const ben = page.locator(`[data-citizen="${BEN.id}"]`);
+    const cara = page.locator(`[data-citizen="${CARA.id}"]`);
     await expect(ada.getByText("Ada Citizen")).toBeVisible();
     await expect(ada).toContainText("joined 12 Oct");
     await expect(ada).toContainText(/last active \d+ days ago/);
+    await expect(ada.locator("[data-status-chip]")).toHaveCount(0);
     await expect(ben).toContainText("Never signed in");
-    await expect(ben).toContainText("Pending application");
+    await expect(ben.locator("[data-status-chip]")).toHaveText("Pending application");
+    await expect(cara.locator("[data-status-chip]")).toHaveText("Application rejected");
+    await expect(page.getByLabel("Search citizens")).toHaveAttribute("placeholder", "Search name or email…");
     await expect(page.locator("[data-admin-citizens]")).not.toContainText("@");
+    await expect(page.locator("[data-admin-citizens]")).not.toContainText("ada@secret.example");
+    await expect(page.locator("[data-admin-citizens]")).not.toContainText("ben@secret.example");
+    await expect(page.locator("[data-admin-citizens]")).not.toContainText("cara@secret.example");
     expect(queries.some((q) => q.get("role") === "citizen")).toBe(true);
 
     await page.getByLabel("Signed in").selectOption("never");
@@ -214,5 +241,80 @@ test.describe("Admin → Citizens", () => {
     await expect(blocked.getByRole("alert")).toContainText("Citizens Wear brand");
     await expect(blocked.getByRole("button", { name: "Delete account" })).toHaveCount(0);
     await expect(page.locator(`[data-citizen="${BEN.id}"]`)).toBeVisible();
+  });
+
+  test("a citizen with no display name is confirmed by typing delete, in any case, ignoring surrounding spaces", async ({
+    page,
+  }) => {
+    await openCitizens(page, [NO_NAME]);
+    const posts: { id: string; confirmName: string }[] = [];
+    await page.route("**/api/admin/citizens/delete**", async (route: Route) => {
+      const request = route.request();
+      if (request.method() === "GET") {
+        return route.fulfill({
+          json: {
+            name: "",
+            follows: 0,
+            placeFollows: 0,
+            saves: 0,
+            rsvps: 0,
+            comments: 0,
+            moments: 0,
+            messages: 0,
+            notifications: 0,
+            blockers: [],
+          },
+        });
+      }
+      posts.push(request.postDataJSON() as { id: string; confirmName: string });
+      return route.fulfill({ json: { outcome: "deleted", warnings: [] } });
+    });
+
+    const row = page.locator(`[data-citizen="${NO_NAME.id}"]`);
+    await expect(row).not.toContainText("noname@secret.example");
+    await row.getByRole("button", { name: "Delete Unnamed citizen" }).click();
+    const modal = page.locator(`[data-delete-citizen="${NO_NAME.id}"]`);
+    const typed = modal.getByLabel("Type the display name to confirm");
+    const confirm = modal.getByRole("button", { name: "Delete account" });
+    await expect(confirm).toBeDisabled();
+    await typed.fill("deleted");
+    await expect(confirm).toBeDisabled();
+    await typed.fill(" DELETE ");
+    await expect(confirm).toBeEnabled();
+    await typed.fill("Delete");
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect(row).toHaveCount(0);
+    expect(posts).toEqual([{ id: NO_NAME.id, confirmName: "Delete" }]);
+  });
+
+  test("overview counts are buttons whose accessible names include the count", async ({ page }) => {
+    await signInAdmin(page);
+    await page.route("**/api/admin/users**", (route: Route) => {
+      const params = new URL(route.request().url()).searchParams;
+      if (params.get("role") === "citizen") {
+        return route.fulfill({ json: { data: [ADA], meta: { page: 1, pageSize: 20, total: 1 } } });
+      }
+      return route.fulfill({ json: { data: [], meta: { page: 1, pageSize: 20, total: 12 } } });
+    });
+    await page.goto("/admin");
+    await expect(page.locator('[data-screen="admin"]')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Overview", exact: true }).click();
+
+    const members = page.getByRole("button", { name: "View 12 members" });
+    await expect(members).toBeVisible();
+    await expect(members).toHaveAccessibleName("View 12 members");
+    const contributors = page.getByRole("button", { name: /^View \d+ contributors?$/ });
+    await expect(contributors).toBeVisible();
+    const contributorCount = ((await contributors.innerText()).match(/\d+/) || [""])[0];
+    await expect(contributors).toHaveAccessibleName(
+      `View ${contributorCount} contributor${contributorCount === "1" ? "" : "s"}`,
+    );
+
+    await members.click();
+    await expect(page.locator("[data-admin-citizens]")).toBeVisible();
+    await page.getByRole("button", { name: "Overview", exact: true }).click();
+    await page.getByRole("button", { name: /^View \d+ contributors?$/ }).click();
+    await expect(page.locator("[data-admin-contributors]")).toBeVisible();
   });
 });

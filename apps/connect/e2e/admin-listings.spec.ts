@@ -92,6 +92,19 @@ test.describe("Admin → Listings", () => {
     const form = page.locator('[data-listing="hope-harvest-outreach"]');
     const hidden = page.locator('[data-listing="kingdom-table-coffee"]');
     await expect(form).toBeVisible();
+    await expect(form.getByRole("button", { name: "Hide", exact: true })).toHaveCount(1);
+    await expect(form.getByRole("button", { name: "Unhide", exact: true })).toHaveCount(0);
+    await expect(hidden.getByRole("button", { name: "Unhide", exact: true })).toHaveCount(1);
+    await expect(hidden.getByRole("button", { name: "Hide", exact: true })).toHaveCount(0);
+    const formDelete = form.getByRole("button", { name: "Delete Hope Harvest Outreach" });
+    await expect(formDelete).toHaveClass(/bg-\[#FEE2E2\]/);
+    const formActions = await form.locator("[data-listing-actions] button").evaluateAll((els) =>
+      els.map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
+    );
+    expect(formActions.at(-1)).toBe("Delete");
+    expect(formActions.filter((label) => label === "Hide" || label === "Unhide")).toHaveLength(1);
+    const deleteGap = await formDelete.evaluate((el) => parseFloat(getComputedStyle(el).marginLeft));
+    expect(deleteGap).toBeGreaterThanOrEqual(16);
     await expect(form.getByText("LIVE", { exact: true })).toBeVisible();
     await expect(form.getByText("Awaiting owner sign-in · lerato@hopeharvest.org.za")).toBeVisible();
     await expect(form.getByRole("link", { name: "/c/hope-harvest-outreach" })).toHaveAttribute(
@@ -116,6 +129,8 @@ test.describe("Admin → Listings", () => {
     await form.getByRole("button", { name: "Hide" }).click();
     await form.getByRole("button", { name: "Confirm hide" }).click();
     await expect(form.getByText("HIDDEN", { exact: true })).toBeVisible();
+    await expect(form.getByRole("button", { name: "Unhide", exact: true })).toHaveCount(1);
+    await expect(form.getByRole("button", { name: "Hide", exact: true })).toHaveCount(0);
     await expect(page.getByText("Hope Harvest Outreach is hidden", { exact: false })).toBeVisible();
     expect(hideBodies).toEqual([{ user_id: FORM_LISTING.id, hidden: true }]);
 

@@ -104,6 +104,13 @@ describe("admin_delete_citizen_account", () => {
     expect(f.text).toMatch(/blocked_by_related_data/);
   });
 
+  it("confirms a blank name with delete, case-insensitively, after trimming", () => {
+    expect(f.text).toMatch(/nullif\(btrim\(v_row\.full_name\), ''\), 'delete'/);
+    expect(f.text).toMatch(
+      /lower\(btrim\(regexp_replace\(coalesce\(_confirm, ''\), '\\s\+', ' ', 'g'\)\)\)/,
+    );
+  });
+
   it("is not executable by public or anon", () => {
     expect(code).toMatch(
       /revoke all on function public\.admin_delete_citizen_account\(uuid, boolean, text\) from public, anon;/,

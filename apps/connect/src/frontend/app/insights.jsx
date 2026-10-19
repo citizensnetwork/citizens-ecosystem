@@ -291,6 +291,9 @@
       ['Crown', '#16A34A', 'Cornerstone Sports League was approved as a contributor', '5 hours ago'],
     ];
     const filtered = contributors.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()));
+    const viewCount = (n, singular) => 'View ' + n + ' ' + singular + (Number(n) === 1 ? '' : 's');
+    const memberCount = real ? (adminStats.totalUsers || 0) : citizens.length;
+    const contributorCount = contributors.length;
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },
       h('div', { className: 'grid grid-cols-2 sm:grid-cols-5 gap-2' },
@@ -298,17 +301,17 @@
         h('button', {
           type: 'button', onClick: () => setTab('citizens'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#C9A84C] transition-colors min-h-[44px]',
-          'aria-label': 'Open Citizens',
+          'aria-label': viewCount(memberCount, real ? 'member' : 'citizen'),
         },
           h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, real ? 'Members' : 'Citizens'),
-          h('p', { className: 'text-xl font-bold mt-1', style: { color: '#16A34A' } }, real ? adminStats.totalUsers : citizens.length)),
+          h('p', { className: 'text-xl font-bold mt-1', style: { color: '#16A34A' } }, memberCount)),
         h('button', {
           type: 'button', onClick: () => setTab('contributors'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#C9A84C] transition-colors min-h-[44px]',
-          'aria-label': 'Open Contributors',
+          'aria-label': viewCount(contributorCount, 'contributor'),
         },
           h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, 'Contributors'),
-          h('p', { className: 'text-xl font-bold mt-1', style: { color: '#9B59B6' } }, contributors.length)),
+          h('p', { className: 'text-xl font-bold mt-1', style: { color: '#9B59B6' } }, contributorCount)),
         KpiCard('Live now', liveNow, '#DC2626', liveNow ? { up: false, text: 'on the map' } : null)),
 
       (pendingApps > 0 || openReports > 0) && h('div', { className: 'grid sm:grid-cols-2 gap-2' },
