@@ -1,0 +1,173 @@
+import { test, expect, type Page, type Route } from "@playwright/test";
+import { mockAppShell } from "./support/fake-project";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+
+// Issue #160: a person can report an event, a profile and a Moment, and a guest
+// is sent to sign in. The API is answered here. Nothing reaches a real project.
+
+const EVENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const PLACE_ID = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+const ORG_ID = "11111111-1111-4111-8111-000000000001";
+const MOMENT_ID = "3f1c0a2e-7b6d-4e18-9a5c-2d8e6f0b1c44";
+const SLUG = "anchor-community-church";
+const PRETORIA = { lat: -25.7479, lng: 28.2293 };
+const THANKS = "Thanks. An admin will look at it.";
+
+const EVENT = {
+  id: EVENT_ID,
+  title: "Hatfield Sunday Celebration",
+  description: "A weekly gathering open to everyone in the city.",
+  date: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+  end_time: new Date(Date.now() + 3 * 86_400_000 + 7_200_000).toISOString(),
+  location: "1186 Burnett Street, Hatfield, Pretoria",
+  category: "church-services",
+  image_url: null,
+  latitude: PRETORIA.lat,
+  longitude: PRETORIA.lng,
+  created_by: ORG_ID,
+  created_at: new Date().toISOString(),
+  volunteer_openings: false,
+};
+const PLACE = {
+  id: PLACE_ID,
+  name: "Brooklyn Anchor Campus",
+  description: "Open through the week for prayer, coffee and community.",
+  address: "212 Justice Mahomed Street, Brooklyn, Pretoria",
+  category: "churches-ministries",
+  custom_category: null,
+  image_url: null,
+  open_hours: "Mon-Fri 08:00-17:00",
+  latitude: PRETORIA.lat + 0.02,
+  longitude: PRETORIA.lng + 0.02,
+  created_by: ORG_ID,
+  verified: true,
+  status: "published",
+  volunteer_openings: false,
+};
+const CONTRIBUTOR = {
+  id: ORG_ID,
+  full_name: "Anchor Community Church",
+  role: "contributor",
+  contributor_kind: "ministry",
+  category: "churches-ministries",
+  contributor_slug: SLUG,
+  bio: "A church family serving Pretoria.",
+  logo_url: null,
+  avatar_url: null,
+  physical_address: "212 Justice Mahomed Street, Brooklyn, Pretoria",
+  physical_latitude: PRETORIA.lat + 0.03,
+  physical_longitude: PRETORIA.lng - 0.03,
+  no_fixed_location: false,
+  gallery_urls: [],
+  cover_photo_urls: [],
+};
+
+async function mockListings(page: Page) {
+  await page.route("**/api/v1/events**", (route: Route) => route.fulfill({ json: { data: [EVENT], meta: {} } }));
+  await page.route(`**/api/v1/events/${EVENT_ID}`, (route: Route) => route.fulfill({ json: { data: { ...EVENT, stats: {} }, meta: {} } }));
+  await page.route("**/api/v1/places**", (route: Route) => route.fulfill({ json: { data: [PLACE], meta: {} } }));
+  await page.route("**/api/v1/contributors**", (route: Route) => route.fulfill({ json: { data: [CONTRIBUTOR], meta: {} } }));
+  await page.route(`**/api/v1/contributors/${SLUG}`, (route: Route) =>
+    route.fulfill({ json: { data: { profile: CONTRIBUTOR, upcoming_events: [], past_events: [], places: [] } } }),
+  );
+}
+
+/** Demo mode: no Supabase. `authed` is the stored demo session the app already treats as signed in. */
+async function openDemo(page: Page, authed: boolean) {
+  await mockAppShell(page, { supabaseUrl: "", anonKey: "" });
+  await mockListings(page);
+  if (authed) {
+    await page.addInitScript(() => {
+      localStorage.setItem("cc_session_v1", JSON.stringify({ authed: true, role: "citizen" }));
+    });
+  }
+}
+
+function captureReports(page: Page) {
+  const bodies: unknown[] = [];
+  const ready = page.route("**/api/reports", async (route) => {
+    if (route.request().method() === "POST") bodies.push(route.request().postDataJSON());
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "6ba7b810-9dad-41d1-80b4-00c04fd430c8" }) });
+  });
+  return { bodies, ready };
+}
+
+async function sendReport(page: Page, reason: string) {
+  const dialog = page.locator("[data-mv2='report']");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("radio").first()).toBeFocused();
+  await dialog.getByRole("radio", { name: reason }).check();
+  await dialog.getByRole("button", { name: "Send report" }).click();
+}
+
+test.describe("Report an event, a profile and a Moment", () => {
+  test("an event page files one report and thanks the person", async ({ page }) => {
+    await openDemo(page, true);
+    const { bodies, ready } = captureReports(page);
+    await ready;
+    await page.goto(`/e/${EVENT_ID}`);
+    await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Report", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Report this event" })).toBeVisible();
+    await sendReport(page, "Spam");
+    await expect(page.getByText(THANKS)).toBeVisible();
+    await expect(page.locator("[data-mv2='report']")).toHaveCount(0);
+    expect(bodies).toEqual([{ target_type: "event", target_id: EVENT_ID, reason: "spam", body: "" }]);
+  });
+
+  test("a profile page files one report about that person", async ({ page }) => {
+    await openDemo(page, true);
+    const { bodies, ready } = captureReports(page);
+    await ready;
+    await page.goto(`/c/${SLUG}`);
+    await expect(page.locator('[data-screen="profile"]').getByRole("heading", { name: "Anchor Community Church" })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Report", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Report this person" })).toBeVisible();
+    await sendReport(page, "Harassment");
+    await expect(page.getByText(THANKS)).toBeVisible();
+    expect(bodies).toEqual([{ target_type: "user", target_id: ORG_ID, reason: "harassment", body: "" }]);
+  });
+
+  test("a Moment on the sheet files one report from its menu", async ({ page }) => {
+    const seed = smallSeed(FIXED_NOW) as MapSeed & { contributors: { id: string; physical_longitude: number; physical_latitude: number }[] };
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed, {
+      moments: [{
+        id: MOMENT_ID,
+        body: "Prayer walk tonight at the north gate.",
+        image_url: null,
+        created_at: new Date(FIXED_NOW - 3 * 3_600_000).toISOString(),
+        expires_at: new Date(FIXED_NOW + 21 * 3_600_000).toISOString(),
+      }],
+    });
+    const { bodies, ready } = captureReports(page);
+    await ready;
+    await openMap(page, "/?map=v2", 8);
+    const c = seed.contributors[0];
+    await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
+    await page.getByRole("tab", { name: "Today" }).click();
+    await page.locator("[data-moment]").getByRole("button", { name: "More options" }).click();
+    await page.getByRole("menuitem", { name: "Report" }).click();
+    await expect(page.getByRole("heading", { name: "Report this note" })).toBeVisible();
+    await sendReport(page, "Something else");
+    await expect(page.getByText(THANKS)).toBeVisible();
+    expect(bodies).toEqual([{ target_type: "moment", target_id: MOMENT_ID, reason: "other", body: "" }]);
+  });
+
+  test("a guest who taps Report is taken to sign in, and no dialog opens", async ({ page }) => {
+    await openDemo(page, false);
+    let posts = 0;
+    await page.route("**/api/reports", async (route) => {
+      posts += 1;
+      await route.fulfill({ status: 401, json: { error: "Sign in required" } });
+    });
+    await page.goto(`/e/${EVENT_ID}`);
+    await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Report", exact: true }).click();
+    await expect(page.locator('[data-screen-label="Sign in"]')).toBeVisible();
+    await expect(page.locator("[data-mv2='report']")).toHaveCount(0);
+    expect(posts).toBe(0);
+  });
+});

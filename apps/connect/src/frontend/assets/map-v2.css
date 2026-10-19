@@ -588,6 +588,8 @@
 [data-mv2='bubble-x']:focus-visible,
 [data-mv2='post'][data-news]:focus-visible,
 [data-mv2='news-link']:focus-visible,
+[data-mv2='report-input']:focus-visible,
+[data-mv2='menu-item']:focus-visible,
 [data-mv2^='viewer-']:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
@@ -1342,6 +1344,192 @@
   }
 }
 
+/* ── 4g. Report dialog: the same centred card as the news reader (issue #160) ── */
+[data-mv2='report'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-viewer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+  touch-action: none;
+  font-family: var(--font-body);
+  animation: mv2-news-scrim-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='report-card'] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--reader-w);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+  animation: mv2-news-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='report-head'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='report-title'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+[data-mv2='report-scroll'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  padding: var(--space-4);
+}
+[data-mv2='report-why'],
+[data-mv2='report-field-label'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='report-reasons'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+[data-mv2='report-reason'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--hit);
+  margin: 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  cursor: pointer;
+}
+[data-mv2='report-reason']:focus-within {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='report-reason'] input {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  margin: 0;
+  accent-color: var(--accent);
+}
+[data-mv2='report-reason'] input:focus {
+  outline: none;
+}
+[data-mv2='report-field'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+[data-mv2='report-input'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--space-8) + var(--space-8));
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  resize: vertical;
+}
+[data-mv2='report-count'] {
+  align-self: flex-end;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='report-alert'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  color: var(--error);
+}
+[data-mv2='report-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+[data-mv2='menu-wrap'] {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+}
+[data-mv2='menu'] {
+  position: absolute;
+  z-index: var(--z-viewer);
+  right: 0;
+  bottom: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: calc(var(--space-8) * 3);
+  padding: var(--space-1);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--elev-2);
+}
+[data-mv2='menu-item'] {
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+[data-mv2='moment-foot'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-mv2='report'] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
 [data-mv2='action'],
 [data-mv2='view-full'],
@@ -1351,7 +1539,9 @@
 [data-mv2='tab'],
 [data-mv2='sort-btn'],
 [data-mv2='tile-btn'],
-[data-mv2='post'][data-news] {
+[data-mv2='post'][data-news],
+[data-mv2='menu-item'],
+[data-mv2='report-reason'] {
   transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
 }
 [data-mv2='action']:active,
@@ -1362,7 +1552,8 @@
 [data-mv2='tab']:active,
 [data-mv2='sort-btn']:active,
 [data-mv2='tile-btn']:active,
-[data-mv2='post'][data-news]:active {
+[data-mv2='post'][data-news]:active,
+[data-mv2='menu-item']:active {
   transform: scale(0.97);
 }
 @media (hover: hover) {
@@ -1376,7 +1567,9 @@
   [data-mv2='more']:hover,
   [data-mv2='icon-btn']:hover,
   [data-mv2='row']:hover,
-  [data-mv2='post'][data-news]:hover {
+  [data-mv2='post'][data-news]:hover,
+  [data-mv2='menu-item']:hover,
+  [data-mv2='report-reason']:hover {
     background: var(--surface-2);
   }
   [data-mv2='tab']:hover {

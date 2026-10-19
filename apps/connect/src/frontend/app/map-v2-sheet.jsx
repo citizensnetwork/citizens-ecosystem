@@ -482,6 +482,14 @@
     const qrAction = qrOk
       ? h('div', { 'data-mv2': 'actions-end' }, h(Action, { icon: 'QrCode', label: Str.qr.action, onClick: (e) => setQr({ from: e.currentTarget }) }))
       : null;
+    const reportOwner = isContributor ? item.id : item.organizerId;
+    const reportType = isContributor ? 'user' : type;
+    const reportAction = window.CCReport
+      ? h(window.CCReport.Action, {
+        key: id, variant: 'sheet', targetType: reportType, targetId: id, ownerId: reportOwner,
+        strings: window.MapV2Strings.report,
+      })
+      : null;
     const openProfile = () => { go(navTarget(type), { id }); onClose(); };
 
     // ── body ────────────────────────────────────────────────────────
@@ -527,10 +535,16 @@
       } else if (active === 'today') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
           const ago = T().postedAgo(m.created_at, now);
+          const Rep = window.CCReport;
           return h('li', { key: m.id, 'data-mv2': 'post', 'data-moment': '' },
             m.image_url && window.UI.safeUrl(m.image_url) && h('img', { src: m.image_url, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
             h('span', { 'data-mv2': 'post-body' }, m.body),
-            ago && h('span', { 'data-mv2': 'row-meta' }, ago));
+            h('div', { 'data-mv2': 'moment-foot' },
+              ago && h('span', { 'data-mv2': 'row-meta' }, ago),
+              Rep && h(Rep.Action, {
+                variant: 'moment', targetType: 'moment', targetId: m.id, ownerId: item.id,
+                strings: window.MapV2Strings.report,
+              })));
         }));
       } else if (active === 'gallery') {
         panel = h(window.MapV2Gallery.Grid, { images, strings: Str.gallery, onOpen: (i, from) => setViewer({ index: i, from }) });
@@ -596,6 +610,7 @@
         body,
         N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, Avatar, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
+        reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)

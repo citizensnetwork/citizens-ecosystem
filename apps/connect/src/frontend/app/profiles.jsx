@@ -171,7 +171,8 @@
           h('div', { className: 'grid grid-cols-3 gap-2' },
             h(Button, { variant: 'outline', size: 'sm', icon: 'MessageCircle', onClick: () => startConversationWith(orgName || 'Organiser', org ? org.profilePhoto : '', true, (org && org.id) || ev.organizerId) }, 'Message'),
             safeUrl(ev.website) && h(Button, { variant: 'outline', size: 'sm', icon: 'Globe', onClick: () => window.open(safeUrl(ev.website), '_blank', 'noopener,noreferrer') }, 'Website'),
-            h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => app.shareLink({ page: 'event', params: { id } }) }, 'Share')))));
+            h(Button, { variant: 'outline', size: 'sm', icon: 'Share2', onClick: () => app.shareLink({ page: 'event', params: { id } }) }, 'Share')),
+          window.CCReport && h(window.CCReport.Action, { targetType: 'event', targetId: ev.id, ownerId: ev.organizerId }))));
   }
 
   // ── Place ──
@@ -219,7 +220,8 @@
               h(Avatar, { src: e.coverPhoto, name: e.title, size: 48, rounded: 'xl' }),
               h('div', { className: 'flex-1 min-w-0' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, e.title), h('p', { className: 'text-xs text-muted-foreground' }, new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' + e.time)),
               h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground' }))))),
-          h(Gallery, { imgs: pl.gallery }))));
+          h(Gallery, { imgs: pl.gallery }),
+          window.CCReport && h(window.CCReport.Action, { targetType: 'place', targetId: pl.id, ownerId: pl.organizerId }))));
   }
 
   // ── Citizen (own profile) ──
@@ -372,7 +374,8 @@
             collabs.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Collaborates with'),
               h('div', { className: 'flex gap-2' }, collabs.map((cc) => h('button', { key: cc.id, onClick: () => go('profile', { id: cc.id }), className: 'flex items-center gap-2 p-2 pr-3 bg-card rounded-full border border-border' },
-                h(Avatar, { src: cc.profilePhoto, name: cc.name, size: 28, rounded: 'full', fit: logoFit(cc.kind) }), h('span', { className: 'text-xs font-semibold text-foreground' }, cc.name)))))))));
+                h(Avatar, { src: cc.profilePhoto, name: cc.name, size: 28, rounded: 'full', fit: logoFit(cc.kind) }), h('span', { className: 'text-xs font-semibold text-foreground' }, cc.name))))),
+            window.CCReport && h(window.CCReport.Action, { targetType: 'user', targetId: c.id, ownerId: c.id })))));
   }
 
   window.EventProfilePage = EventProfilePage;
