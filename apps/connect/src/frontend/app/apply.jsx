@@ -6,7 +6,9 @@
 //  of migration 164 is gone. The wizard below is the required path (3 steps:
 //  about / story / review); the applicant finishes their profile (logo, cover,
 //  socials) from the pending Dashboard — pending-application.jsx — while they
-//  wait. SocialInputs is shared with that screen through window.ApplyParts.
+//  wait. SocialInputs, the four contributor kinds and the step-1 copy are
+//  shared with that screen through window.ApplyParts. The kind sits inside
+//  step 1 (issue #143): a new step would break the wizard's Continue count.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -18,6 +20,55 @@
   // Canonical platform list (icon + URL-builder) lives in data.jsx — reused
   // here for input icons and by profiles.jsx for the public display links.
   const SOCIALS = window.DATA.SOCIAL_PLATFORMS;
+
+  // The four kinds migration 173 stores. Labels are the citizen-facing words
+  // already used on the card and the map ("Organisation"), not the admin
+  // form's American spelling. The value stays `organization`.
+  const CONTRIBUTOR_KINDS = [
+    { value: 'ministry', label: 'Ministry' },
+    { value: 'organization', label: 'Organisation' },
+    { value: 'business', label: 'Business' },
+    { value: 'individual', label: 'Individual' },
+  ];
+
+  function contributorKind(value) {
+    return CONTRIBUTOR_KINDS.some((k) => k.value === value) ? value : 'ministry';
+  }
+
+  function contributorKindLabel(value) {
+    const kind = contributorKind(value);
+    return CONTRIBUTOR_KINDS.find((k) => k.value === kind).label;
+  }
+
+  // Step 1 copy. An individual is addressed as a person. The other three kinds
+  // keep the words the wizard has always used; only the empty-name fallback
+  // follows the kind ("Your ministry" is the ministry kind alone).
+  function aboutCopy(kind) {
+    const safe = contributorKind(kind);
+    if (safe === 'individual') {
+      return {
+        title: 'About you',
+        nameLabel: 'Your name',
+        namePlaceholder: 'e.g. your name',
+        fallbackName: 'Your name',
+      };
+    }
+    return {
+      title: 'About your ministry',
+      nameLabel: 'Organisation / ministry name',
+      namePlaceholder: 'e.g. New Wine Fellowship',
+      fallbackName: safe === 'organization' ? 'Your organisation' : safe === 'business' ? 'Your business' : 'Your ministry',
+    };
+  }
+
+  function KindSelect({ value, onChange }) {
+    return h('select', {
+      value: contributorKind(value),
+      onChange: (e) => onChange(contributorKind(e.target.value)),
+      'aria-label': 'Type',
+      className: window.UI.inputCls,
+    }, CONTRIBUTOR_KINDS.map((k) => h('option', { key: k.value, value: k.value }, k.label)));
+  }
 
   // single-select Contributor-type grid (the 12 types, not event categories)
   function CategoryGrid({ value, onChange }) {
@@ -74,7 +125,7 @@
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [f, setF] = useState({ orgName: '', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false });
+    const [f, setF] = useState({ orgName: '', kind: 'ministry', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
     // Merges a LocationPicker patch ({address?, lat?, lng?}) into the wizard
@@ -95,16 +146,22 @@
         h('p', { className: 'text-white/85 text-xs leading-relaxed max-w-sm' }, 'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.')));
 
     const cat = window.DATA.getEventCategory(f.category);
+    const copy = aboutCopy(f.kind);
     const steps = [
       {
-        title: 'About your ministry', subtitle: 'Tell us who you are and where you serve.',
+        title: copy.title, subtitle: 'Tell us who you are and where you serve.',
         valid: () => f.orgName.trim() && f.category && (f.noFixedLocation || f.location.trim()),
         node: h(F, null,
-          h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
+          // One row, not a stacked field: on a phone the sticky footer would
+          // otherwise cover the MapTiler logo on the map below (Free-plan rule).
+          h('div', { className: 'flex items-center gap-3' },
+            h('span', { className: 'text-xs font-semibold text-foreground/80 shrink-0' }, 'Type'),
+            h('div', { className: 'flex-1 min-w-0' }, h(KindSelect, { value: f.kind, onChange: (v) => up('kind', v) }))),
+          h(Field, { label: copy.nameLabel, required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: copy.namePlaceholder, 'aria-label': copy.nameLabel })),
           h(Field, { label: 'Area / location served', required: !f.noFixedLocation, hint: f.noFixedLocation ? undefined : 'Drag the map or use the pin button — the address fills in automatically.' },
             h('div', { className: 'space-y-2' },
               !f.noFixedLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
-              !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc }),
+              !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc, height: 150 }),
               h(Toggle, {
                 checked: f.noFixedLocation, onChange: setNoFixedLocation,
                 label: "I don't have a fixed physical location",
@@ -128,8 +185,9 @@
             h('div', { className: 'flex items-center gap-3' },
               cat && h('span', { className: 'w-10 h-10 rounded-xl flex items-center justify-center', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 18, className: 'text-white' })),
               h('div', null,
-                h('p', { className: 'font-bold text-foreground' }, f.orgName || 'Your ministry'),
+                h('p', { className: 'font-bold text-foreground' }, f.orgName || copy.fallbackName),
                 h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.noFixedLocation ? 'Online / no fixed location' : (f.location || 'Location'))))),
+            h(ReviewRow, { label: 'Type', value: contributorKindLabel(f.kind) }),
             h(ReviewRow, { label: 'About', value: f.bio }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
@@ -234,7 +292,7 @@
   }
 
   // Shared with pending-application.jsx (the pending Dashboard's profile editor).
-  window.ApplyParts = { SocialInputs };
+  window.ApplyParts = { SocialInputs, CONTRIBUTOR_KINDS, contributorKind, contributorKindLabel, aboutCopy, KindSelect };
   window.ApplyPage = ApplyPage;
   window.OnboardingPage = OnboardingPage;
 })();

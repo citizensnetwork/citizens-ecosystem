@@ -320,6 +320,12 @@
     };
   }
 
+  // The four kinds the database accepts (migration 173). Same list as
+  // ApplyParts.contributorKind. An applicant who never touches Type, or a
+  // value the select cannot produce, is ministry.
+  const CONTRIBUTOR_KIND_VALUES = ['ministry', 'organization', 'business', 'individual'];
+  const contributorKindValue = (value) => (CONTRIBUTOR_KIND_VALUES.indexOf(value) >= 0 ? value : 'ministry');
+
   // socials {platformKey: value} → the /api/contributor/* payload fields, keyed
   // by the profiles column names in window.DATA.SOCIAL_COLUMNS.contributor.
   // Values are sent RAW (handle or URL) — the server normalises both shapes
@@ -908,9 +914,10 @@
     // actually lands.
     const submitApplication = useCallback((form, done) => {
       const finish = (ok) => { if (done) done(ok); };
+      const kind = contributorKindValue(form.kind);
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
-        bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
+        kind: kind, bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
         submittedAt: today(), location: form.noFixedLocation ? '' : form.location,
         lat: form.noFixedLocation ? null : form.lat, lng: form.noFixedLocation ? null : form.lng,
         noFixedLocation: !!form.noFixedLocation,
@@ -943,6 +950,7 @@
             method: 'POST',
             body: JSON.stringify({
               display_name: form.orgName,
+              contributor_kind: kind,
               contributor_category: form.category,
               bio: form.bio,
               no_fixed_location: !!form.noFixedLocation,
@@ -1010,7 +1018,7 @@
               ? { lat: mine.lat, lng: mine.lng }
               : await geocodeAddress(mine.location);
           const org = {
-            id: uid('c'), name: mine.name || 'My Ministry', role: 'contributor', kind: 'organization', slug: null,
+            id: uid('c'), name: mine.name || 'My Ministry', role: 'contributor', kind: mine.kind || 'organization', slug: null,
             bio: mine.bio || '', profilePhoto: mine.photo || '', coverPhoto: mine.coverPhoto || '',
             category: mine.category, website: mine.website || '', contactEmail: mine.contactEmail || '',
             location: mine.noFixedLocation ? '' : (mine.location || ''), members: [], followerCount: 0,

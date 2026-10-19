@@ -109,7 +109,11 @@ test.describe("signed in: applying and waiting", () => {
     // The server was asked to apply, with the wizard's answers and nothing it should not decide.
     await expect.poll(() => db.calls.filter((c) => c.path === "apply").length).toBe(1);
     const applied = db.calls.find((c) => c.path === "apply")!.body!;
-    expect(applied).toMatchObject({ display_name: ORG_NAME, contributor_category: "retreat-healing" });
+    expect(applied).toMatchObject({
+      display_name: ORG_NAME,
+      contributor_category: "retreat-healing",
+      contributor_kind: "ministry",
+    });
     expect(applied).not.toHaveProperty("status");
     expect(applied).not.toHaveProperty("role");
 
@@ -149,6 +153,7 @@ test.describe("signed in: applying and waiting", () => {
       display_name: ORG_NAME,
       bio: "A quiet retreat in the heart of the city.",
       website_url: "grace.example",
+      contributor_kind: "ministry",
     });
     // The staged profile is the only thing this screen writes: no role, status or slug.
     for (const key of ["role", "status", "contributor_status", "contributor_slug", "user_id"]) {
@@ -169,6 +174,54 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.getByRole("button", { name: "Apply to become a Contributor" })).toHaveCount(0);
     await page.getByRole("button", { name: "Open my application" }).click();
     await expect(page.locator('[data-screen="pending-application"]')).toBeVisible();
+  });
+
+  test("an individual is asked for their own name, and the application records that kind", async ({ page }) => {
+    const db = await openAsApplicant(page);
+    await bootAt(page);
+    await goTo(page, "apply");
+    await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
+    await expect(page.getByText("Step 1 of 3")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "About your ministry" })).toBeVisible();
+    await expect(page.locator("label").filter({ hasText: "Organisation / ministry name" })).toBeVisible();
+    const type = page.getByRole("combobox", { name: "Type" });
+    await expect(type).toHaveValue("ministry");
+
+    await type.selectOption("individual");
+    await expect(page.getByRole("heading", { name: "About you" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "About your ministry" })).toHaveCount(0);
+    await expect(page.locator("label").filter({ hasText: /^Your name/ })).toBeVisible();
+    await expect(page.locator("label").filter({ hasText: "Organisation / ministry name" })).toHaveCount(0);
+    await page.getByPlaceholder("e.g. your name").fill("Grace Applicant");
+    await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
+    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText("Individual", { exact: true })).toBeVisible();
+    await expect(page.getByText("Your ministry")).toHaveCount(0);
+    await page.getByRole("button", { name: "Submit application" }).click();
+
+    await expect.poll(() => db.calls.filter((c) => c.path === "apply").length).toBe(1);
+    expect(db.calls.find((c) => c.path === "apply")!.body).toMatchObject({
+      display_name: "Grace Applicant",
+      contributor_kind: "individual",
+    });
+  });
+
+  test("a pending individual keeps that kind, and the name field still says Your name", async ({ page }) => {
+    const db = await openAsApplicant(page, { contributor_kind: "individual" });
+    db.profile.contributor_status = "pending";
+    await bootAt(page, "/dashboard");
+    await expect(page.locator('[data-screen="pending-application"]')).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Type" })).toHaveValue("individual");
+    await expect(page.locator("label").filter({ hasText: /^Your name/ })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Your name" })).toHaveValue(ORG_NAME);
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => db.calls.filter((c) => c.method === "PATCH").length).toBe(1);
+    expect(db.calls.find((c) => c.method === "PATCH")!.body).toMatchObject({
+      display_name: ORG_NAME,
+      contributor_kind: "individual",
+    });
   });
 
   test("C21: the last wizard step says an online-only listing goes live in Kingdom Discovery, never on the map", async ({ page }) => {
