@@ -1,8 +1,6 @@
 -- 196 — C10: verify-first attach for Google Form approvals and Admin Create.
 --
--- NOTE ON THE NUMBER: 194 was the live head on 2026-10-21 and the serving-areas work (issue #259)
--- takes 195. This file is a DRAFT numbered 196; the number is taken again at apply time
--- (re-run list_migrations, rename the file if needed, nothing inside refers to its own number).
+-- APPLIED 2026-10-21 (live version 20261021202339, pre-apply tag connect-pre-mig196-listing-claim). 195 (service areas) was applied a few seconds later.
 --
 -- The problem (GitHub #159, tracker C10)
 -- --------------------------------------
@@ -102,7 +100,7 @@ create policy "Admins can read listing claims"
 -- ── 2. peek_claimable_listing() ──────────────────────────────────────
 -- Read-only. Answers "is there a listing waiting for the person who is signed in right now?" from
 -- the caller's OWN verified email, so there is nothing to enumerate: no argument, and an address
--- that has not been proved gets nothing. `mode` says which screen to show:
+-- that has not been proved gets nothing. A listing an admin removed or hid since is not offered. `mode` says which screen to show:
 --   'attach' the caller has their own account; Confirm copies the listing onto it
 --   'self'   the caller signed in AS the placeholder (a fresh address); Confirm just records it
 create or replace function public.peek_claimable_listing()
@@ -144,7 +142,6 @@ begin
      and role = 'contributor' and contributor_status = 'approved'
      and coalesce(contributor_hidden, false) = false and deleted_at is null;
   if not found then
-    -- Removed or hidden by an admin since: there is nothing left to attach.
     return jsonb_build_object('found', false);
   end if;
 
@@ -180,6 +177,8 @@ comment on function public.peek_claimable_listing() is
 -- source of truth (an 'awaiting' row whose address is the caller's), a re-check that the listing is
 -- still live, and the slug MOVING to the owner so the link in the welcome email keeps working
 -- (the placeholder gives it up first; before this the owner got "name-2" and the emailed link died).
+-- Order inside the body: the placeholder gives its slug up first (the unique index allows one holder), then the
+-- owner's own row takes the two-step not_applied -> pending -> approved path protect_role_column() requires.
 -- The Form's automatic-update choice and sources stay with the placeholder: that consent was given
 -- by whoever filled in the Form, so it is not carried onto an account that did not give it.
 create or replace function public.claim_admin_created_contributor()
@@ -206,7 +205,6 @@ begin
   if caller_email is null or caller_email = '' then
     return jsonb_build_object('success', false, 'reason', 'no_email');
   end if;
-  -- The point of C10: an address that was typed but never proved cannot claim anything.
   if caller_confirmed is null then
     return jsonb_build_object('success', false, 'reason', 'email_not_verified');
   end if;
@@ -235,7 +233,6 @@ begin
     return jsonb_build_object('success', false, 'reason', 'nothing_to_claim');
   end if;
 
-  -- Free the slug first (the unique index would refuse two holders), then hand it on.
   update public.profiles set
     contributor_hidden = true,
     contributor_slug = null,
@@ -248,10 +245,8 @@ begin
     public.generate_contributor_slug(coalesce(nullif(placeholder.full_name, ''), 'contributor'))
   );
 
-  -- Step 1/2: not_applied -> pending (own row), required before the trigger allows step 2.
   update public.profiles set contributor_status = 'pending' where id = auth.uid();
 
-  -- Step 2/2: citizen -> contributor + pending -> approved (own row), plus the field copy.
   update public.profiles set
     role = 'contributor',
     contributor_status = 'approved',

@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  Rollback-only probe for migration 196_listing_claim_verify_first (C10, GitHub #159).
---  Run AFTER the apply, in the SQL editor / MCP execute_sql. (The draft is numbered 196; if the file is renumbered at apply time this
---  probe is renamed with it.) It builds synthetic users only: an existing Citizen who confirms, one who says "Not me", an
+--  Run 2026-10-21 against the live database right after the apply: 55 of 55 PASS, nothing persisted (0 ledger rows, 0 probe users afterwards).
+--  Run it in the SQL editor / MCP execute_sql. It builds synthetic users only: an existing Citizen who confirms, one who says "Not me", an
 --  address that was never verified, a stranger, an admin, an owner who signs in AS the placeholder, and a placeholder an admin hid.
 --  It ends with RAISE EXCEPTION, so the whole transaction rolls back and NOTHING persists. One line per check, PASS or FAIL.
 --  Nothing here names a real person or organisation (all addresses are *.example / *.invalid).
@@ -60,7 +60,7 @@ begin
   update public.profiles set role = 'contributor', contributor_status = 'approved', full_name = 'Probe Org Eight', contributor_slug = 'probe-org-eight', contributor_category = 'church', contributor_kind = 'organization', contributor_claim_email = 'probe-unverified-self@probe.example' where id = fru;
   update public.profiles set role = 'contributor', contributor_status = 'approved', full_name = 'Probe Org Six', contributor_slug = 'probe-org-six', contributor_category = 'church', contributor_kind = 'organization', contributor_claim_email = 'probe-contrib@probe.example' where id = p_ctr;
 
-  -- The five waiting listings: live Contributors under placeholders, with the real address in contributor_claim_email.
+  -- The waiting listings: live Contributors under placeholders, with the real address in contributor_claim_email.
   update public.profiles set role = 'contributor', contributor_status = 'approved', full_name = 'Probe Org One',
          contributor_slug = 'probe-org-one', contributor_category = 'church', contributor_kind = 'organization',
          contributor_claim_email = 'probe-owner@probe.example' where id = p_own;
