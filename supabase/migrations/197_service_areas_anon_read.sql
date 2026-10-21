@@ -1,8 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════
 --  197_service_areas_anon_read: a fix to migration 195's three read policies.
 --
---  NOT APPLIED. Needs the founder's yes to THIS file by name (one yes per file). Rollback-only probe:
---  docs/audit/probes/195_service_areas.probe.sql (run it after this file; it is the probe for 195 and 197 together).
+--  APPLIED 2026-10-21 through MCP apply_migration as `197_service_areas_anon_read` (remote version 20261021205449), on Stephen's
+--  yes in chat naming this file (pre-apply tag `connect-pre-mig197-service-areas-anon-read`). The statements applied are this
+--  file's, with the comments left out. The number is 197 because another session applied `196_listing_claim_verify_first` first.
+--  Rollback-only probe docs/audit/probes/195_service_areas.probe.sql is the probe for 195 and 197 together: run live AFTER this
+--  apply, every line PASSed and nothing persisted (26 areas, no links, no probe users left). Security advisor after: unchanged
+--  from after 195 (0 ERROR / 142 WARN / 3 INFO).
 --
 --  WHAT WENT WRONG IN 195. The three link-table SELECT policies (contributor_service_areas, contributor_service_radius,
 --  contributor_service_presence) were written as one policy "for select using (live listing OR own row OR is_active_team_member(...)

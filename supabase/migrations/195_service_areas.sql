@@ -5,8 +5,8 @@
 --  chat naming this file (pre-apply tag `connect-pre-mig195-service-areas`). The statements applied are this file's, with the
 --  comments left out. Rollback-only probe docs/audit/probes/195_service_areas.probe.sql.
 --
---  KNOWN DEFECT, FIXED BY 197_service_areas_anon_read.sql (NOT APPLIED, awaiting a yes to that file): the probe run on the live
---  objects right after the apply failed with `42501 permission denied for function is_active_team_member` when `anon` read a
+--  KNOWN DEFECT, FIXED BY 197_service_areas_anon_read.sql (APPLIED 2026-10-21, see its header): the probe run on the live
+--  objects right after this apply failed with `42501 permission denied for function is_active_team_member` when `anon` read a
 --  link row of a hidden or pending Contributor. The three link-table SELECT policies below call that helper in one policy
 --  for every role, and `anon` cannot execute it (migration 193). No user was affected (the tables are empty and nothing
 --  reads them yet). 197 splits each policy by role. The tables and functions here are otherwise as probed.

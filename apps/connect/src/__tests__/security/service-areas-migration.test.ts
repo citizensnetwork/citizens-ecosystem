@@ -1,9 +1,10 @@
 // @vitest-environment node
 /**
- * Serving areas (supabase/migrations/195_service_areas.sql, NOT APPLIED until the founder says yes): the static twin of the
+ * Serving areas (supabase/migrations/195_service_areas.sql and 197_service_areas_anon_read.sql, both applied 2026-10-21 on the founder's yes): the static twin of the
  * rollback-only probe. A real database cannot run in CI, so this pins the promises the migration's own comments make, and
  * that the probe still tests the founder's rule. The SQL was also executed on a scratch Postgres (PGlite) with the probe:
- * 64 of 64 PASS, 14 of 14 mutations killed (see the PR). This test keeps the file honest after the apply.
+ * 76 of 76 PASS, 22 of 22 mutations killed (see the PR). The probe also ran on the LIVE objects after both applies: every line PASS.
+ * This test keeps the files honest after the apply.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -41,10 +42,11 @@ function fn(name: string): { header: string; text: string } {
 }
 
 describe("the migration is one transaction with a way back", () => {
-  it("begins and commits once and says it is not applied, with a rollback", () => {
+  it("begins and commits once, records its apply, and keeps a rollback", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
-    expect(raw).toMatch(/NOT APPLIED/);
+    expect(raw).toMatch(/APPLIED 2026-10-21/);
+    expect(raw).toMatch(/pre-apply tag `connect-pre-mig195-service-areas`/);
     expect(raw).toMatch(/-- Rollback/);
     expect(raw).toMatch(/drop table public\.service_areas;/);
   });
@@ -166,8 +168,9 @@ describe("197, the fix: the public (anon) read policies never touch the team hel
     expect(i, `${name} missing`).toBeGreaterThanOrEqual(0);
     return fixFlat.slice(i, fixFlat.indexOf(");", i) + 2);
   };
-  it("says it is not applied and what it fixes", () => {
-    expect(fix).toMatch(/NOT APPLIED/);
+  it("records its apply and what it fixes", () => {
+    expect(fix).toMatch(/APPLIED 2026-10-21/);
+    expect(fix).toMatch(/pre-apply tag `connect-pre-mig197-service-areas-anon-read`/);
     expect(fix).toMatch(/permission denied for function is_active_team_member/);
     expect(fix).toMatch(/-- Rollback/);
   });
