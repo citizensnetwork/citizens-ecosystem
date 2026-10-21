@@ -12,6 +12,13 @@ import { join } from "node:path";
 const ROOT = join(process.cwd(), "../..");
 const raw = readFileSync(join(ROOT, "supabase/migrations/195_service_areas.sql"), "utf8").replace(/\r\n/g, "\n");
 const probe = readFileSync(join(ROOT, "docs/audit/probes/195_service_areas.probe.sql"), "utf8").replace(/\r\n/g, "\n");
+const fix = readFileSync(join(ROOT, "supabase/migrations/197_service_areas_anon_read.sql"), "utf8").replace(/\r\n/g, "\n");
+const fixLines = fix.split("\n");
+const fixCode = fixLines
+  .slice(fixLines.findIndex((l) => l.trim() === "begin;") + 1, fixLines.findIndex((l) => l.trim() === "commit;"))
+  .join("\n")
+  .replace(/--[^\n]*/g, "");
+const fixFlat = fixCode.replace(/\s+/g, " ").toLowerCase();
 
 const lines = raw.split("\n");
 const start = lines.findIndex((l) => l.trim() === "begin;");
@@ -151,6 +158,45 @@ describe("serving_area_listings, the public read", () => {
   });
 });
 
+describe("197, the fix: the public (anon) read policies never touch the team helper", () => {
+  const tables = ["contributor_service_areas", "contributor_service_radius", "contributor_service_presence"];
+  /** One `create policy <name> on public.<t> ... ;` as flattened lower-case text. */
+  const policy = (name: string) => {
+    const i = fixFlat.indexOf(`create policy ${name} `);
+    expect(i, `${name} missing`).toBeGreaterThanOrEqual(0);
+    return fixFlat.slice(i, fixFlat.indexOf(");", i) + 2);
+  };
+  it("says it is not applied and what it fixes", () => {
+    expect(fix).toMatch(/NOT APPLIED/);
+    expect(fix).toMatch(/permission denied for function is_active_team_member/);
+    expect(fix).toMatch(/-- Rollback/);
+  });
+  it.each(tables)("%s: the single policy is dropped and replaced by one per role", (t) => {
+    expect(fixFlat).toContain(`drop policy ${t}_select on public.${t}`);
+    expect(fixFlat).toContain(`create policy ${t}_select_public on public.${t} for select to anon using (`);
+    expect(fixFlat).toContain(`create policy ${t}_select_signed_in on public.${t} for select to authenticated using (`);
+  });
+  it.each(tables)("%s: the anon policy is the approval wall only (no helper, no auth.uid, no admin)", (t) => {
+    const p = policy(`${t}_select_public`);
+    expect(p).toMatch(/p\.role = 'contributor' and p\.contributor_status = 'approved'/);
+    expect(p).toMatch(/coalesce\(p\.contributor_hidden, false\) = false and p\.deleted_at is null/);
+    expect(p).not.toMatch(/is_active_team_member|auth\.uid|is_admin/);
+    // the wall is the whole condition: nothing is OR-ed in front of it
+    expect(p).toMatch(/to anon using \( exists \(/);
+    expect(p).not.toMatch(/\bor\b/);
+  });
+  it.each(tables)("%s: the signed-in policy keeps every arm (live listing, own row, team member, admin)", (t) => {
+    const p = policy(`${t}_select_signed_in`);
+    expect(p).toMatch(/p\.contributor_status = 'approved'/);
+    expect(p).toMatch(/contributor_id = \(select auth\.uid\(\)\)/);
+    expect(p).toMatch(/is_active_team_member\(contributor_id, array\['editor', 'viewer'\]\)/);
+    expect(p).toMatch(/\(select public\.is_admin\(\)\)/);
+  });
+  it("changes nothing else: no table, grant, function or data", () => {
+    expect(fixFlat).not.toMatch(/create table|alter table|grant |revoke |create function|create or replace|insert into|delete from|update /);
+  });
+});
+
 describe("the trigger function", () => {
   it("is executable by no client", () => {
     expect(flat).toMatch(/revoke all on function public\.service_areas_check_parent\(\) from public, anon, authenticated/);
@@ -181,6 +227,8 @@ describe("the probe", () => {
       "direct insert into contributor_service_areas is refused",
       "TRUNCATE is refused",
       "a pinned Contributor''s Also served by row carries no Online tag",
+      "a pending applicant can read back their own areas",
+      "a signed-in stranger cannot read a pending applicant''s areas",
       "a main row carries the chosen No fixed place tag",
     ]) {
       expect(probe, `probe lost the check for: ${rule}`).toContain(rule);

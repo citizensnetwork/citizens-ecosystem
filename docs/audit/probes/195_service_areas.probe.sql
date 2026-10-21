@@ -174,6 +174,14 @@ begin
   perform set_config('request.jwt.claim.sub', d_pending::text, true);
   r := public.set_service_areas(d_pending, array[area_pta], 25, null);
   res := array_append(res, (case when (r->>'success')::boolean and (r->>'radius_centre_area_id')::uuid = area_pta then 'PASS' else 'FAIL' end) || ' a pending applicant can choose areas and a radius');
+  select count(*) into n from public.contributor_service_areas where contributor_id = d_pending;
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a pending applicant can read back their own areas (the owner arm of the signed-in policy)');
+  perform set_config('request.jwt.claims', json_build_object('sub', f_citizen, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', f_citizen::text, true);
+  select count(*) into n from public.contributor_service_areas where contributor_id = d_pending;
+  res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' a signed-in stranger cannot read a pending applicant''s areas');
+  perform set_config('request.jwt.claims', json_build_object('sub', d_pending, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', d_pending::text, true);
 
   -- the rest of the cast, written by the admin
   perform set_config('request.jwt.claims', json_build_object('sub', h_admin, 'role', 'authenticated')::text, true);

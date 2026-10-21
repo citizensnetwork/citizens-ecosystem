@@ -1,9 +1,15 @@
 -- ════════════════════════════════════════════════════════════════════
 --  195_service_areas: serving areas for online and no-fixed-location Contributors (issue #259, option 3 "the globe").
 --
---  NOT APPLIED. The owner applies this exact file after review (pre-apply tag, rollback-only probe
---  docs/audit/probes/195_service_areas.probe.sql, security + performance advisor diff). The number is the next free one at
---  authoring time (live head was 194 on 2026-10-21): re-run list_migrations at apply time and renumber if it moved.
+--  APPLIED 2026-10-21 through MCP apply_migration as `195_service_areas` (remote version 20261021202404), on Stephen's yes in
+--  chat naming this file (pre-apply tag `connect-pre-mig195-service-areas`). The statements applied are this file's, with the
+--  comments left out. Rollback-only probe docs/audit/probes/195_service_areas.probe.sql.
+--
+--  KNOWN DEFECT, FIXED BY 197_service_areas_anon_read.sql (NOT APPLIED, awaiting a yes to that file): the probe run on the live
+--  objects right after the apply failed with `42501 permission denied for function is_active_team_member` when `anon` read a
+--  link row of a hidden or pending Contributor. The three link-table SELECT policies below call that helper in one policy
+--  for every role, and `anon` cannot execute it (migration 193). No user was affected (the tables are empty and nothing
+--  reads them yet). 197 splits each policy by role. The tables and functions here are otherwise as probed.
 --
 --  WHAT THIS ADDS
 --   public.service_areas              the hierarchy province > city/town > suburb. A public commons: read only for everyone.

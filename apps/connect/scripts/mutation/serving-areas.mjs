@@ -42,6 +42,7 @@ const INDEX = "src/app/api/v1/service-areas/route.ts";
 const SERVING = "src/app/api/v1/serving/route.ts";
 const OWNER = "src/app/api/contributor/service-areas/route.ts";
 const SQL = "../../supabase/migrations/195_service_areas.sql";
+const FIX = "../../supabase/migrations/197_service_areas_anon_read.sql";
 const PROBE = "../../docs/audit/probes/195_service_areas.probe.sql";
 
 // edits: [{ file, find, replace, count = 1 }]. `equivalent` marks a mutant that SHOULD survive (a second layer covers it).
@@ -107,6 +108,13 @@ const MUTANTS = [
   { id: "sql-read-function-definer", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "language sql\nstable\nsecurity invoker", replace: "language sql\nstable\nsecurity definer" }] },
   { id: "sql-wall-dropped-in-read", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "       and coalesce(p.contributor_hidden, false) = false and p.deleted_at is null\n  ),\n  main as", replace: "  ),\n  main as" }] },
   { id: "sql-parent-lookup-in-rpc", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "select p_contributor_id, x from unnest(v_ids) as x", replace: "select p_contributor_id, x from unnest(v_ids || (select array_agg(a.parent_id) from public.service_areas a where a.id = any (v_ids))) as x" }] },
+  { id: "fix-anon-policy-calls-helper", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "create policy contributor_service_radius_select_public on public.contributor_service_radius\n  for select to anon\n  using (\n    exists (", replace: "create policy contributor_service_radius_select_public on public.contributor_service_radius\n  for select to anon\n  using (\n    public.is_active_team_member(contributor_id, array['editor']) or exists (" }] },
+  { id: "fix-anon-policy-opened", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "create policy contributor_service_areas_select_public on public.contributor_service_areas\n  for select to anon\n  using (\n    exists (", replace: "create policy contributor_service_areas_select_public on public.contributor_service_areas\n  for select to anon\n  using (\n    true or exists (" }] },
+  { id: "fix-anon-role-widened", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "create policy contributor_service_presence_select_public on public.contributor_service_presence\n  for select to anon", replace: "create policy contributor_service_presence_select_public on public.contributor_service_presence\n  for select to anon, authenticated" }] },
+  { id: "fix-signed-in-loses-owner-arm", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "    or contributor_id = (select auth.uid())\n    or public.is_active_team_member(contributor_id, array['editor', 'viewer'])\n    or (select public.is_admin())\n  );\n\n-- ── contributor_service_radius", replace: "    or public.is_active_team_member(contributor_id, array['editor', 'viewer'])\n    or (select public.is_admin())\n  );\n\n-- ── contributor_service_radius" }] },
+  { id: "fix-old-policy-kept", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "drop policy contributor_service_radius_select on public.contributor_service_radius;", replace: "" }] },
+  { id: "fix-touches-a-grant", kind: "unit", tests: T_SQL, edits: [{ file: FIX, find: "\ncommit;\n", replace: "\ngrant insert on public.contributor_service_areas to authenticated;\ncommit;\n" }] },
+  { id: "probe-loses-owner-read-check", kind: "unit", tests: T_SQL, edits: [{ file: PROBE, find: "a pending applicant can read back their own areas", replace: "a pending applicant can read" }] },
   { id: "probe-loses-truncate-check", kind: "unit", tests: T_SQL, edits: [{ file: PROBE, find: "PASS TRUNCATE is refused", replace: "PASS truncate blocked" }] },
   { id: "probe-loses-upward-check", kind: "unit", tests: T_SQL, edits: [{ file: PROBE, find: "(never upward)", replace: "(ok)" }] },
 ];
