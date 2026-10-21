@@ -6,7 +6,7 @@
 --
 --  Covers: the selection rule (a tick never goes upward, matching goes downward only), the approval wall, the no-pin rule
 --  for the main list, "Also served by" (radius, cap, order, dedupe), the radius needs a centre, who may write, who may read
---  what, and that no client can write a table directly.
+--  what, that no client can write a table directly, and the owner-chosen Online / No fixed place tag.
 -- ════════════════════════════════════════════════════════════════════
 do $probe$
 declare
@@ -115,9 +115,15 @@ begin
   res := array_append(res, (case when r->>'reason' = 'too_many_areas' then 'PASS' else 'FAIL' end) || ' more than 20 areas is refused');
   select count(*) into n from public.contributor_service_areas where contributor_id = a_owner;
   res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a refused save changes nothing');
+  r := public.set_service_areas(a_owner, array[area_eld], null, null, 'travelling');
+  res := array_append(res, (case when r->>'reason' = 'invalid_presence' then 'PASS' else 'FAIL' end) || ' an unknown presence tag is refused');
+  r := public.set_service_areas(a_owner, array[area_eld], null, null, null);
+  res := array_append(res, (case when r->>'reason' = 'invalid_presence' then 'PASS' else 'FAIL' end) || ' a null presence tag is refused');
   r := public.set_service_areas(a_owner, array[area_eld]); -- back to a plain tick, no radius
   select count(*) into n from public.contributor_service_radius where contributor_id = a_owner;
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' saving without a radius removes the radius');
+  select count(*) into n from public.contributor_service_presence where contributor_id = a_owner and presence = 'online';
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' the tag defaults to online');
 
   -- 3. who may write for whom
   r := public.set_service_areas(e_kzn, array[area_kzn]);
@@ -176,7 +182,8 @@ begin
   res := array_append(res, (case when (r->>'success')::boolean then 'PASS' else 'FAIL' end) || ' an admin can write for a Contributor');
   perform public.set_service_areas(e_kzn, array[area_kzn]);
   perform public.set_service_areas(i_gauteng, array[area_gp]);
-  perform public.set_service_areas(j_pretoria, array[area_pta]);
+  r := public.set_service_areas(j_pretoria, array[area_pta], null, null, 'no_fixed_place');
+  res := array_append(res, (case when (r->>'success')::boolean and r->>'presence' = 'no_fixed_place' then 'PASS' else 'FAIL' end) || ' the owner can choose No fixed place');
   r := public.set_service_areas(k_radius, array[area_mid], 50, null);
   res := array_append(res, (case when (r->>'success')::boolean then 'PASS' else 'FAIL' end) || ' radius around a ticked area is saved');
   r := public.set_service_areas(b_pin, array[area_pta], 100, null);
@@ -184,6 +191,11 @@ begin
   r := public.set_service_areas(b_pin, array[]::uuid[], 100, null);
   res := array_append(res, (case when (r->>'success')::boolean then 'PASS' else 'FAIL' end) || ' a pinned Contributor needs no area for a radius');
   perform public.set_service_areas(b_pin, array[area_pta], 100, null);
+  perform public.set_service_areas(f_citizen, array[]::uuid[]);  -- (refused: not a Contributor; no row either way)
+  r := public.set_service_areas(e_kzn, array[]::uuid[]);
+  select count(*) into n from public.contributor_service_presence where contributor_id = e_kzn;
+  res := array_append(res, (case when (r->>'success')::boolean and n = 0 then 'PASS' else 'FAIL' end) || ' clearing every area also clears the tag');
+  perform public.set_service_areas(e_kzn, array[area_kzn]);
 
   -- 4. what the public sees. Back to anon.
   execute 'reset role';
@@ -197,6 +209,8 @@ begin
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' anon cannot read a hidden or pending Contributor''s areas');
   select count(*) into n from public.contributor_service_radius where contributor_id = d_pending;
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' anon cannot read a pending applicant''s radius');
+  select count(*) into n from public.contributor_service_presence where contributor_id in (c_hidden, d_pending);
+  res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' anon cannot read a hidden or pending Contributor''s tag');
   select count(*) into n from public.contributor_service_areas where contributor_id = a_owner;
   res := array_append(res, (case when n = 2 or n = 1 then 'PASS' else 'FAIL' end) || ' anon reads a live Contributor''s areas');
   begin
@@ -224,6 +238,12 @@ begin
   select count(*) into n from public.serving_area_listings(area_eld) where section = 'main' and contributor_id in (e_kzn);
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' another province''s Contributor is not listed');
 
+  -- the tag travels with each row
+  select count(*) into n from public.serving_area_listings(area_eld) where section = 'main' and contributor_id = a_owner and presence = 'online';
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a main row carries the default Online tag');
+  select count(*) into n from public.serving_area_listings(area_hat) where section = 'main' and contributor_id = j_pretoria and presence = 'no_fixed_place';
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a main row carries the chosen No fixed place tag (not labelled Online)');
+
   -- the approval wall and the no-pin rule
   select count(*) into n from public.serving_area_listings(area_pta) where contributor_id = c_hidden;
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' a hidden Contributor is never listed');
@@ -237,6 +257,10 @@ begin
   res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a 50 km radius around Midrand reaches Pretoria (Also served by)');
   select count(*) into n from public.serving_area_listings(area_pta) where section = 'also' and contributor_id = b_pin;
   res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a pinned Contributor''s 100 km radius reaches Pretoria (Also served by)');
+  select count(*) into n from public.serving_area_listings(area_pta) where section = 'also' and contributor_id = b_pin and presence is null;
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' a pinned Contributor''s Also served by row carries no Online tag (they are on the map)');
+  select count(*) into n from public.serving_area_listings(area_pta) where section = 'also' and contributor_id = k_radius and presence = 'online';
+  res := array_append(res, (case when n = 1 then 'PASS' else 'FAIL' end) || ' an unpinned Contributor''s Also served by row carries their tag');
   select count(*) into n from public.serving_area_listings(area_kzn) where section = 'also';
   res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' nothing is "also served" in a faraway province');
   select count(*) into n from public.serving_area_listings(area_mid) where section = 'main' and contributor_id = k_radius;
@@ -273,11 +297,11 @@ begin
 
   -- 5. grants (as the catalog sees them)
   select count(*) into n from information_schema.role_table_grants
-   where table_schema = 'public' and table_name in ('service_areas', 'contributor_service_areas', 'contributor_service_radius')
+   where table_schema = 'public' and table_name in ('service_areas', 'contributor_service_areas', 'contributor_service_radius', 'contributor_service_presence')
      and grantee in ('anon', 'authenticated', 'PUBLIC') and privilege_type <> 'SELECT';
-  res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' anon and authenticated hold SELECT only on the three tables (' || n || ' extra)');
-  res := array_append(res, (case when not has_function_privilege('anon', 'public.set_service_areas(uuid, uuid[], integer, uuid)', 'execute') then 'PASS' else 'FAIL' end) || ' anon cannot execute set_service_areas');
-  res := array_append(res, (case when has_function_privilege('authenticated', 'public.set_service_areas(uuid, uuid[], integer, uuid)', 'execute') then 'PASS' else 'FAIL' end) || ' authenticated can execute set_service_areas (guarded inside)');
+  res := array_append(res, (case when n = 0 then 'PASS' else 'FAIL' end) || ' anon and authenticated hold SELECT only on the four tables (' || n || ' extra)');
+  res := array_append(res, (case when not has_function_privilege('anon', 'public.set_service_areas(uuid, uuid[], integer, uuid, text)', 'execute') then 'PASS' else 'FAIL' end) || ' anon cannot execute set_service_areas');
+  res := array_append(res, (case when has_function_privilege('authenticated', 'public.set_service_areas(uuid, uuid[], integer, uuid, text)', 'execute') then 'PASS' else 'FAIL' end) || ' authenticated can execute set_service_areas (guarded inside)');
   res := array_append(res, (case when not has_function_privilege('anon', 'public.service_areas_check_parent()', 'execute') and not has_function_privilege('authenticated', 'public.service_areas_check_parent()', 'execute') then 'PASS' else 'FAIL' end) || ' the trigger function is not executable by anon or authenticated');
   select count(*) into n from pg_proc p join pg_namespace s on s.oid = p.pronamespace
    where s.nspname = 'public' and p.proname = 'serving_area_listings' and p.prosecdef;

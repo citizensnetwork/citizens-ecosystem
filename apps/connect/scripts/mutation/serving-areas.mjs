@@ -62,6 +62,17 @@ const MUTANTS = [
   { id: "lib-main-dedupe", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: "if (seenMain.has(base.id)) continue;", replace: "" }] },
   { id: "lib-nameless", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: "if (!base.name) continue;", replace: "" }] },
   { id: "lib-refusal-401", kind: "unit", tests: T_OWNER, edits: [{ file: LIB, find: 'not_allowed: { status: 403, error: "Forbidden" },', replace: 'not_allowed: { status: 200, error: "Forbidden" },' }] },
+  // ── the owner's Online / No fixed place tag
+  { id: "lib-presence-default", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: "let presence: ServingPresence = DEFAULT_PRESENCE;", replace: 'let presence: ServingPresence = "no_fixed_place";' }] },
+  { id: "lib-presence-unchecked", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: 'if (!isServingPresence(b.presence)) return { ok: false, error: "invalid_presence" };', replace: "" }] },
+  { id: "lib-presence-raw-value", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: "isServingPresence(r.presence) ? r.presence : DEFAULT_PRESENCE", replace: "(r.presence as ServingPresence)" }] },
+  { id: "lib-presence-pin-null-lost", kind: "unit", tests: T_LIB, edits: [{ file: LIB, find: "r.presence === null || r.presence === undefined ? null : ", replace: "" }] },
+  { id: "owner-put-presence-dropped", kind: "unit", tests: T_OWNER, edits: [{ file: OWNER, find: "p_presence: selection.presence,", replace: 'p_presence: "online",' }] },
+  { id: "owner-get-presence-ignored", kind: "unit", tests: T_OWNER, edits: [{ file: OWNER, find: "isServingPresence(presence.data?.presence) ? presence.data.presence : DEFAULT_PRESENCE", replace: "DEFAULT_PRESENCE" }] },
+  { id: "sql-presence-on-pinned-row", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "case when x.has_pin then null else x.presence end", replace: "x.presence" }] },
+  { id: "sql-presence-values-widened", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "check (presence in ('online', 'no_fixed_place'))", replace: "check (presence in ('online', 'no_fixed_place', 'other'))" }] },
+  { id: "sql-presence-grant", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "grant select on public.contributor_service_presence to anon, authenticated;", replace: "grant select, update on public.contributor_service_presence to anon, authenticated;" }] },
+  { id: "probe-loses-tag-check", kind: "unit", tests: T_SQL, edits: [{ file: PROBE, find: "a main row carries the chosen No fixed place tag", replace: "a main row carries a tag" }] },
   // ── the public reads
   { id: "serving-area-cap-dropped", kind: "unit", tests: T_SERVING, edits: [{ file: SERVING, find: '{ bucket: "v1-serving", resourceId: areaId }', replace: '{ bucket: "v1-serving" }' }] },
   { id: "serving-limit-raised", kind: "unit", tests: T_SERVING, edits: [{ file: SERVING, find: "p_also_limit: ALSO_SERVED_LIMIT", replace: "p_also_limit: 50" }] },

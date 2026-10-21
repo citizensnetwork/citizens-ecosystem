@@ -79,8 +79,9 @@ describe("PUT /api/contributor/service-areas", () => {
       p_area_ids: [A1, A2],
       p_radius_km: 25,
       p_radius_centre_area_id: A2,
+      p_presence: "online",
     });
-    expect(await res.json()).toEqual({ area_ids: [A1, A2], radius_km: 25, radius_centre_area_id: A2 });
+    expect(await res.json()).toEqual({ area_ids: [A1, A2], radius_km: 25, radius_centre_area_id: A2, presence: "online" });
   });
 
   it("an editor or admin names the listing; the database, not the route, decides if they may", async () => {
@@ -88,11 +89,19 @@ describe("PUT /api/contributor/service-areas", () => {
     expect(rpc).toHaveBeenCalledWith("set_service_areas", expect.objectContaining({ p_contributor_id: OTHER }));
   });
 
+  it("passes the owner's tag through and echoes what was saved", async () => {
+    rpc.mockResolvedValue({ data: { success: true, area_ids: [A1], radius_km: null, radius_centre_area_id: null, presence: "no_fixed_place" }, error: null });
+    const res = await put({ area_ids: [A1], presence: "no_fixed_place" });
+    expect(rpc).toHaveBeenCalledWith("set_service_areas", expect.objectContaining({ p_presence: "no_fixed_place" }));
+    expect((await res.json()).presence).toBe("no_fixed_place");
+    expect(await (await put({ area_ids: [A1], presence: "travelling" })).json()).toEqual({ error: "invalid_presence" });
+  });
+
   it("clearing everything is a valid save", async () => {
     rpc.mockResolvedValue({ data: { success: true, area_ids: [], radius_km: null, radius_centre_area_id: null }, error: null });
     const res = await put({ area_ids: [] });
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("set_service_areas", { p_contributor_id: ME, p_area_ids: [], p_radius_km: null, p_radius_centre_area_id: null });
+    expect(rpc).toHaveBeenCalledWith("set_service_areas", { p_contributor_id: ME, p_area_ids: [], p_radius_km: null, p_radius_centre_area_id: null, p_presence: "online" });
   });
 
   it.each([
@@ -105,6 +114,7 @@ describe("PUT /api/contributor/service-areas", () => {
     ["radius_out_of_range", 400],
     ["centre_not_ticked", 400],
     ["radius_needs_centre", 400],
+    ["invalid_presence", 400],
     ["something_new", 400],
   ])("maps the database refusal %s to HTTP %i", async (reason, status) => {
     rpc.mockResolvedValue({ data: { success: false, reason }, error: null });
@@ -130,13 +140,14 @@ describe("GET /api/contributor/service-areas", () => {
   it("returns the caller's own selection by default, sorted, read on the caller's own session", async () => {
     tableAnswers.contributor_service_areas = { data: [{ area_id: A2 }, { area_id: A1 }], error: null };
     tableAnswers.contributor_service_radius = { data: { radius_km: 50, centre_area_id: A1 }, error: null };
+    tableAnswers.contributor_service_presence = { data: { presence: "no_fixed_place" }, error: null };
     const j = await (await get()).json();
-    expect(j).toEqual({ area_ids: [A1, A2], radius_km: 50, radius_centre_area_id: A1 });
+    expect(j).toEqual({ area_ids: [A1, A2], radius_km: 50, radius_centre_area_id: A1, presence: "no_fixed_place" });
     expect(eqCalls).toContainEqual(["contributor_service_areas", "contributor_id", ME]);
   });
 
   it("an empty selection is empty, with no radius", async () => {
-    expect(await (await get()).json()).toEqual({ area_ids: [], radius_km: null, radius_centre_area_id: null });
+    expect(await (await get()).json()).toEqual({ area_ids: [], radius_km: null, radius_centre_area_id: null, presence: "online" });
   });
 
   it("can ask for another listing (RLS decides what comes back) and rejects a bad id", async () => {

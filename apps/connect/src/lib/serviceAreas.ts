@@ -26,10 +26,23 @@ export function isServiceAreaLevel(v: unknown): v is ServiceAreaLevel {
   return v === "province" || v === "place" || v === "suburb";
 }
 
+/**
+ * The plain tag the owner chooses (founder naming rule, 2026-10-21): "online" for online-only Contributors (the default)
+ * or "no_fixed_place" for a travelling or mobile ministry that serves people in person and is NOT online. Public rows
+ * carry it so nobody is labelled "Online" who is not.
+ */
+export type ServingPresence = "online" | "no_fixed_place";
+export const DEFAULT_PRESENCE: ServingPresence = "online";
+
+export function isServingPresence(v: unknown): v is ServingPresence {
+  return v === "online" || v === "no_fixed_place";
+}
+
 export type ServiceAreaSelection = {
   areaIds: string[];
   radiusKm: number | null;
   radiusCentreAreaId: string | null;
+  presence: ServingPresence;
 };
 
 export type ParsedSelection =
@@ -76,7 +89,14 @@ export function parseSelectionPayload(body: unknown): ParsedSelection {
   // a centre without a radius means nothing; refuse rather than silently drop it
   if (radiusKm === null && radiusCentreAreaId !== null) return { ok: false, error: "radius_centre_without_radius" };
 
-  return { ok: true, contributorId, selection: { areaIds: [...seen], radiusKm, radiusCentreAreaId } };
+  // absent means the default; anything else must be one of the two tags
+  let presence: ServingPresence = DEFAULT_PRESENCE;
+  if (b.presence !== undefined && b.presence !== null) {
+    if (!isServingPresence(b.presence)) return { ok: false, error: "invalid_presence" };
+    presence = b.presence;
+  }
+
+  return { ok: true, contributorId, selection: { areaIds: [...seen], radiusKm, radiusCentreAreaId, presence } };
 }
 
 /** What set_service_areas answers when it refuses, and the HTTP status each one gets. */
@@ -90,6 +110,7 @@ export const SET_REFUSALS: Record<string, { status: number; error: string }> = {
   radius_out_of_range: { status: 400, error: "radius_out_of_range" },
   centre_not_ticked: { status: 400, error: "centre_not_ticked" },
   radius_needs_centre: { status: 400, error: "radius_needs_centre" },
+  invalid_presence: { status: 400, error: "invalid_presence" },
 };
 
 /** A row of `serving_area_listings`, exactly as the database returns it. */
@@ -108,6 +129,7 @@ export type ListingRow = {
   centre_area_name: string | null;
   radius_km: number | null;
   distance_km: number | string | null;
+  presence?: string | null;
 };
 
 export type ServingContributor = {
@@ -118,6 +140,8 @@ export type ServingContributor = {
   category: string | null;
   avatar_url: string | null;
   logo_url: string | null;
+  /** "online" or "no_fixed_place"; null for a Contributor who has a map pin (the tag does not describe them). */
+  presence: ServingPresence | null;
 };
 
 export type ServingMainItem = ServingContributor & {
@@ -166,6 +190,8 @@ export function shapeServing(
       category: r.contributor_category ?? null,
       avatar_url: r.avatar_url ?? null,
       logo_url: r.logo_url ?? null,
+      // an unknown tag degrades to the default rather than showing a raw value
+      presence: r.presence === null || r.presence === undefined ? null : isServingPresence(r.presence) ? r.presence : DEFAULT_PRESENCE,
     };
     if (!base.name) continue;
     if (r.section === "main" && isServiceAreaLevel(r.matched_level) && r.matched_area_id && r.matched_area_name) {

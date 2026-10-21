@@ -33,7 +33,7 @@ const ask = (qs: string) => GET(new Request(`http://localhost/api/v1/serving${qs
 const mainRow = (id: string, name: string, level: string) => ({
   section: "main", contributor_id: id, full_name: name, contributor_slug: null, contributor_kind: null, contributor_category: null,
   avatar_url: null, logo_url: null, matched_area_id: AREA, matched_area_name: "Pretoria", matched_level: level,
-  centre_area_name: null, radius_km: null, distance_km: null,
+  centre_area_name: null, radius_km: null, distance_km: null, presence: "online",
 });
 
 beforeEach(() => {
@@ -76,6 +76,12 @@ describe("GET /api/v1/serving", () => {
     expect(j.data.main.map((m: { name: string }) => m.name)).toEqual(["Alpha", "Zed"]); // suburb group first
     expect(j.data.also_served_by).toEqual([expect.objectContaining({ centre_name: "Midrand", radius_km: 50, distance_km: 22.4 })]);
     expect(res.headers.get("cache-control")).toBe("public, s-maxage=60, stale-while-revalidate=120");
+  });
+
+  it("carries the tag so a mobile ministry is never labelled Online", async () => {
+    rpcAnswer = { data: [{ ...mainRow(C1, "Mobile Food Outreach", "place"), presence: "no_fixed_place" }, mainRow(C2, "Daily Word", "place")], error: null };
+    const j = await (await ask(`?area=${AREA}`)).json();
+    expect(j.data.main.map((m: { name: string; presence: string }) => [m.name, m.presence])).toEqual([["Daily Word", "online"], ["Mobile Food Outreach", "no_fixed_place"]]);
   });
 
   it("an area nobody serves is an empty list, not an error (the globe simply does not appear)", async () => {

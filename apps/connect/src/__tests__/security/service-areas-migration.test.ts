@@ -49,7 +49,7 @@ describe("the migration is one transaction with a way back", () => {
 });
 
 describe("the three tables", () => {
-  const tables = ["service_areas", "contributor_service_areas", "contributor_service_radius"];
+  const tables = ["service_areas", "contributor_service_areas", "contributor_service_radius", "contributor_service_presence"];
   it.each(tables)("%s has RLS on, takes every privilege away, and gives back SELECT only", (t) => {
     expect(flat).toContain(`alter table public.${t} enable row level security`);
     expect(flat).toContain(`revoke all on public.${t} from anon, authenticated, public`);
@@ -58,7 +58,7 @@ describe("the three tables", () => {
     expect(flat).not.toMatch(new RegExp(`create policy \\w+ on public\\.${t}\\s+for (insert|update|delete|all)`));
   });
   it("the link tables are public only for a live listing (the approval wall), plus the owner, team and admin", () => {
-    for (const t of ["contributor_service_areas", "contributor_service_radius"]) {
+    for (const t of ["contributor_service_areas", "contributor_service_radius", "contributor_service_presence"]) {
       const i = flat.indexOf(`create policy ${t}_select`);
       expect(i).toBeGreaterThan(0);
       const policy = flat.slice(i, flat.indexOf(";", i));
@@ -74,6 +74,9 @@ describe("the three tables", () => {
     expect(flat).toMatch(/check \(\(level = 'province'\) = \(parent_id is null\)\)/);
     expect(flat).toMatch(/new\.level = 'place' and v_parent_level is distinct from 'province'/);
     expect(flat).toMatch(/new\.level = 'suburb' and v_parent_level is distinct from 'place'/);
+  });
+  it("the tag is one of two plain values and defaults to online", () => {
+    expect(flat).toMatch(/presence\s+text not null default 'online' check \(presence in \('online', 'no_fixed_place'\)\)/);
   });
   it("carries no contact column anywhere", () => {
     expect(flat).not.toMatch(/email|phone|whatsapp|address/);
@@ -103,9 +106,14 @@ describe("set_service_areas, the only write path", () => {
     expect(f.text).toMatch(/'centre_not_ticked'/);
     expect(f.text).toMatch(/'radius_needs_centre'/);
   });
+  it("refuses an unknown or null tag, and clears the tag with the selection", () => {
+    expect(f.text).toMatch(/p_presence is null or p_presence not in \('online', 'no_fixed_place'\)/);
+    expect(f.text).toMatch(/'invalid_presence'/);
+    expect(f.text).toMatch(/cardinality\(v_ids\) = 0 and p_radius_km is null then delete from public\.contributor_service_presence/);
+  });
   it("is executable by signed-in users only", () => {
-    expect(flat).toMatch(/revoke all on function public\.set_service_areas\(uuid, uuid\[\], integer, uuid\) from public, anon/);
-    expect(flat).toMatch(/grant execute on function public\.set_service_areas\(uuid, uuid\[\], integer, uuid\) to authenticated;/);
+    expect(flat).toMatch(/revoke all on function public\.set_service_areas\(uuid, uuid\[\], integer, uuid, text\) from public, anon/);
+    expect(flat).toMatch(/grant execute on function public\.set_service_areas\(uuid, uuid\[\], integer, uuid, text\) to authenticated;/);
   });
 });
 
@@ -116,6 +124,10 @@ describe("serving_area_listings, the public read", () => {
     expect(f.header).not.toMatch(/security definer/);
     expect(f.header).toMatch(/\bstable\b/);
     expect(f.header).toMatch(/set search_path = ''/);
+  });
+  it("returns the tag, and none for someone with a pin (they are on the map)", () => {
+    expect(f.header).toMatch(/presence text \)/);
+    expect(f.text).toMatch(/case when x\.has_pin then null else x\.presence end/);
   });
   it("returns no contact or coordinate column", () => {
     const returns = f.header.slice(f.header.indexOf("returns table"));
@@ -168,6 +180,8 @@ describe("the probe", () => {
       "nearest first",
       "direct insert into contributor_service_areas is refused",
       "TRUNCATE is refused",
+      "a pinned Contributor''s Also served by row carries no Online tag",
+      "a main row carries the chosen No fixed place tag",
     ]) {
       expect(probe, `probe lost the check for: ${rule}`).toContain(rule);
     }

@@ -19,7 +19,7 @@ describe("parseSelectionPayload", () => {
     expect(parseSelectionPayload(ok)).toEqual({
       ok: true,
       contributorId: null,
-      selection: { areaIds: [U(2)], radiusKm: null, radiusCentreAreaId: null },
+      selection: { areaIds: [U(2)], radiusKm: null, radiusCentreAreaId: null, presence: "online" },
     });
   });
 
@@ -71,6 +71,16 @@ describe("parseSelectionPayload", () => {
     expect(parseSelectionPayload({ ...ok, radius_km: null })).toMatchObject({ ok: true, selection: { radiusKm: null } });
   });
 
+  it("takes the owner's tag: online by default, or no_fixed_place, and nothing else", () => {
+    expect(parseSelectionPayload(ok)).toMatchObject({ selection: { presence: "online" } });
+    expect(parseSelectionPayload({ ...ok, presence: null })).toMatchObject({ selection: { presence: "online" } });
+    expect(parseSelectionPayload({ ...ok, presence: "online" })).toMatchObject({ selection: { presence: "online" } });
+    expect(parseSelectionPayload({ ...ok, presence: "no_fixed_place" })).toMatchObject({ selection: { presence: "no_fixed_place" } });
+    for (const bad of ["travelling", "Online", "", 1, true, {}, []]) {
+      expect(parseSelectionPayload({ ...ok, presence: bad })).toEqual({ ok: false, error: "invalid_presence" });
+    }
+  });
+
   it("validates the radius centre and refuses a centre with no radius", () => {
     expect(parseSelectionPayload({ ...ok, radius_km: 25, radius_centre_area_id: U(2) })).toMatchObject({
       ok: true,
@@ -96,6 +106,7 @@ const row = (over: Partial<ListingRow>): ListingRow => ({
   centre_area_name: null,
   radius_km: null,
   distance_km: null,
+  presence: "online",
   ...over,
 });
 
@@ -136,7 +147,7 @@ describe("shapeServing", () => {
     leaky.physical_latitude = -25.7;
     leaky.whatsapp_number = "27000000000";
     const out = shapeServing(AREA, [leaky as unknown as ListingRow]);
-    expect(Object.keys(out.main[0]!).sort()).toEqual(["avatar_url", "category", "id", "kind", "logo_url", "name", "served", "slug"]);
+    expect(Object.keys(out.main[0]!).sort()).toEqual(["avatar_url", "category", "id", "kind", "logo_url", "name", "presence", "served", "slug"]);
     expect(JSON.stringify(out)).not.toMatch(/private@|physical|whatsapp|27000000000/);
   });
 
@@ -155,6 +166,27 @@ describe("shapeServing", () => {
     const out = shapeServing(AREA, rows);
     expect(out.main.map((m) => m.name)).toEqual(["Good One"]);
     expect(out.also_served_by).toEqual([]);
+  });
+
+  it("carries the owner's tag on every row: Online, No fixed place, or none for someone with a pin", () => {
+    const rows = [
+      row({ contributor_id: U(61), full_name: "Aa", presence: "no_fixed_place" }),
+      row({ contributor_id: U(62), full_name: "Bb", presence: "online" }),
+      row({ contributor_id: U(63), full_name: "Cc", presence: null }),
+      row({ contributor_id: U(64), full_name: "Dd", presence: undefined }),
+      row({ contributor_id: U(65), full_name: "Ee", presence: "galaxy" }),
+      row({ section: "also", contributor_id: U(66), full_name: "Ff", radius_km: 50, distance_km: 3, presence: "no_fixed_place" }),
+    ];
+    const out = shapeServing(AREA, rows);
+    // an unknown tag degrades to the default, never a raw value
+    expect(out.main.map((m) => [m.name, m.presence])).toEqual([
+      ["Aa", "no_fixed_place"],
+      ["Bb", "online"],
+      ["Cc", null],
+      ["Dd", null],
+      ["Ee", "online"],
+    ]);
+    expect(out.also_served_by[0]?.presence).toBe("no_fixed_place");
   });
 
   it("lists a Contributor once even if the database returned two rows", () => {

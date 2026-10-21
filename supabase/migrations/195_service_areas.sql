@@ -10,6 +10,10 @@
 --   public.contributor_service_areas  "this Contributor serves this area (and everything inside it)". Nothing else.
 --   public.contributor_service_radius an optional "within N km" add-on: radius (1 to 100) plus the area it is centred on
 --                                     (null = the Contributor's own pin).
+--   public.contributor_service_presence  one plain tag per Contributor, chosen by the owner: 'online' (the default) or
+--                                     'no_fixed_place' (a travelling or mobile ministry that serves people in person and
+--                                     is NOT online). The globe shows it on each row so nobody is labelled "Online" who
+--                                     is not (founder naming rule, 2026-10-21).
 --   public.set_service_areas(...)     the ONLY write path. SECURITY DEFINER, signed-in only. One atomic replace.
 --   public.serving_area_listings(...) the public read for the globe. SECURITY INVOKER: it runs under the caller's own RLS.
 --   a seed of the nine provinces, ten Gauteng cities/towns and seven suburbs (see SEED below).
@@ -18,6 +22,9 @@
 --   Ticking Eldoraigne does not mean serving Centurion, Pretoria or Gauteng. Matching goes downward only: a viewer whose
 --   area in view is Eldoraigne matches anyone who ticked Eldoraigne OR an area containing it; a viewer zoomed out to
 --   Gauteng matches only those who ticked Gauteng as a whole. serving_area_listings walks UP from the viewed area, never down.
+--
+--  PUBLIC WORDING (founder, 2026-10-21): the public side says "Online in this area", the owner side keeps "serving".
+--   That is UI copy (PR B and C); this file only stores the tag and returns it.
 --
 --  WHO APPEARS (honesty, tracker C21): the main list holds only approved, visible, non-deleted Contributors with NO map pin
 --   (no_fixed_location, or no coordinates), which is exactly the people the map cannot show. "Also served by" holds the
@@ -154,6 +161,29 @@ create policy contributor_service_radius_select on public.contributor_service_ra
 revoke all on public.contributor_service_radius from anon, authenticated, public;
 grant select on public.contributor_service_radius to anon, authenticated;
 
+-- one tag per Contributor, owner-chosen, default 'online' (an absent row means 'online')
+create table public.contributor_service_presence (
+  contributor_id uuid primary key references public.profiles(id) on delete cascade,
+  presence       text not null default 'online' check (presence in ('online', 'no_fixed_place')),
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.contributor_service_presence enable row level security;
+create policy contributor_service_presence_select on public.contributor_service_presence
+  for select using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = contributor_service_presence.contributor_id
+        and p.role = 'contributor' and p.contributor_status = 'approved'
+        and coalesce(p.contributor_hidden, false) = false and p.deleted_at is null
+    )
+    or contributor_id = (select auth.uid())
+    or public.is_active_team_member(contributor_id, array['editor', 'viewer'])
+    or (select public.is_admin())
+  );
+revoke all on public.contributor_service_presence from anon, authenticated, public;
+grant select on public.contributor_service_presence to anon, authenticated;
+
 -- ── 3. The one write path ─────────────────────────────────────────────
 -- Replaces a Contributor's whole selection in one transaction. Callable by the Contributor (an applicant still pending
 -- counts: the Apply wizard saves areas after the application row exists), an active editor of the listing, or an admin.
@@ -162,7 +192,8 @@ create function public.set_service_areas(
   p_contributor_id uuid,
   p_area_ids uuid[],
   p_radius_km integer default null,
-  p_radius_centre_area_id uuid default null
+  p_radius_centre_area_id uuid default null,
+  p_presence text default 'online'
 )
 returns jsonb
 language plpgsql
@@ -213,6 +244,10 @@ begin
      where a.user_id = p_contributor_id and a.status = 'pending'
      order by a.submitted_at desc limit 1;
     v_has_pin := coalesce(v_has_pin, false);
+  end if;
+
+  if p_presence is null or p_presence not in ('online', 'no_fixed_place') then
+    return jsonb_build_object('success', false, 'reason', 'invalid_presence');
   end if;
 
   -- de-duplicate; null elements are dropped
@@ -266,20 +301,30 @@ begin
         set radius_km = excluded.radius_km, centre_area_id = excluded.centre_area_id, updated_at = now();
   end if;
 
+  -- the tag lives only while the Contributor has something chosen
+  if cardinality(v_ids) = 0 and p_radius_km is null then
+    delete from public.contributor_service_presence pr where pr.contributor_id = p_contributor_id;
+  else
+    insert into public.contributor_service_presence (contributor_id, presence)
+      values (p_contributor_id, p_presence)
+      on conflict (contributor_id) do update set presence = excluded.presence, updated_at = now();
+  end if;
+
   return jsonb_build_object(
     'success', true,
     'area_ids', to_jsonb(v_ids),
     'radius_km', p_radius_km,
-    'radius_centre_area_id', case when p_radius_km is null then null else v_centre end
+    'radius_centre_area_id', case when p_radius_km is null then null else v_centre end,
+    'presence', p_presence
   );
 end;
 $$;
 
-comment on function public.set_service_areas(uuid, uuid[], integer, uuid) is
-  'Replaces a Contributor''s served areas and optional radius in one transaction. Caller must be the Contributor, an active editor of the listing, or an admin. Returns { success, reason | area_ids, radius_km, radius_centre_area_id }.';
+comment on function public.set_service_areas(uuid, uuid[], integer, uuid, text) is
+  'Replaces a Contributor''s served areas and optional radius in one transaction. Caller must be the Contributor, an active editor of the listing, or an admin. Returns { success, reason | area_ids, radius_km, radius_centre_area_id, presence }.';
 
-revoke all on function public.set_service_areas(uuid, uuid[], integer, uuid) from public, anon;
-grant execute on function public.set_service_areas(uuid, uuid[], integer, uuid) to authenticated;
+revoke all on function public.set_service_areas(uuid, uuid[], integer, uuid, text) from public, anon;
+grant execute on function public.set_service_areas(uuid, uuid[], integer, uuid, text) to authenticated;
 
 -- ── 4. The public read for the globe ──────────────────────────────────
 -- SECURITY INVOKER on purpose: it reads under the caller's own RLS, so it can never show more than the policies above
@@ -300,7 +345,8 @@ returns table (
   matched_level       text,
   centre_area_name    text,
   radius_km           integer,
-  distance_km         numeric
+  distance_km         numeric,
+  presence            text
 )
 language sql
 stable
@@ -319,8 +365,10 @@ as $$
     select p.id, p.full_name, p.contributor_slug, p.contributor_kind, p.contributor_category, p.avatar_url, p.logo_url,
            p.physical_latitude, p.physical_longitude,
            (coalesce(p.contributor_no_fixed_location, false) = false
-              and p.physical_latitude is not null and p.physical_longitude is not null) as has_pin
+              and p.physical_latitude is not null and p.physical_longitude is not null) as has_pin,
+           coalesce(pr.presence, 'online') as presence
       from public.profiles p
+      left join public.contributor_service_presence pr on pr.contributor_id = p.id
      where p.role = 'contributor' and p.contributor_status = 'approved'
        and coalesce(p.contributor_hidden, false) = false and p.deleted_at is null
   ),
@@ -328,7 +376,7 @@ as $$
     -- the nearest matching tick wins when someone ticked several areas on the way up
     select distinct on (l.id)
            l.id, l.full_name, l.contributor_slug, l.contributor_kind, l.contributor_category, l.avatar_url, l.logo_url,
-           c.id as matched_id, c.name as matched_name, c.level as matched_level
+           l.presence, c.id as matched_id, c.name as matched_name, c.level as matched_level
       from chain c
       join public.contributor_service_areas csa on csa.area_id = c.id
       join live l on l.id = csa.contributor_id
@@ -338,7 +386,7 @@ as $$
   here as (select centroid_lat, centroid_lng from chain where depth = 0),
   reach as (
     select l.id, l.full_name, l.contributor_slug, l.contributor_kind, l.contributor_category, l.avatar_url, l.logo_url,
-           r.radius_km, ca.name as centre_name,
+           l.has_pin, l.presence, r.radius_km, ca.name as centre_name,
            -- haversine, kilometres
            6371.0 * 2 * asin(least(1.0, sqrt(
              power(sin(radians(h.centroid_lat - cp.lat) / 2), 2)
@@ -357,13 +405,15 @@ as $$
   )
   select 'main'::text, m.id, m.full_name, m.contributor_slug, m.contributor_kind, m.contributor_category,
          m.avatar_url, m.logo_url, m.matched_id, m.matched_name, m.matched_level,
-         null::text, null::integer, null::numeric
+         null::text, null::integer, null::numeric, m.presence
     from main m
   union all
   select * from (
     select 'also'::text, x.id, x.full_name, x.contributor_slug, x.contributor_kind, x.contributor_category,
            x.avatar_url, x.logo_url, null::uuid, null::text, null::text,
-           x.centre_name, x.radius_km, round(x.d::numeric, 1)
+           x.centre_name, x.radius_km, round(x.d::numeric, 1),
+           -- a Contributor with a pin is on the map: the Online / No fixed place tag does not describe them
+           case when x.has_pin then null else x.presence end
       from reach x
      where x.d <= x.radius_km
      order by x.d, x.full_name, x.id
@@ -424,7 +474,8 @@ commit;
 
 -- Rollback (run in this order; nothing else in the database references these objects):
 --   drop function public.serving_area_listings(uuid, integer);
---   drop function public.set_service_areas(uuid, uuid[], integer, uuid);
+--   drop function public.set_service_areas(uuid, uuid[], integer, uuid, text);
+--   drop table public.contributor_service_presence;
 --   drop table public.contributor_service_radius;
 --   drop table public.contributor_service_areas;
 --   drop table public.service_areas;            -- takes its trigger with it

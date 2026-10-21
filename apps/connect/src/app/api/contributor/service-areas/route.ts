@@ -2,11 +2,12 @@
  * Owner side of serving areas (issue #259, migration 195).
  *
  *   GET /api/contributor/service-areas[?contributor_id=<uuid>]
- *       The current selection: { area_ids, radius_km, radius_centre_area_id }. Defaults to the caller's own listing.
+ *       The current selection: { area_ids, radius_km, radius_centre_area_id, presence }. Defaults to the caller's own listing.
  *       Read on the caller's own session, so RLS decides who may see it (the Contributor, an active team member of the
  *       listing, an admin). Someone who may not simply gets an empty selection.
  *   PUT /api/contributor/service-areas
- *       { contributor_id?, area_ids: uuid[], radius_km?: 1..100, radius_centre_area_id?: uuid }
+ *       { contributor_id?, area_ids: uuid[], radius_km?: 1..100, radius_centre_area_id?: uuid,
+ *         presence?: "online" | "no_fixed_place" }  (the owner's plain tag; default "online")
  *       Replaces the whole selection in one transaction through `set_service_areas`, which decides who may write (the
  *       Contributor, an active editor, an admin), which Contributors may choose areas (approved, or an applicant who is
  *       still pending), and the radius rule (a radius needs a centre: a ticked area, or the Contributor's own pin).
@@ -19,7 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getRouteAuth } from "@/lib/supabase/route";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
-import { parseSelectionPayload, SET_REFUSALS } from "@/lib/serviceAreas";
+import { DEFAULT_PRESENCE, isServingPresence, parseSelectionPayload, SET_REFUSALS } from "@/lib/serviceAreas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,16 +45,17 @@ export async function GET(request: NextRequest) {
   }
   const contributorId = (asked ?? user.id).toLowerCase();
 
-  const [areas, radius] = await Promise.all([
+  const [areas, radius, presence] = await Promise.all([
     supabase.from("contributor_service_areas").select("area_id").eq("contributor_id", contributorId),
     supabase
       .from("contributor_service_radius")
       .select("radius_km, centre_area_id")
       .eq("contributor_id", contributorId)
       .maybeSingle(),
+    supabase.from("contributor_service_presence").select("presence").eq("contributor_id", contributorId).maybeSingle(),
   ]);
-  if (areas.error || radius.error) {
-    console.error("[/api/contributor/service-areas] read", areas.error ?? radius.error);
+  if (areas.error || radius.error || presence.error) {
+    console.error("[/api/contributor/service-areas] read", areas.error ?? radius.error ?? presence.error);
     return NextResponse.json({ error: "read_failed" }, { status: 500 });
   }
 
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest) {
     area_ids: ids,
     radius_km: radius.data?.radius_km ?? null,
     radius_centre_area_id: radius.data?.centre_area_id ?? null,
+    presence: isServingPresence(presence.data?.presence) ? presence.data.presence : DEFAULT_PRESENCE,
   });
 }
 
@@ -88,6 +91,7 @@ export async function PUT(request: NextRequest) {
     p_area_ids: selection.areaIds,
     p_radius_km: selection.radiusKm,
     p_radius_centre_area_id: selection.radiusCentreAreaId,
+    p_presence: selection.presence,
   });
   if (error) {
     console.error("[/api/contributor/service-areas] rpc", error);
@@ -100,6 +104,7 @@ export async function PUT(request: NextRequest) {
     area_ids?: string[];
     radius_km?: number | null;
     radius_centre_area_id?: string | null;
+    presence?: string;
   };
   if (!result.success) {
     const refusal = SET_REFUSALS[result.reason ?? ""] ?? { status: 400, error: "refused" };
@@ -109,5 +114,6 @@ export async function PUT(request: NextRequest) {
     area_ids: result.area_ids ?? [],
     radius_km: result.radius_km ?? null,
     radius_centre_area_id: result.radius_centre_area_id ?? null,
+    presence: result.presence ?? "online",
   });
 }
