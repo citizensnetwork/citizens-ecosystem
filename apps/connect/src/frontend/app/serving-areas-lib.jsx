@@ -16,8 +16,8 @@
 //
 //  Public surface: window.CCServing = { PRESETS, MAX_AREAS, MAX_RADIUS_KM, DEFAULT_PRESENCE, emptySelection, buildIndex,
 //  mergeAreas, childIds, rootIds, ancestorsOf, hasChosenInside, toggleArea, normalise, defaultCentre, setRadius, setCentre,
-//  setPresence, summaryParts, summaryText, search, payloadOf, selectionFromServer, offersPicker, isUuid, fetchAreas,
-//  loadSelection, saveSelection, messageFor }.
+//  setPresence, summaryParts, summaryText, search, payloadOf, selectionFromServer, offersPicker, isUuid, AREA_ZOOM,
+//  resolveLevel, areaInView, fetchServing, fetchAreas, loadSelection, saveSelection, messageFor }.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const PRESETS = [10, 25, 50, 100];       // km; the server accepts 1 to MAX_RADIUS_KM, the screen offers these
@@ -47,7 +47,13 @@
     const kids = {};
     (Array.isArray(areas) ? areas : []).forEach((a) => {
       if (!validArea(a)) return;
-      byId[a.id] = { id: a.id, parentId: a.parent_id || null, level: a.level, name: a.name.trim(), sort: typeof a.sort === 'number' ? a.sort : 0, slug: a.slug || '' };
+      const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+      const bbox = [a.bbox_south, a.bbox_west, a.bbox_north, a.bbox_east].every((v) => num(v) !== null)
+        ? { s: a.bbox_south, w: a.bbox_west, n: a.bbox_north, e: a.bbox_east } : null;
+      byId[a.id] = {
+        id: a.id, parentId: a.parent_id || null, level: a.level, name: a.name.trim(), sort: typeof a.sort === 'number' ? a.sort : 0, slug: a.slug || '',
+        lat: num(a.centroid_lat), lng: num(a.centroid_lng), bbox, raw: a,
+      };
     });
     Object.keys(byId).forEach((id) => { const p = byId[id].parentId || ROOT; (kids[p] = kids[p] || []).push(id); });
     Object.keys(kids).forEach((p) => kids[p].sort((x, y) => (byId[x].sort - byId[y].sort) || byName(byId[x], byId[y])));
@@ -55,7 +61,7 @@
   }
   /** A new index with more rows added (suburbs arrive after the first load). */
   function mergeAreas(index, areas) {
-    const have = Object.keys(index.byId).map((id) => ({ id, parent_id: index.byId[id].parentId, level: index.byId[id].level, name: index.byId[id].name, sort: index.byId[id].sort, slug: index.byId[id].slug }));
+    const have = Object.keys(index.byId).map((id) => index.byId[id].raw);
     return buildIndex(have.concat(Array.isArray(areas) ? areas : []).filter((a, i, all) => all.findIndex((b) => b.id === a.id) === i));
   }
   const childIds = (index, id) => index.kids[id || ROOT] || [];
@@ -176,6 +182,41 @@
   const offersPicker = (row) => !!row && row.noFixedLocation === true;
   const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
+  // ── "the area in view" (the globe, issue #259) ───────────────────────
+  //  Resolved on the device from the small public index, so the map never sends coordinates to us: the centre of the map is
+  //  matched to the SMALLEST area whose rectangle contains it (ties go to the nearest centre), per level. The rectangles are
+  //  approximate by design (no boundary polygons), so near an edge the answer can be the neighbour: it is a hint to look in
+  //  the right place, never a promise about a border.
+  //  The level that counts follows the zoom, with the same gate style as ZOOM_GATES in map.jsx: zoomed right out (a whole
+  //  country) there is no area in view; then the province; then a city or town; then a suburb where one is loaded.
+  const AREA_ZOOM = { province: 6, place: 9.5, suburb: 12.5 };
+  const bboxSize = (a) => (a.bbox.n - a.bbox.s) * (a.bbox.e - a.bbox.w);
+  const centreGap = (a, lat, lng) => ((a.lat === null ? lat : a.lat) - lat) ** 2 + ((a.lng === null ? lng : a.lng) - lng) ** 2;
+  /** The area of ONE level whose rectangle contains the point, or null. */
+  function resolveLevel(index, level, lat, lng) {
+    let best = null;
+    Object.keys(index.byId).forEach((id) => {
+      const a = index.byId[id];
+      if (a.level !== level || !a.bbox) return;
+      if (lat < a.bbox.s || lat > a.bbox.n || lng < a.bbox.w || lng > a.bbox.e) return;
+      if (!best) { best = a; return; }
+      const d = bboxSize(a) - bboxSize(best) || centreGap(a, lat, lng) - centreGap(best, lat, lng) || (a.id < best.id ? -1 : 1);
+      if (d < 0) best = a;
+    });
+    return best ? best.id : null;
+  }
+  /** The area to ask about for this centre and zoom: the most specific level the zoom allows that has an answer. Null = none. */
+  function areaInView(index, lat, lng, zoom) {
+    if (!index || !index.byId || typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(zoom)) return null;
+    if (zoom < AREA_ZOOM.province) return null;
+    const levels = ['suburb', 'place', 'province'].filter((l) => zoom >= AREA_ZOOM[l]);
+    for (let i = 0; i < levels.length; i += 1) {
+      const id = resolveLevel(index, levels[i], lat, lng);
+      if (id) return id;
+    }
+    return null;
+  }
+
   // ── the three requests ───────────────────────────────────────────────
   const base = () => (window.__CC_ENV && window.__CC_ENV.API_BASE_URL) || '';
   /** GET /api/v1/service-areas[query]: public, cached at the edge. Returns { ok, areas } and never throws. */
@@ -191,6 +232,37 @@
       return { ok: false, areas: [] };
     }
   }
+  /** One Contributor row from /api/v1/serving, kept to the allow-listed fields (a contact detail can never ride along). */
+  const text = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const person = (r) => (r && isUuid(r.id) && text(r.name)
+    ? { id: r.id, name: text(r.name), slug: text(r.slug), category: text(r.category), kind: text(r.kind), avatarUrl: text(r.avatar_url), logoUrl: text(r.logo_url), presence: r.presence === 'no_fixed_place' ? 'no_fixed_place' : r.presence === 'online' ? 'online' : null }
+    : null);
+  /** GET /api/v1/serving?area=<uuid>: who is online in this area. Returns { ok, area, main, also } and never throws. */
+  async function fetchServing(areaId, fetcher) {
+    const f = fetcher || (typeof fetch === 'function' ? fetch : null);
+    if (!f || !isUuid(areaId)) return { ok: false };
+    try {
+      const res = await f(base() + '/api/v1/serving?area=' + encodeURIComponent(areaId));
+      if (!res || !res.ok) return { ok: false };
+      const d = ((await res.json()) || {}).data || {};
+      const area = d.area && isUuid(d.area.id) && text(d.area.name) ? { id: d.area.id, name: text(d.area.name), level: d.area.level } : null;
+      if (!area) return { ok: false };
+      const main = (Array.isArray(d.main) ? d.main : []).map((r) => {
+        const p = person(r);
+        const sv = r && r.served;
+        return p && sv && isUuid(sv.id) && text(sv.name) && LEVELS.indexOf(sv.level) >= 0 ? { ...p, served: { id: sv.id, name: text(sv.name), level: sv.level } } : null;
+      }).filter(Boolean);
+      const also = (Array.isArray(d.also_served_by) ? d.also_served_by : []).map((r) => {
+        const p = person(r);
+        return p && Number.isInteger(r.radius_km) && typeof r.distance_km === 'number' && Number.isFinite(r.distance_km)
+          ? { ...p, centreName: text(r.centre_name), radiusKm: r.radius_km, distanceKm: r.distance_km } : null;
+      }).filter(Boolean);
+      return { ok: true, area, main, also };
+    } catch {
+      return { ok: false };
+    }
+  }
+
   /** GET /api/contributor/service-areas: the saved choice. `contributorId` null means the signed-in person's own. */
   async function loadSelection(authedFetch, contributorId) {
     if (typeof authedFetch !== 'function') return { ok: false };
@@ -237,6 +309,7 @@
     emptySelection, buildIndex, mergeAreas, childIds, rootIds, ancestorsOf, hasChosenInside,
     toggleArea, normalise, defaultCentre, setRadius, setCentre, setPresence,
     summaryParts, summaryText, search, payloadOf, selectionFromServer, offersPicker, isUuid,
+    AREA_ZOOM, resolveLevel, areaInView, fetchServing,
     fetchAreas, loadSelection, saveSelection, messageFor,
   };
 })();

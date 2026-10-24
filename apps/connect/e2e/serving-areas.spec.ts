@@ -88,6 +88,8 @@ test.describe("the Apply wizard", () => {
   test("a Contributor with a place sees no picker and no extra step", async ({ page }) => {
     const db = await openAsApplicant(page);
     await bootAt(page);
+    // The home map's globe reads the area list once when the map opens (PR C); that is not the wizard asking.
+    db.areaRequests.length = 0;
     await goTo(page, "apply");
     await expect(page.getByText("Step 1 of 3")).toBeVisible();
     await expect(page.locator("[data-serving-picker]")).toHaveCount(0);

@@ -89,6 +89,25 @@
       // the small tag on each row, chosen by the owner (default online); a mobile ministry is never labelled Online
       tag: { online: 'Online', noFixedPlace: 'No fixed place' },
       alsoReaching: 'Also reaching this area',
+      // the globe button on the map (one labelled button, then the list)
+      button: (n) => 'Online in this area: ' + n + (n === 1 ? ' listing' : ' listings'),
+      // under the sheet title: honest about what the list is (C21: never "on the map")
+      subtitle: (area) => 'Online or no fixed place · ' + area,
+      count: (n) => n + (n === 1 ? ' listing' : ' listings'),
+      closeSheet: 'Close the online list',
+      // the main list is grouped by how specific the area they chose is, then A to Z
+      groups: { suburb: 'This suburb', place: 'This city or town', province: 'The whole province' },
+      rowMeta: (tag, area) => tag + ' · ' + area,
+      openProfile: (name) => 'Open ' + name,
+      alsoHint: 'A wider reach, nearest first.',
+      within: (km, centre) => 'Within ' + km + ' km of ' + centre,
+      withinPin: (km) => 'Within ' + km + ' km of their place',
+      away: (km) => km + ' km away',
+      alsoFoot: 'Nearest first, then A to Z. No ranking.',
+      loading: 'Loading',
+      loadError: 'We could not load this list.',
+      retry: 'Try again',
+      empty: 'No one is online in this area right now.',
     },
 
     // Issue #259, owner side (the area picker in Apply and the Dashboard): this side KEEPS the word "serving".
