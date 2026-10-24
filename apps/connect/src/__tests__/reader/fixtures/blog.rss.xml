@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Hope Fellowship (fictional)</title>
+    <link>https://www.hope-fellowship.example/</link>
+    <item>
+      <title>Food parcels this month &amp; how to help</title>
+      <link>https://www.hope-fellowship.example/news/food-parcels</link>
+      <pubDate>Tue, 20 Oct 2026 08:00:00 +0200</pubDate>
+      <description><![CDATA[<p>We packed <b>120</b> parcels. Questions? Call 012 345 6789.</p>]]></description>
+    </item>
+    <item>
+      <title>Escaped description</title>
+      <link>https://www.hope-fellowship.example/news/escaped</link>
+      <pubDate>Mon, 19 Oct 2026 08:00:00 +0200</pubDate>
+      <description>&lt;p&gt;Thank you to everyone who came.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Old news from last year</title>
+      <link>https://www.hope-fellowship.example/news/old</link>
+      <pubDate>Mon, 01 Dec 2025 08:00:00 +0200</pubDate>
+      <description>Too old to suggest.</description>
+    </item>
+    <item>
+      <title>No date at all</title>
+      <link>https://www.hope-fellowship.example/news/undated</link>
+      <description>Cannot tell if this is recent.</description>
+    </item>
+    <item>
+      <title>Insecure link</title>
+      <link>http://www.hope-fellowship.example/news/insecure</link>
+      <pubDate>Tue, 20 Oct 2026 09:00:00 +0200</pubDate>
+      <description>The link is dropped, the post is kept.</description>
+    </item>
+  </channel>
+</rss>

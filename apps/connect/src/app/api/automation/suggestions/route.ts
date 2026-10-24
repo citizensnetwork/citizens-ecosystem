@@ -41,14 +41,8 @@ import { gateV1 } from "@/lib/v1Gate";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 import { geocodeWithMapTiler } from "@/lib/intake/googleForm";
-import {
-  MAX_ITEMS_PER_REQUEST,
-  isAutoPublishable,
-  isAutoUpdateLevel,
-  validateSuggestion,
-  type AutoUpdateLevel,
-  type EventPayload,
-} from "@/lib/automation/suggestions";
+import { MAX_ITEMS_PER_REQUEST, isAutoPublishable, validateSuggestion, type EventPayload } from "@/lib/automation/suggestions";
+import { contributorEligibility, type Eligibility, type ProfileForAutomation } from "@/lib/automation/dueSources";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,8 +62,6 @@ type ItemResult = {
   reason?: string;
   warnings?: string[];
 };
-
-type Eligibility = { level: AutoUpdateLevel } | { reason: "contributor_not_eligible" | "consent_off" };
 
 /** The refusals a lone item turns into an HTTP 409 (a batch just reports them per item). */
 const CONFLICT_REASONS = new Set(["consent_off", "source_disabled", "contributor_not_eligible"]);
@@ -116,21 +108,7 @@ export async function POST(request: Request) {
       .select("id, role, contributor_status, contributor_hidden, deleted_at, auto_update_level")
       .eq("id", contributorId)
       .maybeSingle();
-    const p = data as {
-      role?: string;
-      contributor_status?: string;
-      contributor_hidden?: boolean;
-      deleted_at?: string | null;
-      auto_update_level?: string;
-    } | null;
-    let result: Eligibility;
-    if (!p || p.role !== "contributor" || p.contributor_status !== "approved" || p.contributor_hidden || p.deleted_at) {
-      result = { reason: "contributor_not_eligible" };
-    } else if (!isAutoUpdateLevel(p.auto_update_level) || p.auto_update_level === "off") {
-      result = { reason: "consent_off" };
-    } else {
-      result = { level: p.auto_update_level };
-    }
+    const result = contributorEligibility(data as ProfileForAutomation | null);
     eligibility.set(contributorId, result);
     return result;
   }

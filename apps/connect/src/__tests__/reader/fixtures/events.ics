@@ -1,0 +1,61 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Hope Fellowship (fictional)//EN
+BEGIN:VEVENT
+UID:svc-1@hope-fellowship.example
+SUMMARY:Sunday Service\, all welcome
+DESCRIPTION:Join us for worship.\nChildren's church runs alongside.
+LOCATION:Hope Hall\, 12 Example Road\, Pretoria
+URL:https://www.hope-fellowship.example/sunday
+DTSTART;TZID=Africa/Johannesburg:20120101T093000
+DTEND;TZID=Africa/Johannesburg:20120101T110000
+RRULE:FREQ=WEEKLY;BYDAY=SU
+EXDATE;TZID=Africa/Johannesburg:20261101T093000
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Reminder that must not be read as the description
+TRIGGER:-PT15M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:prayer-1@hope-fellowship.example
+SUMMARY:First Saturday Prayer
+DTSTART:20260101T060000Z
+DURATION:PT1H
+RRULE:FREQ=MONTHLY;BYDAY=1SA
+END:VEVENT
+BEGIN:VEVENT
+UID:conf-1@hope-fellowship.example
+SUMMARY:Leaders
+  Conference
+DTSTART;TZID=Africa/Johannesburg:20261120T180000
+DURATION:PT2H
+END:VEVENT
+BEGIN:VEVENT
+UID:allday-1@hope-fellowship.example
+SUMMARY:All Day Retreat
+DTSTART;VALUE=DATE:20261121
+END:VEVENT
+BEGIN:VEVENT
+UID:cancel-1@hope-fellowship.example
+SUMMARY:Cancelled Social
+DTSTART:20261110T150000Z
+STATUS:CANCELLED
+END:VEVENT
+BEGIN:VEVENT
+UID:odd-1@hope-fellowship.example
+SUMMARY:Odd repeat
+DTSTART:20260101T060000Z
+RRULE:FREQ=MONTHLY;BYSETPOS=-1;BYDAY=MO,TU
+END:VEVENT
+BEGIN:VEVENT
+UID:past-1@hope-fellowship.example
+SUMMARY:Already Happened
+DTSTART:20250101T060000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:badzone-1@hope-fellowship.example
+SUMMARY:Unknown zone
+DTSTART;TZID=Nowhere/Land:20261125T100000
+END:VEVENT
+END:VCALENDAR

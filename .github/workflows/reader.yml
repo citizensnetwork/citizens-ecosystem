@@ -1,0 +1,57 @@
+name: Reader
+
+# Listing Automation, Phase 2: the Reader. A dependency-free Node script that reads each opted-in
+# Contributor's own public website, calendar and feeds and hands what it finds to Citizens Connect
+# as SUGGESTIONS the owner approves. No language model runs here; nothing is paid for per token.
+# Founder guide: apps/connect/scripts/reader/README.md.
+#
+# Safety, on purpose:
+#   - triggers are `schedule` and `workflow_dispatch` ONLY (never pull_request or pull_request_target),
+#     so a pull request, and above all a fork's, can never run this job or reach its secrets;
+#   - the token can only read the repository (`contents: read`);
+#   - the keys come from Actions secrets, are passed through `env`, and are never echoed;
+#   - the run is skipped on forks, which have no secrets.
+
+on:
+  schedule:
+    # Daily, 03:23 UTC (05:23 in South Africa). Off the :00 minute, when scheduled runs queue longest.
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: read the sources and print counts only. Nothing is posted and no email is sent.'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # One Reader at a time; a manual run waits for the scheduled one instead of cancelling it.
+  group: reader
+  cancel-in-progress: false
+
+jobs:
+  reader:
+    name: Read the listing sources that are due
+    if: github.repository == 'citizensnetwork/citizens-ecosystem'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: apps/connect/scripts/reader
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run the Reader
+        env:
+          AUTOMATION_SUGGEST_KEY: ${{ secrets.AUTOMATION_SUGGEST_KEY }}
+          AUTOMATION_DIGEST_KEY: ${{ secrets.AUTOMATION_DIGEST_KEY }}
+          CONNECT_BASE_URL: ${{ secrets.CONNECT_BASE_URL }}
+          # The schedule is always live. A manual run is a dry run unless the box is unticked.
+          READER_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '--live' }}
+        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE"
