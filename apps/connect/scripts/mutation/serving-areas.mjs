@@ -39,6 +39,9 @@ const T_SQL = ["src/__tests__/security/service-areas-migration.test.ts"];
 const T_FLIB = ["src/__tests__/frontend/servingAreasLib.test.ts"];
 const T_FUI = ["src/__tests__/frontend/servingAreas.test.tsx"];
 const T_FSTR = ["src/__tests__/frontend/mapV2Strings.test.ts"];
+const T_FVIEW = ["src/__tests__/frontend/servingAreasView.test.ts"];
+const T_FON = ["src/__tests__/frontend/mapV2Online.test.tsx"];
+const E_ON = ["e2e/map-v2-online.spec.ts"];
 
 const LIB = "src/lib/serviceAreas.ts";
 const INDEX = "src/app/api/v1/service-areas/route.ts";
@@ -55,6 +58,10 @@ const PEND = "src/frontend/app/pending-application.jsx";
 const HTML = "src/frontend/index.html";
 const BUILD = "scripts/build-frontend.js";
 const STRINGS = "src/frontend/app/map-v2-strings.jsx";
+const ONLINE = "src/frontend/app/map-v2-online.jsx";
+const HOME = "src/frontend/app/home.jsx";
+const MAPJSX = "src/frontend/app/map.jsx";
+const MV2LIB = "src/frontend/app/map-v2-lib.jsx";
 const PROBE = "../../docs/audit/probes/195_service_areas.probe.sql";
 
 // edits: [{ file, find, replace, count = 1 }]. `equivalent` marks a mutant that SHOULD survive (a second layer covers it).
@@ -150,6 +157,38 @@ const MUTANTS = [
   { id: "b-html-registration-lost", kind: "unit", tests: T_FUI, edits: [{ file: HTML, find: '<script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>\n', replace: "" }] },
   { id: "b-build-registration-lost", kind: "unit", tests: T_FUI, edits: [{ file: BUILD, find: "'serving-areas.jsx', ", replace: "" }] },
   { id: "b-strings-group-renamed", kind: "unit", tests: T_FSTR, edits: [{ file: STRINGS, find: "    serving: {\n      title:", replace: "    servingx: {\n      title:" }] },
+  // ── PR C: the area in view and the list read (serving-areas-lib.jsx)
+  { id: "c-largest-rectangle-wins", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "const d = bboxSize(a) - bboxSize(best) ||", replace: "const d = bboxSize(best) - bboxSize(a) ||" }] },
+  { id: "c-edge-not-inside", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "if (lat < a.bbox.s || lat > a.bbox.n || lng < a.bbox.w || lng > a.bbox.e) return;", replace: "if (lat <= a.bbox.s || lat >= a.bbox.n || lng <= a.bbox.w || lng >= a.bbox.e) return;" }] },
+  { id: "c-no-province-gate (equivalent: the level filter below it already yields nothing under the gate)", kind: "unit", tests: T_FVIEW, equivalent: true, edits: [{ file: SLIB, find: "if (zoom < AREA_ZOOM.province) return null;", replace: "" }] },
+  { id: "c-place-gate-lowered", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "const AREA_ZOOM = { province: 6, place: 9.5, suburb: 12.5 };", replace: "const AREA_ZOOM = { province: 6, place: 7, suburb: 12.5 };" }] },
+  { id: "c-no-fallback-level", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "for (let i = 0; i < levels.length; i += 1) {", replace: "for (let i = 0; i < 1; i += 1) {" }] },
+  { id: "c-list-read-sends-coordinates", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "'/api/v1/serving?area=' + encodeURIComponent(areaId)", replace: "'/api/v1/serving?lat=-25.7&lng=28.2&area=' + encodeURIComponent(areaId)" }] },
+  { id: "c-list-read-no-allowlist", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "? { id: r.id, name: text(r.name), slug:", replace: "? { ...r, id: r.id, name: text(r.name), slug:" }] },
+  { id: "c-raw-tag-shown", kind: "unit", tests: T_FVIEW, edits: [{ file: SLIB, find: "presence: r.presence === 'no_fixed_place' ? 'no_fixed_place' : r.presence === 'online' ? 'online' : null }", replace: "presence: r.presence }" }] },
+  // ── PR C: when we ask, and what is drawn (map-v2-online.jsx)
+  { id: "c-asks-per-move", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "if (timer !== null) clearT(timer);\n      timer = setT(look, settleMs);", replace: "look();" }] },
+  { id: "c-same-area-asked-again", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "if (areaId === state.areaId && (state.status === 'loading' || (state.status === 'ready' && hit && now() - hit.at < freshMs))) return;", replace: "" }] },
+  { id: "c-fresh-answer-not-reused", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "if (hit && now() - hit.at < freshMs) { push({ areaId, status: 'ready', data: hit.data }); return; }", replace: "" }] },
+  { id: "c-late-answer-accepted", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "if (dead || mine !== seq || state.areaId !== areaId) return;", replace: "if (dead) return;" }] },
+  { id: "c-globe-ignores-the-constant", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "const globeOn = () => !!(window.isMapV2 && window.isMapV2() && window.MapV2 && window.MapV2.onlineGlobe);", replace: "const globeOn = () => true;" }] },
+  { id: "c-lib-constant-ignored", kind: "unit", tests: T_FON, edits: [{ file: MV2LIB, find: "get onlineGlobe() { return on && ONLINE_GLOBE_ON; },", replace: "get onlineGlobe() { return on; }," }] },
+  { id: "c-empty-area-draws-button", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "const visible = on && (total > 0 || open);", replace: "const visible = on;" }] },
+  { id: "c-button-outside-control-group", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "'maplibregl-ctrl maplibregl-ctrl-group'", replace: "'maplibregl-ctrl'" }] },
+  { id: "c-groups-reversed", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: ".sort((a, b) => LEVEL_ORDER[a] - LEVEL_ORDER[b])", replace: ".sort((a, b) => LEVEL_ORDER[b] - LEVEL_ORDER[a])" }] },
+  { id: "c-tag-flipped", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "presence === 'no_fixed_place' ? S().tag.noFixedPlace : S().tag.online", replace: "presence === 'no_fixed_place' ? S().tag.online : S().tag.noFixedPlace" }] },
+  { id: "c-escape-ignored", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "if (e.key === 'Escape') onClose();", replace: "" }] },
+  { id: "c-no-back-guard", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "    useBackGuard(true, onClose);\n    useEffect(() => {\n      const onKey", replace: "    useEffect(() => {\n      const onKey" }] },
+  { id: "c-sheet-says-on-the-map", kind: "unit", tests: T_FON, edits: [{ file: STRINGS, find: "subtitle: (area) => 'Online or no fixed place · ' + area,", replace: "subtitle: (area) => 'On the map · ' + area," }] },
+  { id: "c-mounted-with-map-v2-off", kind: "unit", tests: T_FON, edits: [{ file: HOME, find: "window.isMapV2 && window.isMapV2() && window.MapV2Online && React.createElement(window.MapV2Online.Globe", replace: "window.MapV2Online && React.createElement(window.MapV2Online.Globe" }] },
+  { id: "c-map-ready-event-lost", kind: "unit", tests: T_FON, edits: [{ file: MAPJSX, find: "if (v2On()) { try { window.dispatchEvent(new Event('cc-map-ready')); } catch { /* old webview */ } }", replace: "" }] },
+  { id: "c-registration-lost", kind: "unit", tests: T_FON, edits: [{ file: BUILD, find: "'map-v2-online.jsx', ", replace: "" }] },
+  { id: "c-listener-left-behind", kind: "unit", tests: T_FON, edits: [{ file: ONLINE, find: "return () => { alive = false; map.off('moveend', onSettle); w.dispose(); watcher.current = null; };", replace: "return () => { alive = false; w.dispose(); watcher.current = null; };" }] },
+  { id: "c-sheet-text-popularity", kind: "unit", tests: T_FON, edits: [{ file: STRINGS, find: "alsoFoot: 'Nearest first, then A to Z. No ranking.',", replace: "alsoFoot: 'Most popular first. Top ranked by followers.'," }] },
+  // ── PR C: in a real browser with real touch (slow: each starts the dev server)
+  { id: "c-e2e-never-follows-the-map", kind: "e2e", tests: E_ON, edits: [{ file: ONLINE, find: "map.on('moveend', onSettle);", replace: "" }] },
+  { id: "c-e2e-flag-off-leaks (equivalent: globeOn() also asks isMapV2(), a third layer)", kind: "e2e", tests: E_ON, equivalent: true, edits: [{ file: HOME, find: "window.isMapV2 && window.isMapV2() && window.MapV2Online && React.createElement(window.MapV2Online.Globe", replace: "window.MapV2Online && React.createElement(window.MapV2Online.Globe" }, { file: MV2LIB, find: "get onlineGlobe() { return on && ONLINE_GLOBE_ON; },", replace: "get onlineGlobe() { return ONLINE_GLOBE_ON; }," }] },
+  { id: "c-e2e-control-on-the-wrong-side", kind: "e2e", tests: E_ON, edits: [{ file: ONLINE, find: "map.addControl(ctl, 'bottom-right');", replace: "map.addControl(ctl, 'top-left');" }] },
   // ── the SQL file and its probe (static twin)
   { id: "sql-upward-walk-reversed", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "join chain c on a.id = c.parent_id", replace: "join chain c on a.parent_id = c.id" }] },
   { id: "sql-pinned-in-main", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "where not l.has_pin", replace: "where true" }] },

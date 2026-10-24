@@ -1,6 +1,6 @@
 # Phone check: serving areas, the area picker and the globe (issue 259; written 2026-10-22)
 
-**Who:** Stephen, on the Android phone. **Time:** about 15 minutes. **Why it is on a phone:** my tests drive Chrome with real touch events and a stand-in for the database, which is the closest a computer gets, but they cannot reproduce Android Chrome's own scroll engine, your real account, or the live database. Sections A and B need a signed-in account that can **apply as a Contributor** (a Citizen who has not applied) or a Contributor with **no fixed location**. Section C (the globe) is added when the globe is built; it is not here yet.
+**Who:** Stephen, on the Android phone. **Time:** about 15 minutes. **Why it is on a phone:** my tests drive Chrome with real touch events and a stand-in for the database, which is the closest a computer gets, but they cannot reproduce Android Chrome's own scroll engine, your real account, or the live database. Sections A and B need a signed-in account that can **apply as a Contributor** (a Citizen who has not applied) or a Contributor with **no fixed location**. Section C (the globe) needs at least one **approved** online Contributor that has chosen the area you are looking at (your own from sections A and B once an admin approves it, or a test one).
 
 **Before you start.** Open the live site in Chrome on the phone. The app keeps its files in a cache so it opens fast; to be sure you have the new version, close the tab, reopen the site, and if the screen still looks as before, clear the site's data (Chrome menu, Settings, Site settings, the site, Clear). This check starts once this work is **merged and live**; it is not live yet.
 
@@ -40,6 +40,27 @@ On the "being reviewed" page, or (once approved) the Dashboard, **Profile** tab,
 | B5  | Switch "No fixed physical location" off              | The picker goes away. (With an address and a map pin you are on the map, so the picker is not offered)                   |      |
 | B6  | Turn airplane mode on, change an area, Save          | A plain message that it could not reach the server; your ticks stay on screen so you can try again                       |      |
 | B7  | (If you have an editor on your team) sign in as them | They can change the areas too; a viewer sees no picker                                                                   |      |
+
+## C. The globe: "Online in this area"
+
+Open the map. Pan and zoom to an area one approved online Contributor serves (a city or town at the usual zoom).
+
+| #   | Do this                                                              | You should see                                                                                                                                                | Pass |
+| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| C1  | Look at the buttons on the right, above the locate button            | **One globe button with a number**, in the same column and look as zoom and locate. Nothing else is new on the map                                            |      |
+| C2  | Pan to an area nobody serves (another province), then zoom right out | The globe **disappears** with no gap among the buttons. Zoomed right out (a whole country) there is no globe at all                                           |      |
+| C3  | Pan back and tap the globe with your thumb                           | A list slides up: **Online in this area**, then "Online or no fixed place · the area · N listings". It never says "on the map"                                |      |
+| C4  | Read the rows                                                        | Grouped (this suburb, this city or town, the whole province), A to Z inside each. Each row's second line says **Online** or **No fixed place**, then the area |      |
+| C5  | Check a travelling or mobile ministry                                | It says **No fixed place**, never Online                                                                                                                      |      |
+| C6  | Look under the main list (only if someone set a distance)            | **Also reaching this area**, at most 5, nearest first with "Within 50 km of ..." and "22 km away". No ranking, no counts of followers                         |      |
+| C7  | Scroll the list with your thumb                                      | The list moves; the map behind it does not                                                                                                                    |      |
+| C8  | Tap a row                                                            | That Contributor's page opens and the list is gone. Press Back: you are on the map and the list is **not** back                                               |      |
+| C9  | Open the list again, press the phone's Back button                   | Only the list closes; you stay on the map in the same place                                                                                                   |      |
+| C10 | Pan around inside the same city for ten seconds                      | The map stays as smooth as before and the number does not flicker                                                                                             |      |
+| C11 | Switch the phone to dark, then back                                  | The globe and the list are readable in both                                                                                                                   |      |
+| C12 | Turn on "Remove animations" in the phone's accessibility settings    | The globe appears with no fade                                                                                                                                |      |
+| C13 | With TalkBack: reach the globe                                       | It reads "Online in this area: N listings, button"; opening it reads the title, then the rows                                                                 |      |
+| C14 | With a pinned Contributor who set a distance reaching this area      | They appear only under "Also reaching this area", never in the main list, and show no Online tag (they are on the map)                                        |      |
 
 ## What I could not check from a computer
 
