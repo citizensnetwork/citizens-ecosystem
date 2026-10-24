@@ -219,7 +219,9 @@
                   checked: f.noFixedLocation, onChange: setNoFixedLocation,
                   label: "I don't have a fixed physical location",
                   desc: "We're online, mobile, or serve without a permanent office. No map pin needed.",
-                }))),
+                }),
+                // #259: no fixed location means "where do you serve?"; it saves on its own button, not with the profile
+                f.noFixedLocation && realUser && h(window.ServingAreas.Editor, { contributorId: null, authedFetch: window.authedFetch, toast }))),
             SocialInputs && h(Field, { label: 'Social media', hint: 'A link or just the handle. Either works.' }, h(SocialInputs, { socials: f.socials, onChange: ups })),
             h(Button, { variant: 'gold', icon: 'Check', disabled: !canSave, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save changes')),
 

@@ -82,6 +82,72 @@
       },
     },
 
+    // Issue #259 (founder naming rule, 2026-10-21): the PUBLIC side says "Online in this area" and never "serving";
+    // every public word for the globe lives in this one group so the wording changes in one place.
+    online: {
+      title: 'Online in this area',
+      // the small tag on each row, chosen by the owner (default online); a mobile ministry is never labelled Online
+      tag: { online: 'Online', noFixedPlace: 'No fixed place' },
+      alsoReaching: 'Also reaching this area',
+    },
+
+    // Issue #259, owner side (the area picker in Apply and the Dashboard): this side KEEPS the word "serving".
+    serving: {
+      title: 'Where do you serve?',
+      intro: 'Choose the areas you serve so people there can find you.',
+      tickMeaning: 'A tick covers that whole area and everything inside it.',
+      noUpward: 'Choosing a suburb never chooses the city above it.',
+      searchLabel: 'Search areas',
+      levels: { province: 'Province', place: 'City or town', suburb: 'Suburb' },
+      expand: (name) => 'Show areas inside ' + name,
+      collapse: (name) => 'Hide areas inside ' + name,
+      tick: (name) => 'Serve ' + name,
+      tickAll: (name) => 'Serve all of ' + name,
+      includes: 'Includes everything inside',
+      containsChosen: 'Contains a chosen area',
+      suburbsHint: 'Suburbs (optional)',
+      noSuburbs: 'No suburbs are listed here yet.',
+      loadingChildren: 'Loading',
+      summaryNone: 'Serving: nothing chosen yet',
+      summary: (list) => 'Serving: ' + list,
+      allOf: (name) => 'all of ' + name,
+      and: 'and',
+      more: (n) => n + ' more',
+      tooMany: (n) => 'You can choose up to ' + n + ' areas.',
+      noMatches: 'No areas match your search.',
+      loading: 'Loading areas',
+      loadError: 'We could not load the areas.',
+      retry: 'Try again',
+      radius: {
+        title: 'Also reach people within a distance (optional)',
+        needsArea: 'Choose an area first. A distance needs a centre.',
+        off: 'Off',
+        km: (n) => n + ' km',
+        measuredFrom: 'Measured from',
+        hint: 'People within this distance of the centre will find you.',
+      },
+      presence: {
+        title: 'How do people find you?',
+        online: 'You serve people over the internet.',
+        noFixedPlace: 'You travel or meet people in person, with no venue.',
+      },
+      save: 'Save areas',
+      saving: 'Saving…',
+      saved: 'Saved. Your areas are updated.',
+      findableNote: 'Online in this area: people there find you once you are approved.',
+      reviewLabel: 'Serving',
+      applyFailed: 'Your application is sent. Please add your areas again from your dashboard.',
+      errors: {
+        generic: 'We could not save your areas. Please try again.',
+        offline: 'We could not reach the server. Please check your connection.',
+        signIn: 'Please sign in first.',
+        forbidden: 'Only the owner or an editor can change this.',
+        tooMany: 'That is too many areas. Please choose fewer.',
+        slowDown: 'Too many changes at once. Please try again shortly.',
+        notReady: 'Your listing is not ready for areas yet.',
+      },
+    },
+
     // Open state, "Starts in 2 h", "Posted 3 h ago": MapV2Time builds these from the templates below.
     time: {
       open24: 'Open 24 hours',

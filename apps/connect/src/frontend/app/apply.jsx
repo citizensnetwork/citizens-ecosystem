@@ -125,8 +125,11 @@
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [f, setF] = useState({ orgName: '', kind: 'ministry', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false });
+    const [f, setF] = useState({ orgName: '', kind: 'ministry', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false, serving: window.CCServing.emptySelection(), servingSummary: '' });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    // The serving-areas picker (issue #259) hands back the choice AND its plain-words summary, which the review step shows.
+    const setServing = (sel, summary) => setF((s) => ({ ...s, serving: sel, servingSummary: summary || '' }));
+    const chosenAreas = window.CCServing.offersPicker(f) && f.serving.areaIds.length > 0;
     const setNoFixedLocation = (v) => setF((s) => ({ ...s, noFixedLocation: v, location: v ? '' : s.location, lat: v ? null : s.lat, lng: v ? null : s.lng }));
     // Merges a LocationPicker patch ({address?, lat?, lng?}) into the wizard
     // form — the picker sends only whichever field(s) actually changed.
@@ -166,7 +169,9 @@
                 checked: f.noFixedLocation, onChange: setNoFixedLocation,
                 label: "I don't have a fixed physical location",
                 desc: "We're online, mobile, or serve without a permanent office — no map pin needed.",
-              }))),
+              }),
+              // #259: only someone with no fixed location is offered the area picker, and it adds no wizard step
+              window.CCServing.offersPicker(f) && h(window.ServingAreas.Field, { value: f.serving, onChange: setServing }))),
           h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
       },
       // Short bio only (optional), plus Website folded in from the old
@@ -188,12 +193,15 @@
                 h('p', { className: 'font-bold text-foreground' }, f.orgName || copy.fallbackName),
                 h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.noFixedLocation ? 'Online / no fixed location' : (f.location || 'Location'))))),
             h(ReviewRow, { label: 'Type', value: contributorKindLabel(f.kind) }),
+            chosenAreas && h(ReviewRow, { label: window.MapV2Strings.serving.reviewLabel, value: f.servingSummary.replace(/^[^:]*:\s*/, '') }),
             h(ReviewRow, { label: 'About', value: f.bio }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
             h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5' }),
             h('p', { className: 'text-xs leading-relaxed' }, // C21: "on the map" only when the wizard has a pin (both coordinates); an online-only listing is in Kingdom Discovery
-              'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f)) + '. You can add your logo and contact details from your Dashboard while you wait.'))),
+              'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f)) + '. You can add your logo and contact details from your Dashboard while you wait.',
+              // #259: said only when they chose at least one area (the founder's rule), and never "on the map" without a pin (C21)
+              chosenAreas && h('span', { className: 'block mt-1' }, window.MapV2Strings.serving.findableNote)))),
       },
     ];
 
