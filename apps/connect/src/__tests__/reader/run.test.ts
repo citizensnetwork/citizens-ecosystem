@@ -228,7 +228,7 @@ describe("a live run", () => {
     expect(r.exitCode).toBe(0);
     expect(connect.byPath("/api/automation/suggestions")).toHaveLength(0);
     expect(r.lines.join("\n")).toContain("Sources due: 0");
-    expect(r.lines.length).toBeLessThanOrEqual(5);
+    expect(r.lines.filter(Boolean).length).toBeLessThanOrEqual(4);
   });
 
   it("a single source whose post fails does not stop the run, but is counted as failed", async () => {

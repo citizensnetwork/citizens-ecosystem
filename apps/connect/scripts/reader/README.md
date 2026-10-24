@@ -32,14 +32,14 @@ finds zero sources, reads nothing, and exits quietly.
    workflow**. Leave **Dry run** ticked and run it. A dry run reads the sources and counts what it finds, but
    posts nothing and sends no email.
 
-3. **Read the summary.** Open the finished run; the **Summary** page shows a table with one row per source:
+3. **Read the summary.** Open the finished run; the **Summary** page lists one line per source, like
 
-   | Column         | Meaning                                                                                |
-   | -------------- | -------------------------------------------------------------------------------------- |
-   | Source         | the first 8 characters of the source's id (never an address or a name)                 |
-   | Kind           | `website`, `youtube` or `calendar`                                                     |
-   | What was found | for example `3 events, 1 post`, `no events found`, `HTTP 404`, `blocked by robots.txt` |
-   | Result         | `dry run`, or on a live run how many suggestions were new, published or already known  |
+   > - `aaaaaaaa website: 3 events, 1 post -> 4 pending`
+
+   The first word is the first 8 characters of the source's id (never an address or a name), then its kind
+   (`website`, `youtube` or `calendar`), then what was found (for example `3 events, 1 post`, `no events found`,
+   `HTTP 404`, `blocked by robots.txt`), then, on a live run, how many suggestions were new, published or already
+   known (`dry run` on a dry run).
 
    With nobody opted in you will see `Sources due: 0` and a green tick. That is correct.
 

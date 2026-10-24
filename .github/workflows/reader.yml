@@ -54,4 +54,8 @@ jobs:
           CONNECT_BASE_URL: ${{ secrets.CONNECT_BASE_URL }}
           # The schedule is always live. A manual run is a dry run unless the box is unticked.
           READER_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '--live' }}
-        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE"
+        # `shell: bash` turns on pipefail, so the Reader's own exit code (red on a refused key or a failed
+        # digest) survives the pipe. The Reader prints only short ids, kinds and fixed phrases, and writes no
+        # file; `tee` copies that report onto the run's Summary page.
+        shell: bash
+        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE" | tee -a "$GITHUB_STEP_SUMMARY"

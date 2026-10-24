@@ -76,8 +76,12 @@ describe(".github/workflows/reader.yml", () => {
     expect(code).toMatch(/persist-credentials:\s*false/);
   });
 
-  it("runs the Reader script and nothing else, with the mode as a quoted argument", () => {
+  it("runs the Reader script and nothing else, with the mode as a quoted argument, copying its report to the run Summary", () => {
     const runs = code.split("\n").filter((l) => /^\s*run:/.test(l));
-    expect(runs).toEqual(['        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE"']);
+    expect(runs).toEqual(['        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE" | tee -a "$GITHUB_STEP_SUMMARY"']);
+  });
+
+  it("keeps the Reader's own exit code through that pipe (bash with pipefail), so a refused key still turns the run red", () => {
+    expect(code).toMatch(/^\s{8}shell: bash$/m);
   });
 });

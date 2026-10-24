@@ -14,7 +14,6 @@
 // phrase. Never an address, a page, an organisation name, or a key. (A GitHub Actions run of a
 // public repository is readable by anyone.)
 
-import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { ConnectError, createConnectClient, redact } from "./connect.mjs";
 import { createFetcher } from "./net.mjs";
@@ -99,7 +98,10 @@ export async function runReader({ argv = [], env = {}, deps = {} } = {}) {
 
   const startedAt = clock();
   const summary = { live, due: 0, read: 0, failed: 0, skipped: 0, events: 0, posts: 0, pending: 0, autoPublished: 0, duplicate: 0, rejected: 0, rows: [], digest: null };
+  // The report is plain text that also reads as Markdown (blank lines, a list): the workflow pipes it into the
+  // run's Summary page, so the script itself never writes a file.
   log(`Citizens Connect Reader: ${live ? "live run" : "dry run (nothing is sent)"}`);
+  log("");
 
   let sources;
   try {
@@ -109,6 +111,7 @@ export async function runReader({ argv = [], env = {}, deps = {} } = {}) {
   }
   summary.due = sources.length;
   log(`Sources due: ${sources.length}`);
+  if (sources.length) log("");
 
   const fetcher = deps.fetcher ?? createFetcher();
   const budgetMs = deps.budgetMs ?? TIME_BUDGET_MS;
@@ -151,16 +154,18 @@ export async function runReader({ argv = [], env = {}, deps = {} } = {}) {
       if (e instanceof ConnectError && e.fatal) fatal = e;
     }
     summary.rows.push(row);
-    log(`  ${row.id} ${row.kind.padEnd(8)} ${row.status}${row.posted ? ` -> ${row.posted}` : ""}`);
+    log(`- ${row.id} ${row.kind}: ${row.status}${row.posted ? ` -> ${row.posted}` : ""}`);
     if (fatal) break;
   }
   if (fatal) return fail(fatal.message);
 
   let exitCode = 0;
+  if (summary.rows.length) log("");
   if (live) {
     try {
       summary.digest = await client.runDigest();
       log(`Digest: ${summary.digest.sent} email(s) sent, ${summary.digest.failed} failed, ${summary.digest.considered} Contributor(s) considered.`);
+      log("");
       if (summary.digest.failed > 0) exitCode = 1;
     } catch (e) {
       log(`Digest failed: ${plainText(redact(e instanceof ConnectError ? e.message : "unexpected error", secrets), 300)}`);
@@ -173,34 +178,7 @@ export async function runReader({ argv = [], env = {}, deps = {} } = {}) {
     `Done: ${summary.read} read, ${summary.failed} failed, ${summary.events} event(s) and ${summary.posts} post(s) found` +
       (live ? `; ${summary.pending} pending, ${summary.autoPublished} published, ${summary.duplicate} already known, ${summary.rejected} refused.` : "."),
   );
-  (deps.writeSummary ?? writeStepSummary)(env, markdown(summary));
   return { exitCode, summary };
-}
-
-function markdown(s) {
-  const lines = [`## Reader ${s.live ? "(live run)" : "(dry run, nothing sent)"}`, "", `Sources due: **${s.due}**, read: **${s.read}**, failed: **${s.failed}**, left for next run: **${s.skipped}**`, ""];
-  if (s.rows.length) {
-    lines.push("| Source | Kind | What was found | Result |", "| --- | --- | --- | --- |");
-    for (const r of s.rows) lines.push(`| ${r.id} | ${r.kind} | ${cell(r.status)} | ${cell(r.posted)} |`);
-    lines.push("");
-  }
-  if (s.live) {
-    lines.push(`Posted: ${s.pending} pending, ${s.autoPublished} published automatically, ${s.duplicate} already known, ${s.rejected} refused.`);
-    if (s.digest) lines.push("", `Digest: ${s.digest.sent} email(s) sent, ${s.digest.failed} failed.`);
-  }
-  return lines.join("\n") + "\n";
-}
-
-const cell = (t) => String(t ?? "").replace(/[|\r\n]/g, " ").slice(0, 160);
-
-function writeStepSummary(env, text) {
-  const file = env.GITHUB_STEP_SUMMARY;
-  if (!file) return;
-  try {
-    appendFileSync(file, text);
-  } catch {
-    /* a missing summary must never fail the run */
-  }
 }
 
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

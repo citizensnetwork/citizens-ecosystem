@@ -133,7 +133,8 @@ const MUTANTS = [
   { id: "workflow-can-write", tests: WORKFLOW, edits: [{ file: WF, find: "permissions:\n  contents: read", replace: "permissions:\n  contents: write" }] },
   { id: "workflow-pull-request-trigger", tests: WORKFLOW, edits: [{ file: WF, find: "on:\n  schedule:", replace: "on:\n  pull_request_target:\n  schedule:" }] },
   { id: "workflow-persists-credentials", tests: WORKFLOW, edits: [{ file: WF, find: "persist-credentials: false", replace: "persist-credentials: true" }] },
-  { id: "workflow-echoes-secret", tests: WORKFLOW, edits: [{ file: WF, find: '        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE"', replace: '        run: echo "$AUTOMATION_SUGGEST_KEY" && node apps/connect/scripts/reader/run.mjs "$READER_MODE"' }] },
+  { id: "workflow-echoes-secret", tests: WORKFLOW, edits: [{ file: WF, find: '        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE" | tee', replace: '        run: echo "$AUTOMATION_SUGGEST_KEY" && node apps/connect/scripts/reader/run.mjs "$READER_MODE" | tee' }] },
+  { id: "workflow-loses-exit-code", tests: WORKFLOW, edits: [{ file: WF, find: "        shell: bash\n", replace: "" }] },
   { id: "workflow-no-fork-guard", tests: WORKFLOW, edits: [{ file: WF, find: "    if: github.repository == 'citizensnetwork/citizens-ecosystem'\n", replace: "" }] },
   { id: "workflow-no-timeout", tests: WORKFLOW, edits: [{ file: WF, find: "timeout-minutes: 20", replace: "timeout-minutes: 360" }] },
 ];
