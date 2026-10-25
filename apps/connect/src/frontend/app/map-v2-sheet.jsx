@@ -213,7 +213,7 @@
     const recentEvents = useMemo(() => {
       if (!isContributor || !item) return [];
       const byId = new Map();
-      events.forEach((e) => { if (isHost(e, item.id) && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, known: true, host: hostLine(e) }); });
+      events.forEach((e) => { if (isHost(e, item.id) && window.DATA.isPastEvent(e, now)) byId.set(e.id, { id: e.id, title: e.title, when: e.startsAt, location: e.location, category: e.category, known: true, host: hostLine(e) }); });
       ((detail.data && detail.data.past) || []).forEach((r) => {
         if (r && r.id && r.title && !byId.has(r.id)) byId.set(r.id, { id: r.id, title: r.title, when: r.date, location: r.location, known: events.some((e) => e.id === r.id) });
       });
@@ -503,34 +503,49 @@
         const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
         const sortBar = h('div', { key: 'sort', 'data-mv2': 'sort', role: 'group', 'aria-label': Str.eventsSort.label },
           ['upcoming', 'recent'].map((m) => h('button', { key: m, type: 'button', 'data-mv2': 'sort-btn', 'aria-pressed': mode === m, onClick: () => setEvSort(m) }, Str.eventsSort[m])));
-        const rowKids = (title, meta, where, host) => [h('span', { key: 't', 'data-mv2': 'row-title' }, title), meta && h('span', { key: 'm', 'data-mv2': 'row-meta' }, meta), where && h('span', { key: 'w', 'data-mv2': 'row-meta' }, where), host && h('span', { key: 'h', 'data-mv2': 'row-meta', 'data-host': '' }, host)];
+        const eventCard = (e, past) => {
+          const when = e.startsAt || e.when;
+          const timeLabel = past ? T().postedAgo(when, now) : T().eventStartsIn(e.startsAt, now, e.endsAt);
+          const host = past ? e.host : hostLine(e);
+          const meta = [];
+          if (timeLabel) meta.push(timeLabel);
+          if (e.location) meta.push(e.location);
+          if (host) meta.push({ text: host, host: true });
+          const known = !past || e.known === true;
+          return h(window.MapV2Card, {
+            variant: 'event',
+            item: { type: 'event', category: e.category },
+            kind: window.MapV2Strings.pin.type.event,
+            title: e.title,
+            meta: meta,
+            date: T().dateParts(when),
+            idPrefix: 'mv2-ev-' + e.id,
+            onClick: known ? () => { go('event', { id: e.id }); onClose(); } : undefined,
+          });
+        };
         const list = mode === 'upcoming'
-          ? (orgEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => h('li', { key: e.id },
-              h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().eventStartsIn(e.startsAt, now, e.endsAt), e.location, hostLine(e))))))
+          ? (orgEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, orgEvents.map((e) => h('li', { key: e.id }, eventCard(e, false))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneUpcoming))
-          : (recentEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, recentEvents.map((e) => h('li', { key: e.id },
-              e.known
-                ? h('button', { type: 'button', 'data-mv2': 'row', onClick: () => { go('event', { id: e.id }); onClose(); } }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host))
-                : h('div', { 'data-mv2': 'row-static' }, rowKids(e.title, T().postedAgo(e.when, now), e.location, e.host)))))
+          : (recentEvents.length ? h('ul', { key: 'list', 'data-mv2': 'list', role: 'list' }, recentEvents.map((e) => h('li', { key: e.id }, eventCard(e, true))))
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
         panel = [sortBar, list];
       } else if (active === 'news') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, posts.map((p) => {
           const ago = T().postedAgo(p.createdAt || p.date, now);
-          const titleId = 'mv2-post-' + p.id + '-t';
-          const metaId = 'mv2-post-' + p.id + '-m';
+          const img = p.image && window.UI.safeUrl(p.image);
           return h('li', { key: p.id },
-            h('button', {
-              type: 'button', 'data-mv2': 'post', 'data-news': '',
-              'aria-haspopup': 'dialog',
-              'aria-labelledby': ago ? titleId + ' ' + metaId : titleId,
+            h(window.MapV2Card, {
+              variant: img ? 'image' : 'text',
+              title: p.title,
+              excerpt: p.body,
+              meta: ago ? [ago] : [],
+              media: img ? { src: img } : null,
+              moreLabel: Str.news.readMore,
+              idPrefix: 'mv2-post-' + p.id,
               onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
-            },
-              p.image && window.UI.safeUrl(p.image) && h('img', { src: p.image, alt: '', loading: 'lazy', decoding: 'async', 'data-mv2': 'post-img' }),
-              h('span', { id: titleId, 'data-mv2': 'row-title' }, p.title),
-              ago && h('span', { id: metaId, 'data-mv2': 'row-meta' }, ago),
-              p.body && h('span', { 'data-mv2': 'post-body' }, p.body),
-              h('span', { 'data-mv2': 'post-more' }, Str.news.readMore)));
+              'data-news': '',
+              'aria-haspopup': 'dialog',
+            }));
         }));
       } else if (active === 'today') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
@@ -574,13 +589,22 @@
     const N = window.MapV2Nearby;
     const nearRows = N && near.length ? near.map(({ marker: m, meters }) => {
       const mc = window.DATA.getItemCategory(m);
-      const label = mc ? mc.name : ((m.type === 'contributor' && window.MapV2Strings.pin.kind[m.kind]) || window.MapV2Strings.pin.type[m.type]);
+      const kind = (m.type === 'contributor' && window.MapV2Strings.pin.kind[m.kind]) || window.MapV2Strings.pin.type[m.type];
+      const label = mc ? mc.name : kind;
       const what = m.type === 'contributor' ? label : window.MapV2Strings.pin.type[m.type] + ' · ' + label;
+      let openState = null;
+      if (m.type === 'place') {
+        const pl = places.find((p) => p.id === m.id);
+        const o = pl && T().openState(pl.openHours, now);
+        if (o && o.status !== 'unknown') openState = { status: o.status, text: o.text };
+      }
       return {
-        id: m.id, type: m.type, name: m.title || '', hex: mc ? mc.hex : '#C9A84C',
+        id: m.id, type: m.type, name: m.title || '',
         meta: what + ' · ' + N.distanceText(meters, Str.nearby),
-        glyph: h(window.Icon, { name: (mc && mc.icon) || 'MapPin', size: 18 }),
         photo: m.type === 'contributor' ? m.profilePhoto : undefined,
+        item: { type: m.type, category: m.category },
+        kind: kind,
+        openState: openState,
       };
     }) : [];
     const peek = snap === 'peek' && !wide;
@@ -608,7 +632,7 @@
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, Avatar, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
+        N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),

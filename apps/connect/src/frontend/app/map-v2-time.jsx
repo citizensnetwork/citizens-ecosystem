@@ -201,5 +201,23 @@
     return w.getUTCDate() + ' ' + T.monthShort[w.getUTCMonth()] + (sameYear ? '' : ' ' + w.getUTCFullYear());
   }
 
-  window.MapV2Time = { TZ, LOCALE, openState, eventStartsIn, postedAgo, parseHours };
+  // Day number and short month for the event card's date block. Month text is the
+  // existing monthShort list; the card uppercases it with CSS.
+  function dateParts(time) {
+    const p = toMs(time);
+    if (p === null) return null;
+    const w = local(p);
+    const months = S().monthShort || [];
+    return { day: String(w.getUTCDate()), month: months[w.getUTCMonth()] || '' };
+  }
+
+  // "18:00" in Africa/Johannesburg, 24-hour. The audio card shows this as given.
+  function clockTime(time) {
+    const p = toMs(time);
+    if (p === null) return null;
+    const w = local(p);
+    return hhmm(w.getUTCHours() * 60 + w.getUTCMinutes());
+  }
+
+  window.MapV2Time = { TZ, LOCALE, openState, eventStartsIn, postedAgo, parseHours, dateParts, clockTime };
 })();

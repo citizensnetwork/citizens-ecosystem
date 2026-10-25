@@ -64,20 +64,28 @@
   }
 
   /**
-   * The list. `rows` come from rank() already described by the sheet:
-   * [{ id, type, name, meta, hex, glyph, photo }]. `Avatar` is the sheet's own avatar, so a row looks like the header.
+   * The list. `rows` come from the sheet already described:
+   * [{ id, type, name, meta, photo, item, kind, openState }]. Each row is a listing card.
    */
-  function List({ rows, strings, Avatar, onPick }) {
-    if (!rows || !rows.length) return null;
+  function List({ rows, strings, onPick }) {
+    const Card = window.MapV2Card;
+    if (!rows || !rows.length || !Card) return null;
     return h('section', { 'data-mv2': 'nearby', 'aria-labelledby': 'mv2-nearby-title' },
       h('h3', { id: 'mv2-nearby-title', 'data-mv2': 'near-title' }, strings.title),
       h('p', { 'data-mv2': 'near-hint' }, strings.hint),
       h('ul', { 'data-mv2': 'list', role: 'list' }, rows.map((r) => h('li', { key: r.type + ':' + r.id },
-        h('button', { type: 'button', 'data-mv2': 'row', 'data-near': '', onClick: () => onPick(r.id, r.type) },
-          h(Avatar, { src: r.photo, name: r.name, hex: r.hex, glyph: r.glyph, size: 'peek' }),
-          h('span', { 'data-mv2': 'near-text' },
-            h('span', { 'data-mv2': 'row-title' }, r.name),
-            h('span', { 'data-mv2': 'row-meta' }, r.meta)))))));
+        h(Card, {
+          variant: 'listing',
+          item: r.item,
+          kind: r.kind,
+          title: r.name,
+          meta: r.meta ? [r.meta] : [],
+          media: r.photo ? { src: r.photo } : null,
+          openState: r.openState,
+          idPrefix: 'mv2-near-' + r.type + '-' + r.id,
+          onClick: () => onPick(r.id, r.type),
+          'data-near': '',
+        })))));
   }
 
   window.MapV2Nearby = { MAX_ROWS, MAX_METERS, metersBetween, rank, distanceText, List };

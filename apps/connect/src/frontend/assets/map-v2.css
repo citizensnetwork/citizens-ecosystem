@@ -587,6 +587,8 @@
 [data-mv2='more']:focus-visible,
 [data-mv2='bubble-x']:focus-visible,
 [data-mv2='post'][data-news]:focus-visible,
+[data-mv2='card2']:focus-visible,
+[data-mv2='card-tap']:focus-visible,
 [data-mv2='news-link']:focus-visible,
 [data-mv2='menu-item']:focus-visible,
 [data-mv2^='viewer-']:focus-visible {
@@ -1384,6 +1386,280 @@
   justify-content: space-between;
   gap: var(--space-2);
   width: 100%;
+}
+
+/* ── 4h. Cards (app/map-v2-card.jsx, issue #222) ─────────────────────
+   One anatomy. 4g above is the Moment menu, so the card rules are 4h.
+   The category dot's colour is set inline from the category hex (data, not a token). */
+[data-mv2='card2'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-regular);
+  text-align: left;
+  text-decoration: none;
+}
+button[data-mv2='card2'],
+a[data-mv2='card2'],
+[data-mv2='card-tap'] {
+  min-height: var(--hit);
+  cursor: pointer;
+}
+[data-mv2='card2'][data-variant='event'],
+[data-mv2='card2'][data-variant='audio'],
+[data-mv2='card2'][data-variant='listing'] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+[data-mv2='card2'][data-split] {
+  flex-direction: column;
+}
+[data-mv2='card-tap'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+[data-mv2='card-tap'][data-variant='event'],
+[data-mv2='card-tap'][data-variant='audio'],
+[data-mv2='card-tap'][data-variant='listing'] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+[data-mv2='card-copy'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+[data-mv2='card2'] [data-mv2='row-title'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='card-chip'],
+[data-mv2='card-group'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  color: var(--text-2);
+}
+[data-mv2='card-chip-label'] {
+  overflow-wrap: anywhere;
+}
+[data-mv2='card-dot'],
+[data-mv2='card-live-dot'] {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--text-2);
+}
+[data-mv2='card-meta'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='card-excerpt'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--text-1);
+}
+[data-mv2='card-media'] {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+[data-mv2='card-photo'] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+[data-mv2='card-play'] {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: auto;
+  border-radius: var(--radius-full);
+  background: var(--scrim);
+  color: var(--viewer-fg);
+}
+[data-mv2='card-duration'] {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--scrim);
+  color: var(--viewer-fg);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+}
+[data-mv2='card-date'],
+[data-mv2='card-art'],
+[data-mv2='card-logo'],
+[data-mv2='card-initials'] {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--avatar-half);
+  height: var(--avatar-half);
+  border-radius: var(--radius-sm);
+}
+[data-mv2='card-date'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+[data-mv2='card-day'] {
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='card-month'] {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+[data-mv2='card-art'] {
+  display: block;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+[data-mv2='card-logo'] {
+  display: block;
+  padding: var(--space-1);
+  object-fit: contain;
+  background: var(--logo-bg);
+}
+[data-mv2='card-initials'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--logo-bg);
+  color: var(--accent-contrast);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='card-live'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='card-live-dot'] {
+  background: var(--live);
+}
+[data-mv2='card-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+[data-mv2='card2'][data-loading] {
+  flex-direction: column;
+}
+[data-mv2='card2'][data-loading][data-variant='event'],
+[data-mv2='card2'][data-loading][data-variant='audio'],
+[data-mv2='card2'][data-loading][data-variant='listing'] {
+  flex-direction: row;
+  align-items: center;
+}
+[data-mv2='card2'][data-loading] [data-mv2='card-media'] {
+  flex: none;
+}
+[data-mv2='card2'][data-loading][data-variant='event'] [data-mv2='card-media'],
+[data-mv2='card2'][data-loading][data-variant='audio'] [data-mv2='card-media'],
+[data-mv2='card2'][data-loading][data-variant='listing'] [data-mv2='card-media'] {
+  width: var(--avatar-half);
+  height: var(--avatar-half);
+  aspect-ratio: auto;
+}
+[data-mv2='card-bars'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+[data-mv2='card-bar'] {
+  display: block;
+  height: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+[data-mv2='card2']:active,
+[data-mv2='card-tap']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='card2']:hover {
+    background: var(--surface-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='card2']:active,
+  [data-mv2='card-tap']:active {
+    transform: none;
+  }
 }
 
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
