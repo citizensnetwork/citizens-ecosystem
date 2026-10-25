@@ -3,9 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "main": "index.js",
+  "devDependencies": {
+    "globals": "16.4.0"
+  },
   "files": [
     "tsconfig.base.json",
-    "eslint-preset.cjs",
+    "eslint-preset.mjs",
+    "eslint-next15.mjs",
     "index.js"
   ]
 }
