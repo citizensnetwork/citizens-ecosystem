@@ -39,9 +39,15 @@ function attrsOf(source) {
   return attrs;
 }
 
-/** Parse `text` into { name: "#document", children }. Throws XmlRefused for a document it will not read. */
+/** @typedef {{ name: string, attrs: Record<string, string>, children: XmlNode[], content: (string | XmlNode)[] }} XmlNode */
+
+/**
+ * Parse `text` into { name: "#document", children }. Throws XmlRefused for a document it will not read.
+ * @returns {XmlNode}
+ */
 export function parseXml(text) {
   const src = String(text ?? "").slice(0, MAX_CHARS);
+  /** @type {XmlNode} */
   const root = { name: "#document", attrs: {}, children: [], content: [] };
   const stack = [root];
   let nodes = 0;

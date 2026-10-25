@@ -112,6 +112,11 @@ function addDocument(acc, r, nowMs) {
 
 // ── mapping to the server's payload shapes ──────────────────────────────────
 
+/**
+ * One item for POST /api/automation/suggestions (src/lib/automation/suggestions.ts has the shapes).
+ * @typedef {{ kind: "event" | "news", source_url: string, payload: Record<string, any> }} SuggestionItem
+ */
+
 const cut = (s, n) => String(s ?? "").trim().slice(0, n).trim();
 const normKey = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const sourceUrlFor = (url, fallback) => (url && url.length <= 500 ? url : fallback);
@@ -164,7 +169,7 @@ export function statusLine(eventCount, postCount, acc) {
 /**
  * @param {{ source_id: string, kind: string, url: string }} source
  * @param {{ fetcher: { get: Function }, nowMs: number }} ctx
- * @returns {Promise<{ items: object[], status: string, events: number, posts: number, outcome: "read" | "failed" | "skipped" }>}
+ * @returns {Promise<{ items: SuggestionItem[], status: string, events: number, posts: number, outcome: "read" | "failed" | "skipped" }>}
  */
 export async function readSource(source, ctx) {
   const done = (items, status, outcome) => ({
