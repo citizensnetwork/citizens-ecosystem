@@ -113,6 +113,66 @@ export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
   { value: "conferences-summits", label: "Conferences & Summits" },
 ];
 
+/**
+ * The six groups over the 17 event categories (founder, 2026-10-21, issue #222).
+ * The list of categories is unchanged. A group is the first identifier on an
+ * event card: `label | category label` (for example "Serve | Care & Recovery").
+ * This is the one mapping. `data.jsx` mirrors `group` and `heading` onto each
+ * event category so `window.DATA.getItemCategory` can return them; a test keeps
+ * the two copies equal. Cards read those fields and do not name a group.
+ *
+ * The Members Only group label is "Access", as decided. Whether "Members" would
+ * read more clearly is an open note for the Designer, not a second label here.
+ */
+export const EVENT_GROUPS = [
+  { id: "worship-church", label: "Worship & church" },
+  { id: "serve", label: "Serve" },
+  { id: "learn-grow", label: "Learn & grow" },
+  { id: "culture-fun", label: "Culture & fun" },
+  { id: "audiences", label: "Audiences" },
+  { id: "access", label: "Access" },
+] as const;
+
+export type EventGroupId = (typeof EVENT_GROUPS)[number]["id"];
+
+/** Every event category belongs to exactly one group. */
+export const EVENT_CATEGORY_GROUP: Record<EventCategory, EventGroupId> = {
+  "worship-prayer": "worship-church",
+  "church-services": "worship-church",
+  "conferences-summits": "worship-church",
+  "outreach-missions": "serve",
+  "community-upliftment": "serve",
+  "care-recovery": "serve",
+  "education-equipping": "learn-grow",
+  "marriage-family": "learn-grow",
+  "arts-culture": "culture-fun",
+  "sport-recreation": "culture-fun",
+  "social-gatherings": "culture-fun",
+  "markets-expos": "culture-fun",
+  "mens-community": "audiences",
+  "womens-community": "audiences",
+  "youth-students": "audiences",
+  kids: "audiences",
+  "members-only": "access",
+};
+
+export function eventCategoryGroup(
+  category: string,
+): { id: EventGroupId; label: string } | undefined {
+  const id = (EVENT_CATEGORY_GROUP as Record<string, EventGroupId | undefined>)[category];
+  if (!id) return undefined;
+  const found = EVENT_GROUPS.find((g) => g.id === id);
+  return found ? { id: found.id, label: found.label } : undefined;
+}
+
+/** "Serve | Care & Recovery". Undefined when `category` is not one of the 17. */
+export function eventGroupHeading(category: string): string | undefined {
+  const group = eventCategoryGroup(category);
+  const name = (CATEGORY_LABELS as Record<string, string | undefined>)[category];
+  if (!group || !name) return undefined;
+  return group.label + " | " + name;
+}
+
 /** Filter list including "all" sentinel. */
 export const CATEGORY_FILTERS: { value: EventCategory | "all"; label: string }[] = [
   { value: "all", label: "All categories" },

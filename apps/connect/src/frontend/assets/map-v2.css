@@ -587,6 +587,8 @@
 [data-mv2='more']:focus-visible,
 [data-mv2='bubble-x']:focus-visible,
 [data-mv2='post'][data-news]:focus-visible,
+[data-mv2='card2']:focus-visible,
+[data-mv2='card-tap']:focus-visible,
 [data-mv2='news-link']:focus-visible,
 [data-mv2='menu-item']:focus-visible,
 [data-mv2^='viewer-']:focus-visible {
@@ -1386,6 +1388,280 @@
   width: 100%;
 }
 
+/* ── 4h. Cards (app/map-v2-card.jsx, issue #222) ─────────────────────
+   One anatomy. 4g above is the Moment menu, so the card rules are 4h.
+   The category dot's colour is set inline from the category hex (data, not a token). */
+[data-mv2='card2'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-regular);
+  text-align: left;
+  text-decoration: none;
+}
+button[data-mv2='card2'],
+a[data-mv2='card2'],
+[data-mv2='card-tap'] {
+  min-height: var(--hit);
+  cursor: pointer;
+}
+[data-mv2='card2'][data-variant='event'],
+[data-mv2='card2'][data-variant='audio'],
+[data-mv2='card2'][data-variant='listing'] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+[data-mv2='card2'][data-split] {
+  flex-direction: column;
+}
+[data-mv2='card-tap'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+[data-mv2='card-tap'][data-variant='event'],
+[data-mv2='card-tap'][data-variant='audio'],
+[data-mv2='card-tap'][data-variant='listing'] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+[data-mv2='card-copy'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+[data-mv2='card2'] [data-mv2='row-title'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='card-chip'],
+[data-mv2='card-group'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  color: var(--text-2);
+}
+[data-mv2='card-chip-label'] {
+  overflow-wrap: anywhere;
+}
+[data-mv2='card-dot'],
+[data-mv2='card-live-dot'] {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--text-2);
+}
+[data-mv2='card-meta'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='card-excerpt'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--text-1);
+}
+[data-mv2='card-media'] {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+[data-mv2='card-photo'] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+[data-mv2='card-play'] {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: auto;
+  border-radius: var(--radius-full);
+  background: var(--scrim);
+  color: var(--viewer-fg);
+}
+[data-mv2='card-duration'] {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--scrim);
+  color: var(--viewer-fg);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+}
+[data-mv2='card-date'],
+[data-mv2='card-art'],
+[data-mv2='card-logo'],
+[data-mv2='card-initials'] {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--avatar-half);
+  height: var(--avatar-half);
+  border-radius: var(--radius-sm);
+}
+[data-mv2='card-date'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+[data-mv2='card-day'] {
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='card-month'] {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+[data-mv2='card-art'] {
+  display: block;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+[data-mv2='card-logo'] {
+  display: block;
+  padding: var(--space-1);
+  object-fit: contain;
+  background: var(--logo-bg);
+}
+[data-mv2='card-initials'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--logo-bg);
+  color: var(--accent-contrast);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='card-live'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='card-live-dot'] {
+  background: var(--live);
+}
+[data-mv2='card-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+[data-mv2='card2'][data-loading] {
+  flex-direction: column;
+}
+[data-mv2='card2'][data-loading][data-variant='event'],
+[data-mv2='card2'][data-loading][data-variant='audio'],
+[data-mv2='card2'][data-loading][data-variant='listing'] {
+  flex-direction: row;
+  align-items: center;
+}
+[data-mv2='card2'][data-loading] [data-mv2='card-media'] {
+  flex: none;
+}
+[data-mv2='card2'][data-loading][data-variant='event'] [data-mv2='card-media'],
+[data-mv2='card2'][data-loading][data-variant='audio'] [data-mv2='card-media'],
+[data-mv2='card2'][data-loading][data-variant='listing'] [data-mv2='card-media'] {
+  width: var(--avatar-half);
+  height: var(--avatar-half);
+  aspect-ratio: auto;
+}
+[data-mv2='card-bars'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+[data-mv2='card-bar'] {
+  display: block;
+  height: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+[data-mv2='card2']:active,
+[data-mv2='card-tap']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='card2']:hover {
+    background: var(--surface-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='card2']:active,
+  [data-mv2='card-tap']:active {
+    transform: none;
+  }
+}
+
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
 [data-mv2='action'],
 [data-mv2='view-full'],
@@ -1437,4 +1713,144 @@
 .maplibregl-ctrl-group button {
   width: var(--hit);
   height: var(--hit);
+}
+/* ── 4h. Online in this area (app/map-v2-online.jsx, issue #259): the globe button and its list ──
+   The button lives in a MapLibre control group, so it sits with zoom and locate and shares their look and their --hit size. One
+   200 ms fade on first appearance (the duration token is 0 under reduced motion); nothing loops. */
+[data-mv2='globe'] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-ink);
+  animation: mv2-globe-in var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-globe-in {
+  from {
+    opacity: 0;
+  }
+}
+[data-mv2='globe'][aria-expanded='true'] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+[data-mv2='globe']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+[data-mv2='globe-count'] {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  box-sizing: border-box;
+  min-width: var(--space-5);
+  height: var(--space-5);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-1);
+  line-height: var(--space-5);
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+[data-mv2='online-sheet'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  height: var(--sheet-half-h);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+  box-shadow: var(--elev-2);
+  animation: mv2-sheet-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='online-sheet']:not([data-wide]) {
+  max-width: var(--sheet-touch-max-w);
+  margin-inline: auto;
+}
+[data-mv2='online-sheet'][data-wide] {
+  left: var(--space-3);
+  right: auto;
+  top: var(--sheet-panel-top);
+  bottom: var(--space-3);
+  width: var(--sheet-panel-w);
+  height: auto;
+  border-radius: var(--sheet-radius);
+  animation: none;
+}
+[data-mv2='online-head'] {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-2) var(--space-3) var(--space-4);
+}
+[data-mv2='online-glyph'] {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-peek);
+  height: var(--avatar-peek);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+[data-mv2='online-title'] {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='online-title']:focus {
+  outline: none;
+}
+[data-mv2='online-title']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='online-head'] [data-mv2='near-hint'] {
+  margin: 0;
+}
+/* the list scrolls inside the sheet: vertical pans are the scroller's, so a thumb moves the list and not the map under it */
+[data-mv2='online-scroller'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 0 var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+}
+[data-mv2='online-group'] {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  color: var(--text-2);
+}
+[data-mv2='online-note'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-5) 0;
+  color: var(--text-2);
+  text-align: center;
+}
+@media (hover: hover) {
+  [data-mv2='globe']:hover {
+    background: var(--surface-2);
+  }
 }

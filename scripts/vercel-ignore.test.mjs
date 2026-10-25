@@ -93,7 +93,7 @@ describe('docs and per-app decisions', () => {
     expectActions(['packages/frontend-build/index.js'], all);
     expectActions(['packages/ui/src/index.ts'], none);
     expectActions(['packages/braces-patched/index.js'], all);
-    expectActions(['packages/config/eslint-preset.cjs'], {
+    expectActions(['packages/config/eslint-preset.mjs'], {
       connect: 'skip',
       vision: 'skip',
       wear: 'build',

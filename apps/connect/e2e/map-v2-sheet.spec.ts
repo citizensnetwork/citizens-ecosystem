@@ -365,7 +365,8 @@ test.describe("P1-07 header, actions, tabs", () => {
     await openMap(page, "/?map=v2", 8);
     const p = seed.places[1] as { id: string; longitude: number; latitude: number }; // no open_hours
     await openOn(page, p.id, p.longitude, p.latitude);
-    await expect(page.locator("[data-mv2='state']")).toHaveCount(0);
+    // This place stays silent. A nearby listing may still say its own hours (issue #222).
+    await expect(page.locator("[data-map-sheet-header] [data-mv2='state']")).toHaveCount(0);
     await expect(page.locator("[data-map-sheet-header]")).not.toContainText(/Open|Closed/);
   });
 

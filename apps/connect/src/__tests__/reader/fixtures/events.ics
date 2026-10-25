@@ -1,0 +1,65 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Example//Fictional Calendar//EN
+BEGIN:VTIMEZONE
+TZID:Africa/Johannesburg
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0200
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:service@church.example.org
+SUMMARY:Sunday Service
+DTSTART;TZID=Africa/Johannesburg:20260104T090000
+DTEND;TZID=Africa/Johannesburg:20260104T103000
+RRULE:FREQ=WEEKLY;BYDAY=SU
+EXDATE;TZID=Africa/Johannesburg:20261108T090000
+LOCATION:Grace Hall\, 12 Example Street\, Pretoria
+DESCRIPTION:Everyone is welcome. This line is long enough to be folded by t
+ he calendar program\, and it continues here.
+BEGIN:VALARM
+ACTION:DISPLAY
+SUMMARY:Alarm summary that must be ignored
+TRIGGER:-PT15M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:service@church.example.org
+RECURRENCE-ID;TZID=Africa/Johannesburg:20261101T090000
+SUMMARY:Sunday Service (Communion)
+DTSTART;TZID=Africa/Johannesburg:20261101T100000
+DTEND;TZID=Africa/Johannesburg:20261101T113000
+END:VEVENT
+BEGIN:VEVENT
+UID:info@church.example.org
+SUMMARY:Youth Camp Info Evening
+DTSTART:20261105T160000Z
+DURATION:PT1H30M
+URL:https://www.church.example.org/camp
+END:VEVENT
+BEGIN:VEVENT
+UID:allday@church.example.org
+SUMMARY:Heritage Day Outing
+DTSTART;VALUE=DATE:20261110
+END:VEVENT
+BEGIN:VEVENT
+UID:private@church.example.org
+CLASS:PRIVATE
+SUMMARY:Pastoral appointment
+DTSTART:20261103T080000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:cancelled@church.example.org
+STATUS:CANCELLED
+SUMMARY:Cancelled Bazaar
+DTSTART:20261107T080000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:yearly@church.example.org
+SUMMARY:Anniversary
+DTSTART:20261106T080000Z
+RRULE:FREQ=YEARLY
+END:VEVENT
+END:VCALENDAR

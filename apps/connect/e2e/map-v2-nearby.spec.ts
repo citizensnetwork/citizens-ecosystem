@@ -120,7 +120,7 @@ test.describe("P2-01 the Nearby list (phone)", () => {
     await openSheetOn(page, seed, things(seed)[0]);
     await toFull(page);
     await scrollEnd(page);
-    const rows = page.locator(`${NEARBY} button[data-mv2='row']`);
+    const rows = page.locator(`${NEARBY} button[data-mv2='card2']`);
     const n = await rows.count();
     expect(n).toBeGreaterThan(0);
     for (let i = 0; i < n; i++) expect((await rows.nth(i).boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -140,7 +140,7 @@ test.describe("P2-01 the Nearby list (phone)", () => {
       const want = expected(seed, from);
       const target = want.find((w) => all.find((t) => t.name === w.name)!.type === kind)!;
       expect(target, `a ${kind} row near ${from.name}`).toBeTruthy();
-      await page.locator(`${NEARBY} button[data-mv2='row']`).filter({ has: page.locator("[data-mv2='row-title']", { hasText: new RegExp("^" + target.name + "$") }) }).tap();
+      await page.locator(`${NEARBY} button[data-mv2='card2']`).filter({ has: page.locator("[data-mv2='row-title']", { hasText: new RegExp("^" + target.name + "$") }) }).tap();
       await expect(page.locator("[data-mv2='name']")).toHaveText(target.name);
       await expect.poll(() => snapOf(page)).toBe("half");
       await page.waitForTimeout(400);
@@ -171,7 +171,7 @@ test.describe("P2-01 the Nearby list (phone)", () => {
     expect(before).toBeGreaterThan(0);
     // a row that is fully inside the scrolling area (the first rows can sit behind the header once scrolled)
     const area = (await scroller.boundingBox())!;
-    const rows = page.locator(`${NEARBY} button[data-mv2='row']`);
+    const rows = page.locator(`${NEARBY} button[data-mv2='card2']`);
     let b: { x: number; y: number; width: number; height: number } | null = null;
     for (let i = 0; i < (await rows.count()) && !b; i++) {
       const r = (await rows.nth(i).boundingBox())!;

@@ -37,7 +37,7 @@
   const LEGACY_THEME_KEY = 'cc_map_theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files.
-  const CSS_HREF = '/assets/map-v2.css?v=20261019e';
+  const CSS_HREF = '/assets/map-v2.css?v=20261025a';
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -76,6 +76,9 @@
   // Map v2 is the default (D15). Set false to take everyone back to the old map
   // in one line (a device with a stored choice keeps it).
   const DEFAULT_ON = true;
+  // The "Online in this area" globe (issue #259, founder's option 3): one button among the map's controls, only when Contributors
+  // with no fixed place serve the area in view. false takes it away in one line (no button, no request): Map v2 is then exactly as it was.
+  const ONLINE_GLOBE_ON = true;
   let on = DEFAULT_ON;
   function resolveFlag() {
     let q = null;
@@ -114,6 +117,8 @@
   // ── Stylesheet (flag on only) ─────────────────────────────────────
   const api = {
     isOn: isMapV2, motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
+    // the globe is on only with Map v2 on AND the constant (read when this file loads, like the flag itself)
+    get onlineGlobe() { return on && ONLINE_GLOBE_ON; },
     // true once assets/map-v2.css has loaded (or failed: never block the map on it)
     styleReady: false,
     FLAG_KEY, CSS_HREF,

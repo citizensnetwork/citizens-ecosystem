@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Grace Fellowship (fictional) - Events</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="alternate" type="application/rss+xml" title="Grace Fellowship Feed" href="/feed/">
+  <link rel="alternate" type="application/rss+xml" title="Grace Fellowship &raquo; Comments Feed" href="/comments/feed/">
+  <link rel=alternate type="text/calendar" href="https://www.church.example.org/events.ics">
+  <link rel="alternate" type="application/rss+xml" href="http://www.church.example.org/insecure-feed/">
+  <!-- <link rel="alternate" type="application/rss+xml" href="/commented-out-feed/"> -->
+  <script>
+    var s = '<link rel="alternate" type="application/rss+xml" href="/feed-inside-a-script/">';
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "Grace Fellowship (fictional)",
+        "event": {
+          "@type": "Event",
+          "name": "Sunday Celebration &amp; Worship",
+          "startDate": "2026-11-08T09:00:00+02:00",
+          "endDate": "2026-11-08T10:30:00+02:00",
+          "description": "<p>Join us for worship.</p><p>Questions? Call 012 345 6789.</p>",
+          "location": {
+            "@type": "Place",
+            "name": "Grace Hall",
+            "address": { "@type": "PostalAddress", "streetAddress": "12 Example Street", "addressLocality": "Pretoria" }
+          },
+          "image": "https://cdn.example.org/poster.jpg"
+        }
+      },
+      {
+        "@type": ["MusicEvent"],
+        "name": "Worship Night",
+        "startDate": "2026-11-14T18:30",
+        "url": "/events/worship-night#top",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "location": { "@type": "VirtualLocation", "url": "https://stream.example.org/live" }
+      },
+      { "@type": "Event", "name": "Cancelled Picnic", "startDate": "2026-11-20T10:00:00+02:00", "eventStatus": "EventCancelled" },
+      { "@type": "Event", "name": "Year-end Camp", "startDate": "2026-12-12" },
+      { "@type": "Event", "name": "Last Month's Outreach", "startDate": "2026-10-01T09:00:00+02:00" }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">{ "@type": "Event", "name": "Broken JSON", </script>
+</head>
+<body>
+  <h1>Events</h1>
+  <p>Contact the office at office@church.example.org.</p>
+</body>
+</html>

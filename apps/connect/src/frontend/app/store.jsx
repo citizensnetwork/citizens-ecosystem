@@ -1034,6 +1034,14 @@
           setApplications((prev) => [app, ...prev.filter((a) => a.id !== 'app-mine')]);
           setContributorStatus('pending');
           toast('Application submitted. An admin will review it soon.', 'gold');
+          // Serving areas (#259): an applicant with no fixed location may have chosen where they serve. It saves AFTER the
+          // application row exists (set_service_areas lets a pending applicant write their own choice), and a failure here
+          // never undoes the application: they are told, and can add the areas from the pending Dashboard.
+          if (form.noFixedLocation && form.serving && Array.isArray(form.serving.areaIds) && form.serving.areaIds.length) {
+            window.CCServing.saveSelection(authedFetch, null, form.serving)
+              .then((r) => { if (!r.ok) toast(window.MapV2Strings.serving.applyFailed, 'red'); })
+              .catch(() => toast(window.MapV2Strings.serving.applyFailed, 'red'));
+          }
           go('dashboard');
           finish(true);
         } catch (e) {
