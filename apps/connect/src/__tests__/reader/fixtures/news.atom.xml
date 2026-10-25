@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://news.example.org/">
+  <title type="text">Example Ministry News</title>
+  <entry>
+    <title type="html">Outreach &lt;em&gt;update&lt;/em&gt;</title>
+    <link rel="alternate" type="text/html" href="posts/outreach"/>
+    <link rel="edit" href="https://news.example.org/edit/1"/>
+    <published>2026-10-31T12:00:00+02:00</published>
+    <summary>Twelve volunteers served at the shelter.</summary>
+  </entry>
+  <entry>
+    <title>Second entry</title>
+    <link href="https://news.example.org/posts/second"/>
+    <updated>2026-10-29T09:00:00Z</updated>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Plain <b>words</b>.</p></div></content>
+  </entry>
+</feed>

@@ -11,11 +11,13 @@
  *   { contributor_id, source_id?, kind: 'event'|'news'|'profile', source_url, payload }
  * A request-level `contributor_id`, `source_id` and `source_url` are defaults for
  * items that do not carry their own. `source_status` (optional, <= 200 chars) is
- * written to the source's "last checked" line; an empty `items` with a `source_id`
- * records a check that found nothing.
+ * written to the source's "last checked" line; an empty `items` with a `source_id` and a
+ * `contributor_id` records a check that found nothing, under rules 1 to 3 below, and the
+ * answer says `source_check: "recorded"` or the reason it was not.
  *
  * The rules, in order, per item (the reader is never trusted):
- *   1. the Contributor exists, is approved, not hidden, not deleted
+ *   1. the Contributor exists, is approved, not hidden, not deleted (lib/automation/eligibility.ts,
+ *      the one rule shared with the sources and digest routes)
  *   2. their automation level is not 'off'                       -> consent_off
  *   3. the source (if named) is theirs and enabled               -> source_disabled
  *   4. the payload passes lib/automation/suggestions.ts: a strict per-kind schema,
@@ -41,14 +43,8 @@ import { gateV1 } from "@/lib/v1Gate";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 import { geocodeWithMapTiler } from "@/lib/intake/googleForm";
-import {
-  MAX_ITEMS_PER_REQUEST,
-  isAutoPublishable,
-  isAutoUpdateLevel,
-  validateSuggestion,
-  type AutoUpdateLevel,
-  type EventPayload,
-} from "@/lib/automation/suggestions";
+import { MAX_ITEMS_PER_REQUEST, isAutoPublishable, validateSuggestion, type EventPayload } from "@/lib/automation/suggestions";
+import { contributorEligibility, type Eligibility, type ProfileForAutomation } from "@/lib/automation/eligibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,8 +64,6 @@ type ItemResult = {
   reason?: string;
   warnings?: string[];
 };
-
-type Eligibility = { level: AutoUpdateLevel } | { reason: "contributor_not_eligible" | "consent_off" };
 
 /** The refusals a lone item turns into an HTTP 409 (a batch just reports them per item). */
 const CONFLICT_REASONS = new Set(["consent_off", "source_disabled", "contributor_not_eligible"]);
@@ -116,21 +110,7 @@ export async function POST(request: Request) {
       .select("id, role, contributor_status, contributor_hidden, deleted_at, auto_update_level")
       .eq("id", contributorId)
       .maybeSingle();
-    const p = data as {
-      role?: string;
-      contributor_status?: string;
-      contributor_hidden?: boolean;
-      deleted_at?: string | null;
-      auto_update_level?: string;
-    } | null;
-    let result: Eligibility;
-    if (!p || p.role !== "contributor" || p.contributor_status !== "approved" || p.contributor_hidden || p.deleted_at) {
-      result = { reason: "contributor_not_eligible" };
-    } else if (!isAutoUpdateLevel(p.auto_update_level) || p.auto_update_level === "off") {
-      result = { reason: "consent_off" };
-    } else {
-      result = { level: p.auto_update_level };
-    }
+    const result = contributorEligibility(data as ProfileForAutomation | null);
     eligibility.set(contributorId, result);
     return result;
   }
@@ -240,6 +220,25 @@ export async function POST(request: Request) {
     results.push({ index, status: "pending", id: row.id, ...(warnings.length ? { warnings } : {}) });
   }
 
+  // An empty batch that only reports a check on a source passes rules 1 to 3 like an item would,
+  // so a key cannot stamp a source that is someone else's, switched off, or whose owner opted out.
+  let sourceCheck: string | undefined;
+  if (rawItems.length === 0 && defaultSourceId !== null) {
+    const contributorId = typeof top.contributor_id === "string" ? top.contributor_id : "";
+    if (!isValidUUID(defaultSourceId) || !isValidUUID(contributorId)) {
+      sourceCheck = "invalid_id";
+    } else {
+      const who = await eligibilityOf(contributorId);
+      const src = "reason" in who ? null : await sourceOf(defaultSourceId);
+      if ("reason" in who) sourceCheck = who.reason;
+      else if (!src || src.contributor_id !== contributorId || !src.enabled) sourceCheck = "source_disabled";
+      else {
+        touchedSources.set(defaultSourceId, contributorId);
+        sourceCheck = "recorded";
+      }
+    }
+  }
+
   // The dashboard's "last checked" line.
   for (const [sourceId, contributorId] of touchedSources) {
     await admin
@@ -247,13 +246,6 @@ export async function POST(request: Request) {
       .update({ last_checked_at: now.toISOString(), last_status: sourceStatus ?? "ok" })
       .eq("id", sourceId)
       .eq("contributor_id", contributorId);
-  }
-  // An empty batch that only reports a check on a source.
-  if (rawItems.length === 0 && defaultSourceId && isValidUUID(defaultSourceId)) {
-    await admin
-      .from("listing_sources")
-      .update({ last_checked_at: now.toISOString(), last_status: sourceStatus ?? "ok" })
-      .eq("id", defaultSourceId);
   }
 
   const tally = results.reduce<Record<string, number>>((t, r) => ((t[r.status] = (t[r.status] ?? 0) + 1), t), {});
@@ -264,7 +256,7 @@ export async function POST(request: Request) {
     const status = CONFLICT_REASONS.has(reason) ? 409 : reason === "rate_limited" ? 429 : reason === "store_failed" ? 500 : 422;
     return json({ error: reason, results }, status);
   }
-  return json({ results });
+  return json({ results, ...(sourceCheck ? { source_check: sourceCheck } : {}) });
 }
 
 /**
