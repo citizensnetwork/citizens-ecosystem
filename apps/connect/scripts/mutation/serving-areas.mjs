@@ -36,6 +36,9 @@ const T_INDEX = ["src/__tests__/api/v1/service-areas.test.ts"];
 const T_SERVING = ["src/__tests__/api/v1/serving.test.ts"];
 const T_OWNER = ["src/__tests__/api/contributor/service-areas.test.ts"];
 const T_SQL = ["src/__tests__/security/service-areas-migration.test.ts"];
+const T_FLIB = ["src/__tests__/frontend/servingAreasLib.test.ts"];
+const T_FUI = ["src/__tests__/frontend/servingAreas.test.tsx"];
+const T_FSTR = ["src/__tests__/frontend/mapV2Strings.test.ts"];
 
 const LIB = "src/lib/serviceAreas.ts";
 const INDEX = "src/app/api/v1/service-areas/route.ts";
@@ -43,6 +46,15 @@ const SERVING = "src/app/api/v1/serving/route.ts";
 const OWNER = "src/app/api/contributor/service-areas/route.ts";
 const SQL = "../../supabase/migrations/195_service_areas.sql";
 const FIX = "../../supabase/migrations/197_service_areas_anon_read.sql";
+const SLIB = "src/frontend/app/serving-areas-lib.jsx";
+const SUI = "src/frontend/app/serving-areas.jsx";
+const APPLY = "src/frontend/app/apply.jsx";
+const STORE = "src/frontend/app/store.jsx";
+const DASH = "src/frontend/app/dashboard.jsx";
+const PEND = "src/frontend/app/pending-application.jsx";
+const HTML = "src/frontend/index.html";
+const BUILD = "scripts/build-frontend.js";
+const STRINGS = "src/frontend/app/map-v2-strings.jsx";
 const PROBE = "../../docs/audit/probes/195_service_areas.probe.sql";
 
 // edits: [{ file, find, replace, count = 1 }]. `equivalent` marks a mutant that SHOULD survive (a second layer covers it).
@@ -97,6 +109,47 @@ const MUTANTS = [
   { id: "owner-put-radius-dropped", kind: "unit", tests: T_OWNER, edits: [{ file: OWNER, find: "p_radius_km: selection.radiusKm,", replace: "p_radius_km: null," }] },
   { id: "owner-get-unauthenticated", kind: "unit", tests: T_OWNER, edits: [{ file: OWNER, find: "export async function GET(request: NextRequest) {\n  const { supabase, user } = await getRouteAuth(request);\n  if (!user) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });", replace: "export async function GET(request: NextRequest) {\n  const { supabase, user: u } = await getRouteAuth(request);\n  const user = u ?? { id: \"00000000-0000-4000-8000-000000000000\" };" }] },
   { id: "owner-get-default-contributor", kind: "unit", tests: T_OWNER, edits: [{ file: OWNER, find: "(asked ?? user.id).toLowerCase()", replace: "(asked ?? OTHER_PLACEHOLDER).toLowerCase()" }, { file: OWNER, find: "export const runtime", replace: 'const OTHER_PLACEHOLDER = "00000000-0000-4000-8000-000000000000";\nexport const runtime' }] },
+  // ── PR B: the picker's rules (serving-areas-lib.jsx)
+  { id: "b-tick-goes-upward", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "sel.areaIds.concat([id])", replace: "sel.areaIds.concat([id], ancestorsOf(index, id))" }] },
+  { id: "b-cap-removed", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "if (!has && sel.areaIds.length >= MAX_AREAS) return", replace: "if (false) return" }] },
+  { id: "b-radius-without-area (equivalent: normalise drops it, the second layer)", kind: "unit", tests: T_FLIB, equivalent: true, edits: [{ file: SLIB, find: "if (!sel.areaIds.length) return sel;\n    return normalise(index, { ...sel, radiusKm: km", replace: "return normalise(index, { ...sel, radiusKm: km" }] },
+  { id: "b-centre-least-specific", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "rows.sort((a, b) => (SPECIFICITY[b.level] - SPECIFICITY[a.level]) || byName(a, b));\n    return rows[0].id;", replace: "rows.sort((a, b) => (SPECIFICITY[a.level] - SPECIFICITY[b.level]) || byName(a, b));\n    return rows[0].id;" }] },
+  { id: "b-normalise-keeps-orphan-radius", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "if (!ids.length || km === null) return", replace: "if (km === null) return" }] },
+  { id: "b-centre-not-chosen-accepted", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "if (sel.areaIds.indexOf(id) < 0) return sel;\n    return normalise(index, { ...sel, radiusCentreAreaId: id });", replace: "return { ...sel, radiusCentreAreaId: id };" }] },
+  { id: "b-summary-shows-covered", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: ".filter((r) => !ancestorsOf(index, r.id).some((a) => ids.indexOf(a) >= 0))", replace: ".filter(() => true)" }] },
+  { id: "b-summary-all-of-suburb", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "all: r.level !== 'suburb'", replace: "all: true" }] },
+  { id: "b-payload-orphan-radius", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "const km = ids.length && Number.isInteger(sel.radiusKm) ? sel.radiusKm : null;", replace: "const km = Number.isInteger(sel.radiusKm) ? sel.radiusKm : null;" }] },
+  { id: "b-picker-for-everyone", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "!!row && row.noFixedLocation === true", replace: "!!row && row.noFixedLocation !== false" }] },
+  { id: "b-save-uses-post", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "{ method: 'PUT', body: JSON.stringify(body) }", replace: "{ method: 'POST', body: JSON.stringify(body) }" }] },
+  { id: "b-slowdown-lost", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "if (status === 429) return E.slowDown || GENERIC;", replace: "" }] },
+  { id: "b-contributor-id-dropped", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "(contributorId ? '?contributor_id=' + encodeURIComponent(contributorId) : '')", replace: "''" }] },
+  { id: "b-presence-any-value", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "(presence === 'online' || presence === 'no_fixed_place' ? { ...sel, presence } : sel)", replace: "({ ...sel, presence })" }] },
+  { id: "b-presence-default-flipped", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "const DEFAULT_PRESENCE = 'online';", replace: "const DEFAULT_PRESENCE = 'no_fixed_place';" }] },
+  { id: "b-radius-max-raised", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: "const MAX_RADIUS_KM = 100;", replace: "const MAX_RADIUS_KM = 500;" }] },
+  { id: "b-bad-rows-kept", kind: "unit", tests: T_FLIB, edits: [{ file: SLIB, find: ".filter(validArea) };", replace: " };" }] },
+  // ── PR B: the screen (serving-areas.jsx)
+  { id: "b-chevron-also-ticks", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "onClick: () => onToggleOpen(id), className: cx(target", replace: "onClick: () => { onToggleOpen(id); onTick(id); }, className: cx(target" }] },
+  { id: "b-radius-never-disabled", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "const enabled = sel.areaIds.length > 0;", replace: "const enabled = true;" }] },
+  { id: "b-radius-reason-hidden", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "!enabled && h('p', { 'data-serving-radius-reason': '1'", replace: "false && h('p', { 'data-serving-radius-reason': '1'" }] },
+  { id: "b-parent-shows-a-tick", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "const ticked = sel.areaIds.indexOf(id) >= 0;", replace: "const ticked = sel.areaIds.indexOf(id) >= 0 || C.hasChosenInside(index, sel.areaIds, id);" }] },
+  { id: "b-marker-note-lost", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "const inside = !ticked && C.hasChosenInside(index, sel.areaIds, id);", replace: "const inside = false;" }] },
+  { id: "b-suburbs-fetched-for-all", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "index.byId[id] && index.byId[id].level === 'place' && onExpand", replace: "index.byId[id] && onExpand" }] },
+  { id: "b-suburbs-refetched", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "if (asked.current[id]) return;\n      asked.current[id] = true;", replace: "asked.current[id] = true;" }] },
+  { id: "b-editor-double-save (equivalent: the disabled button is the second layer)", kind: "unit", tests: T_FUI, equivalent: true, edits: [{ file: SUI, find: "if (!normalised || saving) return;", replace: "if (!normalised) return;" }] },
+  { id: "b-editor-save-always-on", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "disabled: !dirty || saving || state !== 'ready'", replace: "disabled: saving" }] },
+  { id: "b-small-targets", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "const target = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] shrink-0';", replace: "const target = 'inline-flex items-center justify-center min-h-[32px] min-w-[32px] shrink-0';" }] },
+  { id: "b-cap-notice-lost", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "setNotice(S.tooMany(C.MAX_AREAS));", replace: "" }] },
+  { id: "b-field-no-summary", kind: "unit", tests: T_FUI, edits: [{ file: SUI, find: "onChange(next, Sv().summaryText(index, next.areaIds, Str()))", replace: "onChange(next)" }] },
+  { id: "b-index-reads-coordinates", kind: "unit", tests: T_FUI, edits: [{ file: SLIB, find: "'/api/v1/service-areas' + (query || '')", replace: "'/api/v1/service-areas' + (query || '') + '?lat=1&lng=1'" }] },
+  // ── PR B: where it appears
+  { id: "b-apply-picker-for-everyone", kind: "unit", tests: T_FUI, edits: [{ file: APPLY, find: "window.CCServing.offersPicker(f) && h(window.ServingAreas.Field", replace: "true && h(window.ServingAreas.Field" }] },
+  { id: "b-apply-claims-the-map", kind: "unit", tests: T_FLIB, edits: [{ file: STRINGS, find: "findableNote: 'Online in this area: people there find you once you are approved.'", replace: "findableNote: 'Online in this area: you will be on the map once you are approved.'" }] },
+  { id: "b-store-saves-without-no-fixed", kind: "unit", tests: T_FUI, edits: [{ file: STORE, find: "if (form.noFixedLocation && form.serving && Array.isArray", replace: "if (form.serving && Array.isArray" }] },
+  { id: "b-dashboard-viewer-sees-editor", kind: "unit", tests: T_FUI, edits: [{ file: DASH, find: "!locked && window.CCServing.offersPicker(f)", replace: "window.CCServing.offersPicker(f)" }] },
+  { id: "b-pending-demo-mode-editor", kind: "unit", tests: T_FUI, edits: [{ file: PEND, find: "f.noFixedLocation && realUser && h(window.ServingAreas.Editor", replace: "f.noFixedLocation && h(window.ServingAreas.Editor" }] },
+  { id: "b-html-registration-lost", kind: "unit", tests: T_FUI, edits: [{ file: HTML, find: '<script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>\n', replace: "" }] },
+  { id: "b-build-registration-lost", kind: "unit", tests: T_FUI, edits: [{ file: BUILD, find: "'serving-areas.jsx', ", replace: "" }] },
+  { id: "b-strings-group-renamed", kind: "unit", tests: T_FSTR, edits: [{ file: STRINGS, find: "    serving: {\n      title:", replace: "    servingx: {\n      title:" }] },
   // ── the SQL file and its probe (static twin)
   { id: "sql-upward-walk-reversed", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "join chain c on a.id = c.parent_id", replace: "join chain c on a.parent_id = c.id" }] },
   { id: "sql-pinned-in-main", kind: "unit", tests: T_SQL, edits: [{ file: SQL, find: "where not l.has_pin", replace: "where true" }] },

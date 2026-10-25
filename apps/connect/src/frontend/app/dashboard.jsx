@@ -207,6 +207,7 @@
   // already accepted and validated by POST /api/contributor/profile; that
   // route just had no UI calling it after the one-time onboarding wizard.
   function ProfileTab({ contributor, onSave, mode = 'owner' }) {
+    const { toast } = window.useApp();
     const locked = mode === 'viewer';
     const [f, setF] = useState({
       profilePhoto: contributor.profilePhoto || '',
@@ -246,6 +247,9 @@
           label: "No fixed physical location",
           desc: "We're online, mobile, or serve without a permanent office — no map pin.",
         }),
+        // #259: a Contributor with no fixed location says where they serve; it saves on its own button (owner or editor, never a viewer)
+        !locked && window.CCServing.offersPicker(f) && window.CCServing.isUuid(contributor.id)
+          && h(window.ServingAreas.Editor, { contributorId: contributor.id, authedFetch: window.authedFetch, toast }),
         // Driven by window.DATA.SOCIAL_PLATFORMS so this form, the apply
         // wizard, the create-listing form and the public chips can never again
         // disagree about which channels exist. Each field takes a handle OR a
