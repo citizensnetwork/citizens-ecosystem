@@ -81,6 +81,37 @@ describe("/api/admin/users", () => {
     }
   });
 
+  it("GET ?role=contributor adds each listing's verify-first state from the ledger (C10): awaiting, confirmed or declined", async () => {
+    // every table query in this mock answers with the same rows, so one row serves the profile and the ledger read
+    adminClient._chain._result.data = [
+      { id: OTHER_ID, role: "contributor", placeholder_id: OTHER_ID, status: "declined", created_at: "2026-10-20T00:00:00Z" },
+      { id: ADMIN_ID, role: "citizen" },
+    ];
+    adminClient._chain._result.count = 2;
+    const res = await GET(makeReq(null, "GET", "?role=contributor"));
+    const { data } = await res.json();
+    expect(adminClient.from).toHaveBeenCalledWith("listing_claims");
+    expect(adminClient._chain.in).toHaveBeenCalledWith("placeholder_id", [OTHER_ID]);
+    expect(data[0]).toMatchObject({ id: OTHER_ID, claim_status: "declined", claim_created_at: "2026-10-20T00:00:00Z" });
+    expect(data[1]).not.toHaveProperty("claim_status");
+    // the ledger carries addresses; this lookup asks only for status and age
+    const ledgerSelect = adminClient._chain.select.mock.calls.map((c) => String(c[0])).find((c) => c.includes("placeholder_id"));
+    expect(ledgerSelect).toBe("placeholder_id, status, created_at");
+  });
+
+  it("GET keeps listing when the ledger cannot be read (the tab just shows what it did before)", async () => {
+    adminClient._chain._result.data = [{ id: OTHER_ID, role: "contributor" }];
+    adminClient._chain._result.error = null;
+    adminClient.from.mockImplementation(((table: string) => {
+      if (table === "listing_claims") throw new Error("relation does not exist");
+      return adminClient._chain;
+    }) as never);
+    const res = await GET(makeReq(null, "GET", "?role=contributor"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).data[0]).not.toHaveProperty("claim_status");
+    adminClient.from.mockImplementation((() => adminClient._chain) as never);
+  });
+
   it("GET ignores an unknown role filter instead of passing it to the query", async () => {
     adminClient._chain._result.data = [];
     const res = await GET(makeReq(null, "GET", "?role=king"));

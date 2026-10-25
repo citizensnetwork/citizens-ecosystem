@@ -8,8 +8,9 @@ import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-
 //  1. The shareable listing link /c/<slug> (in the welcome email and the
 //     Sheet) opens that Contributor's profile — for a signed-out visitor
 //     too, as a guest — with Discover beneath it so Back stays in Connect.
-//  2. An owner who signs in AS their form-created listing account (Supabase
-//     auto-links the same-email Google sign-in) lands on their dashboard.
+//  2. An owner who signs in AS their form-created listing account is ASKED to confirm
+//     the listing is theirs (C10, verify-first); signing in alone claims nothing.
+//     The Confirm / Not me / Decide later paths are in listing-claim.spec.ts.
 //
 //  Hermetic like the other specs: every backend call is mocked with
 //  page.route(), nothing touches the real Supabase project. (2) needs a
@@ -93,25 +94,30 @@ test.describe("Listing link /c/<slug>", () => {
 
 // ── Real-mode session against a fake Supabase project ─────────────────
 
-async function signedInAs(page: Page, profile: { role: string; contributor_status: string }) {
+async function signedInAs(page: Page, profile: { role: string; contributor_status: string }, waiting = false) {
   const claimCalls: number[] = [];
   await mockApp(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
   const rpcCalls = await signInToFakeProject(page, {
     user: { id: OWNER_ID, email: "daniel@gracepointchurch.org.za", fullName: LISTING.full_name },
     profile,
-    rpc: (fn) =>
-      fn !== "mark_own_listing_claimed"
-        ? []
-        : profile.role === "contributor"
-          ? { success: true, slug: SLUG }
-          : { success: false, reason: "nothing_to_mark" },
   });
-  // Registered after the /api/** catch-all, so it wins for this path.
+  // Registered after the /api/** catch-all, so it wins for this path. A GET is the read-only question
+  // ("is a listing waiting?"); a POST would be a Confirm, and nothing in this spec ever sends one.
+  const askCalls: number[] = [];
+  const confirmCalls: number[] = [];
   await page.route("**/api/contributor/claim", (route: Route) => {
-    claimCalls.push(Date.now());
+    if (route.request().method() === "GET") {
+      askCalls.push(Date.now());
+      return route.fulfill({
+        json: waiting
+          ? { found: true, mode: "self", eligible: true, name: LISTING.full_name, slug: SLUG, category: "churches-ministries", kind: "ministry", logo_url: null }
+          : { found: false },
+      });
+    }
+    confirmCalls.push(Date.now());
     return route.fulfill({ status: 404, json: { error: "nothing_to_claim" } });
   });
-  return { rpcCalls, claimCalls };
+  return { rpcCalls, claimCalls: askCalls, confirmCalls };
 }
 
 test.describe("Sign-in landing for a form-created listing", () => {
@@ -119,29 +125,30 @@ test.describe("Sign-in landing for a form-created listing", () => {
   // bypass it so the fake project stays fully separate from production.
   test.use({ bypassCSP: true });
 
-  test("an owner signed in AS their unclaimed listing lands on their dashboard", async ({ page }) => {
-    const { rpcCalls } = await signedInAs(page, { role: "contributor", contributor_status: "approved" });
+  test("an owner signed in AS their listing is ASKED to confirm; signing in claims nothing", async ({ page }) => {
+    const { rpcCalls, claimCalls, confirmCalls } = await signedInAs(page, { role: "contributor", contributor_status: "approved" }, true);
     await page.goto("/");
 
-    await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Your listing is live", { exact: false })).toBeVisible();
-    expect(rpcCalls.filter((f) => f === "mark_own_listing_claimed")).toHaveLength(1);
-
-    // Every screen has its own URL, so a reload keeps them on the dashboard, and the
-    // welcome (once per browser session) is not stamped or shown a second time.
-    await page.reload();
-    await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 15_000 });
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: /Is .*Grace Point Community Church.* your listing\?/ })).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => claimCalls.length).toBe(1);
+    // The old silent stamp is gone: no RPC, and no Confirm request, until a person presses the button.
+    expect(rpcCalls).not.toContain("mark_own_listing_claimed");
+    expect(confirmCalls).toHaveLength(0);
     await expect(page.getByText("Your listing is live", { exact: false })).toHaveCount(0);
-    expect(rpcCalls.filter((f) => f === "mark_own_listing_claimed")).toHaveLength(1);
+    // They are not taken anywhere until they answer: Confirm is what opens the dashboard.
+    await expect(page.locator('[data-screen="dashboard"]')).toHaveCount(0);
   });
 
-  test("a citizen with nothing to claim is left where they are, silently", async ({ page }) => {
-    const { claimCalls, rpcCalls } = await signedInAs(page, { role: "citizen", contributor_status: "not_applied" });
+  test("a citizen with nothing waiting is left where they are, silently", async ({ page }) => {
+    const { claimCalls, rpcCalls, confirmCalls } = await signedInAs(page, { role: "citizen", contributor_status: "not_applied" });
     await page.goto("/");
 
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
     await expect.poll(() => claimCalls.length).toBe(1);
     expect(rpcCalls).not.toContain("mark_own_listing_claimed");
+    expect(confirmCalls).toHaveLength(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByText(/No pending listing|could not claim/i)).toHaveCount(0);
     await expect(page.locator('[data-screen="dashboard"]')).toHaveCount(0);
   });
