@@ -12,7 +12,9 @@
 //       names it; the copy is deleted only after the file has been restored;
 //    2. on start the harness restores anything the manifest still names (a previous run that was killed);
 //    3. a hash of `git diff HEAD` plus every untracked file is taken before and after, and the run fails loudly if it moved.
-//  A run that executes no test at all is INCONCLUSIVE, never "survived".
+//  A run that executes no test at all is INCONCLUSIVE, never "survived". A suite that hangs under a mutant (its control ran
+//  green in seconds) is KILLED, marked "the suite hung": the hostile-input tests are synchronous, so a quadratic scan
+//  blocks the worker instead of failing a test.
 //
 //  Usage (from apps/connect):  node scripts/mutation/reader.mjs [--only <id,id>] [--list]
 // ════════════════════════════════════════════════════════════════════
@@ -238,7 +240,11 @@ function childEnv() {
 
 function runTests(tests) {
   const args = [join(APP, "node_modules/vitest/vitest.mjs"), "run", ...tests, "--bail=1", "--reporter=default"];
-  const r = spawnSync(process.execPath, args, { cwd: APP, env: childEnv(), encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 240_000 });
+  const r = spawnSync(process.execPath, args, { cwd: APP, env: childEnv(), encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 180_000 });
+  // The controls run green in seconds, so a suite that HANGS under a mutant (the hostile-input
+  // tests are synchronous: a quadratic scan blocks the worker and no test timeout can fire) has
+  // noticed the mutant. That is a kill, reported as such, not "inconclusive".
+  if (r.error?.code === "ETIMEDOUT") return { status: null, verdict: "KILLED", hung: true, tail: "the suite hung under this mutant (timed out after 180 s)" };
   const out = `${r.stdout || ""}\n${r.stderr || ""}`;
   const ranSomething = /Tests\s+.*\b(passed|failed)\b/.test(out);
   const sawFailure = /Tests\s+.*\bfailed\b/.test(out) || /Test Files\s+.*\bfailed\b/.test(out);
@@ -283,7 +289,7 @@ try {
       }
     }
     results.push({ id: m.id, equivalent: !!m.equivalent, verdict: res.verdict });
-    console.log(`${res.verdict.padEnd(12)} ${m.id}${m.equivalent ? "  (expected to survive)" : ""}${res.verdict === "INCONCLUSIVE" ? "\n" + res.tail : ""}`);
+    console.log(`${res.verdict.padEnd(12)} ${m.id}${res.hung ? "  (the suite hung)" : ""}${m.equivalent ? "  (expected to survive)" : ""}${res.verdict === "INCONCLUSIVE" ? "\n" + res.tail : ""}`);
   }
 } finally {
   restore();

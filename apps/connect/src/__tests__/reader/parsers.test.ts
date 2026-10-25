@@ -74,7 +74,9 @@ Disallow: /drafts
     expect(isAllowed(rules, "/files/a.pdf")).toBe(false);
     expect(isAllowed(rules, "/files/a.pdf?x=1")).toBe(true);
     expect(isAllowed(rules, "/")).toBe(true);
+    // A tie goes to Allow whichever order the file lists them in.
     expect(isAllowed(parseRobots("User-agent: *\nAllow: /a\nDisallow: /a"), "/a")).toBe(true);
+    expect(isAllowed(parseRobots("User-agent: *\nDisallow: /a\nAllow: /a"), "/a")).toBe(true);
   });
   it("a prefix of our name is NOT our group (exact product token only)", () => {
     expect(isAllowed(parseRobots("User-agent: Citizens\nDisallow: /\n"), "/x")).toBe(true);

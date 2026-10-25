@@ -31,6 +31,12 @@ describe("isDue", () => {
     expect(isDue(hoursAgo(SOURCE_DUE_AFTER_HOURS + 0.01), NOW)).toBe(true);
     expect(dueCutoff(NOW).toISOString()).toBe(hoursAgo(SOURCE_DUE_AFTER_HOURS));
   });
+  it("the window is a little under a day: 3 or 19 hours ago is not due, 21 hours ago is", () => {
+    expect(SOURCE_DUE_AFTER_HOURS).toBe(20);
+    expect(isDue(hoursAgo(3), NOW)).toBe(false);
+    expect(isDue(hoursAgo(19), NOW)).toBe(false);
+    expect(isDue(hoursAgo(21), NOW)).toBe(true);
+  });
   it("a check in the future (clock skew) is not due", () => {
     expect(isDue(hoursAgo(-2), NOW)).toBe(false);
   });
