@@ -38,6 +38,10 @@ type Db = {
   news: Row[];
   calls: { fn: string; body: Row }[];
   unavailable: boolean;
+  /** Suggestion ids whose dismissal the fake database refuses. */
+  failDismiss: string[];
+  /** When set, the edit route answers 422 with this reason (or 409 for not_pending) and stores nothing. */
+  editRefusal: string | null;
 };
 
 const inDays = (d: number) => {
@@ -139,6 +143,8 @@ function seed(over: Partial<Db> = {}): Db {
     news: [],
     calls: [],
     unavailable: false,
+    failDismiss: [],
+    editRefusal: null,
     ...over,
   };
 }
@@ -191,12 +197,29 @@ async function openOwner(page: Page, db: Db, path = "/dashboard/suggestions") {
     db.calls.push({ fn: "decide_listing_suggestion", body: b });
     const s = db.suggestions.find((x) => x.id === b._id);
     if (!s) return json(route, { success: false, reason: "not_found" });
+    if (b._action === "dismiss" && db.failDismiss.includes(String(b._id))) return json(route, { success: false, reason: "boom" });
+    if (b._action === "dismiss" && s.status !== "pending") return json(route, { success: false, reason: "not_pending" });
     if (b._action === "dismiss") s.status = "dismissed";
     else if (b._action === "published") {
       s.status = "published";
       s.published_ref = b._ref ?? null;
     } else if (b._action === "unpublish") s.status = "dismissed";
     return json(route, { success: true });
+  });
+
+  // The edit route (PATCH /api/automation/suggestions/:id): the browser sends only what changed, with its own token.
+  await page.route("**/api/automation/suggestions/*", (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    const id = new URL(route.request().url()).pathname.split("/").pop() ?? "";
+    const edits = ((body(route).edits ?? {}) as Row);
+    db.calls.push({ fn: "PATCH suggestion", body: { id, edits, authorization: route.request().headers().authorization ?? "" } });
+    if (db.editRefusal) {
+      return route.fulfill({ status: db.editRefusal === "not_pending" ? 409 : 422, json: { error: db.editRefusal } });
+    }
+    const s = db.suggestions.find((x) => x.id === id);
+    if (!s) return route.fulfill({ status: 404, json: { error: "not_found" } });
+    s.payload = { ...(s.payload as Row), ...edits };
+    return route.fulfill({ json: { ok: true, payload: s.payload, warnings: [] } });
   });
 
   await page.route(`${FAKE_PROJECT}/rest/v1/listing_sources**`, (route) => {
@@ -427,6 +450,368 @@ test.describe("Suggestions tab", () => {
     await expect(page.getByRole("button", { name: "suggestions", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "events", exact: true }).click();
     await expect(page.getByRole("button", { name: "Create Event" })).toBeVisible();
+  });
+});
+
+test.describe("Suggestions tab: choosing several at once", () => {
+  const bar = (page: Page) => page.locator('[data-bar="selection"]');
+  const count = (page: Page) => bar(page).getByRole("status");
+  const confirmBox = (page: Page) => page.locator('[data-confirm="dismiss"]');
+  const pick = (page: Page, title: string) => page.getByRole("checkbox", { name: `Select ${title}`, exact: true });
+  const dismissCalls = (db: Db) => callsTo(db, "decide_listing_suggestion").filter((c) => c.body._action === "dismiss");
+
+  test("Select all, then Dismiss selected asks first and says how many, then dismisses every one", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    await expect(card(page, "event")).toBeVisible({ timeout: 15_000 });
+    await expect(count(page)).toHaveText("None selected");
+    await expect(bar(page).getByRole("button", { name: /Dismiss selected/ })).toHaveCount(0);
+
+    await page.getByRole("checkbox", { name: "Select all (3)" }).check();
+    await expect(count(page)).toHaveText("3 of 3 selected");
+    for (const t of ["Sunday Celebration", "New building opens", "Update your About text"]) await expect(pick(page, t)).toBeChecked();
+
+    await bar(page).getByRole("button", { name: "Dismiss selected (3)" }).click();
+    await expect(confirmBox(page)).toBeVisible();
+    await expect(confirmBox(page).getByText("Dismiss 3 suggestions?", { exact: true })).toBeVisible();
+    expect(callsTo(db, "decide_listing_suggestion")).toHaveLength(0); // asking is not doing
+
+    await confirmBox(page).getByRole("button", { name: "Keep them" }).click();
+    await expect(confirmBox(page)).toHaveCount(0);
+    await expect(count(page)).toHaveText("3 of 3 selected"); // nothing was lost
+    expect(callsTo(db, "decide_listing_suggestion")).toHaveLength(0);
+
+    await bar(page).getByRole("button", { name: "Dismiss selected (3)" }).click();
+    await confirmBox(page).getByRole("button", { name: "Yes, dismiss 3" }).click();
+    await expect.poll(() => dismissCalls(db).length).toBe(3);
+    expect(dismissCalls(db).map((c) => c.body)).toEqual(
+      expect.arrayContaining([
+        { _id: SUG_EVENT, _action: "dismiss", _ref: null },
+        { _id: SUG_NEWS, _action: "dismiss", _ref: null },
+        { _id: SUG_PROFILE, _action: "dismiss", _ref: null },
+      ]),
+    );
+    await expect(page.getByText("Nothing is waiting for you")).toBeVisible();
+    await expect(bar(page)).toHaveCount(0);
+    await expect(page.getByText("Dismissed 3 suggestions.")).toBeVisible();
+    // Nothing was published or deleted: the rows stay (as dismissed), so their fingerprints still say "already known".
+    expect(callsTo(db, "insert events")).toHaveLength(0);
+    expect(callsTo(db, "insert news_posts")).toHaveLength(0);
+    expect(db.suggestions.filter((s) => s.status === "dismissed").map((s) => s.id).sort()).toEqual([SUG_EVENT, SUG_NEWS, SUG_PROFILE].sort());
+    expect(db.suggestions).toHaveLength(4);
+  });
+
+  test("a partial selection dismisses only what is ticked, and Select all shows the half-way state", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    await pick(page, "Sunday Celebration").check({ timeout: 15_000 });
+    await pick(page, "New building opens").check();
+    await expect(count(page)).toHaveText("2 of 3 selected");
+    await expect(card(page, "event")).toHaveAttribute("data-selected", "true");
+    await expect(card(page, "profile")).not.toHaveAttribute("data-selected", "true");
+    const all = page.getByRole("checkbox", { name: "Select all (3)" });
+    await expect(all).not.toBeChecked();
+    expect(await all.evaluate((el) => (el as HTMLInputElement).indeterminate)).toBe(true);
+
+    await bar(page).getByRole("button", { name: "Dismiss selected (2)" }).click();
+    await expect(confirmBox(page).getByText("Dismiss 2 suggestions?", { exact: true })).toBeVisible();
+    await confirmBox(page).getByRole("button", { name: "Yes, dismiss 2" }).click();
+    await expect.poll(() => dismissCalls(db).length).toBe(2);
+    expect(dismissCalls(db).map((c) => c.body._id).sort()).toEqual([SUG_EVENT, SUG_NEWS].sort());
+    await expect(card(page, "event")).toHaveCount(0);
+    await expect(card(page, "news")).toHaveCount(0);
+    await expect(card(page, "profile")).toBeVisible();
+    await expect(count(page)).toHaveText("None selected");
+    expect(db.suggestions.find((s) => s.id === SUG_PROFILE)?.status).toBe("pending");
+  });
+
+  test("unticking Select all, or Clear, empties the selection; a changed selection closes an open confirm", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const all = page.getByRole("checkbox", { name: "Select all (3)" });
+    await all.check({ timeout: 15_000 });
+    await all.uncheck();
+    await expect(count(page)).toHaveText("None selected");
+
+    await pick(page, "Sunday Celebration").check();
+    await bar(page).getByRole("button", { name: "Dismiss selected (1)" }).click();
+    await expect(confirmBox(page)).toBeVisible();
+    await pick(page, "New building opens").check(); // a different question now
+    await expect(confirmBox(page)).toHaveCount(0);
+    await expect(count(page)).toHaveText("2 of 3 selected");
+
+    await bar(page).getByRole("button", { name: "Clear" }).click();
+    await expect(count(page)).toHaveText("None selected");
+    expect(callsTo(db, "decide_listing_suggestion")).toHaveLength(0);
+  });
+
+  test("a card dismissed on its own drops out of the selection, so the count never mentions it", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    await pick(page, "New building opens").check({ timeout: 15_000 });
+    await pick(page, "Update your About text").check();
+    await expect(count(page)).toHaveText("2 of 3 selected");
+    await card(page, "news").getByRole("button", { name: "Dismiss" }).click();
+    await expect(card(page, "news")).toHaveCount(0);
+    await expect(count(page)).toHaveText("1 of 2 selected");
+    await expect(bar(page).getByRole("button", { name: "Dismiss selected (1)" })).toBeVisible();
+  });
+
+  test("when one dismissal fails, the others still go and only the failed one stays selected", async ({ page }) => {
+    const db = seed({ failDismiss: [SUG_NEWS] });
+    await openOwner(page, db);
+    await page.getByRole("checkbox", { name: "Select all (3)" }).check({ timeout: 15_000 });
+    await bar(page).getByRole("button", { name: "Dismiss selected (3)" }).click();
+    await confirmBox(page).getByRole("button", { name: "Yes, dismiss 3" }).click();
+    await expect.poll(() => dismissCalls(db).length).toBe(3);
+    await expect(page.getByText("Dismissed 2 of 3. 1 is still selected. Please try again.")).toBeVisible();
+    await expect(card(page, "event")).toHaveCount(0);
+    await expect(card(page, "news")).toBeVisible();
+    await expect(pick(page, "New building opens")).toBeChecked();
+    await expect(count(page)).toHaveText("1 of 1 selected");
+  });
+
+  test("a suggestion already decided somewhere else counts as gone, not as a failure", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    await page.getByRole("checkbox", { name: "Select all (3)" }).check({ timeout: 15_000 });
+    // another tab or an editor dismisses one while this tab still lists it
+    db.suggestions.find((s) => s.id === SUG_PROFILE)!.status = "dismissed";
+    await bar(page).getByRole("button", { name: "Dismiss selected (3)" }).click();
+    await confirmBox(page).getByRole("button", { name: "Yes, dismiss 3" }).click();
+    await expect(page.getByText("Dismissed 3 suggestions.")).toBeVisible();
+    await expect(page.getByText("Nothing is waiting for you")).toBeVisible();
+  });
+
+  test("works from the keyboard alone, with the count announced politely and Escape to back out", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    await expect(card(page, "event")).toBeVisible({ timeout: 15_000 });
+    await expect(count(page)).toHaveAttribute("aria-live", "polite");
+
+    await pick(page, "Sunday Celebration").focus();
+    await page.keyboard.press("Space");
+    await expect(pick(page, "Sunday Celebration")).toBeChecked();
+    await expect(count(page)).toHaveText("1 of 3 selected");
+
+    const open = bar(page).getByRole("button", { name: "Dismiss selected (1)" });
+    await open.focus();
+    await page.keyboard.press("Enter");
+    await expect(confirmBox(page).getByRole("button", { name: "Yes, dismiss 1" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(confirmBox(page)).toHaveCount(0);
+    await expect(open).toBeFocused();
+    expect(callsTo(db, "decide_listing_suggestion")).toHaveLength(0);
+
+    await page.keyboard.press("Enter");
+    await expect(confirmBox(page).getByText("Dismiss 1 suggestion?", { exact: true })).toBeVisible();
+    await page.keyboard.press("Enter"); // the focused confirm button
+    await expect.poll(() => dismissCalls(db).length).toBe(1);
+    await expect(card(page, "event")).toHaveCount(0);
+  });
+
+  test("on a 375 px phone every control is at least 44 px square and nothing scrolls sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const db = seed();
+    await openOwner(page, db);
+    await pick(page, "Sunday Celebration").check({ timeout: 15_000 });
+    await bar(page).getByRole("button", { name: "Dismiss selected (1)" }).click();
+
+    const targets = {
+      "card checkbox": pick(page, "Sunday Celebration").locator("xpath=ancestor::label[1]"),
+      "select all": page.getByRole("checkbox", { name: "Select all (3)" }).locator("xpath=ancestor::label[1]"),
+      "dismiss selected": bar(page).getByRole("button", { name: "Dismiss selected (1)" }),
+      clear: bar(page).getByRole("button", { name: "Clear" }),
+      "yes, dismiss": confirmBox(page).getByRole("button", { name: "Yes, dismiss 1" }),
+      "keep them": confirmBox(page).getByRole("button", { name: "Keep them" }),
+      publish: card(page, "event").getByRole("button", { name: "Publish" }),
+      edit: card(page, "event").getByRole("button", { name: "Edit" }),
+      dismiss: card(page, "event").getByRole("button", { name: "Dismiss" }),
+    };
+    for (const [name, loc] of Object.entries(targets)) {
+      const box = await loc.boundingBox();
+      expect(box, name).not.toBeNull();
+      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(43.5);
+      expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(43.5);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+});
+
+test.describe("Suggestions tab: editing before publishing", () => {
+  const patches = (db: Db) => callsTo(db, "PATCH suggestion");
+  const inputs = (page: Page, kind: string) => card(page, kind);
+
+  test("Save changes keeps the edit on the card without publishing it, and the server is asked with the owner's own token", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await expect(c.getByRole("button", { name: "Save changes" })).toBeDisabled(); // nothing changed yet
+    await expect(c.getByLabel("Title")).toBeFocused();
+
+    await c.getByLabel("Title").fill("Sunday Celebration (new venue)");
+    await c.getByLabel("Where").fill("The Hall, 4 Main Road");
+    await c.getByLabel("Date").fill("2026-11-01");
+    await c.getByLabel("Time").fill("18:30");
+    await c.getByRole("button", { name: "Save changes" }).click();
+
+    await expect.poll(() => patches(db).length).toBe(1);
+    expect(patches(db)[0].body).toMatchObject({
+      id: SUG_EVENT,
+      authorization: expect.stringMatching(/^Bearer .{10,}/),
+      edits: {
+        title: "Sunday Celebration (new venue)",
+        location: "The Hall, 4 Main Road",
+        start: new Date(2026, 10, 1, 18, 30).toISOString(),
+      },
+    });
+    // nothing else was sent: not the description (unchanged), not the category
+    expect(Object.keys((patches(db)[0].body.edits as Row) ?? {}).sort()).toEqual(["location", "start", "title"]);
+
+    // still waiting, still on the card, form closed, focus back on Edit
+    await expect(c.getByText("Sunday Celebration (new venue)")).toBeVisible();
+    await expect(c.getByLabel("Title")).toHaveCount(0);
+    await expect(c.getByRole("button", { name: "Edit" })).toBeFocused();
+    await expect(page.getByText("Saved. It is still waiting for you to publish or dismiss.")).toBeVisible();
+    expect(callsTo(db, "insert events")).toHaveLength(0);
+    expect(callsTo(db, "decide_listing_suggestion")).toHaveLength(0);
+    expect(db.suggestions.find((s) => s.id === SUG_EVENT)?.status).toBe("pending");
+    await expect(page.getByRole("button", { name: "suggestions (3)", exact: true })).toBeVisible();
+  });
+
+  test("a saved edit can be published later, exactly as saved", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Title").fill("Sunday Celebration (new venue)");
+    await c.getByLabel("Date").fill("2026-11-01");
+    await c.getByLabel("Time").fill("18:30");
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Saved. It is still waiting")).toBeVisible();
+
+    await c.getByRole("button", { name: "Publish" }).click();
+    await expect.poll(() => callsTo(db, "insert events").length).toBe(1);
+    const row = callsTo(db, "insert events")[0].body;
+    expect(row).toMatchObject({ title: "Sunday Celebration (new venue)", created_by: MEMBER.id });
+    expect(new Date(String(row.date)).getTime()).toBe(new Date(2026, 10, 1, 18, 30).getTime());
+    expect(callsTo(db, "decide_listing_suggestion")[0].body).toMatchObject({ _id: SUG_EVENT, _action: "published" });
+  });
+
+  test("a saved edit can be dismissed later too", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "news");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Post").fill("We open our doors on Sunday at nine.");
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => patches(db).length).toBe(1);
+    expect(patches(db)[0].body.edits).toEqual({ body: "We open our doors on Sunday at nine." });
+    await expect(c.getByText("We open our doors on Sunday at nine.")).toBeVisible();
+
+    await c.getByRole("button", { name: "Dismiss" }).click();
+    await expect.poll(() => callsTo(db, "decide_listing_suggestion").length).toBe(1);
+    expect(callsTo(db, "decide_listing_suggestion")[0].body).toEqual({ _id: SUG_NEWS, _action: "dismiss", _ref: null });
+    await expect(c).toHaveCount(0);
+  });
+
+  test("Publish from the open form publishes what is typed, even before it is saved (a new time moves the end with it)", async ({ page }) => {
+    const db = seed();
+    const start = new Date(2026, 10, 1, 9, 0);
+    const payload = db.suggestions[0].payload as Row;
+    payload.start = start.toISOString();
+    payload.end = new Date(2026, 10, 1, 11, 0).toISOString();
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Time").fill("18:00");
+    await c.getByRole("button", { name: "Publish" }).click();
+    await expect.poll(() => callsTo(db, "insert events").length).toBe(1);
+    const row = callsTo(db, "insert events")[0].body;
+    expect(new Date(String(row.date)).getTime()).toBe(new Date(2026, 10, 1, 18, 0).getTime());
+    expect(new Date(String(row.end_time)).getTime()).toBe(new Date(2026, 10, 1, 20, 0).getTime());
+    expect(patches(db)).toHaveLength(0);
+  });
+
+  test("Cancel (or Escape) throws the draft away and sends nothing", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Title").fill("Something else entirely");
+    await c.getByRole("button", { name: "Cancel" }).click();
+    await expect(c.getByText("Sunday Celebration")).toBeVisible();
+    await expect(c.getByLabel("Title")).toHaveCount(0);
+    await expect(c.getByRole("button", { name: "Edit" })).toBeFocused();
+
+    await c.getByRole("button", { name: "Edit" }).click();
+    await expect(c.getByLabel("Title")).toHaveValue("Sunday Celebration"); // the draft did not survive
+    await c.getByLabel("Title").fill("Another try");
+    await page.keyboard.press("Escape");
+    await expect(c.getByLabel("Title")).toHaveCount(0);
+    expect(patches(db)).toHaveLength(0);
+  });
+
+  test("a refusal from the server is shown on the card, in words, and nothing changes", async ({ page }) => {
+    const db = seed({ editRefusal: "event_title_required" });
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Title").fill("ab");
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect(c.getByRole("alert")).toHaveText("Please give it a title of at least 3 letters.");
+    await expect(c.getByLabel("Title")).toHaveValue("ab"); // what was typed is kept for another try
+    expect((db.suggestions[0].payload as Row).title).toBe("Sunday Celebration");
+    // typing again clears the message
+    await c.getByLabel("Title").fill("abc");
+    await expect(c.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("if it was dealt with elsewhere, the card says so and leaves the list", async ({ page }) => {
+    const db = seed({ editRefusal: "not_pending" });
+    await openOwner(page, db);
+    const c = card(page, "news");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Title").fill("A better headline");
+    db.suggestions.find((s) => s.id === SUG_NEWS)!.status = "dismissed";
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect(card(page, "news")).toHaveCount(0);
+  });
+
+  test("a profile suggestion's text can be edited and saved too", async ({ page }) => {
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "profile");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("About text").fill("We serve the whole city with love.");
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect.poll(() => patches(db).length).toBe(1);
+    expect(patches(db)[0].body).toMatchObject({ id: SUG_PROFILE, edits: { value: "We serve the whole city with love." } });
+    await expect(c.getByText("We serve the whole city with love.")).toBeVisible();
+  });
+
+  test("on a 375 px phone the form fits, with 44 px fields and buttons", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const db = seed();
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    for (const [name, loc] of Object.entries({
+      title: c.getByLabel("Title"),
+      date: c.getByLabel("Date"),
+      time: c.getByLabel("Time"),
+      where: c.getByLabel("Where"),
+      save: c.getByRole("button", { name: "Save changes" }),
+      cancel: c.getByRole("button", { name: "Cancel" }),
+      publish: c.getByRole("button", { name: "Publish" }),
+    })) {
+      const box = await loc.boundingBox();
+      expect(box, name).not.toBeNull();
+      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(43.5);
+      expect(box!.x + box!.width, `${name} inside the screen`).toBeLessThanOrEqual(375);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });
 

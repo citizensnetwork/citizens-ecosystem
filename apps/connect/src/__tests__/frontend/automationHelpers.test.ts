@@ -22,6 +22,20 @@ type Helpers = {
     date: string;
   };
   profileFieldsFrom: (field: string, value: string, contributor?: { socials?: Record<string, string> }) => Record<string, unknown> | null;
+  suggestionTitle: (s: { kind: string; payload?: Record<string, unknown> }) => string;
+  toggled: (picked: string[], id: string, on: boolean) => string[];
+  selectionOf: (
+    pending: { id: string }[],
+    picked: string[],
+  ) => { ids: string[]; count: number; total: number; all: boolean; some: boolean };
+  selectionText: (count: number, total: number) => string;
+  dismissQuestion: (count: number) => string;
+  dismissedText: (total: number, failed: number) => string;
+  mapInChunks: <T, R>(items: T[], size: number, fn: (x: T) => Promise<R>) => Promise<R[]>;
+  draftFromSuggestion: (s: { kind: string; payload?: Record<string, unknown> }) => Record<string, string>;
+  changesFromDraft: (s: { kind: string; payload?: Record<string, unknown> }, draft: Record<string, string>) => Record<string, string> | null;
+  applyChanges: (s: { kind: string; payload: Record<string, unknown> }, changes: Record<string, string> | null) => Record<string, unknown>;
+  editErrorText: (reason?: string) => string;
 };
 
 let H: Helpers;
@@ -183,5 +197,143 @@ describe("newsFormFromPayload / profileFieldsFrom", () => {
     ).toEqual({
       socials: { facebook: "facebook.com/church", youtube: "@church", instagram: "@church" },
     });
+  });
+});
+
+describe("choosing several suggestions at once", () => {
+  const pending = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("names a suggestion for a screen reader by its title, or by what it would change", () => {
+    expect(H.suggestionTitle({ kind: "event", payload: { title: "Sunday Celebration" } })).toBe("Sunday Celebration");
+    expect(H.suggestionTitle({ kind: "news", payload: { title: "New building opens" } })).toBe("New building opens");
+    expect(H.suggestionTitle({ kind: "profile", payload: { field: "bio", value: "x" } })).toBe("Update your About text");
+    expect(H.suggestionTitle({ kind: "profile", payload: { field: "nope" } })).toBe("Update your profile");
+    expect(H.suggestionTitle({ kind: "news", payload: {} })).toBe("News post");
+    expect(H.suggestionTitle({ kind: "event" })).toBe("Event");
+  });
+
+  it("adds and removes one id without ever duplicating it or touching the rest", () => {
+    expect(H.toggled([], "a", true)).toEqual(["a"]);
+    expect(H.toggled(["a"], "a", true)).toEqual(["a"]);
+    expect(H.toggled(["a", "b"], "a", false)).toEqual(["b"]);
+    expect(H.toggled(["b"], "a", false)).toEqual(["b"]);
+  });
+
+  it("reports none, some and all against what is still waiting", () => {
+    expect(H.selectionOf(pending, [])).toEqual({ ids: [], count: 0, total: 3, all: false, some: false });
+    expect(H.selectionOf(pending, ["b"])).toEqual({ ids: ["b"], count: 1, total: 3, all: false, some: true });
+    expect(H.selectionOf(pending, ["c", "a", "b"])).toEqual({ ids: ["a", "b", "c"], count: 3, total: 3, all: true, some: false });
+  });
+
+  it("forgets an id that is no longer pending, so a count or a confirm never mentions it", () => {
+    expect(H.selectionOf(pending, ["a", "gone"])).toMatchObject({ ids: ["a"], count: 1 });
+    expect(H.selectionOf([], ["a"])).toEqual({ ids: [], count: 0, total: 0, all: false, some: false });
+  });
+
+  it("says the count in plain words, in the singular too", () => {
+    expect(H.selectionText(0, 5)).toBe("None selected");
+    expect(H.selectionText(2, 5)).toBe("2 of 5 selected");
+    expect(H.dismissQuestion(1)).toBe("Dismiss 1 suggestion?");
+    expect(H.dismissQuestion(7)).toBe("Dismiss 7 suggestions?");
+  });
+
+  it("reports a batch result, including a partial one", () => {
+    expect(H.dismissedText(3, 0)).toBe("Dismissed 3 suggestions.");
+    expect(H.dismissedText(1, 0)).toBe("Dismissed 1 suggestion.");
+    expect(H.dismissedText(4, 1)).toBe("Dismissed 3 of 4. 1 is still selected. Please try again.");
+    expect(H.dismissedText(4, 3)).toBe("Dismissed 1 of 4. 3 are still selected. Please try again.");
+  });
+
+  it("runs a batch a few at a time, in order, never more at once than asked", async () => {
+    let live = 0;
+    let peak = 0;
+    const out = await H.mapInChunks([1, 2, 3, 4, 5, 6, 7], 3, async (n) => {
+      live++;
+      peak = Math.max(peak, live);
+      await new Promise((r) => setTimeout(r, 1));
+      live--;
+      return n * 10;
+    });
+    expect(out).toEqual([10, 20, 30, 40, 50, 60, 70]);
+    expect(peak).toBe(3);
+    expect(await H.mapInChunks([], 3, async (n: number) => n)).toEqual([]);
+  });
+});
+
+describe("editing a suggestion that is still waiting", () => {
+  // Built from local parts so the expectations do not depend on where the test runs.
+  const start = new Date(2026, 9, 11, 9, 30);
+  const end = new Date(2026, 9, 11, 11, 30);
+  const eventS = {
+    id: "s1",
+    kind: "event",
+    payload: {
+      title: "Sunday Celebration",
+      description: "Join us.",
+      location: "12 Church Street",
+      category: "church-services",
+      start: start.toISOString(),
+      end: end.toISOString(),
+    },
+  };
+  const newsS = { id: "s2", kind: "news", payload: { title: "New building", body: "Open Sunday.", link: null, post_date: "2026-10-03" } };
+  const profS = { id: "s3", kind: "profile", payload: { field: "bio", value: "We serve Pretoria." } };
+
+  it("shows exactly the fields an owner can change, an event's start as their own date and time", () => {
+    expect(H.draftFromSuggestion(eventS)).toEqual({
+      title: "Sunday Celebration",
+      description: "Join us.",
+      location: "12 Church Street",
+      date: "2026-10-11",
+      time: "09:30",
+    });
+    expect(H.draftFromSuggestion(newsS)).toEqual({ title: "New building", body: "Open Sunday." });
+    expect(H.draftFromSuggestion(profS)).toEqual({ value: "We serve Pretoria." });
+    expect(H.draftFromSuggestion({ kind: "event", payload: { title: "x", start: "nope" } })).toMatchObject({ date: "", time: "" });
+  });
+
+  it("finds nothing to save when nothing differs", () => {
+    for (const s of [eventS, newsS, profS]) expect(H.changesFromDraft(s, H.draftFromSuggestion(s)), s.kind).toBeNull();
+  });
+
+  it("names only what changed, in the keys the server accepts", () => {
+    expect(H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), title: "Sunday Celebration (new venue)" })).toEqual({ title: "Sunday Celebration (new venue)" });
+    expect(H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), location: "The Hall", description: "" })).toEqual({ location: "The Hall", description: "" });
+    expect(H.changesFromDraft(newsS, { title: "New building", body: "Open Sunday at 9." })).toEqual({ body: "Open Sunday at 9." });
+    expect(H.changesFromDraft(profS, { value: "We serve the city." })).toEqual({ value: "We serve the city." });
+  });
+
+  it("turns a new date or time into a start instant from the owner's own clock", () => {
+    const moved = H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), date: "2026-10-18", time: "18:00" });
+    expect(Object.keys(moved ?? {})).toEqual(["start"]);
+    expect(moved?.start).toBe(new Date(2026, 9, 18, 18, 0).toISOString());
+    const onlyTime = H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), time: "10:00" });
+    expect(onlyTime?.start).toBe(new Date(2026, 9, 11, 10, 0).toISOString());
+  });
+
+  it("sends an empty start for a date or time that was cleared, so the server's own rule refuses it", () => {
+    expect(H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), date: "" })).toEqual({ start: "" });
+    expect(H.changesFromDraft(eventS, { ...H.draftFromSuggestion(eventS), time: "" })).toEqual({ start: "" });
+  });
+
+  it("lays the changes over the payload, and moves an event's end with its start", () => {
+    expect(H.applyChanges(eventS, null)).toEqual(eventS.payload);
+    const moved = H.applyChanges(eventS, { start: new Date(2026, 9, 18, 18, 0).toISOString() });
+    expect(moved.start).toBe(new Date(2026, 9, 18, 18, 0).toISOString());
+    expect(moved.end).toBe(new Date(2026, 9, 18, 20, 0).toISOString()); // still two hours
+    const explicit = H.applyChanges(eventS, { start: new Date(2026, 9, 18, 18, 0).toISOString(), end: new Date(2026, 9, 18, 19, 0).toISOString() });
+    expect(explicit.end).toBe(new Date(2026, 9, 18, 19, 0).toISOString());
+    const noEnd = H.applyChanges({ ...eventS, payload: { ...eventS.payload, end: null } }, { start: new Date(2026, 9, 18, 18, 0).toISOString() });
+    expect(noEnd.end).toBeNull();
+    expect(H.applyChanges(newsS, { body: "x" })).toEqual({ ...newsS.payload, body: "x" });
+  });
+
+  it("explains each refusal in plain words, with a safe default", () => {
+    for (const reason of ["event_title_required", "news_body_required", "event_start_invalid", "event_start_out_of_range", "profile_value_invalid", "not_pending", "not_found", "consent_off"]) {
+      expect(H.editErrorText(reason), reason).toMatch(/[a-z]/);
+      expect(H.editErrorText(reason), reason).not.toBe(H.editErrorText("something_new"));
+    }
+    expect(H.editErrorText(undefined)).toBe("Could not save that change. Please try again.");
+    expect(H.editErrorText("something_new")).toBe("Could not save that change. Please try again.");
   });
 });
