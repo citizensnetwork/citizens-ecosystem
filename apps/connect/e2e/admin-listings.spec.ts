@@ -24,6 +24,9 @@ const FORM_LISTING = {
   contributor_claim_email: "lerato@hopeharvest.org.za",
   contributor_claimed_at: null,
   created_at: "2026-09-27T08:00:00Z",
+  // C10: the verify-first ledger's state, as /api/admin/users adds it (three days waiting)
+  claim_status: "awaiting",
+  claim_created_at: new Date(Date.now() - 3 * 86_400_000 - 60_000).toISOString(),
 };
 const HIDDEN_LISTING = {
   id: "77777777-7777-4777-8777-777777777777",
@@ -37,6 +40,24 @@ const HIDDEN_LISTING = {
   contributor_claim_email: null,
   contributor_claimed_at: "2026-09-20T10:00:00Z",
   created_at: "2026-09-19T08:00:00Z",
+  claim_status: "confirmed",
+  claim_created_at: "2026-09-19T08:00:00Z",
+};
+// The owner tapped "Not me": hidden at once, flagged for the admin, and NOT shown as "awaiting".
+const DECLINED_LISTING = {
+  id: "99999999-9999-4999-8999-999999999999",
+  full_name: "Mercy Mission",
+  avatar_url: null,
+  role: "contributor",
+  contributor_kind: "organization",
+  contributor_status: "approved",
+  contributor_slug: "mercy-mission",
+  contributor_hidden: true,
+  contributor_claim_email: "someone@mercymission.example",
+  contributor_claimed_at: null,
+  created_at: "2026-10-20T08:00:00Z",
+  claim_status: "declined",
+  claim_created_at: "2026-10-20T08:00:00Z",
 };
 
 // Claimed from a different account: the listing now lives on the owner's row;
@@ -75,7 +96,7 @@ test.describe("Admin → Listings", () => {
       }
       listQueries.push(params);
       return route.fulfill({
-        json: { data: [FORM_LISTING, HIDDEN_LISTING, MOVED_PLACEHOLDER], meta: { page: 1, pageSize: 20, total: 3 } },
+        json: { data: [FORM_LISTING, HIDDEN_LISTING, MOVED_PLACEHOLDER, DECLINED_LISTING], meta: { page: 1, pageSize: 20, total: 4 } },
       });
     });
     await page.route("**/api/admin/contributors/hide", (route: Route) => {
@@ -106,13 +127,18 @@ test.describe("Admin → Listings", () => {
     const deleteGap = await formDelete.evaluate((el) => parseFloat(getComputedStyle(el).marginLeft));
     expect(deleteGap).toBeGreaterThanOrEqual(16);
     await expect(form.getByText("LIVE", { exact: true })).toBeVisible();
-    await expect(form.getByText("Awaiting owner sign-in · lerato@hopeharvest.org.za")).toBeVisible();
+    await expect(form.getByText("Awaiting owner · 3 d · lerato@hopeharvest.org.za")).toBeVisible();
     await expect(form.getByRole("link", { name: "/c/hope-harvest-outreach" })).toHaveAttribute(
       "href",
       "/c/hope-harvest-outreach",
     );
     await expect(hidden.getByText("HIDDEN", { exact: true })).toBeVisible();
-    await expect(hidden.getByText(/Owner signed in/)).toBeVisible();
+    await expect(hidden.getByText(/Owner confirmed/)).toBeVisible();
+    // "Not me": flagged for the admin to decide on, and never mislabelled as still awaiting
+    const declined = page.locator('[data-listing="mercy-mission"]');
+    await expect(declined.getByText("HIDDEN", { exact: true })).toBeVisible();
+    await expect(declined.getByText(/Owner declined/)).toBeVisible();
+    await expect(declined.getByText(/Awaiting owner/)).toHaveCount(0);
     expect(listQueries[0]?.get("page")).toBe("1");
     const moved = page.locator(`[data-listing="${MOVED_PLACEHOLDER.id}"]`);
     await expect(moved.getByText(/Moved to its owner's account/)).toBeVisible();
