@@ -6,10 +6,11 @@
  * refusal on the ledger (the Sheet then shows "Owner declined"); nothing on the caller's own account changes. This
  * route then tells the admin by email, fail-soft: a mail problem never undoes the refusal.
  *
+ * Bearer-only like Confirm (a cookie session alone is refused: no cross-site request can answer for the person).
  * No body and no id: like Confirm, the match is the caller's own verified email, so there is nothing to forge.
  */
 
-import { getRouteAuth } from "@/lib/supabase/route";
+import { getRouteAuth, hasBearerToken } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { adminNotifyEmail, sendEmail, siteOrigin } from "@/lib/email/send";
@@ -25,6 +26,7 @@ const STATUS_FOR_REASON: Record<string, number> = {
 };
 
 export async function POST(request: Request) {
+  if (!hasBearerToken(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { supabase, user } = await getRouteAuth(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

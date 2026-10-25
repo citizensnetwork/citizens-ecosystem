@@ -227,7 +227,7 @@ describe("when it goes wrong", () => {
   });
 
   it("the server's own sentence is never shown", async () => {
-    const submit = vi.fn(async () => ({ ok: false, status: 409, json: async () => ({ error: "SECRET_SERVER_TEXT" }) }));
+    const submit = vi.fn(async () => ({ ok: false, status: 409, statusText: "SECRET_SERVER_TEXT", json: async () => ({ error: "SECRET_SERVER_TEXT", message: "SECRET_SERVER_TEXT" }) }));
     open(ATTACH, { submit });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Confirm" })); });
     expect(document.body.textContent).not.toContain("SECRET_SERVER_TEXT");

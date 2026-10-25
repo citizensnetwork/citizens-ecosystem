@@ -6,6 +6,14 @@ const mockClient = createMockSupabaseClient();
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue(mockClient),
 }));
+// A bearer request would otherwise ask the real auth server who the token belongs to: answer from the mock client instead.
+vi.mock("@/lib/supabase/route", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase/route")>()),
+  getRouteAuth: async () => {
+    const { data } = await mockClient.auth.getUser();
+    return { supabase: mockClient, user: data.user };
+  },
+}));
 // No real email, ever: only the network send is faked.
 const mockSendEmail = vi.fn();
 vi.mock("@/lib/email/send", async (importOriginal) => ({
@@ -17,7 +25,7 @@ const { POST } = await import("@/app/api/contributor/claim/decline/route");
 
 const USER_ID = "11111111-2222-3333-4444-555555555555";
 const ADMIN_INBOX = "admin@citizens.example";
-const req = () => new Request("http://localhost/api/contributor/claim/decline", { method: "POST" });
+const req = () => new Request("http://localhost/api/contributor/claim/decline", { method: "POST", headers: { Authorization: "Bearer test-token" } });
 const signedIn = () => mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
 
 beforeEach(() => {
@@ -33,6 +41,16 @@ describe("POST /api/contributor/claim/decline — Not me (C10)", () => {
   it("401 when signed out, and nothing is hidden or sent", async () => {
     mockClient.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     expect((await POST(req())).status).toBe(401);
+    expect(mockClient.rpc).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("a cookie session alone is refused: Not me is bearer-only, so a cross-site request can never answer for the person", async () => {
+    for (const headers of [{}, { Authorization: "Bearer " }, { Cookie: "sb-x-auth-token=abc" }] as Record<string, string>[]) {
+      signedIn();
+      const res = await POST(new Request("http://localhost/api/contributor/claim/decline", { method: "POST", headers }));
+      expect(res.status, JSON.stringify(headers)).toBe(401);
+    }
     expect(mockClient.rpc).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
@@ -113,7 +131,7 @@ describe("POST /api/contributor/claim/decline — Not me (C10)", () => {
   it("takes no input", async () => {
     signedIn();
     mockClient.rpc.mockResolvedValueOnce({ data: { success: true, name: "X", slug: "x" }, error: null });
-    await POST(new Request("http://localhost/x?id=victim", { method: "POST", body: JSON.stringify({ placeholder_id: "victim" }) }));
+    await POST(new Request("http://localhost/x?id=victim", { method: "POST", headers: { Authorization: "Bearer test-token" }, body: JSON.stringify({ placeholder_id: "victim" }) }));
     expect(mockClient.rpc.mock.calls[0]).toHaveLength(1);
   });
 });

@@ -125,6 +125,8 @@ describe("POST /api/intake/google-form/status — what it answers", () => {
     };
     const body = await (await POST(signedReq({ slugs: ["grace"] }))).json();
     expect(body.statuses.grace.status).toBe("awaiting");
+    // the order is asked of the database (oldest first, so the newest overwrites): the mock hands rows back as given
+    expect(chain.order).toHaveBeenCalledWith("created_at", { ascending: true });
   });
 
   it("de-duplicates the slugs it asks for", async () => {

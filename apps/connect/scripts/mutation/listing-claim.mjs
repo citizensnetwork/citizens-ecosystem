@@ -47,6 +47,7 @@ const E2E = ["e2e/listing-claim.spec.ts"];
 const STATUS = "src/app/api/intake/google-form/status/route.ts";
 const CLAIM = "src/app/api/contributor/claim/route.ts";
 const DECLINE = "src/app/api/contributor/claim/decline/route.ts";
+const ROUTE_AUTH = "src/lib/supabase/route.ts";
 const CRON = "src/app/api/cron/listing-claim-reminders/route.ts";
 const LIB = "src/lib/listingClaim.ts";
 const ALIAS = "src/lib/placeholderEmail.ts";
@@ -75,10 +76,13 @@ const MUTANTS = [
   { id: "claim-eligible-truthy", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: "eligible: peek.eligible === true,", replace: "eligible: !!peek.eligible," }] },
   { id: "claim-attach-after-unverified", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: 'if (ownResult?.reason && ownResult.reason !== "nothing_to_mark") {', replace: "if (false) {" }] },
   { id: "claim-unverified-is-409", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: "  email_not_verified: 403,\n", replace: "" }] },
+  { id: "claim-cookie-session-accepted", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: "  if (!hasBearerToken(request)) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });\n", replace: "" }] },
+  { id: "claim-bearer-any-header", kind: "unit", tests: T_CLAIM, edits: [{ file: ROUTE_AUTH, find: 'return /^bearer\\s+\\S+/i.test(request.headers.get("authorization") ?? "");', replace: 'return (request.headers.get("authorization") ?? "") !== "" || true;' }] },
   { id: "claim-signed-out-allowed", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: '  if (!user) {\n    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });\n  }', replace: "" }] },
   { id: "claim-no-rate-limit", kind: "unit", tests: T_CLAIM, edits: [{ file: CLAIM, find: "  if (!rl.success) {\n    return NextResponse.json(\n      { error: \"Too many attempts\" },\n      { status: 429, headers: { \"Retry-After\": Math.ceil(rl.resetMs / 1000).toString() } },\n    );\n  }\n\n  // Self first", replace: "  // Self first" }] },
   // ── Not me
   { id: "decline-runs-the-claim", kind: "unit", tests: T_DECLINE, edits: [{ file: DECLINE, find: 'supabase.rpc("decline_listing_claim")', replace: 'supabase.rpc("claim_admin_created_contributor")' }] },
+  { id: "decline-cookie-session-accepted", kind: "unit", tests: T_DECLINE, edits: [{ file: DECLINE, find: "  if (!hasBearerToken(request)) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });\n", replace: "" }] },
   { id: "decline-admin-not-told", kind: "unit", tests: T_DECLINE, edits: [{ file: DECLINE, find: "  if (to) {", replace: "  if (false) {" }] },
   { id: "decline-unverified-is-409", kind: "unit", tests: T_DECLINE, edits: [{ file: DECLINE, find: "  email_not_verified: 403,\n", replace: "" }] },
   { id: "decline-email-before-success", kind: "unit", tests: T_DECLINE, edits: [{ file: DECLINE, find: "  if (!result?.success) {", replace: "  if (false) {" }] },
@@ -126,14 +130,14 @@ const MUTANTS = [
   { id: "gs-welcome-hasaccount-not-passed", kind: "unit", tests: T_GS, edits: [{ file: GS, find: " res.body.on_map === true, res.body.owner_has_account === true);", replace: " res.body.on_map === true);" }] },
   // ── the confirm screen
   { id: "dialog-swaps-confirm-and-decline", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "kind === 'confirm' ? '/api/contributor/claim' : '/api/contributor/claim/decline'", replace: "kind === 'confirm' ? '/api/contributor/claim/decline' : '/api/contributor/claim'" }] },
-  { id: "dialog-double-tap", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "      if (lock.current) return;\n", replace: "" }] },
+  { id: "dialog-double-tap (equivalent: the disabled buttons are the second layer)", kind: "unit", tests: T_FE, equivalent: true, edits: [{ file: DIALOG, find: "      if (lock.current) return;\n", replace: "" }] },
   { id: "dialog-always-eligible", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "const eligible = claim.eligible !== false;", replace: "const eligible = true;" }] },
   { id: "dialog-backdrop-answers", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "      onPointerDown: (e) => e.stopPropagation(),\n    },", replace: "      onPointerDown: (e) => e.stopPropagation(),\n      onClick: (e) => { if (e.target === e.currentTarget) send('decline'); },\n    }," }] },
   { id: "dialog-server-text-shown", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "        setError(status === 404 ? S.gone", replace: "        setError(res && res.statusText ? res.statusText : status === 404 ? S.gone" }] },
   { id: "dialog-no-reload-after-attach", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "      window.location.href = '/dashboard';\n", replace: "" }] },
   { id: "dialog-self-reloads", kind: "unit", tests: T_FE, edits: [{ file: DIALOG, find: "        app.resetNav('dashboard');\n        return;", replace: "        window.location.href = '/dashboard';\n        return;" }] },
   { id: "store-ask-claims", kind: "unit", tests: T_FE, edits: [{ file: STORE, find: "const res = await authedFetch('/api/contributor/claim');", replace: "const res = await authedFetch('/api/contributor/claim', { method: 'POST' });" }] },
-  { id: "store-ask-trusts-any-answer", kind: "unit", tests: T_FE, edits: [{ file: STORE, find: "if (!body || body.found !== true) return null;", replace: "if (!body) return null;" }] },
+  { id: "store-ask-trusts-any-answer", kind: "e2e", tests: [...E2E, "e2e/contributor-intake-landing.spec.ts"], edits: [{ file: STORE, find: "if (!body || body.found !== true) return null;", replace: "if (!body) return null;" }] },
   { id: "shell-manual-button-claims", kind: "unit", tests: T_FE, edits: [{ file: SHELL, find: "const found = await askAboutListing(realUser.id, true);", replace: "const found = await window.authedFetch('/api/contributor/claim', { method: 'POST' });" }] },
   // ── the same screen in a real browser
   { id: "page-never-asks", kind: "e2e", tests: E2E, edits: [{ file: STORE, find: "        askAboutListing(s.user.id, false, () => active);\n", replace: "" }] },

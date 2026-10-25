@@ -12,12 +12,15 @@
  * against the caller's own VERIFIED email (the SECURITY DEFINER functions refuse an unverified address), so there is
  * nothing for a client to forge or enumerate.
  *
+ * Confirm is BEARER-ONLY (the app's own fetch always sends the token). A cookie session alone is refused, so a page the
+ * person merely visits can never press Confirm for them with a cross-site request (CSRF); see hasBearerToken().
+ *
  * The POST tries "self" first and "attach" second. A person can be in only one of the two states (an account that is
  * itself a listing placeholder is already a Contributor and so can never attach another), so the order is a choice
  * of which cheap check runs first, not a way to reach a different listing.
  */
 
-import { getRouteAuth } from "@/lib/supabase/route";
+import { getRouteAuth, hasBearerToken } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -68,6 +71,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!hasBearerToken(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { supabase, user } = await getRouteAuth(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
