@@ -156,13 +156,17 @@ test.describe("Email-code sign-in", () => {
     expect(mocks.rpcCalls).not.toContain("mark_own_listing_claimed");
   });
 
-  test("an owner on Outlook mail signs in AS their listing and lands on its dashboard", async ({ page }) => {
-    const mocks = await openSignedOut(
-      page,
-      OWNER,
-      { role: "contributor", contributor_status: "approved" },
-      (fn) => (fn === "mark_own_listing_claimed" ? { success: true, slug: "harvest-radio" } : []),
-    );
+  test("an owner on Outlook mail signs in AS their listing, is asked to confirm it, and lands on its dashboard", async ({ page }) => {
+    const mocks = await openSignedOut(page, OWNER, { role: "contributor", contributor_status: "approved" });
+    // C10: the sign-in only ASKS (GET); the Confirm press is the only POST.
+    const confirms: string[] = [];
+    await page.route("**/api/contributor/claim", (route: Route) => {
+      if (route.request().method() === "GET") {
+        return route.fulfill({ json: { found: true, mode: "self", eligible: true, name: "Harvest Radio", slug: "harvest-radio", category: "media-broadcasting", logo_url: null } });
+      }
+      confirms.push(route.request().method());
+      return route.fulfill({ json: { success: true, mode: "self", slug: "harvest-radio" } });
+    });
     await page.goto("/");
 
     await continueWithEmail(page).click();
@@ -171,9 +175,15 @@ test.describe("Email-code sign-in", () => {
     await codeField(page).fill(CODE);
     await signIn(page).click();
 
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: /Is .*Harvest Radio.* your listing\?/ })).toBeVisible({ timeout: 15_000 });
+    expect(confirms).toHaveLength(0);
+    await dialog.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText("Thank you. Your listing is confirmed.")).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator('[data-screen="dashboard"]')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Your listing is live", { exact: false })).toBeVisible();
-    expect(mocks.rpcCalls.filter((f) => f === "mark_own_listing_claimed")).toHaveLength(1);
+    expect(confirms).toEqual(["POST"]);
+    expect(mocks.rpcCalls).not.toContain("mark_own_listing_claimed");
     expect(mocks.verifyAttempts).toEqual([{ email: OWNER.email, token: CODE, type: "email" }]);
   });
 
