@@ -58,7 +58,7 @@ async function run(argv: string[], { env = {}, handlers = {}, budgetMs }: { env?
 /** Nothing in a public log may carry an address, a page's words, an organisation's name or a key. */
 function expectPublicSafe(out: string) {
   expect(out).not.toContain("://");
-  expect(out).not.toMatch(/example\.org|youtube\.com/i);
+  for (const host of ["example.org", "youtube.com"]) expect(out.toLowerCase()).not.toContain(host);
   expect(out).not.toContain("SUGGESTsecret");
   expect(out).not.toContain("DIGESTsecret");
   expect(out).not.toMatch(/Grace|Fellowship|Sunday|Worship|Food parcels/);
