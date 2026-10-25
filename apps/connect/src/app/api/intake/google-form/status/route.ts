@@ -27,7 +27,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BODY_CHARS = 64_000;
-export const MAX_SLUGS = 200;
+const MAX_SLUGS = 200;
 /** Listing slugs are lower-case letters, digits and hyphens (generate_contributor_slug). */
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,119}$/;
 
