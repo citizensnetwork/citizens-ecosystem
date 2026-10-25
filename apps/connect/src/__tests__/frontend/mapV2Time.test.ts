@@ -17,6 +17,8 @@ type Time = {
   eventStartsIn: (start: unknown, now: number, end?: unknown) => string | null;
   postedAgo: (time: unknown, now: number) => string | null;
   parseHours: (text: unknown) => { days: [number, number][][] } | null;
+  dateParts: (time: unknown) => { day: string; month: string } | null;
+  clockTime: (time: unknown) => string | null;
 };
 
 let T: Time;
@@ -184,5 +186,23 @@ describe("postedAgo", () => {
   it("accepts ISO strings and Dates", () => {
     expect(T.postedAgo(new Date(now - 2 * HOUR).toISOString(), now)).toBe("2 h ago");
     expect(T.postedAgo(new Date(now - 2 * HOUR), now)).toBe("2 h ago");
+  });
+});
+
+describe("dateParts and clockTime (event and audio cards)", () => {
+  it("splits a Johannesburg instant into a day number and the short month", () => {
+    expect(T.dateParts(sast(2026, 10, 14, 10, 0))).toEqual({ day: "14", month: "Oct" });
+    expect(T.dateParts(sast(2026, 10, 4, 8, 0))).toEqual({ day: "4", month: "Oct" });
+  });
+
+  it("reads a clock as 24-hour Africa/Johannesburg", () => {
+    expect(T.clockTime("2026-10-10T16:00:00.000Z")).toBe("18:00");
+    expect(T.clockTime(sast(2026, 10, 14, 9, 5))).toBe("09:05");
+  });
+
+  it("is silent for a value that is not a time", () => {
+    expect(T.dateParts("nope")).toBeNull();
+    expect(T.clockTime("nope")).toBeNull();
+    expect(T.dateParts(null)).toBeNull();
   });
 });
