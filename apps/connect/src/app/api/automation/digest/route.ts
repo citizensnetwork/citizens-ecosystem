@@ -8,6 +8,7 @@
  *
  * Who gets one, at most ONCE A DAY:
  *   - an approved, visible Contributor whose automation level is not 'off'
+ *     (lib/automation/eligibility.ts, the rule shared with the sources and suggestions routes)
  *   - with at least one PENDING suggestion created since their last nudge (an
  *     automatically published event alone never triggers an email)
  *   - who has not switched off `notification_prefs.contributor_updates`
@@ -28,7 +29,7 @@ import { hasScope } from "@/lib/apiKey";
 import { gateV1 } from "@/lib/v1Gate";
 import { sendEmail, siteOrigin } from "@/lib/email/send";
 import { suggestionsDigestEmail } from "@/lib/email/automationTemplates";
-import { isAutoUpdateLevel } from "@/lib/automation/suggestions";
+import { contributorEligibility } from "@/lib/automation/eligibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,12 +106,9 @@ export async function POST(request: Request) {
       .eq("id", contributorId)
       .maybeSingle();
     const p = data as Profile | null;
-    if (!p || p.role !== "contributor" || p.contributor_status !== "approved" || p.contributor_hidden || p.deleted_at) {
-      skip("not_eligible");
-      continue;
-    }
-    if (!isAutoUpdateLevel(p.auto_update_level) || p.auto_update_level === "off") {
-      skip("automation_off");
+    const who = contributorEligibility(p);
+    if (!p || "reason" in who) {
+      skip("reason" in who && who.reason === "consent_off" ? "automation_off" : "not_eligible");
       continue;
     }
     if (p.notification_prefs && p.notification_prefs.contributor_updates === false) {
