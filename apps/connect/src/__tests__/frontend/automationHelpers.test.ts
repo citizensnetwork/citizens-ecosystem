@@ -329,7 +329,7 @@ describe("editing a suggestion that is still waiting", () => {
   });
 
   it("explains each refusal in plain words, with a safe default", () => {
-    for (const reason of ["event_title_required", "news_body_required", "event_start_invalid", "event_start_out_of_range", "profile_value_invalid", "not_pending", "not_found", "consent_off"]) {
+    for (const reason of ["event_title_required", "news_body_required", "event_start_invalid", "event_start_out_of_range", "profile_value_invalid", "not_pending", "not_found", "consent_off", "edit_unavailable"]) {
       expect(H.editErrorText(reason), reason).toMatch(/[a-z]/);
       expect(H.editErrorText(reason), reason).not.toBe(H.editErrorText("something_new"));
     }

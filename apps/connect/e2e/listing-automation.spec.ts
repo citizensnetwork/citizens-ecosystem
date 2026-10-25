@@ -214,7 +214,8 @@ async function openOwner(page: Page, db: Db, path = "/dashboard/suggestions") {
     const edits = ((body(route).edits ?? {}) as Row);
     db.calls.push({ fn: "PATCH suggestion", body: { id, edits, authorization: route.request().headers().authorization ?? "" } });
     if (db.editRefusal) {
-      return route.fulfill({ status: db.editRefusal === "not_pending" ? 409 : 422, json: { error: db.editRefusal } });
+      const status = db.editRefusal === "not_pending" ? 409 : db.editRefusal === "edit_unavailable" ? 503 : 422;
+      return route.fulfill({ status, json: { error: db.editRefusal } });
     }
     const s = db.suggestions.find((x) => x.id === id);
     if (!s) return route.fulfill({ status: 404, json: { error: "not_found" } });
@@ -640,7 +641,6 @@ test.describe("Suggestions tab: choosing several at once", () => {
 
 test.describe("Suggestions tab: editing before publishing", () => {
   const patches = (db: Db) => callsTo(db, "PATCH suggestion");
-  const inputs = (page: Page, kind: string) => card(page, kind);
 
   test("Save changes keeps the edit on the card without publishing it, and the server is asked with the owner's own token", async ({ page }) => {
     const db = seed();
@@ -767,6 +767,24 @@ test.describe("Suggestions tab: editing before publishing", () => {
     // typing again clears the message
     await c.getByLabel("Title").fill("abc");
     await expect(c.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("if saving is not switched on yet (migration 198 not applied), the card says so, stops offering Save, and Publish still works", async ({ page }) => {
+    const db = seed({ editRefusal: "edit_unavailable" });
+    await openOwner(page, db);
+    const c = card(page, "event");
+    await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
+    await c.getByLabel("Title").fill("Sunday Celebration (new venue)");
+    await c.getByRole("button", { name: "Save changes" }).click();
+    await expect(c.getByRole("alert")).toHaveText("Saving changes is not switched on yet. You can still change the text and publish it.");
+    await expect(c.getByRole("button", { name: "Save changes" })).toHaveCount(0);
+    await expect(c.getByText("Saving changes is not switched on yet. Publish this when it looks right, or dismiss it.")).toBeVisible();
+    expect((db.suggestions[0].payload as Row).title).toBe("Sunday Celebration"); // nothing half-saved
+
+    // what was typed is still there to publish
+    await c.getByRole("button", { name: "Publish" }).click();
+    await expect.poll(() => callsTo(db, "insert events").length).toBe(1);
+    expect(callsTo(db, "insert events")[0].body).toMatchObject({ title: "Sunday Celebration (new venue)" });
   });
 
   test("if it was dealt with elsewhere, the card says so and leaves the list", async ({ page }) => {

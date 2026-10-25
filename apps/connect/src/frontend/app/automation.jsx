@@ -227,6 +227,7 @@
     not_found: 'This one is no longer in your list.',
     consent_off: 'Automatic updates are off, so nothing can be saved.',
     rate_limited: 'Too many tries. Please wait a moment.',
+    edit_unavailable: 'Saving changes is not switched on yet. You can still change the text and publish it.',
   };
   const editErrorText = (reason) => EDIT_ERRORS[reason] || 'Could not save that change. Please try again.';
 
@@ -248,6 +249,8 @@
     // status: 'idle' (not applicable) | 'loading' | 'ready' | 'unavailable'
     const [data, setData] = useState({ status: 'idle', settings: null, sources: [], suggestions: [] });
     const [busy, setBusy] = useState(false);
+    // Set when the server says it cannot save edits yet (the database function is not deployed): the form then stops offering Save.
+    const [saveOff, setSaveOff] = useState(false);
     // An editor writes sources against the listing, not their own profile.
     const uid = listingRole === 'editor' ? activeContributorId : (realUser ? realUser.id : null);
 
@@ -359,7 +362,9 @@
         return { ok: false, message: editErrorText() };
       }
       if (!res.ok || !body || !body.payload) {
-        const reason = body && body.error;
+        // A missing route or function, a proxy error page: all "not available", never a half-save.
+        const reason = (body && body.error) || ([404, 405, 501, 502, 503].indexOf(res.status) !== -1 ? 'edit_unavailable' : undefined);
+        if (reason === 'edit_unavailable') setSaveOff(true);
         if (reason === 'not_pending' || reason === 'not_found') await load(); // it has left the list
         return { ok: false, message: editErrorText(reason) };
       }
@@ -410,7 +415,7 @@
 
     const pending = data.suggestions.filter((s) => s.status === 'pending');
     const autoPublished = data.suggestions.filter((s) => s.status === 'auto_published');
-    return Object.assign({}, data, { enabled, busy, pending, autoPublished, canManageConsent, viewOnly, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, dismissMany, saveEdit, publish, unpublish });
+    return Object.assign({}, data, { enabled, busy, pending, autoPublished, canManageConsent, viewOnly, saveOff, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, dismissMany, saveEdit, publish, unpublish });
   }
 
   // ── Profile tab: the card ────────────────────────────────────────────────
@@ -578,12 +583,14 @@
         s.kind === 'profile' && h(Field, { label: valueLabel }, h(Textarea, { value: draft.value, onChange: set('value'), rows: 3, maxLength: 1000, 'aria-label': valueLabel, autoFocus: true })),
         problem && h('p', { role: 'alert', className: 'text-xs font-semibold text-destructive' }, problem),
         h('p', { className: 'text-[11px] text-muted-foreground leading-relaxed' },
-          'Save keeps your changes here and nothing is published yet. You can publish or dismiss it later.')),
+          auto.saveOff
+            ? 'Saving changes is not switched on yet. Publish this when it looks right, or dismiss it.'
+            : 'Save keeps your changes here and nothing is published yet. You can publish or dismiss it later.')),
       h(SourceLine, { url: s.source_url }),
       !auto.viewOnly && h('div', { ref: rowRef, className: 'flex flex-wrap gap-2' },
         h(Button, { variant: 'primary', size: 'sm', icon: 'Check', className: tall, disabled: auto.busy, onClick: () => auto.publish(s, changes) }, s.kind === 'profile' ? 'Apply' : 'Publish'),
         editing
-          ? h(Button, { variant: 'soft', size: 'sm', icon: 'Save', className: tall, disabled: auto.busy || !changes, onClick: save }, 'Save changes')
+          ? (!auto.saveOff && h(Button, { variant: 'soft', size: 'sm', icon: 'Save', className: tall, disabled: auto.busy || !changes, onClick: save }, 'Save changes'))
           : h(Button, { 'data-focus': 'edit', variant: 'outline', size: 'sm', icon: 'Pencil', className: tall, disabled: auto.busy, onClick: startEditing }, 'Edit'),
         editing && h(Button, { variant: 'outline', size: 'sm', className: tall, disabled: auto.busy, onClick: () => stopEditing() }, 'Cancel'),
         h(Button, { variant: 'ghost', size: 'sm', icon: 'X', className: tall, disabled: auto.busy, onClick: () => auto.dismiss(s.id) }, 'Dismiss')));
@@ -605,7 +612,7 @@
 
   // The selection bar: "Select all", how many are chosen (announced politely as it changes), and the one
   // batch action. Dismissing asks first, in the page, and says how many.
-  function SelectionBar({ auto, sel, picked, setPicked, onDismissed }) {
+  function SelectionBar({ auto, sel, setPicked, onDismissed }) {
     const [confirming, setConfirming] = useState(false);
     const allRef = useRef(null);
     const barRef = useRef(null);
@@ -667,7 +674,7 @@
         icon: 'Sparkles', title: 'Nothing is waiting for you',
         sub: level === 'off' ? 'Turn on automatic updates in your Profile tab and new events, news and profile changes will appear here for you to approve.' : 'When we find something new on your website, YouTube channel or calendar it will appear here for you to approve.',
       }),
-      auto.pending.length > 0 && h(SelectionBar, { auto, sel, picked, setPicked, onDismissed: () => { if (introRef.current) introRef.current.focus(); } }),
+      auto.pending.length > 0 && h(SelectionBar, { auto, sel, setPicked, onDismissed: () => { if (introRef.current) introRef.current.focus(); } }),
       groups.map(([kind, label]) => {
         const rows = auto.pending.filter((s) => s.kind === kind);
         if (!rows.length) return null;
@@ -675,7 +682,7 @@
           h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-1' }, label),
           rows.map((s) => h(SuggestionCard, {
             key: s.id, s, auto,
-            pick: { checked: sel.ids.indexOf(s.id) !== -1, disabled: auto.busy, onChange: (on) => setPicked(toggled(picked, s.id, on)) },
+            pick: { checked: sel.ids.indexOf(s.id) !== -1, disabled: auto.busy, onChange: (on) => setPicked((cur) => toggled(cur, s.id, on)) },
           })));
       }),
       auto.autoPublished.length > 0 && h(F, null,
@@ -686,8 +693,8 @@
             h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, [s.payload && whenText(s.payload.start), s.payload && s.payload.location].filter(Boolean).join(' · '))),
           h(SourceLine, { url: s.source_url }),
           h('div', { className: 'flex flex-wrap gap-2' },
-            s.published_ref && h(Button, { variant: 'outline', size: 'sm', icon: 'Calendar', onClick: () => onViewEvent(s.published_ref) }, 'View event'),
-            h(Button, { variant: 'danger', size: 'sm', icon: 'Undo2', disabled: auto.busy, onClick: () => auto.unpublish(s) }, 'Unpublish'))))));
+            s.published_ref && h(Button, { variant: 'outline', size: 'sm', icon: 'Calendar', className: 'min-h-[44px]', onClick: () => onViewEvent(s.published_ref) }, 'View event'),
+            h(Button, { variant: 'danger', size: 'sm', icon: 'Undo2', className: 'min-h-[44px]', disabled: auto.busy, onClick: () => auto.unpublish(s) }, 'Unpublish'))))));
   }
 
   window.useAutomation = useAutomation;
