@@ -184,10 +184,31 @@ describe("POST /api/automation/suggestions: storing", () => {
   });
 
   it("an empty batch with a source_id records a check that found nothing", async () => {
-    const res = await POST(req({ source_id: SRC_ID, source_status: "nothing new", items: [] }));
+    const res = await POST(req({ source_id: SRC_ID, contributor_id: CONTRIB, source_status: "nothing new", items: [] }));
     expect(res.status).toBe(200);
-    expect((await res.json()).results).toEqual([]);
+    expect(await res.json()).toEqual({ results: [], source_check: "recorded" });
     expect(state.listing_sources[0]).toMatchObject({ last_status: "nothing new" });
+    expect(state.listing_sources[0].last_checked_at).toEqual(expect.any(String));
+  });
+
+  it("an empty batch stamps nothing for someone else's, a switched-off or an opted-out source, or without a contributor_id", async () => {
+    const src = (over: Row = {}): Row[] => [{ id: SRC_ID, contributor_id: CONTRIB, kind: "website", url: "https://a.example/", enabled: true, last_status: null, ...over }];
+    const cases: [Row, Row[], Row[], string][] = [
+      [{ contributor_id: CONTRIB }, [profile()], src({ contributor_id: OTHER }), "source_disabled"],
+      [{ contributor_id: CONTRIB }, [profile()], src({ enabled: false }), "source_disabled"],
+      [{ contributor_id: CONTRIB }, [profile()], [], "source_disabled"],
+      [{ contributor_id: CONTRIB }, [profile({ auto_update_level: "off" })], src(), "consent_off"],
+      [{ contributor_id: CONTRIB }, [profile({ contributor_hidden: true })], src(), "contributor_not_eligible"],
+      [{}, [profile()], src(), "invalid_id"],
+    ];
+    for (const [extra, profiles, sources, reason] of cases) {
+      state.profiles = profiles;
+      state.listing_sources = sources;
+      const res = await POST(req({ source_id: SRC_ID, source_status: "nothing new", items: [], ...extra }));
+      expect(res.status, reason).toBe(200);
+      expect((await res.json()).source_check, reason).toBe(reason);
+      for (const s of state.listing_sources) expect(s.last_status, reason).toBeNull();
+    }
   });
 
   it("caps new items per Contributor per hour", async () => {
