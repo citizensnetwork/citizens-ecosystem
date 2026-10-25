@@ -66,6 +66,9 @@ const nextConfig: NextConfig = {
       toApp("/e/:id"),
       toApp("/p/:id"),
       toApp("/c/:slug"),
+      // Token is required. A bare /upgrade is not a screen and stays a 404.
+      toApp("/upgrade/:token"),
+      toApp("/upgrade/:token/decline"),
     ];
   },
 

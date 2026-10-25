@@ -3,11 +3,15 @@
  *
  * Bound to the responses Sheet "New 219-Connect Contributor (Responses)".
  * Ticking "Approve" on a row is the ONLY manual step: this script sends the
- * row to Connect (HMAC-signed), Connect puts the Contributor live in Kingdom
- * Discovery (and on the map when it has a pin), this script writes Status / Listing URL /
- * Processed at / Notes back to the row, then emails the owner a welcome
- * asking them to sign in with their owner email (a 6-digit emailed code, or
- * Google if that address is a Google account).
+ * row to Connect (HMAC-signed). A new account goes live in Kingdom Discovery
+ * (and on the map when it has a pin); this script writes Status / Listing URL /
+ * Processed at / Notes back to the row, then emails the owner a welcome.
+ * An owner email that already has a citizen account does NOT go live and
+ * does NOT get that welcome. Connect emails that account a confirm link.
+ * Status becomes "Awaiting confirmation". A 10-minute poll writes Live ✓,
+ * Declined or Expired when the owner answers. The server sends the welcome
+ * only after they confirm — this script must not send a second one.
+ * Tick Resend to email the confirm link again (same expiry).
  *
  * Setup: see README.md in this folder (run setup() once).
  * Server side: apps/connect/src/app/api/intake/google-form/route.ts.
@@ -24,9 +28,15 @@ var RESIZE_WIDTH = { logo: 800, cover: 1600 };
 var STATUS_LIVE = 'Live ✓';
 var STATUS_PROCESSING = 'Processing…';
 var STATUS_ERROR = 'Error';
+var STATUS_AWAITING = 'Awaiting confirmation';
+var STATUS_DECLINED = 'Declined';
+var STATUS_EXPIRED = 'Expired';
 
 // Columns the founder adds to the right of the Form's columns.
+// Request id and Resend are optional so a sheet that has not been updated
+// still approves new accounts. setup() and onEdit append them.
 var MANUAL_HEADERS = ['Approve', 'Status', 'Listing URL', 'Processed at', 'Notes'];
+var OPTIONAL_HEADERS = ['Request id', 'Resend'];
 
 // Form columns are found by the WORDING of each question (the text after
 // "Question N.N:"), never by position or number — Google inserts columns
@@ -84,14 +94,18 @@ function setup() {
   if (!props.getProperty('INTAKE_URL') || !props.getProperty('INTAKE_SECRET')) {
     throw new Error('Add the Script properties INTAKE_URL and INTAKE_SECRET first (Project Settings → Script properties).');
   }
-  columns_(getSheet_()); // throws, naming any missing header
+  var sheet = getSheet_();
+  ensureManualHeaders_(sheet);
+  columns_(sheet); // throws, naming any missing question
 
   var ss = SpreadsheetApp.getActive();
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'onApproveEdit') ScriptApp.deleteTrigger(t);
+    var handler = t.getHandlerFunction();
+    if (handler === 'onApproveEdit' || handler === 'pollUpgrades') ScriptApp.deleteTrigger(t);
   });
   // An INSTALLABLE trigger: a simple onEdit() may not call UrlFetchApp/MailApp.
   ScriptApp.newTrigger('onApproveEdit').forSpreadsheet(ss).onEdit().create();
+  ScriptApp.newTrigger('pollUpgrades').timeBased().everyMinutes(10).create();
   ss.toast('Intake is ready. Tick "Approve" on a row to publish it.', 'Citizens Connect', 10);
 }
 
@@ -119,19 +133,27 @@ function onApproveEdit(e) {
   if (!e || !e.range) return;
   var sheet = e.range.getSheet();
   if (sheet.getName() !== SHEET_NAME) return;
+  ensureManualHeaders_(sheet);
   var cols = columns_(sheet);
   var approveCol = cols.Approve;
-  if (approveCol < e.range.getColumn() || approveCol > e.range.getLastColumn()) return;
+  var resendCol = cols.Resend || 0;
+  var start = e.range.getColumn();
+  var end = e.range.getLastColumn();
+  var touchesApprove = approveCol >= start && approveCol <= end;
+  var touchesResend = resendCol && resendCol >= start && resendCol <= end;
+  if (!touchesApprove && !touchesResend) return;
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) {
     sheet.getRange(e.range.getRow(), cols.Notes).setValue('Busy with another row — untick and tick Approve again.');
-    sheet.getRange(e.range.getRow(), approveCol).setValue(false);
+    if (touchesApprove) sheet.getRange(e.range.getRow(), approveCol).setValue(false);
+    if (touchesResend) sheet.getRange(e.range.getRow(), resendCol).setValue(false);
     return;
   }
   try {
     for (var row = Math.max(2, e.range.getRow()); row <= e.range.getLastRow(); row++) {
-      processRow_(sheet, cols, row);
+      if (touchesResend) resendRow_(sheet, cols, row);
+      if (touchesApprove) processRow_(sheet, cols, row);
     }
   } finally {
     lock.releaseLock();
@@ -145,7 +167,8 @@ function processRow_(sheet, cols, row) {
 
   if (val('Approve') !== true) return;
   var status = str('Status');
-  if (status === STATUS_LIVE || status === STATUS_PROCESSING) return; // already done / in flight
+  // Awaiting confirmation is waiting on the owner, not an error. Leave it.
+  if (status === STATUS_LIVE || status === STATUS_PROCESSING || status === STATUS_AWAITING) return;
 
   var cell = function (header, value) { sheet.getRange(row, cols[header]).setValue(value); };
   cell('Status', STATUS_PROCESSING);
@@ -156,8 +179,14 @@ function processRow_(sheet, cols, row) {
   try {
     var payload = buildPayload_(str, notes);
     var res = post_(payload);
-    if (res.code === 200 && res.body.success) {
-      notes = notes.concat(res.body.warnings || []);
+    var outcome = intakeOutcome_(res);
+    notes = notes.concat((res.body && res.body.warnings) || []);
+    if (outcome.kind === 'awaiting') {
+      cell('Status', STATUS_AWAITING);
+      if (cols['Request id']) cell('Request id', outcome.requestId);
+      cell('Processed at', new Date());
+      if (outcome.message) notes.push(outcome.message);
+    } else if (outcome.kind === 'live') {
       cell('Status', STATUS_LIVE);
       cell('Listing URL', res.body.url);
       cell('Processed at', new Date());
@@ -168,8 +197,7 @@ function processRow_(sheet, cols, row) {
         notes.push('Listing is live, but the welcome email failed: ' + mailErr.message);
       }
     } else {
-      var reason = (res.body && (res.body.message || res.body.error)) || ('HTTP ' + res.code);
-      throw new Error(reason);
+      throw new Error(outcome.message);
     }
   } catch (err) {
     cell('Status', STATUS_ERROR);
@@ -177,6 +205,93 @@ function processRow_(sheet, cols, row) {
     cell('Approve', false); // fix the row, then tick again to retry
   }
   cell('Notes', notes.join('\n'));
+}
+
+/**
+ * What a signed intake reply means for the row. Pure so the tests can pin it.
+ * Awaiting confirmation must not send the welcome. Live still does.
+ */
+function intakeOutcome_(res) {
+  var body = res && res.body;
+  if (res && res.code === 200 && body && body.success && body.status === 'awaiting_confirmation') {
+    if (!body.request_id) return { kind: 'error', message: body.message || 'Confirmation started, but no request id came back.' };
+    return { kind: 'awaiting', requestId: body.request_id, message: body.message || '' };
+  }
+  if (res && res.code === 200 && body && body.success) {
+    return { kind: 'live' };
+  }
+  var reason = (body && (body.message || body.error)) || ('HTTP ' + (res && res.code));
+  return { kind: 'error', message: reason };
+}
+
+/** What a status-poll row means. confirmed does not send a welcome from the sheet. */
+function pollOutcome_(row) {
+  if (!row || !row.status) return { kind: 'unchanged' };
+  if (row.status === 'confirmed' && row.url) return { kind: 'live', url: row.url, onMap: row.on_map === true };
+  if (row.status === 'declined') return { kind: 'declined' };
+  if (row.status === 'expired') return { kind: 'expired' };
+  return { kind: 'unchanged' };
+}
+
+function resendRow_(sheet, cols, row) {
+  if (!cols.Resend || !cols['Request id']) return;
+  var values = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var val = function (key) { return values[cols[key] - 1]; };
+  var str = function (key) { var v = val(key); return v === null || v === undefined ? '' : String(v).trim(); };
+  if (val('Resend') !== true) return;
+  var cell = function (header, value) { sheet.getRange(row, cols[header]).setValue(value); };
+  cell('Resend', false);
+  if (str('Status') !== STATUS_AWAITING || !str('Request id')) {
+    cell('Notes', 'Resend only works while Status is Awaiting confirmation and a Request id is present.');
+    return;
+  }
+  var res = post_({ id: str('Request id') }, 'resend');
+  if (res.code === 200 && res.body && res.body.success) {
+    cell('Notes', res.body.message || 'Confirmation email sent again.');
+    return;
+  }
+  if (res.code === 429) {
+    cell('Notes', 'Resend is limited. Try again later.');
+    return;
+  }
+  cell('Notes', (res.body && (res.body.message || res.body.error)) || ('HTTP ' + res.code));
+}
+
+/** Every 10 minutes: rows left on Awaiting confirmation. Never sends a welcome. */
+function pollUpgrades() {
+  var sheet = getSheet_();
+  var cols = columns_(sheet);
+  if (!cols['Request id']) return;
+  var last = sheet.getLastRow();
+  if (last < 2) return;
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  var pending = [];
+  for (var i = 0; i < values.length; i++) {
+    var status = String(values[i][cols.Status - 1] || '').trim();
+    var id = String(values[i][cols['Request id'] - 1] || '').trim();
+    if (status === STATUS_AWAITING && id) pending.push({ row: i + 2, id: id });
+  }
+  for (var start = 0; start < pending.length; start += 40) {
+    var batch = pending.slice(start, start + 40);
+    var res = post_({ ids: batch.map(function (p) { return p.id; }) }, 'status');
+    var results = (res.body && res.body.results) || [];
+    var byId = {};
+    results.forEach(function (r) { if (r && r.id) byId[r.id] = r; });
+    batch.forEach(function (p) {
+      var outcome = pollOutcome_(byId[p.id]);
+      if (outcome.kind === 'live') {
+        sheet.getRange(p.row, cols.Status).setValue(STATUS_LIVE);
+        sheet.getRange(p.row, cols['Listing URL']).setValue(outcome.url);
+        sheet.getRange(p.row, cols['Processed at']).setValue(new Date());
+      } else if (outcome.kind === 'declined') {
+        sheet.getRange(p.row, cols.Status).setValue(STATUS_DECLINED);
+        sheet.getRange(p.row, cols.Approve).setValue(false);
+      } else if (outcome.kind === 'expired') {
+        sheet.getRange(p.row, cols.Status).setValue(STATUS_EXPIRED);
+        sheet.getRange(p.row, cols.Approve).setValue(false);
+      }
+    });
+  }
 }
 
 // ── Payload ──────────────────────────────────────────────────────────────
@@ -279,10 +394,13 @@ function resized_(fileId, width) {
 
 // ── Transport ────────────────────────────────────────────────────────────
 
-/** Signed POST to Connect. Returns {code, body}. */
-function post_(payload) {
+/** Signed POST to Connect. which is 'status' or 'resend' for the follow-up routes. Returns {code, body}. */
+function post_(payload, which) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty('INTAKE_URL');
+  if (which === 'status' || which === 'resend') {
+    url = String(url || '').replace(/\/google-form\/?$/, '/google-form/' + which);
+  }
   var secret = props.getProperty('INTAKE_SECRET');
   if (!url || !secret) throw new Error('Script properties INTAKE_URL / INTAKE_SECRET are not set.');
 
@@ -385,6 +503,22 @@ function getSheet_() {
  * Manual headers match exactly (ignoring capitals and extra spaces: "Processed At" = "Processed at").
  * Form questions match when the text AFTER "Question N.N:" contains the phrase.
  */
+/** Append any manual column this sheet does not have yet. Safe to re-run. */
+function ensureManualHeaders_(sheet) {
+  var last = Math.max(sheet.getLastColumn(), 1);
+  var norm = function (s) {
+    return String(s).replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+  };
+  var headers = sheet.getRange(1, 1, 1, last).getValues()[0].map(norm);
+  MANUAL_HEADERS.concat(OPTIONAL_HEADERS).forEach(function (name) {
+    if (headers.indexOf(norm(name)) === -1) {
+      last += 1;
+      sheet.getRange(1, last).setValue(name);
+      headers.push(norm(name));
+    }
+  });
+}
+
 function columns_(sheet) {
   var norm = function (s) {
     return String(s).replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
@@ -400,6 +534,10 @@ function columns_(sheet) {
   MANUAL_HEADERS.forEach(function (name) {
     var i = headers.indexOf(norm(name));
     if (i === -1) problems.push('missing "' + name + '"'); else cols[name] = i + 1;
+  });
+  OPTIONAL_HEADERS.forEach(function (name) {
+    var i = headers.indexOf(norm(name));
+    if (i !== -1) cols[name] = i + 1;
   });
   Object.keys(Q).forEach(function (key) {
     var phrase = norm(Q[key]);

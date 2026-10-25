@@ -10,6 +10,8 @@ import {
   applicationApprovedEmail,
   applicationRejectedEmail,
   newApplicationAdminEmail,
+  intakeUpgradeEmail,
+  intakeUpgradeFlagEmail,
   ownerWelcomeEmail,
 } from "@/lib/email/templates";
 
@@ -222,6 +224,39 @@ describe("email templates", () => {
       expect(e.text).toContain("https://www.citizens.example/c/hope-hub");
       expect(e.text).toContain("Thank you for joining the Body");
     }
+  });
+
+  describe("intake upgrade email", () => {
+    const input = {
+      name: "Example Fellowship",
+      confirmUrl: "https://www.citizens.example/upgrade/" + "ab".repeat(32),
+      declineUrl: "https://www.citizens.example/upgrade/" + "ab".repeat(32) + "/decline",
+      expiresOn: "1 November 2026",
+    };
+
+    it("asks if the organisation is theirs and includes both actions", () => {
+      const e = intakeUpgradeEmail(input);
+      expect(e.subject).toBe("Is Example Fellowship your organisation?");
+      expect(e.html).toContain(input.confirmUrl);
+      expect(e.html).toContain(input.declineUrl);
+      expect(e.text).toContain("Nothing is public");
+      expect(e.text).toContain(input.expiresOn);
+    });
+
+    it("escapes the organisation name", () => {
+      const e = intakeUpgradeEmail({ ...input, name: `<script>alert(1)</script>` });
+      expect(e.html).not.toContain("<script>");
+      expect(e.html).toContain("&lt;script&gt;");
+      expect(e.subject).not.toMatch(/[\r\n]/);
+    });
+
+    it("the admin flag names the outcome and the request, and has no account address", () => {
+      const e = intakeUpgradeFlagEmail({ name: "Example Fellowship", outcome: "expired", requestId: "55555555-5555-4555-8555-555555555555" });
+      expect(e.text).toContain("expired");
+      expect(e.text).toContain("55555555-5555-4555-8555-555555555555");
+      expect(e.text).not.toMatch(/@/);
+      expect(e.html).not.toContain("<script>");
+    });
   });
 
   describe("owner welcome email (admin-created listings)", () => {

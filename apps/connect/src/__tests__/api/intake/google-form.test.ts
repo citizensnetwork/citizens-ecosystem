@@ -330,19 +330,63 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(json.message).toContain("(currently hidden)");
   });
 
-  it("409 email_already_registered with what to do, when the email is an ordinary account", async () => {
-    emailTaken({ message: "A user with this email address has already been registered" });
+  const CITIZEN_ID = "44444444-4444-4444-8444-444444444444";
+  const REQUEST_ID = "55555555-5555-4555-8555-555555555555";
+
+  it("200 awaiting_confirmation for an existing citizen, with no listing and no welcome url", async () => {
+    emailTaken({ message: "A user with this email address has already been registered", code: "email_exists" });
     profileLookup.maybeSingle.mockResolvedValueOnce({
-      data: { role: "citizen", contributor_slug: null, contributor_hidden: false },
+      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email, contributor_slug: null, deleted_at: null },
+      error: null,
+    });
+    mockAdmin.rpc.mockResolvedValueOnce({
+      data: { success: true, request_id: REQUEST_ID, reused: false, expires_at: "2026-11-01T00:00:00.000Z" },
       error: null,
     });
     const res = await POST(signedReq(row));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.error).toBe("email_already_registered");
-    expect(json.message).toMatch(/Become a Contributor/);
-    expect(json.message).toContain(row.owner_email);
+    expect(json).toMatchObject({ success: true, status: "awaiting_confirmation", request_id: REQUEST_ID });
+    expect(json.url).toBeUndefined();
+    expect(json.message).not.toContain(row.owner_email);
+    expect(mockAdmin.rpc).toHaveBeenCalledWith("create_intake_upgrade_request", expect.objectContaining({ _profile_id: CITIZEN_ID, _display_name: row.organisation_name }));
+    expect(mockAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("reuses a pending confirmation and does not email again", async () => {
+    emailTaken({ message: "already been registered", code: "email_exists" });
+    profileLookup.maybeSingle.mockResolvedValueOnce({
+      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email },
+      error: null,
+    });
+    mockAdmin.rpc.mockResolvedValueOnce({
+      data: { success: true, request_id: REQUEST_ID, reused: true },
+      error: null,
+    });
+    const json = await (await POST(signedReq(row))).json();
+    expect(json).toMatchObject({ status: "awaiting_confirmation", request_id: REQUEST_ID, email: "skipped" });
+    expect(json.message).toMatch(/already waiting/);
+  });
+
+  it("409 account_not_eligible for an admin, a deleted account, or a contributor with no slug", async () => {
+    for (const data of [
+      { id: CITIZEN_ID, role: "admin" },
+      { id: CITIZEN_ID, role: "citizen", deleted_at: "2026-01-01T00:00:00.000Z" },
+      { id: CITIZEN_ID, role: "contributor", contributor_slug: null },
+    ]) {
+      emailTaken({ message: "already been registered", code: "email_exists" });
+      profileLookup.maybeSingle.mockResolvedValueOnce({ data, error: null });
+      const res = await POST(signedReq(row));
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("account_not_eligible");
+    }
     expect(mockAdmin.rpc).not.toHaveBeenCalled();
+  });
+
+  it("treats a literal No website and social as empty for a new account", async () => {
+    const res = await POST(signedReq({ ...row, website: "No", facebook: "No" }));
+    expect(res.status).toBe(200);
+    expect(rpcArgs()).toMatchObject({ _website_url: null, _facebook_url: null });
   });
 
   it("409 email_already_registered even when the account lookup itself fails", async () => {

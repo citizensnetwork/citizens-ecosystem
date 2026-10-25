@@ -89,16 +89,26 @@ Before you tick **Approve**, check:
 - It's a real Form submission. Approving a hand-typed sample row publishes a real listing and
   emails whoever's address is in column E, so delete sample rows instead.
 
-Tick **Approve**. Within about 10–20 seconds:
+Tick **Approve**. Within about 10–20 seconds, a **new** account:
 
 - **Status** = `Live ✓`.
 - **Listing URL** = the public page (`…/c/<name>`). It's shareable, so the owner can post it anywhere.
 - **Processed at** = when it happened.
 - **Notes** = anything worth knowing (see below).
 
-The owner then gets the welcome email.
+The owner then gets the welcome email from the sheet.
 
-Ticking a row that's already `Live ✓` does nothing. If a row ends in `Error`, fix the cell the
+If that owner email **already has a citizen account**, nothing goes live yet:
+
+- **Status** = `Awaiting confirmation`. **Request id** is filled in. Approve stays ticked.
+- Connect emails that account a link: confirm the upgrade, or say it is not theirs. The link lasts 7 days and does not move when you resend it.
+- The sheet does **not** send the welcome. The server sends it only after they confirm.
+- About every 10 minutes the sheet asks Connect. **Live ✓** (with the listing URL) means they confirmed. **Declined** or **Expired** means the account was not changed; untick happens on its own. Tick **Approve** again after Expired to start a fresh link.
+- Tick **Resend** (a checkbox) to email the same confirmation again. It is limited.
+
+Re-paste `intake.gs` and run `setup()` once so the **Request id** and **Resend** columns appear and the 10-minute check is installed. Until that runs, a new account still goes live. An existing citizen account is marked **Awaiting confirmation** in Status, and the notes explain the email. The request id and the 10-minute check need the new columns, which `setup()` and the next edit of the sheet add.
+
+Ticking a row that's already `Live ✓` or `Awaiting confirmation` does nothing. If a row ends in `Error`, fix the cell the
 Notes point to, then tick **Approve** again.
 
 ### What the Notes mean
@@ -112,7 +122,9 @@ Notes point to, then tick **Approve** again.
 | `invalid_website_url`, `invalid_contact_email`, `invalid_<social>` | That answer can't be used as-is (or is a dangerous link) | Fix or clear that cell |
 | `Faith alignment and permission to publish must both be given.` | *Faith alignment* is empty, or *Permission to publish* is empty or "No" | Can't publish without consent |
 | `… already has a Contributor listing: …/c/<name> — nothing was changed.` | This owner is already live (e.g. the row was approved before, or they applied in the app). Says `(currently hidden)` if you hid it | Nothing to do, or unhide it in Admin → Listings |
-| `… already has a Citizens Connect account, so no listing was created. …` | The owner email belongs to someone who already signed in to the app as a citizen | They can go live themselves: Settings → Become a Contributor. Or change the owner's email on the row and tick again |
+| `This owner already has a Citizens account…` | The owner email is an existing citizen account | Leave the row on Awaiting confirmation. They confirm from the email. Tick Resend if the email did not arrive |
+| `A confirmation is already waiting…` | Approve was ticked again while a link is still open | Nothing was emailed again. Tick Resend if they need the link |
+| `That email can't take a Contributor listing this way` / `already belongs to a Contributor account` | The address is an admin, a removed account, or a Contributor with no public page | Nothing was changed. Do not retry the same address |
 | `Sheet columns: no question containing "…"` / `"…" matches 2 questions` | A Form question was renamed or duplicated, and the script finds every question by its wording (see below) | Restore the wording, or update `Q` in `intake.gs` and re-paste it |
 | `unauthorized` | The two secrets differ | Re-copy the same value into Vercel and the Script property, then redeploy |
 | `intake_not_configured` | Vercel has no `INTAKE_WEBHOOK_SECRET` | Add it (step 4) and redeploy |

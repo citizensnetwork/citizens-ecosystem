@@ -156,6 +156,55 @@ export function applicationRejectedEmail(input: {
  * fixed location"): it is always in Kingdom Discovery, but only some are on the
  * map, and an online-only Contributor must not be told otherwise.
  */
+// ── To an existing account: confirm an intake upgrade ───────────────────
+
+/**
+ * Sent only to the address already on the citizen account. The links open a
+ * screen; they do not change the account. Confirm and Not mine both require
+ * the person to be signed in as that account and to press a button.
+ */
+export function intakeUpgradeEmail(input: { name: string; confirmUrl: string; declineUrl: string; expiresOn: string }): Email {
+  const name = escapeHtml(input.name);
+  return {
+    subject: subjectSafe(`Is ${input.name} your organisation?`),
+    html: layout(
+      "Is this your organisation?",
+      `<p>A listing for <strong>${name}</strong> was submitted to Citizens Connect on your account.</p>` +
+        "<p>Nothing is public, and your account is unchanged, until you confirm it. " +
+        "If this is your organisation, confirm the upgrade. If it is not yours, tell us.</p>" +
+        button(input.confirmUrl, "Confirm the upgrade") +
+        `<p><a href="${escapeHtml(input.declineUrl)}" style="color:${GOLD}">This is not my organisation</a></p>` +
+        `<p style="font-size:13px;color:#555">This link expires on ${escapeHtml(input.expiresOn)}. ` +
+        "After that, your account stays as it is.</p>",
+    ),
+    text:
+      "Is this your organisation?\n\n" +
+      `A listing for ${input.name} was submitted to Citizens Connect on your account.\n\n` +
+      "Nothing is public, and your account is unchanged, until you confirm it.\n\n" +
+      `Confirm the upgrade: ${input.confirmUrl}\n` +
+      `This is not my organisation: ${input.declineUrl}\n\n` +
+      `This link expires on ${input.expiresOn}. After that, your account stays as it is.\n\n${SIGN_OFF_TEXT}`,
+  };
+}
+
+/** To the admin when an upgrade is declined or expires. No account email. */
+export function intakeUpgradeFlagEmail(input: { name: string; outcome: "declined" | "expired"; requestId: string }): Email {
+  const happened = input.outcome === "declined" ? "was declined" : "expired";
+  const sheet = input.outcome === "declined" ? "Declined" : "Expired";
+  return {
+    subject: subjectSafe(`Intake upgrade ${happened}: ${input.name}`),
+    html: layout(
+      `An intake upgrade ${happened}`,
+      `<p><strong>${escapeHtml(input.name)}</strong> ${happened}. The citizen account was not changed, and no listing was created.</p>` +
+        `<p>The sheet row should read <strong>${sheet}</strong>. Request ${escapeHtml(input.requestId)}.</p>`,
+    ),
+    text:
+      `An intake upgrade ${happened}.\n\n` +
+      `${input.name} ${happened}. The citizen account was not changed, and no listing was created.\n` +
+      `The sheet row should read ${sheet}. Request ${input.requestId}.\n\n${SIGN_OFF_TEXT}`,
+  };
+}
+
 export function ownerWelcomeEmail(input: {
   name: string;
   ownerEmail: string;
