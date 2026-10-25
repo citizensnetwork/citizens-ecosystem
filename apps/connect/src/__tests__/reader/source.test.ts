@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { LIMITS, STATUS, classify, readSource, statusLine } from "../../../scripts/reader/source.mjs";
 import { REASONS } from "../../../scripts/reader/net.mjs";
 import { validateSuggestion } from "@/lib/automation/suggestions";
@@ -113,6 +115,19 @@ describe("readSource: calendars and feeds given directly", () => {
     expect(classify("\ufeffBEGIN:VCALENDAR\r\n")).toBe("ics");
     expect(classify("<?xml version='1.0'?><rss>")).toBe("feed");
     expect(classify("<!doctype html>")).toBe("html");
+  });
+});
+
+describe("the founder's test calendar (scripts/reader/test-calendar.ics)", () => {
+  it("always yields the next two weekly dates of a clearly-labelled test event, whatever the day", async () => {
+    const url = "https://raw.githubusercontent.com/citizensnetwork/citizens-ecosystem/main/apps/connect/scripts/reader/test-calendar.ics";
+    const ics = readFileSync(join(process.cwd(), "scripts/reader/test-calendar.ics"), "utf8");
+    for (const day of [0, 1, 3, 6]) {
+      const nowMs = NOW + day * 86_400_000;
+      const r = await readSource(src({ kind: "calendar", url }), { fetcher: fakeFetcher({ [url]: ics }), nowMs });
+      expect(r.status, String(day)).toBe("2 events found");
+      expect(r.items.every((i) => i.payload.title === "Reader test event (please dismiss)")).toBe(true);
+    }
   });
 });
 
