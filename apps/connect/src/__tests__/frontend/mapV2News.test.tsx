@@ -264,7 +264,7 @@ describe("where the reader is wired", () => {
     expect(build.indexOf("'map-v2-news.jsx'")).toBeLessThan(build.indexOf("'map-v2-sheet.jsx'"));
     expect(html).toContain("app/map-v2-news.jsx?v=20261019a");
     expect(html).toContain("app/profiles.jsx?v=20261019d");
-    expect(html).toContain("app/map-v2-strings.jsx?v=20261019e");
+    expect(html).toContain("app/map-v2-strings.jsx?v=20261022b");
   });
 
   it("adds only the scrim blur and the reading width, and the card motion follows the duration token", () => {

@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Citizens Connect//Reader test calendar//EN
+X-WR-CALNAME:Reader test calendar
+BEGIN:VEVENT
+UID:reader-test-weekly@citizenscentral.co.za
+SUMMARY:Reader test event (please dismiss)
+DESCRIPTION:A weekly test entry for the Citizens Connect Reader. It is not a real event: dismiss it.
+LOCATION:Test only
+DTSTART;TZID=Africa/Johannesburg:20261001T180000
+DTEND;TZID=Africa/Johannesburg:20261001T190000
+RRULE:FREQ=WEEKLY
+END:VEVENT
+END:VCALENDAR

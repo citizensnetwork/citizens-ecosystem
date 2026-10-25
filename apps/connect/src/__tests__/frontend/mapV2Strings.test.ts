@@ -25,8 +25,8 @@ function collect(node: unknown, path: string, out: { path: string; text: string 
 }
 
 describe("the strings file", () => {
-  it("has the pin, sheet and time groups, and no empty string", () => {
-    expect(Object.keys(S).sort()).toEqual(["pin", "report", "sheet", "time"]);
+  it("has the pin, sheet and time groups, the serving-areas groups, and no empty string", () => {
+    expect(Object.keys(S).sort()).toEqual(["online", "pin", "report", "serving", "sheet", "time"]);
     const all: { path: string; text: string }[] = [];
     collect(S, "", all);
     expect(all.length).toBeGreaterThan(60);
@@ -60,7 +60,7 @@ describe("no component carries a string of its own", () => {
   // A string literal that starts with a capital letter, has a space and lower-case letters reads like
   // user-visible text. Icon names (Navigation, Share2, ChevronUp) have no space, so they pass.
   const looksLikeText = (lit: string) => /^[A-Z][^\n]*\s[^\n]*[a-z]/.test(lit);
-  for (const file of ["map-v2-sheet.jsx", "map-v2-gallery.jsx", "map-v2-pins.jsx", "map-v2-time.jsx", "map-v2-nearby.jsx", "map-v2-news.jsx"]) {
+  for (const file of ["map-v2-sheet.jsx", "map-v2-gallery.jsx", "map-v2-pins.jsx", "map-v2-time.jsx", "map-v2-nearby.jsx", "map-v2-news.jsx", "serving-areas.jsx"]) {
     it(`${file} has no hard-coded label`, () => {
       const src = readFileSync(join(APP, file), "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "")

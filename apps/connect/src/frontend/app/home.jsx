@@ -179,6 +179,10 @@
         // MapTiler's Free plan requires its logo bottom-left on the map (map.jsx, MapTilerLogo).
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
 
+      // Issue #259: the "Online in this area" globe and its list (Map v2 only; it draws nothing, and asks for nothing, unless
+      // Contributors with no fixed place serve the area in view). A tap on a row opens that profile.
+      window.isMapV2 && window.isMapV2() && window.MapV2Online && React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
+
       // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
       selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
         ? React.createElement(window.MapV2Sheet, {
