@@ -530,11 +530,18 @@
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
         panel = [sortBar, list];
       } else if (active === 'news') {
-        panel = h('ul', { 'data-mv2': 'list', role: 'list' }, posts.map((p) => {
-          const ago = T().postedAgo(p.createdAt || p.date, now);
-          const img = p.image && window.UI.safeUrl(p.image);
-          return h('li', { key: p.id },
-            h(window.MapV2Card, {
+        // The newest posts in one sideways row; "See all" opens the whole list in place (map-v2-row.jsx). Keyed by listing,
+        // so a different Contributor starts again at the first card, collapsed.
+        panel = h(window.MapV2Row.Row, {
+          key: 'news:' + id,
+          items: posts,
+          idPrefix: 'mv2-news',
+          strings: Str.news.row,
+          keyOf: (p) => p.id,
+          render: (p) => {
+            const ago = T().postedAgo(p.createdAt || p.date, now);
+            const img = p.image && window.UI.safeUrl(p.image);
+            return h(window.MapV2Card, {
               variant: img ? 'image' : 'text',
               title: p.title,
               excerpt: p.body,
@@ -545,8 +552,9 @@
               onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
               'data-news': '',
               'aria-haspopup': 'dialog',
-            }));
-        }));
+            });
+          },
+        });
       } else if (active === 'today') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
           const ago = T().postedAgo(m.created_at, now);
@@ -632,7 +640,7 @@
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
+        N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),

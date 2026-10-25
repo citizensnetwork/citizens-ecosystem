@@ -135,6 +135,9 @@
   --reader-w: 560px;             /* the news reader's reading width; UI.Overlay's default maxWidth */
   --scrim-blur: 4px;             /* the dim behind the news reader; the same blur UI.Overlay already uses */
   --dim-opacity: 0.3;               /* a pin outside the chosen category filter */
+  --hrow-card-w: 264px;             /* one card width for every card in a sideways row, portrait or landscape (4i) */
+  --hrow-peek: 48px;                /* a row's card is never wider than the row minus this, so the next card shows at the edge */
+  --disabled-opacity: 0.4;          /* a control that cannot act right now (it stays focusable) */
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -694,6 +697,12 @@
 [data-mv2='scroller'] * {
   touch-action: var(--mv2-ta, none);
 }
+/* A sideways row scrolls, so it ends the chain again: it and everything in it takes the sheet's value PLUS pan-x
+   (--mv2-ta-row, set beside --mv2-ta below). A vertical swipe is still the sheet's or the page's; only a sideways one is the row's. */
+[data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'],
+[data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'] * {
+  touch-action: var(--mv2-ta-row, pan-x);
+}
 [data-mv2='scroller'] {
   flex: 1 1 auto;
   min-height: 0;
@@ -706,20 +715,24 @@
 [data-mv2='sheet'][data-wide] [data-mv2='scroller'] {
   overflow-y: auto;
   --mv2-ta: pan-y;
+  --mv2-ta-row: pan-x pan-y;
 }
 /* Zoom in the full card (founder, 2026-10-17, accessibility): at FULL a pinch on the content zooms the page, so a person with
    poor eyesight can enlarge the text. Half and peek still keep every two-finger gesture, and the native shell blocks page
    zoom through its viewport tag (R9). The side panel (a fine pointer) is unchanged. */
 [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'] {
   --mv2-ta: pan-y pinch-zoom;
+  --mv2-ta-row: pan-x pan-y pinch-zoom;
 }
 [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
   --mv2-ta: pan-down pinch-zoom;
+  --mv2-ta-row: pan-x pan-down pinch-zoom;
 }
 /* a browser without pan-down (older iOS) keeps today's behaviour: the content scrolls, no hand-off */
 @supports not (touch-action: pan-down) {
   [data-mv2='sheet'][data-snap='full']:not([data-wide]) [data-mv2='scroller'][data-top] {
     --mv2-ta: pan-y pinch-zoom;
+    --mv2-ta-row: pan-x pan-y pinch-zoom;
   }
 }
 
@@ -1660,6 +1673,128 @@ a[data-mv2='card2'],
   [data-mv2='card-tap']:active {
     transform: none;
   }
+}
+
+/* ── 4i. Sideways rows (app/map-v2-row.jsx): News and Nearby on the sheet ──────────────
+   One card width for every card (--hrow-card-w, never wider than the row minus --hrow-peek, so the next card
+   always shows at the edge) and one height: the row is as tall as its tallest card, whatever the mix of
+   portrait (text, image, video) and landscape (listing, event, audio) cards. One card alone fills the width.
+   The row bleeds to the sheet's edge by the scroller's own side padding, so a card slides under the screen
+   edge instead of being cut at the gutter; the 4 px of top and bottom padding keep a focus ring from being
+   clipped by the scroller. "See all" sets data-layout="stack": the plain vertical list, as before. */
+[data-mv2='hrow'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+[data-mv2='hrow-head'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit);
+}
+[data-mv2='hrow-count'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='hrow-nav'] {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+[data-mv2='hrow-btn'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='hrow-btn'][aria-disabled='true'] {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+[data-mv2='hrow-all'] {
+  flex: none;
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--accent-ink);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='hrow-btn']:focus-visible,
+[data-mv2='hrow-all']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='hrow-btn'],
+[data-mv2='hrow-all'] {
+  transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
+}
+[data-mv2='hrow-btn']:not([aria-disabled='true']):active,
+[data-mv2='hrow-all']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='hrow-btn']:not([aria-disabled='true']):hover {
+    border-color: var(--accent-ink);
+  }
+  [data-mv2='hrow-all']:hover {
+    background: var(--surface-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='hrow-btn']:active,
+  [data-mv2='hrow-all']:active {
+    transform: none;
+  }
+}
+[data-mv2='hrow'] > [data-mv2='list'][data-layout='row'] {
+  flex-direction: row;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: calc(var(--space-1) * -1) calc(var(--space-4) * -1);
+  padding: var(--space-1) var(--space-4);
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--space-4);
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+[data-mv2='hrow'] > [data-mv2='list'][data-layout='row']::-webkit-scrollbar {
+  display: none;
+}
+[data-mv2='hrow'] > [data-layout='row'] > [data-mv2='hrow-item'] {
+  display: flex;
+  flex: none;
+  width: min(var(--hrow-card-w), calc(100% - var(--hrow-peek)));
+  scroll-snap-align: start;
+}
+[data-mv2='hrow'] > [data-layout='row'] > [data-mv2='hrow-item']:only-child {
+  width: 100%;
+}
+[data-mv2='hrow-item'] > [data-mv2='card2'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* the cards in a row share a height, so "Read more" sits at the bottom of each */
+[data-mv2='hrow'] > [data-layout='row'] [data-mv2='card-copy'] > [data-mv2='post-more'] {
+  margin-top: auto;
 }
 
 /* ── 4e. Hover and pressed states for every control, and the map's own round buttons at 44 px (E23) ── */
