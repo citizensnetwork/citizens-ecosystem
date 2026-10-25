@@ -524,6 +524,7 @@
         // lets a spec (or the console) jumpTo an exact zoom instead of
         // keyboard-stepping toward it. Read-only by convention; cleared on unmount.
         window.__ccMap = map;
+        if (v2On()) { try { window.dispatchEvent(new Event('cc-map-ready')); } catch { /* old webview */ } }   // the "Online in this area" globe waits for this (#259)
         setMapReady(true);
         // Density gates follow the zoom, including the programmatic flyTo /
         // fitBounds below, so the first frame is already correct.
