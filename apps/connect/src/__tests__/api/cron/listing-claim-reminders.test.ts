@@ -112,8 +112,10 @@ describe("GET /api/cron/listing-claim-reminders — the one reminder", () => {
     const res = await GET(req());
     expect(await res.json()).toMatchObject({ due: 1, sent: 0 });
     expect(mockSendEmail).not.toHaveBeenCalled();
-    // the conditional update repeated the guards, so a lost race cannot stamp over a later state
+    // the conditional update repeats the guards (still awaiting, still unreminded), so a lost race cannot stamp over a later state
     expect(filters).toContainEqual(["listing_claims", "id", "c1"]);
+    expect(filters.filter((f) => f[1] === "is:reminder_sent_at" && f[2] === null)).toHaveLength(2); // the read AND the stamp
+    expect(filters.filter((f) => f[1] === "status" && f[2] === "awaiting")).toHaveLength(2);
     expect(updates[0].payload.reminder_sent_at).toEqual(expect.any(String));
   });
 
