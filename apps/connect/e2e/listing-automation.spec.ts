@@ -696,6 +696,7 @@ test.describe("Suggestions tab: editing before publishing", () => {
     const row = callsTo(db, "insert events")[0].body;
     expect(row).toMatchObject({ title: "Sunday Celebration (new venue)", created_by: MEMBER.id });
     expect(new Date(String(row.date)).getTime()).toBe(new Date(2026, 10, 1, 18, 30).getTime());
+    await expect.poll(() => callsTo(db, "decide_listing_suggestion").length).toBe(1);
     expect(callsTo(db, "decide_listing_suggestion")[0].body).toMatchObject({ _id: SUG_EVENT, _action: "published" });
   });
 
@@ -784,7 +785,7 @@ test.describe("Suggestions tab: editing before publishing", () => {
     await openOwner(page, db);
     const c = card(page, "profile");
     await c.getByRole("button", { name: "Edit" }).click({ timeout: 15_000 });
-    await c.getByLabel("About text").fill("We serve the whole city with love.");
+    await c.getByLabel("About text", { exact: true }).fill("We serve the whole city with love.");
     await c.getByRole("button", { name: "Save changes" }).click();
     await expect.poll(() => patches(db).length).toBe(1);
     expect(patches(db)[0].body).toMatchObject({ id: SUG_PROFILE, edits: { value: "We serve the whole city with love." } });
