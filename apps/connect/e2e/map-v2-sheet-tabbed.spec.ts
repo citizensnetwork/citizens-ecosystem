@@ -289,6 +289,11 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
     expect(Math.abs(moved.gap - stuck.gap)).toBeLessThan(2);
     expect(stuck.tile - moved.tile).toBeGreaterThan(50);
 
+    // Nearby is one row, a card tall, so there is less under the block than when it was a stack. Give the scroller
+    // the room, so the block can leave the top: the bar leaving with its block is what is under test.
+    await scroller.evaluate((el) => {
+      (el as HTMLElement).style.paddingBottom = "900px";
+    });
     await scroller.evaluate((el) => {
       const sc = el as HTMLElement;
       const block = sc.querySelector("[data-mv2='tabbed']") as HTMLElement;
@@ -362,6 +367,11 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
     expect(stuck).toBeGreaterThanOrEqual(-1);
     expect(stuck).toBeLessThanOrEqual(12);
 
+    // Nearby is one row, a card tall, so there is less under the block than when it was a stack. Give the scroller
+    // the room, so the block can leave the top: the bar leaving with its block is what is under test.
+    await scroller.evaluate((el) => {
+      (el as HTMLElement).style.paddingBottom = "900px";
+    });
     await scroller.evaluate((el) => {
       const sc = el as HTMLElement;
       const block = sc.querySelector("[data-mv2='tabbed']") as HTMLElement;
