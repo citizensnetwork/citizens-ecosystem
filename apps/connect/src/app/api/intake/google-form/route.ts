@@ -5,22 +5,30 @@
  * row of the Form's responses Sheet; the Sheet's Apps Script
  * (tools/google-forms/intake.gs) POSTs that row here; this route puts the
  * Contributor live in Kingdom Discovery (and on the map when it has a pin)
- * under a placeholder account for the owner's email, and returns the listing's
- * slug + URL, and whether it is on the map, for the script to write back to the
- * row and put in the welcome email. When the owner
- * signs in with Google using that email, Supabase links the sign-in to this
- * account and they land on their own dashboard (store.jsx bootstrap).
+ * under a placeholder account, and returns the listing's slug + URL, whether it is on
+ * the map, and whether the owner already has an account, for the script to write back
+ * to the row and put in the welcome email.
+ *
+ * Verify-first (C10, migration 196): NOTHING is attached to anybody until the owner has
+ * proved the address and said yes on a confirm screen.
+ *   - the address has no account: the placeholder holds it; the owner signs in as it and
+ *     confirms the listing is theirs ("self").
+ *   - the address already has an account: the placeholder gets an alias address that is
+ *     never mailed (lib/placeholderEmail.ts) and the owner is asked to attach it to their
+ *     own account ("attach"). Nothing on that account changes before they confirm.
+ * Either way a listing_claims ledger row records the request, and the Sheet polls
+ * POST /api/intake/google-form/status for "Awaiting owner" / "Owner confirmed" / "Owner declined".
  *
  * Auth is an HMAC, not a user session:
  *   X-Intake-Timestamp: unix seconds (±300 s replay window)
  *   X-Intake-Signature: hex HMAC-SHA256(INTAKE_WEBHOOK_SECRET, `${ts}.${rawBody}`)
  * Any failure → 401 with no detail. No secret configured → 503 (fail closed).
  *
- * Idempotency: a second approval of the same row finds the owner's email
- * already registered → 409 `listing_exists` (with the live listing's URL);
- * an email that belongs to an ordinary account → 409
- * `email_already_registered`. Both carry a `message` saying what to do. The
- * script also skips rows whose Status is already set.
+ * Idempotency: a second approval of the same row finds the owner's email already
+ * holding a listing → 409 `listing_exists` (with the live listing's URL), or already
+ * waiting for the owner → 409 `listing_pending`; an email that belongs to an
+ * administrator or to an applicant → 409 `email_already_registered`. All carry a
+ * `message` saying what to do. The script also skips rows whose Status is already set.
  *
  * Body (raw Form labels — every label → slug decision is made here):
  *   { owner_email, organisation_name, organisation_type, primary_category,
@@ -30,7 +38,10 @@
  *     permission_to_publish: true, logo?: {mime, base64}, cover?: {mime, base64},
  *     auto_update?: 'off'|'suggest'|'events_auto' (Form "Keeping your listing up to date",
  *     mig 181: stored with a consent stamp, and the listed sources are saved) }
- * Response 200: { success, slug, url, warnings: string[], on_map: boolean }
+ * Response 200: { success, slug, url, warnings: string[], on_map: boolean,
+ *   owner_has_account: boolean, awaiting_owner: true }
+ *   owner_has_account picks the wording of the welcome email (an owner with an account is asked to
+ *   attach the listing to it; a new owner is asked to confirm it is theirs).
  *   on_map is hasMapPin: the pin was found (maps link, the Sheet's geocode, or MapTiler) and the listing is not
  *   "no fixed location". The script's welcome email says "on the map" only when it is true (tracker C21).
  * Errors: { error: <code>, message?: <human-readable, for the Sheet's Notes> }
@@ -39,8 +50,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { getClientIp } from "@/lib/v1Gate";
 import { hasMapPin, parseListingFields } from "@/lib/contributorFields";
 import { parseAutoUpdateLevel } from "@/lib/automation/suggestions";
 import { sourcesFromListing } from "@/lib/automation/sources";
@@ -53,11 +62,12 @@ import {
   parseFixedLocation,
   parseMapsCoordinates,
   toLatLng,
-  verifyIntakeSignature,
   type ImageResult,
   type IntakeImage,
   type LatLng,
 } from "@/lib/intake/googleForm";
+import { gateIntakeRequest } from "@/lib/intake/gate";
+import { createListingUser, pendingListingMessage, registerListingClaim } from "@/lib/listingClaim";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,7 +76,6 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_CHARS = 4_400_000;
 /** Contributor logos/covers already live here (MediaPicker scope "event-cover"). */
 const IMAGE_BUCKET = "event-images";
-const MIN_SECRET_LENGTH = 32;
 
 const fail = (status: number, error: string, message?: string) =>
   NextResponse.json(message ? { error, message } : { error }, { status });
@@ -79,66 +88,15 @@ const IMAGE_REFUSED: Record<Exclude<ImageResult, { ok: true }>["reason"], string
   invalid: "couldn't be read",
 };
 
-/**
- * The owner email already has an account, so nothing was created. Say which
- * case it is and what to do (the script writes `message` to the row's Notes)
- * instead of a bare 409. Service-role lookup (email is a private profiles
- * column) — reachable only past the HMAC check.
- */
-async function existingAccountConflict(admin: ReturnType<typeof createAdminClient>, email: string, origin: string) {
-  const { data } = await admin
-    .from("profiles")
-    .select("role, contributor_slug, contributor_hidden")
-    .eq("email", email)
-    .maybeSingle();
-  const existing = data as { role?: string; contributor_slug?: string | null; contributor_hidden?: boolean } | null;
-  if (existing?.role === "contributor" && existing.contributor_slug) {
-    const url = `${origin}/c/${existing.contributor_slug}`;
-    const hidden = existing.contributor_hidden ? " (currently hidden)" : "";
-    return NextResponse.json(
-      {
-        error: "listing_exists",
-        message: `${email} already has a Contributor listing${hidden}: ${url} — nothing was changed.`,
-        url,
-      },
-      { status: 409 },
-    );
-  }
-  return fail(
-    409,
-    "email_already_registered",
-    `${email} already has a Citizens Connect account, so no listing was created. Ask the owner to sign in and choose ` +
-      "Settings → Become a Contributor, or change the owner's email on this row and tick Approve again.",
-  );
-}
-
 export async function POST(request: Request) {
-  const secret = process.env.INTAKE_WEBHOOK_SECRET ?? "";
-  if (secret.length < MIN_SECRET_LENGTH) {
-    console.error("[/api/intake/google-form] INTAKE_WEBHOOK_SECRET missing or too short");
-    return fail(503, "intake_not_configured");
-  }
-
-  const rl = await checkRateLimit(`intake-google-form:${getClientIp(request)}`, RATE_LIMITS.mutation);
-  if (!rl.success) {
-    return NextResponse.json(
-      { error: "rate_limited" },
-      { status: 429, headers: { "Retry-After": Math.ceil(rl.resetMs / 1000).toString() } },
-    );
-  }
-
   // Raw body first: the signature covers the exact bytes sent.
-  const rawBody = await request.text();
-  if (rawBody.length > MAX_BODY_CHARS) return fail(413, "payload_too_large");
-
-  const authentic = verifyIntakeSignature({
-    secret,
-    timestamp: request.headers.get("x-intake-timestamp"),
-    signature: request.headers.get("x-intake-signature"),
-    body: rawBody,
-    nowSeconds: Math.floor(Date.now() / 1000),
+  const gate = await gateIntakeRequest(request, {
+    rateKey: "intake-google-form",
+    logTag: "/api/intake/google-form",
+    maxBodyChars: MAX_BODY_CHARS,
   });
-  if (!authentic) return fail(401, "unauthorized");
+  if (!gate.ok) return gate.response;
+  const rawBody = gate.rawBody;
 
   let body: Record<string, unknown>;
   try {
@@ -235,19 +193,22 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: fields.claimEmail,
-    email_confirm: true,
-    user_metadata: { full_name: fields.displayName, created_via: "google_form" },
+  const listingUser = await createListingUser(admin, {
+    claimEmail: fields.claimEmail,
+    userMetadata: { full_name: fields.displayName, created_via: "google_form" },
+    origin,
   });
-  if (createErr || !created?.user) {
-    if (createErr?.code === "email_exists" || createErr?.message?.toLowerCase().includes("already been registered")) {
-      return existingAccountConflict(admin, fields.claimEmail, origin);
-    }
-    console.error("[/api/intake/google-form] createUser", createErr);
-    return fail(500, "create_user_failed");
+  if (!listingUser.ok) {
+    return NextResponse.json(
+      {
+        error: listingUser.error,
+        ...(listingUser.message ? { message: listingUser.message } : {}),
+        ...(listingUser.url ? { url: listingUser.url } : {}),
+      },
+      { status: listingUser.status },
+    );
   }
-  const userId = created.user.id;
+  const { userId, ownerHasAccount } = listingUser;
 
   const storage = admin.storage.from(IMAGE_BUCKET);
   const uploadedPaths: string[] = [];
@@ -299,6 +260,23 @@ export async function POST(request: Request) {
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     console.error("[/api/intake/google-form] profile rpc", rpcErr, result);
     return fail(500, result?.reason ?? "create_failed");
+  }
+
+  // The ledger row (mig 196): the owner is now asked to confirm. A second open request for the same
+  // address is refused by the database, so roll this placeholder back and say which one is waiting.
+  const claim = await registerListingClaim(admin, {
+    placeholderId: userId,
+    slug: result.slug,
+    claimEmail: fields.claimEmail,
+    source: "google_form",
+  });
+  if (!claim.ok) {
+    if (uploadedPaths.length) await storage.remove(uploadedPaths).catch(() => {});
+    await admin.auth.admin.deleteUser(userId).catch(() => {});
+    if (claim.reason === "duplicate") {
+      return fail(409, "listing_pending", pendingListingMessage(fields.claimEmail, claim.existingSlug, origin));
+    }
+    return fail(500, "claim_ledger_failed");
   }
 
   // Listing automation (mig 181): the Form's "Keeping your listing up to date" answer and
@@ -355,5 +333,7 @@ export async function POST(request: Request) {
     url: `${origin}/c/${result.slug}`,
     warnings,
     on_map: hasMapPin({ no_fixed_location: fields.noFixedLocation, physical_latitude: fields.latitude, physical_longitude: fields.longitude }),
+    owner_has_account: ownerHasAccount,
+    awaiting_owner: true,
   });
 }

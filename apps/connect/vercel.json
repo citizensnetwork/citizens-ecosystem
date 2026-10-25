@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["fra1"],
-  "ignoreCommand": "node \"$(git rev-parse --show-toplevel)/scripts/vercel-ignore.mjs\" connect || exit 1"
+  "ignoreCommand": "node \"$(git rev-parse --show-toplevel)/scripts/vercel-ignore.mjs\" connect || exit 1",
+  "crons": [{ "path": "/api/cron/listing-claim-reminders", "schedule": "0 7 * * *" }]
 }
