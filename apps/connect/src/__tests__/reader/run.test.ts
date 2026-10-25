@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseArgs, plainText, runReader } from "../../../scripts/reader/run.mjs";
+import { LIVE_REFUSED, liveWritesArmed, parseArgs, plainText, runReader } from "../../../scripts/reader/run.mjs";
 import { BATCH, ConnectError, createConnectClient, normaliseBaseUrl, redact } from "../../../scripts/reader/connect.mjs";
 import { NOW, fakeFetcher, fixture } from "./helpers";
 
@@ -47,9 +47,11 @@ async function run(argv: string[], { env = {}, handlers = {}, budgetMs }: { env?
   const lines: string[] = [];
   const fetcher = fakeFetcher(pages);
   const sleeps: number[] = [];
+  // A --live test is armed unless the caller sets READER_LIVE itself. Production refuses --live without it.
+  const armed = argv.includes("--live") ? { READER_LIVE: "true" } : {};
   const result = await runReader({
     argv,
-    env: { AUTOMATION_SUGGEST_KEY: SUGGEST, AUTOMATION_DIGEST_KEY: DIGEST, CONNECT_BASE_URL: BASE, ...env },
+    env: { AUTOMATION_SUGGEST_KEY: SUGGEST, AUTOMATION_DIGEST_KEY: DIGEST, CONNECT_BASE_URL: BASE, ...armed, ...env },
     deps: { log: (l: string) => lines.push(l), fetcher, connectFetch: server.fetchImpl, budgetMs, nowMs: () => NOW, sleep: async (ms: number) => void sleeps.push(ms) },
   });
   return { ...result, lines, out: lines.join("\n"), calls: server.calls, fetcher, sleeps };
@@ -94,6 +96,66 @@ describe("runReader: a dry run (the default)", () => {
     expect(r.exitCode).toBe(0);
     expect(r.out).toContain("Sources due: 0");
     expect(r.fetcher.requested).toEqual([]);
+  });
+});
+
+describe("runReader: live writes stay disarmed unless READER_LIVE is exactly true", () => {
+  it("liveWritesArmed accepts only that exact string", () => {
+    expect(liveWritesArmed({ READER_LIVE: "true" })).toBe(true);
+    expect(liveWritesArmed(undefined)).toBe(false);
+    expect(liveWritesArmed(null)).toBe(false);
+    for (const value of [undefined, "", "false", "True", "TRUE", "1", "yes", " true", "true ", "true\n"]) {
+      expect(liveWritesArmed({ READER_LIVE: value }), JSON.stringify(value)).toBe(false);
+    }
+  });
+  it("a disarmed --live run fails before any network call and prints only the refusal", async () => {
+    const samples: Array<Record<string, string | undefined>> = [
+      {},
+      { READER_LIVE: "" },
+      { READER_LIVE: "false" },
+      { READER_LIVE: "True" },
+      { READER_LIVE: "TRUE" },
+      { READER_LIVE: "1" },
+      { READER_LIVE: "yes" },
+      { READER_LIVE: " true" },
+      { READER_LIVE: "true " },
+      { READER_LIVE: "true\n" },
+    ];
+    for (const extra of samples) {
+      const lines: string[] = [];
+      const server = connectServer();
+      const fetcher = fakeFetcher(pages);
+      const r = await runReader({
+        argv: ["--live"],
+        env: { AUTOMATION_SUGGEST_KEY: SUGGEST, AUTOMATION_DIGEST_KEY: DIGEST, CONNECT_BASE_URL: BASE, ...extra },
+        deps: { log: (l: string) => lines.push(l), fetcher, connectFetch: server.fetchImpl, nowMs: () => NOW },
+      });
+      const label = JSON.stringify(extra.READER_LIVE);
+      expect(r.exitCode, label).toBe(1);
+      expect(r.summary, label).toEqual({ refusedLive: true });
+      expect(lines, label).toEqual([LIVE_REFUSED]);
+      expect(server.calls, label).toEqual([]);
+      expect(fetcher.requested, label).toEqual([]);
+      expectPublicSafe(lines.join("\n"));
+    }
+  });
+  it("a disarmed live run fails even with no keys, and does not take the not-set-up success path", async () => {
+    const lines: string[] = [];
+    const r = await runReader({
+      argv: ["--live"],
+      env: { AUTOMATION_SUGGEST_KEY: "", AUTOMATION_DIGEST_KEY: "" },
+      deps: { log: (l: string) => lines.push(l) },
+    });
+    expect(r.exitCode).toBe(1);
+    expect(lines).toEqual([LIVE_REFUSED]);
+    expect(r.summary).toEqual({ refusedLive: true });
+  });
+  it("a dry run sends nothing even when READER_LIVE is true", async () => {
+    const r = await run(["--dry-run"], { env: { READER_LIVE: "true" } });
+    expect(r.exitCode).toBe(0);
+    expect(r.calls.every((c) => c.method === "GET")).toBe(true);
+    expect(r.out).toContain("dry run, nothing is sent");
+    expect(r.out).not.toContain(LIVE_REFUSED);
   });
 });
 

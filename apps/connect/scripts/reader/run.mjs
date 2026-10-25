@@ -4,11 +4,13 @@
 //   node scripts/reader/run.mjs              dry run (the default): reads each due source, prints counts, sends nothing
 //   node scripts/reader/run.mjs --dry-run    the same, said out loud
 //   node scripts/reader/run.mjs --live       reads, posts suggestions, then triggers the daily digest email
+//                                            refused unless READER_LIVE is exactly true
 //
 // Environment (GitHub Actions secrets in production; see README.md):
 //   AUTOMATION_SUGGEST_KEY  key with scope automation:suggest   (lists sources, posts suggestions)
 //   AUTOMATION_DIGEST_KEY   key with scope automation:digest    (only for --live)
 //   CONNECT_BASE_URL        defaults to https://www.citizenscentral.co.za
+//   READER_LIVE             must be exactly true before --live will send anything
 //
 // Everything it prints is safe for a PUBLIC log (an Actions run of a public repository is readable
 // by anyone): a short source id, the kind of source and a fixed status phrase with numbers. Never an
@@ -39,9 +41,11 @@ export function plainText(value, max = 200) {
 export const HELP = `Citizens Connect Reader (no AI at run time)
 
   --dry-run   (default) read each due source and print counts only; nothing is sent
-  --live      post what was found as suggestions, then trigger the daily digest email
+  --live      post what was found as suggestions, then trigger the daily digest email.
+              Refused unless READER_LIVE is exactly true (nothing is sent).
 
-Environment: AUTOMATION_SUGGEST_KEY, AUTOMATION_DIGEST_KEY (for --live), CONNECT_BASE_URL.
+Environment: AUTOMATION_SUGGEST_KEY, AUTOMATION_DIGEST_KEY (for --live), CONNECT_BASE_URL,
+READER_LIVE=true (required before --live will send anything).
 See apps/connect/scripts/reader/README.md.`;
 
 export function parseArgs(argv) {
@@ -52,6 +56,21 @@ export function parseArgs(argv) {
   if (argv.includes("--live") && argv.includes("--dry-run")) return { error: "Choose one of --dry-run or --live." };
   return { live: argv.includes("--live") };
 }
+
+/**
+ * Live writes are armed only when READER_LIVE is exactly the string "true".
+ * Unset, empty, "True", "1" and anything else stay disarmed. The workflow uses the same comparison.
+ * @param {Record<string, string | undefined> | null | undefined} env
+ * @returns {boolean}
+ */
+export function liveWritesArmed(env) {
+  if (!env) return false;
+  return env.READER_LIVE === "true";
+}
+
+/** The only line a disarmed --live run prints. Fixed phrase: safe for a public log. */
+export const LIVE_REFUSED =
+  "Refusing a live run: READER_LIVE is not true, so nothing was sent. Set READER_LIVE to the exact value true, then run again.";
 
 const shortId = (id) => plainText(String(id).slice(0, 8), 8);
 
@@ -70,6 +89,11 @@ export async function runReader({ argv = [], env = {}, deps = {} } = {}) {
   if (args.error) {
     log(args.error);
     return { exitCode: 2, summary: {} };
+  }
+  // Fail before any read or write. A dry run does not consult READER_LIVE.
+  if (args.live && !liveWritesArmed(env)) {
+    log(LIVE_REFUSED);
+    return { exitCode: 1, summary: { refusedLive: true } };
   }
   const live = args.live;
   const suggestKey = String(env.AUTOMATION_SUGGEST_KEY ?? "").trim();
