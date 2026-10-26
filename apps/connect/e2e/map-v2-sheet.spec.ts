@@ -540,6 +540,85 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
   });
 });
 
+test.describe("photo viewer focus and the sheet behind it", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("at half, a drag does not move the sheet, a swipe still changes photo, and Tab, Escape and Back stay inside", async ({ page }) => {
+    const seed = seed0();
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed, { gallery: 3 });
+    await openMap(page, "/?map=v2", 8);
+    const c = seed.contributors[2];
+    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await page.evaluate(() => { document.documentElement.style.overflow = "scroll"; });
+    const openPhoto = () => page.getByRole("button", { name: "Photo 1 of 3" }).evaluate((el: HTMLButtonElement) => el.click());
+    await openPhoto();
+    const viewer = page.getByRole("dialog", { name: "Photo 1 of 3" });
+    await expect(viewer).toBeVisible();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("hidden");
+    expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(true);
+    await expect(page.getByRole("button", { name: "Close photo" })).toBeFocused();
+
+    const stage = (await page.locator("[data-mv2='viewer-stage']").boundingBox())!;
+    const x = stage.x + stage.width / 2;
+    const y = stage.y + 140;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 220, { steps: 8 });
+    await page.mouse.up();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await expect(page.getByRole("dialog", { name: "Photo 1 of 3" })).toBeVisible();
+
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 140, y + 4, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByRole("dialog", { name: "Photo 2 of 3" })).toBeVisible();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+
+    const behind = await page.evaluate(() => {
+      const root = document.getElementById("root");
+      const btn = root?.querySelector("button");
+      if (btn instanceof HTMLElement) btn.focus();
+      document.documentElement.scrollTop = 400;
+      return { inRoot: !!root?.contains(document.activeElement), scroll: document.documentElement.scrollTop };
+    });
+    expect(behind.inRoot).toBe(false);
+    expect(behind.scroll).toBe(0);
+
+    const close = page.getByRole("button", { name: "Close photo" });
+    const prev = page.getByRole("button", { name: "Previous photo" });
+    const next = page.getByRole("button", { name: "Next photo" });
+    await close.focus();
+    await page.keyboard.press("Tab");
+    await expect(prev).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(next).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(close).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(next).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-mv2='viewer']")).toHaveCount(0);
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await expect(page.getByRole("button", { name: "Photo 1 of 3" })).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("scroll");
+    expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(false);
+
+    await page.locator("[data-mv2='handle']").click();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "full");
+    await page.getByRole("button", { name: "Photo 1 of 3" }).click();
+    await expect(page.locator("[data-mv2='viewer']")).toBeVisible();
+    await page.goBack();
+    await expect(page.locator("[data-mv2='viewer']")).toHaveCount(0);
+    await expect(sheet(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Photo 1 of 3" })).toBeFocused();
+  });
+});
+
 test.describe("P1-06 side panel (wide screens)", () => {
   test.use({ viewport: { width: 1000, height: 800 } });
 

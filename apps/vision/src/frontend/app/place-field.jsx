@@ -48,9 +48,9 @@
   function CentrePin() {
     return (
       <svg width="30" height="38" viewBox="0 0 30 38" aria-hidden="true"
-        style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -100%)", marginTop: 1, pointerEvents: "none", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.35))" }}>
-        <path d="M15 37C15 37 2 22.5 2 14a13 13 0 0 1 26 0c0 8.5-13 23-13 23z" fill="#D9A50C" stroke="#141414" strokeWidth="2" />
-        <circle cx="15" cy="14" r="4.5" fill="#FFFFFF" />
+        style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -100%)", marginTop: 1, pointerEvents: "none", filter: "var(--pin-shadow)" }}>
+        <path d="M15 37C15 37 2 22.5 2 14a13 13 0 0 1 26 0c0 8.5-13 23-13 23z" fill="var(--accent)" stroke="var(--text-1)" strokeWidth="2" />
+        <circle cx="15" cy="14" r="4.5" fill="var(--logo-bg)" />
       </svg>
     );
   }
@@ -70,7 +70,7 @@
       let refusedSeen = false;
       loadMap().then((ml) => {
         if (cancelled || !hostRef.current) return;
-        const theme = document.documentElement.getAttribute("data-theme") === "noir" ? "noir" : "light";
+        const theme = TL.isDarkTheme(document.documentElement.getAttribute("data-theme")) ? "dark" : "light";
         const url = TL.styleUrl(env, theme);
         if (!url) { onRefused(); return; }
         try {
@@ -113,7 +113,7 @@
             style={{ position: "absolute", inset: 0 }} />
           {state === "failed" ? null : <CentrePin />}
           <a href="https://www.maptiler.com" target="_blank" rel="noopener noreferrer" data-cv-maptiler-logo=""
-            style={{ position: "absolute", left: 8, bottom: 8, display: "inline-block", lineHeight: 0, padding: "3px 6px", borderRadius: 999, background: "rgba(23,19,16,0.62)" }}>
+            style={{ position: "absolute", left: 8, bottom: 8, display: "inline-block", lineHeight: 0, padding: "3px 6px", borderRadius: "var(--radius-full)", background: "var(--scrim)" }}>
             <img src="https://api.maptiler.com/resources/logo.svg" alt="MapTiler logo" width="54" height="16" decoding="async" />
           </a>
         </div>
@@ -326,12 +326,12 @@
               onFocus={() => { if (shown.length > 0) setOpen(true); }} onBlur={() => setOpen(false)}
               style={{ ...control, width: "100%", boxSizing: "border-box" }} />
             {listOpen ? (
-              <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 30, background: "var(--surface-card)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", overflow: "hidden" }}>
+              <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 30, background: "var(--surface-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--elev-2)", overflow: "hidden" }}>
                 <ul id={listId} role="listbox" aria-label="Places that match" style={{ listStyle: "none", margin: 0, padding: 4 }}>
                   {shown.map((r, i) => (
                     <li key={r.id} id={uid + "-opt-" + i} role="option" aria-selected={i === active}
                       onMouseDown={(e) => e.preventDefault()} onClick={() => pick(r)} onMouseEnter={() => setActive(i)}
-                      style={{ padding: "8px 10px", borderRadius: 8, fontSize: 13.5, cursor: "pointer", background: i === active ? "var(--gold-50)" : "transparent", color: "var(--text-primary)" }}>
+                      style={{ padding: "8px 10px", borderRadius: 8, fontSize: 13.5, cursor: "pointer", background: i === active ? "var(--surface-2)" : "transparent", color: "var(--text-primary)" }}>
                       {r.label}
                     </li>
                   ))}

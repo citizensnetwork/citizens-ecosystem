@@ -17,7 +17,7 @@
     const [navHidden, setNavHidden] = React.useState({});
 
     React.useEffect(() => {
-      document.documentElement.setAttribute("data-theme", theme === "noir" ? "noir" : "light");
+      document.documentElement.setAttribute("data-theme", theme === "noir" ? "dark" : "light");
     }, [theme]);
 
     const goView = React.useCallback((v, m, f) => {

@@ -120,9 +120,12 @@ buildFrontend({
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MAPTILER_KEY'],
   mobileMissingLabel: 'Supabase/MapTiler',
 
-  // index.html loads these from unpkg/jsDelivr, where OSV-Scanner can't see
-  // them. The build fails unless each tag pins the exact lockfile version with
-  // an SRI hash matching the installed package's bytes — the same job
+  // index.html loads supabase-js from jsDelivr, where OSV-Scanner can't see
+  // it. The build fails unless the tag pins the exact lockfile version with an
+  // SRI hash matching the installed package's bytes — the same job
   // assertMaplibreVendorInSync does for the vendored map runtime.
-  sriPackages: ['react', 'react-dom', '@supabase/supabase-js'],
+  // React/ReactDOM can't be listed: npm React is 19 (no UMD build) while the
+  // page loads the 18.3.1 UMD from unpkg — their hashes are hand-verified
+  // (see index.html). Same split Vision already uses.
+  sriPackages: ['@supabase/supabase-js'],
 });

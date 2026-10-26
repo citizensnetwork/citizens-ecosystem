@@ -2,7 +2,7 @@
 
 > **What this is.** The short, practical guide the Builder follows for any UI or visual issue, together with that issue's `## Design spec` comment.
 > **What it is not.** It is not the measured reference. Token values, contrast ratios, the drift index and the canon decision live in [`docs/design/DESIGN.md`](design/DESIGN.md). Where the two differ, `DESIGN.md` and the code win, and this guide gets fixed.
-> **Canon.** Map v2's tokens in [`apps/connect/src/frontend/assets/map-v2.css`](../apps/connect/src/frontend/assets/map-v2.css) (sections 1 to 3). Vision and Wear keep their own token blocks until #209.
+> **Canon.** Map v2's tokens in [`apps/connect/src/frontend/assets/map-v2.css`](../apps/connect/src/frontend/assets/map-v2.css) (sections 1 to 3). Vision's `:root` and `[data-theme='dark']` use this set (the Noir control sets `dark`). Wear keeps its own token block until the Wear part of #209.
 
 ## 1. Tokens (use the names, never the values)
 

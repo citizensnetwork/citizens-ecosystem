@@ -7,66 +7,153 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
 <style>
   /* ============================================================
-     Citizens Design System tokens (design-handoff _ds/tokens) —
-     one gold metal, warm neutrals, Light (default) + Noir looks.
+     Map v2 canon (apps/connect/src/frontend/assets/map-v2.css,
+     sections 1–3). One gold fill. Light is :root; dark is
+     [data-theme='dark'] (the Noir control sets that attribute).
+     Raw colours live here. Screens read var(--…).
      ============================================================ */
   :root {
-    /* Kingdom Gold ramp */
-    --gold-50:#FEF8E2; --gold-100:#FCEEB8; --gold-200:#F9E08A; --gold-300:#F6D257;
-    --gold-400:#F3C636; --gold-500:#F0C024; --gold-600:#D9A50C; --gold-700:#B07F08;
-    --gold-800:#845E06; --gold-900:#523A05;
-    --gold-antique:#D4AF37;
+    /* surfaces */
+    --surface-0: #f7f4ee;
+    --surface-1: #ffffff;
+    --surface-2: #f5f1e8;
+    --logo-bg: #ffffff;
 
-    /* Warm neutrals */
-    --paper:#FFFFFF; --ground:#E9E7E1; --mist:#FEF5F5; --muted:#F2F0EB;
-    --n-300:#DCD9D2; --n-400:#A8A59C; --n-500:#8B887F; --n-700:#3A3A3A;
-    --n-800:#1A1A1A; --n-900:#0E0E0E; --ink:#000000;
+    /* text */
+    --text-1: #0a0908;
+    --text-2: #5c5444;
 
-    /* Semantic & status */
-    --success:#16A34A; --success-bg:#DCFCE7;
-    --danger:#DC2626;  --danger-bg:#FEE2E2;
-    --warning:#D97706; --warning-bg:#FEF3C7;
-    --info:#2563EB;    --admin:#8E44AD;
+    /* one gold: a fill with a near-black label; ink for text, rings, icons */
+    --accent: #c9a84c;
+    --accent-contrast: #0a0908;
+    --accent-ink: #8b6914;
 
-    /* Semantic aliases — LIGHT look (default) */
-    --brand:var(--gold-500); --brand-strong:var(--gold-600);
-    --brand-ink:var(--gold-700); --on-brand:var(--ink);
-    --surface-app:var(--ground); --surface-card:var(--paper);
-    --surface-sunk:var(--muted); --surface-inverse:var(--n-900);
-    --text-primary:var(--ink); --text-secondary:var(--n-500);
-    --text-tertiary:var(--n-400); --text-on-inverse:var(--paper);
-    --border:var(--n-300); --border-strong:var(--n-400); --divider:var(--n-300);
-    --ring:var(--gold-500); --overlay-scrim:rgba(14,14,14,0.55);
+    /* status (canon). Vision's chips keep their own names below. */
+    --ok: #1e6b3c;
+    --closed: #a32d22;
+    --error: #a32d22;
+
+    --focus-ring: #8b6914;
+    --divider: rgba(10, 9, 8, 0.12);
+    --scrim: rgba(10, 9, 8, 0.4);
+    --elev-1: 0 1px 3px rgba(10, 9, 8, 0.16);
+    --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
+    --pin-shadow: drop-shadow(0 3px 5px rgba(10, 9, 8, 0.32));
+
+    /* scales — the same in both looks */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 32px;
+    --space-8: 48px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-full: 999px;
+    --fs-1: 12px;
+    --lh-1: 16px;
+    --fs-2: 14px;
+    --lh-2: 20px;
+    --fs-3: 18px;
+    --lh-3: 24px;
+    --fw-regular: 400;
+    --fw-semibold: 600;
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+    --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --hit: 44px;
+    --focus-w: 2px;
+    --focus-offset: 2px;
+
+    /* Names the screens already use, pointed at the canon. */
+    --brand: var(--accent);
+    --brand-strong: var(--accent);
+    --brand-ink: var(--accent-ink);
+    --on-brand: var(--accent-contrast);
+    --surface-app: var(--surface-0);
+    --surface-card: var(--surface-1);
+    --surface-sunk: var(--surface-2);
+    --surface-inverse: var(--text-1);
+    --text-primary: var(--text-1);
+    --text-secondary: var(--text-2);
+    --text-tertiary: var(--text-2);
+    --text-on-inverse: var(--surface-0);
+    --border: var(--divider);
+    --border-strong: var(--divider);
+    --ring: var(--focus-ring);
+    --overlay-scrim: var(--scrim);
+    --paper: var(--logo-bg);
+    --n-300: var(--surface-2);
+    --n-500: var(--text-2);
+
+    /* Status chips: words carry the meaning. Not a second gold. */
+    --success: #16a34a;
+    --success-bg: #dcfce7;
+    --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --warning: #d97706;
+    --warning-bg: #fef3c7;
+    --info: #2563eb;
+    --admin: #8e44ad;
   }
-  [data-theme="noir"] {
-    --surface-app:var(--n-900); --surface-card:var(--n-800);
-    --surface-sunk:#161616; --surface-inverse:var(--paper);
-    --text-primary:var(--paper); --text-secondary:#B8B5AC;
-    --text-tertiary:var(--n-500); --text-on-inverse:var(--ink);
-    --brand-ink:var(--gold-400);
-    --border:rgba(255,255,255,0.10); --border-strong:rgba(255,255,255,0.18);
-    --divider:rgba(255,255,255,0.08); --overlay-scrim:rgba(0,0,0,0.62);
+  [data-theme='dark'],
+  [data-theme='noir'] {
+    --surface-0: #0a0908;
+    --surface-1: #1a1714;
+    --surface-2: #26221d;
+    --text-1: #f7f4ee;
+    --text-2: #b9ae9a;
+    --accent: #c9a84c;
+    --accent-contrast: #0a0908;
+    --accent-ink: #e8d48b;
+    --ok: #62d68f;
+    --closed: #ff8f80;
+    --error: #ff8f80;
+    --focus-ring: #e8d48b;
+    --divider: rgba(247, 244, 238, 0.14);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --elev-1: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+    --pin-shadow: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --dur-fast: 0ms;
+      --dur-base: 0ms;
+      --dur-slow: 0ms;
+    }
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; }
   body {
     margin: 0; background: var(--surface-app); color: var(--text-primary);
-    font-family: 'Manrope', ui-sans-serif, sans-serif;
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased; overscroll-behavior: none;
-    transition: background .25s ease, color .25s ease;
+    transition: background var(--dur-base) var(--ease-enter), color var(--dur-base) var(--ease-enter);
   }
   input, textarea, select, button { font-family: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: var(--focus-w) solid var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(139,136,127,0.35); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--divider); border-radius: var(--radius-full); }
 
-  .fade-in { animation: fadeIn .28s ease-out; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn var(--dur-base) var(--ease-enter); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(var(--space-2)); } to { opacity: 1; transform: translateY(0); } }
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -90,7 +177,7 @@
      lockfile version with SRI — never a floating @2. The build checks this pin +
      hash against the installed npm package (sriPackages in
      scripts/build-frontend.js); after a version bump it prints the new hash. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js" integrity="sha384-3wY11tldQ5+yWqAvmTN4XtQvnjoTva0cV15O/O/O5NTtp0ivVopSzLOzsVXWZse9" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="config.js"></script>
 <script src="capacitor-bridge.js?v=1"></script>
 <script src="auth-client.js?v=1"></script>
