@@ -170,7 +170,7 @@
   const spaces = [
     { id: "sp-1", name: "Community Projects", icon: "grid", color: "var(--info)", activities: 12, people: 86, reach: 476, trend: [8, 9, 12, 11, 12, 14] },
     { id: "sp-2", name: "Volunteers", icon: "users", color: "var(--success)", activities: 9, people: 34, reach: 210, trend: [10, 9, 9, 8, 8, 9] },
-    { id: "sp-3", name: "Outreach", icon: "map", color: "var(--gold-600)", activities: 6, people: 41, reach: 388, trend: [3, 4, 4, 5, 6, 6] },
+    { id: "sp-3", name: "Outreach", icon: "map", color: "var(--accent-ink)", activities: 6, people: 41, reach: 388, trend: [3, 4, 4, 5, 6, 6] },
     { id: "sp-4", name: "Fundraising", icon: "target", color: "var(--admin)", activities: 4, people: 18, reach: 152, trend: [2, 2, 3, 3, 4, 4] },
     { id: "sp-5", name: "Events", icon: "calendar", color: "var(--danger)", activities: 15, people: 120, reach: 610, trend: [11, 12, 12, 14, 15, 15] },
   ];

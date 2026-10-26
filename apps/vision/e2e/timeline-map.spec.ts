@@ -35,6 +35,6 @@ test.describe("Timeline Map", () => {
           return map.getPaintProperty("cv-ground", "background-color");
         }),
       )
-      .toBe("#EFEAD9");
+      .toBe("#f7f4ee");
   });
 });

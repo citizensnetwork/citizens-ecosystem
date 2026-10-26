@@ -38,13 +38,13 @@
       <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div className="fade-in" style={{
           width: "100%", maxWidth: 420, background: "var(--surface-card)",
-          border: "1px solid var(--border)", borderRadius: 22, padding: "44px 36px",
+          border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "44px 36px",
           textAlign: "center",
         }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
             <Crown size={56} />
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.01em" }}>Citizens Vision</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.01em" }}>Citizens Vision</div>
           <div style={{ marginTop: 6, fontSize: 14, color: "var(--text-secondary)", fontWeight: 600 }}>
             Connecting the Kingdom
           </div>

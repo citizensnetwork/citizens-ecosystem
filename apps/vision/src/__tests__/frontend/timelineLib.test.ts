@@ -37,7 +37,10 @@ interface Lib {
   NOTHING: unknown[];
   playStep(span: number): number;
   summaryLine(cur: Sum, prev: Sum | null, compare: boolean): string;
-  BLANK_STYLE: { version: number; sources: object; layers: { id: string; type: string }[] };
+  BLANK_STYLE: { version: number; sources: object; layers: { id: string; type: string; paint?: { "background-color"?: string } }[] };
+  blankStyle(): { layers: { paint: { "background-color": string } }[] };
+  mapPaint(): { accent: string; text: string; muted: string; paper: string; ground: string };
+  isDarkTheme(theme: unknown): boolean;
   hasKey(env: unknown): boolean;
   styleUrl(env: unknown, theme?: string): string | null;
   isKeyRefusal(err: unknown): boolean;
@@ -268,6 +271,10 @@ describe("base map choice", () => {
   it("builds the MapTiler style URL, light or noir, with the key encoded", () => {
     expect(TL.styleUrl({ MAPTILER_KEY: "abc123" }, "light")).toBe("https://api.maptiler.com/maps/dataviz/style.json?key=abc123");
     expect(TL.styleUrl({ MAPTILER_KEY: "abc123" }, "noir")).toBe("https://api.maptiler.com/maps/dataviz-dark/style.json?key=abc123");
+    expect(TL.styleUrl({ MAPTILER_KEY: "abc123" }, "dark")).toBe("https://api.maptiler.com/maps/dataviz-dark/style.json?key=abc123");
+    expect(TL.isDarkTheme("dark")).toBe(true);
+    expect(TL.isDarkTheme("noir")).toBe(true);
+    expect(TL.isDarkTheme("light")).toBe(false);
     expect(TL.styleUrl({ MAPTILER_KEY: "a b&c" })).toContain("key=a%20b%26c");
     expect(TL.styleUrl({})).toBeNull();
   });
@@ -275,6 +282,10 @@ describe("base map choice", () => {
     expect(TL.BLANK_STYLE.version).toBe(8);
     expect(TL.BLANK_STYLE.sources).toEqual({});
     expect(TL.BLANK_STYLE.layers[0]!.type).toBe("background");
+    // The canon app surface, not the old parchment (#EFEAD9).
+    expect(TL.BLANK_STYLE.layers[0]!.paint?.["background-color"]).toBe("#f7f4ee");
+    expect(TL.mapPaint().accent).toBe("#c9a84c");
+    expect(TL.mapPaint().paper).toBe("#ffffff");
   });
   it("treats only 401 and 403 as a refused key", () => {
     expect(TL.isKeyRefusal({ status: 403 })).toBe(true);
