@@ -275,7 +275,7 @@
   function CreateFab() {
     const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
-    if (!(isContributor || listingRole === 'editor') || ['messages', 'settings'].includes(nav.page)) return null;
+    if (!(isContributor || listingRole === 'editor') || ['messages', 'settings', 'intake-upgrade'].includes(nav.page)) return null;
     return React.createElement('div', { className: 'fixed right-4 bottom-20 md:bottom-6 z-40 flex flex-col items-end gap-2' },
       open && React.createElement(React.Fragment, null,
         React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
@@ -302,6 +302,7 @@
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
       case 'settings': return React.createElement(window.SettingsPage);
+      case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
       case 'event': return React.createElement(window.EventProfilePage, { id: nav.params.id });

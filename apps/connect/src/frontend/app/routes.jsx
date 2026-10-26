@@ -14,6 +14,7 @@
 //    /c/<slug>              Contributor        /me         my own profile
 //    /messages[/<uuid>]     inbox [+ thread]   /notifications  /settings
 //    /apply  /onboarding    Contributor wizards
+//    /upgrade/<64 hex>      confirm an intake upgrade (optional /decline)
 //    /dashboard[/<tab>]     Contributor portal (tab in the URL)
 //    /admin[/<tab>]         admin panel (tab in the URL)
 //    /index.html[?c=<slug>] legacy shell URL → / or /c/<slug>
@@ -24,6 +25,7 @@
 (function () {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const SLUG_RE = /^[a-z0-9-]{1,120}$/;
+  const UPGRADE_TOKEN_RE = /^[a-f0-9]{64}$/i;
   const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
   const isSlug = (v) => typeof v === 'string' && SLUG_RE.test(v);
 
@@ -53,10 +55,10 @@
 
   // Every first path segment this table owns. next.config.ts rewrites exactly these
   // to index.html (never a catch-all, which would shadow /api, /auth and static files).
-  const PREFIXES = [...Object.keys(PAGE_BY_SEGMENT), 'map', 'me', 'e', 'p', 'c'];
+  const PREFIXES = [...Object.keys(PAGE_BY_SEGMENT), 'map', 'me', 'e', 'p', 'c', 'upgrade'];
 
   // Every screen name the app can show (history.state.nav is trusted only for these).
-  const PAGES = Object.keys(STATIC_PATHS).concat(['event', 'place', 'profile']);
+  const PAGES = Object.keys(STATIC_PATHS).concat(['event', 'place', 'profile', 'intake-upgrade']);
 
   const HOME = () => ({ page: 'home', params: {} });
   const fallback = () => ({ ok: false, nav: HOME(), canonical: '/', legacy: true });
@@ -140,6 +142,17 @@
       }
       if (SLUG_RE.test(seg[1])) return resolved({ page: 'profile', params: { slug: seg[1] } }, '/c/' + seg[1], trimmed);
     }
+
+    // The token is the path, not a query: safeReturnPath drops queries, and a
+    // Google sign-in has to come back to this exact screen. /upgrade alone is
+    // not a screen (no token to confirm).
+    if (head === 'upgrade' && (seg.length === 2 || seg.length === 3) && UPGRADE_TOKEN_RE.test(seg[1]) && (seg.length === 2 || seg[2] === 'decline')) {
+      const token = seg[1].toLowerCase();
+      const decline = seg.length === 3;
+      const canonical = decline ? '/upgrade/' + token + '/decline' : '/upgrade/' + token;
+      const params = decline ? { token: token, intent: 'decline' } : { token: token };
+      return resolved({ page: 'intake-upgrade', params: params }, canonical, trimmed || token !== seg[1]);
+    }
     return fallback();
   }
 
@@ -157,6 +170,11 @@
       case 'messages': return isUuid(p.convId) ? '/messages/' + p.convId.toLowerCase() : '/messages';
       case 'event': return isUuid(p.id) ? '/e/' + p.id.toLowerCase() : null;
       case 'place': return isUuid(p.id) ? '/p/' + p.id.toLowerCase() : null;
+      case 'intake-upgrade': {
+        const token = typeof p.token === 'string' ? p.token.toLowerCase() : '';
+        if (!/^[a-f0-9]{64}$/.test(token)) return null;
+        return p.intent === 'decline' ? '/upgrade/' + token + '/decline' : '/upgrade/' + token;
+      }
       case 'profile': {
         if (typeof p.slug === 'string' && SLUG_RE.test(p.slug)) return '/c/' + p.slug;
         if (p.id === undefined || p.id === null || p.id === '') return '/me';
@@ -177,6 +195,7 @@
       case 'profile': return p.id || p.slug ? 'public' : 'auth';
       case 'dashboard': return 'contributor';
       case 'admin': return 'admin';
+      case 'intake-upgrade': return 'auth';
       default: return 'auth';
     }
   }
@@ -211,6 +230,7 @@
     'kingdom-discovery': 'Kingdom Exploration', community: 'Kingdom Projects', messages: 'Messages',
     notifications: 'Notifications', settings: 'Settings', apply: 'Become a Contributor',
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
+    'intake-upgrade': 'Confirm your listing',
   };
   /** Tab / history title. `name` is the loaded entity's own name (event title, place, Contributor). */
   function titleFor(nav, name) {

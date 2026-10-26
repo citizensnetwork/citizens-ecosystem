@@ -9,15 +9,16 @@
  * the map, and whether the owner already has an account, for the script to write back
  * to the row and put in the welcome email.
  *
- * Verify-first (C10, migration 196): NOTHING is attached to anybody until the owner has
- * proved the address and said yes on a confirm screen.
- *   - the address has no account: the placeholder holds it; the owner signs in as it and
- *     confirms the listing is theirs ("self").
- *   - the address already has an account: the placeholder gets an alias address that is
- *     never mailed (lib/placeholderEmail.ts) and the owner is asked to attach it to their
- *     own account ("attach"). Nothing on that account changes before they confirm.
- * Either way a listing_claims ledger row records the request, and the Sheet polls
- * POST /api/intake/google-form/status for "Awaiting owner" / "Owner confirmed" / "Owner declined".
+ * Two outcomes, and nothing is attached until the owner has said yes:
+ *   - the address has no account (C10, migration 196): the listing goes live under that
+ *     placeholder. The owner signs in as it and confirms the listing is theirs. A
+ *     listing_claims row records the request. The Sheet polls
+ *     POST /api/intake/google-form/status with `{ slugs }` for "Awaiting owner" /
+ *     "Owner confirmed" / "Owner declined".
+ *   - the address is already a plain citizen account (#248, migration 198): no listing
+ *     and no alias user. A pending upgrade is stored and that account is emailed a
+ *     one-time link. The Sheet polls the same status route with `{ ids }`.
+ * Admin Create still uses the alias-placeholder attach. This route does not.
  *
  * Auth is an HMAC, not a user session:
  *   X-Intake-Timestamp: unix seconds (±300 s replay window)
@@ -25,10 +26,13 @@
  * Any failure → 401 with no detail. No secret configured → 503 (fail closed).
  *
  * Idempotency: a second approval of the same row finds the owner's email already
- * holding a listing → 409 `listing_exists` (with the live listing's URL), or already
- * waiting for the owner → 409 `listing_pending`; an email that belongs to an
- * administrator or to an applicant → 409 `email_already_registered`. All carry a
- * `message` saying what to do. The script also skips rows whose Status is already set.
+ * registered. A live Contributor listing → 409 `listing_exists` (with the listing's URL).
+ * A second open ledger row for a new address → 409 `listing_pending`. An administrator
+ * or an applicant → 409 `email_already_registered`. A removed account, or a Contributor
+ * with no public page → 409 `account_not_eligible`. An ordinary citizen account → 200
+ * `awaiting_confirmation` (a pending upgrade, no listing yet; a second tick while that
+ * confirmation is open reuses it and does not send another email). All refusals carry
+ * a `message` saying what to do. The script also skips rows whose Status is already set.
  *
  * Body (raw Form labels — every label → slug decision is made here):
  *   { owner_email, organisation_name, organisation_type, primary_category,
@@ -38,21 +42,22 @@
  *     permission_to_publish: true, logo?: {mime, base64}, cover?: {mime, base64},
  *     auto_update?: 'off'|'suggest'|'events_auto' (Form "Keeping your listing up to date",
  *     mig 181: stored with a consent stamp, and the listed sources are saved) }
- * Response 200: { success, slug, url, warnings: string[], on_map: boolean,
- *   owner_has_account: boolean, awaiting_owner: true }
- *   owner_has_account picks the wording of the welcome email (an owner with an account is asked to
- *   attach the listing to it; a new owner is asked to confirm it is theirs).
+ * Response 200 (new account): { success, slug, url, warnings: string[], on_map: boolean,
+ *   owner_has_account: false, awaiting_owner: true }
  *   on_map is hasMapPin: the pin was found (maps link, the Sheet's geocode, or MapTiler) and the listing is not
  *   "no fixed location". The script's welcome email says "on the map" only when it is true (tracker C21).
+ * Response 200 (existing citizen): { success, status: "awaiting_confirmation", request_id, email, message, warnings }
+ *   No slug and no URL. The sheet must not send a welcome.
  * Errors: { error: <code>, message?: <human-readable, for the Sheet's Notes> }
  */
 
-import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { hasMapPin, parseListingFields } from "@/lib/contributorFields";
-import { parseAutoUpdateLevel } from "@/lib/automation/suggestions";
-import { sourcesFromListing } from "@/lib/automation/sources";
+import { randomUUID } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { hasMapPin, parseListingFields } from '@/lib/contributorFields';
+import { parseAutoUpdateLevel } from '@/lib/automation/suggestions';
+import { sourcesFromListing } from '@/lib/automation/sources';
+import { respondWhenEmailExists } from '@/lib/intake/existingAccount';
 import {
   decodeIntakeImage,
   geocodeWithMapTiler,
@@ -65,24 +70,24 @@ import {
   type ImageResult,
   type IntakeImage,
   type LatLng,
-} from "@/lib/intake/googleForm";
-import { gateIntakeRequest } from "@/lib/intake/gate";
-import { createListingUser, pendingListingMessage, registerListingClaim } from "@/lib/listingClaim";
+} from '@/lib/intake/googleForm';
+import { gateIntakeRequest } from '@/lib/intake/gate';
+import { createListingUser, pendingListingMessage, registerListingClaim } from '@/lib/listingClaim';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /** Just under Vercel's ~4.5 MB function body limit. */
 const MAX_BODY_CHARS = 4_400_000;
 /** Contributor logos/covers already live here (MediaPicker scope "event-cover"). */
-const IMAGE_BUCKET = "event-images";
+const IMAGE_BUCKET = 'event-images';
 
 const fail = (status: number, error: string, message?: string) =>
   NextResponse.json(message ? { error, message } : { error }, { status });
 
 const clip = (v: unknown) => String(v).slice(0, 100);
 
-const IMAGE_REFUSED: Record<Exclude<ImageResult, { ok: true }>["reason"], string> = {
+const IMAGE_REFUSED: Record<Exclude<ImageResult, { ok: true }>['reason'], string> = {
   too_large: `is larger than ${MAX_IMAGE_BYTES / 1_000_000} MB`,
   unsupported_type: "isn't a JPEG, PNG or WebP image",
   invalid: "couldn't be read",
@@ -91,8 +96,8 @@ const IMAGE_REFUSED: Record<Exclude<ImageResult, { ok: true }>["reason"], string
 export async function POST(request: Request) {
   // Raw body first: the signature covers the exact bytes sent.
   const gate = await gateIntakeRequest(request, {
-    rateKey: "intake-google-form",
-    logTag: "/api/intake/google-form",
+    rateKey: 'intake-google-form',
+    logTag: '/api/intake/google-form',
     maxBodyChars: MAX_BODY_CHARS,
   });
   if (!gate.ok) return gate.response;
@@ -101,30 +106,47 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(rawBody);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new Error('not an object');
     body = parsed as Record<string, unknown>;
   } catch {
-    return fail(400, "invalid_json");
+    return fail(400, 'invalid_json');
   }
 
   // POPIA: both boxes must be ticked on the Form.
   if (body.faith_alignment !== true || body.permission_to_publish !== true) {
-    return fail(400, "consent_required", "Faith alignment and permission to publish must both be given.");
+    return fail(
+      400,
+      'consent_required',
+      'Faith alignment and permission to publish must both be given.',
+    );
   }
 
   const kind = mapOrganisationType(body.organisation_type);
   if (!kind.ok) {
-    return fail(400, "unknown_organisation_type", `Unknown Organisation Type "${clip(body.organisation_type)}".`);
+    return fail(
+      400,
+      'unknown_organisation_type',
+      `Unknown Organisation Type "${clip(body.organisation_type)}".`,
+    );
   }
   const category = mapPrimaryCategory(body.primary_category);
   if (!category.ok) {
-    return fail(400, "unknown_primary_category", `Unknown Primary category "${clip(body.primary_category)}".`);
+    return fail(
+      400,
+      'unknown_primary_category',
+      `Unknown Primary category "${clip(body.primary_category)}".`,
+    );
   }
   const fixed = parseFixedLocation(body.fixed_location);
-  if (fixed === "unknown") {
-    return fail(400, "unknown_location_answer", `Unrecognised fixed-location answer "${clip(body.fixed_location)}".`);
+  if (fixed === 'unknown') {
+    return fail(
+      400,
+      'unknown_location_answer',
+      `Unrecognised fixed-location answer "${clip(body.fixed_location)}".`,
+    );
   }
-  const hasAddress = typeof body.street_address === "string" && body.street_address.trim() !== "";
+  const hasAddress = typeof body.street_address === 'string' && body.street_address.trim() !== '';
   const noFixedLocation = fixed === false || (fixed === null && !hasAddress);
 
   // lenientSocials: nobody is here to correct a Form answer (the row is approved
@@ -160,15 +182,21 @@ export async function POST(request: Request) {
 
   // Images are checked BEFORE anything is created; a refused image is a
   // warning (the owner adds it from the dashboard), never a failed intake.
-  const images: { role: "logo" | "cover"; image: IntakeImage }[] = [];
-  for (const role of ["logo", "cover"] as const) {
+  const images: { role: 'logo' | 'cover'; image: IntakeImage }[] = [];
+  for (const role of ['logo', 'cover'] as const) {
     const result = decodeIntakeImage(body[role]);
     if (!result) continue;
     if (result.ok) images.push({ role, image: result.image });
-    else warnings.push(`${role === "logo" ? "Logo" : "Cover photo"} skipped: it ${IMAGE_REFUSED[result.reason]}.`);
+    else
+      warnings.push(
+        `${role === 'logo' ? 'Logo' : 'Cover photo'} skipped: it ${IMAGE_REFUSED[result.reason]}.`,
+      );
   }
 
-  const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/+$/, "");
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(
+    /\/+$/,
+    '',
+  );
 
   if (!fields.noFixedLocation) {
     const geocoded = body.geocoded as { lat?: unknown; lng?: unknown } | undefined;
@@ -177,7 +205,7 @@ export async function POST(request: Request) {
       toLatLng(geocoded?.lat, geocoded?.lng) ??
       (fields.physicalAddress
         ? await geocodeWithMapTiler(fields.physicalAddress, {
-            key: process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "",
+            key: process.env.NEXT_PUBLIC_MAPTILER_KEY ?? '',
             referer: `${origin}/`,
           })
         : null);
@@ -193,12 +221,36 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const listingUser = await createListingUser(admin, {
-    claimEmail: fields.claimEmail,
-    userMetadata: { full_name: fields.displayName, created_via: "google_form" },
-    origin,
-  });
+  const listingUser = await createListingUser(
+    admin,
+    {
+      claimEmail: fields.claimEmail,
+      userMetadata: { full_name: fields.displayName, created_via: 'google_form' },
+      origin,
+    },
+    // An existing citizen confirms an upgrade of their own account. Admin Create keeps the alias attach.
+    { existingCitizen: 'defer' },
+  );
   if (!listingUser.ok) {
+    if (listingUser.error === 'existing_citizen') {
+      if (!listingUser.profile) return fail(500, 'create_failed');
+      const upgradeWarnings = warnings.filter((w) => !w.startsWith('No map pin:'));
+      if (warnings.some((w) => w.startsWith('No map pin:'))) {
+        upgradeWarnings.push(
+          "No map pin: the location couldn't be found. It can be added after the upgrade is confirmed.",
+        );
+      }
+      return respondWhenEmailExists({
+        admin,
+        email: fields.claimEmail,
+        origin,
+        fields,
+        images,
+        warnings: upgradeWarnings,
+        autoUpdate: body.auto_update,
+        existing: listingUser.profile,
+      });
+    }
     return NextResponse.json(
       {
         error: listingUser.error,
@@ -221,14 +273,16 @@ export async function POST(request: Request) {
     });
     if (upErr) {
       console.error(`[/api/intake/google-form] ${role} upload`, upErr);
-      warnings.push(`${role === "logo" ? "Logo" : "Cover photo"} upload failed; the owner can add it from the dashboard.`);
+      warnings.push(
+        `${role === 'logo' ? 'Logo' : 'Cover photo'} upload failed; the owner can add it from the dashboard.`,
+      );
       continue;
     }
     uploadedPaths.push(path);
     urls[role] = storage.getPublicUrl(path).data.publicUrl;
   }
 
-  const { data: rpcData, error: rpcErr } = await admin.rpc("intake_create_contributor_profile", {
+  const { data: rpcData, error: rpcErr } = await admin.rpc('intake_create_contributor_profile', {
     _target_id: userId,
     _display_name: fields.displayName,
     _claim_email: fields.claimEmail,
@@ -258,8 +312,8 @@ export async function POST(request: Request) {
     // Roll back so a retry starts clean: no orphaned account or images.
     if (uploadedPaths.length) await storage.remove(uploadedPaths).catch(() => {});
     await admin.auth.admin.deleteUser(userId).catch(() => {});
-    console.error("[/api/intake/google-form] profile rpc", rpcErr, result);
-    return fail(500, result?.reason ?? "create_failed");
+    console.error('[/api/intake/google-form] profile rpc', rpcErr, result);
+    return fail(500, result?.reason ?? 'create_failed');
   }
 
   // The ledger row (mig 196): the owner is now asked to confirm. A second open request for the same
@@ -268,15 +322,19 @@ export async function POST(request: Request) {
     placeholderId: userId,
     slug: result.slug,
     claimEmail: fields.claimEmail,
-    source: "google_form",
+    source: 'google_form',
   });
   if (!claim.ok) {
     if (uploadedPaths.length) await storage.remove(uploadedPaths).catch(() => {});
     await admin.auth.admin.deleteUser(userId).catch(() => {});
-    if (claim.reason === "duplicate") {
-      return fail(409, "listing_pending", pendingListingMessage(fields.claimEmail, claim.existingSlug, origin));
+    if (claim.reason === 'duplicate') {
+      return fail(
+        409,
+        'listing_pending',
+        pendingListingMessage(fields.claimEmail, claim.existingSlug, origin),
+      );
     }
-    return fail(500, "claim_ledger_failed");
+    return fail(500, 'claim_ledger_failed');
   }
 
   // Listing automation (mig 181): the Form's "Keeping your listing up to date" answer and
@@ -288,7 +346,7 @@ export async function POST(request: Request) {
   if (body.auto_update !== undefined) {
     const consent = parseAutoUpdateLevel(body.auto_update);
     if (consent.warning) warnings.push(consent.warning);
-    let stage = "sources";
+    let stage = 'sources';
     try {
       const rows = sourcesFromListing(
         {
@@ -298,41 +356,51 @@ export async function POST(request: Request) {
           instagram: fields.socials.instagram_handle,
           tiktok: fields.socials.tiktok_handle,
         },
-        consent.level !== "off",
+        consent.level !== 'off',
       );
       if (rows.length) {
-        const { error } = await admin.from("listing_sources").insert(rows.map((r) => ({ contributor_id: userId, ...r })));
+        const { error } = await admin
+          .from('listing_sources')
+          .insert(rows.map((r) => ({ contributor_id: userId, ...r })));
         if (error) throw error;
       }
-      stage = "consent";
-      if (consent.level !== "off") {
+      stage = 'consent';
+      if (consent.level !== 'off') {
         const { error } = await admin
-          .from("profiles")
+          .from('profiles')
           .update({
             auto_update_level: consent.level,
             auto_update_consent_at: new Date().toISOString(),
-            auto_update_consent_source: "google_form",
+            auto_update_consent_source: 'google_form',
           })
-          .eq("id", userId);
+          .eq('id', userId);
         if (error) throw error;
       }
     } catch (e) {
       console.error(`[/api/intake/google-form] automation ${stage}`, e);
       warnings.push(
-        stage === "sources"
+        stage === 'sources'
           ? "Automatic updates: the owner's website and social links could not be saved as sources; the owner can add them in their dashboard."
           : "Automatic updates: the owner's choice could not be saved, so automatic updates are off. The owner can switch them on in their dashboard.",
       );
     }
   }
 
-  console.info("[/api/intake/google-form] live", { userId, slug: result.slug, warnings: warnings.length });
+  console.info('[/api/intake/google-form] live', {
+    userId,
+    slug: result.slug,
+    warnings: warnings.length,
+  });
   return NextResponse.json({
     success: true,
     slug: result.slug,
     url: `${origin}/c/${result.slug}`,
     warnings,
-    on_map: hasMapPin({ no_fixed_location: fields.noFixedLocation, physical_latitude: fields.latitude, physical_longitude: fields.longitude }),
+    on_map: hasMapPin({
+      no_fixed_location: fields.noFixedLocation,
+      physical_latitude: fields.latitude,
+      physical_longitude: fields.longitude,
+    }),
     owner_has_account: ownerHasAccount,
     awaiting_owner: true,
   });

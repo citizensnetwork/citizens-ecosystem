@@ -190,6 +190,13 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // address, notification preference, consent level and last-nudge time to decide whether to send
   // the daily "new suggestions" email. The address goes only to the mailer; the response is counts.
   "app/api/automation/digest/route.ts": ["email", "notification_email", "notification_prefs", "auto_update_level", "auto_update_nudged_at"],
+  // createAdminClient() after the HMAC intake check (issue #248): the existing
+  // account's address is read only to send the confirm link. The sheet response
+  // has the request id and a status, never the address.
+  "lib/intake/existingAccount.ts": ["email"],
+  // createAdminClient() after the HMAC resend check: the address is read only
+  // to send the rotated link. The response has no address and no profile id.
+  "app/api/intake/google-form/resend/route.ts": ["email"],
 };
 
 /**

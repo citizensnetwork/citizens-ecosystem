@@ -321,10 +321,41 @@ describe("isSlug / isUuid: the only shapes allowed into a request path", () => {
   });
 });
 
+describe("intake upgrade confirm link", () => {
+  const TOKEN = "ab".repeat(32);
+  it("keeps a 64-hex token in the path, including the decline action", () => {
+    expect(R.pathFor(nav("intake-upgrade", { token: TOKEN }))).toBe(`/upgrade/${TOKEN}`);
+    expect(R.navFromPath(`/upgrade/${TOKEN}`)).toMatchObject({
+      ok: true,
+      legacy: false,
+      canonical: `/upgrade/${TOKEN}`,
+      nav: nav("intake-upgrade", { token: TOKEN }),
+    });
+    expect(R.navFromPath(`/upgrade/${TOKEN.toUpperCase()}/decline`)).toMatchObject({
+      ok: true,
+      canonical: `/upgrade/${TOKEN}/decline`,
+      nav: nav("intake-upgrade", { token: TOKEN, intent: "decline" }),
+    });
+    expect(R.pathFor(nav("intake-upgrade", { token: TOKEN, intent: "decline" }))).toBe(`/upgrade/${TOKEN}/decline`);
+  });
+  it("needs a signed-in account, and the return path keeps the token (queries are dropped)", () => {
+    expect(R.accessFor(nav("intake-upgrade", { token: TOKEN }))).toBe("auth");
+    expect(R.safeReturnPath(`/upgrade/${TOKEN}`)).toBe(`/upgrade/${TOKEN}`);
+    expect(R.safeReturnPath(`/upgrade/${TOKEN}?next=https://evil.example`)).toBe(`/upgrade/${TOKEN}`);
+    expect(R.titleFor(nav("intake-upgrade", { token: TOKEN }))).toBe("Confirm your listing · Citizens Connect");
+  });
+  it("refuses a token that is not 64 hex, and a bare /upgrade", () => {
+    for (const bad of ["/upgrade", "/upgrade/", "/upgrade/abc", `/upgrade/${TOKEN}/extra`, `/upgrade/${TOKEN}/Decline`]) {
+      expect(R.navFromPath(bad).ok, bad).toBe(false);
+    }
+    expect(R.pathFor(nav("intake-upgrade", { token: "nope" }))).toBeNull();
+  });
+});
+
 describe("PREFIXES: the server rewrites exactly these top-level paths, no more", () => {
   it("lists every first path segment the table owns", () => {
     expect([...R.PREFIXES].sort()).toEqual(
-      ["admin", "apply", "c", "community", "dashboard", "discover", "e", "map", "me", "messages", "notifications", "onboarding", "p", "settings"].sort(),
+      ["admin", "apply", "c", "community", "dashboard", "discover", "e", "map", "me", "messages", "notifications", "onboarding", "p", "settings", "upgrade"].sort(),
     );
   });
   it("never claims a path the server owns", () => {
