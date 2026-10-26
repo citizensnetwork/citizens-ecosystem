@@ -6,7 +6,8 @@
   const { createElement: h, useState, useEffect, useCallback, useRef } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, Avatar, BrandLogo, SafeImg, Spinner, EmptyState, ErrorNote } = window.CWUI;
+  const { GOLD, GOLD_INK, Avatar, BrandLogo, SafeImg, Spinner, EmptyState, ErrorNote } =
+    window.CWUI;
 
   function DiscoverScreen() {
     const { openBrand, openUser, openConcepts } = useStore();
@@ -209,7 +210,7 @@
                         width: 42,
                         height: 42,
                         borderRadius: 13,
-                        background: 'rgba(242,186,27,0.16)',
+                        background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -503,7 +504,7 @@
                                   rel: 'noreferrer noopener',
                                   style: { display: 'flex' },
                                 },
-                                Icon('link', { size: 15, color: GOLD }),
+                                Icon('link', { size: 15, color: GOLD_INK }),
                               )
                             : null,
                         ),

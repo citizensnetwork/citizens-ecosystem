@@ -6,24 +6,23 @@
   const { createElement: h, useState, useEffect } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, ScreenHeader, timeAgo } = window.CWUI;
+  const { GOLD_INK, GoldButton, ScreenHeader, timeAgo } = window.CWUI;
 
   const field = {
     width: '100%',
-    border: '1px solid #efedea',
-    borderRadius: 14,
+    border: '1px solid var(--divider)',
+    borderRadius: 'var(--radius-md)',
     padding: '12px 14px',
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: 500,
-    outline: 'none',
-    background: '#fff',
-    color: '#1a1a1a',
+    background: 'var(--surface-1)',
+    color: 'var(--text-1)',
   };
   const label = { fontSize: 12, fontWeight: 700, color: '#4a4a4a', margin: '16px 0 6px' };
   const card = {
     background: '#fff',
     border: '1px solid #f0eee9',
-    borderRadius: 18,
+    borderRadius: 'var(--radius-lg)',
     padding: '18px 20px',
     marginTop: 16,
   };
@@ -41,7 +40,7 @@
             height: 18,
             flex: 'none',
             borderRadius: '50%',
-            background: met ? '#eef5e9' : '#faf8f3',
+            background: met ? '#eef5e9' : 'var(--surface-2)',
             border: '1px solid ' + (met ? '#cfe3c4' : '#eceae3'),
             color: met ? '#3f6f34' : '#b5b3ac',
             fontSize: 11,
@@ -109,7 +108,7 @@
           { style: { marginTop: 10 } },
           h(
             'div',
-            { style: { fontSize: 13, fontWeight: 800, color: '#7a6212' } },
+            { style: { fontSize: 13, fontWeight: 800, color: 'var(--accent-ink)' } },
             '“' + a.brandName + '” is under review',
           ),
           h(
@@ -448,9 +447,9 @@
                   style: {
                     width: '100%',
                     marginTop: 14,
-                    border: '1.5px solid ' + GOLD,
+                    border: '1.5px solid ' + GOLD_INK,
                     background: '#fff',
-                    color: '#7a6212',
+                    color: 'var(--accent-ink)',
                     borderRadius: 13,
                     padding: 13,
                     fontSize: 13.5,
