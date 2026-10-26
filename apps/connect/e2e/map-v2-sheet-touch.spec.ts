@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 import {
   touchSession, swipe, flickTouch, swipeThenCancel, tapTouch, recordPointerEvents, pointerCounts, resetPointerCounts, type Pt,
 } from "./support/touch";
@@ -37,7 +37,7 @@ async function at(loc: Locator): Promise<Pt> {
   return { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) };
 }
 
-/** A phone with a thumb: the sheet opens by a real tap on the pin. */
+/** A phone with a thumb: the sheet opens by a real tap on the pin's card in the Explore row (#210). */
 async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "contributor", size?: { width: number; height: number }) {
   if (size) await page.setViewportSize(size);
   const seed = seed0();
@@ -49,7 +49,7 @@ async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "
   const lng = (pick as unknown as { physical_longitude?: number; longitude?: number }).physical_longitude ?? (pick as unknown as { longitude: number }).longitude;
   const lat = (pick as unknown as { physical_latitude?: number; latitude?: number }).physical_latitude ?? (pick as unknown as { latitude: number }).latitude;
   await jump(page, lng, lat, 15.5);
-  await pinOf(page, pick.id).tap({ force: true });
+  await openListing(page, pick.id, "tap");
   await expect(sheet(page)).toBeVisible();
   // a Contributor's photos arrive from the per-slug fetch: wait for the Gallery panel so the content has its real height
   if (kind === "contributor") await expect(page.getByRole("tab", { name: "Gallery" })).toBeVisible();
@@ -269,7 +269,7 @@ test.describe("R7 content position and the mouse (phone width)", () => {
       await openMap(page, "/?map=v2", 8);
       const c = seed.contributors[0];
       await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-      await pinOf(page, c.id).click({ force: true });
+      await openListing(page, c.id);
       await expect(sheet(page)).toBeVisible();
       await page.locator("[data-mv2='handle']").click();
       await expect.poll(() => snapOf(page)).toBe("full");
@@ -360,7 +360,7 @@ test.describe("D16 a desktop with a mouse (1280 x 900)", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await pinOf(page, c.id).click({ force: true });
+    await openListing(page, c.id);
     await expect(sheet(page)).toHaveAttribute("data-wide", "1");
     await expect(sheet(page)).toHaveAttribute("data-snap", "panel");
     await expect(page.locator("[data-mv2='handle']")).toHaveCount(0);

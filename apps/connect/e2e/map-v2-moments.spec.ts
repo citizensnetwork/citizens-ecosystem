@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Moments on the Contributor sheet (tracker P2-05, ADAPTED; migration 188). Hermetic, clock frozen.
@@ -28,7 +28,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openListing(page, c.id);
   await expect(sheet(page)).toBeVisible();
   return { seed, c };
 }
@@ -115,7 +115,7 @@ test.describe("Moments: four tabs fit on a narrow phone", () => {
       await mockContributorDetail(page, seed, { gallery: 2, moments: [note("m1", "A note")] });
       await openMap(page, "/?map=v2", 8);
       await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-      await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+      await openListing(page, c.id);
       await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Today", "Gallery"]);
       const fits = await page.locator("[data-mv2='tabs']").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
       expect(fits.scroll).toBeLessThanOrEqual(fits.client);

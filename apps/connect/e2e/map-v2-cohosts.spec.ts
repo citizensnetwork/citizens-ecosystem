@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 import { touchSession, tapTouch } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -27,7 +27,7 @@ async function openMapWith(page: Page, seed: ReturnType<typeof seed0>) {
 }
 async function pickMarker(page: Page, id: string, lng: number, lat: number) {
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [lng, lat]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).click({ force: true });
+  await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 const pickContributor = (page: Page, c: C) => pickMarker(page, c.id, c.physical_longitude, c.physical_latitude);

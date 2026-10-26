@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, FIXED_NOW, openListing } from "./support/map-v2";
 import { touchSession, swipe, recordPointerEvents, pointerCounts, resetPointerCounts } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -81,9 +81,7 @@ async function openSheet(page: Page, seed: Seed, who: Who, o: { posts?: number; 
     ([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
     [who.lng, who.lat],
   );
-  const pin = page.locator(`.maplibregl-marker[data-cc-id="${who.id}"]`);
-  if (o.touch) await pin.tap({ force: true });
-  else await pin.click({ force: true });
+  await openListing(page, who.id, o.touch ? "tap" : "click");
   await expect(sheet(page)).toBeVisible();
   if (o.touch) await expect.poll(() => snapOf(page)).toBe("half");
   await page.waitForTimeout(400);

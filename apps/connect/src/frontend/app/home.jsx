@@ -2,7 +2,7 @@
 //  Citizens Connect — Discover (map home) + pin preview panel
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { useState, useRef } = React;
+  const { useState, useRef, useMemo, useCallback } = React;
   const { cx, CategoryBadge, Button } = window.UI;
   const Icon = window.Icon;
   const useBackGuard = window.useBackGuard || function () {};
@@ -101,6 +101,23 @@
     // one state update per crossing, not one per zoom frame.
     const [zoomBand, setZoomBand] = useState('all');
     const pillsRef = useRef(null);
+    // Map v2 (#210): the pill (a group, Events or All), the listing whose sheet is open (a card was tapped; the pin
+    // tap only highlights its card), and whether the keyboard chose the pin (then focus follows to its card).
+    const v2 = !!(window.isMapV2 && window.isMapV2());
+    const X = window.MapV2Explore;
+    const [pill, setPill] = useState('all');
+    const [sheet, setSheet] = useState(null);
+    const [focusCard, setFocusCard] = useState(false);
+    const rootRef = useRef(null);
+    const narrow = X ? X.useNarrow() : false;
+    const clean = v2 && !!(app.nav && app.nav.params && app.nav.params.view === 'map');
+    const pillTest = useMemo(() => (X && pill !== 'all' ? (m) => X.pillMatches(pill, m) : null), [X, pill]);
+    // The row's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
+    const onExploreHeight = useCallback((px) => {
+      if (!rootRef.current) return;
+      rootRef.current.style.setProperty('--explore-h', px + 'px');
+      if (px > 0 && mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
+    }, []);
 
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
@@ -128,6 +145,66 @@
     // places, which is what the sheet uniquely offered) behind a leading "All",
     // plus the Contributor types no event/place category already covers.
     const CATEGORY_PILLS = window.DATA.FILTER_CATEGORIES;
+
+    if (v2 && X) {
+      const openSheet = (id, t) => { setSelected(id); setSelType(t); setSheet({ id, type: t }); if (t === 'event') trackImpression(id); };
+      const closeSheet = () => setSheet(null);
+      const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
+      const showSheet = sheet && window.MapV2Sheet;
+      const XS = window.MapV2Strings.explore;
+      return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined },
+        React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
+          React.createElement(window.StylizedMap, {
+            markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
+            // #210: a pin highlights its card in the Explore row (the row scrolls to it); the card opens the sheet.
+            // The clean map (the nav's Map) has no row, so there a pin opens the sheet as before. Ideas keep their panel.
+            onSelect: (id, t) => {
+              if (t === 'idea') { setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
+              if (clean) { openSheet(id, t); return; }
+              const a = document.activeElement;
+              setFocusCard(!!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })()));
+              setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t);
+            },
+            onDismissBubble: dismissBubble,
+            onZoomBandChange: setZoomBand,
+          })),
+
+        // top: search and the account button, round and glassy (#210); the pills under them, except on the clean map
+        React.createElement('div', { 'data-mv2': 'home-top' },
+          React.createElement('div', { 'data-mv2': 'home-bar' },
+            React.createElement('label', { 'data-mv2': 'home-search' },
+              React.createElement(Icon, { name: 'Search', size: 18 }),
+              React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
+              query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
+            React.createElement(window.AccountButton, { variant: 'round' })),
+          !clean && React.createElement(X.Pills, { value: pill, onChange: setPill, ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v) })),
+
+        // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
+        React.createElement('div', { 'data-mv2': 'home-corner' },
+          zoomBand !== 'all' && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
+            React.createElement(Icon, { name: 'ZoomIn', size: 16 }),
+            React.createElement('span', null,
+              zoomBand === 'none' ? 'Zoom in to see contributors, events and places'
+                : zoomBand === 'contributors' ? 'Zoom in to see events and places'
+                : 'Zoom in to see places')),
+          window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
+
+        window.MapV2Online && React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
+
+        // ONE bottom area: the Explore row, or the sheet of the card that was tapped, never both. The row stays mounted
+        // (hidden) under the sheet, so it keeps its place and the card that opened the sheet gets focus back.
+        !clean && React.createElement(X.Explore, {
+          hidden: !!showSheet,
+          markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard,
+          onOpen: openSheet, onSeeAll: () => app.go('kingdom-discovery'), onHeight: onExploreHeight,
+        }),
+        showSheet && React.createElement(window.MapV2Sheet, {
+          id: sheet.id, type: sheet.type, onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
+          nearby: markers,
+          onPick: (id, t) => openSheet(id, t),
+        }),
+        selected && selType === 'idea' && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }));
+    }
 
     return React.createElement('div', { className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover' },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => setSelected(null) },

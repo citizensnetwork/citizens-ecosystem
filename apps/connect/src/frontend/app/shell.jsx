@@ -25,10 +25,12 @@
   }
 
   // ── Profile / role-switch panel ──
-  function ProfilePanel({ onClose, anchor }) {
+  // anchor 'top' (under the account button), 'nav' (above Map v2's folding nav, #210) or the sidebar's default.
+  // extras: Map v2's nav has no Projects, Messages or Alerts of its own, so its account menu lists them, with counts.
+  function ProfilePanel({ onClose, anchor, extras }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
-    const { user, role, go, isAdmin, isContributor, isPendingApplicant, listingRole, signOut, showSignIn, authed, toast, realUser, askAboutListing } = app;
+    const { user, role, go, isAdmin, isContributor, isPendingApplicant, listingRole, signOut, showSignIn, authed, toast, realUser, askAboutListing, unreadMsgs, unreadNotifs } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
@@ -37,7 +39,7 @@
       return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
     }, [onClose]);
 
-    const pos = anchor === 'top' ? 'right-0 top-full mt-2' : 'left-full bottom-0 ml-2';
+    const pos = anchor === 'top' ? 'right-0 top-full mt-2' : anchor === 'nav' ? 'left-0 right-0 mx-auto bottom-0' : 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
 
     // An admin, or the Google Form, may have made a listing for this person's email (see
@@ -51,13 +53,20 @@
         const found = await askAboutListing(realUser.id, true);
         if (found) onClose();
         else toast('No pending listing found for your email.', 'red');
-      } catch (e) {
+      } catch {
         toast('Could not check for a listing — please check your connection.', 'red');
       }
       setClaiming(false);
     };
 
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
+    if (extras) {
+      const menu = (window.MapV2Strings && window.MapV2Strings.nav && window.MapV2Strings.nav.menu) || {};
+      links.push(
+        { p: 'community', label: menu.projects, icon: 'Lightbulb' },
+        { p: 'messages', label: menu.messages, icon: 'MessageCircle', count: unreadMsgs },
+        { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs });
+    }
     // citizenscentral.co.za/dashboard is a real, bookmarkable destination
     // (next.config.ts rewrite + store.jsx deep link) once you ARE a
     // contributor. "Become a Contributor" itself deliberately lives only in
@@ -95,7 +104,11 @@
           },
             React.createElement(Icon, { name: l.icon, size: 15, className: 'text-muted-foreground' }),
             React.createElement('span', null, l.label),
-            React.createElement(Icon, { name: 'ChevronRight', size: 13, className: 'ml-auto text-muted-foreground' })))),
+            l.count > 0 && React.createElement('span', {
+              className: 'ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-gold text-foreground text-[11px] font-bold flex items-center justify-center',
+              'aria-label': window.MapV2Strings.nav.unread(l.count),
+            }, l.count),
+            React.createElement(Icon, { name: 'ChevronRight', size: 13, className: cx(l.count > 0 ? '' : 'ml-auto', 'text-muted-foreground') })))),
 
         role === 'citizen' && realUser && React.createElement('button', {
           onClick: claimListing, disabled: claiming,
@@ -128,7 +141,8 @@
   function AccountButton({ variant = 'floating' }) {
     const { user, role } = window.useApp();
     const [open, setOpen] = useState(false);
-    const floating = variant === 'floating';
+    const floating = variant === 'floating' || variant === 'round';
+    const round = variant === 'round';   // Map v2's home (#210): a round glass button with a gold ring
     const size = floating ? 48 : 36;
     return React.createElement('div', { className: 'relative shrink-0' },
       React.createElement('button', {
@@ -136,10 +150,11 @@
         'aria-label': 'Your account',
         'aria-expanded': open,
         className: cx('overflow-hidden relative block',
-          floating ? 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60'
-                   : 'w-9 h-9 rounded-xl ring-1 ring-border'),
+          round ? 'w-12 h-12 glass rounded-full shadow-xl ring-2 ring-gold'
+            : floating ? 'w-12 h-12 glass rounded-2xl shadow-xl border border-white/60'
+              : 'w-9 h-9 rounded-xl ring-1 ring-border'),
       },
-        React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size, rounded: 'xl' }),
+        React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size, rounded: round ? 'full' : 'xl' }),
         role !== 'citizen' && React.createElement('span', {
           className: 'absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-gold border-2 border-white flex items-center justify-center',
         }, React.createElement(Icon, { name: 'Crown', size: 7, className: 'text-white' }))),
@@ -276,7 +291,9 @@
     const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
     if (!(isContributor || listingRole === 'editor') || ['messages', 'settings', 'intake-upgrade'].includes(nav.page)) return null;
-    return React.createElement('div', { className: 'fixed right-4 bottom-20 md:bottom-6 z-40 flex flex-col items-end gap-2' },
+    // Map v2 has no bottom bar: the button sits level with the folding nav, clear of the Explore row above it.
+    const v2 = !!(window.isMapV2 && window.isMapV2());
+    return React.createElement('div', { className: cx('fixed right-4 md:bottom-6 z-40 flex flex-col items-end gap-2', v2 ? 'bottom-[calc(env(safe-area-inset-bottom)+12px)]' : 'bottom-20') },
       open && React.createElement(React.Fragment, null,
         React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
           React.createElement(Icon, { name: 'MapPin', size: 15, className: 'text-[#3498DB]' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Add Place')),
@@ -339,7 +356,8 @@
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),
-      React.createElement(BottomNav),
+      // Map v2 (#210): one folding round button instead of the bar; the old map (?map=v1) keeps the bar.
+      React.createElement(window.isMapV2 && window.isMapV2() && window.MapV2Nav ? window.MapV2Nav : BottomNav),
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),

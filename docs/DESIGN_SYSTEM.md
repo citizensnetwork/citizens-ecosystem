@@ -22,6 +22,8 @@ Component CSS reads `var(--…)` only. Raw colours and px values live in the tok
 | Z-index           | `--z-pin` 10 · `--z-controls` 20 · `--z-sheet` 120 · `--z-viewer` 300 (dialogs, viewer) · `--z-toast` 400                                      |
 | Motion            | `--dur-fast` 120 · `--dur-base` 200 · `--dur-slow` 320 ms · `--ease-enter`, `--ease-exit`. JS twins: `MapV2.motion`, `MapV2.dur()`             |
 | Sizes             | `--hit` 44 px (minimum target), `--avatar-peek`, `--avatar-half`, `--sheet-*`, `--pin-*`, `--hrow-card-w`, `--hrow-peek`, `--disabled-opacity` |
+| Category groups   | `--cat-worship`, `--cat-serve`, `--cat-culture`, `--cat-learn`, `--cat-audiences`, `--cat-business`: one muted colour per group (#210), light and dark; read through `[data-cat]` as `--cat-c` |
+| Glass and nav     | `--glass-bg`, `--glass-blur` (frosted controls over the map), `--nav-dim`, `--accent-soft` (the selected nav item), `--select-w` (gold ring and selection outline), `--nav-btn` 56 px, `--nav-zone`, `--explore-card-w` 280 px |
 
 Light is `:root` and dark is `[data-theme='dark']`. Dark is set from the phone's own setting by `app/map-v2-lib.jsx`.
 
@@ -65,6 +67,30 @@ A list that grows with the Contributor's activity (News, Nearby) is **one row of
 - **Arrows:** Previous and Next appear only on a fine pointer and only while the row overflows. They use `aria-disabled` at the ends (never `disabled`, so focus is not lost) and move a whole number of cards. They glide unless `prefers-reduced-motion: reduce` (decided in the script; the stylesheet never sets `scroll-behavior`).
 - **Touch:** a scroller ends the `touch-action` chain, so the row and everything in it use `--mv2-ta-row`, which is the sheet's `--mv2-ta` plus `pan-x`. A vertical swipe is still the sheet's or the page's. Also `overscroll-behavior-x: contain`. Check any change with real touch (`e2e/support/touch.ts`), not a mouse.
 
+### Category colour (#210)
+
+Every category belongs to exactly one **group**, and each group has one muted colour token. Gold is never a category colour: it stays the brand and the selection colour. The mapping lives in `app/map-v2-explore.jsx` (`GROUP_OF`; a unit test checks that every event category, place category and Contributor type is in it).
+
+| Group | Pill | Light | Dark | Holds |
+| --- | --- | --- | --- | --- |
+| `worship` | Churches & worship | `#6e5a8f` | `#b3a2d6` | worship and prayer, church services, conferences, churches and ministries |
+| `serve` | Serve & care | `#3f7a6a` | `#86c2b0` | outreach, community upliftment, care and recovery, health, safe spaces, retreat, clinic, rehab |
+| `culture` | Culture & fun | `#a65a3c` | `#e0a084` | markets, sport and recreation, arts, social gatherings, media |
+| `learn` | Learn & grow | `#46699a` | `#93b3e0` | education and equipping, marriage and family, training |
+| `audiences` | Audiences | `#9a4f72` | `#dc9cbb` | men, women, youth, kids, members only |
+| `business` | Business | `#66713a` | `#b5c27f` | Christian businesses, hospitality and cafés, retail |
+
+- Each is at least 4.4:1 on the card, the raised surface and the app background in light, and at least 6.8:1 in dark (`scripts/map-v2/contrast.mjs`). It is still decoration: the category **name** carries the meaning.
+- On a card the colour is a dot, a 1 px outline on the category chip and a `--select-w` top edge. Pass `cat` (the group) to `MapV2Card`. On a pill it is a dot.
+
+### The Explore row (#210)
+
+The map home's bottom carousel: "Explore" and "See all", then the shared sideways row (above) of large image cards (`--explore-card-w`): cover photo (or a neutral tile with the category icon), category chip, name, and distance in km ("1.2 km away" from the person, or "from the map centre" until their position is known). Nearest first, at most 20 (`app/map-v2-explore.jsx`).
+
+- **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); the card also says "Selected on the map". Nothing opens. When the keyboard chose the pin, focus moves to the card.
+- **A card tap** opens the listing sheet. The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
+- The row reports its height as `--explore-h`, so the map's controls, the MapTiler logo and the "frame the data" padding stay clear of it.
+
 ## 4. Overlays, dialogs and sheets
 
 The pattern is #216's news reader. `MapV2QR.Dialog` and `MapV2Gallery.Viewer` are being brought up to it in #223.
@@ -106,3 +132,9 @@ The pattern is #217 on the map sheet.
 2. The Builder builds from **this guide plus the issue's spec** and does not need a design review for work that matches them.
 3. Ask for a Designer review only when the build **deviates** from the spec or this guide. That includes a new token, a new component pattern, a changed layout, or a state the spec didn't cover. To ask, comment on the PR with what differs and why.
 4. Questions of brand (which gold, fonts, the logo), category lists and policy belong to the product owner, not this guide.
+
+## 8. Navigation and pills (#210)
+
+- **Folding nav (phone):** one round frosted button (`--nav-btn`, `--glass-bg`, a `--select-w` ring of `--accent`), bottom centre, showing the current place's icon and a small dot when anything is unread (also in its name). A tap opens a frosted bar: **Home** (the map with the pills and the Explore row), **Explore** (Kingdom Exploration), **Map** (the same map, clean: no pills, no row), **Profile** (the account menu, which also lists Projects, Messages and Alerts with counts). Every item is at least `--nav-btn` square; the current one sits on `--accent-soft` with `aria-current="page"`. The map dims behind it (`--nav-dim`). It folds back after 5 s untouched, on a tap outside, Escape or Back, and on any new screen. Wide screens keep the sidebar; the old map (`?map=v1`) keeps its bar. `app/map-v2-nav.jsx`.
+- **Category pills:** one sideways row (`role="group"`, `aria-pressed` on each): All, Churches & worship, Events, Business, Serve & care, Culture & fun, Learn & grow, Audiences, Ideas. At least `--hit` tall. The selected pill is an `--accent` fill with its `--accent-contrast` label; the rest are `--surface-1` with a 1 px `--divider`. A pill filters the Explore row and dims the other pins (Ideas toggles the idea pins).
+- **Home controls:** search and the account button are round and frosted (`--glass-bg`), with an `--accent-ink` ring when focused or chosen.

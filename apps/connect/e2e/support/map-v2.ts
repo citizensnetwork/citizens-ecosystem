@@ -60,6 +60,34 @@ export async function openMap(page: Page, path = "/", min = 1) {
   );
 }
 
+/**
+ * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
+ * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
+ * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
+ * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
+ */
+export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
+  const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
+  await card.waitFor({ state: "visible", timeout: 10_000 });
+  // the row glides the card to its start; press it once it has stopped
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      const w = window as unknown as { __mv2x?: number };
+      const x = el.getBoundingClientRect().left;
+      const still = w.__mv2x === x;
+      w.__mv2x = x;
+      return still;
+    },
+    `[data-mv2='explore'] [data-explore-id="${id}"] [data-mv2='card2']`,
+    { polling: 100, timeout: 5_000 },
+  );
+  if (how === "tap") await card.tap();
+  else await card.click();
+}
+
 /** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
 export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
 const fixtureSvg = (n: number) =>

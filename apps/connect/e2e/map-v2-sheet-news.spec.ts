@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The News tab (tracker P1-07 / P1-05). The app reads `news_posts` straight
@@ -72,7 +72,7 @@ async function openSheetNews(page: Page, seed: Seed, posts: Post[]) {
   await mockContributorDetail(page, seed, { gallery: 0 });
   await openMap(page, "/?map=v2", 8);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openListing(page, c.id);
   await expect(sheet(page)).toBeVisible();
   // Half clips the list (the scroller does not scroll there). Full shows the card.
   if (await sheet(page).getAttribute("data-wide") !== "1") {
@@ -103,7 +103,7 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   await mockContributorDetail(page, seed, { gallery: 0 });
   await openMap(page, "/?map=v2", 8);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openListing(page, c.id);
   const sheet = page.locator("[data-mv2='sheet']");
   await expect(sheet).toBeVisible();
 

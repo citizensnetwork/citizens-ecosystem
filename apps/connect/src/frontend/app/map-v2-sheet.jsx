@@ -285,11 +285,11 @@
       if (snap !== 'full' && scroller.current && scroller.current.scrollTop) scroller.current.scrollTop = 0;
     }, [snap]);
 
-    // Focus moves into the sheet; it goes back to the pin on close (keyboard users).
+    // Focus moves into the sheet; it goes back to the pin, or the Explore card (#210), that opened it on close (keyboard users).
     const opener = useRef(null);
     useEffect(() => {
       const a = document.activeElement;
-      if (a && a.getAttribute && a.getAttribute('data-cc-id')) opener.current = a;
+      if (a && a.getAttribute && (a.getAttribute('data-cc-id') || (a.closest && a.closest('[data-explore-id]')))) opener.current = a;
       return () => {
         const o = opener.current;
         if (o && o.isConnected) o.focus({ preventScroll: true });

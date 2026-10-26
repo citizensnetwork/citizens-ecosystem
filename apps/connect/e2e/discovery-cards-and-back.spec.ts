@@ -645,11 +645,13 @@ test.describe("One profile entry point", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // The bottom bar's fifth slot is Kingdom Exploration now, not "You" —
-    // whose panel opened past the bottom edge of the screen and was unusable.
-    const bottomNav = page.locator("nav.md\\:hidden");
+    // #210: the bar folds into one round button (app/map-v2-nav.jsx). Open, it is Home, Explore, Map and Profile;
+    // never the old "You" tab, whose panel opened past the bottom edge of the screen and was unusable.
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    const bottomNav = page.getByRole("navigation", { name: "Main" });
     await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
     await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // Exactly one account control, and its panel opens inside the viewport.
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
@@ -664,6 +666,7 @@ test.describe("One profile entry point", () => {
     await page.keyboard.press("Escape");
 
     // Same control, same corner, on the list screen.
+    await page.getByRole("button", { name: "Open navigation" }).click();
     await bottomNav.getByRole("button", { name: "Explore" }).click();
     await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
@@ -679,10 +682,13 @@ test.describe("One profile entry point", () => {
     await expect(page.getByRole("button", { name: "Filter by category" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Kingdom Discovery" })).toHaveCount(0);
 
-    // One row, starting with All, carrying BOTH category sets (the only thing
-    // the removed sheet offered that the row did not).
-    await expect(page.getByRole("button", { name: "All categories" })).toBeVisible();
-    await expect(screen.getByRole("button", { name: /Church$/ }).first()).toBeVisible();
-    await expect(screen.getByRole("button", { name: /Cafés/ }).first()).toBeAttached();
+    // One row, starting with All. #210 (founder, 2026-10-26): the pills are the category GROUPS, which between them
+    // cover every event category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping).
+    const pills = screen.getByRole("group", { name: "Show on the map" });
+    await expect(pills.getByRole("button", { name: "All", exact: true })).toBeVisible();
+    await expect(pills.getByRole("button", { name: "Churches & worship" })).toBeVisible();
+    await expect(pills.getByRole("button", { name: "Business" })).toBeAttached();
+    const tops = await pills.getByRole("button").evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
+    expect(tops).toBe(1);
   });
 });

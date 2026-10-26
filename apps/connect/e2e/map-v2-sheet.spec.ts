@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 bottom sheet (tracker P1-06 to P1-11); Map v2 is on by default since D15.
@@ -25,7 +25,7 @@ const jump = (page: Page, lng: number, lat: number, zoom: number) =>
 /** Open the sheet on the first pin of a kind by tapping it (a real click, so it counts as a user gesture). */
 async function openOn(page: Page, id: string, lng: number, lat: number) {
   await jump(page, lng, lat, 15.5);
-  await pinOf(page, id).click({ force: true });
+  await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 const top = (page: Page) => sheet(page).evaluate((e) => e.getBoundingClientRect().top);
@@ -256,7 +256,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     expect(new URL(page.url()).pathname).toBe("/"); // never left the app
   });
 
-  test("keyboard: Enter on a pin moves focus into the sheet; Escape returns it to that pin", async ({ page }) => {
+  test("keyboard: Enter on a pin moves focus to its Explore card, Enter there into the sheet; Escape returns it to the card", async ({ page }) => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
@@ -266,11 +266,16 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     const pin = pinOf(page, c.id);
     await pin.focus();
     await page.keyboard.press("Enter");
+    // #210: the pin outlines its card in the row and the keyboard follows it there
+    const card = () => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"));
+    await expect.poll(card).toBe(c.id);
+    await expect(sheet(page)).toHaveCount(0);
+    await page.keyboard.press("Enter");
     await expect(sheet(page)).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-cc-id"))).toBe(c.id);
+    await expect.poll(card).toBe(c.id);
   });
 
   test("a screen reader hears the state change", async ({ page }) => {

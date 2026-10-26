@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The sheet on the small phone (360 x 800) and with iOS-style safe areas
@@ -18,7 +18,7 @@ async function open(page: Page, seed: Seed) {
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[0];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openListing(page, c.id);
   await expect(page.locator(SHEET)).toBeVisible();
 }
 

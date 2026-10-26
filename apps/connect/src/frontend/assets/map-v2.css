@@ -138,6 +138,24 @@
   --hrow-card-w: 264px;             /* one card width for every card in a sideways row, portrait or landscape (4i) */
   --hrow-peek: 48px;                /* a row's card is never wider than the row minus this, so the next card shows at the edge */
   --disabled-opacity: 0.4;          /* a control that cannot act right now (it stays focusable) */
+
+  /* ── #210: category groups, glass chrome, the folding nav and the Explore row ── */
+  /* one muted colour per category GROUP (map-v2-explore.jsx). Gold stays the brand and the selection colour.
+     Each is at least 3:1 on the card, the raised surface and the app background in both looks (contrast.mjs). */
+  --cat-worship: #6e5a8f;
+  --cat-serve: #3f7a6a;
+  --cat-culture: #a65a3c;
+  --cat-learn: #46699a;
+  --cat-audiences: #9a4f72;
+  --cat-business: #66713a;
+  --glass-bg: rgba(255, 255, 255, 0.82);   /* frosted controls over the map */
+  --glass-blur: 16px;
+  --nav-dim: rgba(10, 9, 8, 0.18);          /* the map fades back a little while the nav is open */
+  --accent-soft: rgba(201, 168, 76, 0.26);  /* the selected nav item's soft gold highlight */
+  --select-w: 3px;                          /* the gold ring of the nav button and a selected Explore card */
+  --nav-btn: 56px;                          /* the folded nav: one round button */
+  --nav-zone: calc(var(--nav-btn) + var(--space-3) * 2 + env(safe-area-inset-bottom, 0px));
+  --explore-card-w: 280px;                  /* the Explore row's large cards */
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -174,6 +192,16 @@
   --pin-shadow: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
   --pin-lift: 0 3px 6px rgba(0, 0, 0, 0.6);
   --live: #ff5252;
+
+  --cat-worship: #b3a2d6;
+  --cat-serve: #86c2b0;
+  --cat-culture: #e0a084;
+  --cat-learn: #93b3e0;
+  --cat-audiences: #dc9cbb;
+  --cat-business: #b5c27f;
+  --glass-bg: rgba(26, 23, 20, 0.84);
+  --nav-dim: rgba(0, 0, 0, 0.32);
+  --accent-soft: rgba(201, 168, 76, 0.3);
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
@@ -1987,5 +2015,452 @@ a[data-mv2='card2'],
 @media (hover: hover) {
   [data-mv2='globe']:hover {
     background: var(--surface-2);
+  }
+}
+
+/* ── 4j. The map home's top bar and category pills (app/home.jsx, app/map-v2-explore.jsx, issue #210) ──
+   Round, frosted controls with a gold ring for what is chosen. One sideways row of pills: the selected pill is a
+   gold fill with its near-black label; the rest are the card surface with a thin line. Each group pill carries its
+   colour as a dot; the word carries the meaning. Every control is at least --hit tall. */
+[data-mv2='home-top'] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-controls);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) 0 0;
+  pointer-events: none;
+}
+[data-mv2='home-bar'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  pointer-events: auto;
+}
+[data-mv2='home-search'] {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+  color: var(--accent-ink);
+  font-family: var(--font-body);
+}
+[data-mv2='home-search']:focus-within {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent-ink), var(--elev-1);
+}
+[data-mv2='home-search'] input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  outline: none;
+}
+[data-mv2='home-search'] input::placeholder {
+  color: var(--text-2);
+}
+[data-mv2='home-clear'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+[data-mv2='pills'] {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-1) var(--space-3);
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  pointer-events: auto;
+}
+[data-mv2='pills']::-webkit-scrollbar {
+  display: none;
+}
+[data-mv2='pill'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-enter);
+}
+[data-mv2='pill'] svg {
+  color: var(--accent-ink);
+}
+[data-mv2='pill'][aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+[data-mv2='pill'][aria-pressed='true'] svg {
+  color: var(--accent-contrast);
+}
+[data-mv2='pill-dot'] {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--cat-c, var(--text-2));
+}
+[data-mv2='pill']:active {
+  transform: scale(0.97);
+}
+[data-mv2='pill']:focus-visible,
+[data-mv2='home-clear']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* the group colour, read by every dot, tile and card edge that names a group */
+[data-cat='worship'] {
+  --cat-c: var(--cat-worship);
+}
+[data-cat='serve'] {
+  --cat-c: var(--cat-serve);
+}
+[data-cat='culture'] {
+  --cat-c: var(--cat-culture);
+}
+[data-cat='learn'] {
+  --cat-c: var(--cat-learn);
+}
+[data-cat='audiences'] {
+  --cat-c: var(--cat-audiences);
+}
+[data-cat='business'] {
+  --cat-c: var(--cat-business);
+}
+[data-mv2='card-dot'][data-cat] {
+  background: var(--cat-c);
+}
+
+/* The zoom hint, the MapTiler logo, and MapLibre's own controls and credit sit above the Explore row (--explore-h,
+   which the row sets as it measures itself) and, on a phone, above the folding nav (--nav-clear). */
+[data-mv2='home'] {
+  --nav-clear: 0px;
+}
+[data-mv2='home'][data-narrow] {
+  --nav-clear: var(--nav-zone);
+}
+[data-mv2='home'] .maplibregl-ctrl-bottom-right {
+  margin-bottom: calc(var(--explore-h, 0px) + var(--nav-clear) + var(--space-2));
+}
+[data-mv2='home-corner'] {
+  position: absolute;
+  left: var(--space-3);
+  bottom: calc(var(--explore-h, 0px) + var(--nav-clear) + var(--space-2));
+  z-index: var(--z-controls);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+[data-mv2='zoom-hint'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: var(--label-max-w);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+}
+[data-mv2='zoom-hint'] svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+/* ── 4k. The Explore row (app/map-v2-explore.jsx, issue #210) ──────────────
+   A frosted panel at the foot of the map: "Explore" and "See all", then the shared sideways row (4i) of large
+   image cards (--explore-card-w). Each card names its category with the group's colour as a dot, a thin outline
+   on its chip and a top edge. A pin tap outlines its card in gold (--select-w) and says so in words
+   ("Selected on the map"). The home screen shows this row OR the listing sheet, never both. Outside the sheet the
+   row's touch rule falls back to plain pan-x (4i), so a sideways swipe scrolls the row and nothing else. */
+[data-mv2='explore'] {
+  --hrow-card-w: var(--explore-card-w);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--nav-clear);
+  z-index: var(--z-controls);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  color: var(--text-1);
+  font-family: var(--font-body);
+}
+[data-mv2='explore'][hidden] {
+  display: none;
+}
+[data-mv2='home'][data-narrow] [data-mv2='explore'] {
+  margin: 0 var(--space-2);
+  border-radius: var(--sheet-radius);
+}
+[data-mv2='explore-head'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+[data-mv2='explore-title'] {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='explore-all'] {
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='explore-all']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='explore-empty'] {
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  color: var(--text-2);
+}
+[data-mv2='explore'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+[data-mv2='explore-card'] > [data-mv2='card2'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-top: var(--select-w) solid var(--cat-c, var(--divider));
+}
+[data-mv2='explore-card'][data-selected] > [data-mv2='card2'] {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 var(--select-w) var(--accent-ink);
+}
+[data-mv2='explore-card'] [data-mv2='card-chip'] {
+  align-self: flex-start;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--cat-c, var(--divider));
+  border-radius: var(--radius-full);
+}
+[data-mv2='card-media'][data-tile] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cat-c, var(--text-2));
+}
+[data-mv2='explore-card'][data-selected] [data-mv2='card-meta'] > [data-mv2='row-meta']:last-child {
+  color: var(--accent-ink);
+  font-weight: var(--fw-semibold);
+}
+
+/* ── 4l. The folding nav (app/map-v2-nav.jsx, issue #210) ──────────────
+   Folded: one round frosted button with a gold ring, bottom centre, showing where you are. Open: a frosted bar of
+   four items (Home, Explore, Map, Profile), each at least --hit, the current one on a soft rounded gold highlight,
+   and a close button. The map behind fades back (--nav-dim). Only opacity and transform move, from the duration
+   tokens, so reduced motion makes it instant. The nav sits under the listing sheet, which covers it. */
+[data-mv2='nav'] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  z-index: calc(var(--z-controls) + 1);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--font-body);
+}
+[data-mv2='nav'] > * {
+  pointer-events: auto;
+}
+[data-mv2='nav-dim'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-controls);
+  background: var(--nav-dim);
+  animation: mv2-fade-in var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+[data-mv2='nav-toggle'] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--nav-btn);
+  height: var(--nav-btn);
+  padding: 0;
+  border: var(--select-w) solid var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-enter);
+}
+[data-mv2='nav-toggle']:active {
+  transform: scale(0.95);
+}
+[data-mv2='nav-bar'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  animation: mv2-nav-in var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-nav-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+[data-mv2='nav-item'] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: var(--nav-btn);
+  min-height: var(--nav-btn);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='nav-item'][aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--text-1);
+}
+[data-mv2='nav-item'][aria-current='page'] svg {
+  color: var(--accent-ink);
+}
+[data-mv2='nav-close'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+[data-mv2='nav-dot'] {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--space-2);
+  height: var(--space-2);
+  border: 1px solid var(--surface-1);
+  border-radius: var(--radius-full);
+  background: var(--live);
+}
+[data-mv2='nav-menu'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--space-3));
+}
+[data-mv2='nav-toggle']:focus-visible,
+[data-mv2='nav-item']:focus-visible,
+[data-mv2='nav-close']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+@media (hover: hover) {
+  [data-mv2='pill']:not([aria-pressed='true']):hover,
+  [data-mv2='nav-item']:not([aria-current='page']):hover,
+  [data-mv2='nav-close']:hover,
+  [data-mv2='home-clear']:hover,
+  [data-mv2='explore-all']:hover {
+    background: var(--surface-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='pill']:active,
+  [data-mv2='nav-toggle']:active {
+    transform: none;
   }
 }

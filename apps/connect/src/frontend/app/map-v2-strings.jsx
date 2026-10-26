@@ -215,6 +215,52 @@
       loading: 'Loading',
     },
 
+    // Issue #210: the folding navigation (app/map-v2-nav.jsx). Messages, Alerts and Projects live in the
+    // account menu that Profile opens (founder, 2026-10-26), each with its count.
+    nav: {
+      label: 'Main',
+      open: 'Open navigation',
+      openUnread: 'Open navigation, you have unread messages or alerts',
+      close: 'Close navigation',
+      items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
+      menu: { projects: 'Projects', messages: 'Messages', alerts: 'Alerts' },
+      unread: (n) => n + ' unread',
+    },
+
+    // Issue #210: the map home's category pills and the Explore row (app/map-v2-explore.jsx).
+    // One muted colour per group (founder, 2026-10-26); the group names are the pills.
+    explore: {
+      title: 'Explore',
+      seeAll: 'See all',
+      seeAllLabel: 'See all listings',
+      label: 'Listings near you, closest first',
+      labelCentre: 'Listings near the middle of the map, closest first',
+      pillsLabel: 'Show on the map',
+      search: 'Search events, places, people…',
+      clearSearch: 'Clear search',
+      groups: {
+        all: 'All',
+        worship: 'Churches & worship',
+        events: 'Events',
+        business: 'Business',
+        serve: 'Serve & care',
+        culture: 'Culture & fun',
+        learn: 'Learn & grow',
+        audiences: 'Audiences',
+        ideas: 'Ideas',
+      },
+      selected: 'Selected on the map',
+      under: 'Under 100 m away',
+      metres: (n) => n + ' m away',
+      km: (n) => n + ' km away',
+      centre: {
+        under: 'Under 100 m from the map centre',
+        metres: (n) => n + ' m from the map centre',
+        km: (n) => n + ' km from the map centre',
+      },
+      empty: 'Nothing here yet. Move the map or pick another category.',
+    },
+
     // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).
     // Map surfaces pass this object in; other screens use STR.
     report: {

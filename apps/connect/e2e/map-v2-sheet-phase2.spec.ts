@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 sheet, Phase 2 (tracker P2-07, P2-08, P2-06). Hermetic, clock frozen.
@@ -20,7 +20,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openListing(page, c.id);
   await expect(sheet(page)).toBeVisible();
   return { seed, c };
 }
@@ -75,7 +75,7 @@ test.describe("P2-07 Upcoming | Recent", () => {
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1"]);
     const other = seed.contributors[1];
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [other.physical_longitude, other.physical_latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${other.id}"]`).click({ force: true });
+    await openListing(page, other.id);
     await expect(page.getByRole("button", { name: "Upcoming" })).toHaveAttribute("aria-pressed", "true");
   });
 });
@@ -105,7 +105,7 @@ test.describe("P2-08 count buckets: shown only from 100, never below", () => {
     await openMap(page, "/?map=v2", 8);
     const pl = seed.places[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [pl.longitude, pl.latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${pl.id}"]`).click({ force: true });
+    await openListing(page, pl.id);
     await expect(sheet(page)).toBeVisible();
     await expect(page.locator("[data-map-sheet-header]")).not.toContainText("followers");
   });
@@ -194,7 +194,7 @@ test.describe("P2-06 QR code per Contributor", () => {
     await openMap(page, "/?map=v2", 8);
     const ev = seed.events[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`).click({ force: true });
+    await openListing(page, ev.id);
     await expect(sheet(page)).toBeVisible();
     await expect(page.getByRole("button", { name: "QR code", exact: true })).toHaveCount(0);
   });

@@ -15,6 +15,12 @@
 //  is left out. A broken picture is dropped. A listing logo falls back to
 //  initials instead.
 //
+//  `cat` (#210) names a category GROUP (map-v2-explore.jsx): the dot and the
+//  card's thin top edge then take that group's colour token (--cat-<group>)
+//  instead of the category's own hex. `tile` asks for a neutral picture tile
+//  with the category icon when an image card has no picture, so cards in one
+//  row keep one shape.
+//
 //  Styles: assets/map-v2.css section 4h (tokens only). Words the card paints
 //  itself live in MapV2Strings.card. Everything else is passed in.
 // ════════════════════════════════════════════════════════════════════
@@ -51,14 +57,15 @@
     return out;
   }
 
-  function categoryLine(cat, kind, slot) {
+  function categoryLine(cat, kind, slot, group) {
     const label = (cat && (cat.heading || cat.name)) || kind || '';
     if (!label) return null;
-    const hex = cat && cat.hex && HEX.test(cat.hex) ? cat.hex : '';
+    const hex = !group && cat && cat.hex && HEX.test(cat.hex) ? cat.hex : '';
     return h('span', { 'data-mv2': slot },
       h('span', {
         'data-mv2': 'card-dot', 'aria-hidden': 'true',
-        'data-fallback': hex ? undefined : '',
+        'data-cat': group || undefined,
+        'data-fallback': hex || group ? undefined : '',
         style: hex ? { background: hex } : undefined,
       }),
       h('span', { 'data-mv2': 'card-chip-label' }, label));
@@ -83,7 +90,7 @@
       const letters = initialsOf(props.title);
       return letters ? h('span', { 'data-mv2': 'card-initials', 'aria-hidden': 'true' }, letters) : null;
     }
-    if (failed) return null;
+    if (failed) return tileSlot(props);
     if (variant === 'event') {
       if (!props.date || !props.date.day) return null;
       return h('span', { 'data-mv2': 'card-date', 'aria-hidden': 'true' },
@@ -96,13 +103,21 @@
       return h(Picture, { src: url, attr: 'card-art', onFail: () => setFailed(true) });
     }
     const poster = props.media && safe(props.media.src);
-    if (!poster) return null;
+    if (!poster) return tileSlot(props);
     const Icon = window.Icon;
     return h('span', { 'data-mv2': 'card-media' },
       h(Picture, { src: poster, attr: 'card-photo', onFail: () => setFailed(true) }),
       variant === 'video' && linked ? h('span', { 'data-mv2': 'card-play', 'aria-hidden': 'true' },
         Icon ? h(Icon, { name: 'Play', size: 20 }) : null) : null,
       variant === 'video' && props.duration ? h('span', { 'data-mv2': 'card-duration' }, props.duration) : null);
+  }
+
+  /** A neutral 16:9 tile with the category icon, for an image card that asked for one (`tile`) and has no picture. */
+  function tileSlot(props) {
+    if (!props.tile || props.variant !== 'image') return null;
+    const Icon = window.Icon;
+    return h('span', { 'data-mv2': 'card-media', 'data-tile': '', 'data-cat': props.cat || undefined, 'aria-hidden': 'true' },
+      Icon && props.tile.icon ? h(Icon, { name: props.tile.icon, size: 32 }) : null);
   }
 
   function actionNode(action, key) {
@@ -139,7 +154,7 @@
     }
 
     const cat = lookupCategory(props);
-    const line = categoryLine(cat, props.kind, variant === 'event' ? 'card-group' : 'card-chip');
+    const line = categoryLine(cat, props.kind, variant === 'event' ? 'card-group' : 'card-chip', props.cat);
     const parts = metaParts(props.meta);
     const liveWord = props.live ? strings().live : '';
     const prefix = props.idPrefix || 'mv2-card';
@@ -192,6 +207,8 @@
       'data-news': props['data-news'],
       'data-near': props['data-near'],
       'aria-haspopup': props['aria-haspopup'],
+      'aria-current': props['aria-current'],
+      'data-cat': props.cat || undefined,
     };
     const control = Object.assign({}, markers, {
       'aria-labelledby': labelled || undefined,
