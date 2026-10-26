@@ -211,7 +211,12 @@ test.describe("a phone, 375 px, real touch", () => {
 
     // full, at the top: a downward swipe from a card is the scroll hand-off and collapses the sheet
     await scroller(page).evaluate((e) => { e.scrollTop = 0; });
-    await page.waitForTimeout(250);
+    await expect(scroller(page)).toHaveAttribute("data-top", "");
+    // touch-action is read when a touch starts, from the last committed frame: wait for the row's value to be the
+    // hand-off one and for a couple of frames to be painted, so a slow runner does not swipe on the old value
+    await expect.poll(() => page.locator("[data-mv2='hrow'] [data-mv2='card2']").first().evaluate((e) => getComputedStyle(e).touchAction)).toBe("pan-x pan-down pinch-zoom");
+    await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+    await page.waitForTimeout(400);
     const top = await geom(page, "Latest news");
     await swipe(cdp, { x: top.items[0].l + 100, y: top.items[0].t + 40 }, 220, { ms: 400, steps: 14 });
     await expect.poll(() => snapOf(page)).toBe("half");
