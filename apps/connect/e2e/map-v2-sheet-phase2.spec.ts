@@ -212,4 +212,75 @@ test.describe("P2-06 QR code per Contributor", () => {
     expect(box.x + box.width).toBeLessThanOrEqual(360);
     expect(box.y + box.height).toBeLessThanOrEqual(640);
   });
+
+  test("at half, a press on the dialog does not drag the sheet, and focus, Escape, Back and a backdrop tap behave", async ({ page }) => {
+    await openContributor(page, 0);
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await page.evaluate(() => { document.documentElement.style.overflow = "scroll"; });
+    // The action sits below the half sheet's fold. A script click opens it without moving the sheet.
+    await page.getByRole("button", { name: "QR code", exact: true }).evaluate((el: HTMLButtonElement) => el.click());
+    const dlg = page.getByRole("dialog", { name: "QR code for Fixture Fellowship 1" });
+    await expect(dlg).toBeVisible();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("hidden");
+    expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(true);
+    await expect(page.getByRole("button", { name: "Close QR code" })).toBeFocused();
+
+    const card = page.locator("[data-mv2='qr-card']");
+    const box = (await card.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + 28;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, Math.min(y + 220, box.y + box.height - 12), { steps: 8 });
+    await page.mouse.up();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await expect(dlg).toBeVisible();
+
+    const behind = await page.evaluate(() => {
+      const root = document.getElementById("root");
+      const btn = root?.querySelector("button");
+      if (btn instanceof HTMLElement) btn.focus();
+      document.documentElement.scrollTop = 400;
+      return { inRoot: !!root?.contains(document.activeElement), scroll: document.documentElement.scrollTop };
+    });
+    expect(behind.inRoot).toBe(false);
+    expect(behind.scroll).toBe(0);
+
+    const save = page.getByRole("button", { name: "Save image" });
+    const close = page.getByRole("button", { name: "Close QR code" });
+    await page.keyboard.press("Tab");
+    await expect(save).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(close).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(save).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(close).toBeFocused();
+
+    await page.locator("[data-mv2='qr-card']").click();
+    await expect(dlg).toBeVisible();
+    await page.locator("[data-mv2='qr']").click({ position: { x: 8, y: 8 } });
+    await expect(dlg).toHaveCount(0);
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await expect(page.getByRole("button", { name: "QR code", exact: true })).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("scroll");
+    expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(false);
+
+    await page.getByRole("button", { name: "QR code", exact: true }).evaluate((el: HTMLButtonElement) => el.click());
+    await expect(dlg).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dlg).toHaveCount(0);
+    await expect(sheet(page)).toBeVisible();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await expect(page.getByRole("button", { name: "QR code", exact: true })).toBeFocused();
+
+    await expand(page);
+    await page.getByRole("button", { name: "QR code", exact: true }).click();
+    await expect(dlg).toBeVisible();
+    await page.goBack();
+    await expect(dlg).toHaveCount(0);
+    await expect(sheet(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "QR code", exact: true })).toBeFocused();
+  });
 });

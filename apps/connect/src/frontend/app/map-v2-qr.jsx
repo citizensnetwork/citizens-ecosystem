@@ -267,24 +267,44 @@
   // each close only this; focus goes back to the button that opened it.
   function Dialog({ url, name, slug, strings, onClose, returnFocus }) {
     const closeBtn = useRef(null);
+    const rootRef = useRef(null);
+    const closeRef = useRef(onClose);
+    const backTo = useRef(returnFocus);
+    closeRef.current = onClose;
+    backTo.current = returnFocus;
     useBackGuard(true, onClose);
+    const qr = useMemo(() => encode(url), [url]);
     useEffect(() => {
+      if (!qr || !rootRef.current) return undefined;
       if (closeBtn.current) closeBtn.current.focus({ preventScroll: true });
-      return () => { if (returnFocus && returnFocus.isConnected) returnFocus.focus({ preventScroll: true }); };
-    }, []);
+      // Lift the page lock before returning focus: the opener is inside #root.
+      const hold = window.MapV2 && window.MapV2.lockBehind ? window.MapV2.lockBehind() : function () {};
+      const trap = window.MapV2 && window.MapV2.trapFocus ? window.MapV2.trapFocus(rootRef.current) : function () {};
+      return () => {
+        trap();
+        hold();
+        const el = backTo.current;
+        if (el && el.isConnected) el.focus({ preventScroll: true });
+      };
+    }, [qr]);
     useEffect(() => {
       // capture, so the sheet's own Escape handler (bubble phase) never sees this key
-      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onClose(); } };
+      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); closeRef.current(); } };
       document.addEventListener('keydown', onKey, true);
       return () => document.removeEventListener('keydown', onKey, true);
     });
-    const qr = useMemo(() => encode(url), [url]);
     if (!qr) return null;
     const p = pathData(qr, 4);
     // Inside the Capacitor phone app a blob download does nothing (the web view has no download handler), and a button
     // that silently does nothing is worse than none: there, no Save button, and a screenshot is the way to keep it.
     const native = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
-    return h('div', { 'data-mv2': 'qr', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mv2-qr-title' },
+    return h('div', {
+      ref: rootRef, 'data-mv2': 'qr', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mv2-qr-title',
+      // A press here must not reach the sheet's onPointerDown. React portals bubble
+      // synthetic events, so without this a press on the dialog starts a sheet drag.
+      onPointerDown: (e) => e.stopPropagation(),
+      onClick: (e) => { if (e.target === e.currentTarget) closeRef.current(); },
+    },
       h('div', { 'data-mv2': 'qr-card' },
         h('h2', { id: 'mv2-qr-title', 'data-mv2': 'qr-title' }, strings.title(name)),
         h('svg', { 'data-mv2': 'qr-img', viewBox: '0 0 ' + p.size + ' ' + p.size, role: 'img', 'aria-label': strings.imageLabel(name, url), shapeRendering: 'crispEdges' },

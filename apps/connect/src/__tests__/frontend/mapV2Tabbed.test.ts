@@ -105,6 +105,6 @@ describe("map sheet tabbed block (issue 217)", () => {
     expect(sheet).not.toContain("role: 'separator'");
     expect(lib).toContain("/assets/map-v2.css?v=20261025a");
     expect(html).toContain("app/map-v2-sheet.jsx?v=20261025a");
-    expect(html).toContain("app/map-v2-lib.jsx?v=20261025a");
+    expect(html).toContain("app/map-v2-lib.jsx?v=20261026a");
   });
 });
