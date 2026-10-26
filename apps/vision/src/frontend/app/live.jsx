@@ -374,7 +374,7 @@
         id: s.id,
         name: s.name,
         icon: s.icon || "grid",
-        color: s.colour || "var(--gold-600)",
+        color: s.colour || "var(--accent-ink)",
         activities: num(s.activities) || 0,
         people: num(s.people) || 0,
         reach: num(s.reach) || 0,

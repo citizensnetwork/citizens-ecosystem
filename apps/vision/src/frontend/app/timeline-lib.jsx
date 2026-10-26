@@ -185,13 +185,40 @@
   // ── Base map ───────────────────────────────────────────────────────
   // A MapTiler style needs a key that works for THIS origin (the key is
   // restricted by HTTP origin). When there is no key — or MapTiler refuses it —
-  // the map still draws the activity points on a plain parchment ground
-  // instead of failing: the Kingdom activity is the content, the tiles are context.
-  const BLANK_STYLE = {
-    version: 8,
-    sources: {},
-    layers: [{ id: "cv-ground", type: "background", paint: { "background-color": "#EFEAD9" } }],
-  };
+  // the map still draws the activity points on a plain ground in the canon
+  // surface colour instead of failing: the Kingdom activity is the content, the tiles are context.
+  // MapLibre paint cannot read CSS variables. These fallbacks are the Map v2
+  // canon hexes (map-v2.css); the live page reads the same tokens off :root
+  // so Light and Noir stay in step with the stylesheet.
+  function tokenColour(name) {
+    if (typeof document === "undefined" || !document.documentElement) return "";
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function mapPaint() {
+    const read = (name, fallback) => tokenColour(name) || fallback;
+    return {
+      accent: read("--accent", "#c9a84c"),
+      text: read("--text-1", "#0a0908"),
+      muted: read("--text-2", "#5c5444"),
+      paper: read("--logo-bg", "#ffffff"),
+      ground: read("--surface-0", "#f7f4ee"),
+    };
+  }
+
+  function blankStyle() {
+    return {
+      version: 8,
+      sources: {},
+      layers: [{ id: "cv-ground", type: "background", paint: { "background-color": mapPaint().ground } }],
+    };
+  }
+
+  const BLANK_STYLE = blankStyle();
+
+  function isDarkTheme(theme) {
+    return theme === "dark" || theme === "noir";
+  }
 
   function hasKey(env) {
     const k = env && env.MAPTILER_KEY;
@@ -200,7 +227,7 @@
 
   function styleUrl(env, theme) {
     if (!hasKey(env)) return null;
-    const name = theme === "noir" ? "dataviz-dark" : "dataviz";
+    const name = isDarkTheme(theme) ? "dataviz-dark" : "dataviz";
     return "https://api.maptiler.com/maps/" + name + "/style.json?key=" + encodeURIComponent(env.MAPTILER_KEY);
   }
 
@@ -216,6 +243,6 @@
     dayNumber, isoFromDay, validCoord, toPoints, featureCollection, extent, bounds,
     windowAt, previousWindow, summarise, dotRadius, ringRadius, dotRadiusExpr, ringRadiusExpr,
     windowFilter, NOTHING, playStep, summaryLine,
-    BLANK_STYLE, hasKey, styleUrl, isKeyRefusal,
+    BLANK_STYLE, blankStyle, mapPaint, tokenColour, isDarkTheme, hasKey, styleUrl, isKeyRefusal,
   };
 })();

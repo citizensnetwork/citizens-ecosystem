@@ -7,8 +7,8 @@ const require = createRequire(import.meta.url);
 // Wear extends next/core-web-vitals and prettier, not next/typescript.
 export default [
   ...next15FlatConfig({
-    eslintConfigNextPkg: require.resolve('eslint-config-next/package.json'),
-    reactVersion: '18.3',
+    eslintConfigNextPkg: require.resolve('eslint-config-next'),
+    reactVersion: '19.3',
     typescript: false,
   }),
   prettier,

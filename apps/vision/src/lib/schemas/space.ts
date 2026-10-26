@@ -5,7 +5,7 @@ import { z } from "zod";
 export const createSpaceSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
-  // Hex or CSS colour token (e.g. '#4a90d9' or 'var(--gold-600)').
+  // Hex or CSS colour token (e.g. '#4a90d9' or 'var(--accent-ink)').
   colour: z.string().max(64).optional(),
   icon: z.string().max(64).optional(),
   sort_order: z.number().int().min(0).max(100000).optional(),
