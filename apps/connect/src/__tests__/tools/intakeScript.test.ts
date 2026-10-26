@@ -14,11 +14,13 @@ const SECRET = "c".repeat(64);
 const SRC = readFileSync(join(process.cwd(), "tools/google-forms/intake.gs"), "utf8");
 
 type Script = {
-  post_: (payload: unknown) => { code: number; body: Record<string, unknown> };
+  post_: (payload: unknown, which?: string) => { code: number; body: Record<string, unknown> };
   columns_: (sheet: unknown) => Record<string, number>;
   buildPayload_: (str: (k: string) => string, notes: string[]) => Record<string, unknown>;
   autoUpdateLevel_: (answer: string, notes: string[]) => string;
   sendWelcome_: (email: string, name: string, url: string, onMap?: boolean, hasAccount?: boolean) => void;
+  intakeOutcome_: (res: { code: number; body: Record<string, unknown> }) => { kind: string; requestId?: string; message?: string };
+  pollOutcome_: (row: { status?: string; url?: string; on_map?: boolean } | null) => { kind: string; url?: string; onMap?: boolean };
   refreshStatuses: () => void;
   processRow_: (sheet: unknown, cols: Record<string, number>, row: number) => void;
   awaitingStatus_: (days: number, reminded: boolean) => string;
@@ -103,7 +105,7 @@ function load(): Script {
   const names = Object.keys(google);
   const factory = new Function(
     ...names,
-    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q };`,
+    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, intakeOutcome_, pollOutcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q };`,
   );
   return factory(...names.map((n) => google[n as keyof typeof google])) as Script;
 }
@@ -542,12 +544,70 @@ describe("intake.gs Status (C10)", () => {
     expect(triggersMade).toEqual([
       { fn: "onApproveEdit", kind: "edit", ss: true },
       { fn: "refreshStatuses", kind: "time", minutes: 10 },
+      { fn: "pollUpgrades", kind: "time", minutes: 10 },
     ]);
     expect(toasts.join(" ")).toMatch(/Intake is ready/);
   });
 
   it("the trigger handler is a public name (Apps Script cannot run a private one on a timer)", () => {
     expect(SRC).toMatch(/^function refreshStatuses\(\)/m);
+    expect(SRC).toMatch(/^function pollUpgrades\(\)/m);
     expect(SRC).not.toMatch(/function refreshStatuses_/);
+  });
+
+  it("treats Request id and Resend as optional, and finds them when the sheet has them", () => {
+    const script = load();
+    const headers = questionHeaders(script);
+    const headerSheet = (names: string[]) => ({
+      getLastColumn: () => names.length,
+      getRange: () => ({ getValues: () => [names] }),
+    });
+    const without = script.columns_(headerSheet(["Timestamp", ...headers, ...MANUAL]));
+    expect(without["Request id"]).toBeUndefined();
+    expect(without.Resend).toBeUndefined();
+    const withOptional = script.columns_(headerSheet(["Timestamp", ...headers, ...MANUAL, "Request id", "Resend"]));
+    expect(withOptional["Request id"]).toBe(headers.length + MANUAL.length + 2);
+    expect(withOptional.Resend).toBe(headers.length + MANUAL.length + 3);
+  });
+
+  it("an awaiting_confirmation reply is not a live listing, and the poll does not send a welcome", () => {
+    const script = load();
+    expect(script.intakeOutcome_({
+      code: 200,
+      body: { success: true, status: "awaiting_confirmation", request_id: "req-1", message: "Waiting." },
+    })).toEqual({ kind: "awaiting", requestId: "req-1", message: "Waiting." });
+    expect(script.intakeOutcome_({ code: 200, body: { success: true, status: "awaiting_confirmation", message: "No id." } })).toEqual({
+      kind: "error",
+      message: "No id.",
+    });
+    expect(script.intakeOutcome_({ code: 200, body: { success: true, url: "https://www.citizenscentral.co.za/c/example" } }).kind).toBe("live");
+    expect(script.intakeOutcome_({ code: 409, body: { message: "Already live." } })).toEqual({ kind: "error", message: "Already live." });
+
+    expect(script.pollOutcome_({ status: "confirmed", url: "https://www.citizenscentral.co.za/c/example", on_map: true })).toEqual({
+      kind: "live",
+      url: "https://www.citizenscentral.co.za/c/example",
+      onMap: true,
+    });
+    expect(script.pollOutcome_({ status: "declined" })).toEqual({ kind: "declined" });
+    expect(script.pollOutcome_({ status: "expired" })).toEqual({ kind: "expired" });
+    expect(script.pollOutcome_({ status: "awaiting_confirmation" })).toEqual({ kind: "unchanged" });
+    expect(script.pollOutcome_(null)).toEqual({ kind: "unchanged" });
+
+    const poll = SRC.slice(SRC.indexOf("function pollUpgrades"), SRC.indexOf("function post_"));
+    expect(poll).not.toContain("sendWelcome_");
+    const awaiting = SRC.slice(SRC.indexOf("outcome.kind === 'awaiting'"), SRC.indexOf("outcome.kind === 'live'"));
+    expect(awaiting).not.toContain("sendWelcome_");
+  });
+
+  it("posts status and resend to the sibling routes, and leaves the original intake URL alone", () => {
+    const script = load();
+    script.post_({ organisation_name: "Example Fellowship" });
+    script.post_({ ids: ["11111111-1111-4111-8111-111111111111"] }, "status");
+    script.post_({ id: "11111111-1111-4111-8111-111111111111" }, "resend");
+    expect(fetchCalls.map((c) => c.url)).toEqual([
+      "https://www.citizenscentral.co.za/api/intake/google-form",
+      "https://www.citizenscentral.co.za/api/intake/google-form/status",
+      "https://www.citizenscentral.co.za/api/intake/google-form/resend",
+    ]);
   });
 });

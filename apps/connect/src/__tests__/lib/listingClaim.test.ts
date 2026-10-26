@@ -73,6 +73,34 @@ describe("createListingUser", () => {
     expect(createUser).toHaveBeenCalledWith({ email: "owner@example.com", email_confirm: true, user_metadata: { full_name: "Org" } });
   });
 
+  it("defer: a plain Citizen is handed back for an upgrade, and no alias user is created", async () => {
+    const profile = { id: "citizen-1", role: "citizen", email: "owner@example.com", contributor_status: "not_applied", contributor_slug: null, deleted_at: null };
+    const { admin, createUser } = fakeAdmin({ users: [taken], profile });
+    const result = await createListingUser(admin, input, { existingCitizen: "defer" });
+    expect(result).toEqual({ ok: false, status: 409, error: "existing_citizen", profile });
+    expect(createUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("a removed account is refused, even when the caller would otherwise defer or alias it", async () => {
+    const { admin, createUser } = fakeAdmin({
+      users: [taken],
+      profile: { role: "citizen", contributor_status: "not_applied", deleted_at: "2026-01-01T00:00:00.000Z" },
+    });
+    const result = await createListingUser(admin, input, { existingCitizen: "defer" });
+    expect(result).toMatchObject({ ok: false, status: 409, error: "account_not_eligible" });
+    expect(createUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("a Contributor with no public page is refused without an alias", async () => {
+    const { admin, createUser } = fakeAdmin({
+      users: [taken],
+      profile: { role: "contributor", contributor_slug: null },
+    });
+    const result = await createListingUser(admin, input);
+    expect(result).toMatchObject({ ok: false, status: 409, error: "account_not_eligible" });
+    expect(createUser).toHaveBeenCalledTimes(1);
+  });
+
   it("a taken address of a plain Citizen: an alias placeholder, flagged, never the real address twice", async () => {
     const { admin, createUser } = fakeAdmin({ users: [taken, { id: "alias1" }], profile: { role: "citizen", contributor_status: "not_applied", contributor_slug: null } });
     expect(await createListingUser(admin, input)).toEqual({ ok: true, userId: "alias1", ownerHasAccount: true });
