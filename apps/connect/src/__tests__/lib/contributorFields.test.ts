@@ -158,6 +158,28 @@ describe("parseListingFields — socials that are the wrong kind of value", () =
     expect(res.notes[0].length).toBeLessThan(300);
   });
 
+  it("lenient: a literal No in website or socials is empty, with no skip note", () => {
+    const res = parseListingFields(
+      { ...valid, website_url: " No ", facebook_url: "no", instagram_handle: "NO" },
+      { lenientSocials: true },
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.fields.websiteUrl).toBeNull();
+    expect(res.fields.socials.facebook_url).toBeNull();
+    expect(res.fields.socials.instagram_handle).toBeNull();
+    expect(res.notes).toEqual([]);
+  });
+
+  it("strict: a literal No is not blanked before validation", () => {
+    const website = parse({ website_url: "No" });
+    if (website.ok) expect(website.fields.websiteUrl).not.toBeNull();
+    else expect(website.error).toBe("invalid_website_url");
+    const social = parse({ facebook_url: "No" });
+    if (social.ok) expect(social.fields.socials.facebook_url).not.toBeNull();
+    else expect(social.error).toBe("invalid_facebook_url");
+  });
+
   it("returns no notes when every social is fine", () => {
     const res = parseListingFields({ ...valid, instagram_handle: "@gracepoint", facebook_url: "facebook.com/gracepoint" });
     expect(res.ok && res.notes).toEqual([]);

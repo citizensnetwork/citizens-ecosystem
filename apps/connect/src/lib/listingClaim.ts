@@ -24,9 +24,28 @@ export type ClaimSource = "google_form" | "admin_create";
 /** One reminder, this long after the listing went live. Nothing ever expires or attaches by itself. */
 export const REMINDER_AFTER_DAYS = 7;
 
+/** The profile row behind a taken address. Only the columns createListingUser selects. */
+export type ExistingListingProfile = {
+  id?: string;
+  role?: string;
+  email?: string | null;
+  contributor_status?: string | null;
+  contributor_slug?: string | null;
+  contributor_hidden?: boolean | null;
+  deleted_at?: string | null;
+};
+
 export type ListingUserResult =
   | { ok: true; userId: string; ownerHasAccount: boolean }
-  | { ok: false; status: number; error: string; message?: string; url?: string };
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      message?: string;
+      url?: string;
+      /** Set only for `existing_citizen`: the Google Form route starts an upgrade instead of an alias listing. */
+      profile?: ExistingListingProfile;
+    };
 
 function isEmailTaken(err: { code?: string; message?: string } | null | undefined): boolean {
   return err?.code === "email_exists" || !!err?.message?.toLowerCase().includes("already been registered");
@@ -36,13 +55,16 @@ function isEmailTaken(err: { code?: string; message?: string } | null | undefine
  * Create the auth user a new listing will live under.
  *
  * Tries the real address first. If it is taken, the owner already has an account: a plain Citizen with nothing in
- * progress gets the alias flow; anything else is refused with a message that says what to do (it goes to the
- * Sheet's Notes / the admin's screen). The profile lookup is service-role: `profiles.email` is private, and this is
- * only reachable past the HMAC check or the admin check.
+ * progress gets the alias flow, unless the caller passes `existingCitizen: "defer"` (the Google Form). That returns
+ * `existing_citizen` and creates nothing, so the form can start a confirm-and-upgrade of the account itself.
+ * Anything else is refused with a message that says what to do (it goes to the Sheet's Notes / the admin's screen).
+ * The profile lookup is service-role: `profiles.email` is private, and this is only reachable past the HMAC check
+ * or the admin check.
  */
 export async function createListingUser(
   admin: Admin,
   input: { claimEmail: string; userMetadata: Record<string, unknown>; origin: string },
+  opts?: { existingCitizen?: "alias" | "defer" },
 ): Promise<ListingUserResult> {
   const first = await admin.auth.admin.createUser({
     email: input.claimEmail,
@@ -59,15 +81,20 @@ export async function createListingUser(
 
   const { data } = await admin
     .from("profiles")
-    .select("role, contributor_status, contributor_slug, contributor_hidden")
+    .select("id, role, contributor_status, contributor_slug, contributor_hidden, deleted_at")
     .eq("email", input.claimEmail)
     .maybeSingle();
-  const existing = data as {
-    role?: string;
-    contributor_status?: string;
-    contributor_slug?: string | null;
-    contributor_hidden?: boolean;
-  } | null;
+  const existing = data as ExistingListingProfile | null;
+
+  // A removed account is never a listing target and never an upgrade target.
+  if (existing?.deleted_at) {
+    return {
+      ok: false,
+      status: 409,
+      error: "account_not_eligible",
+      message: "That email can't take a Contributor listing this way, so nothing was changed.",
+    };
+  }
 
   if (existing?.role === "contributor" && existing.contributor_slug) {
     const url = `${input.origin}/c/${existing.contributor_slug}`;
@@ -79,6 +106,23 @@ export async function createListingUser(
       message: `${input.claimEmail} already has a Contributor listing${hidden}: ${url} — nothing was changed.`,
       url,
     };
+  }
+
+  if (existing?.role === "contributor") {
+    return {
+      ok: false,
+      status: 409,
+      error: "account_not_eligible",
+      message: "That email already belongs to a Contributor account, so nothing was changed.",
+    };
+  }
+
+  // Google Form (#248): a plain citizen confirms an upgrade of their own account. No alias listing.
+  // Admin Create keeps the alias (default). Pending and rejected applications are refused below.
+  const plainCitizen =
+    existing?.role === "citizen" && existing.contributor_status !== "pending" && existing.contributor_status !== "rejected";
+  if (opts?.existingCitizen === "defer" && existing && plainCitizen) {
+    return { ok: false, status: 409, error: "existing_citizen", profile: existing };
   }
 
   if (existing?.role === "citizen" && existing.contributor_status === "not_applied") {

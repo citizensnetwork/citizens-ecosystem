@@ -55,6 +55,8 @@ describe("next.config.ts rewrites ↔ routes.jsx", () => {
       { page: "profile", params: { slug: "impact-radio" } },
       { page: "profile", params: { id: ID } },
       { page: "profile", params: {} },
+      { page: "intake-upgrade", params: { token: "ab".repeat(32) } },
+      { page: "intake-upgrade", params: { token: "cd".repeat(32), intent: "decline" } },
     ];
     for (const n of navs) {
       const path = R.pathFor(n)!;

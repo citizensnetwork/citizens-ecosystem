@@ -105,6 +105,16 @@ export type ParseListingOptions = {
   lenientSocials?: boolean;
 };
 
+/**
+ * A Form cell that says exactly "No" (any capitalisation) means "I don't have
+ * one", not a handle and not a website. Only the lenient writer (Google Form
+ * intake) treats it as empty. Admin Create still validates the value as typed.
+ */
+function literalNoAsEmpty(value: unknown, lenient: boolean): unknown {
+  if (!lenient || typeof value !== "string") return value;
+  return value.trim().toLowerCase() === "no" ? "" : value;
+}
+
 const NOTE_VALUE_MAX = 60;
 
 /** One human-readable line for the Sheet's Notes column; the value is clipped and single-line. */
@@ -148,7 +158,9 @@ export function parseListingFields(
   }
   const category = payload.contributor_category;
 
-  const rawWebsite = trimOrNull(payload.website_url, MAX_URL);
+  const lenient = options.lenientSocials === true;
+  const notes: string[] = [];
+  const rawWebsite = trimOrNull(literalNoAsEmpty(payload.website_url, lenient), MAX_URL);
   const websiteUrl = rawWebsite === null ? null : coercePublicUrl(rawWebsite, MAX_URL);
   if (rawWebsite !== null && websiteUrl === null) {
     return { ok: false, error: "invalid_website_url" };
@@ -158,11 +170,9 @@ export function parseListingFields(
   const contactEmail = hasContactEmail ? normaliseEmail(payload.contact_email) : null;
   if (hasContactEmail && !contactEmail) return { ok: false, error: "invalid_contact_email" };
 
-  const lenient = options.lenientSocials === true;
-  const notes: string[] = [];
   const socials = {} as Record<SocialField, string | null>;
   for (const [key, label] of SOCIAL_FIELDS) {
-    const check = checkSocialField(key, payload[key], MAX_SOCIAL, { matchPlatformHost: lenient });
+    const check = checkSocialField(key, literalNoAsEmpty(payload[key], lenient), MAX_SOCIAL, { matchPlatformHost: lenient });
     if (check.ok) {
       socials[key] = check.value;
     } else if (lenient && check.reason !== "invalid") {
