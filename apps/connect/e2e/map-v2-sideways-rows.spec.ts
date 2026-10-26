@@ -204,12 +204,22 @@ test.describe("a phone, 375 px, real touch", () => {
     const sh = await scroller(page).evaluate((e) => e.scrollHeight - e.clientHeight);
     expect(sh, "the content is taller than the sheet").toBeGreaterThan(120);
     const t0 = await scroller(page).evaluate((e) => e.scrollTop);
-    await swipe(cdp, { x: mid.items[0].l + 100, y: mid.items[0].t + 120 }, -150, { ms: 400, steps: 14 });
+    // the finger rests for a moment before it lifts, so the page stops where it is instead of carrying on (a fling)
+    await swipe(cdp, { x: mid.items[0].l + 100, y: mid.items[0].t + 120 }, -150, { ms: 400, steps: 14, hold: true });
+    await page.waitForTimeout(250);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] } as never);
     await expect.poll(() => scroller(page).evaluate((e) => e.scrollTop), { timeout: 3000 }).toBeGreaterThan(t0 + 60);
     expect(await snapOf(page)).toBe("full");
     expect(await scrollLeftOf(page, newsRegion(page))).toBe(0);
 
     // full, at the top: a downward swipe from a card is the scroll hand-off and collapses the sheet
+    let seen = -1;
+    await expect.poll(async () => {
+      const now = await scroller(page).evaluate((e) => e.scrollTop);
+      const still = now === seen;
+      seen = now;
+      return still;
+    }, { intervals: [300], timeout: 8000, message: "the content has stopped scrolling" }).toBe(true);
     await scroller(page).evaluate((e) => { e.scrollTop = 0; });
     await expect(scroller(page)).toHaveAttribute("data-top", "");
     // touch-action is read when a touch starts, from the last committed frame: wait for the row's value to be the
