@@ -99,9 +99,8 @@ async function applyAsContributor(page: Page) {
 
   await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
   await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
-  // One of the 12 Contributor types (not an event category) — a NEW slug,
-  // so the whole path below runs on it.
-  await page.getByRole("button", { name: "Retreat / Healing" }).click();
+  // One of the 12 Contributor types with no onboarding preset, so the wizard asks for the address as before.
+  await page.getByRole("button", { name: "Market / Expo" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
   // "Your story" step — bio/website are optional, skip straight through.

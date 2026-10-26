@@ -61,6 +61,12 @@
         app.status === 'pending' && app.previouslyRemovedAt && h('div', { className: 'mt-3 flex items-start gap-2 p-3 rounded-xl bg-[#FEF3C7] text-[#92400E]', 'data-testid': 'previously-removed' },
           h(Icon, { name: 'Flag', size: 14, className: 'shrink-0 mt-0.5' }),
           h('p', { className: 'text-xs leading-relaxed' }, 'Previously removed by an admin on ' + fmt(app.previouslyRemovedAt) + '. Check why before you approve this one.')),
+        // Care / Recovery (#202, founder decision 2026-10-21): they list with EXTRA admin review.
+        app.status === 'pending' && window.CCPresets.needsExtraReview(app.category) && h('div', { className: 'mt-3 flex items-start gap-2 p-3 rounded-xl bg-[#FEF3C7] text-[#92400E]', 'data-testid': 'extra-review' },
+          h(Icon, { name: 'Flag', size: 14, className: 'shrink-0 mt-0.5' }),
+          h('div', null,
+            h('p', { className: 'text-[10px] font-bold uppercase tracking-wide mb-0.5' }, window.CCPresets.COPY.adminBadge),
+            h('p', { className: 'text-xs leading-relaxed' }, window.CCPresets.COPY.adminCheck))),
         h('p', { className: 'text-xs text-muted-foreground mt-3 leading-relaxed' }, app.bio),
         h('div', { className: 'mt-3 p-3 bg-muted/60 rounded-xl' },
           h('p', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1' }, 'Why they want to contribute'),

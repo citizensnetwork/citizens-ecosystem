@@ -95,7 +95,7 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.getByRole("heading", { name: "Become a Contributor" })).toBeVisible();
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
     await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
-    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Market / Expo" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByText(/admin reviews every application/i)).toBeVisible();
@@ -111,7 +111,7 @@ test.describe("signed in: applying and waiting", () => {
     const applied = db.calls.find((c) => c.path === "apply")!.body!;
     expect(applied).toMatchObject({
       display_name: ORG_NAME,
-      contributor_category: "retreat-healing",
+      contributor_category: "markets-expos",
       contributor_kind: "ministry",
     });
     expect(applied).not.toHaveProperty("status");
@@ -194,7 +194,7 @@ test.describe("signed in: applying and waiting", () => {
     await expect(page.locator("label").filter({ hasText: "Organisation / ministry name" })).toHaveCount(0);
     await page.getByPlaceholder("e.g. your name").fill("Grace Applicant");
     await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
-    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Market / Expo" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByText("Individual", { exact: true })).toBeVisible();
@@ -206,6 +206,71 @@ test.describe("signed in: applying and waiting", () => {
       display_name: "Grace Applicant",
       contributor_kind: "individual",
     });
+  });
+
+  test("presets (#202): a category starts the Type on its default, and a Type the person chose is never overwritten", async ({ page }) => {
+    await openAsApplicant(page);
+    await bootAt(page);
+    await goTo(page, "apply");
+    const type = page.getByRole("combobox", { name: "Type" });
+    await expect(type).toHaveValue("ministry");
+    await page.getByRole("button", { name: "Business", exact: true }).click();
+    await expect(type).toHaveValue("business");
+    await expect(page.getByText(/We matched your Type to Business/)).toBeVisible();
+    // No extra step: still three.
+    await expect(page.getByText("Step 1 of 3")).toBeVisible();
+
+    await type.selectOption("individual");
+    await expect(page.getByText(/We matched your Type/)).toHaveCount(0);
+    await page.getByRole("button", { name: "Church", exact: true }).click();
+    await expect(type).toHaveValue("individual");
+  });
+
+  test("Care / Recovery (#202) opts in to the map: no address is asked for, and none is sent", async ({ page }) => {
+    const db = await openAsApplicant(page);
+    await bootAt(page);
+    await goTo(page, "apply");
+    await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
+    await page.getByRole("button", { name: "Clinic" }).click();
+    await expect(page.getByRole("combobox", { name: "Type" })).toHaveValue("organization");
+    await expect(page.getByTestId("preset-care-note")).toContainText("extra look from an admin");
+    await expect(page.getByPlaceholder("e.g. Eastside, Central District")).toHaveCount(0);
+    await expect(page.getByText("I don't have a fixed physical location")).toHaveCount(0);
+
+    // Nothing but the name and category is needed to go on.
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText("Step 3 of 3")).toBeVisible();
+    await expect(page.getByText("No, kept private")).toBeVisible();
+    await expect(page.getByText(/closer look before anything is public/)).toBeVisible();
+    await page.getByRole("button", { name: "Submit application" }).click();
+
+    await expect.poll(() => db.calls.filter((c) => c.path === "apply").length).toBe(1);
+    expect(db.calls.find((c) => c.path === "apply")!.body).toMatchObject({
+      contributor_category: "clinic",
+      contributor_kind: "organization",
+      show_on_map: false,
+      physical_address: null,
+      physical_latitude: null,
+      physical_longitude: null,
+    });
+  });
+
+  test("Care / Recovery (#202): turning the map on brings the address back and says so", async ({ page }) => {
+    const db = await openAsApplicant(page);
+    await bootAt(page);
+    await goTo(page, "apply");
+    await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
+    await page.getByRole("button", { name: "Clinic" }).click();
+    await page.getByText("Show my address and pin on the map").click();
+    await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText("No, kept private")).toHaveCount(0);
+    await page.getByRole("button", { name: "Submit application" }).click();
+
+    await expect.poll(() => db.calls.filter((c) => c.path === "apply").length).toBe(1);
+    expect(db.calls.find((c) => c.path === "apply")!.body).toMatchObject({ show_on_map: true, physical_address: "Church Square, Pretoria" });
   });
 
   test("a pending individual keeps that kind, and the name field still says Your name", async ({ page }) => {
@@ -230,7 +295,7 @@ test.describe("signed in: applying and waiting", () => {
     await goTo(page, "apply");
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
     await page.getByRole("button", { name: /fixed physical location/ }).click();
-    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Market / Expo" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     const note = page.getByText(/admin reviews every application/i);
@@ -335,6 +400,12 @@ test.describe("signed in as the admin: Applications", () => {
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     return reviews;
   }
+
+  test("a Care / Recovery application carries the extra-review note for the admin, and nobody else's does (#202)", async ({ page }) => {
+    await openApplications(page, [application({}), application({ id: "22222222-2222-4222-8222-222222222222", category: "churches-ministries" })]);
+    await expect(page.locator(`[data-application="${PENDING_ID}"]`).getByTestId("extra-review")).toContainText("EXTRA REVIEW");
+    await expect(page.locator('[data-application="22222222-2222-4222-8222-222222222222"]').getByTestId("extra-review")).toHaveCount(0);
+  });
 
   test("shows the staged profile, the 'previously removed' note, and only ever links http(s) addresses", async ({ page }) => {
     await openApplications(page, [application({ previouslyRemovedAt: "2026-10-03T14:07:00Z" })]);
