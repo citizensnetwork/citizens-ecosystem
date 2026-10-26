@@ -9,7 +9,7 @@
 (function () {
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { useStore } = window.CWStore;
-  const { Avatar, BrandLogo, Spinner, EmptyState, GOLD, fmtCount, timeAgo } = window.CWUI;
+  const { Avatar, BrandLogo, Spinner, EmptyState, GOLD_INK, fmtCount, timeAgo } = window.CWUI;
   const { Icon } = window.CWIcons;
 
   const TABS = [
@@ -117,9 +117,9 @@
                     fontWeight: 800,
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase',
-                    color: '#7a6212',
-                    background: '#faf6ec',
-                    border: '1px solid #f0e2b0',
+                    color: 'var(--accent-ink)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--divider)',
                     borderRadius: 6,
                     padding: '2px 7px',
                   },
@@ -182,7 +182,7 @@
                 h(BrandLogo, { brand: b, size: 32 }),
                 h('span', { style: { fontSize: 13, fontWeight: 700 } }, b.name),
                 b.verified
-                  ? Icon('check', { size: 14, color: GOLD })
+                  ? Icon('check', { size: 14, color: GOLD_INK })
                   : h('span', { style: { fontSize: 11, color: '#a09e97' } }, 'unverified'),
               ),
             ),
@@ -219,8 +219,8 @@
             fontWeight: 700,
             padding: '2px 8px',
             borderRadius: 20,
-            background: on ? '#faf6ec' : '#f4f2ee',
-            color: on ? '#7a6212' : '#a09e97',
+            background: on ? 'var(--surface-2)' : '#f4f2ee',
+            color: on ? 'var(--accent-ink)' : '#a09e97',
           },
         },
         label,
@@ -501,7 +501,7 @@
             style: {
               border: 'none',
               background: 'none',
-              color: GOLD,
+              color: GOLD_INK,
               fontWeight: 700,
               fontSize: 12.5,
               marginBottom: 10,

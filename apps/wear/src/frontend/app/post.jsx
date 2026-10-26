@@ -5,8 +5,19 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, Avatar, BrandLogo, Spinner, ErrorNote, ScreenHeader, timeAgo, fmtCount } =
-    window.CWUI;
+  const {
+    GOLD,
+    ON_GOLD,
+    GOLD_INK,
+    INK,
+    Avatar,
+    BrandLogo,
+    Spinner,
+    ErrorNote,
+    ScreenHeader,
+    timeAgo,
+    fmtCount,
+  } = window.CWUI;
 
   function PostScreen({ params }) {
     const { pop, openBrand, openUser } = useStore();
@@ -179,12 +190,12 @@
             },
             Icon('heart', {
               size: 25,
-              color: viewerLiked ? GOLD : INK,
-              fill: viewerLiked ? GOLD : null,
+              color: viewerLiked ? GOLD_INK : INK,
+              fill: viewerLiked ? GOLD_INK : null,
             }),
             h(
               'span',
-              { style: { fontSize: 12.5, fontWeight: 700, color: viewerLiked ? GOLD : INK } },
+              { style: { fontSize: 12.5, fontWeight: 700, color: viewerLiked ? GOLD_INK : INK } },
               fmtCount(likeCount),
             ),
           ),
@@ -200,8 +211,8 @@
             { onClick: toggleSave, style: { border: 'none', background: 'none', padding: 0 } },
             Icon('bookmark', {
               size: 23,
-              color: viewerSaved ? GOLD : INK,
-              fill: viewerSaved ? GOLD : null,
+              color: viewerSaved ? GOLD_INK : INK,
+              fill: viewerSaved ? GOLD_INK : null,
             }),
           ),
         ),
@@ -294,7 +305,7 @@
               flex: 'none',
             },
           },
-          Icon('send', { size: 16, color: '#fff' }),
+          Icon('send', { size: 16, color: ON_GOLD }),
         ),
       ),
     );

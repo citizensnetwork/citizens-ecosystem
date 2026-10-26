@@ -10,18 +10,17 @@
   const { createElement: h, useState } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, ImagePicker } = window.CWUI;
+  const { ON_GOLD, GOLD_INK, GoldButton, ImagePicker } = window.CWUI;
 
   const field = {
     width: '100%',
-    border: '1px solid #efedea',
-    borderRadius: 14,
+    border: '1px solid var(--divider)',
+    borderRadius: 'var(--radius-md)',
     padding: '12px 14px',
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: 500,
-    outline: 'none',
-    background: '#fff',
-    color: '#1a1a1a',
+    background: 'var(--surface-1)',
+    color: 'var(--text-1)',
   };
   const label = { fontSize: 12, fontWeight: 700, color: '#4a4a4a', margin: '14px 0 6px' };
 
@@ -143,10 +142,12 @@
                 alignItems: 'center',
                 gap: 10,
                 border:
-                  effectiveMode === t.k && !t.nav ? '1.5px solid ' + GOLD : '1px solid #efedea',
+                  effectiveMode === t.k && !t.nav
+                    ? '1.5px solid ' + GOLD_INK
+                    : '1px solid var(--divider)',
                 borderRadius: 18,
                 padding: '20px 8px',
-                background: effectiveMode === t.k && !t.nav ? '#fdf8ec' : '#fff',
+                background: effectiveMode === t.k && !t.nav ? 'var(--surface-2)' : '#fff',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               },
             },
@@ -157,7 +158,7 @@
                   width: 48,
                   height: 48,
                   borderRadius: 14,
-                  background: '#faf8f3',
+                  background: 'var(--surface-2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -166,7 +167,7 @@
               },
               Icon(t.icon, {
                 size: 26,
-                color: effectiveMode === t.k && !t.nav ? GOLD : '#2a2a2a',
+                color: effectiveMode === t.k && !t.nav ? GOLD_INK : 'var(--text-1)',
                 sw: 1.8,
               }),
             ),
@@ -202,9 +203,9 @@
                   borderRadius: 12,
                   padding: '12px 14px',
                   marginBottom: 4,
-                  background: '#fdf8ec',
-                  color: '#7a6212',
-                  border: '1px solid #f0e2b0',
+                  background: 'var(--surface-2)',
+                  color: 'var(--accent-ink)',
+                  border: '1px solid var(--divider)',
                 },
               },
               'Your brand is pending verification — you’ll be able to post apparel once it’s approved. Meanwhile, share Concepts and Stories.',
@@ -340,7 +341,7 @@
             label: busy ? 'Working…' : effectiveMode === 'post' ? 'Create New Post' : 'Share Story',
             onClick: submit,
             disabled: busy || !canSubmit,
-            icon: Icon('plus', { size: 17, color: '#fff' }),
+            icon: Icon('plus', { size: 17, color: ON_GOLD }),
           }),
         ),
       ),

@@ -7,24 +7,23 @@
 (function () {
   const { createElement: h, useState } = React;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, ScreenHeader } = window.CWUI;
+  const { GOLD, ON_GOLD, GoldButton, ScreenHeader } = window.CWUI;
 
   const field = {
     width: '100%',
-    border: '1px solid #efedea',
-    borderRadius: 14,
+    border: '1px solid var(--divider)',
+    borderRadius: 'var(--radius-md)',
     padding: '12px 14px',
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: 500,
-    outline: 'none',
-    background: '#fff',
-    color: '#1a1a1a',
+    background: 'var(--surface-1)',
+    color: 'var(--text-1)',
   };
   const label = { fontSize: 12, fontWeight: 700, color: '#4a4a4a', margin: '16px 0 6px' };
   const card = {
     background: '#fff',
     border: '1px solid #f0eee9',
-    borderRadius: 18,
+    borderRadius: 'var(--radius-lg)',
     padding: '18px 20px',
     marginTop: 16,
   };
@@ -63,7 +62,7 @@
             borderRadius: 7,
             border: '1.5px solid ' + (checked ? GOLD : '#d9d6cf'),
             background: checked ? GOLD : '#fff',
-            color: '#fff',
+            color: ON_GOLD,
             fontSize: 13,
             fontWeight: 800,
             display: 'flex',

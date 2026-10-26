@@ -21,7 +21,7 @@
    */
   function Icon(name, o) {
     o = o || {};
-    const c = o.color || '#1a1a1a';
+    const c = o.color || 'var(--text-1)';
     const sw = o.sw || 1.9;
     const size = o.size || 22;
     const fc = o.fill || null;
