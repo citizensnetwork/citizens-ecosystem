@@ -8,7 +8,7 @@
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
   const {
-    GOLD,
+    GOLD_INK,
     INK,
     Avatar,
     BrandLogo,
@@ -155,10 +155,10 @@
               padding: 0,
             },
           },
-          Icon('heart', { size: 25, color: liked ? GOLD : INK, fill: liked ? GOLD : null }),
+          Icon('heart', { size: 25, color: liked ? GOLD_INK : INK, fill: liked ? GOLD_INK : null }),
           h(
             'span',
-            { style: { fontSize: 12.5, fontWeight: 700, color: liked ? GOLD : INK } },
+            { style: { fontSize: 12.5, fontWeight: 700, color: liked ? GOLD_INK : INK } },
             fmtCount(likeCount),
           ),
         ),
@@ -198,14 +198,22 @@
           },
           Icon('share', { size: 23, color: INK }),
           shareNote
-            ? h('span', { style: { fontSize: 11.5, fontWeight: 700, color: '#7a6212' } }, shareNote)
+            ? h(
+                'span',
+                { style: { fontSize: 11.5, fontWeight: 700, color: 'var(--accent-ink)' } },
+                shareNote,
+              )
             : null,
         ),
         h('div', { style: { flex: 1 } }),
         h(
           'button',
           { onClick: toggleSave, style: { border: 'none', background: 'none', padding: 0 } },
-          Icon('bookmark', { size: 23, color: saved ? GOLD : INK, fill: saved ? GOLD : null }),
+          Icon('bookmark', {
+            size: 23,
+            color: saved ? GOLD_INK : INK,
+            fill: saved ? GOLD_INK : null,
+          }),
         ),
       ),
       // caption
@@ -251,16 +259,16 @@
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: '#faf6ec',
+                  background: 'var(--surface-2)',
                   borderRadius: 9,
                   padding: '5px 10px',
                   marginTop: 7,
                   fontSize: 11.5,
                   fontWeight: 700,
-                  color: '#7a6212',
+                  color: 'var(--accent-ink)',
                 },
               },
-              Icon('star', { size: 13, color: '#F2BA1B' }),
+              Icon('star', { size: 13, color: 'var(--accent-ink)' }),
               post.concept.creator
                 ? 'Concept by @' + post.concept.creator.handle
                 : 'From a community concept',
@@ -406,7 +414,7 @@
                 },
               },
               you
-                ? Icon('plus', { color: GOLD, size: 22, sw: 2.3 })
+                ? Icon('plus', { color: GOLD_INK, size: 22, sw: 2.3 })
                 : s.author
                   ? h(Avatar, { user: s.author, size: 49 })
                   : h(Crown, { size: 26 }),
@@ -598,9 +606,9 @@
         {
           onClick: () => openBrand(brand.slug),
           style: {
-            border: '1px solid #F2BA1B',
-            background: '#F2BA1B',
-            color: '#fff',
+            border: '1px solid var(--accent)',
+            background: 'var(--accent)',
+            color: 'var(--accent-contrast)',
             fontSize: 12.5,
             fontWeight: 700,
             padding: '7px 18px',

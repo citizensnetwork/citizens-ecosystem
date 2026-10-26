@@ -8,11 +8,11 @@
   const { createElement: h, useState } = React;
   const { Crown } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, GoldButton, Spinner } = window.CWUI;
+  const { GoldButton, Spinner } = window.CWUI;
 
-  const PAPER = '#fbfaf8';
-  const INK = '#1a1a1a';
-  const ERR = '#8f4a2b';
+  const PAPER = 'var(--surface-0)';
+  const INK = 'var(--text-1)';
+  const ERR = 'var(--error)';
 
   // ── shared bits ──────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            color: '#8b8980',
+            color: 'var(--text-2)',
             marginBottom: 6,
           },
         },
@@ -46,14 +46,13 @@
         onBlur: () => setFocused(false),
         style: {
           width: '100%',
-          background: '#fff',
-          border: '1px solid ' + (focused ? GOLD : '#e6e3dc'),
-          borderRadius: 14,
+          background: 'var(--surface-1)',
+          border: '1px solid ' + (focused ? 'var(--focus-ring)' : 'var(--divider)'),
+          borderRadius: 'var(--radius-md)',
           padding: '13px 14px',
-          fontSize: 14,
+          fontSize: 16,
           fontWeight: 500,
           color: INK,
-          outline: 'none',
           boxSizing: 'border-box',
         },
       }),
@@ -73,7 +72,7 @@
           lineHeight: 1.5,
           background: '#fdf6ec',
           border: '1px solid #f2e3c8',
-          borderRadius: 12,
+          borderRadius: 'var(--radius-md)',
           padding: '10px 14px',
         },
       },
@@ -86,9 +85,9 @@
       'div',
       {
         style: {
-          background: '#fff',
-          border: '1px solid #f0eee7',
-          borderRadius: 16,
+          background: 'var(--surface-1)',
+          border: '1px solid var(--divider)',
+          borderRadius: 'var(--radius-lg)',
           padding: '20px 18px',
           textAlign: 'center',
         },
@@ -100,7 +99,7 @@
           style: {
             marginTop: 8,
             fontSize: 12.5,
-            color: '#7d7b73',
+            color: 'var(--text-2)',
             fontWeight: 500,
             lineHeight: 1.6,
           },
@@ -121,7 +120,7 @@
           background: 'none',
           fontSize: 12.5,
           fontWeight: 700,
-          color: muted ? '#a09e97' : '#b8860b',
+          color: muted ? 'var(--text-2)' : 'var(--accent-ink)',
           padding: 4,
         },
       },
@@ -139,7 +138,15 @@
         { style: { marginTop: 22, textAlign: 'center', lineHeight: 1.2 } },
         h(
           'div',
-          { style: { fontSize: 19, letterSpacing: '0.42em', fontWeight: 700, color: INK } },
+          {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: 19,
+              letterSpacing: '0.42em',
+              fontWeight: 600,
+              color: INK,
+            },
+          },
           'CITIZENS',
         ),
         h(
@@ -148,7 +155,7 @@
             style: {
               fontSize: 13,
               letterSpacing: '0.34em',
-              color: '#a09e97',
+              color: 'var(--text-2)',
               marginTop: 4,
               fontWeight: 600,
             },
@@ -214,7 +221,7 @@
       'svg',
       { width: 17, height: 17, viewBox: '0 0 24 24' },
       h('path', {
-        fill: '#fff',
+        fill: 'currentColor',
         d: 'M21.35 11.1H12v2.9h5.35c-.5 2.5-2.6 4.3-5.35 4.3a5.8 5.8 0 1 1 0-11.6c1.5 0 2.8.55 3.85 1.45l2.15-2.15A8.9 8.9 0 0 0 12 3.2a8.8 8.8 0 1 0 0 17.6c5.1 0 8.75-3.6 8.75-8.65 0-.35-.05-.7-.1-1.05Z',
       }),
     );
@@ -502,7 +509,7 @@
               label: mode === 'signup' ? 'Sign up with Google' : 'Continue with Google',
               onClick: signIn,
               icon: h(GoogleIcon, {}),
-              style: { background: INK, boxShadow: '0 6px 18px -6px rgba(26,26,26,0.5)' },
+              style: { background: INK, color: 'var(--surface-0)', boxShadow: 'var(--elev-2)' },
             }),
           )
         : null,

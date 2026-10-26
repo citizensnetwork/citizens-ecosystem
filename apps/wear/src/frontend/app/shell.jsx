@@ -6,7 +6,7 @@
   const { createElement: h, useState, useEffect } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD } = window.CWUI;
+  const { GOLD_INK } = window.CWUI;
 
   const TABS = [
     { k: 'home', label: 'Home', icon: 'home' },
@@ -157,8 +157,8 @@
           left: 0,
           right: 0,
           height: 'calc(84px + var(--safe-bottom))',
-          background: '#fbfaf8',
-          borderTop: '1px solid #f0eee9',
+          background: 'var(--surface-0)',
+          borderTop: '1px solid var(--divider)',
           display: 'flex',
           alignItems: 'flex-start',
           padding: '11px 8px calc(0px + var(--safe-bottom))',
@@ -167,7 +167,7 @@
       },
       TABS.map((t) => {
         const active = !overlayOpen && nav.tab === t.k;
-        const col = active ? GOLD : '#9a9892';
+        const col = active ? GOLD_INK : 'var(--text-2)';
         return h(
           'button',
           {
@@ -211,20 +211,20 @@
             alignItems: 'center',
             gap: 13,
             border: 'none',
-            background: active ? '#faf6ec' : 'transparent',
-            borderRadius: 11,
+            background: active ? 'var(--surface-2)' : 'transparent',
+            borderRadius: 'var(--radius-md)',
             padding: '10px 12px',
             width: '100%',
           },
         },
-        Icon(t.icon, { size: 20, color: active ? GOLD : '#6a6a6a' }),
+        Icon(t.icon, { size: 20, color: active ? GOLD_INK : 'var(--text-2)' }),
         h(
           'span',
           {
             style: {
               fontSize: 13.5,
               fontWeight: active ? 700 : 600,
-              color: active ? GOLD : '#555',
+              color: active ? GOLD_INK : 'var(--text-2)',
             },
           },
           t.label,
@@ -237,12 +237,12 @@
         style: {
           width: 236,
           flex: 'none',
-          borderRight: '1px solid #f0eee9',
+          borderRight: '1px solid var(--divider)',
           padding: '24px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: 3,
-          background: '#fff',
+          background: 'var(--surface-1)',
         },
       },
       h(
@@ -259,10 +259,21 @@
           },
         },
         h(Crown, { size: 22 }),
-        h('span', { style: { fontSize: 14, letterSpacing: '0.3em', fontWeight: 700 } }, 'CITIZENS'),
+        h(
+          'span',
+          {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: 14,
+              letterSpacing: '0.3em',
+              fontWeight: 600,
+            },
+          },
+          'CITIZENS',
+        ),
       ),
       TABS.map((t) => item(t, () => setTab(t.k))),
-      h('div', { style: { height: 1, background: '#f0eee9', margin: '11px 10px' } }),
+      h('div', { style: { height: 1, background: 'var(--divider)', margin: '11px 10px' } }),
       item(
         { k: 'concepts', label: 'Concepts', icon: 'tee' },
         openConcepts,
@@ -294,7 +305,7 @@
           style: {
             height: '100%',
             display: 'flex',
-            background: '#e9e7e1',
+            background: 'var(--surface-0)',
             justifyContent: 'center',
             padding: '26px 16px',
           },
@@ -307,17 +318,19 @@
               maxWidth: 1180,
               height: '100%',
               display: 'flex',
-              background: '#fff',
-              borderRadius: 18,
+              background: 'var(--surface-1)',
+              borderRadius: 'var(--radius-lg)',
               overflow: 'hidden',
-              boxShadow: '0 30px 70px -30px rgba(0,0,0,0.35)',
-              border: '1px solid #ececec',
+              boxShadow: 'var(--elev-2)',
+              border: '1px solid var(--divider)',
             },
           },
           h(Sidebar, {}),
           h(
             'div',
-            { style: { flex: 1, minWidth: 0, position: 'relative', background: '#fcfbf9' } },
+            {
+              style: { flex: 1, minWidth: 0, position: 'relative', background: 'var(--surface-0)' },
+            },
             h(ImpersonationBanner, {}),
             h(
               'div',
@@ -327,9 +340,9 @@
                   height: '100%',
                   maxWidth: 640,
                   margin: '0 auto',
-                  background: '#fff',
-                  borderLeft: '1px solid #f0eee9',
-                  borderRight: '1px solid #f0eee9',
+                  background: 'var(--surface-1)',
+                  borderLeft: '1px solid var(--divider)',
+                  borderRight: '1px solid var(--divider)',
                 },
               },
               renderScreen(current),
@@ -341,7 +354,14 @@
 
     return h(
       'div',
-      { style: { height: '100%', position: 'relative', background: '#fff', overflow: 'hidden' } },
+      {
+        style: {
+          height: '100%',
+          position: 'relative',
+          background: 'var(--surface-1)',
+          overflow: 'hidden',
+        },
+      },
       h(ImpersonationBanner, {}),
       h(
         'div',
