@@ -664,7 +664,7 @@
   // Live: GET /api/map/activities (RLS-gated, Bearer via authFetch). Demo:
   // D.mapActivities. The pure maths lives in timeline-lib.jsx (window.CV_TIMELINE).
   //
-  // MapLibre is the vendored v6.11.2 copy Connect also ships (v6 dropped its UMD
+  // MapLibre is the vendored v6.15.0 copy Connect also ships (v6 dropped its UMD
   // build; GHSA-jrc7-96c5-q579) and is loaded on FIRST visit to this screen by
   // maplibre-loader.mjs, so nobody pays ~1 MB for a map they never open.
   let maplibreLoading = null;

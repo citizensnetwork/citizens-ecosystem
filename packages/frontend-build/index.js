@@ -26,7 +26,7 @@
  * hash), so the browser can never run different bytes than CI scanned.
  *
  * DESIGN CONSTRAINT — the host injects its own esbuild instance
- * (`options.esbuild`). Connect pins esbuild 0.28.x, Wear 0.25.x; injection
+ * (`options.esbuild`). Connect and Wear pin esbuild 0.28.x; injection
  * keeps each app's output byte-identical to what its own toolchain produced
  * before the extraction, and keeps this package dependency-free.
  */
