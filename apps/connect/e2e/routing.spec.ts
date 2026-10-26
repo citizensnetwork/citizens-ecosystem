@@ -1,5 +1,4 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -399,7 +398,6 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("a card and a screen opened by real taps push inside the tap, one entry per screen", async ({ page }) => {
-    await useOldMap(page);
     await recordPushes(page);
     await openDemo(page);
     await page.goto("/manifest.json");
@@ -413,8 +411,8 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await expect.poll(async () => (await pushes(page)).length).toBe(1);
     expect((await pushes(page))[0]).toMatchObject({ active: true, guard: true });
 
-    // "View Full Profile" moves on: the card's guard entry becomes the event's entry (no 2nd push)
-    await page.locator('[data-entity-card="event"]').getByRole("button", { name: "View Full Profile" }).click();
+    // "View Full Profile" moves on: the sheet's guard entry becomes the event's entry (no 2nd push)
+    await page.locator("[data-mv2='view-full']").click();
     await expect(page.locator('[data-screen="event"]')).toBeVisible();
     expect(path(page)).toBe(`/e/${EVENT_ID}`);
     expect(await pushes(page)).toHaveLength(1);
@@ -447,7 +445,6 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("closing a card with its own button leaves no extra entry behind", async ({ page }) => {
-    await useOldMap(page);
     await recordPushes(page);
     await openDemo(page);
     await page.goto("/manifest.json");
@@ -456,7 +453,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
 
     await page.locator('[data-cc-pin="event"]').first().click();
     await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
-    await page.locator('[data-entity-card="event"]').getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Close details" }).click();
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
     // the card's own entry is taken back off the stack (async), so one Back leaves
     await page.waitForTimeout(300);
@@ -490,7 +487,6 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("opening and closing a card twice never stacks entries or traps Back", async ({ page }) => {
-    await useOldMap(page);
     await openDemo(page);
     await page.goto("/manifest.json");
     await page.goto("/");
@@ -500,7 +496,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
 
     await pin.click();
     await expect(card).toBeVisible();
-    await card.getByRole("button", { name: "Close" }).click(); // closed by its button
+    await page.getByRole("button", { name: "Close details" }).click(); // closed by its button
     await expect(card).toBeHidden();
     await page.waitForTimeout(300);
     await pin.click();
@@ -518,7 +514,6 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
   });
 
   test("two overlays closed out of order leave nothing for Back to stall on", async ({ page }) => {
-    await useOldMap(page);
     await openDemo(page);
     await page.goto("/manifest.json");
     await page.goto("/");
@@ -532,7 +527,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await expect(sheet).toBeVisible();
 
     // the LOWER overlay (the card) closes first, so its history entry is left under the sheet's
-    await card.getByRole("button", { name: "Close" }).evaluate((el: HTMLElement) => el.click());
+    await page.getByRole("button", { name: "Close details" }).evaluate((el: HTMLElement) => el.click());
     await expect(card).toBeHidden();
     await expect(sheet).toBeVisible();
 

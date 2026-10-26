@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════
-   Citizens Connect — Map v2 design tokens and styles (flag ?map=v2 only)
+   Citizens Connect — Map v2 design tokens and styles
    ------------------------------------------------------------------
-   Loaded by app/map-v2-lib.jsx ONLY when the flag is on, so the v1 page
-   never requests it. Bump the ?v= in map-v2-lib.jsx when this file changes.
+   Loaded by app/map-v2-lib.jsx on every page. Bump the ?v= (CSS_HREF) in
+   map-v2-lib.jsx when this file changes.
 
    RULE (tracker P1-02): every raw colour and every px value lives in the
    token blocks below. The component rules further down read var(--…) only
@@ -24,7 +24,7 @@
   --surface-1: #ffffff;          /* the sheet */
   --surface-2: #f5f1e8;          /* raised elements, tile placeholders */
   --logo-bg: #ffffff;            /* logos are drawn for a light page: they sit on white in BOTH looks */
-  --card-bg: transparent;        /* the v1 EntityCard body inside the sheet (its text is dark): light in the dark look */
+  --card-bg: transparent;        /* the EntityCard body inside the sheet (its text is dark): light in the dark look */
   --map-base: #f9f9f6;           /* the live base style's background, for contrast checks */
 
   /* text */
@@ -83,7 +83,7 @@
   --lh-3: 24px;
   --fw-regular: 400;
   --fw-semibold: 600;
-  /* z-index: the app's real stacking (bottom nav 50, the v1 preview 120, modals 200, toasts 400) */
+  /* z-index: the app's real stacking (bottom nav 50, the Impact Idea preview 120, modals 200, toasts 400) */
   --z-sticky: 1;             /* local lift: a sticky bar paints above the content in its own block */
   --z-pin: 10;
   --z-controls: 20;
@@ -118,7 +118,7 @@
   --sheet-full-h: calc(90dvh - env(safe-area-inset-top, 0px));
   --sheet-panel-w: 380px;
   --sheet-touch-max-w: 640px;
-  --sheet-panel-top: 112px;          /* clears the v1 search and category row (measured: it ends at about 104 px) */
+  --sheet-panel-top: 112px;          /* clears the search and category row (measured: it ends at about 104 px) */
   --handle-w: 36px;
   --handle-h: 4px;
   --avatar-peek: 40px;
@@ -143,7 +143,7 @@
   --surface-1: #1a1714;
   --surface-2: #26221d;
   --card-bg: #ffffff;
-  --map-bg: #292929;              /* what the map shows before its tiles arrive (v1's is warm beige) */
+  --map-bg: #292929;              /* what the map shows before its tiles arrive (the old map's was warm beige) */
   --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
 
   --text-1: #f7f4ee;
@@ -1346,7 +1346,7 @@
 }
 
 /* ── 4g. The Moment menu on the sheet. The report dialog itself is assets/report.css,
-      which loads on both maps, so a report on ?map=v1 is not an unstyled card. ── */
+      which reads these tokens. ── */
 [data-mv2='menu-wrap'] {
   position: relative;
   flex: none;

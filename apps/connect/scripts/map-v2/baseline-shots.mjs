@@ -26,7 +26,7 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     await jumpTo(s.page, { lng: c0.physical_longitude, lat: c0.physical_latitude, zoom: 15.5 });
     writeFileSync(join(outDir, `${prefix}-${name}-z15.png`), await s.page.screenshot({ animations: 'disabled', caret: 'hide' }));
 
-    // Tap a Contributor pin: the v1 preview card.
+    // Tap a Contributor pin: the preview (the sheet's card body).
     const pin = s.page.locator('.maplibregl-marker:has([data-cc-pin^="contributor"])').first();
     await pin.click({ force: true });
     await s.page.waitForSelector('[data-entity-card]', { timeout: 5000 });

@@ -231,10 +231,9 @@ function installApi(serving: Record<string, { main: Served[]; also_served_by: un
     return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
   }));
 }
-function setFlags(on: boolean, globe = true) {
+function setFlags(globe = true) {
   const w = window as unknown as Record<string, unknown>;
-  w.isMapV2 = () => on;
-  w.MapV2 = { onlineGlobe: on && globe, dur: () => 0 };
+  w.MapV2 = { onlineGlobe: globe, dur: () => 0 };
 }
 
 async function mountGlobe(opts: { map?: FakeMap; onOpenProfile?: (id: string) => void } = {}) {
@@ -253,7 +252,7 @@ const sheet = () => document.querySelector("[data-mv2='online-sheet']") as HTMLE
 const S = () => W.MapV2Strings.online;
 const settleMap = async (map: FakeMap) => { act(() => map.emit("moveend")); await act(async () => { await vi.advanceTimersByTimeAsync(W.MapV2Online.SETTLE_MS + 50); }); await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
 
-beforeEach(() => { vi.useFakeTimers(); backGuards.length = 0; setFlags(true); });
+beforeEach(() => { vi.useFakeTimers(); backGuards.length = 0; setFlags(); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); delete (window as unknown as Record<string, unknown>).__ccMap; });
 
 describe("nothing is drawn when nothing serves the area in view", () => {
@@ -264,15 +263,13 @@ describe("nothing is drawn when nothing serves the area in view", () => {
     expect(map.controls).toHaveLength(0); // no empty gap among the zoom and locate buttons
     expect(requests.filter((r) => r.startsWith("/api/v1/serving"))).toHaveLength(1);
   });
-  it("is off entirely with the constant off (or Map v2 off): no button, no control, NO request at all", async () => {
+  it("is off entirely with the constant off: no button, no control, NO request at all", async () => {
     installApi({ [PTA]: { main: [person(10, "Daily Word Online")], also_served_by: [] } });
-    for (const [on, globe] of [[true, false], [false, true]] as const) {
-      setFlags(on, globe);
-      const { map } = await mountGlobe();
-      expect(globeBtn()).toBeNull();
-      expect(map.controls).toHaveLength(0);
-      cleanup();
-    }
+    setFlags(false);
+    const { map } = await mountGlobe();
+    expect(globeBtn()).toBeNull();
+    expect(map.controls).toHaveLength(0);
+    cleanup();
     expect(requests).toEqual([]);
   });
 });
@@ -491,16 +488,17 @@ describe("the sheet's own states", () => {
 
 describe("wiring", () => {
   const read = (f: string) => readFileSync(join(process.cwd(), "src/frontend", f), "utf8");
-  it("the one constant lives in map-v2-lib.jsx and the globe also needs Map v2 on", () => {
+  it("the one constant lives in map-v2-lib.jsx and is the only thing the globe asks", () => {
     const lib = read("app/map-v2-lib.jsx");
     expect(lib).toMatch(/const ONLINE_GLOBE_ON = true;/);
-    expect(lib).toMatch(/get onlineGlobe\(\) \{ return on && ONLINE_GLOBE_ON; \}/);
+    expect(lib).toMatch(/get onlineGlobe\(\) \{ return ONLINE_GLOBE_ON; \}/);
+    expect(read("app/map-v2-online.jsx")).toMatch(/const globeOn = \(\) => !!\(window\.MapV2 && window\.MapV2\.onlineGlobe\);/);
   });
-  it("home.jsx mounts it only with Map v2 on, and a tap opens the profile", () => {
-    expect(read("app/home.jsx")).toMatch(/window\.isMapV2 && window\.isMapV2\(\) && window\.MapV2Online && React\.createElement\(window\.MapV2Online\.Globe, \{ onOpenProfile: \(id\) => app\.go\('profile', \{ id \}\) \}\)/);
+  it("home.jsx mounts it, and a tap opens the profile", () => {
+    expect(read("app/home.jsx")).toMatch(/React\.createElement\(window\.MapV2Online\.Globe, \{ onOpenProfile: \(id\) => app\.go\('profile', \{ id \}\) \}\)/);
   });
-  it("map.jsx tells the globe the map exists, for Map v2 only", () => {
-    expect(read("app/map.jsx")).toMatch(/if \(v2On\(\)\) \{ try \{ window\.dispatchEvent\(new Event\('cc-map-ready'\)\); \}/);
+  it("map.jsx tells the globe the map exists", () => {
+    expect(read("app/map.jsx")).toMatch(/try \{ window\.dispatchEvent\(new Event\('cc-map-ready'\)\); \}/);
   });
   it("is registered in the page (before the sheet and home) and in the build", () => {
     const html = read("index.html");

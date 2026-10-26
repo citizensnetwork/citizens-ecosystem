@@ -261,18 +261,3 @@ test.describe("looks and settings", () => {
     expect(bg).not.toBe("rgb(255, 255, 255)"); // the dark sheet, not the light one
   });
 });
-
-test.describe("flag off keeps the map exactly as it was", () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  test("on the old map (?map=v1) there is no globe, no stylesheet rule and NO request for areas", async ({ page }) => {
-    const { api, extra } = installOnlineApi({ [PTA]: TWO });
-    await mockMapNetwork(page, seed0(), extra);
-    await page.goto("/?map=v1");
-    await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
-    await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap, undefined, { timeout: 20_000 });
-    await jump(page, PRETORIA.lng, PRETORIA.lat, 11);
-    await page.waitForTimeout(900);
-    await expect(globe(page)).toHaveCount(0);
-    expect(api.requests).toEqual([]);
-  });
-});

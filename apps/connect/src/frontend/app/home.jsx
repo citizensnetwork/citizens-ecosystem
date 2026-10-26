@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — Discover (map home) + pin preview panel
+//  Citizens Connect — Discover (map home) + Impact Idea preview panel
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const { useState, useRef } = React;
@@ -7,53 +7,37 @@
   const Icon = window.Icon;
   const useBackGuard = window.useBackGuard || function () {};
 
-  // ── Preview panel (on pin click) ──
-  //  The card body is window.EntityCard — the SAME component Kingdom
-  //  Exploration renders, at its 'panel' density. Founder call: an Event, a
-  //  Place and a Contributor must not look like different things depending on
-  //  whether you found them on the map or in the list — and every pin opens
-  //  the same small card (its "View Full Profile" button is the way in to the
-  //  full page), so no kind of listing feels more or less important than any
-  //  other.
-  function PreviewPanel({ id, type, onClose }) {
+  // ── Impact Idea preview (on pin click) ──
+  //  A Contributor, a Place and an Event open the Map v2 bottom sheet (map-v2-sheet.jsx). Impact Ideas
+  //  are not listings — they have no organiser, no category profile page and no socials — so they keep
+  //  this small panel.
+  function IdeaPanel({ id, onClose }) {
     const app = window.useApp();
     // A Back press dismisses the pin preview before it leaves the map —
     // the same expectation a native map app sets.
     useBackGuard(true, onClose);
-    const { events, places, contributors, ideas, toggleIdeaVote } = app;
-    const isIdea = type === 'idea';
-    let item;
-    if (type === 'event') item = events.find((e) => e.id === id);
-    else if (type === 'place') item = places.find((p) => p.id === id);
-    else if (type === 'contributor') item = contributors.find((c) => c.id === id);
-    else item = ideas.find((i) => i.id === id);
+    const { ideas, toggleIdeaVote } = app;
+    const item = ideas.find((i) => i.id === id);
     if (!item) return null;
 
-    // Impact Ideas are not listings — they have no organiser, no category
-    // profile page and no socials, so they keep their own small panel.
-    if (isIdea) {
-      const cat = window.DATA.getCategory(item.category);
-      const pct = Math.min(100, Math.round((item.votes / item.threshold) * 100));
-      return Wrapper(
-        React.createElement('div', { className: 'p-4' },
-          React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
-            React.createElement('span', { className: 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, React.createElement(Icon, { name: 'Lightbulb', size: 10 }), 'Impact Idea'),
-            cat && React.createElement(CategoryBadge, { cat })),
-          React.createElement('h3', { className: 'text-lg text-foreground leading-tight mb-1' }, item.title),
-          React.createElement('p', { className: 'text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3' }, item.description),
-          React.createElement('div', { className: 'flex items-center justify-between mb-1' },
-            React.createElement('span', { className: 'text-xs font-bold text-foreground' }, item.votes.toLocaleString() + ' votes'),
-            React.createElement('span', { className: 'text-[10px] text-muted-foreground' }, 'Goal ' + item.threshold.toLocaleString())),
-          React.createElement('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-3' },
-            React.createElement('div', { className: 'h-full gold-gradient rounded-full', style: { width: pct + '%' } })),
-          React.createElement('div', { className: 'flex gap-2' },
-            React.createElement(Button, { variant: item.votedByMe ? 'success' : 'gold', className: 'flex-1', icon: item.votedByMe ? 'Check' : 'Heart', onClick: () => toggleIdeaVote(item.id) }, item.votedByMe ? 'Voted — tap to undo' : 'Collaborate'),
-            React.createElement(Button, { variant: 'outline', icon: 'X', onClick: onClose }, 'Dismiss'))));
-    }
+    const cat = window.DATA.getCategory(item.category);
+    const pct = Math.min(100, Math.round((item.votes / item.threshold) * 100));
 
-    return Wrapper(React.createElement(window.EntityCard, {
-      item: Object.assign({}, item, { type }), layout: 'panel', onClose,
-    }));
+    return Wrapper(
+      React.createElement('div', { className: 'p-4' },
+        React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
+          React.createElement('span', { className: 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, React.createElement(Icon, { name: 'Lightbulb', size: 10 }), 'Impact Idea'),
+          cat && React.createElement(CategoryBadge, { cat })),
+        React.createElement('h3', { className: 'text-lg text-foreground leading-tight mb-1' }, item.title),
+        React.createElement('p', { className: 'text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3' }, item.description),
+        React.createElement('div', { className: 'flex items-center justify-between mb-1' },
+          React.createElement('span', { className: 'text-xs font-bold text-foreground' }, item.votes.toLocaleString() + ' votes'),
+          React.createElement('span', { className: 'text-[10px] text-muted-foreground' }, 'Goal ' + item.threshold.toLocaleString())),
+        React.createElement('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-3' },
+          React.createElement('div', { className: 'h-full gold-gradient rounded-full', style: { width: pct + '%' } })),
+        React.createElement('div', { className: 'flex gap-2' },
+          React.createElement(Button, { variant: item.votedByMe ? 'success' : 'gold', className: 'flex-1', icon: item.votedByMe ? 'Check' : 'Heart', onClick: () => toggleIdeaVote(item.id) }, item.votedByMe ? 'Voted — tap to undo' : 'Collaborate'),
+          React.createElement(Button, { variant: 'outline', icon: 'X', onClick: onClose }, 'Dismiss'))));
 
     function Wrapper(children) {
       return React.createElement('div', {
@@ -88,7 +72,7 @@
     const app = window.useApp();
     const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
-    // Map v2: the sheet reports how much of the map it covers; the map keeps the selected pin clear of it
+    // The sheet reports how much of the map it covers; the map keeps the selected pin clear of it
     const mapApi = useRef(null);
     const [selType, setSelType] = useState('event');
     const [filter, setFilter] = useState(null);
@@ -117,9 +101,9 @@
       ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
-    // Map v2: what decides which pin keeps its name label when two collide, and who heads a "+N" group:
+    // What decides which pin keeps its name label when two collide, and who heads a "+N" group:
     // an upcoming event first (soonest), then the most recent activity, then the name. Never popularity.
-    if (window.isMapV2 && window.isMapV2()) decorateForV2(markers, events, newsPosts || [], now);
+    decorateForV2(markers, events, newsPosts || [], now);
     const scroll = (dir) => pillsRef.current && pillsRef.current.scrollBy({ left: dir === 'l' ? -200 : 200, behavior: 'smooth' });
 
     // ONE category control. There used to be two — a scrollable pill row AND a
@@ -179,19 +163,19 @@
         // MapTiler's Free plan requires its logo bottom-left on the map (map.jsx, MapTilerLogo).
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
 
-      // Issue #259: the "Online in this area" globe and its list (Map v2 only; it draws nothing, and asks for nothing, unless
+      // Issue #259: the "Online in this area" globe and its list (it draws nothing, and asks for nothing, unless
       // Contributors with no fixed place serve the area in view). A tap on a row opens that profile.
-      window.isMapV2 && window.isMapV2() && window.MapV2Online && React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
+      React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
 
-      // Map v2: ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
-      selected && (window.isMapV2 && window.isMapV2() && window.MapV2Sheet && selType !== 'idea'
+      // ONE bottom sheet for a Contributor, a Place and an Event; Impact Ideas keep their small panel.
+      selected && (selType !== 'idea'
         ? React.createElement(window.MapV2Sheet, {
           id: selected, type: selType, onClose: () => setSelected(null), onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
           // P2-01: the same markers the map draws; a pick in the Nearby list moves the selection (the sheet stays open, one history entry)
           nearby: markers,
           onPick: (id, t) => { setSelected(id); setSelType(t); if (t === 'event') trackImpression(id); },
         })
-        : React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) })));
+        : React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) })));
   }
 
   window.HomePage = HomePage;

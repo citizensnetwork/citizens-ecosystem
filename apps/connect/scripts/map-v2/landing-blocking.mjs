@@ -1,7 +1,8 @@
-// R4 (tracker section 8A): main-thread blocking on the LANDING screen, Map v2 on vs off.
+// R4 (tracker section 8A): main-thread blocking on the LANDING screen. The old map is gone (issue #179), so compare builds:
+// serve each build on its own port and pass one label=url per build.
 //
 //   node scripts/map-v2/landing-blocking.mjs [runs=12] label=url [label=url ...]
-//   e.g. node scripts/map-v2/landing-blocking.mjs 12 default=http://localhost:3103/ optout=http://localhost:3103/?map=v1 old=http://localhost:3102/
+//   e.g. node scripts/map-v2/landing-blocking.mjs 12 current=http://localhost:3103/ before=http://localhost:3102/
 //
 // Local tool, not shipped, not a test. It is NOT Lighthouse (not a repo dependency): it counts Chromium
 // long tasks (> 50 ms) after first-contentful-paint, the same idea as Lighthouse's Total Blocking Time,
@@ -101,7 +102,7 @@ async function once(browser, url) {
         blockAll,
         longTasksAll: all.length,
         longTasks: tasks.length,
-        mapV2: typeof window.isMapV2 === 'function' ? window.isMapV2() : null,
+        mapV2: !!window.MapV2,
         stylesheet: !!document.querySelector('link[href*="map-v2.css"]'),
       };
     }, WINDOW_MS);

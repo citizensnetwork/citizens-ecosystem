@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
 import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
@@ -96,14 +95,5 @@ test.describe("P1-12 the map look follows the phone", () => {
     await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     // the gold action keeps its near-black label
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");
-  });
-
-  test("flag off: no look is applied, even on a dark phone", async ({ page }) => {
-    await useOldMap(page);
-    await page.emulateMedia({ colorScheme: "dark" });
-    const seed = smallSeed(FIXED_NOW) as Seed;
-    await mockMapNetwork(page, seed);
-    await openMap(page, "/", 8);
-    expect(await theme(page)).toBeNull();
   });
 });

@@ -1,10 +1,10 @@
 /**
- * Map v2 foundations (`src/frontend/app/map-v2-lib.jsx`, tracker P1-01 / P1-03):
- * the `?map=v2` flag, the motion constants and the map look. The file is
- * an IIFE that publishes `window.isMapV2` / `window.MapV2`, so it is evaluated
- * against a stub window like the other frontend modules (no DOM here, which also
- * means the stylesheet mount is skipped, exactly the "does nothing without
- * a document" path).
+ * Map v2 foundations (`src/frontend/app/map-v2-lib.jsx`, tracker P1-03):
+ * the motion constants and the map look (the `?map=` flag is gone, issue #179). The file is
+ * an IIFE that publishes `window.MapV2`, so it is evaluated
+ * against a stub window like the other frontend modules (boot() has no document, so
+ * the stylesheet mount is skipped: the "does nothing without a document" path;
+ * bootWithDocument() gives it a minimal one so mount() runs).
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -12,12 +12,10 @@ import { join } from "node:path";
 import { loadFrontend } from "./support/loadFrontend";
 
 type MapV2 = {
-  isOn: () => boolean;
   motion: { fast: number; base: number; slow: number; enter: string; exit: string };
   dur: (n: "fast" | "base" | "slow") => number;
   prefersReducedMotion: () => boolean;
   resolvedTheme: () => string;
-  FLAG_KEY: string;
   CSS_HREF: string;
 };
 
@@ -51,83 +49,73 @@ function boot(opts: { search?: string; storage?: ReturnType<typeof memoryStorage
     win.localStorage = storage;
   }
   loadFrontend("map-v2-lib.jsx", win);
-  return { win, storage, api: win.MapV2 as MapV2, isMapV2: win.isMapV2 as () => boolean };
+  return { win, storage, api: win.MapV2 as MapV2 };
 }
 
-/**
- * The same source with DEFAULT_ON flipped to false: what "roll everyone back" means. The replace is
- * asserted, so this fails (rather than silently testing the default) if the constant is renamed.
- */
-function bootRolledBack(opts: { search?: string; storage?: ReturnType<typeof memoryStorage> } = {}) {
-  const src = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
-  const off = src.replace("const DEFAULT_ON = true;", "const DEFAULT_ON = false;");
-  expect(off).not.toBe(src);
-  const storage = opts.storage ?? memoryStorage();
+/** boot() with a minimal document, so mount() runs (it forgets the old choices, then adds the stylesheet link). */
+function bootWithDocument(opts: { storage?: ReturnType<typeof memoryStorage> | "blocked" } = {}) {
+  const storage = opts.storage === "blocked" ? null : (opts.storage ?? memoryStorage());
+  const appended: unknown[] = [];
+  const doc = {
+    readyState: "complete",
+    head: { appendChild: (n: unknown) => void appended.push(n) },
+    documentElement: { setAttribute: () => undefined },
+    createElement: () => ({}),
+    addEventListener: () => undefined,
+  };
   const win: Record<string, unknown> = {
-    location: { search: opts.search ?? "" },
+    location: { search: "" },
     matchMedia: () => ({ matches: false }),
     dispatchEvent: () => true,
-    localStorage: storage,
   };
-  new Function("window", "React", "document", off)(win, {}, undefined);
-  return { storage, isMapV2: win.isMapV2 as () => boolean };
+  if (opts.storage === "blocked") {
+    Object.defineProperty(win, "localStorage", {
+      get() {
+        throw new Error("SecurityError");
+      },
+    });
+  } else {
+    win.localStorage = storage;
+  }
+  const src = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
+  new Function("window", "React", "document", src)(win, {}, doc);
+  return { storage, appended, win };
 }
 
-describe("the Map v2 flag (default ON since D15, 2026-10-13)", () => {
-  it("is ON by default, with nothing stored", () => {
+describe("the old map is gone (issue #179, R6): no flag, and old choices are harmless", () => {
+  it("publishes no isMapV2 and no flag API", () => {
     const b = boot();
-    expect(b.isMapV2()).toBe(true);
-    // a visitor who never chose anything must not get a key written for them
-    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({});
+    expect(b.win.isMapV2).toBeUndefined();
+    const api = b.api as unknown as Record<string, unknown>;
+    expect(api.isOn).toBeUndefined();
+    expect(api.FLAG_KEY).toBeUndefined();
   });
 
-  it("?map=v1 turns it off and remembers that choice under cc_map_v2", () => {
-    const b = boot({ search: "?map=v1" });
-    expect(b.isMapV2()).toBe(false);
-    expect((b.storage as ReturnType<typeof memoryStorage>).dump()).toEqual({ cc_map_v2: "v1" });
+  it("nothing reads the query: ?map=v1 and ?map=v2 change nothing", () => {
+    for (const search of ["?map=v1", "?map=v2", "?map=false", "?map=0"]) {
+      const b = boot({ search });
+      expect(b.api.resolvedTheme(), search).toBe("light");
+    }
   });
 
-  it("the opt-out survives a reload whose address no longer carries the query (the router rewrites it)", () => {
-    const storage = memoryStorage({ cc_map_v2: "v1" });
-    expect(boot({ search: "", storage }).isMapV2()).toBe(false);
+  it("an old cc_map_v2 choice ('v1' or 'v2') is forgotten when the page mounts, and nothing else is touched", () => {
+    for (const old of ["v1", "v2", "off"]) {
+      const storage = memoryStorage({ cc_map_v2: old, cc_other: "keep" });
+      bootWithDocument({ storage });
+      expect(storage.dump(), old).toEqual({ cc_other: "keep" });
+    }
   });
 
-  it("?map=v2 turns it back on and forgets the opt-out (back to the default)", () => {
-    const storage = memoryStorage({ cc_map_v2: "v1" });
-    const b = boot({ search: "?map=v2", storage });
-    expect(b.isMapV2()).toBe(true);
-    expect(storage.dump()).toEqual({});
+  it("with storage blocked: nothing throws", () => {
+    expect(() => bootWithDocument({ storage: "blocked" })).not.toThrow();
   });
 
-  it("a device that stored 'v2' while Map v2 was behind the flag stays on, and ?map=v2 tidies the key", () => {
-    expect(boot({ storage: memoryStorage({ cc_map_v2: "v2" }) }).isMapV2()).toBe(true);
-    const storage = memoryStorage({ cc_map_v2: "v2" });
-    expect(boot({ search: "?map=v2", storage }).isMapV2()).toBe(true);
-    expect(storage.dump()).toEqual({});
-  });
-
-  it("ignores any other value (only the exact 'v1' stored, or ?map=v1, turns it off)", () => {
-    expect(boot({ search: "?map=false" }).isMapV2()).toBe(true);
-    expect(boot({ search: "?map=0" }).isMapV2()).toBe(true);
-    expect(boot({ storage: memoryStorage({ cc_map_v2: "0" }) }).isMapV2()).toBe(true);
-    expect(boot({ storage: memoryStorage({ cc_map_v2: "off" }) }).isMapV2()).toBe(true);
-  });
-
-  it("with storage blocked: on by default, and ?map=v1 still works for this page and nothing throws", () => {
-    expect(boot({ storage: "blocked" }).isMapV2()).toBe(true);
-    expect(boot({ search: "?map=v1", storage: "blocked" }).isMapV2()).toBe(false);
-    expect(boot({ search: "?map=v2", storage: "blocked" }).isMapV2()).toBe(true);
-  });
-
-  it("DEFAULT_ON = false is the one-line rollback: off for everyone, a device's stored choice still wins", () => {
-    expect(bootRolledBack().isMapV2()).toBe(false);
-    expect(bootRolledBack({ search: "?map=v2" }).isMapV2()).toBe(true);
-    expect(bootRolledBack({ search: "?map=v2" }).storage.dump()).toEqual({ cc_map_v2: "v2" });
-    expect(bootRolledBack({ storage: memoryStorage({ cc_map_v2: "v2" }) }).isMapV2()).toBe(true);
-    // the opt-out key is not needed when off is the default
-    const s = memoryStorage({ cc_map_v2: "v1" });
-    expect(bootRolledBack({ search: "?map=v1", storage: s }).isMapV2()).toBe(false);
-    expect(s.dump()).toEqual({});
+  it("the source keeps no flag: no isMapV2, no DEFAULT_ON, no ?map= query read", () => {
+    const src = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
+    expect(src).not.toMatch(/window\.isMapV2\s*=/);
+    expect(src).not.toContain("DEFAULT_ON");
+    expect(src).not.toContain("URLSearchParams");
+    expect(src).not.toContain("location.search");
   });
 });
 
@@ -197,9 +185,9 @@ describe("the fixed tilt (tracker R8, founder decision D17)", () => {
     expect(p).toBeLessThanOrEqual(60);
   });
 
-  it("the map reads it only for Map v2, and only when it is above 0 (the rollback is PITCH = 0)", () => {
+  it("the map reads it only when it is above 0 (the rollback is PITCH = 0)", () => {
     const src = readFileSync(join(process.cwd(), "src/frontend/app/map.jsx"), "utf8");
-    expect(src).toContain("v2On() && window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0");
+    expect(src).toContain("window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0");
     // all four options come from the one angle, and nothing else in the file sets a pitch
     expect(src).toContain("pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false");
     expect(src.match(/\bpitch\s*:/g)?.length).toBe(1);

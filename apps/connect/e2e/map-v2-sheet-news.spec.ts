@@ -233,7 +233,7 @@ test("tapping a news card opens the reader, and every close leaves the sheet whe
 });
 
 test.describe("the same reader on the profile page", () => {
-  test("opens from a profile news card, and ?map=v1 keeps the card a div with its line breaks", async ({ page }) => {
+  test("opens from a profile news card, which keeps its line breaks in the card", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     const c = seed.contributors[2];
     await installNews(page, postsFor(c.id, rich()));
@@ -257,14 +257,6 @@ test.describe("the same reader on the profile page", () => {
     await expect(reader(page)).toHaveCount(0);
     await expect(button).toBeFocused();
     expect(page.url()).toContain(`/c/${c.contributor_slug}`);
-
-    await page.goto(`/c/${c.contributor_slug}?map=v1`);
-    await expect(page.locator("[data-screen='profile']").getByRole("heading", { level: 1, name: c.full_name })).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("[data-screen='profile'] button", { hasText: "Fresh update" })).toHaveCount(0);
-    const plain = page.locator("[data-screen='profile'] p", { hasText: "Intro paragraph" });
-    await expect(plain).toHaveClass(/whitespace-pre-line/);
-    await expect(plain).not.toHaveClass(/line-clamp-3/);
-    await expect(page.locator("[data-mv2='news']")).toHaveCount(0);
   });
 });
 

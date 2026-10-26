@@ -263,7 +263,7 @@ describe("where the reader is wired", () => {
     expect(build.indexOf("'map-v2-gallery.jsx'")).toBeLessThan(build.indexOf("'map-v2-news.jsx'"));
     expect(build.indexOf("'map-v2-news.jsx'")).toBeLessThan(build.indexOf("'map-v2-sheet.jsx'"));
     expect(html).toContain("app/map-v2-news.jsx?v=20261019a");
-    expect(html).toContain("app/profiles.jsx?v=20261019d");
+    expect(html).toContain("app/profiles.jsx?v=20261026a");
     expect(html).toContain("app/map-v2-strings.jsx?v=20261025a");
   });
 
@@ -282,11 +282,11 @@ describe("where the reader is wired", () => {
     expect(css).toMatch(/\[data-mv2='news-link'\]:focus-visible/);
   });
 
-  it("keeps the profile card a div with preserved line breaks when Map v2 is off", () => {
+  it("the profile news card is always the reader's button, with preserved line breaks", () => {
     const src = read("src/frontend/app/profiles.jsx");
     expect(src).toContain("whitespace-pre-line");
     expect(src).toContain("line-clamp-3");
-    expect(src).toContain("window.isMapV2 && window.isMapV2()");
+    expect(src).not.toContain("isMapV2");
     expect(src).toContain("MapV2News.Reader");
     const sheet = read("src/frontend/app/map-v2-sheet.jsx");
     expect(sheet).toContain("'data-news': ''");
