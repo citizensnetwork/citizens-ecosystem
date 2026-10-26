@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import { expect, type Locator, type Page, type Route } from "@playwright/test";
 // One fixture generator for the measurement scripts and these specs (a plain .mjs;
 // `allowJs` lets the typecheck read it).
 import { makeSeed, smallSeed } from "../../scripts/map-v2/fixtures.mjs";
@@ -110,4 +110,36 @@ export async function mockContributorDetail(
     });
   });
   return { calls: () => calls };
+}
+
+/**
+ * Wait until `locator` (a control inside the Map v2 sheet) has stopped moving, then return its box.
+ * The sheet slides up, and its content (the detail request, the gallery, the follower count) can still change the layout
+ * after it is visible; a tap aimed at a box measured mid-move lands beside the button. So the sheet must have no running
+ * animation or transition, and the box must agree with itself over `samples` consecutive looks `gapMs` apart. On a slow
+ * machine the first quiet moment can be a pause before the next frame, hence several looks and not two. Measure again
+ * right before EVERY tap: a toast or a label change can move things between two taps.
+ */
+export async function stillBox(page: Page, locator: Locator, { samples = 4, gapMs = 60 } = {}) {
+  const sheet = page.locator("[data-mv2='sheet']");
+  await expect
+    .poll(
+      async () => {
+        const running = await sheet.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length);
+        if (running > 0) return 99;
+        let prev = await locator.boundingBox();
+        let worst = 0;
+        for (let i = 0; i < samples; i++) {
+          await page.waitForTimeout(gapMs);
+          const next = await locator.boundingBox();
+          if (!prev || !next) return 99;
+          worst = Math.max(worst, Math.abs(prev.x - next.x) + Math.abs(prev.y - next.y) + Math.abs(prev.width - next.width) + Math.abs(prev.height - next.height));
+          prev = next;
+        }
+        return worst;
+      },
+      { message: "the control never stopped moving", timeout: 20_000 },
+    )
+    .toBeLessThan(0.5);
+  return (await locator.boundingBox())!;
 }
