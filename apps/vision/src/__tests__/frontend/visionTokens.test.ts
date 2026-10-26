@@ -3,7 +3,7 @@
  * are the ones in apps/connect/src/frontend/assets/map-v2.css sections 1–2.
  * A second fill gold, or a pair under WCAG AA, fails here.
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -60,11 +60,13 @@ function frontendSources(): string[] {
   const dir = join(root, "src/frontend");
   const out: string[] = [];
   const walk = (d: string) => {
-    for (const name of readdirSync(d)) {
-      const p = join(d, name);
-      if (name === "vendor") continue;
-      if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(jsx?|html|css)$/.test(name) && !name.endsWith("config.example.js")) out.push(readFileSync(p, "utf8"));
+    for (const ent of readdirSync(d, { withFileTypes: true })) {
+      if (ent.name === "vendor") continue;
+      const p = join(d, ent.name);
+      if (ent.isDirectory()) walk(p);
+      else if (ent.isFile() && /\.(jsx?|html|css)$/.test(ent.name) && !ent.name.endsWith("config.example.js")) {
+        out.push(readFileSync(p, "utf8"));
+      }
     }
   };
   walk(dir);
