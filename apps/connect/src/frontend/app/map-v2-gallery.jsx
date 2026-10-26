@@ -47,11 +47,22 @@
   function Viewer({ images, index, onClose, onIndex, strings, returnFocus }) {
     const stage = useRef(null);
     const closeBtn = useRef(null);
+    const rootRef = useRef(null);
     const drag = useRef(null);
+    const backTo = useRef(returnFocus);
+    backTo.current = returnFocus;
     useBackGuard(true, onClose);
     useEffect(() => {
       if (closeBtn.current) closeBtn.current.focus({ preventScroll: true });
-      return () => { if (returnFocus && returnFocus.isConnected) returnFocus.focus({ preventScroll: true }); };
+      // Lift the page lock before returning focus: the opener is inside #root.
+      const hold = window.MapV2 && window.MapV2.lockBehind ? window.MapV2.lockBehind() : function () {};
+      const trap = window.MapV2 && window.MapV2.trapFocus ? window.MapV2.trapFocus(rootRef.current) : function () {};
+      return () => {
+        trap();
+        hold();
+        const el = backTo.current;
+        if (el && el.isConnected) el.focus({ preventScroll: true });
+      };
     }, []);
     const n = images.length;
     const step = (d) => onIndex((index + d + n) % n);
@@ -73,7 +84,12 @@
       const dx = e.clientX - d.x, dy = e.clientY - d.y;
       if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
     };
-    return h('div', { 'data-mv2': 'viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': strings.viewerLabel(index + 1, n) },
+    return h('div', {
+      ref: rootRef, 'data-mv2': 'viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': strings.viewerLabel(index + 1, n),
+      // On the root, not the stage: the stage's own press still starts a swipe,
+      // and the press does not bubble out to the sheet's drag.
+      onPointerDown: (e) => e.stopPropagation(),
+    },
       h('div', { 'data-mv2': 'viewer-stage', ref: stage, onPointerDown: down, onPointerUp: up, onPointerCancel: () => { drag.current = null; } },
         h('img', { src: im.url, alt: im.caption || '', 'data-mv2': 'viewer-img', decoding: 'async', draggable: false })),
       im.caption && h('p', { 'data-mv2': 'viewer-caption' }, im.caption),
