@@ -6,6 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LIVE_REFUSED } from "../../../scripts/reader/run.mjs";
 
 const RAW = readFileSync(join(process.cwd(), "../../.github/workflows/reader.yml"), "utf8").replace(/\r\n/g, "\n");
 const LINES = RAW.split("\n").filter((l) => !/^\s*#/.test(l));
@@ -33,11 +34,26 @@ describe("reader.yml: when it runs", () => {
       expect(YAML).not.toMatch(new RegExp(`^\\s*${banned}:`, "m"));
     }
   });
-  it("a manual run is a dry run unless 'live' is chosen; a scheduled run is dry unless READER_LIVE is true", () => {
+  it("live writes require READER_LIVE to be exactly true, for a scheduled run and a manual one", () => {
     expect(YAML).toMatch(/default: dry-run/);
+    // --live only when the variable is exactly true AND this run asked to write (daily, or mode live).
     expect(YAML).toContain(
-      "READER_MODE: ${{ ((github.event_name == 'workflow_dispatch' && inputs.mode == 'live') || (github.event_name == 'schedule' && vars.READER_LIVE == 'true')) && '--live' || '--dry-run' }}",
+      "READER_MODE: ${{ vars.READER_LIVE == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live')) && '--live' || '--dry-run' }}",
     );
+    expect(YAML).toContain("READER_LIVE: ${{ vars.READER_LIVE }}");
+    expect(YAML).not.toContain("secrets.READER_LIVE");
+    expect(YAML.match(/vars\.READER_LIVE/g)).toHaveLength(3);
+    // A hand-picked live mode used to write with the variable unset. That expression must not return.
+    expect(YAML).not.toContain(
+      "(github.event_name == 'workflow_dispatch' && inputs.mode == 'live') || (github.event_name == 'schedule' && vars.READER_LIVE == 'true')",
+    );
+    expect(YAML).toContain("if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live' && vars.READER_LIVE != 'true'");
+    const refuseAt = YAML.indexOf("Refuse a manual live run until READER_LIVE is true");
+    const checkoutAt = YAML.indexOf("uses: actions/checkout@v4");
+    expect(refuseAt).toBeGreaterThan(-1);
+    expect(checkoutAt).toBeGreaterThan(refuseAt);
+    expect(YAML).toContain(LIVE_REFUSED);
+    expect(YAML).toContain("exit 1");
   });
   it("never on a fork, one run at a time, and at most 20 minutes", () => {
     expect(YAML).toContain("if: github.repository == 'citizensnetwork/citizens-ecosystem'");
@@ -70,15 +86,19 @@ describe("reader.yml: secrets", () => {
   });
   it("no expression is interpolated into a shell line (no script injection)", () => {
     const runLines = LINES.filter((l) => /^\s*run:/.test(l));
-    expect(runLines).toHaveLength(1);
+    expect(runLines).toHaveLength(2);
     expect(runLines.join("\n")).not.toContain("${{");
   });
 });
 
-describe("reader.yml: the single run line", () => {
-  it("runs the script once under bash (so pipefail keeps its exit code) and tees its report into the Summary", () => {
-    expect(LINES.filter((l) => /^\s*run:/.test(l)).map((l) => l.trim())).toEqual([`run: ${RUN_LINE}`]);
+describe("reader.yml: what it runs", () => {
+  it("refuses a disarmed manual live run in a static shell line, then runs the script once under bash", () => {
+    expect(LINES.filter((l) => /^\s*run:/.test(l)).map((l) => l.trim())).toEqual([
+      `run: 'echo "::error::${LIVE_REFUSED}" && exit 1'`,
+      `run: ${RUN_LINE}`,
+    ]);
     expect(YAML).toMatch(/shell: bash\n\s+env:/);
+    expect(YAML.match(/shell: bash/g)).toEqual(["shell: bash"]);
     // The script itself writes no file (CodeQL js/http-to-file-access); only the workflow touches the Summary.
     for (const f of ["run", "net", "source", "connect", "html", "xml", "feed", "jsonld", "ics", "time", "robots"]) {
       expect(readFileSync(join(process.cwd(), `scripts/reader/${f}.mjs`), "utf8"), f).not.toMatch(/writeFile|appendFile|createWriteStream|from "node:fs"|GITHUB_STEP_SUMMARY/);

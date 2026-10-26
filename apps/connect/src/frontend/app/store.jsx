@@ -638,6 +638,32 @@
     const [savedContributors, setSavedContributors] = useState(() => new Set());
     const [savedPlaces, setSavedPlaces] = useState(() => new Set());
 
+    // A listing waiting for the signed-in person to confirm it (C10). Set by askAboutListing, shown by
+    // CCListingClaim.Host (listing-claim.jsx), cleared when they answer or put it off.
+    const [pendingListing, setPendingListing] = useState(null);
+    const clearPendingListing = useCallback(() => setPendingListing(null), []);
+    // "Decide later" lasts for this browser session; the next sign-in asks again.
+    const snoozePendingListing = useCallback((userId) => {
+      try { if (userId) sessionStorage.setItem('cc_listing_claim_later_v1:' + userId, '1'); } catch (e) { /* still closes */ }
+      setPendingListing(null);
+    }, []);
+    // Read-only: is a listing waiting for this person? `force` ignores a "Decide later" (the account menu's
+    // manual "Claim a Contributor listing"). Resolves to the claim or null; never claims anything itself.
+    const askAboutListing = useCallback(async (userId, force, stillActive) => {
+      if (!force) {
+        try { if (userId && sessionStorage.getItem('cc_listing_claim_later_v1:' + userId)) return null; } catch (e) { /* ask anyway */ }
+      }
+      try {
+        const res = await authedFetch('/api/contributor/claim');
+        if (!res.ok) return null;
+        const body = await res.json().catch(() => null);
+        if (!body || body.found !== true) return null;
+        if (stillActive && !stillActive()) return null;
+        setPendingListing(body);
+        return body;
+      } catch (e) { return null; }
+    }, []);
+
     // toasts
     const [toasts, setToasts] = useState([]);
     const toast = useCallback((msg, kind = 'gold') => {
@@ -2249,36 +2275,16 @@
       // be there: a Contributor stays on their Dashboard, anyone else is nudged to
       // apply. It runs once per URL-originated screen (gatePending), so a later auth
       // event (a token refresh) never yanks the person back.
-      // Owners of a listing made FOR them (Google Form intake, or admin
-      // Create) land on their own dashboard the first time they sign in —
-      // once per browser session, best-effort (the account menu's "Claim a
-      // Contributor listing" stays as the manual fallback):
-      //  (a) Supabase linked their same-email Google sign-in to the listing
-      //      account, so they ARE the contributor: stamp the claim
-      //      (mark_own_listing_claimed, mig 173 — a no-op for anyone else).
-      //  (b) a separate citizen account with the listing's email: claim it
-      //      (copies the listing onto this account), then reload into the
-      //      dashboard so the new role is picked up everywhere.
-      let landingTried = false;
-      const landOwnListing = async (s) => {
-        if (landingTried) return;
-        landingTried = true;
-        const key = 'cc_listing_landing_v1:' + s.user.id;
-        try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) { /* still try once */ }
-        try {
-          if (s.role === 'contributor') {
-            const { data } = await window.CC_AUTH.supabase.rpc('mark_own_listing_claimed');
-            if (active && data && data.success) {
-              resetNav('dashboard');
-              toast('Welcome to Citizens Connect! Your listing is live — manage it here.', 'green');
-            }
-          } else if (s.role === 'citizen' && s.contributorStatus === 'not_applied') {
-            const res = await authedFetch('/api/contributor/claim', { method: 'POST' });
-            // A full load, on purpose: the claim just changed this account's role in the
-            // database, and the whole app (role, listing, menus) re-reads it on a fresh load.
-            if (active && res.ok) window.location.href = '/dashboard';
-          }
-        } catch (e) { /* best-effort */ }
+      // A listing made FOR the person (Google Form intake, or admin Create) is never attached
+      // by signing in (C10). Once the session resolves we only ASK whether one is waiting
+      // (GET /api/contributor/claim, read-only); the confirm screen (listing-claim.jsx) is the
+      // only thing that runs the claim. Best-effort, once per page load; "Decide later" is
+      // remembered for the browser session.
+      let askedAboutListing = false;
+      const askOnce = (s) => {
+        if (askedAboutListing) return;
+        askedAboutListing = true;
+        askAboutListing(s.user.id, false, () => active);
       };
       const apply = async () => {
         try {
@@ -2294,7 +2300,7 @@
               restoreReturnPath();
               settleRoute({ authed: true, role: s.role || 'citizen', contributorStatus: s.contributorStatus || 'not_applied' });
             }
-            landOwnListing(s);
+            askOnce(s);
           } else {
             setRealUser(null);
             setAuthed(false);
@@ -3123,6 +3129,7 @@
       // A citizen whose Contributor application is waiting for an admin (D-12): their Dashboard is the "being reviewed" page.
       isPendingApplicant: role === 'citizen' && contributorStatus === 'pending',
       unreadNotifs, unreadMsgs, toasts, toast,
+      pendingListing, clearPendingListing, snoozePendingListing, askAboutListing,
       createKind, createEditing, openCreate, closeCreate, updateAvatar,
       updateEvent, setEventStatus, updatePlace, setPlaceStatus,
       updateContributorProfile, addCoverPhoto, deleteCoverPhoto, updateCoverPhotoCaption,

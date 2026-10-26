@@ -9,6 +9,14 @@
  * asking them to sign in with their owner email (a 6-digit emailed code, or
  * Google if that address is a Google account).
  *
+ * Verify-first (C10): the listing is live at once, but it is NEVER attached to anybody
+ * until the owner has signed in and said "Confirm" on a screen in Connect. The Status
+ * column follows what the DATABASE says, not what this script did:
+ *   Awaiting owner · 3 days  → Owner confirmed ✓    or    Owner declined
+ * refreshStatuses() asks Connect (POST <INTAKE_URL>/status, HMAC-signed) every ~10
+ * minutes and writes the answer into the row. It is read-only: the Sheet never
+ * triggers anything in Connect, so editing a Status cell changes nothing there.
+ *
  * Setup: see README.md in this folder (run setup() once).
  * Server side: apps/connect/src/app/api/intake/google-form/route.ts.
  * Secrets live in Script properties (INTAKE_URL, INTAKE_SECRET) — never here.
@@ -21,9 +29,15 @@ var SHEET_NAME = 'Form Responses 1';
 var MAX_IMAGE_BYTES = 1500000;
 var RESIZE_WIDTH = { logo: 800, cover: 1600 };
 
-var STATUS_LIVE = 'Live ✓';
+var STATUS_LIVE = 'Live ✓'; // rows approved before the verify-first change keep this
+var STATUS_AWAITING = 'Awaiting owner'; // written with its age: "Awaiting owner · 3 days"
+var STATUS_CONFIRMED = 'Owner confirmed ✓';
+var STATUS_DECLINED = 'Owner declined';
 var STATUS_PROCESSING = 'Processing…';
 var STATUS_ERROR = 'Error';
+
+// Connect answers for at most this many listings per call (MAX_SLUGS in the status route).
+var STATUS_BATCH = 200;
 
 // Columns the founder adds to the right of the Form's columns.
 var MANUAL_HEADERS = ['Approve', 'Status', 'Listing URL', 'Processed at', 'Notes'];
@@ -92,7 +106,12 @@ function setup() {
   });
   // An INSTALLABLE trigger: a simple onEdit() may not call UrlFetchApp/MailApp.
   ScriptApp.newTrigger('onApproveEdit').forSpreadsheet(ss).onEdit().create();
-  ss.toast('Intake is ready. Tick "Approve" on a row to publish it.', 'Citizens Connect', 10);
+  // The status poll (C10): every ~10 minutes, read-only. Public name on purpose: a trigger cannot call a private one.
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'refreshStatuses') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('refreshStatuses').timeBased().everyMinutes(10).create();
+  ss.toast('Intake is ready. Tick "Approve" on a row to publish it; its Status then follows the owner\'s answer.', 'Citizens Connect', 10);
 }
 
 /**
@@ -145,7 +164,7 @@ function processRow_(sheet, cols, row) {
 
   if (val('Approve') !== true) return;
   var status = str('Status');
-  if (status === STATUS_LIVE || status === STATUS_PROCESSING) return; // already done / in flight
+  if (isFinishedStatus_(status)) return; // already done / waiting for its owner / in flight
 
   var cell = function (header, value) { sheet.getRange(row, cols[header]).setValue(value); };
   cell('Status', STATUS_PROCESSING);
@@ -158,12 +177,14 @@ function processRow_(sheet, cols, row) {
     var res = post_(payload);
     if (res.code === 200 && res.body.success) {
       notes = notes.concat(res.body.warnings || []);
-      cell('Status', STATUS_LIVE);
+      // Live, and waiting for the owner to confirm it. refreshStatuses() keeps this line true.
+      cell('Status', awaitingStatus_(0, false));
       cell('Listing URL', res.body.url);
       cell('Processed at', new Date());
       try {
-        // on_map comes from Connect (it resolves the pin: maps link, geocode, MapTiler); anything but true is "no pin"
-        sendWelcome_(payload.owner_email, payload.organisation_name, res.body.url, res.body.on_map === true);
+        // on_map comes from Connect (it resolves the pin: maps link, geocode, MapTiler); anything but true is "no pin".
+        // owner_has_account picks the welcome's wording (asked to attach it to their account, or to confirm it is theirs).
+        sendWelcome_(payload.owner_email, payload.organisation_name, res.body.url, res.body.on_map === true, res.body.owner_has_account === true);
       } catch (mailErr) {
         notes.push('Listing is live, but the welcome email failed: ' + mailErr.message);
       }
@@ -177,6 +198,97 @@ function processRow_(sheet, cols, row) {
     cell('Approve', false); // fix the row, then tick again to retry
   }
   cell('Notes', notes.join('\n'));
+}
+
+// ── Status (C10) ─────────────────────────────────────────────────────────
+
+function ageLabel_(days) {
+  var n = Math.max(0, Math.floor(Number(days) || 0));
+  return n < 1 ? 'today' : n === 1 ? '1 day' : n + ' days';
+}
+
+/** "Awaiting owner · 3 days", with "(reminded)" once the single 7-day reminder has gone out. */
+function awaitingStatus_(days, reminded) {
+  return STATUS_AWAITING + ' · ' + ageLabel_(days) + (reminded ? ' (reminded)' : '');
+}
+
+/** Still waiting for the owner: the only Status the poll is allowed to rewrite. */
+function isOpenStatus_(status) {
+  return String(status).indexOf(STATUS_AWAITING) === 0;
+}
+
+/** A row that has been processed (or is being): ticking Approve again must not send it twice. */
+function isFinishedStatus_(status) {
+  var s = String(status);
+  return s === STATUS_LIVE || s === STATUS_PROCESSING || s === STATUS_CONFIRMED || s === STATUS_DECLINED || isOpenStatus_(s);
+}
+
+/** The slug at the end of a listing link, "https://…/c/grace-point" → "grace-point"; '' when it is not one. */
+function slugFromUrl_(url) {
+  var m = String(url || '').match(/\/c\/([a-z0-9][a-z0-9-]*)\/?$/);
+  return m ? m[1] : '';
+}
+
+/**
+ * Time-driven (setup() installs it every 10 minutes). Asks Connect where each waiting listing stands and writes it
+ * into the row's Status. READ-ONLY toward Connect: the database holds the state and the Sheet only shows it, so
+ * nothing here can attach, hide, remind or approve anything. Only rows whose Status still says "Awaiting owner" are
+ * touched, and a cell the founder edited meanwhile is left alone.
+ */
+function refreshStatuses() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return; // a row is being approved right now; the next run catches up
+  try {
+    var sheet = getSheet_();
+    var cols = columns_(sheet);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var count = lastRow - 1;
+    var statuses = sheet.getRange(2, cols.Status, count, 1).getValues();
+    var urls = sheet.getRange(2, cols['Listing URL'], count, 1).getValues();
+
+    var open = [];
+    for (var i = 0; i < count; i++) {
+      if (!isOpenStatus_(statuses[i][0])) continue;
+      var slug = slugFromUrl_(urls[i][0]);
+      if (slug) open.push({ row: i + 2, slug: slug });
+    }
+    if (!open.length) return;
+
+    var slugs = [];
+    open.forEach(function (o) { if (slugs.indexOf(o.slug) === -1) slugs.push(o.slug); });
+    var answers = {};
+    for (var from = 0; from < slugs.length; from += STATUS_BATCH) {
+      var res = post_({ slugs: slugs.slice(from, from + STATUS_BATCH) }, '/status');
+      if (res.code !== 200 || !res.body || !res.body.statuses) {
+        Logger.log('Status poll skipped: HTTP ' + res.code + ' ' + JSON.stringify(res.body));
+        return;
+      }
+      Object.keys(res.body.statuses).forEach(function (k) { answers[k] = res.body.statuses[k]; });
+    }
+
+    open.forEach(function (o) {
+      var entry = answers[o.slug];
+      if (!entry) return; // Connect does not know it (an older listing, or one an admin deleted): leave the row alone
+      var label = entry.status === 'confirmed' ? STATUS_CONFIRMED
+        : entry.status === 'declined' ? STATUS_DECLINED
+        : entry.status === 'awaiting' ? awaitingStatus_(entry.age_days, entry.reminded === true)
+        : '';
+      if (!label) return;
+      var cell = sheet.getRange(o.row, cols.Status);
+      var current = String(cell.getValue());
+      if (!isOpenStatus_(current) || current === label) return; // edited meanwhile, or nothing new to say
+      cell.setValue(label);
+      if (entry.status === 'declined') {
+        var notes = sheet.getRange(o.row, cols.Notes);
+        var line = 'The owner said this listing is not theirs. It is hidden. Decide in Admin → Listings whether to Delete it.';
+        var existing = String(notes.getValue());
+        notes.setValue(existing ? existing + '\n' + line : line);
+      }
+    });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── Payload ──────────────────────────────────────────────────────────────
@@ -279,12 +391,13 @@ function resized_(fileId, width) {
 
 // ── Transport ────────────────────────────────────────────────────────────
 
-/** Signed POST to Connect. Returns {code, body}. */
-function post_(payload) {
+/** Signed POST to Connect (INTAKE_URL, plus an optional path such as '/status'). Returns {code, body}. */
+function post_(payload, suffix) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty('INTAKE_URL');
   var secret = props.getProperty('INTAKE_SECRET');
   if (!url || !secret) throw new Error('Script properties INTAKE_URL / INTAKE_SECRET are not set.');
+  if (suffix) url += suffix;
 
   // Pure-ASCII JSON (non-ASCII escaped as \uXXXX) so the bytes Connect
   // verifies are byte-for-byte the string signed here, whatever the charset.
@@ -317,13 +430,27 @@ function post_(payload) {
 
 // `onMap` is whether Connect gave the listing a map pin (tracker C21): everyone is in Kingdom Discovery, but an
 // online-only Contributor, or one whose address could not be placed, is not on the map and must not be told so.
-function sendWelcome_(ownerEmail, orgName, listingUrl, onMap) {
+// `hasAccount` is whether that address already has a Citizens Connect account (C10): the listing is then OFFERED to the
+// account ("Attach it to your account?"), never merged into it, and nothing on the account changes unless they confirm.
+// Either way the words say "sign in, then confirm"; the listing is not theirs until they do. Keep in step with
+// ownerWelcomeEmail in apps/connect/src/lib/email/templates.ts.
+function sendWelcome_(ownerEmail, orgName, listingUrl, onMap, hasAccount) {
   var where = onMap === true ? 'on the map and in Kingdom Discovery' : 'in Kingdom Discovery';
   var appUrl = PropertiesService.getScriptProperties().getProperty('INTAKE_URL').replace(/\/api\/.*$/, '');
   var signInUrl = escapeHtml_(appUrl + '/dashboard');
   var safeListingUrl = escapeHtml_(listingUrl);
   var safeName = escapeHtml_(orgName);
   var safeEmail = escapeHtml_(ownerEmail);
+  var askHtml = hasAccount === true
+    ? '<p>You already have a Citizens Connect account with <strong>' + safeEmail + '</strong>. When you sign in as usual we will ask: ' +
+      '<em>"Attach ' + safeName + ' to your account?"</em> Nothing on your account changes unless you tap <strong>Confirm</strong>. ' +
+      'If this listing is not yours, tap <strong>Not me</strong> and we will hide it straight away.</p>'
+    : '<p>When you sign in we will ask you to confirm that this listing is yours. ' +
+      'If it is not, tap <strong>Not me</strong> and we will hide it straight away.</p>';
+  var askText = hasAccount === true
+    ? 'You already have a Citizens Connect account with ' + ownerEmail + '. When you sign in as usual we will ask: "Attach ' + orgName +
+      ' to your account?" Nothing on your account changes unless you tap Confirm. If this listing is not yours, tap Not me and we will hide it straight away.'
+    : 'When you sign in we will ask you to confirm that this listing is yours. If it is not, tap Not me and we will hide it straight away.';
 
   var html =
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#1f1f1f;line-height:1.55">' +
@@ -331,13 +458,14 @@ function sendWelcome_(ownerEmail, orgName, listingUrl, onMap) {
     '<p>Thank you for joining the Body on Citizens Connect — you\'re now ' + where + ', ' +
     'where citizens across the city can find, follow and connect with you.</p>' +
     '<p><a href="' + safeListingUrl + '" style="color:#A67C00">View your listing</a></p>' +
-    '<p><strong>To manage your profile</strong>, sign in with <strong>' + safeEmail + '</strong>. ' +
+    '<p><strong>To see your listing and manage it</strong>, sign in with <strong>' + safeEmail + '</strong>. ' +
     'You don\'t need a Google account:</p>' +
     '<ol style="padding-left:20px;margin:0 0 14px">' +
     '<li>Open <a href="' + signInUrl + '" style="color:#A67C00">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>' +
     '<li>Enter <strong>' + safeEmail + '</strong>. We\'ll email you a 6-digit code (check your junk folder too).</li>' +
-    '<li>Type the code in. You\'ll land on your Contributor dashboard.</li>' +
+    '<li>Type the code in, then confirm the listing is yours.</li>' +
     '</ol>' +
+    askHtml +
     '<p><a href="' + signInUrl + '" style="display:inline-block;background:#A67C00;color:#fff;padding:12px 20px;' +
     'border-radius:10px;text-decoration:none;font-weight:bold">Sign in to your Contributor Portal</a></p>' +
     '<p style="font-size:13px;color:#555">Is ' + safeEmail + ' a Google account? You can tap the Google button instead. ' +
@@ -349,10 +477,11 @@ function sendWelcome_(ownerEmail, orgName, listingUrl, onMap) {
   var text =
     orgName + ' is live on Citizens Connect.\n\n' +
     'View your listing: ' + listingUrl + '\n\n' +
-    'To manage your profile, sign in with ' + ownerEmail + '. You don\'t need a Google account:\n' +
+    'To see your listing and manage it, sign in with ' + ownerEmail + '. You don\'t need a Google account:\n' +
     '1. Open ' + appUrl + '/dashboard and tap "Continue with email".\n' +
     '2. Enter ' + ownerEmail + '. We\'ll email you a 6-digit code (check your junk folder too).\n' +
-    '3. Type the code in. You\'ll land on your Contributor dashboard.\n\n' +
+    '3. Type the code in, then confirm the listing is yours.\n\n' +
+    askText + '\n\n' +
     'Is ' + ownerEmail + ' a Google account? You can tap the Google button instead.\n' +
     'Signed in with a different address by mistake? Sign out, then sign in again with ' + ownerEmail + '.\n\n' +
     'The Citizens Connect team';

@@ -18,6 +18,13 @@
  * deleted so no orphaned account is left behind. Every field is validated
  * (shared rules: `@/lib/contributorFields`) BEFORE the auth user is created.
  *
+ * Verify-first (C10, migration 196): the listing is live at once but is never attached to anybody until the
+ * owner has signed in with the address and confirmed. If the address has no account, the new auth user holds it
+ * and the owner confirms the listing is theirs; if the address already has an account (a plain Citizen), the
+ * new auth user gets an alias address that is never mailed and the owner is asked to attach the listing to
+ * their own account. Either way a listing_claims row records the request (one reminder goes out at 7 days).
+ * The response carries `ownerHasAccount` and `awaitingOwner: true` so the success panel can say so.
+ *
  * Welcome email (founder decision D-13): unless the admin unticks "Email the
  * owner" (`email_owner: false`; on by default), Connect itself mails the owner
  * the sign-in steps from no-reply@citizenscentral.co.za, with the admin's notify
@@ -47,6 +54,7 @@
 import { getRouteAuth } from "@/lib/supabase/route";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
+import { createListingUser, pendingListingMessage, registerListingClaim } from "@/lib/listingClaim";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { coercePublicUrl, normalisePublicUrl } from "@/lib/publicUrl";
@@ -128,22 +136,22 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // 1. Create the real auth user this listing will live under (unconfirmed
-  //    password/no OAuth identity attached — only usable via claim). Only
-  //    the service_role client can call the Admin Auth API.
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: fields.claimEmail,
-    email_confirm: true,
-    user_metadata: { full_name: fields.displayName, created_by_admin: true },
+  // 1. Create the auth user this listing will live under (a placeholder: no password, no OAuth identity, only
+  //    ever usable by its owner once they have confirmed). If the address already has an account the user gets
+  //    an alias address instead. Only the service_role client can call the Admin Auth API.
+  const origin = siteOrigin(request);
+  const listingUser = await createListingUser(admin, {
+    claimEmail: fields.claimEmail,
+    userMetadata: { full_name: fields.displayName, created_by_admin: true },
+    origin,
   });
-  if (createErr || !created?.user) {
-    const alreadyExists = createErr?.message?.toLowerCase().includes("already been registered");
+  if (!listingUser.ok) {
     return NextResponse.json(
-      { error: alreadyExists ? "email_already_registered" : "create_user_failed" },
-      { status: alreadyExists ? 409 : 500 },
+      { error: listingUser.error, ...(listingUser.message ? { message: listingUser.message } : {}) },
+      { status: listingUser.status },
     );
   }
-  const newUserId = created.user.id;
+  const { userId: newUserId, ownerHasAccount } = listingUser;
 
   // 2. Fill in the Contributor fields via the admin_create_contributor_profile
   //    RPC, called through the ADMIN'S OWN session (`supabase`, resolved
@@ -206,6 +214,25 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // The ledger row: from here the owner is asked to confirm. A second open request for the same address is
+  // refused by the database; roll this one back and say which listing is already waiting.
+  const claim = await registerListingClaim(admin, {
+    placeholderId: newUserId,
+    slug: result.slug ?? "",
+    claimEmail: fields.claimEmail,
+    source: "admin_create",
+  });
+  if (!claim.ok) {
+    await admin.auth.admin.deleteUser(newUserId).catch(() => {});
+    if (claim.reason === "duplicate") {
+      return NextResponse.json(
+        { error: "listing_pending", message: pendingListingMessage(fields.claimEmail, claim.existingSlug, origin) },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "create_failed" }, { status: 500 });
+  }
+
   await logAdminAction(supabase, {
     actorId: guard.user.id,
     action: "contributor_created",
@@ -222,7 +249,6 @@ export async function POST(request: NextRequest) {
   const onMap = hasMapPin({ no_fixed_location: fields.noFixedLocation, physical_latitude: fields.latitude, physical_longitude: fields.longitude });
   let email: EmailOutcome = "skipped";
   if (payload.email_owner !== false) {
-    const origin = siteOrigin(request);
     email = await sendEmail({
       to: fields.claimEmail,
       replyTo: adminNotifyEmail(),
@@ -232,6 +258,7 @@ export async function POST(request: NextRequest) {
         listingUrl: result.slug ? `${origin}/c/${encodeURIComponent(result.slug)}` : origin,
         signInUrl: `${origin}/dashboard`,
         onMap,
+        hasAccount: ownerHasAccount,
       }),
     });
   }
@@ -243,5 +270,7 @@ export async function POST(request: NextRequest) {
     claim_email: fields.claimEmail,
     onMap,
     email,
+    ownerHasAccount,
+    awaitingOwner: true,
   });
 }

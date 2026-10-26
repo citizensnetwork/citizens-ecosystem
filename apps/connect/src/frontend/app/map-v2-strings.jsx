@@ -192,6 +192,15 @@
       monthShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     },
 
+    // Issue #222. Words the card itself paints. Category and group names are data
+    // (window.DATA.getItemCategory), not strings here. Posted-ago and open state
+    // stay in `time`. "Read more" stays on sheet.news.
+    card: {
+      listen: 'Listen',
+      live: 'Live',
+      loading: 'Loading',
+    },
+
     // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).
     // Map surfaces pass this object in; other screens use STR.
     report: {

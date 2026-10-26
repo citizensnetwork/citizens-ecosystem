@@ -13,6 +13,7 @@
  *   - It returns `"sent" | "failed" | "skipped"` so a caller can report it.
  *     `skipped` = not configured (no key) or nothing usable to send to.
  *   - It logs the outcome without the recipient's address (no PII in logs).
+ *   - A listing placeholder's alias address (lib/placeholderEmail.ts, C10) is never mailed: it is `skipped`.
  *   - Headers cannot be injected: `to` must be a plausible single address, the
  *     subject and reply-to are flattened to one line.
  *
@@ -21,6 +22,7 @@
  */
 
 import { normaliseEmail } from "@/lib/contributorFields";
+import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
 export type EmailOutcome = "sent" | "failed" | "skipped";
 
@@ -96,6 +98,11 @@ export async function sendEmail(mail: OutgoingEmail): Promise<EmailOutcome> {
   const to = normaliseEmail(mail.to);
   if (!to) {
     console.warn("[email] no valid recipient; email skipped");
+    return "skipped";
+  }
+
+  if (isPlaceholderEmail(to)) {
+    console.warn("[email] placeholder address; email skipped");
     return "skipped";
   }
 
