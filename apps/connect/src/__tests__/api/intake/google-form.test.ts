@@ -11,10 +11,12 @@ const storageBucket = {
   remove: vi.fn().mockResolvedValue({ data: [], error: null }),
 };
 // The 409 path looks the existing account up: from("profiles").select().eq().maybeSingle().
+// The verify-first ledger row (C10) is written with from("listing_claims").insert(...).
 const profileLookup = {
   select: vi.fn(() => profileLookup),
   eq: vi.fn(() => profileLookup),
   maybeSingle: vi.fn(),
+  insert: vi.fn(),
 };
 const mockAdmin = {
   auth: { admin: { createUser: vi.fn(), deleteUser: vi.fn().mockResolvedValue({ error: null }) } },
@@ -68,6 +70,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_MAPTILER_KEY", "mt-key");
   mockAdmin.auth.admin.createUser.mockResolvedValue({ data: { user: { id: NEW_USER_ID } }, error: null });
   mockAdmin.rpc.mockResolvedValue({ data: { success: true, slug: "grace-point-community-church" }, error: null });
+  profileLookup.insert.mockResolvedValue({ error: null });
   storageBucket.upload.mockResolvedValue({ data: {}, error: null });
   profileLookup.maybeSingle.mockResolvedValue({ data: null, error: null });
 });
@@ -150,6 +153,8 @@ describe("POST /api/intake/google-form — creating the listing", () => {
       url: "http://localhost/c/grace-point-community-church",
       warnings: [],
       on_map: true,
+      owner_has_account: false,
+      awaiting_owner: true,
     });
     expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledWith(
       expect.objectContaining({ email: "daniel@gracepointchurch.org.za", email_confirm: true }),
@@ -336,7 +341,7 @@ describe("POST /api/intake/google-form — creating the listing", () => {
   it("200 awaiting_confirmation for an existing citizen, with no listing and no welcome url", async () => {
     emailTaken({ message: "A user with this email address has already been registered", code: "email_exists" });
     profileLookup.maybeSingle.mockResolvedValueOnce({
-      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email, contributor_slug: null, deleted_at: null },
+      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email, contributor_status: "not_applied", contributor_slug: null, deleted_at: null },
       error: null,
     });
     mockAdmin.rpc.mockResolvedValueOnce({
@@ -350,13 +355,15 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(json.url).toBeUndefined();
     expect(json.message).not.toContain(row.owner_email);
     expect(mockAdmin.rpc).toHaveBeenCalledWith("create_intake_upgrade_request", expect.objectContaining({ _profile_id: CITIZEN_ID, _display_name: row.organisation_name }));
+    expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledTimes(1);
     expect(mockAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+    expect(profileLookup.insert).not.toHaveBeenCalled();
   });
 
   it("reuses a pending confirmation and does not email again", async () => {
     emailTaken({ message: "already been registered", code: "email_exists" });
     profileLookup.maybeSingle.mockResolvedValueOnce({
-      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email },
+      data: { id: CITIZEN_ID, role: "citizen", email: row.owner_email, contributor_status: "not_applied" },
       error: null,
     });
     mockAdmin.rpc.mockResolvedValueOnce({
@@ -368,9 +375,8 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(json.message).toMatch(/already waiting/);
   });
 
-  it("409 account_not_eligible for an admin, a deleted account, or a contributor with no slug", async () => {
+  it("409 account_not_eligible for a deleted account or a contributor with no slug", async () => {
     for (const data of [
-      { id: CITIZEN_ID, role: "admin" },
       { id: CITIZEN_ID, role: "citizen", deleted_at: "2026-01-01T00:00:00.000Z" },
       { id: CITIZEN_ID, role: "contributor", contributor_slug: null },
     ]) {
@@ -381,6 +387,29 @@ describe("POST /api/intake/google-form — creating the listing", () => {
       expect((await res.json()).error).toBe("account_not_eligible");
     }
     expect(mockAdmin.rpc).not.toHaveBeenCalled();
+    expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledTimes(2);
+  });
+
+  it("409 email_already_registered with what to do, when the email belongs to an applicant or an admin", async () => {
+    for (const [data, words] of [
+      [{ role: "citizen", contributor_status: "pending", contributor_slug: null }, /application of its own/],
+      [{ role: "admin", contributor_status: "not_applied", contributor_slug: null }, /administrator/],
+    ] as const) {
+      mockAdmin.auth.admin.createUser.mockClear();
+      emailTaken({ message: "A user with this email address has already been registered" });
+      profileLookup.maybeSingle.mockResolvedValueOnce({ data, error: null });
+      const res = await POST(signedReq(row));
+      expect(res.status).toBe(409);
+      const json = await res.json();
+      expect(json.error).toBe("email_already_registered");
+      expect(json.message).toMatch(words);
+      expect(json.message).toMatch(/Become a Contributor/);
+      expect(json.message).toContain(row.owner_email);
+      // refused: no alias user, no profile, no ledger row
+      expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledTimes(1);
+      expect(mockAdmin.rpc).not.toHaveBeenCalled();
+      expect(profileLookup.insert).not.toHaveBeenCalled();
+    }
   });
 
   it("treats a literal No website and social as empty for a new account", async () => {
@@ -395,6 +424,42 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     const res = await POST(signedReq(row));
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("email_already_registered");
+  });
+
+  describe("verify-first (C10): a new address is not attached until the owner confirms", () => {
+
+    it("records the ledger row for a brand-new address too (the owner confirms it is theirs)", async () => {
+      const res = await POST(signedReq(row));
+      expect((await res.json()).owner_has_account).toBe(false);
+      expect(mockAdmin.auth.admin.createUser).toHaveBeenCalledTimes(1);
+      expect(profileLookup.insert).toHaveBeenCalledWith(expect.objectContaining({ placeholder_id: NEW_USER_ID, claim_email: row.owner_email }));
+    });
+
+    it("stores the owner address lower-cased and trimmed (the ledger refuses anything else)", async () => {
+      await POST(signedReq({ ...row, owner_email: "  Daniel@GracePointChurch.org.za " }));
+      expect(profileLookup.insert).toHaveBeenCalledWith(expect.objectContaining({ claim_email: "daniel@gracepointchurch.org.za" }));
+    });
+
+    it("a second open request for the same new address: 409 listing_pending, and the new placeholder is rolled back", async () => {
+      profileLookup.insert.mockResolvedValueOnce({ error: { code: "23505", message: "duplicate key" } });
+      profileLookup.maybeSingle.mockResolvedValueOnce({ data: { slug: "grace-point-first" }, error: null });
+      const res = await POST(signedReq({ ...row, logo: { mime: "image/png", base64: PNG_B64 } }));
+      expect(res.status).toBe(409);
+      const json = await res.json();
+      expect(json.error).toBe("listing_pending");
+      expect(json.message).toContain("http://localhost/c/grace-point-first");
+      expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
+      expect(storageBucket.remove).toHaveBeenCalledWith([expect.stringMatching(`^${NEW_USER_ID}/intake/logo-`)]);
+    });
+
+    it("a ledger failure rolls the placeholder back and reports it (never a listing nobody is asked about)", async () => {
+      profileLookup.insert.mockResolvedValueOnce({ error: { code: "42P01", message: "relation does not exist" } });
+      const res = await POST(signedReq(row));
+      expect(res.status).toBe(500);
+      expect((await res.json()).error).toBe("claim_ledger_failed");
+      expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
+    });
+
   });
 
   it("rolls back the auth user and uploaded images when the profile RPC fails", async () => {
@@ -431,6 +496,7 @@ describe("POST /api/intake/google-form — listing automation (mig 181)", () => 
     mockAdmin.from.mockImplementation(((table: string) => ({
       ...profileLookup,
       insert: (payload: unknown) => {
+        if (table === "listing_claims") return Promise.resolve({ error: null });
         inserts.push({ table, payload });
         return Promise.resolve({ error: table === "listing_sources" ? sourcesError : null });
       },

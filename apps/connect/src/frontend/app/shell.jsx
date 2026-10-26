@@ -28,7 +28,7 @@
   function ProfilePanel({ onClose, anchor }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
-    const { user, role, go, isAdmin, isContributor, isPendingApplicant, listingRole, signOut, showSignIn, authed, toast, realUser } = app;
+    const { user, role, go, isAdmin, isContributor, isPendingApplicant, listingRole, signOut, showSignIn, authed, toast, realUser, askAboutListing } = app;
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
@@ -40,33 +40,21 @@
     const pos = anchor === 'top' ? 'right-0 top-full mt-2' : 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
 
-    // An admin may have manually created a listing for this person's email
-    // (see admin.jsx "Create Contributor") — offer a way to claim it. Only
-    // meaningful for a real, non-contributor citizen; the claim endpoint is
-    // a no-op ("nothing to claim") for anyone else, so this is harmless to
-    // show broadly, but keep it scoped to reduce menu clutter.
+    // An admin, or the Google Form, may have made a listing for this person's email (see
+    // admin.jsx "Create Contributor"). This only ASKS (C10): when one is waiting, the confirm screen
+    // opens; nothing is attached until they press Confirm there. Harmless to show broadly, since
+    // the answer comes from the caller's own verified email.
     const claimListing = async () => {
       if (claiming || !realUser) return;
       setClaiming(true);
       try {
-        const res = await window.authedFetch('/api/contributor/claim', { method: 'POST' });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast(body.error === 'nothing_to_claim'
-            ? 'No pending listing found for your email.'
-            : 'Could not claim a listing — please try again.', 'red');
-          setClaiming(false);
-          return;
-        }
-        toast("Listing claimed — welcome to your Contributor Portal!", 'green');
-        onClose();
-        // A full load, on purpose: the claim just changed this account's role in the
-        // database, and the whole app (role, listing, menus) re-reads it on a fresh load.
-        window.location.href = '/dashboard';
+        const found = await askAboutListing(realUser.id, true);
+        if (found) onClose();
+        else toast('No pending listing found for your email.', 'red');
       } catch (e) {
-        toast('Could not claim a listing — please check your connection.', 'red');
-        setClaiming(false);
+        toast('Could not check for a listing — please check your connection.', 'red');
       }
+      setClaiming(false);
     };
 
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
@@ -355,6 +343,7 @@
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),
+      window.CCListingClaim && React.createElement(window.CCListingClaim.Host),
       React.createElement(Toasts));
   }
 

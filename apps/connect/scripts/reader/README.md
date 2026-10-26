@@ -84,15 +84,26 @@ Open the finished run and look at its **Summary**. It shows one row per source:
 
 ## 3. Switch it on
 
-1. Run it once by hand with **mode** set to `live`. Check the Summary and one owner's Suggestions tab.
-2. To make the daily run live as well, go to **Settings → Secrets and variables → Actions →
-   Variables → New repository variable** and add `READER_LIVE` with the value `true`. Without this
-   variable, the daily 06:23 (South African time) run stays a dry run.
+Live writes — suggestions and the digest email — happen only when the repository variable
+`READER_LIVE` is exactly `true`. The daily run and a run you start by hand both obey that switch.
+Until then, the daily run stays a dry run. A hand run with **mode** set to `live` stops immediately
+and sends nothing.
+
+1. Go to **Settings → Secrets and variables → Actions → Variables → New repository variable** and
+   add `READER_LIVE` with the value `true` (those four letters, lower case, nothing else).
+2. Run it once by hand with **mode** set to `live`. Check the Summary and one owner's Suggestions
+   tab. The daily 06:23 (South African time) run is live as well, because it reads the same
+   variable.
+
+If you start a hand run with **mode** `live` while `READER_LIVE` is missing or set to anything other
+than `true`, the run fails at once. The log says `Refusing a live run`, and nothing is read or sent.
+Choose `dry-run`, or set the variable to `true`, and run again.
 
 ## Switch it off
 
 - **Pause the live runs:** change `READER_LIVE` to `false`, or delete it. The daily run goes back to
-  being a harmless dry run.
+  being a harmless dry run. A hand run left on `live` fails until you set the variable back to
+  `true` or choose `dry-run`.
 - **Stop it completely:** **Actions → Reader → ⋯ → Disable workflow**.
 - **One owner:** the owner sets automatic updates to _Off_ on their Dashboard. That switches off
   every one of their sources at once, and they are never offered to the Reader again.
@@ -121,9 +132,10 @@ dismiss)". Its address once this is merged is
    link (.ics)** with the address above.
 2. **Actions → Reader → Run workflow → dry-run.** The Summary shows a row for that source reading
    "2 events found" (the next two weekly dates). The other rows are your real opted-in listings.
-3. Run it again with **live**. The row now shows "2 pending". Open Dashboard → **Suggestions**, where
-   both wait marked "From raw.githubusercontent.com". Dismiss them. (Approving one would publish it on
-   the map, so don't approve unless you want to watch that and delete it afterwards.)
+3. Set `READER_LIVE` to `true` (section 3), then run it again with **live**. The row now shows
+   "2 pending". Open Dashboard → **Suggestions**, where both wait marked "From
+   raw.githubusercontent.com". Dismiss them. (Approving one would publish it on the map, so don't
+   approve unless you want to watch that and delete it afterwards.)
 4. The digest email ("you have new suggestions") arrives at that Contributor's address. It is sent at
    most once a day.
 5. Run live again. The row shows "2 already known", so nothing is suggested twice.
@@ -135,6 +147,8 @@ dismiss)". Its address once this is merged is
 cd apps/connect
 node scripts/reader/run.mjs --help
 AUTOMATION_SUGGEST_KEY=... CONNECT_BASE_URL=http://localhost:3000 node scripts/reader/run.mjs   # dry run against a local server
+# A live run is refused unless READER_LIVE is exactly true.
+READER_LIVE=true AUTOMATION_SUGGEST_KEY=... AUTOMATION_DIGEST_KEY=... CONNECT_BASE_URL=http://localhost:3000 node scripts/reader/run.mjs --live
 ```
 
 - `run.mjs` is the entry point. `connect.mjs` is the client for `/api/automation/{sources,suggestions,digest}`.

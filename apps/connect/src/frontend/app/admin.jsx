@@ -128,7 +128,10 @@
 
   // The server answers with a stable code. The box under the form says it in
   // plain words and stays until the next try (a toast alone disappears).
-  function createErrorMessage(code) {
+  function createErrorMessage(code, message) {
+    // The server's sentence says exactly what to do for these (an admin account, an application in progress,
+    // a listing that already exists or is already waiting for its owner).
+    if ((code === 'email_already_registered' || code === 'listing_exists' || code === 'listing_pending') && message) return message;
     if (code === 'email_already_registered') return 'That email already has an account on Citizens.';
     if (code === 'invalid_contact_email') return 'The public contact email is not a valid email address.';
     if (code === 'invalid_cover_url') return 'The cover photo must be an https or http image link.';
@@ -200,7 +203,7 @@
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const message = createErrorMessage(body.error);
+          const message = createErrorMessage(body.error, body.message);
           setError(message);
           toast(message, 'red');
           return;
@@ -210,10 +213,12 @@
         // C21: the server says whether the new listing has a pin; if it did not say, claim nothing about the map
         toast('Contributor listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in Kingdom Discovery now. It has no map pin.' : 'live now.'), 'green');
         toast(welcomeEmailLine(emailRequested, body.email, claimEmail), emailRequested && body.email === 'sent' ? 'green' : 'gold');
+        // C10: the listing waits for its owner to confirm it. Say so, and say which kind of confirmation.
+        if (body.ownerHasAccount === true) toast(claimEmail + ' already has an account, so the owner will be asked to attach the listing to it. Nothing on that account changes unless they confirm.', 'gold');
         setF({ ...EMPTY_CREATE, socials: {} });
         setError('');
         if (onCreated) onCreated({ slug: body.slug });
-        else setResult({ slug: body.slug, claimEmail, emailRequested, email: body.email });
+        else setResult({ slug: body.slug, claimEmail, emailRequested, email: body.email, ownerHasAccount: body.ownerHasAccount === true });
       } catch (err) {
         const message = 'Could not create the listing — please check your connection.';
         setError(message);
@@ -225,12 +230,12 @@
 
     return h('form', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl', 'data-testid': 'admin-create-form', onSubmit: submit },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        "Create a Contributor listing on their behalf — it goes live in Kingdom Discovery immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) to see the listing and manage it themselves from their own Contributor Portal."),
+        "Create a Contributor listing on their behalf — it goes live in Kingdom Discovery immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) and is asked to confirm the listing is theirs; only then does it become theirs to manage from their own Contributor Portal. If that email already has an account, they are asked to attach the listing to it, and nothing on the account changes unless they confirm."),
 
       result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2', 'data-testid': 'create-result' },
         h(Icon, { name: 'CheckCircle2', size: 15, className: 'text-[#16A34A] shrink-0 mt-0.5' }),
         h('div', { className: 'text-xs text-[#15803d] leading-relaxed space-y-1' },
-          h('p', null, h('strong', null, 'Live: '), '/' + result.slug + ' — claimable by ', h('strong', null, result.claimEmail)),
+          h('p', null, h('strong', null, 'Live: '), '/' + result.slug + ' — waiting for ', h('strong', null, result.claimEmail), ' to confirm it', result.ownerHasAccount ? ' (that address already has an account, so they will be asked to attach it)' : ''),
           h('p', { 'data-testid': 'create-email-status', className: result.emailRequested && result.email !== 'sent' ? 'font-semibold text-[#B45309]' : undefined },
             !result.emailRequested
               ? 'No welcome email was sent (you chose not to). Let them know yourself.'
@@ -241,7 +246,7 @@
                   : "Email isn't set up on the server yet, so no welcome was sent. Let them know yourself."))),
 
       h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
-      h(Field, { label: "Owner's email", required: true, hint: 'The email they sign in with (a 6-digit code we email them, or Google) to see this listing.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
+      h(Field, { label: "Owner's email", required: true, hint: 'The email they sign in with (a 6-digit code we email them, or Google). They are asked to confirm the listing is theirs.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
 
       h('div', { className: 'grid grid-cols-2 gap-3' },
         h(Field, { label: 'Type', htmlFor: 'admin-create-kind' }, h('select', { id: 'admin-create-kind', value: f.kind, onChange: (e) => up('kind', e.target.value), className: window.UI.inputCls },
@@ -325,7 +330,11 @@
     const hidden = !!row.contributor_hidden;
     const name = row.full_name || 'this listing';
     const kind = CONTRIBUTOR_KINDS.find((k) => k.value === row.contributor_kind);
-    const awaitingOwner = row.contributor_claim_email && !row.contributor_claimed_at;
+    // C10: the ledger (claim_status) is the truth when the API sent it; an older row falls back to the claim columns.
+    const claimStatus = row.claim_status || (row.contributor_claim_email && !row.contributor_claimed_at ? 'awaiting' : row.contributor_claimed_at ? 'confirmed' : '');
+    const awaitingOwner = claimStatus === 'awaiting';
+    const declinedByOwner = claimStatus === 'declined';
+    const waitingDays = row.claim_created_at ? Math.max(0, Math.floor((Date.now() - Date.parse(row.claim_created_at)) / 86400000)) : null;
     // A listing claimed from a DIFFERENT account (claim_admin_created_contributor)
     // was copied onto the owner and this placeholder hidden with its slug
     // cleared — the live listing is the owner's row. Unhiding it would publish
@@ -350,10 +359,11 @@
               h(Icon, { name: 'Sparkles', size: 9 }),
               'Automatic updates: ' + ({ off: 'Off', suggest: 'Suggest', events_auto: 'Auto events' }[row.auto_update_level] || row.auto_update_level) +
                 (row.pending_suggestions ? ' · ' + row.pending_suggestions + ' pending' : '')),
-            awaitingOwner && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'Clock', size: 9 }), 'Awaiting owner sign-in · ' + row.contributor_claim_email),
+            awaitingOwner && h('span', { className: 'flex items-center gap-1', 'data-claim-status': 'awaiting' }, h(Icon, { name: 'Clock', size: 9 }), 'Awaiting owner' + (waitingDays !== null ? ' · ' + waitingDays + ' d' : '') + (row.contributor_claim_email ? ' · ' + row.contributor_claim_email : '')),
+            declinedByOwner && h('span', { className: 'flex items-center gap-1 font-semibold text-[#B45309]', 'data-claim-status': 'declined' }, h(Icon, { name: 'AlertCircle', size: 9 }), 'Owner declined — hidden; decide whether to Delete'),
             movedToOwner
               ? h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Moved to its owner\'s account ' + fmt(row.contributor_claimed_at))
-              : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner signed in ' + fmt(row.contributor_claimed_at)))),
+              : row.contributor_claimed_at && h('span', { className: 'flex items-center gap-1' }, h(Icon, { name: 'CheckCircle2', size: 9 }), 'Owner confirmed ' + fmt(row.contributor_claimed_at)))),
         // One visibility action: Hide while it is live, Unhide while it is hidden.
         // Delete is the danger button, last, with a gap so it is not next to Hide.
         !confirming && h('div', { className: 'flex items-center shrink-0 ml-auto', 'data-listing-actions': '' },

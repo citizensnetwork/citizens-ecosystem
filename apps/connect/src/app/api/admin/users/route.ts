@@ -202,10 +202,35 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Verify-first claim state (mig 196), for the Listings tab: is the owner still to answer, did they confirm,
+  // or did they say "Not me"? Best-effort and separate for the same reason as the automation lookup above:
+  // without the table the list is unchanged and the tab falls back to what it showed before.
+  const claims = new Map<string, { status: string; created_at: string }>();
+  if (contributorIds.length > 0) {
+    try {
+      const { data: ledger, error: ledgerErr } = await admin
+        .from("listing_claims")
+        .select("placeholder_id, status, created_at")
+        .in("placeholder_id", contributorIds);
+      if (!ledgerErr) {
+        for (const c of (ledger ?? []) as { placeholder_id: string; status: string; created_at: string }[]) {
+          claims.set(c.placeholder_id, { status: c.status, created_at: c.created_at });
+        }
+      }
+    } catch (e) {
+      console.warn("[admin/users GET] claim lookup skipped", e);
+    }
+  }
+
   return NextResponse.json({
     data: rows.map((r) => {
       const a = automation.get(r.id);
-      return a ? { ...r, auto_update_level: a.level, pending_suggestions: a.pending } : r;
+      const c = claims.get(r.id);
+      return {
+        ...r,
+        ...(a ? { auto_update_level: a.level, pending_suggestions: a.pending } : {}),
+        ...(c ? { claim_status: c.status, claim_created_at: c.created_at } : {}),
+      };
     }),
     meta: { page, pageSize: PAGE_SIZE, total: count ?? 0 },
   });

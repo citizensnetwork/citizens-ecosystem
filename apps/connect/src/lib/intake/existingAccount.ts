@@ -57,19 +57,23 @@ export async function respondWhenEmailExists(args: {
   images: { role: "logo" | "cover"; image: IntakeImage }[];
   warnings: string[];
   autoUpdate: unknown;
+  /** When the caller already read this row (createListingUser), skip a second lookup. */
+  existing?: ProfileHit | null;
 }): Promise<NextResponse> {
   const { admin, email, origin, fields, images, warnings, autoUpdate } = args;
-  const { data, error } = await admin
-    .from("profiles")
-    .select("id, role, email, contributor_slug, contributor_hidden, deleted_at")
-    .eq("email", email)
-    .maybeSingle();
+  let existing = args.existing ?? null;
+  if (!existing) {
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, role, email, contributor_slug, contributor_hidden, deleted_at")
+      .eq("email", email)
+      .maybeSingle();
 
-  if (error || !data) {
-    return fail(409, "email_already_registered", "That email already has an account, but the account could not be read. Nothing was created.");
+    if (error || !data) {
+      return fail(409, "email_already_registered", "That email already has an account, but the account could not be read. Nothing was created.");
+    }
+    existing = data as ProfileHit;
   }
-
-  const existing = data as ProfileHit;
   if (existing.role === "contributor" && existing.contributor_slug) {
     const url = `${origin}/c/${existing.contributor_slug}`;
     const hidden = existing.contributor_hidden ? " (currently hidden)" : "";
