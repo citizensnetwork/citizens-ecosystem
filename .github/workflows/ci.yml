@@ -80,7 +80,11 @@ jobs:
   e2e-connect:
     name: E2E (Connect — Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # `playwright install --with-deps` runs apt. A slow mirror (about 12
+    # minutes) plus the ~8 minute suite exceeds 20 and cancels the job
+    # while tests are still running. The dot reporter's × is a retry, not
+    # a final failure.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
