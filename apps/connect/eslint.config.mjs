@@ -5,10 +5,10 @@ const require = createRequire(import.meta.url);
 
 const eslintConfig = [
   ...next15FlatConfig({
-    eslintConfigNextPkg: require.resolve("eslint-config-next/package.json"),
-    // Installed React is 18.3. "detect" would resolve the same line, but it
+    eslintConfigNextPkg: require.resolve("eslint-config-next"),
+    // Installed React is 19.3. "detect" would resolve the same line, but it
     // calls context.getFilename(), which ESLint 10 removed.
-    reactVersion: "18.3",
+    reactVersion: "19.3",
     typescript: true,
   }),
   {

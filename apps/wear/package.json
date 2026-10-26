@@ -23,22 +23,22 @@
     "@citizens/utils": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.102.1",
-    "next": "15.5.18",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@citizens/config": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
     "@types/node": "26.6.5",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "8.71.2",
     "@typescript-eslint/parser": "8.71.2",
     "@vitest/coverage-v8": "^5.0.5",
     "esbuild": "^0.25.0",
     "eslint": "10.12.0",
-    "eslint-config-next": "15.5.15",
+    "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "10.1.8",
     "typescript": "5.5.4",
     "vitest": "^5.0.5"
