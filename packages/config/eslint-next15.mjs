@@ -6,10 +6,13 @@ import globals from 'globals';
  * (and, when `typescript` is set, `next/typescript`).
  *
  * eslint-config-next 15's entry file applies @rushstack/eslint-patch, which
- * throws on ESLint 10 ("the calling module was not recognized"). Next 16's
- * native flat export is out of scope, so the rules are composed here from the
- * same plugins that package already depends on. Rule text is copied from
- * eslint-config-next@15.5 index.js, core-web-vitals.js and typescript.js.
+ * throws on ESLint 10 ("the calling module was not recognized"). eslint-config-next
+ * 16 exports a native flat config, but its react-hooks v7 preset turns on the
+ * React Compiler rules as errors. This composer keeps the eslint-config-next 15
+ * rule set (rules-of-hooks + exhaustive-deps only) so a Next 16 bump does not
+ * rewrite every static-frontend component. Plugins are loaded from the installed
+ * eslint-config-next. `@next/eslint-plugin-next` 16 exposes `configs['core-web-vitals']`
+ * (flat); the old `flatConfig` key is gone.
  *
  * `settings.react.version` is a concrete version rather than "detect":
  * detection calls context.getFilename(), which ESLint 10 removed. The version
@@ -44,13 +47,18 @@ export function next15FlatConfig({ eslintConfigNextPkg, reactVersion, typescript
     },
     {
       files: allFiles,
-      // `recommended` is still the eslintrc shape (plugins: string[]).
-      // `recommended-latest` is the same two rules in flat config.
-      ...hooks.configs['recommended-latest'],
+      // react-hooks 7's `recommended-latest` adds the React Compiler rules as
+      // errors. Keep the two rules eslint-config-next 15 actually enforced.
+      plugins: { 'react-hooks': hooks },
+      rules: {
+        'react-hooks/rules-of-hooks': 'error',
+        'react-hooks/exhaustive-deps': 'warn',
+      },
     },
     {
       files: allFiles,
-      ...nextPlugin.flatConfig.coreWebVitals,
+      // @next/eslint-plugin-next 16: flat config lives on `configs`, not `flatConfig`.
+      ...nextPlugin.configs['core-web-vitals'],
     },
     {
       // eslint-config-next's parser.js is Next's bundled @babel/eslint-parser.

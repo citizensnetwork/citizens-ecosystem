@@ -15,7 +15,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     // false (not the create-next-app default): Vercel builds are ephemeral, so an
     // incremental tsbuildinfo buys nothing. NOTE: this was first blamed for the
     // phantom "Module 'react' has no exported member 'cache'" build failures
