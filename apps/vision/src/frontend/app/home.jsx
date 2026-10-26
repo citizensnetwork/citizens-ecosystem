@@ -65,8 +65,8 @@
                 <button key={key} onClick={() => setTab(key)} style={{
                   border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12.5, fontWeight: 700,
                   cursor: "pointer",
-                  background: tab === key ? "var(--gold-100)" : "transparent",
-                  color: tab === key ? "var(--gold-800)" : "var(--text-secondary)",
+                  background: tab === key ? "var(--surface-2)" : "transparent",
+                  color: tab === key ? "var(--accent-ink)" : "var(--text-secondary)",
                 }}>{label}</button>
               ))}
             </div>
@@ -169,7 +169,7 @@
           <Card>
             <SectionTitle>Organisation health</SectionTitle>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <Ring pct={org.health} label={org.health} sub="of 100" color="var(--brand)" />
+              <Ring pct={org.health} label={org.health} sub="of 100" color="var(--accent-ink)" />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
                   Weighted across your success priorities. Trend over 6 months:

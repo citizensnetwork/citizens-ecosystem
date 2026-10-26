@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
           // CSP so far; Connect/Wear deferred theirs):
           //   - React/MapLibre UMD from unpkg.com; supabase-js UMD from
           //     cdn.jsdelivr.net (pinned tags + SRI where the CDN supports it)
-          //   - Google Fonts (Manrope): stylesheet + font files
+          //   - Google Fonts (Playfair Display, Plus Jakarta Sans): stylesheet + font files
           //   - Supabase (REST, auth, realtime wss)
           //   - MapTiler tiles for the Timeline Map (api.maptiler.com)
           //   - MapLibre GL needs 'wasm-unsafe-eval' + blob workers

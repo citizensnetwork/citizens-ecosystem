@@ -150,7 +150,7 @@
         {list.length === 0 ? (
           <Card>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ color: "var(--gold-600)" }}><Icon name="grid" size={20} /></span>
+              <span style={{ color: "var(--accent-ink)" }}><Icon name="grid" size={20} /></span>
               <div>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>No spaces yet</div>
                 <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3 }}>
@@ -193,7 +193,7 @@
     const isLive = D.mode === "live" && !!D.orgId;
     const authFetch = (window.CV_STORE && window.CV_STORE.authFetch) || null;
     const [spaces, setSpaces] = React.useState(
-      D.spaces.map((s) => ({ id: s.id, name: s.name, icon: s.icon || "grid", color: s.color || "var(--gold-600)", saved: s.name }))
+      D.spaces.map((s) => ({ id: s.id, name: s.name, icon: s.icon || "grid", color: s.color || "var(--accent-ink)", saved: s.name }))
     );
     const [cats, setCats] = React.useState([]);
     const [name, setName] = React.useState("");
@@ -215,7 +215,7 @@
       const n = name.trim();
       if (!n) return;
       if (!isLive) {
-        setSpaces([...spaces, { id: "sp-" + Date.now(), name: n, icon: "grid", color: "var(--gold-600)", saved: n }]);
+        setSpaces([...spaces, { id: "sp-" + Date.now(), name: n, icon: "grid", color: "var(--accent-ink)", saved: n }]);
         setName(""); return;
       }
       setBusy(true); setErr(null);
@@ -226,7 +226,7 @@
         if (!res.ok) throw new Error("Could not add space");
         const j = await res.json();
         const s = j.data;
-        setSpaces([...spaces, { id: s.id, name: s.name, icon: s.icon || "grid", color: s.colour || "var(--gold-600)", saved: s.name }]);
+        setSpaces([...spaces, { id: s.id, name: s.name, icon: s.icon || "grid", color: s.colour || "var(--accent-ink)", saved: s.name }]);
         setName("");
       } catch (e) { setErr(e.message || "Could not add space"); }
       finally { setBusy(false); }
@@ -584,7 +584,7 @@
                       <td style={td}>{a.rating === null || a.rating === undefined ? "—" : a.rating + "★"}</td>
                       <td style={{ ...td, whiteSpace: "nowrap" }}>
                         {a.claimed ? (
-                          <span style={{ fontSize: 11, fontWeight: 800, color: "var(--gold-800)", background: "var(--gold-100)", borderRadius: 999, padding: "3px 9px", marginRight: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "var(--accent-ink)", background: "var(--surface-2)", borderRadius: 999, padding: "3px 9px", marginRight: 8 }}>
                             Claimed from Connect
                           </span>
                         ) : null}
@@ -717,7 +717,7 @@
     const [compare, setCompare] = React.useState(false);
     const [types, setTypes] = React.useState(() => new Set());
     const [selId, setSelId] = React.useState(null);
-    const [noir, setNoir] = React.useState(() => document.documentElement.getAttribute("data-theme") === "noir");
+    const [noir, setNoir] = React.useState(() => TL.isDarkTheme(document.documentElement.getAttribute("data-theme")));
 
     pointsRef.current = points;
     const hasPoints = points.length > 0;
@@ -749,7 +749,7 @@
 
     // Follow the Light / Noir toggle (it only flips an attribute on <html>).
     React.useEffect(() => {
-      const mo = new MutationObserver(() => setNoir(document.documentElement.getAttribute("data-theme") === "noir"));
+      const mo = new MutationObserver(() => setNoir(TL.isDarkTheme(document.documentElement.getAttribute("data-theme"))));
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       return () => mo.disconnect();
     }, []);
@@ -762,11 +762,12 @@
       let refused = false;
       loadMapLibre().then((ml) => {
         if (cancelled || !hostRef.current) return;
-        const url = TL.styleUrl(env, document.documentElement.getAttribute("data-theme") === "noir" ? "noir" : "light");
+        const theme = TL.isDarkTheme(document.documentElement.getAttribute("data-theme")) ? "dark" : "light";
+        const url = TL.styleUrl(env, theme);
         try {
           map = new ml.Map({
             container: hostRef.current,
-            style: url || TL.BLANK_STYLE,
+            style: url || TL.blankStyle(),
             center: [28.19, -25.75],
             zoom: 9,
             attributionControl: { compact: true },
@@ -783,14 +784,15 @@
           if (!map.getSource("cv-points")) map.addSource("cv-points", { type: "geojson", data: TL.featureCollection(pointsRef.current) });
           if (!map.getSource("cv-sel")) map.addSource("cv-sel", { type: "geojson", data: EMPTY_FC });
           const add = (def) => { if (!map.getLayer(def.id)) map.addLayer(def); };
+          const paint = TL.mapPaint();
           add({ id: "cv-prev", type: "circle", source: "cv-points", filter: TL.NOTHING,
-            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#8B8574", "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.75 } });
+            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": paint.muted, "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.75 } });
           add({ id: "cv-ring", type: "circle", source: "cv-points", filter: TL.NOTHING,
-            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#D4AF37", "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.6 } });
+            paint: { "circle-radius": TL.ringRadiusExpr(), "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": paint.accent, "circle-stroke-width": 1.5, "circle-stroke-opacity": 0.6 } });
           add({ id: "cv-dot", type: "circle", source: "cv-points", filter: TL.NOTHING,
-            paint: { "circle-radius": TL.dotRadiusExpr(), "circle-color": "#D9A50C", "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1.5, "circle-opacity": 0.92 } });
+            paint: { "circle-radius": TL.dotRadiusExpr(), "circle-color": paint.accent, "circle-stroke-color": paint.paper, "circle-stroke-width": 1.5, "circle-opacity": 0.92 } });
           add({ id: "cv-sel", type: "circle", source: "cv-sel",
-            paint: { "circle-radius": ["+", 4, TL.ringRadiusExpr()], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#141414", "circle-stroke-width": 2.5 } });
+            paint: { "circle-radius": ["+", 4, TL.ringRadiusExpr()], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": paint.text, "circle-stroke-width": 2.5 } });
         };
         map.on("style.load", () => { addLayers(); setEpoch((n) => n + 1); });
         map.on("error", (ev) => {
@@ -798,7 +800,7 @@
           if (!refused && url && TL.isKeyRefusal(ev && ev.error)) {
             refused = true;
             setBase("refused");
-            map.setStyle(TL.BLANK_STYLE);
+            map.setStyle(TL.blankStyle());
           }
         });
         map.on("click", (ev) => {
@@ -818,12 +820,16 @@
       };
     }, [hasPoints, loading]);
 
-    // Switching Light / Noir swaps the base style (a plain background has no Noir twin).
+    // Switching Light / Noir swaps the base style. The plain ground reads --surface-0.
     React.useEffect(() => {
       const map = mapRef.current;
-      if (!map || base !== "tiles") return;
-      const url = TL.styleUrl(env, noir ? "noir" : "light");
-      if (url) map.setStyle(url);
+      if (!map || base === "loading") return;
+      if (base === "tiles") {
+        const url = TL.styleUrl(env, noir ? "dark" : "light");
+        if (url) map.setStyle(url);
+      } else {
+        map.setStyle(TL.blankStyle());
+      }
     }, [noir]);
 
     // The playback window, the type filter and Compare drive three layer filters.
@@ -951,7 +957,7 @@
             style={{ height: 440, width: "100%", background: "var(--surface-sunk)" }} />
           {base === "tiles" ? (
             <a href="https://www.maptiler.com" target="_blank" rel="noopener noreferrer" data-cv-maptiler-logo=""
-              style={{ position: "absolute", left: 10, bottom: 10, display: "inline-block", lineHeight: 0, padding: "3px 6px", borderRadius: 999, background: "rgba(23,19,16,0.62)" }}>
+              style={{ position: "absolute", left: 10, bottom: 10, display: "inline-block", lineHeight: 0, padding: "3px 6px", borderRadius: "var(--radius-full)", background: "var(--scrim)" }}>
               <img src="https://api.maptiler.com/resources/logo.svg" alt="MapTiler logo" width="67" height="20" decoding="async" />
             </a>
           ) : null}
@@ -999,7 +1005,7 @@
             {inWindow.slice(0, 60).map((p) => (
               <li key={p.id}>
                 <button onClick={() => setSelId(p.id)}
-                  style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === p.id ? "var(--gold-50)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
+                  style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === p.id ? "var(--surface-2)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
                   <strong>{p.title}</strong> · {fmtDay(p.t)} · {p.people} {p.people === 1 ? "person" : "people"}{p.place ? " · " + p.place : ""}
                 </button>
               </li>
@@ -1100,7 +1106,7 @@
                 style={{ width: "100%", height: "auto", display: "block" }}>
                 {L.nodes.map((n, i) => (
                   <line key={"e" + n.id} x1="0" y1="0" x2={n.x} y2={n.y} strokeLinecap="round"
-                    style={{ stroke: "var(--gold-400)", strokeWidth: L.edges[i].w, opacity: selId && selId !== n.id ? 0.25 : 0.6 }} />
+                    style={{ stroke: "var(--accent-ink)", strokeWidth: L.edges[i].w, opacity: selId && selId !== n.id ? 0.25 : 0.6 }} />
                 ))}
                 <circle cx="0" cy="0" r={L.center.r} style={{ fill: "var(--brand)", stroke: "var(--brand-strong)", strokeWidth: 2 }} />
                 <text x="0" y="5" textAnchor="middle" style={{ fontSize: 15, fontWeight: 800, fill: "var(--on-brand)" }}>{NW.initials(myName)}</text>
@@ -1115,7 +1121,7 @@
                       onClick={() => pick(n.id)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(n.id); } }}>
                       <circle cx={n.x} cy={n.y} r={n.r + (on ? 5 : 0)}
-                        style={{ fill: "var(--surface-card)", stroke: on ? "var(--text-primary)" : "var(--gold-600)", strokeWidth: on ? 3 : 2 }} />
+                        style={{ fill: "var(--surface-card)", stroke: on ? "var(--text-primary)" : "var(--accent-ink)", strokeWidth: on ? 3 : 2 }} />
                       <text x={n.x} y={n.y + 4} textAnchor="middle" style={{ fontSize: Math.max(10, n.r * 0.6), fontWeight: 800, fill: "var(--text-primary)", pointerEvents: "none" }}>{NW.initials(n.name)}</text>
                       <text x={n.x} y={n.y + n.r + 15} textAnchor="middle" style={{ fontSize: 11.5, fontWeight: 700, fill: "var(--text-primary)", pointerEvents: "none" }}>{NW.clip(n.name, 20)}</text>
                       <text x={n.x} y={n.y + n.r + 28} textAnchor="middle" style={{ fontSize: 11, fill: "var(--text-secondary)", pointerEvents: "none" }}>{row.shared} shared</text>
@@ -1141,7 +1147,7 @@
                 {rows.map((r) => (
                   <li key={r.id}>
                     <button onClick={() => pick(r.id)}
-                      style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === r.id ? "var(--gold-50)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
+                      style={{ width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 10, background: selId === r.id ? "var(--surface-2)" : "var(--surface-card)", color: "var(--text-primary)", padding: "8px 12px", cursor: "pointer", fontSize: 13 }}>
                       <strong>{r.name}</strong> · {r.shared} shared · {r.shared} of your {r.mine} ({NW.fmtPct(r.pctMine)}) · {r.shared} of their {r.theirs} ({NW.fmtPct(r.pctTheirs)})
                     </button>
                   </li>
@@ -1758,7 +1764,7 @@
                 )}
                 <span style={{ flex: 1, fontWeight: 700, fontSize: 14 }}>
                   {m.name}
-                  {m.isFounder ? <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "var(--gold-800)", background: "var(--gold-100)", borderRadius: 999, padding: "2px 7px" }}>Founder</span> : null}
+                  {m.isFounder ? <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "var(--accent-ink)", background: "var(--surface-2)", borderRadius: 999, padding: "2px 7px" }}>Founder</span> : null}
                   {isSelf ? <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)" }}>you</span> : null}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{m.dept}</span>

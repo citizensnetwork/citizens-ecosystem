@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Vision — shared UI primitives (window.UI)
 //  ------------------------------------------------------------------
-//  Design law: inline styles only, Citizens DS var(--*) tokens, 18px
-//  card radius, 1px hairline borders, generous space, Manrope. Icons are
-//  a small inline-SVG set (stroke = currentColor) — no icon CDN.
+//  Design law: inline styles only, Map v2 var(--*) tokens, --radius-lg
+//  cards, 1px hairline borders, Playfair for the name and Plus Jakarta
+//  for the rest. Icons are a small inline-SVG set (stroke = currentColor).
 // ════════════════════════════════════════════════════════════════════
 (() => {
   const paths = {
@@ -48,7 +48,7 @@
     );
   };
 
-  const Crown = ({ size = 34, color = "var(--gold-500)" }) => (
+  const Crown = ({ size = 34, color = "var(--accent-ink)" }) => (
     <svg width={size} height={size * 0.72} viewBox="0 0 100 72" fill="none" aria-label="Citizens crown">
       <path d="M8 58 4 22l22 14L50 8l24 28 22-14-4 36z" stroke={color} strokeWidth="5"
         strokeLinejoin="round" fill="none" />
@@ -59,7 +59,7 @@
   const Card = ({ children, style, onClick }) => (
     <div onClick={onClick} style={{
       background: "var(--surface-card)", border: "1px solid var(--border)",
-      borderRadius: 18, padding: 20, cursor: onClick ? "pointer" : undefined,
+      borderRadius: "var(--radius-lg)", padding: 20, cursor: onClick ? "pointer" : undefined,
       ...style,
     }}>{children}</div>
   );
@@ -74,9 +74,9 @@
   const Pill = ({ children, active, onClick, tone }) => (
     <button onClick={onClick} style={{
       border: "1px solid " + (active ? "var(--brand-strong)" : "var(--border)"),
-      background: active ? "var(--gold-100)" : "var(--surface-sunk)",
-      color: tone || (active ? "var(--gold-800)" : "var(--text-secondary)"),
-      borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+      background: active ? "var(--surface-2)" : "var(--surface-sunk)",
+      color: tone || (active ? "var(--accent-ink)" : "var(--text-secondary)"),
+      borderRadius: "var(--radius-full)", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
     }}>{children}</button>
   );
 
@@ -89,7 +89,7 @@
     };
     return (
       <button type="button" onClick={onClick} disabled={disabled} {...rest} style={{
-        ...kinds[kind], borderRadius: 12, padding: "9px 16px", fontSize: 14, fontWeight: 700,
+        ...kinds[kind], borderRadius: "var(--radius-md)", padding: "9px 16px", fontSize: 14, fontWeight: 700,
         cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.55 : 1,
         display: "inline-flex", alignItems: "center", gap: 8, ...style,
       }}>{children}</button>
@@ -97,7 +97,7 @@
   };
 
   // SVG donut — pct 0..100
-  const Ring = ({ pct, r = 44, stroke = 9, color = "var(--brand)", label, sub }) => {
+  const Ring = ({ pct, r = 44, stroke = 9, color = "var(--accent-ink)", label, sub }) => {
     const c = 2 * Math.PI * r;
     const off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
     const s = r * 2 + stroke * 2;
@@ -118,7 +118,7 @@
   };
 
   // Sparkline — vals[] scaled into a w×h path (+ soft area fill)
-  const Spark = ({ vals, w = 160, h = 44, color = "var(--gold-600)" }) => {
+  const Spark = ({ vals, w = 160, h = 44, color = "var(--accent-ink)" }) => {
     if (!vals || vals.length < 2) return null;
     const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
     const pts = vals.map((v, i) => [
@@ -138,7 +138,7 @@
 
   const Toggle = ({ on, onChange }) => (
     <button onClick={() => onChange(!on)} aria-pressed={on} style={{
-      width: 40, height: 22, borderRadius: 999, border: "1px solid var(--border)",
+      width: 40, height: 22, borderRadius: "var(--radius-full)", border: "1px solid var(--border)",
       background: on ? "var(--brand)" : "var(--surface-sunk)", position: "relative",
       cursor: "pointer", transition: "background .18s ease", padding: 0,
     }}>
