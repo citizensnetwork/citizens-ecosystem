@@ -835,10 +835,12 @@
   border-radius: var(--radius-md);
 }
 
+/* each tab is a full --hit tall; the bar's underline sits below them (#210: it used to take 1 px from the tabs) */
 [data-mv2='tabs'] {
   display: flex;
   align-items: stretch;
   gap: var(--space-2);
+  box-sizing: content-box;
   height: var(--hit);
   margin: var(--space-2) 0 var(--space-3);
   border-bottom: 1px solid var(--divider);
@@ -2299,12 +2301,7 @@ a[data-mv2='card2'],
   border-color: var(--accent-ink);
   box-shadow: 0 0 0 var(--select-w) var(--accent-ink);
 }
-[data-mv2='explore-card'] [data-mv2='card-chip'] {
-  align-self: flex-start;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--cat-c, var(--divider));
-  border-radius: var(--radius-full);
-}
+/* the chip's outline in the group colour: 4m (shared with the expanded sheet's header) */
 [data-mv2='card-media'][data-tile] {
   display: flex;
   align-items: center;
@@ -2462,5 +2459,67 @@ a[data-mv2='card2'],
   [data-mv2='pill']:active,
   [data-mv2='nav-toggle']:active {
     transform: none;
+  }
+}
+
+/* ── 4m. The expanded listing sheet (app/map-v2-sheet.jsx `expanded`, issue #210) ──────────────
+   An Explore card opens the sheet at full: a fixed bar (the grab bar to the eye, X at --hit to a thumb), then a header
+   at the top of the content that scrolls with it: the cover in the card's own 16:9 media box (a neutral tile with the
+   category icon when there is none), the name, the card's category chip in its group colour (--cat-c from data-cat)
+   and the facts (distance in km, open state, followers). A newly chosen tab's panel slides in from the side it came
+   from, over --dur-base, so reduced motion shows it at once. */
+[data-mv2='xbar'] {
+  display: grid;
+  grid-template-columns: var(--hit) 1fr var(--hit);
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+}
+[data-mv2='xbar'] > [data-mv2='handle-bar'] {
+  grid-column: 2;
+  justify-self: center;
+}
+[data-mv2='xbar'] > [data-mv2='icon-btn'] {
+  grid-column: 3;
+}
+[data-mv2='xhead'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+}
+[data-mv2='xhead'] > [data-mv2='card-media'] {
+  border-radius: var(--radius-md);
+}
+[data-mv2='xmeta'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+[data-mv2='explore-card'] [data-mv2='card-chip'],
+[data-mv2='xhead'] [data-mv2='card-chip'] {
+  align-self: flex-start;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--cat-c, var(--divider));
+  border-radius: var(--radius-full);
+}
+[data-mv2='panel'][data-enter='next'] {
+  animation: mv2-panel-next var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='panel'][data-enter='prev'] {
+  animation: mv2-panel-prev var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-panel-next {
+  from {
+    opacity: 0;
+    transform: translateX(var(--space-6));
+  }
+}
+@keyframes mv2-panel-prev {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--space-6) * -1));
   }
 }

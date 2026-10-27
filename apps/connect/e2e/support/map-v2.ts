@@ -88,6 +88,23 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
   else await card.click();
 }
 
+/**
+ * #210 part 2: a card opens the EXPANDED sheet (full only; swipe down goes back to the row). The half / peek sheet is
+ * what a pin opens on the clean map (the nav's Map), so a spec about snap states, the handle or the scroll hand-off
+ * switches to that map first (no Explore row, no pills; the map and its pins stay as they are) and presses the pin.
+ * The switch is an in-app navigation: call useCleanMap before measuring history.length.
+ */
+export async function useCleanMap(page: Page) {
+  await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
+  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
+}
+export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
+  if (await page.locator("[data-mv2='explore']").count()) await useCleanMap(page);
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+}
+
 /** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
 export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
 const fixtureSvg = (n: number) =>
