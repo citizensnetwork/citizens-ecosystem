@@ -9,6 +9,12 @@
 
 export type EmailResult = { ok: true } | { ok: false; error: string };
 
+// A listing placeholder's alias address (C10, mirrors apps/connect/src/lib/placeholderEmail.ts) is never mailed.
+const PLACEHOLDER_EMAIL_DOMAIN = "listing-placeholder.invalid";
+function isPlaceholderEmail(v: string): boolean {
+  return v.trim().toLowerCase().endsWith("@" + PLACEHOLDER_EMAIL_DOMAIN);
+}
+
 export async function sendEmail(opts: {
   to: string | string[];
   subject: string;
@@ -18,6 +24,11 @@ export async function sendEmail(opts: {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) {
     return { ok: false, error: "RESEND_API_KEY not set" };
+  }
+
+  const recipients = (Array.isArray(opts.to) ? opts.to : [opts.to]).filter((t) => !isPlaceholderEmail(t));
+  if (recipients.length === 0) {
+    return { ok: false, error: "no deliverable recipient (placeholder address)" };
   }
 
   const from =
@@ -32,7 +43,7 @@ export async function sendEmail(opts: {
     },
     body: JSON.stringify({
       from,
-      to: Array.isArray(opts.to) ? opts.to : [opts.to],
+      to: recipients,
       subject: opts.subject,
       html: opts.html,
       ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),

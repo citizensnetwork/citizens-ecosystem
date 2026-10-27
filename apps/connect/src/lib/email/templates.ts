@@ -146,25 +146,94 @@ export function applicationRejectedEmail(input: {
 
 /**
  * The same plain-language steps as the Google Form's welcome email
- * (docs/handoffs/intake-v2.gs `sendWelcome_`): Continue with email → a 6-digit
- * code → the Dashboard; Google as the alternative; and what to do if they signed
- * in with a different address. Worded "sign in to see your listing", never "it is
- * automatically yours": the claim confirm screen (RESUME C10) will sit in front of
- * every claim, admin-created ones included, and this email must stay true then.
+ * (tools/google-forms/intake.gs `sendWelcome_`): Continue with email → a 6-digit
+ * code → asked to confirm; Google as the alternative; and what to do if they signed
+ * in with a different address.
+ *
+ * Verify-first (C10): the listing is live, but it is never attached to anybody until they have signed in with
+ * this address and said yes. So this says "sign in to see your listing" and "we will ask you to confirm", never
+ * "it is automatically yours". Two variants:
+ *   - `hasAccount` false: the address has no account. The listing waits under it; signing in shows
+ *     "Is this your listing? [Confirm] [Not me]".
+ *   - `hasAccount` true: the address already has an account. Signing in shows "Attach it to your account?
+ *     [Confirm] [Not me]"; nothing on the account changes unless they confirm.
+ * Either way "Not me" hides the listing at once.
  *
  * `onMap` is whether the listing has a map pin (an admin may create one with "no
  * fixed location"): it is always in Kingdom Discovery, but only some are on the
  * map, and an online-only Contributor must not be told otherwise.
  */
+// ── To an existing account: confirm an intake upgrade ───────────────────
+
+/**
+ * Sent only to the address already on the citizen account. The links open a
+ * screen; they do not change the account. Confirm and Not mine both require
+ * the person to be signed in as that account and to press a button.
+ */
+export function intakeUpgradeEmail(input: { name: string; confirmUrl: string; declineUrl: string; expiresOn: string }): Email {
+  const name = escapeHtml(input.name);
+  return {
+    subject: subjectSafe(`Is ${input.name} your organisation?`),
+    html: layout(
+      "Is this your organisation?",
+      `<p>A listing for <strong>${name}</strong> was submitted to Citizens Connect on your account.</p>` +
+        "<p>Nothing is public, and your account is unchanged, until you confirm it. " +
+        "If this is your organisation, confirm the upgrade. If it is not yours, tell us.</p>" +
+        button(input.confirmUrl, "Confirm the upgrade") +
+        `<p><a href="${escapeHtml(input.declineUrl)}" style="color:${GOLD}">This is not my organisation</a></p>` +
+        `<p style="font-size:13px;color:#555">This link expires on ${escapeHtml(input.expiresOn)}. ` +
+        "After that, your account stays as it is.</p>",
+    ),
+    text:
+      "Is this your organisation?\n\n" +
+      `A listing for ${input.name} was submitted to Citizens Connect on your account.\n\n` +
+      "Nothing is public, and your account is unchanged, until you confirm it.\n\n" +
+      `Confirm the upgrade: ${input.confirmUrl}\n` +
+      `This is not my organisation: ${input.declineUrl}\n\n` +
+      `This link expires on ${input.expiresOn}. After that, your account stays as it is.\n\n${SIGN_OFF_TEXT}`,
+  };
+}
+
+/** To the admin when an upgrade is declined or expires. No account email. */
+export function intakeUpgradeFlagEmail(input: { name: string; outcome: "declined" | "expired"; requestId: string }): Email {
+  const happened = input.outcome === "declined" ? "was declined" : "expired";
+  const sheet = input.outcome === "declined" ? "Declined" : "Expired";
+  return {
+    subject: subjectSafe(`Intake upgrade ${happened}: ${input.name}`),
+    html: layout(
+      `An intake upgrade ${happened}`,
+      `<p><strong>${escapeHtml(input.name)}</strong> ${happened}. The citizen account was not changed, and no listing was created.</p>` +
+        `<p>The sheet row should read <strong>${sheet}</strong>. Request ${escapeHtml(input.requestId)}.</p>`,
+    ),
+    text:
+      `An intake upgrade ${happened}.\n\n` +
+      `${input.name} ${happened}. The citizen account was not changed, and no listing was created.\n` +
+      `The sheet row should read ${sheet}. Request ${input.requestId}.\n\n${SIGN_OFF_TEXT}`,
+  };
+}
+
 export function ownerWelcomeEmail(input: {
   name: string;
   ownerEmail: string;
   listingUrl: string;
   signInUrl: string;
   onMap: boolean;
+  /** The address already has a Citizens Connect account (the listing is offered to it, never merged). */
+  hasAccount?: boolean;
 }): Email {
   const email = escapeHtml(input.ownerEmail);
   const where = listedWhere(input.onMap);
+  const hasAccount = input.hasAccount === true;
+  const askHtml = hasAccount
+    ? `<p>You already have a Citizens Connect account with <strong>${email}</strong>. When you sign in as usual we will ask: ` +
+      `<em>"Attach ${escapeHtml(input.name)} to your account?"</em> Nothing on your account changes unless you tap <strong>Confirm</strong>. ` +
+      "If this listing is not yours, tap <strong>Not me</strong> and we will hide it straight away.</p>"
+    : "<p>When you sign in we will ask you to confirm that this listing is yours. " +
+      "If it is not, tap <strong>Not me</strong> and we will hide it straight away.</p>";
+  const askText = hasAccount
+    ? `You already have a Citizens Connect account with ${input.ownerEmail}. When you sign in as usual we will ask: "Attach ${input.name} to your account?" ` +
+      "Nothing on your account changes unless you tap Confirm. If this listing is not yours, tap Not me and we will hide it straight away."
+    : "When you sign in we will ask you to confirm that this listing is yours. If it is not, tap Not me and we will hide it straight away.";
   return {
     subject: subjectSafe(`You're live on Citizens Connect — ${input.name}`),
     html: layout(
@@ -178,8 +247,9 @@ export function ownerWelcomeEmail(input: {
         '<ol style="padding-left:20px;margin:0 0 14px">' +
         `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD}">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>` +
         `<li>Enter <strong>${email}</strong>. We'll email you a 6-digit code (check your junk folder too).</li>` +
-        "<li>Type the code in. You'll land on your Contributor dashboard.</li>" +
+        "<li>Type the code in, then confirm the listing is yours.</li>" +
         "</ol>" +
+        askHtml +
         button(input.signInUrl, "Sign in to your Contributor Portal") +
         `<p style="font-size:13px;color:#555">Is ${email} a Google account? You can tap the Google button instead. ` +
         `Signed in with a different address by mistake? Sign out, then sign in again with ${email}.</p>`,
@@ -191,7 +261,8 @@ export function ownerWelcomeEmail(input: {
       `To see your listing and manage it, sign in with ${input.ownerEmail}. You don't need a Google account:\n` +
       `1. Open ${input.signInUrl} and tap "Continue with email".\n` +
       `2. Enter ${input.ownerEmail}. We'll email you a 6-digit code (check your junk folder too).\n` +
-      "3. Type the code in. You'll land on your Contributor dashboard.\n\n" +
+      "3. Type the code in, then confirm the listing is yours.\n\n" +
+      `${askText}\n\n` +
       `Is ${input.ownerEmail} a Google account? You can tap the Google button instead.\n` +
       `Signed in with a different address by mistake? Sign out, then sign in again with ${input.ownerEmail}.\n\n${SIGN_OFF_TEXT}`,
   };

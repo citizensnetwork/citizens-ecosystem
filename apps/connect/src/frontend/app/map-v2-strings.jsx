@@ -82,6 +82,91 @@
       },
     },
 
+    // Issue #259 (founder naming rule, 2026-10-21): the PUBLIC side says "Online in this area" and never "serving";
+    // every public word for the globe lives in this one group so the wording changes in one place.
+    online: {
+      title: 'Online in this area',
+      // the small tag on each row, chosen by the owner (default online); a mobile ministry is never labelled Online
+      tag: { online: 'Online', noFixedPlace: 'No fixed place' },
+      alsoReaching: 'Also reaching this area',
+      // the globe button on the map (one labelled button, then the list)
+      button: (n) => 'Online in this area: ' + n + (n === 1 ? ' listing' : ' listings'),
+      // under the sheet title: honest about what the list is (C21: never "on the map")
+      subtitle: (area) => 'Online or no fixed place · ' + area,
+      count: (n) => n + (n === 1 ? ' listing' : ' listings'),
+      closeSheet: 'Close the online list',
+      // the main list is grouped by how specific the area they chose is, then A to Z
+      groups: { suburb: 'This suburb', place: 'This city or town', province: 'The whole province' },
+      rowMeta: (tag, area) => tag + ' · ' + area,
+      openProfile: (name) => 'Open ' + name,
+      alsoHint: 'A wider reach, nearest first.',
+      within: (km, centre) => 'Within ' + km + ' km of ' + centre,
+      withinPin: (km) => 'Within ' + km + ' km of their place',
+      away: (km) => km + ' km away',
+      alsoFoot: 'Nearest first, then A to Z. No ranking.',
+      loading: 'Loading',
+      loadError: 'We could not load this list.',
+      retry: 'Try again',
+      empty: 'No one is online in this area right now.',
+    },
+
+    // Issue #259, owner side (the area picker in Apply and the Dashboard): this side KEEPS the word "serving".
+    serving: {
+      title: 'Where do you serve?',
+      intro: 'Choose the areas you serve so people there can find you.',
+      tickMeaning: 'A tick covers that whole area and everything inside it.',
+      noUpward: 'Choosing a suburb never chooses the city above it.',
+      searchLabel: 'Search areas',
+      levels: { province: 'Province', place: 'City or town', suburb: 'Suburb' },
+      expand: (name) => 'Show areas inside ' + name,
+      collapse: (name) => 'Hide areas inside ' + name,
+      tick: (name) => 'Serve ' + name,
+      tickAll: (name) => 'Serve all of ' + name,
+      includes: 'Includes everything inside',
+      containsChosen: 'Contains a chosen area',
+      suburbsHint: 'Suburbs (optional)',
+      noSuburbs: 'No suburbs are listed here yet.',
+      loadingChildren: 'Loading',
+      summaryNone: 'Serving: nothing chosen yet',
+      summary: (list) => 'Serving: ' + list,
+      allOf: (name) => 'all of ' + name,
+      and: 'and',
+      more: (n) => n + ' more',
+      tooMany: (n) => 'You can choose up to ' + n + ' areas.',
+      noMatches: 'No areas match your search.',
+      loading: 'Loading areas',
+      loadError: 'We could not load the areas.',
+      retry: 'Try again',
+      radius: {
+        title: 'Also reach people within a distance (optional)',
+        needsArea: 'Choose an area first. A distance needs a centre.',
+        off: 'Off',
+        km: (n) => n + ' km',
+        measuredFrom: 'Measured from',
+        hint: 'People within this distance of the centre will find you.',
+      },
+      presence: {
+        title: 'How do people find you?',
+        online: 'You serve people over the internet.',
+        noFixedPlace: 'You travel or meet people in person, with no venue.',
+      },
+      save: 'Save areas',
+      saving: 'Saving…',
+      saved: 'Saved. Your areas are updated.',
+      findableNote: 'Online in this area: people there find you once you are approved.',
+      reviewLabel: 'Serving',
+      applyFailed: 'Your application is sent. Please add your areas again from your dashboard.',
+      errors: {
+        generic: 'We could not save your areas. Please try again.',
+        offline: 'We could not reach the server. Please check your connection.',
+        signIn: 'Please sign in first.',
+        forbidden: 'Only the owner or an editor can change this.',
+        tooMany: 'That is too many areas. Please choose fewer.',
+        slowDown: 'Too many changes at once. Please try again shortly.',
+        notReady: 'Your listing is not ready for areas yet.',
+      },
+    },
+
     // Open state, "Starts in 2 h", "Posted 3 h ago": MapV2Time builds these from the templates below.
     time: {
       open24: 'Open 24 hours',
@@ -105,6 +190,15 @@
       daysAgo: (n) => n + ' days ago',
       dayShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       monthShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    },
+
+    // Issue #222. Words the card itself paints. Category and group names are data
+    // (window.DATA.getItemCategory), not strings here. Posted-ago and open state
+    // stay in `time`. "Read more" stays on sheet.news.
+    card: {
+      listen: 'Listen',
+      live: 'Live',
+      loading: 'Loading',
     },
 
     // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).

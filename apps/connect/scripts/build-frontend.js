@@ -95,9 +95,9 @@ buildFrontend({
   // <script type="text/babel"> tags loaded them (later files reference
   // `window.X` set by earlier ones).
   appFileOrder: [
-    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-nearby.jsx', 'map-v2-sheet.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
-    'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx',
+    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
+    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+    'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'intake-upgrade.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],
 
@@ -120,9 +120,12 @@ buildFrontend({
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MAPTILER_KEY'],
   mobileMissingLabel: 'Supabase/MapTiler',
 
-  // index.html loads these from unpkg/jsDelivr, where OSV-Scanner can't see
-  // them. The build fails unless each tag pins the exact lockfile version with
-  // an SRI hash matching the installed package's bytes — the same job
+  // index.html loads supabase-js from jsDelivr, where OSV-Scanner can't see
+  // it. The build fails unless the tag pins the exact lockfile version with an
+  // SRI hash matching the installed package's bytes — the same job
   // assertMaplibreVendorInSync does for the vendored map runtime.
-  sriPackages: ['react', 'react-dom', '@supabase/supabase-js'],
+  // React/ReactDOM can't be listed: npm React is 19 (no UMD build) while the
+  // page loads the 18.3.1 UMD from unpkg — their hashes are hand-verified
+  // (see index.html). Same split Vision already uses.
+  sriPackages: ['@supabase/supabase-js'],
 });

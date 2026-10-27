@@ -63,7 +63,7 @@ async function installNews(page: Page, posts: Post[]) {
 
 const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 const reader = (page: Page) => page.locator("[data-mv2='news-card']");
-const card = (page: Page) => sheet(page).locator("[data-mv2='post'][data-news]").first();
+const card = (page: Page) => sheet(page).locator("[data-mv2='card2'][data-news]").first();
 
 async function openSheetNews(page: Page, seed: Seed, posts: Post[]) {
   const c = seed.contributors[2];
@@ -108,10 +108,10 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   await expect(sheet).toBeVisible();
 
   await expect(sheet.getByRole("tab")).toHaveText(["News"]);
-  const titles = await sheet.locator("[data-mv2='post'] [data-mv2='row-title']").allTextContents();
+  const titles = await sheet.locator("[data-mv2='card2'][data-news] [data-mv2='row-title']").allTextContents();
   expect(titles).toEqual(["Fresh update", "Older update"]);
-  await expect(sheet.locator("[data-mv2='post']").first()).toContainText("3 h ago");
-  await expect(sheet.locator("[data-mv2='post']").last()).toContainText("3 Oct");
+  await expect(sheet.locator("[data-mv2='card2'][data-news]").first()).toContainText("3 h ago");
+  await expect(sheet.locator("[data-mv2='card2'][data-news]").last()).toContainText("3 Oct");
   await expect(sheet.locator("[data-mv2='post-more']").first()).toHaveText("Read more");
 });
 
@@ -307,7 +307,7 @@ test.describe("awkward posts at a phone width", () => {
     ]));
 
     const openNamed = async (title: string) => {
-      await sheet(page).locator("[data-mv2='post'][data-news]", { hasText: title }).click();
+      await sheet(page).locator("[data-mv2='card2'][data-news]", { hasText: title }).click();
       await expect(reader(page)).toBeVisible();
     };
 

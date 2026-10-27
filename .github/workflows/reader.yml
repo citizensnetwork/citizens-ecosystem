@@ -1,0 +1,68 @@
+name: Reader
+
+# The deterministic Reader (Listing Automation Phase 2, issue #263): reads the public websites and
+# calendars of Contributors who switched automatic updates on, and hands what it finds to Connect as
+# suggestions. No language model at run time, no dependencies. Founder guide:
+# apps/connect/scripts/reader/README.md
+#
+# Safety: never runs for pull requests (no pull_request or pull_request_target), reads the repo
+# only, gets its three secrets through env (never interpolated into the script), and the log is
+# public, so the script prints only a short source id, the kind and a fixed status phrase.
+#
+# Live writes happen only when the repository variable READER_LIVE is exactly true. That switch
+# covers the daily run and a run started by hand. A manual live run without it stops below, before
+# checkout, and sends nothing. The script repeats the check, so a later edit that still passes
+# --live cannot write while the variable is disarmed.
+
+on:
+  schedule:
+    # Daily at 04:23 UTC (06:23 in South Africa), so the digest email lands before the day starts.
+    # Off the :00 minute, when scheduled runs queue longest. This run stays a dry run unless
+    # READER_LIVE is exactly true (README: "Switch it on").
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run reads and counts only; live posts suggestions and sends the digest, only when READER_LIVE is exactly true'
+        type: choice
+        options:
+          - dry-run
+          - live
+        default: dry-run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reader
+  cancel-in-progress: false
+
+jobs:
+  read:
+    name: Read listing sources
+    if: github.repository == 'citizensnetwork/citizens-ecosystem'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Static shell line: the decision is in `if`, so the variable's value is never expanded here.
+      - name: Refuse a manual live run until READER_LIVE is true
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live' && vars.READER_LIVE != 'true'
+        run: 'echo "::error::Refusing a live run: READER_LIVE is not true, so nothing was sent. Set READER_LIVE to the exact value true, then run again." && exit 1'
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Run the Reader
+        shell: bash
+        env:
+          AUTOMATION_SUGGEST_KEY: ${{ secrets.AUTOMATION_SUGGEST_KEY }}
+          AUTOMATION_DIGEST_KEY: ${{ secrets.AUTOMATION_DIGEST_KEY }}
+          CONNECT_BASE_URL: ${{ secrets.CONNECT_BASE_URL }}
+          READER_LIVE: ${{ vars.READER_LIVE }}
+          READER_MODE: ${{ vars.READER_LIVE == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live')) && '--live' || '--dry-run' }}
+        run: node apps/connect/scripts/reader/run.mjs "$READER_MODE" | tee -a "$GITHUB_STEP_SUMMARY"

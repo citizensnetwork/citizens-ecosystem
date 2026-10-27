@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Next 16 compiles next.config.ts to CommonJS. Node 22 then loads that output
+// as ESM when it contains require(), which throws "exports is not defined".
+// This file stays free of runtime imports. __dirname is the CommonJS global
+// the compiler preserves; two levels up from apps/connect is the monorepo root.
+const outputFileTracingRoot = __dirname.replace(/\\/g, "/").split("/").slice(0, -2).join("/");
 
 // CDN domains required by the static HTML frontend (loaded via <script> / <link> tags).
 // These are only needed when the frontend is served from the same Next.js project
@@ -26,7 +28,7 @@ const nextConfig: NextConfig = {
   // start with "Cannot find module 'next/dist/compiled/source-map'" — the
   // actual cause of prod's blank map/DB (turbo.json env-var work was real but
   // unrelated). Wear's next.config.js already uses this same pattern.
-  outputFileTracingRoot: join(__dirname, "../../"),
+  outputFileTracingRoot,
   poweredByHeader: false,
   images: {
     remotePatterns: [
@@ -66,6 +68,9 @@ const nextConfig: NextConfig = {
       toApp("/e/:id"),
       toApp("/p/:id"),
       toApp("/c/:slug"),
+      // Token is required. A bare /upgrade is not a screen and stays a 404.
+      toApp("/upgrade/:token"),
+      toApp("/upgrade/:token/decline"),
     ];
   },
 

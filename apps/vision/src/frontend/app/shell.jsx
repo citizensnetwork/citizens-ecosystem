@@ -98,8 +98,8 @@
             border: "none", cursor: "pointer", textAlign: "left",
             borderRadius: 10, padding: narrow ? "10px" : "9px 12px",
             paddingLeft: narrow ? 10 : 12 + depthLevel * 16,
-            background: active ? "var(--gold-100)" : "transparent",
-            color: active ? "var(--gold-800)" : depthLevel ? "var(--text-secondary)" : "var(--text-primary)",
+            background: active ? "var(--surface-2)" : "transparent",
+            color: active ? "var(--accent-ink)" : depthLevel ? "var(--text-secondary)" : "var(--text-primary)",
             fontSize: depthLevel ? 13 : 14, fontWeight: depthLevel ? 650 : 750,
             justifyContent: narrow ? "center" : "flex-start",
           }}>
@@ -130,7 +130,7 @@
             <Crown size={narrow ? 26 : 30} />
             {!narrow ? (
               <div>
-                <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.01em" }}>Citizens Vision</div>
+                <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em" }}>Citizens Vision</div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", color: "var(--brand-ink)" }}>CONNECTING THE KINGDOM</div>
               </div>
             ) : null}
@@ -163,8 +163,8 @@
               <span title={dataMode.reason} style={{
                 fontSize: 11, fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap",
                 borderRadius: 999, padding: "5px 11px",
-                color: dataMode.mode === "live" ? "var(--gold-800)" : "var(--text-secondary)",
-                background: dataMode.mode === "live" ? "var(--gold-100)" : "var(--surface-sunk)",
+                color: dataMode.mode === "live" ? "var(--accent-contrast)" : "var(--text-secondary)",
+                background: dataMode.mode === "live" ? "var(--accent)" : "var(--surface-sunk)",
               }}>{dataMode.mode === "live" ? "Live data" : "Demo data"}</span>
             ) : null}
             {/* Basic / In-depth depth toggle */}
@@ -172,8 +172,8 @@
               {["basic", "indepth"].map((d) => (
                 <button key={d} onClick={() => setDepth(d)} style={{
                   border: "none", padding: "7px 13px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                  background: depth === d ? "var(--gold-100)" : "transparent",
-                  color: depth === d ? "var(--gold-800)" : "var(--text-secondary)",
+                  background: depth === d ? "var(--surface-2)" : "transparent",
+                  color: depth === d ? "var(--accent-ink)" : "var(--text-secondary)",
                 }}>{d === "basic" ? "Basic" : "In-depth"}</button>
               ))}
             </div>
@@ -186,7 +186,7 @@
                 <img src={session.avatarUrl} alt="" style={{ width: 30, height: 30, borderRadius: "50%", border: "2px solid var(--ring)" }} />
               ) : (
                 <div style={{
-                  width: 30, height: 30, borderRadius: "50%", background: "var(--gold-100)", color: "var(--gold-800)",
+                  width: 30, height: 30, borderRadius: "50%", background: "var(--surface-2)", color: "var(--accent-ink)",
                   display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13,
                 }}>{(session.name || "?")[0]}</div>
               )}

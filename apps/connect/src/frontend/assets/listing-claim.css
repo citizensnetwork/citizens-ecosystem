@@ -1,0 +1,206 @@
+/* ════════════════════════════════════════════════════════════════════
+   Citizens Connect — the owner's confirm screen for a listing made for them (C10, issue #159)
+   ------------------------------------------------------------------
+   Loaded from index.html after assets/report.css, whose token block (html:not([data-theme]))
+   supplies --surface-1, --text-1, --accent, the space, radius and type scales and the z-index when
+   the old map is showing; Map v2's own sheet sets the same tokens while it is on. Tokens only here.
+
+   Bump the ?v= on the index.html <link> when this file changes.
+   ════════════════════════════════════════════════════════════════════ */
+
+@keyframes cc-claim-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cc-claim-in {
+  from { opacity: 0; transform: translateY(var(--space-3)); }
+  to { opacity: 1; transform: none; }
+}
+[data-mv2='claim'] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-viewer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+  touch-action: none;
+  font-family: var(--font-body);
+  animation: cc-claim-scrim-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='claim-card'] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--reader-w);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+  animation: cc-claim-in var(--dur-base) var(--ease-enter) both;
+}
+[data-mv2='claim-head'] {
+  flex: none;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='claim-title'] {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+[data-mv2='claim-scroll'] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  padding: var(--space-4);
+}
+[data-mv2='claim-preview'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+[data-mv2='claim-logo'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-8));
+  height: calc(var(--space-8));
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  color: var(--accent-ink);
+  object-fit: cover;
+}
+[data-mv2='claim-preview-text'] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+}
+[data-mv2='claim-name'] {
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+[data-mv2='claim-category'] {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='claim-link'] {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+[data-mv2='claim-body'],
+[data-mv2='claim-help'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+[data-mv2='claim-help'] {
+  color: var(--text-2);
+}
+[data-mv2='claim-alert'] {
+  margin: 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  color: var(--error);
+}
+[data-mv2='claim-actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+[data-mv2='claim'] [data-mv2='action'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='claim'] [data-mv2='action'][data-primary] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+[data-mv2='claim'] [data-mv2='action']:disabled,
+[data-mv2='claim-later']:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+[data-mv2='claim-later'] {
+  align-self: center;
+  min-height: var(--hit);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+[data-mv2='claim'] [data-mv2='action']:focus-visible,
+[data-mv2='claim-later']:focus-visible,
+[data-mv2='claim-link']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='claim'] [data-mv2='action'] {
+  transition: transform var(--dur-fast) var(--ease-enter), opacity var(--dur-fast) linear;
+}
+[data-mv2='claim'] [data-mv2='action']:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  [data-mv2='claim'] [data-mv2='action']:hover {
+    border-color: var(--accent-ink);
+  }
+  [data-mv2='claim'] [data-mv2='action'][data-primary]:hover {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-mv2='claim'] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

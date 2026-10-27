@@ -4,8 +4,9 @@ A new Contributor fills in the Google Form **"New 219-Connect Contributor"**. Yo
 the responses Sheet and tick **Approve**. That is the only manual step: the Contributor goes live on
 the map and in Kingdom Discovery, the row is stamped, and the owner gets a welcome email asking them
 to sign in with that owner email: a 6-digit emailed code (works for any inbox, including Outlook), or
-Google if it's a Google account. Signing in with that email lands them straight on their own
-Contributor dashboard.
+Google if it's a Google account. **When they sign in, Connect asks them to confirm the listing is
+theirs** ("Attach 'X' to your account?" if that email already has an account). Nothing is attached to
+anybody until they say yes, and "Not me" hides the listing at once.
 
 ```
 You tick "Approve" in the Sheet
@@ -14,7 +15,9 @@ You tick "Approve" in the Sheet
   → Connect: check signature → validate → map labels → locate → create listing → upload logo/cover
   → the Sheet row gets Status / Listing URL / Processed at / Notes
   → the owner gets a welcome email (from your Gmail)
-Owner signs in with that email (6-digit code, or Google) → lands on their dashboard
+Owner signs in with that email (6-digit code, or Google) → Connect asks "Confirm / Not me"
+  → every ~10 minutes the script asks Connect (read-only) and writes the answer into Status:
+      Awaiting owner · 3 days  →  Owner confirmed ✓   or   Owner declined
 ```
 
 | File | What it is |
@@ -22,15 +25,16 @@ Owner signs in with that email (6-digit code, or Google) → lands on their dash
 | `intake.gs` | The Apps Script bound to the responses Sheet (this pipeline). |
 | `create-contributor-application-form.gs` | **Superseded.** The old form builder; the live Form was built by hand. |
 | `apps/connect/src/app/api/intake/google-form/route.ts` | The Connect endpoint it calls. |
+| `apps/connect/src/app/api/intake/google-form/status/route.ts` | The read-only status endpoint the 10-minute poll calls. |
 | `apps/connect/src/lib/intake/googleForm.ts` | The label → category/kind maps, and the coordinate, signature and image checks. |
 
 ---
 
 ## One-time setup
 
-> **Before the first approval:** database migration **173** must be applied (it adds the
-> "Individual" kind and the intake function). Until it is, every approval fails with
-> `create_failed` and nothing is created.
+> **Before the first approval:** database migrations **173** (the "Individual" kind and the intake
+> function) and **196** (the verify-first ledger, C10) must be applied. Without 173 every approval fails
+> with `create_failed`; without 196 it fails with `claim_ledger_failed`. Nothing is created either way.
 
 1. **Form confirmation message.** Form → Settings → Presentation → Confirmation message:
    > Thank you! We'll email you at the owner address you gave us when your listing is live. Then just
@@ -71,7 +75,11 @@ Owner signs in with that email (6-digit code, or Google) → lands on their dash
    - If Google warns that it "hasn't verified this app", that's expected for your own script:
      **Advanced** → **Go to … (unsafe)** → **Allow**.
    - Done when the Execution log shows *"Execution completed"* and the Sheet shows a toast, *"Intake is
-     ready."*
+     ready."* `setup` also installs two **status polls**, each every 10 minutes: `refreshStatuses`
+     (a new account's listing) and `pollUpgrades` (an existing citizen's confirmation). Triggers, the
+     clock icon, shows all three. If you re-paste the script, run `setup` again; it replaces the old
+     triggers rather than doubling them. `setup` also adds the **Request id** and **Resend** columns
+     when they are missing.
 8. **Run `testConnection`** the same way: pick it in the dropdown, then click **Run**. The Sheet should
    show *"Connected ✓ — the secret matches."* Nothing is created. Any other message says what to fix.
    This needs `INTAKE_WEBHOOK_SECRET` in Vercel **and a redeploy** (step 4).
@@ -85,20 +93,37 @@ Before you tick **Approve**, check:
 - **Column B = column E?** B is the Google account that actually submitted the Form; E is the
   owner's email the listing will belong to. If they differ, the submitter may not control that inbox.
   Confirm with them first: anyone can fill in a public Form.
-- The name and category look right, and the Contributor isn't already on Citizens Connect.
+- The name and category look right. (If the owner's email already has a plain citizen account, nothing
+  goes live yet: they get a confirmation link and the row waits on **Awaiting confirmation**. An
+  administrator or someone with an application in progress is refused. Admin → Create still uses the
+  separate placeholder-and-attach path.)
 - It's a real Form submission. Approving a hand-typed sample row publishes a real listing and
   emails whoever's address is in column E, so delete sample rows instead.
 
-Tick **Approve**. Within about 10–20 seconds:
+Tick **Approve**. Within about 10–20 seconds, a **new** account:
 
-- **Status** = `Live ✓`.
+- **Status** = `Awaiting owner · today`. The listing is live, and it waits for its owner to confirm it.
+  The poll then keeps the line true: `Awaiting owner · 3 days` (with `(reminded)` after the one
+  7-day reminder), then `Owner confirmed ✓`, or `Owner declined` (the owner tapped **Not me**: the
+  listing is already hidden, and the Notes tell you to decide in Admin → Listings whether to Delete it).
+  Rows approved before this change still say `Live ✓` and are not polled.
 - **Listing URL** = the public page (`…/c/<name>`). It's shareable, so the owner can post it anywhere.
 - **Processed at** = when it happened.
 - **Notes** = anything worth knowing (see below).
 
-The owner then gets the welcome email.
+The owner then gets the welcome email from the sheet.
 
-Ticking a row that's already `Live ✓` does nothing. If a row ends in `Error`, fix the cell the
+If that owner email **already has a citizen account**, nothing goes live yet:
+
+- **Status** = `Awaiting confirmation`. **Request id** is filled in. Approve stays ticked.
+- Connect emails that account a link: confirm the upgrade, or say it is not theirs. The link lasts 7 days and does not move when you resend it.
+- The sheet does **not** send the welcome. The server sends it only after they confirm.
+- About every 10 minutes the sheet asks Connect. **Live ✓** (with the listing URL) means they confirmed. **Declined** or **Expired** means the account was not changed; untick happens on its own. Tick **Approve** again after Expired to start a fresh link.
+- Tick **Resend** (a checkbox) to email the same confirmation again. It is limited.
+
+Re-paste `intake.gs` and run `setup()` once so the **Request id** and **Resend** columns appear and both 10-minute checks are installed. Until that runs, a new account still goes live. An existing citizen account is marked **Awaiting confirmation** in Status, and the notes explain the email. The request id and the confirmation check need the new columns, which `setup()` and the next edit of the sheet add.
+
+Ticking a row that already has a Status (`Awaiting confirmation`, `Awaiting owner…`, `Owner confirmed ✓`, `Owner declined`, `Declined`, `Expired`, `Live ✓`) does nothing. If a row ends in `Error`, fix the cell the
 Notes point to, then tick **Approve** again.
 
 ### What the Notes mean
@@ -112,7 +137,13 @@ Notes point to, then tick **Approve** again.
 | `invalid_website_url`, `invalid_contact_email`, `invalid_<social>` | That answer can't be used as-is (or is a dangerous link) | Fix or clear that cell |
 | `Faith alignment and permission to publish must both be given.` | *Faith alignment* is empty, or *Permission to publish* is empty or "No" | Can't publish without consent |
 | `… already has a Contributor listing: …/c/<name> — nothing was changed.` | This owner is already live (e.g. the row was approved before, or they applied in the app). Says `(currently hidden)` if you hid it | Nothing to do, or unhide it in Admin → Listings |
-| `… already has a Citizens Connect account, so no listing was created. …` | The owner email belongs to someone who already signed in to the app as a citizen | They can go live themselves: Settings → Become a Contributor. Or change the owner's email on the row and tick again |
+| `This owner already has a Citizens account…` | The owner email is an existing citizen account | Leave the row on Awaiting confirmation. They confirm from the email. Tick Resend if the email did not arrive |
+| `A confirmation is already waiting…` | Approve was ticked again while a link is still open | Nothing was emailed again. Tick Resend if they need the link |
+| `That email can't take a Contributor listing this way` / `already belongs to a Contributor account` | The address is a removed account, or a Contributor with no public page | Nothing was changed. Do not retry the same address |
+| `… already has a listing waiting for the owner to confirm: …/c/<name>. Nothing was created …` | A second approval for a new address that still has a listing waiting | Wait for the first answer, or Delete the first listing in Admin → Listings and tick again |
+| `… belongs to an administrator account` / `… has a Contributor application of its own` / `… already has a Citizens Connect account, so no listing was created. …` | The owner email is an admin, or someone with an application in progress | They can go live themselves: Settings → Become a Contributor. Or change the owner's email on the row and tick again |
+| `claim_ledger_failed` | Migration 196 is not applied | Apply it; nothing was created |
+| *(Status)* `Owner declined` | The person this listing was made for signed in and said **Not me** | It is hidden already. Check the Form submission (was the email mistyped, or is it someone else's?), then Delete it in Admin → Listings if it should not stand |
 | `Sheet columns: no question containing "…"` / `"…" matches 2 questions` | A Form question was renamed or duplicated, and the script finds every question by its wording (see below) | Restore the wording, or update `Q` in `intake.gs` and re-paste it |
 | `unauthorized` | The two secrets differ | Re-copy the same value into Vercel and the Script property, then redeploy |
 | `intake_not_configured` | Vercel has no `INTAKE_WEBHOOK_SECRET` | Add it (step 4) and redeploy |
@@ -182,26 +213,40 @@ reword a question, change its phrase in the `Q` table at the top of `intake.gs` 
 
 ## How the owner gets in
 
-The listing is created under an account with the **owner's email**, and the owner signs in with
-**that same email**, either way:
+The listing goes live at once, but it is **never attached to anybody until the owner has signed in and
+confirmed** (C10). The owner signs in with **the owner email on the row**, either way:
 
 - **Continue with email (a 6-digit code).** Works for any inbox, including Outlook and company mail,
   so nobody needs a Google account. They enter the address, we email a 6-digit code, they type it back.
-  They are signed in AS the listing's account and land on their dashboard. Receiving the code is the
-  proof they own the inbox.
-- **Google, using that same email.** Supabase links the Google sign-in to that account, with the same
-  result.
+  Receiving the code is the proof they own the inbox.
+- **Google, using that same email.**
 
-If Supabase ever creates a *separate* account for that same email instead of linking (only possible
-via Google), the app claims the listing for them automatically on sign-in. The account menu's **Claim a
-Contributor listing** does the same by hand.
+Then Connect shows one screen, with two buttons:
 
-A **different** address can't claim the listing; that person is simply an ordinary citizen. The
-welcome email tells the owner exactly which address to sign in with, and to sign out and back in with
-it if they used the wrong one.
+- **Email has no account yet.** The listing waits under that address. The owner sees *"Is 'X' your
+  listing? [Confirm] [Not me]"*. **Confirm** records that it is theirs and opens their dashboard.
+- **Email already has an account.** The listing waits under a placeholder with an address that is
+  never mailed. The owner sees *"Attach 'X' to your account? [Confirm] [Not me]"*. **Confirm** copies
+  the listing onto their own account (the link in the welcome email keeps working). Nothing on the
+  account changes before that.
+- **Not me** hides the listing at once, tells you by email, and shows `Owner declined` in the Sheet.
+  Nothing on their account changes.
+- **Decide later** (a small link) closes the screen for that browser session and asks again next
+  sign-in.
+
+**No answer?** The listing stays live and nothing is ever attached or expired. After 7 days one
+reminder email goes out (a daily job in Connect; it needs `CRON_SECRET` in Vercel). The Sheet shows
+`Awaiting owner · N days` until they answer.
+
+An address that was never proved (a code that was never entered) can't confirm anything, and a
+**different** address can't see the listing at all. The welcome email tells the owner exactly which
+address to sign in with, and to sign out and back in with it if they used the wrong one.
+The account menu's **Claim a Contributor listing** reopens the same screen by hand.
 
 > **After you change `intake.gs` in the repo, re-paste it into the Sheet's Apps Script** (one-time
-> setup, step 5). The welcome email only changes once the Sheet's copy of the script does.
+> setup, step 5), then run `setup` once more so the 10-minute status trigger exists. The welcome email
+> and the Status lines only change once the Sheet's copy of the script does. (C10 changed the script:
+> new Status values, the `refreshStatuses` poll, and a welcome that says "confirm the listing is yours".)
 
 > **The 6-digit email must carry the code.** In Supabase → Authentication → Email Templates, both the
 > **Magic Link** and **Confirm signup** templates need `{{ .Token }}` in the body: existing accounts

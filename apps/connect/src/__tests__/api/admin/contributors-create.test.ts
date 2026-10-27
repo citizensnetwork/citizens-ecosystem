@@ -4,6 +4,14 @@ import { createMockSupabaseClient } from "../../helpers/supabase-mock";
 import { resetRateLimitStore } from "@/lib/rate-limit";
 
 const mockClient = createMockSupabaseClient();
+// from("profiles").select().eq().maybeSingle() finds the existing account behind a taken address;
+// from("listing_claims").insert() writes the verify-first ledger row (C10); .select().eq().eq().maybeSingle() finds the open one.
+const adminTable = {
+  select: vi.fn(() => adminTable),
+  eq: vi.fn(() => adminTable),
+  maybeSingle: vi.fn(),
+  insert: vi.fn(),
+};
 const mockAdmin = {
   auth: {
     admin: {
@@ -11,6 +19,7 @@ const mockAdmin = {
       deleteUser: vi.fn().mockResolvedValue({ error: null }),
     },
   },
+  from: vi.fn(() => adminTable),
 };
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -62,6 +71,8 @@ beforeEach(() => {
     data: { user: { id: NEW_USER_ID } },
     error: null,
   });
+  adminTable.maybeSingle.mockResolvedValue({ data: null, error: null });
+  adminTable.insert.mockResolvedValue({ error: null });
   mockSendEmail.mockResolvedValue("sent");
   vi.stubEnv("ADMIN_NOTIFY_EMAIL", ADMIN_INBOX);
 });
@@ -254,14 +265,106 @@ describe("POST /api/admin/contributors/create", () => {
     expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
   });
 
-  it("returns 409 when the email is already registered", async () => {
+  it("returns 409 when the email is registered to an account that cannot be offered a listing", async () => {
     mockAdmin.auth.admin.createUser.mockResolvedValueOnce({
       data: { user: null },
       error: { message: "Email address has already been registered" },
     });
+    adminTable.maybeSingle.mockResolvedValueOnce({ data: { role: "admin", contributor_status: "not_applied", contributor_slug: null }, error: null });
     const res = await POST(req(validBody));
     expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe("email_already_registered");
+    expect(json.message).toMatch(/administrator/);
     expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockClient.rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 listing_exists for an address that already holds a live listing", async () => {
+    mockAdmin.auth.admin.createUser.mockResolvedValueOnce({ data: { user: null }, error: { message: "", code: "email_exists" } });
+    adminTable.maybeSingle.mockResolvedValueOnce({ data: { role: "contributor", contributor_slug: "grace-outreach", contributor_hidden: false }, error: null });
+    const res = await POST(req(validBody));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("listing_exists");
+  });
+
+  // ── C10: verify-first. An address that already has an account is never touched. ──
+  describe("verify-first (C10)", () => {
+    const ALIAS_ID = "77777777-7777-4777-8777-777777777777";
+    const created = () =>
+      mockClient.rpc.mockResolvedValueOnce({ data: { success: true, slug: "grace-outreach" }, error: null });
+    const takenByCitizen = () => {
+      mockAdmin.auth.admin.createUser
+        .mockResolvedValueOnce({ data: { user: null }, error: { message: "has already been registered", code: "email_exists" } })
+        .mockResolvedValueOnce({ data: { user: { id: ALIAS_ID } }, error: null });
+      adminTable.maybeSingle.mockResolvedValueOnce({
+        data: { role: "citizen", contributor_status: "not_applied", contributor_slug: null },
+        error: null,
+      });
+    };
+
+    it("a new address: records the ledger row and tells the screen the owner has no account", async () => {
+      created();
+      const json = await (await POST(req(validBody))).json();
+      expect(json).toMatchObject({ success: true, ownerHasAccount: false, awaitingOwner: true });
+      expect(mockAdmin.from).toHaveBeenCalledWith("listing_claims");
+      expect(adminTable.insert).toHaveBeenCalledWith({
+        placeholder_id: NEW_USER_ID,
+        slug: "grace-outreach",
+        claim_email: "org@example.com",
+        source: "admin_create",
+      });
+    });
+
+    it("an address with an account: the listing goes live under an alias placeholder, and nothing on that account is touched", async () => {
+      takenByCitizen();
+      created();
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ success: true, contributor_id: ALIAS_ID, ownerHasAccount: true, awaitingOwner: true });
+      const alias = mockAdmin.auth.admin.createUser.mock.calls[1][0] as { email: string; email_confirm: boolean };
+      expect(alias.email).toMatch(/^listing-[0-9a-f-]{36}@listing-placeholder\.invalid$/);
+      expect(alias.email_confirm).toBe(true);
+      // The profile is made on the alias user and remembers the REAL address as the claim email.
+      expect(mockClient.rpc).toHaveBeenCalledWith("admin_create_contributor_profile", expect.objectContaining({ _target_id: ALIAS_ID, _claim_email: "org@example.com" }));
+      expect(adminTable.insert).toHaveBeenCalledWith(expect.objectContaining({ placeholder_id: ALIAS_ID, claim_email: "org@example.com", source: "admin_create" }));
+      expect(mockClient._chain.update).not.toHaveBeenCalled();
+    });
+
+    it("the welcome email is addressed to the REAL address and offers the attach, never to the alias", async () => {
+      takenByCitizen();
+      created();
+      await POST(req(validBody));
+      const mail = mockSendEmail.mock.calls[0][0] as { to: string; text: string; html: string };
+      expect(mail.to).toBe("org@example.com");
+      expect(mail.to).not.toContain("listing-placeholder");
+      expect(mail.text).toContain("You already have a Citizens Connect account with org@example.com");
+      expect(mail.text).toContain('"Attach Grace Outreach to your account?"');
+      expect(mail.text).toContain("Nothing on your account changes unless you tap Confirm");
+      expect(mail.html).toContain("Attach Grace Outreach to your account?");
+    });
+
+    it("a second open request for the same address: 409 listing_pending, rolled back, no email", async () => {
+      created();
+      adminTable.insert.mockResolvedValueOnce({ error: { code: "23505", message: "duplicate" } });
+      adminTable.maybeSingle.mockResolvedValueOnce({ data: { slug: "grace-first" }, error: null });
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(409);
+      const json = await res.json();
+      expect(json.error).toBe("listing_pending");
+      expect(json.message).toContain("/c/grace-first");
+      expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("a ledger failure rolls the listing back (never a listing nobody is asked about)", async () => {
+      created();
+      adminTable.insert.mockResolvedValueOnce({ error: { code: "42P01", message: "relation does not exist" } });
+      const res = await POST(req(validBody));
+      expect(res.status).toBe(500);
+      expect(mockAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(NEW_USER_ID);
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
   });
 
   // ── D-13: the owner's welcome email ─────────────────────────────────────
@@ -330,8 +433,11 @@ describe("POST /api/admin/contributors/create", () => {
       expect(mail.text).toContain("/c/grace-outreach");
       expect(mail.text).toContain("/dashboard");
       expect(mail.text).toContain("sign in with org@example.com");
-      // C10 will put a confirm screen in front of every claim: never promise it is "automatically yours".
+      // C10: a confirm screen sits in front of every claim, so the email says so and never promises it is "automatically yours".
       expect(mail.text.toLowerCase()).not.toContain("automatically");
+      expect(mail.text).toContain("confirm the listing is yours");
+      expect(mail.text).toContain("tap Not me");
+      expect(mail.text).not.toContain("land on your Contributor dashboard");
       expect(mail.html).toContain("Google");
     });
 

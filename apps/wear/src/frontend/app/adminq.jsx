@@ -15,6 +15,7 @@
   const { useStore } = window.CWStore;
   const {
     GOLD,
+    ON_GOLD,
     INK,
     MUTED,
     Avatar,
@@ -50,7 +51,7 @@
     return {
       border: '1.5px solid ' + (primary ? GOLD : '#e6e3dc'),
       background: primary ? GOLD : '#fff',
-      color: primary ? '#fff' : '#5a5a5a',
+      color: primary ? ON_GOLD : '#5a5a5a',
       borderRadius: 10,
       padding: '8px 14px',
       fontSize: 12,

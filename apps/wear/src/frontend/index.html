@@ -7,37 +7,136 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
 <style>
+  /* ============================================================
+     Map v2 canon (apps/connect/src/frontend/assets/map-v2.css,
+     sections 1–3). One gold fill. Light is :root; dark is
+     [data-theme='dark']. Wear has no theme control, so the page
+     stays light until a screen sets the attribute. Raw colours
+     live here. Screens read var(--…).
+     ============================================================ */
   :root {
-    --gold: #F2BA1B;
-    --ink: #1a1a1a;
-    --muted: #a09e97;
-    --muted-2: #9a9892;
-    --bg-page: #fbfaf8;
-    --bg-soft: #f2f0ea;
-    --bg-chip: #f4f2ec;
-    --border: #f0eee9;
-    --border-soft: #f3f1ee;
+    /* surfaces */
+    --surface-0: #f7f4ee;
+    --surface-1: #ffffff;
+    --surface-2: #f5f1e8;
+    --logo-bg: #ffffff;
+
+    /* text */
+    --text-1: #0a0908;
+    --text-2: #5c5444;
+
+    /* one gold: a fill with a near-black label; ink for text, rings, icons */
+    --accent: #c9a84c;
+    --accent-contrast: #0a0908;
+    --accent-ink: #8b6914;
+
+    --ok: #1e6b3c;
+    --closed: #a32d22;
+    --error: #a32d22;
+
+    --focus-ring: #8b6914;
+    --divider: rgba(10, 9, 8, 0.12);
+    --scrim: rgba(10, 9, 8, 0.4);
+    --elev-1: 0 1px 3px rgba(10, 9, 8, 0.16);
+    --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
+
+    /* scales — the same in both looks */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 32px;
+    --space-8: 48px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-full: 999px;
+    --fs-1: 12px;
+    --lh-1: 16px;
+    --fs-2: 14px;
+    --lh-2: 20px;
+    --fs-3: 18px;
+    --lh-3: 24px;
+    --fw-regular: 400;
+    --fw-semibold: 600;
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+    --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --hit: 44px;
+    --focus-w: 2px;
+    --focus-offset: 2px;
+
+    /* Names the screens already use, pointed at the canon. */
+    --gold: var(--accent);
+    --gold-ink: var(--accent-ink);
+    --on-gold: var(--accent-contrast);
+    --ink: var(--text-1);
+    --muted: var(--text-2);
+    --muted-2: var(--text-2);
+    --bg-page: var(--surface-0);
+    --bg-soft: var(--surface-2);
+    --bg-chip: var(--surface-2);
+    --border: var(--divider);
+    --border-soft: var(--divider);
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
   }
+  [data-theme='dark'] {
+    --surface-0: #0a0908;
+    --surface-1: #1a1714;
+    --surface-2: #26221d;
+    --text-1: #f7f4ee;
+    --text-2: #b9ae9a;
+    --accent: #c9a84c;
+    --accent-contrast: #0a0908;
+    --accent-ink: #e8d48b;
+    --ok: #62d68f;
+    --closed: #ff8f80;
+    --error: #ff8f80;
+    --focus-ring: #e8d48b;
+    --divider: rgba(247, 244, 238, 0.14);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --elev-1: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --dur-fast: 0ms;
+      --dur-base: 0ms;
+      --dur-slow: 0ms;
+    }
+  }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; }
   body {
-    margin: 0; background: #fff; color: #1a1a1a;
-    font-family: 'Manrope', system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+    margin: 0; background: var(--surface-0); color: var(--text-1);
+    font-family: var(--font-body); -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
   }
   input, textarea, select, button { font-family: inherit; }
   button { cursor: pointer; }
   a { color: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: var(--focus-w) solid var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
   .cwsc { scrollbar-width: none; }
   .cwsc::-webkit-scrollbar { width: 0; height: 0; display: none; }
-  .fade-in { animation: cwUp .3s ease-out; }
-  @keyframes cwUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .scale-in { animation: cwScaleIn .25s cubic-bezier(.34,1.3,.64,1); }
+  .fade-in { animation: cwUp var(--dur-base) var(--ease-enter); }
+  @keyframes cwUp { from { opacity: 0; transform: translateY(var(--space-2)); } to { opacity: 1; transform: none; } }
+  .scale-in { animation: cwScaleIn var(--dur-base) var(--ease-enter); }
   @keyframes cwScaleIn { from { transform: scale(.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .spin { animation: cwSpin 1s linear infinite; }
   @keyframes cwSpin { to { transform: rotate(360deg); } }
@@ -48,9 +147,11 @@
 
 <!-- React/ReactDOM: DEVELOPMENT builds here, for local no-build dev (full React
      warnings); the build (@citizens/frontend-build) ships each data-prod-* twin
-     instead. The pin + integrity hash of every React/ReactDOM/supabase-js tag is
-     checked at build time against the lockfile-installed npm package (sriPackages
-     in scripts/build-frontend.js) — after a version bump the build prints the new hash. -->
+     instead. Unlike supabase-js below, these React hashes are NOT build-checked:
+     npm React is 19 (the API), which has no UMD build to compare against. The
+     page keeps the 18.3.1 UMD. If you change a React URL, recompute its hash
+     from the fetched bytes:
+     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous" data-prod-src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" data-prod-integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous" data-prod-src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" data-prod-integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -59,7 +160,7 @@
      Plain scripts (run before Babel transforms the app below). supabase-js runs
      on the page that holds users' auth sessions, so it is pinned to the exact
      lockfile version with SRI — never a floating @2. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js" integrity="sha384-3wY11tldQ5+yWqAvmTN4XtQvnjoTva0cV15O/O/O5NTtp0ivVopSzLOzsVXWZse9" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="config.js"></script>
 
 <!-- Cache-busting for the no-build dev server (python http.server sends no

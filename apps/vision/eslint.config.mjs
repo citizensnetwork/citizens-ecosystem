@@ -6,6 +6,16 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  {
+    // eslint-config-next sets settings.react.version to "detect", which calls
+    // context.getFilename(). ESLint 10 removed that method. 19.3 is the React
+    // line this app installs, which is what detection would have found.
+    settings: {
+      react: {
+        version: "19.3",
+      },
+    },
+  },
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",

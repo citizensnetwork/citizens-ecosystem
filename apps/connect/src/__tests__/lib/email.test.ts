@@ -6,10 +6,14 @@ import {
   sendEmail,
   siteOrigin,
 } from "@/lib/email/send";
+import { listingClaimReminderEmail, listingDeclinedAdminEmail } from "@/lib/email/listingClaimTemplates";
+import { placeholderAliasEmail } from "@/lib/placeholderEmail";
 import {
   applicationApprovedEmail,
   applicationRejectedEmail,
   newApplicationAdminEmail,
+  intakeUpgradeEmail,
+  intakeUpgradeFlagEmail,
   ownerWelcomeEmail,
 } from "@/lib/email/templates";
 
@@ -60,6 +64,13 @@ describe("sendEmail", () => {
   it("is skipped when there is no usable recipient", async () => {
     await expect(sendEmail({ ...mail, to: "not an email" })).resolves.toBe("skipped");
     await expect(sendEmail({ ...mail, to: "" })).resolves.toBe("skipped");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never mails a listing placeholder's alias address (C10), whatever its case", async () => {
+    for (const to of [placeholderAliasEmail(), "LISTING-X@Listing-Placeholder.INVALID"]) {
+      expect(await sendEmail({ ...mail, to })).toBe("skipped");
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -224,6 +235,39 @@ describe("email templates", () => {
     }
   });
 
+  describe("intake upgrade email", () => {
+    const input = {
+      name: "Example Fellowship",
+      confirmUrl: "https://www.citizens.example/upgrade/" + "ab".repeat(32),
+      declineUrl: "https://www.citizens.example/upgrade/" + "ab".repeat(32) + "/decline",
+      expiresOn: "1 November 2026",
+    };
+
+    it("asks if the organisation is theirs and includes both actions", () => {
+      const e = intakeUpgradeEmail(input);
+      expect(e.subject).toBe("Is Example Fellowship your organisation?");
+      expect(e.html).toContain(input.confirmUrl);
+      expect(e.html).toContain(input.declineUrl);
+      expect(e.text).toContain("Nothing is public");
+      expect(e.text).toContain(input.expiresOn);
+    });
+
+    it("escapes the organisation name", () => {
+      const e = intakeUpgradeEmail({ ...input, name: `<script>alert(1)</script>` });
+      expect(e.html).not.toContain("<script>");
+      expect(e.html).toContain("&lt;script&gt;");
+      expect(e.subject).not.toMatch(/[\r\n]/);
+    });
+
+    it("the admin flag names the outcome and the request, and has no account address", () => {
+      const e = intakeUpgradeFlagEmail({ name: "Example Fellowship", outcome: "expired", requestId: "55555555-5555-4555-8555-555555555555" });
+      expect(e.text).toContain("expired");
+      expect(e.text).toContain("55555555-5555-4555-8555-555555555555");
+      expect(e.text).not.toMatch(/@/);
+      expect(e.html).not.toContain("<script>");
+    });
+  });
+
   describe("owner welcome email (admin-created listings)", () => {
     const input = {
       name: "Grace Hub",
@@ -260,11 +304,48 @@ describe("email templates", () => {
       expect(e.subject).toBe("You're live on Citizens Connect — Grace Hub");
     });
 
-    it("says 'sign in to see your listing', never that it is automatically theirs (a confirm screen is coming)", () => {
+    it("says 'sign in to see your listing', never that it is automatically theirs (the confirm screen sits in front of every claim)", () => {
       const e = ownerWelcomeEmail(input);
       expect(e.text).toContain("To see your listing and manage it, sign in with");
       expect((e.html + e.text).toLowerCase()).not.toContain("automatically");
       expect((e.html + e.text).toLowerCase()).not.toContain("belongs to that address");
+      // C10: the steps end in a confirmation, never in landing on the dashboard unasked
+      for (const part of [e.html, e.text]) {
+        expect(part).toContain("confirm the listing is yours");
+        expect(part).toContain("Not me");
+        expect(part).not.toContain("land on your Contributor dashboard");
+      }
+    });
+
+    it("a new address: asks them to confirm the listing is theirs, and does not talk about an account they do not have", () => {
+      const e = ownerWelcomeEmail(input);
+      expect(e.text).toContain("we will ask you to confirm that this listing is yours");
+      expect(e.text).not.toContain("already have a Citizens Connect account");
+      expect(e.text).not.toContain("Attach");
+    });
+
+    it("an address with an account: offers to attach, and promises nothing changes unless they confirm", () => {
+      const e = ownerWelcomeEmail({ ...input, hasAccount: true });
+      for (const part of [e.html, e.text]) {
+        expect(part).toContain("already have a Citizens Connect account with");
+        expect(part).toContain("Attach Grace Hub to your account?");
+        expect(part).toContain("Nothing on your account changes unless you tap");
+        expect(part).toContain("hide it straight away");
+      }
+      // the same sign-in steps either way
+      expect(e.text).toContain("Continue with email");
+    });
+
+    it("only an explicit true picks the account wording", () => {
+      for (const hasAccount of [undefined, false]) {
+        expect(ownerWelcomeEmail({ ...input, hasAccount }).text).not.toContain("Attach");
+      }
+    });
+
+    it("escapes the name inside the attach question too", () => {
+      const e = ownerWelcomeEmail({ ...input, hasAccount: true, name: '<img src=x onerror="alert(1)">' });
+      expect(e.html).not.toContain("<img");
+      expect(e.html).toContain("&lt;img");
     });
 
     it("escapes the name, the address and the links in the HTML part, and keeps the subject on one line", () => {
@@ -290,5 +371,55 @@ describe("email templates", () => {
     expect(e.text).toContain(reason);
     expect(e.text).toContain("apply again");
     expect(e.subject).toBe("About your Contributor application");
+  });
+});
+
+describe("verify-first listing emails (C10)", () => {
+  const reminder = {
+    name: "Grace Hub",
+    ownerEmail: "owner@grace.example",
+    listingUrl: "https://www.citizens.example/c/grace-hub",
+    signInUrl: "https://www.citizens.example/dashboard",
+  };
+
+  it("the reminder asks, never threatens: live, nothing attached, nothing expires, the only one", () => {
+    const e = listingClaimReminderEmail(reminder);
+    for (const part of [e.html, e.text]) {
+      expect(part).toContain("Grace Hub");
+      expect(part).toContain("owner@grace.example");
+      expect(part).toContain("Not me");
+      expect(part).toContain("Nothing happens to your account unless you confirm");
+      expect(part).toContain("only reminder we will send");
+    }
+    expect(e.text).toContain(reminder.listingUrl);
+    expect(e.text).toContain(reminder.signInUrl);
+    expect((e.html + e.text).toLowerCase()).not.toMatch(/expire|deleted|removed|last chance|urgent/);
+    expect(e.subject).toBe("Your Citizens Connect listing is waiting — Grace Hub");
+  });
+
+  it("the reminder escapes hostile values and keeps the subject on one line", () => {
+    const e = listingClaimReminderEmail({ ...reminder, name: "<script>alert(1)</script>\r\nBcc: x@y.example", listingUrl: 'https://x.example/c/a"><b>' });
+    expect(e.html).not.toContain("<script>");
+    expect(e.html).not.toContain('"><b>');
+    expect(e.subject).not.toMatch(/[\r\n]/);
+  });
+
+  it("the admin's note says what happened and what to do, with no address or id in it", () => {
+    const e = listingDeclinedAdminEmail({ name: "Grace Hub", slug: "grace-hub", siteUrl: "https://www.citizens.example" });
+    for (const part of [e.html, e.text]) {
+      expect(part).toContain("Not me");
+      expect(part).toContain("Nothing on their account was changed");
+      expect(part).toContain("grace-hub");
+    }
+    expect(e.text).toContain("decide whether to Delete it");
+    expect(e.subject).toBe("Owner declined a listing: Grace Hub");
+    expect(e.text).not.toMatch(/@/);
+    expect(listingDeclinedAdminEmail({ name: "X", slug: null, siteUrl: "https://s.example" }).text).not.toContain("Listing:");
+  });
+
+  it("the admin's note escapes a hostile listing name", () => {
+    const e = listingDeclinedAdminEmail({ name: "<img src=x>", slug: "s<b>", siteUrl: "https://s.example" });
+    expect(e.html).not.toContain("<img");
+    expect(e.html).not.toContain("s<b>");
   });
 });

@@ -19,6 +19,18 @@ import { createClient } from "./server";
  * unauthenticated — callers should return 401). This is the single place that
  * knows how a request proves its identity, so individual routes stay uniform.
  */
+/**
+ * True when the request carries an `Authorization: Bearer <token>` header.
+ *
+ * Routes that CHANGE an account on one person's yes (the listing confirm / "Not me", C10) require this on top of
+ * getRouteAuth(): a cookie session alone is never enough. A browser attaches cookies to a request that any other site
+ * makes, but it can only add an Authorization header on a cross-origin request when the CORS preflight allowed that
+ * origin, so a bearer-only route cannot be driven by a page the person merely visited (CSRF).
+ */
+export function hasBearerToken(request: Request): boolean {
+  return /^bearer\s+\S+/i.test(request.headers.get("authorization") ?? "");
+}
+
 export async function getRouteAuth(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
   const bearer = /^bearer\s+/i.test(authHeader)

@@ -12,6 +12,8 @@
   const { useStore } = window.CWStore;
   const {
     GOLD,
+    ON_GOLD,
+    GOLD_INK,
     INK,
     MUTED,
     Avatar,
@@ -48,13 +50,12 @@
   };
   const field = {
     width: '100%',
-    border: '1px solid #efedea',
-    borderRadius: 14,
+    border: '1px solid var(--divider)',
+    borderRadius: 'var(--radius-md)',
     padding: '12px 14px',
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: 500,
-    outline: 'none',
-    background: '#fff',
+    background: 'var(--surface-1)',
     color: INK,
   };
   const label = { fontSize: 12, fontWeight: 700, color: '#4a4a4a', margin: '14px 0 6px' };
@@ -71,9 +72,9 @@
           fontWeight: 800,
           letterSpacing: '0.4px',
           textTransform: 'uppercase',
-          color: open ? '#3f6f34' : released ? '#fff' : '#7a6212',
-          background: open ? '#eef5ea' : released ? INK : '#faf3da',
-          border: '1px solid ' + (open ? '#dcead5' : released ? INK : '#f0e2b0'),
+          color: open ? '#3f6f34' : released ? '#fff' : 'var(--accent-ink)',
+          background: open ? '#eef5ea' : released ? INK : 'var(--surface-2)',
+          border: '1px solid ' + (open ? '#dcead5' : released ? INK : 'var(--divider)'),
           borderRadius: 8,
           padding: '4px 9px',
           flex: 'none',
@@ -118,8 +119,8 @@
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          border: '1px solid ' + (on ? GOLD : '#e6e3dc'),
-          background: on ? '#fdf6e3' : '#fff',
+          border: '1px solid ' + (on ? GOLD_INK : 'var(--divider)'),
+          background: on ? 'var(--surface-2)' : '#fff',
           borderRadius: 10,
           padding: compact ? '5px 11px' : '8px 15px',
           flex: 'none',
@@ -127,8 +128,8 @@
       },
       Icon('heart', {
         size: compact ? 14 : 16,
-        color: on ? GOLD : '#9a9892',
-        fill: on ? GOLD : null,
+        color: on ? GOLD_INK : 'var(--text-2)',
+        fill: on ? GOLD_INK : null,
       }),
       h(
         'span',
@@ -136,7 +137,7 @@
           style: {
             fontSize: compact ? 12 : 13,
             fontWeight: 800,
-            color: on ? '#7a6212' : '#6a6a6a',
+            color: on ? 'var(--accent-ink)' : '#6a6a6a',
           },
         },
         fmtCount(n),
@@ -184,22 +185,22 @@
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          border: '1px solid ' + (done ? GOLD : '#e6e3dc'),
-          background: done ? '#fdf6e3' : '#fff',
+          border: '1px solid ' + (done ? GOLD_INK : 'var(--divider)'),
+          background: done ? 'var(--surface-2)' : '#fff',
           borderRadius: 10,
           padding: compact ? '5px 11px' : '8px 15px',
           flex: 'none',
           position: 'relative',
         },
       },
-      Icon('share', { size: compact ? 14 : 16, color: done ? GOLD : '#9a9892' }),
+      Icon('share', { size: compact ? 14 : 16, color: done ? GOLD_INK : 'var(--text-2)' }),
       h(
         'span',
         {
           style: {
             fontSize: compact ? 12 : 13,
             fontWeight: 800,
-            color: done ? '#7a6212' : '#6a6a6a',
+            color: done ? 'var(--accent-ink)' : '#6a6a6a',
           },
         },
         note || fmtCount(n),
@@ -388,16 +389,16 @@
             style: {
               border: 'none',
               background: GOLD,
-              borderRadius: '50%',
-              width: 36,
-              height: 36,
+              borderRadius: 'var(--radius-full)',
+              width: 'var(--hit)',
+              height: 'var(--hit)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 6px 14px -6px rgba(242,186,27,0.8)',
+              boxShadow: 'var(--elev-1)',
             },
           },
-          Icon('plus', { size: 19, color: '#fff', sw: 2.2 }),
+          Icon('plus', { size: 19, color: ON_GOLD, sw: 2.2 }),
         ),
       }),
       h(StatusesBar, { statuses, onSeen: markSeen }),
@@ -489,7 +490,7 @@
           concept.proposalCount
             ? h(
                 'span',
-                { style: { fontSize: 11.5, fontWeight: 700, color: '#7a6212' } },
+                { style: { fontSize: 11.5, fontWeight: 700, color: 'var(--accent-ink)' } },
                 concept.proposalCount +
                   (concept.proposalCount === 1 ? ' brand proposed' : ' brands proposed'),
               )
@@ -559,11 +560,15 @@
                   flex: 'none',
                 },
               },
-              reached ? Icon('check', { size: 12, color: '#fff', sw: 3 }) : null,
+              reached ? Icon('check', { size: 12, color: ON_GOLD, sw: 3 }) : null,
             ),
             !last
               ? h('div', {
-                  style: { width: 2, flex: 1, background: i < currentIdx ? GOLD : '#eeece6' },
+                  style: {
+                    width: 2,
+                    flex: 1,
+                    background: i < currentIdx ? GOLD_INK : 'var(--divider)',
+                  },
                 })
               : null,
           ),
@@ -810,7 +815,9 @@
                         },
                         h(BrandLogo, { brand: t.brand, size: 22 }),
                         h('span', { style: { fontSize: 12, fontWeight: 700 } }, t.brand.name),
-                        t.brand.verified ? Icon('check', { size: 13, color: GOLD, sw: 3 }) : null,
+                        t.brand.verified
+                          ? Icon('check', { size: 13, color: GOLD_INK, sw: 3 })
+                          : null,
                       )
                     : null,
                 ),
@@ -856,7 +863,7 @@
                     },
                     concept.claimedBy.name,
                     concept.claimedBy.verified
-                      ? Icon('check', { size: 14, color: GOLD, sw: 3 })
+                      ? Icon('check', { size: 14, color: GOLD_INK, sw: 3 })
                       : null,
                   ),
                   claim
@@ -1061,7 +1068,7 @@
                       background: 'none',
                       padding: 0,
                       fontSize: 10.5,
-                      color: '#7a6212',
+                      color: 'var(--accent-ink)',
                       fontWeight: 700,
                     },
                   },
@@ -1110,8 +1117,8 @@
                       style: {
                         fontSize: 11,
                         fontWeight: 700,
-                        color: '#7a6212',
-                        background: '#faf6ec',
+                        color: 'var(--accent-ink)',
+                        background: 'var(--surface-2)',
                         borderRadius: 8,
                         padding: '4px 9px',
                       },
@@ -1224,7 +1231,9 @@
       bits.length
         ? h(
             'div',
-            { style: { fontSize: 11.5, color: '#7a6212', fontWeight: 700, marginTop: 4 } },
+            {
+              style: { fontSize: 11.5, color: 'var(--accent-ink)', fontWeight: 700, marginTop: 4 },
+            },
             bits.join(' · '),
           )
         : null,
@@ -1291,9 +1300,9 @@
                         ),
                       disabled: !!busyKey,
                       style: {
-                        border: '1.5px solid ' + GOLD,
+                        border: '1.5px solid ' + GOLD_INK,
                         background: '#fff',
-                        color: '#7a6212',
+                        color: 'var(--accent-ink)',
                         borderRadius: 11,
                         padding: '9px 18px',
                         fontSize: 12.5,
@@ -1486,7 +1495,7 @@
               style: {
                 border: '1.5px solid ' + (s === 'released' ? GOLD : '#e6e3dc'),
                 background: s === 'released' ? GOLD : '#fff',
-                color: s === 'released' ? '#fff' : '#4a4a4a',
+                color: s === 'released' ? ON_GOLD : 'var(--text-2)',
                 borderRadius: 11,
                 padding: '9px 15px',
                 fontSize: 12.5,
@@ -1682,7 +1691,7 @@
                     r.status === 'closed'
                       ? MUTED
                       : r.status === 'proof_submitted'
-                        ? '#7a6212'
+                        ? 'var(--accent-ink)'
                         : '#3f6f34',
                 },
               },
@@ -1698,7 +1707,7 @@
                   rel: 'noreferrer noopener',
                   style: {
                     fontSize: 11.5,
-                    color: '#7a6212',
+                    color: 'var(--accent-ink)',
                     fontWeight: 700,
                     marginTop: 3,
                     display: 'inline-block',
@@ -1834,16 +1843,16 @@
                     display: 'flex',
                     alignItems: 'center',
                     gap: 7,
-                    background: '#faf6ec',
+                    background: 'var(--surface-2)',
                     borderRadius: 10,
                     padding: '8px 12px',
                     marginTop: 11,
                     fontSize: 11.5,
                     fontWeight: 700,
-                    color: '#7a6212',
+                    color: 'var(--accent-ink)',
                   },
                 },
-                Icon('star', { size: 14, color: GOLD, fill: creator.earned ? GOLD : null }),
+                Icon('star', { size: 14, color: GOLD_INK, fill: creator.earned ? GOLD_INK : null }),
                 creator.earned
                   ? 'Creator — your Concepts join the statuses bar for 24h.'
                   : creator.threshold -

@@ -213,15 +213,18 @@
 </style>
 <!-- Report dialog. Both maps: Map v2's stylesheet stays behind the flag. -->
 <link href="assets/report.css?v=20261019e" rel="stylesheet" />
+<link href="assets/listing-claim.css?v=20261021a" rel="stylesheet" />
 </head>
 <body>
 <div id="root"></div>
 
 <!-- React/ReactDOM: DEVELOPMENT builds here, for local no-build dev (full React
      warnings); the build (@citizens/frontend-build) ships each data-prod-* twin
-     instead. The pin + integrity hash of every React/ReactDOM/supabase-js tag is
-     checked at build time against the lockfile-installed npm package (sriPackages
-     in scripts/build-frontend.js) — after a version bump the build prints the new hash. -->
+     instead. Unlike supabase-js below, these React hashes are NOT build-checked:
+     npm React is 19 (the API), which has no UMD build to compare against. The
+     page keeps the 18.3.1 UMD. If you change a React URL, recompute its hash
+     from the fetched bytes:
+     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous" data-prod-src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" data-prod-integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous" data-prod-src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" data-prod-integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -230,7 +233,7 @@
      Plain scripts (run before Babel transforms the app below). supabase-js runs
      on the page that holds users' auth sessions, so it is pinned to the exact
      lockfile version with SRI — never a floating @2. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js" integrity="sha384-3wY11tldQ5+yWqAvmTN4XtQvnjoTva0cV15O/O/O5NTtp0ivVopSzLOzsVXWZse9" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="config.js"></script>
 
 <!-- Cache-busting for our own no-build scripts. The static host (python
@@ -241,41 +244,47 @@
 
 <script type="text/babel" src="app/icons.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/routes.jsx?v=20261004a"></script>
-<script type="text/babel" src="app/map-v2-lib.jsx?v=20261019e"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261026a"></script>
 <script type="text/babel" src="app/saved-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/cohost-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince-lib.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/data.jsx?v=20261015a"></script>
-<script type="text/babel" src="app/store.jsx?v=20261019d"></script>
+<script type="text/babel" src="app/serving-areas-lib.jsx?v=20261022b"></script>
+<script type="text/babel" src="app/data.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/store.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/ui.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/report.jsx?v=20261019e"></script>
+<script type="text/babel" src="app/listing-claim.jsx?v=20261021a"></script>
 <script type="text/babel" src="app/auth.jsx?v=20261003a"></script>
 <script type="text/babel" src="app/cohosts.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/map-v2-strings.jsx?v=20261019e"></script>
-<script type="text/babel" src="app/map-v2-time.jsx?v=20261010a"></script>
-<script type="text/babel" src="app/map-v2-qr.jsx?v=20261015b"></script>
+<script type="text/babel" src="app/map-v2-strings.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>
+<script type="text/babel" src="app/map-v2-time.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/map-v2-qr.jsx?v=20261019f"></script>
 <script type="text/babel" src="app/map-v2-pins.jsx?v=20261010d"></script>
-<script type="text/babel" src="app/map.jsx?v=20261014a"></script>
+<script type="text/babel" src="app/map.jsx?v=20261022b"></script>
 <script type="text/babel" src="app/entity-card.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/map-v2-gallery.jsx?v=20261010b"></script>
+<script type="text/babel" src="app/map-v2-gallery.jsx?v=20261019f"></script>
 <script type="text/babel" src="app/map-v2-news.jsx?v=20261019a"></script>
-<script type="text/babel" src="app/map-v2-nearby.jsx?v=20261015a"></script>
-<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261019d"></script>
-<script type="text/babel" src="app/home.jsx?v=20261015a"></script>
+<script type="text/babel" src="app/map-v2-card.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/map-v2-nearby.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/map-v2-online.jsx?v=20261022b"></script>
+<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/home.jsx?v=20261022b"></script>
 <script type="text/babel" src="app/kingdom-discovery.jsx?v=20261002b"></script>
-<script type="text/babel" src="app/apply.jsx?v=20261018b"></script>
-<script type="text/babel" src="app/pending-application.jsx?v=20261018b"></script>
+<script type="text/babel" src="app/apply.jsx?v=20261022a"></script>
+<script type="text/babel" src="app/pending-application.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/admin.jsx?v=20261015a"></script>
-<script type="text/babel" src="app/dashboard.jsx?v=20261017d"></script>
+<script type="text/babel" src="app/dashboard.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/automation.jsx?v=20261004a"></script>
 <script type="text/babel" src="app/insights.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/create.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/messages.jsx?v=20261019d"></script>
 <script type="text/babel" src="app/profiles.jsx?v=20261019d"></script>
 <script type="text/babel" src="app/pages.jsx?v=20261018a"></script>
+<script type="text/babel" src="app/intake-upgrade.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/tweaks-panel.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/tweaks.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/shell.jsx?v=20261004a"></script>

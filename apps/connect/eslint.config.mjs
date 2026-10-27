@@ -1,15 +1,16 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
+import { createRequire } from "node:module";
+import { next15FlatConfig } from "../../packages/config/eslint-next15.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const compat = new FlatCompat({ baseDirectory: __dirname });
+const require = createRequire(import.meta.url);
 
 const eslintConfig = [
-  ...compat.extends(
-    "next/core-web-vitals",
-    "next/typescript"
-  ),
+  ...next15FlatConfig({
+    eslintConfigNextPkg: require.resolve("eslint-config-next"),
+    // Installed React is 19.3. "detect" would resolve the same line, but it
+    // calls context.getFilename(), which ESLint 10 removed.
+    reactVersion: "19.3",
+    typescript: true,
+  }),
   {
     // src/frontend/** is the standalone HTML/React frontend (browser React + Babel
     // via CDN, no module imports). It is not part of the Next.js API build and must

@@ -182,10 +182,21 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   // level is read to enforce "consent gates everything" (level off => 409 consent_off). It
   // decides the response and is never returned; the intake route only WRITES these columns.
   "app/api/automation/suggestions/route.ts": ["auto_update_level"],
+  // createAdminClient() after the `automation:suggest` API-key check: the Reader's "which sources
+  // are due" list. The consent level only decides WHOSE sources are listed (never a Contributor at
+  // 'off'); the response is source id, Contributor id, kind, address and last status, no profile column.
+  "app/api/automation/sources/route.ts": ["auto_update_level"],
   // createAdminClient() after the `automation:digest` API-key check (mig 181): reads the owner's
   // address, notification preference, consent level and last-nudge time to decide whether to send
   // the daily "new suggestions" email. The address goes only to the mailer; the response is counts.
   "app/api/automation/digest/route.ts": ["email", "notification_email", "notification_prefs", "auto_update_level", "auto_update_nudged_at"],
+  // createAdminClient() after the HMAC intake check (issue #248): the existing
+  // account's address is read only to send the confirm link. The sheet response
+  // has the request id and a status, never the address.
+  "lib/intake/existingAccount.ts": ["email"],
+  // createAdminClient() after the HMAC resend check: the address is read only
+  // to send the rotated link. The response has no address and no profile id.
+  "app/api/intake/google-form/resend/route.ts": ["email"],
 };
 
 /**
