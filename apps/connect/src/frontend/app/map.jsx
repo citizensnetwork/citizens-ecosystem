@@ -794,10 +794,18 @@
           });
         },
         // #210: where the map is looking and where the person is (null until known), and a way to hear when it settles.
+        // "Looking" is the middle of the OPEN map, between the top bar and the Explore row, not the canvas centre
+        // (on the home that is the top edge of the row, far from the pins the person is looking at when zoomed out).
         view() {
           const mp = mapRef.current;
-          const c = mp ? mp.getCenter() : null;
-          return { centre: c ? { lat: c.lat, lng: c.lng } : null, user: userLocRef.current };
+          const el = containerRef.current;
+          if (!mp) return { centre: null, user: userLocRef.current };
+          const pad = framePadding(el);
+          let c = mp.getCenter();
+          if (typeof pad === 'object' && el && el.clientHeight) {
+            c = mp.unproject([el.clientWidth / 2, pad.top + (el.clientHeight - pad.top - pad.bottom) / 2]);
+          }
+          return { centre: { lat: c.lat, lng: c.lng }, user: userLocRef.current };
         },
         onView(fn) {
           viewSubs.current.add(fn);
