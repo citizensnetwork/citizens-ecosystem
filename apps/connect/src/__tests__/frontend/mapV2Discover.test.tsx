@@ -326,6 +326,10 @@ describe("wiring", () => {
       expect(block(sel), sel).not.toContain("backdrop-filter");
     }
     expect(block("[data-mv2='discover-top']")).toContain("background: var(--surface-0);");
+    // the Explore card's fixed height (two title lines, one-line chip and meta) is not scoped to the map's row, so the
+    // same card here never changes height when a pill refills a row
+    expect(block("[data-mv2='explore-card'] [data-mv2='row-title']")).toContain("min-height: calc(var(--lh-2) * 2);");
+    expect(block("[data-mv2='explore-card'] [data-mv2='card-meta']")).toContain("white-space: nowrap;");
     expect(css).toMatch(/\[data-mv2='discover-scroll'\] \{[^}]*padding-bottom: calc\(var\(--nav-clear\)/);
     expect(css).toMatch(/\[data-mv2='discover'\]\[data-narrow\] \{\s*--nav-clear: var\(--nav-zone\);/);
   });
