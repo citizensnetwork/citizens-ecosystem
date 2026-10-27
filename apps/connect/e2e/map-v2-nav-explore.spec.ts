@@ -197,6 +197,39 @@ test.describe("on a phone", () => {
     await expect(card).toHaveAttribute("data-selected", "");
   });
 
+  test("data spread across the country: no drawn pin starts behind the row, and they are in the open map, tappable", async ({ page }) => {
+    // the live data shape: a few listings in each city, so the map opens zoomed out to its gate
+    const seed = makeSeed({ contributors: 10, places: 6, events: 2, now: FIXED_NOW, spread: 3, seed: 5 }) as unknown as Seed;
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed, { gallery: 0 });
+    await openMap(page, "/?map=v2", 4);
+    await page.waitForTimeout(800);
+    const row = (await explore(page).boundingBox())!;
+    const top = (await page.locator("[data-mv2='home-top']").boundingBox())!;
+    const pins = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".maplibregl-marker")]
+        .filter((m) => m.style.display !== "none")
+        .map((m) => {
+          const r = m.getBoundingClientRect();
+          const x = r.left + r.width / 2;
+          const y = r.top + r.height / 2;
+          const hit = document.elementFromPoint(x, y);
+          return { y, mine: !!hit && hit.closest(".maplibregl-marker") === m, onScreen: x > 0 && x < window.innerWidth };
+        })
+        .filter((p) => p.onScreen),
+    );
+    expect(pins.length).toBeGreaterThan(0);
+    // none starts behind the Explore row, and the middle of them sits in the open map between the bar and the row
+    // (a pin hangs above its point, so one near the top edge may touch the pill row)
+    for (const p of pins) expect(p.y).toBeLessThan(row.y);
+    const ys = pins.map((p) => p.y).sort((a, b) => a - b);
+    const mid = ys[Math.floor(ys.length / 2)];
+    expect(mid).toBeGreaterThan(top.y + top.height);
+    expect(mid).toBeLessThan(row.y);
+    // at least one drawn pin takes a tap itself (nothing over it: not the zoom hint, the logo or the credit)
+    expect(pins.some((p) => p.mine)).toBe(true);
+  });
+
   test("the map's controls and the MapTiler logo sit above the row", async ({ page }) => {
     await open(page);
     const row = (await explore(page).boundingBox())!;
