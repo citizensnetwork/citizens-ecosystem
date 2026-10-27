@@ -316,6 +316,16 @@ describe("wiring", () => {
     expect(css).not.toMatch(/\[data-mv2='discover'\] \{[^}]*--mv2-ta-row/); // outside the sheet a row keeps the browser's own touch rule
     expect(css).toMatch(/\[data-mv2='discover'\] \[data-mv2='pills'\] \{\s*touch-action: pan-x pan-y;/);
     expect(css).toMatch(/\[data-mv2='discover-top'\] \{[^}]*position: sticky;/);
+    // a full-screen page never takes a large backdrop blur (it is redrawn on every scroll frame)
+    const block = (sel: string) => {
+      const at = css.indexOf("\n" + sel + " {");
+      expect(at, sel).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf("}", at));
+    };
+    for (const sel of ["[data-mv2='discover']", "[data-mv2='discover-top']", "[data-mv2='discover-scroll']"]) {
+      expect(block(sel), sel).not.toContain("backdrop-filter");
+    }
+    expect(block("[data-mv2='discover-top']")).toContain("background: var(--surface-0);");
     expect(css).toMatch(/\[data-mv2='discover-scroll'\] \{[^}]*padding-bottom: calc\(var\(--nav-clear\)/);
     expect(css).toMatch(/\[data-mv2='discover'\]\[data-narrow\] \{\s*--nav-clear: var\(--nav-zone\);/);
   });

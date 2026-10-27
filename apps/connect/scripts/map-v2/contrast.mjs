@@ -77,6 +77,8 @@ export const PAIRS = [
   ['Secondary text on frosted glass (over the map)', '--text-2', '--glass-bg', 4.5, 'bgalpha', '--map-base'],
   ['Gold ink as an icon or ring on frosted glass', '--accent-ink', '--glass-bg', 3, 'bgalpha', '--map-base'],
   ['Primary text on the selected nav item', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--surface-1'],
+  ['Secondary text on the Explore panel (over the map)', '--text-2', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Gold ink on the Explore panel (See all)', '--accent-ink', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
   // #210: one muted colour per category group, as a dot, a chip outline and a card edge (3:1, non-text)
   ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
     [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],
@@ -84,9 +86,6 @@ export const PAIRS = [
     // #210 part 3: the Discover page's row titles carry the group dot on the page background
     [`Category colour (${g}) on the app background`, `--cat-${g}`, '--surface-0', 3],
   ]),
-  // #210 part 3: the Discover page's sticky title bar and pills, frosted over the page instead of the map
-  ['Primary text on frosted glass (over the page)', '--text-1', '--glass-bg', 4.5, 'bgalpha', '--surface-0'],
-  ['Gold ink as an icon or ring on frosted glass (over the page)', '--accent-ink', '--glass-bg', 3, 'bgalpha', '--surface-0'],
 ];
 
 /** Best of white or near-black as a glyph colour on a category fill: the glyph rule. */

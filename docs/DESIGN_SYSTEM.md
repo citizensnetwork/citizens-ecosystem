@@ -87,7 +87,7 @@ Every category belongs to exactly one **group**, and each group has one muted co
 
 The map home's bottom carousel: "Explore" and "See all", then the shared sideways row (above) of large image cards (`--explore-card-w`): cover photo (or a neutral tile with the category icon), category chip, name, and distance in km ("1.2 km away" from the person, or "from the map centre" until their position is known). Nearest first, at most 20 (`app/map-v2-explore.jsx`).
 
-- **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); the card also says "Selected on the map". Nothing opens. When the keyboard chose the pin, focus moves to the card.
+- **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); a gold "Selected" badge sits over its picture (it takes no space, so the row never resizes) and the card carries aria-current. If the listing was further than the row's 20, it is added at the end, so no other card moves. Nothing opens. When the keyboard chose the pin, focus moves to the card.
 - **A card tap** opens the listing sheet. The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
 - The row reports its height as `--explore-h`, so the map's controls, the MapTiler logo and the "frame the data" padding stay clear of it.
 - **See all** opens the Discover page (below). The card itself is `MapV2Explore.cardFor`, shared by both: never copy it.
@@ -96,7 +96,7 @@ The map home's bottom carousel: "Explore" and "See all", then the shared sideway
 
 "See all" and the nav's Explore open it at `/explore` under Map v2 (`app/map-v2-discover.jsx`). The old map (`?map=v1`) shows Kingdom Exploration at that address, and `/discover` stays Kingdom Exploration everywhere (the sidebar's item).
 
-- **Layout:** a sticky frosted bar (title, account button, the pills without Ideas), then sideways rows of the Explore card: **Near you** (closest first, at most 20), **Popular** (at most 20, with a one-line hint saying what it means), then one row per group with listings, in the groups' order, titled with the group name and its dot. Group rows hold every listing of the group, closest first; the row's own "See all N" opens past 20. An empty row is left out.
+- **Layout:** a sticky bar on the solid app background, never a blur (title, account button, the pills without Ideas), then sideways rows of the Explore card: **Near you** (closest first, at most 20), **Popular** (at most 20, with a one-line hint saying what it means), then one row per group with listings, in the groups' order, titled with the group name and its dot. Group rows hold every listing of the group, closest first; the row's own "See all N" opens past 20. An empty row is left out.
 - **Pills:** All shows every row; a group keeps Near you, Popular and that group's row, each filtered to the group; Events keeps events in every row. A new pill starts at the top.
 - **Popular honours the small** (VISION.md): one point per thing going on, never per amount (an event in the next 30 days, news in the last 30 days, an event live now), one card per host, and equal scores in fair turns drawn afresh each day from the listing id. No counts are shown or used.
 - **Distance:** from the person (the map's position, or one silent read when the browser already allows it; the page never asks), else the map centre, else the city centre, and the words say which.

@@ -249,7 +249,7 @@
         audiences: 'Audiences',
         ideas: 'Ideas',
       },
-      selected: 'Selected on the map',
+      selectedBadge: 'Selected',
       under: 'Under 100 m away',
       metres: (n) => n + ' m away',
       km: (n) => n + ' km away',
