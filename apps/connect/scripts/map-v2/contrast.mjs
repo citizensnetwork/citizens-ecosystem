@@ -81,7 +81,12 @@ export const PAIRS = [
   ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
     [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],
     [`Category colour (${g}) on a raised surface`, `--cat-${g}`, '--surface-2', 3],
+    // #210 part 3: the Discover page's row titles carry the group dot on the page background
+    [`Category colour (${g}) on the app background`, `--cat-${g}`, '--surface-0', 3],
   ]),
+  // #210 part 3: the Discover page's sticky title bar and pills, frosted over the page instead of the map
+  ['Primary text on frosted glass (over the page)', '--text-1', '--glass-bg', 4.5, 'bgalpha', '--surface-0'],
+  ['Gold ink as an icon or ring on frosted glass (over the page)', '--accent-ink', '--glass-bg', 3, 'bgalpha', '--surface-0'],
 ];
 
 /** Best of white or near-black as a glyph colour on a category fill: the glyph rule. */

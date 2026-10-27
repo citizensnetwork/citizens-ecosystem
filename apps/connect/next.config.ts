@@ -15,7 +15,7 @@ const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 // First path segments of the frontend's single-segment screens (see rewrites() below).
 const APP_PAGES = [
-  "map", "discover", "community", "me", "messages", "notifications",
+  "map", "discover", "explore", "community", "me", "messages", "notifications",
   "settings", "apply", "onboarding", "dashboard", "admin",
 ];
 

@@ -196,7 +196,7 @@
         !clean && React.createElement(X.Explore, {
           hidden: !!showSheet,
           markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard,
-          onOpen: openSheet, onSeeAll: () => app.go('kingdom-discovery'), onHeight: onExploreHeight,
+          onOpen: openSheet, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
         }),
         showSheet && React.createElement(window.MapV2Sheet, {
           id: sheet.id, type: sheet.type, onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },

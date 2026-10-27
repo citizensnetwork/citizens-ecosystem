@@ -214,13 +214,14 @@ describe("the folding nav", () => {
     expect(N.currentOf({ page: "home", params: {} })).toBe("home");
     expect(N.currentOf({ page: "home", params: { view: "map" } })).toBe("map");
     expect(N.currentOf({ page: "kingdom-discovery", params: {} })).toBe("explore");
+    expect(N.currentOf({ page: "explore", params: {} })).toBe("explore"); // #210 part 3: the Discover page
     expect(N.currentOf({ page: "messages", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "profile", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "profile", params: { id: "x" } })).toBe("");
     expect(N.currentOf({ page: "event", params: { id: "x" } })).toBe("");
     expect(N.targetOf("home")).toEqual(["home", {}]);
     expect(N.targetOf("map")).toEqual(["home", { view: "map" }]);
-    expect(N.targetOf("explore")).toEqual(["kingdom-discovery", {}]);
+    expect(N.targetOf("explore")).toEqual(["explore", {}]);
     expect(N.targetOf("profile")).toBeNull();
     expect(N.ITEMS.map((i) => i.id)).toEqual(["home", "explore", "map", "profile"]);
   });
@@ -313,13 +314,13 @@ describe("the stylesheet and the wiring", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
     for (const f of ["map-v2-explore.jsx", "map-v2-nav.jsx"]) {
-      expect(html).toContain(`src="app/${f}?v=20261026b"`);
+      expect(html).toContain(`src="app/${f}?v=20261026c"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261026b");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261026c");
   });
 
   it("keeps the old map's bottom bar: the folding nav only replaces it under Map v2", () => {

@@ -13,7 +13,8 @@
 //  closest first, as large cards on the shared sideways row (map-v2-row.jsx, map-v2-card.jsx). Tapping a pin
 //  scrolls the row to that card and outlines it in gold; tapping a card opens the listing sheet. The home
 //  screen shows the row OR the sheet, never both. The row ranks again only when the map settles (moveend),
-//  never per frame, and holds its own state, so a pan never re-renders the map screen.
+//  never per frame, and holds its own state, so a pan never re-renders the map screen. "See all" opens the
+//  Discover page (map-v2-discover.jsx), which draws the SAME card (cardFor) and measures from lastView().
 //
 //  Pure helpers (groupOf, pillMatches, rank, PILLS) are unit-tested in mapV2Explore.test.tsx.
 //  Styles: assets/map-v2.css sections 4j and 4k (tokens only). Text: MapV2Strings.explore.
@@ -107,19 +108,61 @@
     return on;
   }
 
-  /** The pill row. props: value (pill id), onChange(id), ideas (bool), onIdeas() */
+  /**
+   * The pill row. props: value (pill id), onChange(id), label (defaults to the map's), and ideas (bool) + onIdeas():
+   * the Ideas pill is drawn only with onIdeas (the Discover page lists listings, and Ideas are not listings).
+   */
   function Pills(props) {
     const words = S().groups || {};
     const Icon = window.Icon;
     const pill = (id, selected, onClick, lead) => h('button', {
       key: id, type: 'button', 'data-mv2': 'pill', 'data-pill': id, 'aria-pressed': selected ? 'true' : 'false', onClick: onClick,
     }, lead, h('span', null, words[id]));
-    return h('div', { 'data-mv2': 'pills', role: 'group', 'aria-label': S().pillsLabel },
+    return h('div', { 'data-mv2': 'pills', role: 'group', 'aria-label': props.label || S().pillsLabel },
       PILLS.map((p) => pill(p.id, (props.value || 'all') === p.id, () => props.onChange(p.id),
         p.group ? h('span', { 'data-mv2': 'pill-dot', 'data-cat': p.id, 'aria-hidden': 'true' })
           : (p.icon && Icon ? h(Icon, { name: p.icon, size: 16 }) : null))),
-      pill('ideas', !!props.ideas, props.onIdeas, Icon ? h(Icon, { name: 'Lightbulb', size: 16 }) : null));
+      props.onIdeas ? pill('ideas', !!props.ideas, props.onIdeas, Icon ? h(Icon, { name: 'Lightbulb', size: 16 }) : null) : null);
   }
+
+  /** Full records by 'type:id': covers and names live there; the map's markers carry only what a pin needs. */
+  function indexSources(src) {
+    const map = new Map();
+    const s = src || {};
+    (s.contributors || []).forEach((r) => map.set('contributor:' + r.id, r));
+    (s.places || []).forEach((r) => map.set('place:' + r.id, r));
+    (s.events || []).forEach((r) => map.set('event:' + r.id, r));
+    return map;
+  }
+
+  /**
+   * ONE large Explore card, shared by the Explore row and the Discover page (map-v2-discover.jsx): the cover (or a
+   * neutral tile with the category icon), the category chip in its group colour, the title and the distance in km.
+   * opts: m (marker), meters, rec (full record), idPrefix (unique per row: one listing can sit in several rows),
+   * words (distance words), selected + selectedWords (the map's gold outline), onOpen(id, type).
+   */
+  function cardFor(opts) {
+    const Card = window.MapV2Card;
+    const near = window.MapV2Nearby;
+    const m = opts.m;
+    const rec = opts.rec || {};
+    const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
+    const group = groupOf(m);
+    const cover = rec.coverPhoto || '';
+    return h('div', { 'data-mv2': 'explore-card', 'data-explore-id': m.id, 'data-selected': opts.selected ? '' : undefined },
+      h(Card, {
+        variant: 'image', idPrefix: opts.idPrefix, title: m.title,
+        media: cover ? { src: cover } : null,
+        tile: { icon: (cat && cat.icon) || 'MapPin' },
+        category: cat ? { name: cat.name } : null, kind: m.kind, cat: group || undefined,
+        meta: [Number.isFinite(opts.meters) && near ? near.distanceText(opts.meters, opts.words) : '', opts.selected ? opts.selectedWords : ''],
+        'aria-current': opts.selected ? 'true' : undefined,
+        onClick: () => opts.onOpen(m.id, m.type),
+      }));
+  }
+
+  // Where the Explore row last looked ({ centre, user }), so the Discover page can measure from the same place.
+  let lastView = { centre: null, user: null };
 
   /**
    * The Explore row. props: markers (what the map draws), sources ({ events, places, contributors }),
@@ -140,6 +183,7 @@
       const read = () => {
         const v = api.current ? api.current.view() : null;
         if (!v) return;
+        lastView = v;
         setView((p) => {
           const same = (a, b) => (a === b) || (a && b && a.lat === b.lat && a.lng === b.lng);
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
@@ -149,15 +193,7 @@
       return api.current.onView(read);
     }, [api]);
 
-    // Covers and names come from the full records; the map's markers carry only what a pin needs.
-    const byKey = useMemo(() => {
-      const map = new Map();
-      const src = props.sources || {};
-      (src.contributors || []).forEach((r) => map.set('contributor:' + r.id, r));
-      (src.places || []).forEach((r) => map.set('place:' + r.id, r));
-      (src.events || []).forEach((r) => map.set('event:' + r.id, r));
-      return map;
-    }, [props.sources]);
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
 
     const origin = view.user || view.centre;
     const rows = useMemo(() => rank(origin, props.markers, props.selectedId, ROW_CAP),
@@ -194,25 +230,11 @@
       }
     }, [props.selectedId, props.focusCard, rows.length]);
 
-    const near = window.MapV2Nearby;
     const distWords = view.user ? str : (str.centre || {});
-    const render = ({ m, meters }) => {
-      const rec = byKey.get(m.type + ':' + m.id) || {};
-      const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
-      const group = groupOf(m);
-      const selected = props.selectedId === m.id;
-      const cover = rec.coverPhoto || '';
-      return h('div', { 'data-mv2': 'explore-card', 'data-explore-id': m.id, 'data-selected': selected ? '' : undefined },
-        h(Card, {
-          variant: 'image', idPrefix: 'mv2-x-' + m.id, title: m.title,
-          media: cover ? { src: cover } : null,
-          tile: { icon: (cat && cat.icon) || 'MapPin' },
-          category: cat ? { name: cat.name } : null, kind: m.kind, cat: group || undefined,
-          meta: [Number.isFinite(meters) && near ? near.distanceText(meters, distWords) : '', selected ? str.selected : ''],
-          'aria-current': selected ? 'true' : undefined,
-          onClick: () => props.onOpen(m.id, m.type),
-        }));
-    };
+    const render = ({ m, meters }) => cardFor({
+      m: m, meters: meters, rec: byKey.get(m.type + ':' + m.id), idPrefix: 'mv2-x-' + m.id, words: distWords,
+      selected: props.selectedId === m.id, selectedWords: str.selected, onOpen: props.onOpen,
+    });
 
     return h('section', {
       ref: root, 'data-mv2': 'explore', 'aria-labelledby': 'mv2-explore-title', hidden: props.hidden || undefined,
@@ -237,5 +259,8 @@
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
 
-  window.MapV2Explore = { ROW_CAP, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, Pills, Explore };
+  window.MapV2Explore = {
+    ROW_CAP, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, indexSources, cardFor, Pills, Explore,
+    lastView: () => lastView,
+  };
 })();

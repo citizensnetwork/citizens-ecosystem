@@ -2,7 +2,7 @@
 //  Citizens Connect — Map v2 folding navigation (issue #210)
 //  ------------------------------------------------------------------
 //  On a phone the navigation folds into ONE round frosted button with a gold ring, bottom centre. A tap
-//  opens the bar: Home (the map with the Explore row), Explore (Kingdom Exploration), Map (the same map,
+//  opens the bar: Home (the map with the Explore row), Explore (the Discover page), Map (the same map,
 //  clean: no pills, no row) and Profile (the account menu, which also lists Projects, Messages and
 //  Alerts with their counts; founder, 2026-10-26). The open bar dims the map a little, and folds itself
 //  back after IDLE_MS without a touch, a click or a key, or on a tap outside, Escape or Back.
@@ -35,7 +35,7 @@
     const page = nav && nav.page;
     const params = (nav && nav.params) || {};
     if (!page || page === 'home') return params.view === 'map' ? 'map' : 'home';
-    if (page === 'kingdom-discovery') return 'explore';
+    if (page === 'explore' || page === 'kingdom-discovery') return 'explore';
     if (page === 'profile') return params.id ? '' : 'profile';
     return UNDER_PROFILE.indexOf(page) !== -1 ? 'profile' : '';
   }
@@ -44,7 +44,7 @@
   function targetOf(id) {
     if (id === 'home') return ['home', {}];
     if (id === 'map') return ['home', { view: 'map' }];
-    if (id === 'explore') return ['kingdom-discovery', {}];
+    if (id === 'explore') return ['explore', {}];
     return null;
   }
 

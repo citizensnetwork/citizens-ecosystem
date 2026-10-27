@@ -167,8 +167,9 @@ test.describe("on a phone", () => {
     await expect(withCat).toBeVisible();
     const edge = await withCat.evaluate((e) => getComputedStyle(e).borderTopColor);
     expect(edge).not.toBe("rgb(201, 168, 76)");
+    // #210 part 3: See all opens the Discover page (e2e/map-v2-discover.spec.ts)
     await explore(page).getByRole("button", { name: "See all listings" }).tap();
-    await expect(page).toHaveURL(/\/discover$/);
+    await expect(page).toHaveURL(/\/explore$/);
   });
 
   test("a real tap on a pin scrolls the row to its card and outlines it in gold; only the card opens the sheet", async ({ page }) => {

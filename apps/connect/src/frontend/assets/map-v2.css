@@ -2464,3 +2464,100 @@ a[data-mv2='card2'],
     transform: none;
   }
 }
+
+/* ── 4m. The Discover page (app/map-v2-discover.jsx, issue #210 part 3) ──────────────
+   A full screen of the Explore row's own cards (4k) as sideways rows (4i): Near you, Popular, then one row per
+   category group, titled with the group's name and its colour dot. The title and the pills stay at the top
+   (sticky, frosted); a selected pill is the same gold fill as on the map. The page scrolls under them and clears
+   the folding nav on a phone. Outside the sheet a row keeps the browser's own touch handling, so a vertical swipe
+   that starts on a card scrolls the page and a sideways one scrolls only that row, which snaps card by card; the
+   pills get the same (their map rule is pan-x only). */
+[data-mv2='discover'] {
+  --hrow-card-w: var(--explore-card-w);
+  --nav-clear: 0px;
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-family: var(--font-body);
+}
+[data-mv2='discover'][data-narrow] {
+  --nav-clear: var(--nav-zone);
+}
+[data-mv2='discover-scroll'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-bottom: calc(var(--nav-clear) + var(--space-4));
+}
+[data-mv2='discover-top'] {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-controls);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) 0 var(--space-2);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+}
+[data-mv2='discover-bar'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-4);
+}
+[data-mv2='discover-title'] {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='discover'] [data-mv2='pills'] {
+  touch-action: pan-x pan-y;
+}
+[data-mv2='discover-row'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-4) 0;
+}
+[data-mv2='discover-row-title'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+[data-mv2='discover-hint'],
+[data-mv2='discover-empty'] {
+  margin: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='discover-empty'] {
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+[data-mv2='discover'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
