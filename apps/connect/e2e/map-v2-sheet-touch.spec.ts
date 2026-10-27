@@ -20,7 +20,6 @@ const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
 const SHEET = "[data-mv2='sheet']";
 const sheet = (page: Page) => page.locator(SHEET);
 const scroller = (page: Page) => page.locator("[data-mv2='scroller']");
-const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 const snapOf = (page: Page) => sheet(page).getAttribute("data-snap");
 const top = (page: Page) => sheet(page).evaluate((e) => e.getBoundingClientRect().top);
 const innerH = (page: Page) => page.evaluate(() => window.innerHeight);

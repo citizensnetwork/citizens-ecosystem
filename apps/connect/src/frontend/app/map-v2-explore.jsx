@@ -23,6 +23,7 @@
   const { useState, useEffect, useRef, useMemo } = React;
 
   const ROW_CAP = 20;                // cards in the row: the nearest twenty (plus the selected one, wherever it is)
+  const SETTLE_MS = 150;             // rank again only once the map has been still this long (a programmatic pan ends a move every frame)
   const REDUCED_MQ = '(prefers-reduced-motion: reduce)';
   const NARROW_MQ = '(max-width: 767px)';
   const S = () => (window.MapV2Strings && window.MapV2Strings.explore) || {};
@@ -70,7 +71,8 @@
 
   /**
    * The Explore row's order: listings with a position, nearest to `origin` first (then by name), at most `cap`.
-   * The selected listing is always included, in its place by distance, even when it is further than the cap.
+   * The selected listing is always included: when it is further than the cap it is added at the END, so the cards
+   * already in the row never move (no reorder, no layout shift under the person's thumb).
    * Returns [{ m, meters }]. Ideas are not listings and never appear.
    */
   function rank(origin, markers, selectedId, cap) {
@@ -89,7 +91,7 @@
     const head = list.slice(0, max);
     if (selectedId && !head.some((r) => r.m.id === selectedId)) {
       const sel = list.find((r) => r.m.id === selectedId);
-      if (sel) { head[max - 1] = sel; }
+      if (sel) head.push(sel);
     }
     return head;
   }
@@ -123,7 +125,7 @@
 
   /**
    * The Explore row. props: markers (what the map draws), sources ({ events, places, contributors }),
-   * apiRef (the map's), selectedId, focusCard (the keyboard chose the pin), hidden (the sheet is open),
+   * apiRef (the map's), selectedId, focusCard (the keyboard chose the pin), tap (counts pin taps), hidden (the sheet is open),
    * onOpen(id, type), onSeeAll(), onHeight(px).
    */
   function Explore(props) {
@@ -135,8 +137,10 @@
     const Row = window.MapV2Row && window.MapV2Row.Row;
 
     // Rank again when the map settles or the person's position arrives: one state update per settle, never per frame.
+    // A burst of moves (an eased pan ends a move on every frame) is one update, SETTLE_MS after the last.
     useEffect(() => {
       if (!api || !api.current || !api.current.onView) return undefined;
+      let timer = null;
       const read = () => {
         const v = api.current ? api.current.view() : null;
         if (!v) return;
@@ -145,8 +149,10 @@
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
         });
       };
+      const later = () => { clearTimeout(timer); timer = setTimeout(read, SETTLE_MS); };
       read();
-      return api.current.onView(read);
+      const off = api.current.onView(later);
+      return () => { clearTimeout(timer); off(); };
     }, [api]);
 
     // Covers and names come from the full records; the map's markers carry only what a pin needs.
@@ -167,13 +173,21 @@
     useEffect(() => {
       const el = root.current;
       if (!el || !props.onHeight) return undefined;
-      const tell = () => props.onHeight(el.offsetHeight);
+      // hidden under the sheet it measures 0: keep the last height, so the map's controls do not jump as the sheet opens
+      const tell = () => { if (!el.hidden) props.onHeight(el.offsetHeight); };
       tell();
       let ro = null;
       if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(tell); ro.observe(el); }
       return () => { if (ro) ro.disconnect(); props.onHeight(0); };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // A new ranking starts again at the nearest card (a scroll, never a layout shift). Runs before the pin's own scroll below.
+    const rankKey = rows.map((r) => r.m.id).join('|');
+    useEffect(() => {
+      const list = root.current && root.current.querySelector("[data-mv2='list']");
+      if (list) list.scrollLeft = 0;
+    }, [rankKey]);
 
     // A pin was tapped: bring its card to the row's start (a glide, unless reduced motion), without moving focus
     // unless the keyboard chose the pin.
@@ -192,7 +206,7 @@
         const btn = card.querySelector('button, a');
         if (btn) btn.focus({ preventScroll: true });
       }
-    }, [props.selectedId, props.focusCard, rows.length]);
+    }, [props.selectedId, props.focusCard, props.tap, rankKey]);
 
     const near = window.MapV2Nearby;
     const distWords = view.user ? str : (str.centre || {});
@@ -203,12 +217,14 @@
       const selected = props.selectedId === m.id;
       const cover = rec.coverPhoto || '';
       return h('div', { 'data-mv2': 'explore-card', 'data-explore-id': m.id, 'data-selected': selected ? '' : undefined },
+        // "Selected" in words (never the outline alone), laid OVER the picture so the card never changes size
+        selected ? h('span', { 'data-mv2': 'explore-badge', 'aria-hidden': 'true' }, str.selectedBadge) : null,
         h(Card, {
           variant: 'image', idPrefix: 'mv2-x-' + m.id, title: m.title,
           media: cover ? { src: cover } : null,
           tile: { icon: (cat && cat.icon) || 'MapPin' },
           category: cat ? { name: cat.name } : null, kind: m.kind, cat: group || undefined,
-          meta: [Number.isFinite(meters) && near ? near.distanceText(meters, distWords) : '', selected ? str.selected : ''],
+          meta: [Number.isFinite(meters) && near ? near.distanceText(meters, distWords) : ''],
           'aria-current': selected ? 'true' : undefined,
           onClick: () => props.onOpen(m.id, m.type),
         }));
@@ -222,7 +238,9 @@
         h('button', { type: 'button', 'data-mv2': 'explore-all', 'aria-label': str.seeAllLabel, onClick: props.onSeeAll }, str.seeAll)),
       rows.length && Row && Card
         ? h(Row, {
-          items: rows, keyOf: (r) => r.m.type + ':' + r.m.id, idPrefix: 'mv2-explore', render: render,
+          // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
+          // place, so no card ever slides into a new position under the person's eyes (a layout shift).
+          items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
           strings: { label: view.user ? str.label : str.labelCentre },
         })
         : h('p', { 'data-mv2': 'explore-empty' }, str.empty));
@@ -237,5 +255,5 @@
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
 
-  window.MapV2Explore = { ROW_CAP, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, Pills, Explore };
+  window.MapV2Explore = { ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, Pills, Explore };
 })();

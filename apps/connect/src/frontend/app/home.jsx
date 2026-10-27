@@ -108,6 +108,7 @@
     const [pill, setPill] = useState('all');
     const [sheet, setSheet] = useState(null);
     const [focusCard, setFocusCard] = useState(false);
+    const [pinTaps, setPinTaps] = useState(0);   // every pin tap, so a second tap on the same pin scrolls to its card again
     const rootRef = useRef(null);
     const narrow = X ? X.useNarrow() : false;
     const clean = v2 && !!(app.nav && app.nav.params && app.nav.params.view === 'map');
@@ -167,7 +168,8 @@
               if (clean) { openSheet(id, t); return; }
               const a = document.activeElement;
               setFocusCard(!!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })()));
-              setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t);
+              // A second tap on the same pin keeps it chosen (and brings its card back into view); a tap on the map clears it.
+              setSheet(null); setSelected(id); setSelType(t); setPinTaps((n) => n + 1);
             },
             onDismissBubble: dismissBubble,
             onZoomBandChange: setZoomBand,
@@ -199,7 +201,7 @@
         // (hidden) under the sheet, so it keeps its place and the card that opened the sheet gets focus back.
         !clean && React.createElement(X.Explore, {
           hidden: !!showSheet,
-          markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard,
+          markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard, tap: pinTaps,
           onOpen: openSheet, onSeeAll: () => app.go('kingdom-discovery'), onHeight: onExploreHeight,
         }),
         // a card opens the expanded sheet (#210: full, its cover and distance, swipe down back to the row); the clean

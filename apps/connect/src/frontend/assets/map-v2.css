@@ -149,6 +149,7 @@
   --cat-audiences: #9a4f72;
   --cat-business: #66713a;
   --glass-bg: rgba(255, 255, 255, 0.82);   /* frosted controls over the map */
+  --explore-bg: rgba(255, 255, 255, 0.96);  /* the Explore panel: nearly solid and NOT blurred (a large blur re-renders every pan frame) */
   --glass-blur: 16px;
   --nav-dim: rgba(10, 9, 8, 0.18);          /* the map fades back a little while the nav is open */
   --accent-soft: rgba(201, 168, 76, 0.26);  /* the selected nav item's soft gold highlight */
@@ -200,6 +201,7 @@
   --cat-audiences: #dc9cbb;
   --cat-business: #b5c27f;
   --glass-bg: rgba(26, 23, 20, 0.84);
+  --explore-bg: rgba(26, 23, 20, 0.96);
   --nav-dim: rgba(0, 0, 0, 0.32);
   --accent-soft: rgba(201, 168, 76, 0.3);
 }
@@ -2235,9 +2237,8 @@ a[data-mv2='card2'],
   box-sizing: border-box;
   padding: var(--space-2) var(--space-4) var(--space-3);
   border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  /* no backdrop-filter here: a blur this large is redrawn on every frame the map pans under it (frame time) */
+  background: var(--explore-bg);
   box-shadow: var(--elev-2);
   color: var(--text-1);
   font-family: var(--font-body);
@@ -2288,6 +2289,7 @@ a[data-mv2='card2'],
   color: var(--text-2);
 }
 [data-mv2='explore'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
@@ -2308,9 +2310,20 @@ a[data-mv2='card2'],
   justify-content: center;
   color: var(--cat-c, var(--text-2));
 }
-[data-mv2='explore-card'][data-selected] [data-mv2='card-meta'] > [data-mv2='row-meta']:last-child {
-  color: var(--accent-ink);
+/* "Selected", in words, over the picture's corner: it takes no space, so choosing a pin never resizes the row */
+[data-mv2='explore-badge'] {
+  position: absolute;
+  top: calc(var(--space-3) + var(--space-2));
+  left: calc(var(--space-3) + var(--space-2));
+  z-index: var(--z-sticky);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
+  pointer-events: none;
 }
 
 /* ── 4l. The folding nav (app/map-v2-nav.jsx, issue #210) ──────────────

@@ -178,7 +178,11 @@ test.describe("on a phone", () => {
     await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
     const card = explore(page).locator(`[data-explore-id="${id}"]`);
     await expect(card).toHaveAttribute("data-selected", "");
-    await expect(card).toContainText("Selected on the map");
+    await expect(card.locator("[data-mv2='explore-badge']")).toHaveText("Selected");
+    // the badge sits over the picture, so choosing a pin never changes the card's size
+    const cardBox = (await card.locator("[data-mv2='card2']").boundingBox())!;
+    const other = (await explore(page).locator("[data-explore-id]:not([data-selected]) [data-mv2='card2']").first().boundingBox())!;
+    expect(Math.abs(cardBox.height - other.height)).toBeLessThan(1);
     await expect(card.locator("[data-mv2='card2']")).toHaveCSS("box-shadow", /rgb\(139, 105, 20\)/); // --accent-ink ring
     await expect(sheet(page)).toHaveCount(0);
     // the row brought it to the start, fully on screen
