@@ -424,17 +424,26 @@
 
   // ── The map component ──────────────────────────────────────────────
   // The "frame the data" fallback keeps pins clear of what sits over the map. The old map: 70 px all round. Map v2's home
-  // (#210): its top bar and pills, and the Explore row plus the folding nav at the foot (CSS variables the home screen sets).
+  // (#210): measured, not guessed: below its top bar and pills, above the Explore row and the folding nav.
+  const FRAME_GAP = 40;
   function framePadding(el) {
-    if (!v2On() || !el || !window.getComputedStyle) return 70;
-    const cs = window.getComputedStyle(el);
-    const px = (name) => parseFloat(cs.getPropertyValue(name)) || 0;
-    const top = 70 + (el.closest && el.closest("[data-mv2='home']") ? 100 : 0);
-    const bottom = 40 + px('--explore-h') + px('--nav-clear');
-    const h = el.clientHeight || 0;
+    const home = v2On() && el && el.closest ? el.closest("[data-mv2='home']") : null;
+    if (!home) return 70;
+    const box = el.getBoundingClientRect();
+    // the folding nav lives in the shell, outside the home screen: look for it in the document
+    const reach = (sel, fromTop, root) => {
+      const o = (root || home).querySelector(sel);
+      if (!o || o.hidden) return 0;
+      const r = o.getBoundingClientRect();
+      if (!r.height) return 0;
+      return fromTop ? Math.max(0, r.bottom - box.top) : Math.max(0, box.bottom - r.top);
+    };
+    const top = FRAME_GAP + reach("[data-mv2='home-top']", true);
+    const bottom = FRAME_GAP + Math.max(reach("[data-mv2='explore']", false), reach("[data-mv2='nav-toggle']", false, document));
+    const h = box.height || el.clientHeight || 0;
     // never ask for more padding than the map is tall (MapLibre would refuse to fit at all)
     if (h && top + bottom > h * 0.8) return 70;
-    return { top, bottom, left: 40, right: 40 };
+    return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
   }
 
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
