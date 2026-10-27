@@ -243,6 +243,46 @@ test.describe("on the Map v2 sheet", () => {
   });
 });
 
+test.describe("#183 the half sheet with the Convince row, on two phones", () => {
+  // The header, the action row and the Convince row must be fully on screen at half snap. If they are not, that is a bug to
+  // report with these numbers (the sheet's own height is NOT changed in issue #183). The numbers are attached to the test.
+  for (const vp of [{ width: 360, height: 740 }, { width: 412, height: 915 }]) {
+    test(`header and action row are fully visible at half snap (Convince row measured), ${vp.width} x ${vp.height}`, async ({ page }) => {
+      await page.setViewportSize(vp);
+      const db = newDb();
+      const seed = await openAs(page, db);
+      const ev = seed.events[0];
+      await page.goto("/?map=v2");
+      await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 20_000 });
+      await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= 3, undefined, { timeout: 20_000 });
+      await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
+      await page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`).click({ force: true });
+      const sheet = page.locator("[data-mv2='sheet']");
+      await expect(sheet).toBeVisible();
+      await expect(sheet).toHaveAttribute("data-snap", "half");
+      const row = sheet.locator('[data-convince="row"]');
+      await expect(row).toBeVisible();
+      await page.waitForFunction(() => document.querySelector("[data-mv2='sheet']")?.getAnimations({ subtree: true }).every((a) => a.playState !== "running"));
+      const parts: Record<string, string> = { sheet: "[data-mv2='sheet']", header: "[data-mv2='head']", actions: "[data-mv2='actions']", convince: '[data-convince="row"]' };
+      const boxes: Record<string, { top: number; bottom: number } | null> = {};
+      for (const [name, sel] of Object.entries(parts)) {
+        const b = await page.locator(sel).first().boundingBox();
+        boxes[name] = b ? { top: Math.round(b.y), bottom: Math.round(b.y + b.height) } : null;
+      }
+      test.info().annotations.push({ type: `half-sheet ${vp.width}x${vp.height}`, description: JSON.stringify(boxes) });
+      console.log(`half sheet ${vp.width}x${vp.height}: ${JSON.stringify(boxes)}`);
+      for (const name of ["header", "actions"]) {
+        expect(boxes[name], `${name} exists`).not.toBeNull();
+        expect(boxes[name]!.top, `${name} starts on screen`).toBeGreaterThanOrEqual(0);
+        expect(boxes[name]!.bottom, `${name} ends on screen`).toBeLessThanOrEqual(vp.height);
+      }
+      // The Convince row is MEASURED, not asserted: on both phones it sits below the half-snap fold (numbers in the pull request
+      // for #183). Per the issue that is a finding to report; the sheet's half height is not changed here.
+      expect(boxes.convince, "convince exists").not.toBeNull();
+    });
+  }
+});
+
 test.describe("nothing for people who cannot use it", () => {
   test("in the signed-out demo the event page has neither the note nor the row, and asks the database nothing", async ({ page }) => {
     const seed = seed0();
