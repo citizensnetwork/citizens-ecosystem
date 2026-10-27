@@ -230,6 +230,26 @@ test.describe("on a phone", () => {
     expect(pins.some((p) => p.mine)).toBe(true);
   });
 
+  test("the row keeps one height when a pan refills it with other listings (nothing above it moves)", async ({ page }) => {
+    const seed = makeSeed({ contributors: 12, places: 10, events: 4, now: FIXED_NOW, spread: 0.3, seed: 9 }) as unknown as Seed;
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed, { gallery: 0 });
+    await openMap(page, "/?map=v2", 4);
+    await page.waitForTimeout(600);
+    const ids = () => explore(page).locator("[data-explore-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-explore-id")).join());
+    const before = { h: (await explore(page).boundingBox())!.height, ids: await ids() };
+    for (const [dx, dy] of [[0.25, 0.2], [-0.3, -0.25]]) {
+      await page.evaluate(([x, y]) => {
+        const m = (window as unknown as { __ccMap: { getCenter: () => { lng: number; lat: number }; jumpTo: (o: object, d: object) => void } }).__ccMap;
+        const c = m.getCenter();
+        m.jumpTo({ center: [c.lng + x, c.lat + y] }, { originalEvent: {} });
+      }, [dx, dy]);
+      await page.waitForTimeout(500);
+      expect((await explore(page).boundingBox())!.height).toBeCloseTo(before.h, 0);
+    }
+    expect(await ids()).not.toBe(before.ids); // it really did refill
+  });
+
   test("the map's controls and the MapTiler logo sit above the row", async ({ page }) => {
     await open(page);
     const row = (await explore(page).boundingBox())!;
