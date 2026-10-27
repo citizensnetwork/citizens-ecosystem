@@ -449,15 +449,29 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
     const c = seed.contributors[2]; // no upcoming events, no news: the photos are all there is
     await toCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
     await page.evaluate(() => {
-      (window as unknown as { __cls: number }).__cls = 0;
-      new PerformanceObserver((l) => { for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value; }).observe({ type: "layout-shift", buffered: false });
+      const w = window as unknown as { __cls: number; __clsWho: string[] };
+      w.__cls = 0;
+      w.__clsWho = [];
+      // what moved, kept for the failure message (a shift seen only on a slower runner is otherwise a guess)
+      const name = (n: Node | null) => { const el = n as Element | null; return el && el.getAttribute ? el.getAttribute("data-mv2") || el.className || el.nodeName : String(n); };
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean; sources: { node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[] }[]) {
+          if (e.hadRecentInput) continue;
+          w.__cls += e.value;
+          w.__clsWho.push(e.value.toFixed(4) + " " + e.sources.map((s) => `${name(s.node)} y${Math.round(s.previousRect.y)}->${Math.round(s.currentRect.y)} h${Math.round(s.previousRect.height)}->${Math.round(s.currentRect.height)}`).join(", "));
+        }
+      }).observe({ type: "layout-shift", buffered: false });
     });
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).locator("[data-skeleton]").first()).toBeVisible();
     expect(await sheet(page).locator("[class*='spin']").count()).toBe(0);
     await expect(sheet(page).locator("[data-mv2='tile-img']")).toHaveCount(6, { timeout: 5000 });
     await page.waitForTimeout(400);
-    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBeLessThan(0.01);
+    const cls = await page.evaluate(() => {
+      const w = window as unknown as { __cls: number; __clsWho: string[] };
+      return { total: w.__cls, who: w.__clsWho.join(" | ") };
+    });
+    expect(cls.total, cls.who).toBeLessThan(0.01);
   });
 
   test("a failed photo load says so plainly and Try again works", async ({ page }) => {

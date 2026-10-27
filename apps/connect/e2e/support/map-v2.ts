@@ -106,6 +106,28 @@ export async function openPinSheet(page: Page, id: string, how: "click" | "tap" 
   else await pin.click({ force: true });
 }
 
+/**
+ * A point on BARE map for a two-finger gesture: in the open map between the top bar and the Explore row (#210), on a
+ * line where nothing but the map canvas sits for `span` px either side of the centre. A touch that starts on a pin or
+ * an overlay is not the map's, and the home now frames its pins in exactly that open middle.
+ */
+export async function bareMapPoint(page: Page, span = 120): Promise<{ x: number; y: number }> {
+  const pt = await page.evaluate((half) => {
+    const x = window.innerWidth / 2;
+    const top = document.querySelector("[data-mv2='home-top']")?.getBoundingClientRect().bottom ?? 0;
+    const row = document.querySelector("[data-mv2='explore']")?.getBoundingClientRect().top ?? window.innerHeight;
+    const bare = (px: number, py: number) => !!document.elementFromPoint(px, py)?.classList.contains("maplibregl-canvas");
+    for (let y = Math.round(top + 30); y < row - 30; y += 6) {
+      let ok = true;
+      for (let dx = -half; dx <= half && ok; dx += 10) ok = bare(x + dx, y) && bare(x + dx, y - 22) && bare(x + dx, y + 22);
+      if (ok) return { x, y };
+    }
+    return null;
+  }, span);
+  if (!pt) throw new Error("no bare stretch of map for a two-finger gesture");
+  return pt;
+}
+
 /** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
 export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
 const fixtureSvg = (n: number) =>

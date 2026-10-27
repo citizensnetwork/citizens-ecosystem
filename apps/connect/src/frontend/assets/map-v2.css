@@ -2321,6 +2321,10 @@ a[data-mv2='card2'],
 [data-mv2='explore-card'] [data-mv2='row-title'] {
   min-height: calc(var(--lh-2) * 2);
 }
+/* the distance line is there before the map knows where it is (chip, two title lines, distance, and their gaps) */
+[data-mv2='explore-card'] [data-mv2='card-copy'] {
+  min-height: calc(var(--lh-1) * 2 + var(--lh-2) * 2 + var(--space-2) * 2);
+}
 [data-mv2='explore-card'] [data-mv2='card-chip'] {
   max-width: 100%;
   overflow: hidden;
