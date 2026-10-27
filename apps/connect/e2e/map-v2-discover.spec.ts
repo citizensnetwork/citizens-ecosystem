@@ -141,13 +141,30 @@ test.describe("on a phone", () => {
     const cards = page.locator("[data-mv2='explore-card'] [data-mv2='card2']");
     const n = await cards.count();
     expect(n).toBeGreaterThan(6);
+    let coloured = 0;
     for (let i = 0; i < n; i += 3) {
       const c = cards.nth(i);
-      await expect(c).toHaveAttribute("data-cat", /^(worship|serve|culture|learn|audiences|business)$/);
-      const [edge, chip] = await c.evaluate((e) => [getComputedStyle(e).borderTopColor, getComputedStyle(e.querySelector("[data-mv2='card-chip']")!).borderTopColor]);
+      const cat = await c.getAttribute("data-cat");
+      const [edge, chip, label] = await c.evaluate((e) => {
+        const ch = e.querySelector("[data-mv2='card-chip']")!;
+        return [getComputedStyle(e).borderTopColor, getComputedStyle(ch).borderTopColor, ch.textContent || ""];
+      });
+      // a listing with a category carries its group's colour; one with none (a Contributor that never chose one)
+      // names its kind instead, on a neutral edge. Either way the words are there and the edge is never the gold.
+      if (cat) {
+        expect(cat).toMatch(/^(worship|serve|culture|learn|audiences|business)$/);
+        coloured += 1;
+      }
+      expect(label.trim().length, "a category or kind label").toBeGreaterThan(0);
       expect(edge).toBe(chip);
       expect(edge).not.toBe("rgb(201, 168, 76)");
       await expect(c).toContainText(/\d+(\.\d)? km|\d+ m|Under 100 m/);
+    }
+    expect(coloured).toBeGreaterThan(2);
+    // every card in a group's own row is in that group's colour
+    for (const sec of await page.locator("[data-mv2='discover-row'][data-cat]").all()) {
+      const g = await sec.getAttribute("data-cat");
+      for (const c of await sec.locator("[data-mv2='card2']").all()) await expect(c).toHaveAttribute("data-cat", g!);
     }
     await expect(page$(page)).not.toContainText(/\bmiles?\b|\bmi\b/);
     const b = (await cards.first().boundingBox())!;
