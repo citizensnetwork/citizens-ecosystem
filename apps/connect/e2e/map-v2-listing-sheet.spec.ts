@@ -72,8 +72,15 @@ async function openCard(page: Page, c: C, how: "click" | "tap" = "click") {
   await jump(page, c.physical_longitude, c.physical_latitude);
   await openListing(page, c.id, how);
   await expect(sheet(page)).toHaveAttribute("data-expanded", "");
-  await expect.poll(() => sheet(page).evaluate((e) => Math.round(e.getBoundingClientRect().top)), { timeout: 3000 })
-    .toBeLessThan(await page.evaluate(() => window.innerHeight * 0.2));
+  // at rest: high up, and no longer moving (on a slow CI runner the slide-in is still running when it first passes 20 %)
+  const limit = await page.evaluate(() => window.innerHeight * 0.2);
+  let last = NaN;
+  await expect.poll(async () => {
+    const now = await sheet(page).evaluate((e) => Math.round(e.getBoundingClientRect().top));
+    const still = now === last && now < limit;
+    last = now;
+    return still;
+  }, { timeout: 5000, intervals: [150] }).toBe(true);
 }
 
 const centreOf = async (page: Page, sel: string): Promise<Pt> => {
@@ -295,7 +302,8 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const sizes = await sheet(page).locator("[data-mv2='xbar'] button, [role='tab']").evaluateAll((els) =>
       els.map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
     expect(sizes.length).toBe(4);
-    for (const s of sizes) expect(s).toBeGreaterThanOrEqual(44);
+    // to 1/100 px: a box under the sheet's translate can measure 43.99999 in floating point
+    for (const s of sizes) expect(Math.round(s * 100) / 100).toBeGreaterThanOrEqual(44);
   });
 
   test("reduced motion: the sheet and a newly chosen tab's panel arrive at once", async ({ page, baseURL }) => {
