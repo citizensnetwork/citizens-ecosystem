@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // Issue 217: the tab bar and its panel are one block. A hairline closes it.
 // Nearby, the QR action and View Full Profile stay outside the block.
@@ -16,7 +16,7 @@ const jump = (page: Page, lng: number, lat: number, zoom: number) =>
 
 async function openOn(page: Page, id: string, lng: number, lat: number) {
   await jump(page, lng, lat, 15.5);
-  await openListing(page, id);
+  await openPinSheet(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 

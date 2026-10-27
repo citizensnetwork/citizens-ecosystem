@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 import { touchSession, twoFingerSwipe, pinch, rotateGesture, swipe } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -188,7 +188,7 @@ test.describe("R8 fixed tilt: the map still works under it (phone)", () => {
     const seed = await open(page);
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await openListing(page, c.id, "tap");
+    await openPinSheet(page, c.id, "tap");
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(900); // the 320 ms ease

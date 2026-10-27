@@ -67,8 +67,9 @@ export async function openMap(page: Page, path = "/", min = 1) {
  * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
-  await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
   const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
+  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
+  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
   await card.waitFor({ state: "visible", timeout: 10_000 });
   // the row glides the card to its start; press it once it has stopped
   await page.waitForFunction(

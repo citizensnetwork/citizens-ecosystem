@@ -195,7 +195,9 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const onRow = await centreOf(page, "[data-mv2='panel'] [data-mv2='hrow-item']");
     await swipe(cdp, { x: 320, y: onRow.y }, 0, { dx: -220, steps: 10, ms: 200 });
     await expect.poll(() => newsRow(page).evaluate((e) => e.scrollLeft), { timeout: 3000 }).toBeGreaterThan(50);
-    await page.waitForTimeout(300);
+    // let the row's momentum settle on its card edge (a tap during a fling only stops the fling)
+    let x = -1;
+    await expect.poll(async () => { const now = await newsRow(page).evaluate((e) => e.scrollLeft); const still = now === x; x = now; return still; }, { intervals: [250] }).toBe(true);
     expect(await selectedTab(page)).toBe("News");
 
     // a tap on Gallery

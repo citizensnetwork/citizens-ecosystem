@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 import { touchSession, tapTouch } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -29,7 +29,7 @@ async function pick(page: Page, seed: ReturnType<typeof seed0>, kind: Kind, inde
       ? { id: seed.places[index].id, lng: seed.places[index].longitude, lat: seed.places[index].latitude }
       : { id: seed.events[index].id, lng: seed.events[index].longitude, lat: seed.events[index].latitude };
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [t.lng, t.lat]);
-  await openListing(page, t.id);
+  await openPinSheet(page, t.id);
   await expect(sheet(page)).toBeVisible();
   return t;
 }
