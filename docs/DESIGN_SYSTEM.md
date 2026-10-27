@@ -87,7 +87,7 @@ Every category belongs to exactly one **group**, and each group has one muted co
 
 The map home's bottom carousel: "Explore" and "See all", then the shared sideways row (above) of large image cards (`--explore-card-w`): cover photo (or a neutral tile with the category icon), category chip, name, and distance in km ("1.2 km away" from the person, or "from the map centre" until their position is known). Nearest first, at most 20 (`app/map-v2-explore.jsx`).
 
-- **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); the card also says "Selected on the map". Nothing opens. When the keyboard chose the pin, focus moves to the card.
+- **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); a gold "Selected" badge sits over its picture (it takes no space, so the row never resizes) and the card carries aria-current. If the listing was further than the row's 20, it is added at the end, so no other card moves. Nothing opens. When the keyboard chose the pin, focus moves to the card.
 - **A card tap** opens the listing sheet. The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
 - The row reports its height as `--explore-h`, so the map's controls, the MapTiler logo and the "frame the data" padding stay clear of it.
 

@@ -106,13 +106,11 @@ describe("the Explore row's order", () => {
     expect(rows[0].meters).toBeLessThan(1100);
   });
 
-  it("is capped, and always keeps the selected listing even when it is further than the cap", () => {
+  it("is capped, and adds the selected listing at the end when it is further than the cap (nothing else moves)", () => {
     const many = Array.from({ length: 30 }, (_, i) => mk("n" + i, i + 1));
     expect(X.rank(ORIGIN, many, null).length).toBe(X.ROW_CAP);
     const rows = X.rank(ORIGIN, many, "n29", 5);
-    expect(rows.length).toBe(5);
-    expect(rows.map((r) => r.m.id)).toContain("n29");
-    expect(rows[0].m.id).toBe("n0");
+    expect(rows.map((r) => r.m.id)).toEqual(["n0", "n1", "n2", "n3", "n4", "n29"]);
   });
 
   it("falls back to name order when there is no origin yet", () => {
@@ -176,7 +174,7 @@ describe("Explore", () => {
     const sel = document.querySelector("[data-explore-id='two']")!;
     expect(sel.hasAttribute("data-selected")).toBe(true);
     expect(document.querySelectorAll("[data-selected]").length).toBe(1);
-    expect(sel.textContent).toContain(S.explore.selected as string);
+    expect(sel.querySelector("[data-mv2='explore-badge']")!.textContent).toBe(S.explore.selectedBadge as string);
     expect(sel.querySelector("[aria-current='true']")).toBeTruthy();
     expect(scrollTo).toHaveBeenCalled();
     fireEvent.click(sel.querySelector("button")!);

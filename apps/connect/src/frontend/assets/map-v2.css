@@ -2286,6 +2286,7 @@ a[data-mv2='card2'],
   color: var(--text-2);
 }
 [data-mv2='explore'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
@@ -2311,9 +2312,20 @@ a[data-mv2='card2'],
   justify-content: center;
   color: var(--cat-c, var(--text-2));
 }
-[data-mv2='explore-card'][data-selected] [data-mv2='card-meta'] > [data-mv2='row-meta']:last-child {
-  color: var(--accent-ink);
+/* "Selected", in words, over the picture's corner: it takes no space, so choosing a pin never resizes the row */
+[data-mv2='explore-badge'] {
+  position: absolute;
+  top: calc(var(--space-3) + var(--space-2));
+  left: calc(var(--space-3) + var(--space-2));
+  z-index: var(--z-sticky);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
+  pointer-events: none;
 }
 
 /* ── 4l. The folding nav (app/map-v2-nav.jsx, issue #210) ──────────────
