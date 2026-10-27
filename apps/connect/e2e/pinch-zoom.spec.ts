@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing, bareMapPoint } from "./support/map-v2";
 import { touchSession, pinch, swipe, recordPointerEvents, pointerCounts, resetPointerCounts, type Pt } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -105,7 +105,8 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     await openOnMap(page);
     const cdp = await touchSession(page);
     const z0 = await mapZoom(page);
-    await pinch(cdp, { x: 195, y: 420 }, 60, 220, { ms: 500, steps: 16 });
+    // on bare map (#210): the home frames its pins in the open middle, and a touch on a pin is not the map's
+    await pinch(cdp, await bareMapPoint(page), 60, 220, { ms: 500, steps: 16 });
     await expect.poll(() => mapZoom(page), { timeout: 4000 }).toBeGreaterThan(z0 + 0.5);
     expect(await scale(page)).toBe(1);
   });

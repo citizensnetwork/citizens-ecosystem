@@ -303,6 +303,11 @@ describe("the stylesheet and the wiring", () => {
     expect(light).toMatch(/--nav-btn: 56px;/);
   });
 
+  it("keeps every Explore card one height, distance line or not (a refill never shifts the map's controls)", () => {
+    expect(css).toMatch(/\[data-mv2='explore-card'\] \[data-mv2='row-title'\] \{\s*min-height: calc\(var\(--lh-2\) \* 2\);/);
+    expect(css).toMatch(/\[data-mv2='explore-card'\] \[data-mv2='card-copy'\] \{\s*min-height: calc\(var\(--lh-1\) \* 2 \+ var\(--lh-2\) \* 2 \+ var\(--space-2\) \* 2\);/);
+  });
+
   it("animates the nav from the duration tokens only (reduced motion makes it instant)", () => {
     expect(css).toMatch(/\[data-mv2='nav-bar'\] \{[^}]*animation: mv2-nav-in var\(--dur-base\)/);
     expect(css).toMatch(/\[data-mv2='nav-dim'\] \{[^}]*animation: mv2-fade-in var\(--dur-base\)/);

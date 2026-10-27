@@ -229,6 +229,17 @@ test.describe("on a phone", () => {
     expect(mid).toBeLessThan(row.y);
     // at least one drawn pin takes a tap itself (nothing over it: not the zoom hint, the logo or the credit)
     expect(pins.some((p) => p.mine)).toBe(true);
+    // the row measures from the middle of the OPEN map, so the nearest card is a listing the person can see there
+    const firstId = await explore(page).locator("[data-explore-id]").first().getAttribute("data-explore-id");
+    const firstPin = await page.evaluate((id) => {
+      const m = document.querySelector<HTMLElement>(`.maplibregl-marker[data-cc-id="${id}"]`);
+      if (!m) return null;
+      const r = m.getBoundingClientRect();
+      return { y: r.top + r.height / 2, x: r.left + r.width / 2 };
+    }, firstId);
+    expect(firstPin).not.toBeNull();
+    expect(firstPin!.y).toBeLessThan(row.y);
+    expect(firstPin!.y).toBeGreaterThan(top.y);
   });
 
   test("the row keeps one height when a pan refills it with other listings (nothing above it moves)", async ({ page }) => {
