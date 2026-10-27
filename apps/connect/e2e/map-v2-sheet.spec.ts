@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, openListing, useCleanMap } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, openListing, toCleanMap } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 bottom sheet (tracker P1-06 to P1-11); Map v2 is on by default since D15.
@@ -180,7 +180,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await mockContributorDetail(page, seed);
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
-    await useCleanMap(page); // an in-app navigation: measure from here
+    await toCleanMap(page); // an in-app navigation: measure from here
     const before = await page.evaluate(() => history.length);
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     const open = await page.evaluate(() => history.length);
@@ -447,7 +447,7 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
     await mockContributorDetail(page, seed, { gallery: 6, delayMs: 700 });
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[2]; // no upcoming events, no news: the photos are all there is
-    await useCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
+    await toCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
     await page.evaluate(() => {
       (window as unknown as { __cls: number }).__cls = 0;
       new PerformanceObserver((l) => { for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value; }).observe({ type: "layout-shift", buffered: false });
