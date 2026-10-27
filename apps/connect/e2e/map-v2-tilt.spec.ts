@@ -55,7 +55,8 @@ test.describe("R8 fixed tilt: the camera (phone)", () => {
     await open(page);
     const cdp = await touchSession(page);
     const before = await cam(page);
-    await twoFingerSwipe(cdp, { x: 150, y: 420 }, { x: 240, y: 420 }, -220, { ms: 500, steps: 16 });
+    // in the open map (#210): at the screen centre a finger would start on the Explore row and prove nothing
+    await twoFingerSwipe(cdp, { x: 150, y: 340 }, { x: 240, y: 340 }, -220, { ms: 500, steps: 16 });
     await twoFingerSwipe(cdp, { x: 150, y: 300 }, { x: 240, y: 300 }, 260, { ms: 500, steps: 16 });
     const after = await cam(page);
     expect(after.pitch).toBeCloseTo(before.pitch, 5);
@@ -66,10 +67,11 @@ test.describe("R8 fixed tilt: the camera (phone)", () => {
     await open(page);
     const cdp = await touchSession(page);
     const z0 = (await cam(page)).zoom;
-    await pinch(cdp, { x: 195, y: 420 }, 60, 220, { ms: 500, steps: 16 });
+    // in the open map, between the top bar and the Explore row (#210), not the screen centre the row reaches
+    await pinch(cdp, { x: 195, y: 255 }, 60, 220, { ms: 500, steps: 16 });
     await expect.poll(async () => (await cam(page)).zoom, { timeout: 4000 }).toBeGreaterThan(z0 + 0.5);
     const b0 = (await cam(page)).bearing;
-    await rotateGesture(cdp, { x: 195, y: 420 }, 90, 70, { ms: 500, steps: 16 });
+    await rotateGesture(cdp, { x: 195, y: 255 }, 90, 70, { ms: 500, steps: 16 });
     await expect.poll(async () => Math.abs((await cam(page)).bearing - b0), { timeout: 4000 }).toBeGreaterThan(10);
     expect((await cam(page)).pitch).toBeCloseTo(PITCH, 1);
   });

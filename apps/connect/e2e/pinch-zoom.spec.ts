@@ -105,7 +105,8 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     await openOnMap(page);
     const cdp = await touchSession(page);
     const z0 = await mapZoom(page);
-    await pinch(cdp, { x: 195, y: 420 }, 60, 220, { ms: 500, steps: 16 });
+    // in the open map, between the top bar and the Explore row (#210), not the screen centre the row reaches
+    await pinch(cdp, { x: 195, y: 255 }, 60, 220, { ms: 500, steps: 16 });
     await expect.poll(() => mapZoom(page), { timeout: 4000 }).toBeGreaterThan(z0 + 0.5);
     expect(await scale(page)).toBe(1);
   });
