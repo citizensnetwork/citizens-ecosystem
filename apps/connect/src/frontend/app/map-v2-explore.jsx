@@ -23,6 +23,7 @@
   const { useState, useEffect, useRef, useMemo } = React;
 
   const ROW_CAP = 20;                // cards in the row: the nearest twenty (plus the selected one, wherever it is)
+  const SETTLE_MS = 150;             // rank again only once the map has been still this long (a programmatic pan ends a move every frame)
   const REDUCED_MQ = '(prefers-reduced-motion: reduce)';
   const NARROW_MQ = '(max-width: 767px)';
   const S = () => (window.MapV2Strings && window.MapV2Strings.explore) || {};
@@ -136,8 +137,10 @@
     const Row = window.MapV2Row && window.MapV2Row.Row;
 
     // Rank again when the map settles or the person's position arrives: one state update per settle, never per frame.
+    // A burst of moves (an eased pan ends a move on every frame) is one update, SETTLE_MS after the last.
     useEffect(() => {
       if (!api || !api.current || !api.current.onView) return undefined;
+      let timer = null;
       const read = () => {
         const v = api.current ? api.current.view() : null;
         if (!v) return;
@@ -146,8 +149,10 @@
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
         });
       };
+      const later = () => { clearTimeout(timer); timer = setTimeout(read, SETTLE_MS); };
       read();
-      return api.current.onView(read);
+      const off = api.current.onView(later);
+      return () => { clearTimeout(timer); off(); };
     }, [api]);
 
     // Covers and names come from the full records; the map's markers carry only what a pin needs.
@@ -250,5 +255,5 @@
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
 
-  window.MapV2Explore = { ROW_CAP, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, Pills, Explore };
+  window.MapV2Explore = { ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, Pills, Explore };
 })();
