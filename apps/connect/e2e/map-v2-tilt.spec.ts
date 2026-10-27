@@ -114,9 +114,13 @@ test.describe("R8 fixed tilt: desktop", () => {
   test("a right-button drag still rotates and never tilts (no pitch with rotate)", async ({ page }) => {
     await open(page);
     const b0 = (await cam(page)).bearing;
-    await page.mouse.move(700, 450);
+    // start on bare map (#210: the pins are framed in the open middle, and a press on a pin is not a map drag); the
+    // vertical part of the drag goes whichever way has room, and is what would tilt the map if pitch-with-rotate were on
+    const at = await bareMapPoint(page, 40);
+    const dy = at.y > 330 ? -14 : 14;
+    await page.mouse.move(at.x, at.y);
     await page.mouse.down({ button: "right" });
-    for (let i = 1; i <= 12; i++) await page.mouse.move(700 + 12 * i, 450 - 14 * i);
+    for (let i = 1; i <= 12; i++) await page.mouse.move(at.x + 12 * i, at.y + dy * i);
     await page.mouse.up({ button: "right" });
     const c = await cam(page);
     expect(Math.abs(c.bearing - b0)).toBeGreaterThan(5);
