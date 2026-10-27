@@ -8,21 +8,21 @@
 
 Component CSS reads `var(--…)` only. Raw colours and px values live in the token blocks; 0 and 1 px borders are the only exception (`mapV2Tokens.test.ts` enforces this). You can propose a new token only in an issue spec, by name, and only when nothing below fits.
 
-| Group             | Tokens                                                                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Surfaces          | `--surface-0` (app), `--surface-1` (sheet, card), `--surface-2` (raised, placeholder), `--logo-bg` (white in both looks)                       |
-| Text              | `--text-1`, `--text-2`                                                                                                                         |
-| Gold              | `--accent` (fill) with `--accent-contrast` (its label), `--accent-ink` (gold text, rings, icons). Never plain gold text on white               |
-| Status            | `--ok`, `--closed`, `--error`, `--live`: always with words, never colour alone                                                                 |
-| Lines, focus, dim | `--divider`, `--focus-ring`, `--focus-w`, `--focus-offset`, `--scrim`, `--viewer-bg`, `--viewer-fg`                                            |
-| Spacing (4-pt)    | `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16 · `--space-5` 20 · `--space-6` 24 · `--space-7` 32 · `--space-8` 48            |
-| Radii             | `--radius-sm` 8 · `--radius-md` 12 · `--radius-lg` 20 (`--sheet-radius`) · `--radius-full`                                                     |
-| Type              | `--fs-1/--lh-1` 12/16 · `--fs-2/--lh-2` 14/20 · `--fs-3/--lh-3` 18/24 · `--fw-regular`, `--fw-semibold` · `--font-display`, `--font-body`      |
-| Elevation         | `--elev-1` (controls), `--elev-2` (sheets, dialogs)                                                                                            |
-| Z-index           | `--z-pin` 10 · `--z-controls` 20 · `--z-sheet` 120 · `--z-viewer` 300 (dialogs, viewer) · `--z-toast` 400                                      |
-| Motion            | `--dur-fast` 120 · `--dur-base` 200 · `--dur-slow` 320 ms · `--ease-enter`, `--ease-exit`. JS twins: `MapV2.motion`, `MapV2.dur()`             |
-| Sizes             | `--hit` 44 px (minimum target), `--avatar-peek`, `--avatar-half`, `--sheet-*`, `--pin-*`, `--hrow-card-w`, `--hrow-peek`, `--disabled-opacity` |
-| Category groups   | `--cat-worship`, `--cat-serve`, `--cat-culture`, `--cat-learn`, `--cat-audiences`, `--cat-business`: one muted colour per group (#210), light and dark; read through `[data-cat]` as `--cat-c` |
+| Group             | Tokens                                                                                                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Surfaces          | `--surface-0` (app), `--surface-1` (sheet, card), `--surface-2` (raised, placeholder), `--logo-bg` (white in both looks)                                                                                                       |
+| Text              | `--text-1`, `--text-2`                                                                                                                                                                                                         |
+| Gold              | `--accent` (fill) with `--accent-contrast` (its label), `--accent-ink` (gold text, rings, icons). Never plain gold text on white                                                                                               |
+| Status            | `--ok`, `--closed`, `--error`, `--live`: always with words, never colour alone                                                                                                                                                 |
+| Lines, focus, dim | `--divider`, `--focus-ring`, `--focus-w`, `--focus-offset`, `--scrim`, `--viewer-bg`, `--viewer-fg`                                                                                                                            |
+| Spacing (4-pt)    | `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16 · `--space-5` 20 · `--space-6` 24 · `--space-7` 32 · `--space-8` 48                                                                                            |
+| Radii             | `--radius-sm` 8 · `--radius-md` 12 · `--radius-lg` 20 (`--sheet-radius`) · `--radius-full`                                                                                                                                     |
+| Type              | `--fs-1/--lh-1` 12/16 · `--fs-2/--lh-2` 14/20 · `--fs-3/--lh-3` 18/24 · `--fw-regular`, `--fw-semibold` · `--font-display`, `--font-body`                                                                                      |
+| Elevation         | `--elev-1` (controls), `--elev-2` (sheets, dialogs)                                                                                                                                                                            |
+| Z-index           | `--z-pin` 10 · `--z-controls` 20 · `--z-sheet` 120 · `--z-viewer` 300 (dialogs, viewer) · `--z-toast` 400                                                                                                                      |
+| Motion            | `--dur-fast` 120 · `--dur-base` 200 · `--dur-slow` 320 ms · `--ease-enter`, `--ease-exit`. JS twins: `MapV2.motion`, `MapV2.dur()`                                                                                             |
+| Sizes             | `--hit` 44 px (minimum target), `--avatar-peek`, `--avatar-half`, `--sheet-*`, `--pin-*`, `--hrow-card-w`, `--hrow-peek`, `--disabled-opacity`                                                                                 |
+| Category groups   | `--cat-worship`, `--cat-serve`, `--cat-culture`, `--cat-learn`, `--cat-audiences`, `--cat-business`: one muted colour per group (#210), light and dark; read through `[data-cat]` as `--cat-c`                                 |
 | Glass and nav     | `--glass-bg`, `--glass-blur` (frosted controls over the map), `--nav-dim`, `--accent-soft` (the selected nav item), `--select-w` (gold ring and selection outline), `--nav-btn` 56 px, `--nav-zone`, `--explore-card-w` 280 px |
 
 Light is `:root` and dark is `[data-theme='dark']`. Dark is set from the phone's own setting by `app/map-v2-lib.jsx`.
@@ -71,14 +71,14 @@ A list that grows with the Contributor's activity (News, Nearby) is **one row of
 
 Every category belongs to exactly one **group**, and each group has one muted colour token. Gold is never a category colour: it stays the brand and the selection colour. The mapping lives in `app/map-v2-explore.jsx` (`GROUP_OF`; a unit test checks that every event category, place category and Contributor type is in it).
 
-| Group | Pill | Light | Dark | Holds |
-| --- | --- | --- | --- | --- |
-| `worship` | Churches & worship | `#6e5a8f` | `#b3a2d6` | worship and prayer, church services, conferences, churches and ministries |
-| `serve` | Serve & care | `#3f7a6a` | `#86c2b0` | outreach, community upliftment, care and recovery, health, safe spaces, retreat, clinic, rehab |
-| `culture` | Culture & fun | `#a65a3c` | `#e0a084` | markets, sport and recreation, arts, social gatherings, media |
-| `learn` | Learn & grow | `#46699a` | `#93b3e0` | education and equipping, marriage and family, training |
-| `audiences` | Audiences | `#9a4f72` | `#dc9cbb` | men, women, youth, kids, members only |
-| `business` | Business | `#66713a` | `#b5c27f` | Christian businesses, hospitality and cafés, retail |
+| Group       | Pill               | Light     | Dark      | Holds                                                                                          |
+| ----------- | ------------------ | --------- | --------- | ---------------------------------------------------------------------------------------------- |
+| `worship`   | Churches & worship | `#6e5a8f` | `#b3a2d6` | worship and prayer, church services, conferences, churches and ministries                      |
+| `serve`     | Serve & care       | `#3f7a6a` | `#86c2b0` | outreach, community upliftment, care and recovery, health, safe spaces, retreat, clinic, rehab |
+| `culture`   | Culture & fun      | `#a65a3c` | `#e0a084` | markets, sport and recreation, arts, social gatherings, media                                  |
+| `learn`     | Learn & grow       | `#46699a` | `#93b3e0` | education and equipping, marriage and family, training                                         |
+| `audiences` | Audiences          | `#9a4f72` | `#dc9cbb` | men, women, youth, kids, members only                                                          |
+| `business`  | Business           | `#66713a` | `#b5c27f` | Christian businesses, hospitality and cafés, retail                                            |
 
 - Each is at least 4.4:1 on the card, the raised surface and the app background in light, and at least 6.8:1 in dark (`scripts/map-v2/contrast.mjs`). It is still decoration: the category **name** carries the meaning.
 - On a card the colour is a dot, a 1 px outline on the category chip and a `--select-w` top edge. Pass `cat` (the group) to `MapV2Card`. On a pill it is a dot.

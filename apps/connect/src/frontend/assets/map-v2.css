@@ -2188,7 +2188,9 @@ a[data-mv2='card2'],
 [data-mv2='home'] .maplibregl-ctrl-bottom-right {
   margin-bottom: calc(var(--explore-h, 0px) + var(--nav-clear) + var(--space-2));
 }
+/* the corner never takes a tap meant for a pin under it; only the MapTiler link inside it is a target */
 [data-mv2='home-corner'] {
+  pointer-events: none;
   position: absolute;
   left: var(--space-3);
   bottom: calc(var(--explore-h, 0px) + var(--nav-clear) + var(--space-2));
@@ -2197,6 +2199,9 @@ a[data-mv2='card2'],
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
+}
+[data-mv2='home-corner'] a {
+  pointer-events: auto;
 }
 [data-mv2='zoom-hint'] {
   display: flex;
@@ -2309,6 +2314,34 @@ a[data-mv2='card2'],
   align-items: center;
   justify-content: center;
   color: var(--cat-c, var(--text-2));
+}
+/* One height for the panel, whatever it holds: a new ranking refills the same cards (a pan, a pill), so every card keeps
+   two title lines and one line each for the chip and the distance, and the row's mouse arrows sit in the header line
+   beside "See all" instead of adding a line. Nothing above the map moves when the cards change (layout shift). */
+[data-mv2='explore-card'] [data-mv2='row-title'] {
+  min-height: calc(var(--lh-2) * 2);
+}
+[data-mv2='explore-card'] [data-mv2='card-chip'] {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+[data-mv2='explore-card'] [data-mv2='card-chip-label'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-mv2='explore-card'] [data-mv2='card-meta'] {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+[data-mv2='explore'] > [data-mv2='hrow'] > [data-mv2='hrow-head'] {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-4);
+}
+[data-mv2='explore']:has([data-mv2='hrow-nav']) [data-mv2='explore-all'] {
+  margin-right: calc(var(--hit) * 2 + var(--space-1) + var(--space-2));
 }
 /* "Selected", in words, over the picture's corner: it takes no space, so choosing a pin never resizes the row */
 [data-mv2='explore-badge'] {

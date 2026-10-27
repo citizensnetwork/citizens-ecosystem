@@ -455,7 +455,8 @@
       const gate = ZOOM_GATES[m.type];
       outermost = Math.min(outermost, gate === undefined ? 0 : gate);
     });
-    mp.fitBounds(b, { padding: framePadding(el), maxZoom: 13, duration: 0 });
+    const pad = framePadding(el);
+    mp.fitBounds(b, { padding: pad, maxZoom: 13, duration: 0 });
     // Data spread across the whole country frames out past every gate and
     // would open on a blank map. Never zoom out further than the point where
     // at least one type of pin is still drawn — and centre on THOSE pins, not
@@ -467,7 +468,10 @@
         const gate = ZOOM_GATES[m.type];
         if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
       });
-      mp.jumpTo({ center: shown.getCenter(), zoom: outermost });
+      // centred in what is left visible between the overlays (Map v2's home, #210), not in the middle of the screen,
+      // which there is the top edge of the Explore row
+      const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
+      mp.easeTo({ center: shown.getCenter(), zoom: outermost, offset: [0, dy], duration: 0 });
     }
   }
 
