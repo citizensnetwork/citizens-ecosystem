@@ -83,6 +83,8 @@ export const PAIRS = [
   ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
     [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],
     [`Category colour (${g}) on a raised surface`, `--cat-${g}`, '--surface-2', 3],
+    // #210 part 3: the Discover page's row titles carry the group dot on the page background
+    [`Category colour (${g}) on the app background`, `--cat-${g}`, '--surface-0', 3],
   ]),
 ];
 

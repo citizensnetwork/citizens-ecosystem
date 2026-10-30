@@ -313,6 +313,8 @@
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
+      // #210: Map v2's Discover page; the old map (?map=v1) shows Kingdom Exploration at the same address.
+      case 'explore': return React.createElement(window.isMapV2 && window.isMapV2() && window.MapV2Discover ? window.MapV2Discover.Discover : window.KingdomDiscoveryPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);

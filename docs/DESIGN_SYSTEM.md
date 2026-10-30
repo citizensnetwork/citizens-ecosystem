@@ -90,6 +90,18 @@ The map home's bottom carousel: "Explore" and "See all", then the shared sideway
 - **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); a gold "Selected" badge sits over its picture (it takes no space, so the row never resizes) and the card carries aria-current. If the listing was further than the row's 20, it is added at the end, so no other card moves. Nothing opens. When the keyboard chose the pin, focus moves to the card.
 - **A card tap** opens the listing sheet. The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
 - The row reports its height as `--explore-h`, so the map's controls, the MapTiler logo and the "frame the data" padding stay clear of it.
+- **See all** opens the Discover page (below). The card itself is `MapV2Explore.cardFor`, shared by both: never copy it.
+
+### The Discover page (#210)
+
+"See all" and the nav's Explore open it at `/explore` under Map v2 (`app/map-v2-discover.jsx`). The old map (`?map=v1`) shows Kingdom Exploration at that address, and `/discover` stays Kingdom Exploration everywhere (the sidebar's item).
+
+- **Layout:** a sticky bar on the solid app background, never a blur (title, account button, the pills without Ideas), then sideways rows of the Explore card: **Near you** (closest first, at most 20), **Popular** (at most 20, with a one-line hint saying what it means), then one row per group with listings, in the groups' order, titled with the group name and its dot. Group rows hold every listing of the group, closest first; the row's own "See all N" opens past 20. An empty row is left out.
+- **Pills:** All shows every row; a group keeps Near you, Popular and that group's row, each filtered to the group; Events keeps events in every row. A new pill starts at the top.
+- **Popular honours the small** (VISION.md): one point per thing going on, never per amount (an event in the next 30 days, news in the last 30 days, an event live now), one card per host, and equal scores in fair turns drawn afresh each day from the listing id. No counts are shown or used.
+- **Distance:** from the person (the map's position, or one silent read when the browser already allows it; the page never asks), else the map centre, else the city centre, and the words say which.
+- **A card tap** opens the listing sheet over the page; one Back closes it and the page is where it was. The pill and every scroll position are kept on the page's own history entry (`history.state.mv2discover`), so Back from anywhere the sheet led restores them.
+- **Touch:** outside the sheet a row keeps the browser's own touch handling (the sheet's `--mv2-ta-row` rule does not reach it), so a vertical swipe that starts on a card scrolls the page and a sideways one scrolls only that row, which snaps. The pills take `pan-x pan-y` here.
 
 ## 4. Overlays, dialogs and sheets
 
@@ -135,6 +147,6 @@ The pattern is #217 on the map sheet.
 
 ## 8. Navigation and pills (#210)
 
-- **Folding nav (phone):** one round frosted button (`--nav-btn`, `--glass-bg`, a `--select-w` ring of `--accent`), bottom centre, showing the current place's icon and a small dot when anything is unread (also in its name). A tap opens a frosted bar: **Home** (the map with the pills and the Explore row), **Explore** (Kingdom Exploration), **Map** (the same map, clean: no pills, no row), **Profile** (the account menu, which also lists Projects, Messages and Alerts with counts). Every item is at least `--nav-btn` square; the current one sits on `--accent-soft` with `aria-current="page"`. The map dims behind it (`--nav-dim`). It folds back after 5 s untouched, on a tap outside, Escape or Back, and on any new screen. Wide screens keep the sidebar; the old map (`?map=v1`) keeps its bar. `app/map-v2-nav.jsx`.
+- **Folding nav (phone):** one round frosted button (`--nav-btn`, `--glass-bg`, a `--select-w` ring of `--accent`), bottom centre, showing the current place's icon and a small dot when anything is unread (also in its name). A tap opens a frosted bar: **Home** (the map with the pills and the Explore row), **Explore** (the Discover page; Kingdom Exploration on the old map), **Map** (the same map, clean: no pills, no row), **Profile** (the account menu, which also lists Projects, Messages and Alerts with counts). Every item is at least `--nav-btn` square; the current one sits on `--accent-soft` with `aria-current="page"`. The map dims behind it (`--nav-dim`). It folds back after 5 s untouched, on a tap outside, Escape or Back, and on any new screen. Wide screens keep the sidebar; the old map (`?map=v1`) keeps its bar. `app/map-v2-nav.jsx`.
 - **Category pills:** one sideways row (`role="group"`, `aria-pressed` on each): All, Churches & worship, Events, Business, Serve & care, Culture & fun, Learn & grow, Audiences, Ideas. At least `--hit` tall. The selected pill is an `--accent` fill with its `--accent-contrast` label; the rest are `--surface-1` with a 1 px `--divider`. A pill filters the Explore row and dims the other pins (Ideas toggles the idea pins).
 - **Home controls:** search and the account button are round and frosted (`--glass-bg`), with an `--accent-ink` ring when focused or chosen.

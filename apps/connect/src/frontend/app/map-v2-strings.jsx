@@ -261,6 +261,31 @@
       empty: 'Nothing here yet. Move the map or pick another category.',
     },
 
+    // Issue #210 part 3: the Discover page that "See all" and the nav's Explore open (app/map-v2-discover.jsx).
+    // The group names are explore.groups; distances use explore's words (or the city centre's, below).
+    discover: {
+      title: 'Explore',
+      pillsLabel: 'Show on this page',
+      near: 'Near you',
+      nearLabel: 'Listings near you, closest first',
+      popular: 'Popular',
+      popularHint: 'Busy this month with events or news, in fair turns',
+      popularLabel: 'Popular: busy this month with events or news, in fair turns',
+      groupLabel: (name) => name + ', closest first',
+      row: {
+        count: (shown, total) => 'Closest ' + shown + ' of ' + total,
+        all: (total) => 'All ' + total + ' listings',
+        seeAll: (total) => 'See all ' + total,
+        showFewer: 'Show fewer',
+      },
+      city: {
+        under: 'Under 100 m from the city centre',
+        metres: (n) => n + ' m from the city centre',
+        km: (n) => n + ' km from the city centre',
+      },
+      empty: 'Nothing here yet. Pick another category.',
+    },
+
     // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).
     // Map surfaces pass this object in; other screens use STR.
     report: {

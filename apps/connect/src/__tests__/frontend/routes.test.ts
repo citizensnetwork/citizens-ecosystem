@@ -38,6 +38,7 @@ describe("pathFor ↔ navFromPath: every row of the route table", () => {
   const rows: [Nav, string][] = [
     [nav("home"), "/"],
     [nav("kingdom-discovery"), "/discover"],
+    [nav("explore"), "/explore"],
     [nav("community"), "/community"],
     [nav("messages"), "/messages"],
     [nav("messages", { convId: ID }), `/messages/${ID}`],
@@ -207,7 +208,7 @@ describe("malformed or unknown paths fall back to the map (ok=false, so the app 
 
 describe("accessFor: the URL never grants access, it only says what the screen needs", () => {
   it("public screens", () => {
-    for (const n of [nav("home"), nav("kingdom-discovery"), nav("community"), nav("event", { id: ID }), nav("place", { id: ID }), nav("profile", { id: ID }), nav("profile", { slug: "x" })]) {
+    for (const n of [nav("home"), nav("kingdom-discovery"), nav("explore"), nav("community"), nav("event", { id: ID }), nav("place", { id: ID }), nav("profile", { id: ID }), nav("profile", { slug: "x" })]) {
       expect(R.accessFor(n), n.page).toBe("public");
     }
   });
@@ -287,6 +288,7 @@ describe("titleFor", () => {
   it("names the screen in the tab and history", () => {
     expect(R.titleFor(nav("home"))).toBe("Citizens Connect");
     expect(R.titleFor(nav("kingdom-discovery"))).toBe("Kingdom Exploration · Citizens Connect");
+    expect(R.titleFor(nav("explore"))).toBe("Explore · Citizens Connect");
     expect(R.titleFor(nav("dashboard", { tab: "events" }))).toBe("Dashboard · Citizens Connect");
     expect(R.titleFor(nav("admin"))).toBe("Admin · Citizens Connect");
     expect(R.titleFor(nav("messages"))).toBe("Messages · Citizens Connect");
@@ -355,7 +357,7 @@ describe("intake upgrade confirm link", () => {
 describe("PREFIXES: the server rewrites exactly these top-level paths, no more", () => {
   it("lists every first path segment the table owns", () => {
     expect([...R.PREFIXES].sort()).toEqual(
-      ["admin", "apply", "c", "community", "dashboard", "discover", "e", "map", "me", "messages", "notifications", "onboarding", "p", "settings", "upgrade"].sort(),
+      ["admin", "apply", "c", "community", "dashboard", "discover", "e", "explore", "map", "me", "messages", "notifications", "onboarding", "p", "settings", "upgrade"].sort(),
     );
   });
   it("never claims a path the server owns", () => {

@@ -665,10 +665,10 @@ test.describe("One profile entry point", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
     await page.keyboard.press("Escape");
 
-    // Same control, same corner, on the list screen.
+    // Same control, same corner, on the list screen (#210 part 3: the nav's Explore is the Discover page).
     await page.getByRole("button", { name: "Open navigation" }).click();
     await bottomNav.getByRole("button", { name: "Explore" }).click();
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
