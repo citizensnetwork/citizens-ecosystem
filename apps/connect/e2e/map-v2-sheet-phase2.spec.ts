@@ -86,6 +86,7 @@ test.describe("P2-07 Upcoming | Recent", () => {
     const other = seed.contributors[1];
     await page.locator("[data-mv2='handle']").click();   // back to half: at full the sheet covers the other pin
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await page.waitForTimeout(700);   // the slide down (200 ms) and the map easing the pin clear of the half sheet (320 ms) must be over: a pin is pressed where it is
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [other.physical_longitude, other.physical_latitude]);
     await openPinSheet(page, other.id);
     await expand(page);

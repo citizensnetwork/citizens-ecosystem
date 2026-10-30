@@ -448,6 +448,9 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[2]; // no upcoming events, no news: the photos are all there is
     await toCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
+    // ...and let that shift be reported before the observer starts: the map's buttons drop by the panel's height as it leaves, and on
+    // a slow runner the browser hands that entry over a frame or two late (CI saw 0.0155 from exactly that)
+    await page.waitForTimeout(600);
     await page.evaluate(() => {
       const w = window as unknown as { __cls: number; __clsWho: string[] };
       w.__cls = 0;
