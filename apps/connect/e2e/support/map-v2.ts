@@ -67,8 +67,9 @@ export async function openMap(page: Page, path = "/", min = 1) {
  * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
-  await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
   const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
+  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
+  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
   await card.waitFor({ state: "visible", timeout: 10_000 });
   // the row glides the card to its start; press it once it has stopped
   await page.waitForFunction(
@@ -86,6 +87,23 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
   );
   if (how === "tap") await card.tap();
   else await card.click();
+}
+
+/**
+ * #210 part 2: a card opens the EXPANDED sheet (full only; swipe down goes back to the row). The half / peek sheet is
+ * what a pin opens on the clean map (the nav's Map), so a spec about snap states, the handle or the scroll hand-off
+ * switches to that map first (no Explore row, no pills; the map and its pins stay as they are) and presses the pin.
+ * The switch is an in-app navigation: call toCleanMap before measuring history.length.
+ */
+export async function toCleanMap(page: Page) {
+  await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
+  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
+}
+export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
+  if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
 }
 
 /**

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, openListing, toCleanMap } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 bottom sheet (tracker P1-06 to P1-11); Map v2 is on by default since D15.
@@ -24,6 +24,12 @@ const jump = (page: Page, lng: number, lat: number, zoom: number) =>
 
 /** Open the sheet on the first pin of a kind by tapping it (a real click, so it counts as a user gesture). */
 async function openOn(page: Page, id: string, lng: number, lat: number) {
+  await jump(page, lng, lat, 15.5);
+  await openPinSheet(page, id);
+  await expect(sheet(page)).toBeVisible();
+}
+/** #210: the same listing opened from its Explore card (the expanded sheet): the history rules hold there too. */
+async function openCardOn(page: Page, id: string, lng: number, lat: number) {
   await jump(page, lng, lat, 15.5);
   await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
@@ -174,6 +180,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await mockContributorDetail(page, seed);
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
+    await toCleanMap(page); // an in-app navigation: measure from here
     const before = await page.evaluate(() => history.length);
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     const open = await page.evaluate(() => history.length);
@@ -214,17 +221,17 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     expect(await pushes()).toEqual([]);
 
     const c = seed.contributors[0];
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     expect(await pushes()).toEqual([{ active: true, guard: true, url: expect.any(String) }]);
 
     // closed by its own button, reopened, closed by Back, reopened, closed by Back
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
     await page.waitForTimeout(300); // the guard's own entry is taken back off the stack (async)
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe("/");
@@ -245,10 +252,10 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await mockContributorDetail(page, seed);
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
     // the guard's own entry is taken back off the stack once the sheet is gone: we are on the arrival entry again
@@ -440,6 +447,7 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
     await mockContributorDetail(page, seed, { gallery: 6, delayMs: 700 });
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[2]; // no upcoming events, no news: the photos are all there is
+    await toCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
     await page.evaluate(() => {
       const w = window as unknown as { __cls: number; __clsWho: string[] };
       w.__cls = 0;

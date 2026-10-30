@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing, bareMapPoint } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, bareMapPoint } from "./support/map-v2";
 import { touchSession, pinch, swipe, recordPointerEvents, pointerCounts, resetPointerCounts, type Pt } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -121,7 +121,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
         ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
         [c.physical_longitude, c.physical_latitude],
       );
-      await openListing(page, c.id, "tap");
+      await openPinSheet(page, c.id, "tap");
       const sheet = page.locator(SHEET);
       await expect(sheet).toBeVisible();
       await expect.poll(() => sheet.getAttribute("data-snap")).toBe("half");
@@ -152,7 +152,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
       [c.physical_longitude, c.physical_latitude],
     );
-    await openListing(page, c.id, "tap");
+    await openPinSheet(page, c.id, "tap");
     const sheet = page.locator(SHEET);
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(400);
@@ -175,7 +175,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
       [c.physical_longitude, c.physical_latitude],
     );
-    await openListing(page, c.id, "tap");
+    await openPinSheet(page, c.id, "tap");
     await expect(page.locator(SHEET)).toBeVisible();
     await page.waitForTimeout(400);
     const rule = () => page.evaluate(() => {

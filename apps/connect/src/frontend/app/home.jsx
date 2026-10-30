@@ -148,7 +148,11 @@
     const CATEGORY_PILLS = window.DATA.FILTER_CATEGORIES;
 
     if (v2 && X) {
-      const openSheet = (id, t) => { setSelected(id); setSelType(t); setSheet({ id, type: t }); if (t === 'event') trackImpression(id); };
+      // #210: where the map is looking as the sheet opens, so its distance says what the card said (the map moves under the sheet)
+      const openSheet = (id, t, from) => {
+        const view = from || (mapApi.current && mapApi.current.view ? mapApi.current.view() : null);
+        setSelected(id); setSelType(t); setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
+      };
       const closeSheet = () => setSheet(null);
       const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
       const showSheet = sheet && window.MapV2Sheet;
@@ -200,10 +204,14 @@
           markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard, tap: pinTaps,
           onOpen: openSheet, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
         }),
+        // a card opens the expanded sheet (#210: full, its cover and distance, swipe down back to the row); the clean
+        // map's pin opens today's half sheet
         showSheet && React.createElement(window.MapV2Sheet, {
-          id: sheet.id, type: sheet.type, onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
+          id: sheet.id, type: sheet.type, expanded: !clean, view: sheet.view,
+          onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
           nearby: markers,
-          onPick: (id, t) => openSheet(id, t),
+          // a Nearby pick keeps the place the distances were measured from (the map has moved under the sheet since)
+          onPick: (id, t) => openSheet(id, t, sheet.view),
         }),
         selected && selType === 'idea' && React.createElement(PreviewPanel, { id: selected, type: selType, onClose: () => setSelected(null) }));
     }

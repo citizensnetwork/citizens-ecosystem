@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Moments on the Contributor sheet (tracker P2-05, ADAPTED; migration 188). Hermetic, clock frozen.
@@ -28,7 +28,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await openListing(page, c.id);
+  await openPinSheet(page, c.id);
   await expect(sheet(page)).toBeVisible();
   return { seed, c };
 }
@@ -36,9 +36,9 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
 test.use({ viewport: { width: 390, height: 844 } });
 
 test.describe("Moments: the Today tab", () => {
-  test("a live note adds a Today tab after Events (and before the photos); it shows the note and when it was posted", async ({ page }) => {
+  test("a live note adds a Today tab after Events, News and Gallery (#210: their order is fixed); it shows the note and when it was posted", async ({ page }) => {
     await openContributor(page, 0, { gallery: 2, moments: [note("m1", "Prayer walk tonight at the north gate.")] });
-    await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "Today", "Gallery"]);
+    await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "Gallery", "Today"]);
     await sheet(page).getByRole("tab", { name: "Today" }).click();
     const row = page.locator("[data-mv2='panel'] [data-moment]");
     await expect(row).toHaveCount(1);
@@ -98,7 +98,7 @@ test.describe("Moments: the Today tab", () => {
 
 test.describe("Moments: four tabs fit on a narrow phone", () => {
   for (const width of [360, 320]) {
-    test(`Events, News, Today and Gallery fit in ${width} px without scrolling sideways`, async ({ page }) => {
+    test(`Events, News, Gallery and Today fit in ${width} px without scrolling sideways`, async ({ page }) => {
       const seed = seed0();
       const c = seed.contributors[0];
       const posts = [{ id: "n1", contributor_id: c.id, title: "An update", body: "Doors open at nine.", image_url: null, post_date: "2026-10-10", created_at: new Date(FIXED_NOW - 3 * H).toISOString() }];
@@ -115,8 +115,8 @@ test.describe("Moments: four tabs fit on a narrow phone", () => {
       await mockContributorDetail(page, seed, { gallery: 2, moments: [note("m1", "A note")] });
       await openMap(page, "/?map=v2", 8);
       await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-      await openListing(page, c.id);
-      await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Today", "Gallery"]);
+      await openPinSheet(page, c.id);
+      await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Gallery", "Today"]);
       const fits = await page.locator("[data-mv2='tabs']").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
       expect(fits.scroll).toBeLessThanOrEqual(fits.client);
       // each tab keeps the size the existing tabs have (43 px tall inside the 44 px row, as map-v2-sheet-devices pins) and is not squeezed

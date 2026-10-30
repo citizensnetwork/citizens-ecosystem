@@ -88,7 +88,7 @@ Every category belongs to exactly one **group**, and each group has one muted co
 The map home's bottom carousel: "Explore" and "See all", then the shared sideways row (above) of large image cards (`--explore-card-w`): cover photo (or a neutral tile with the category icon), category chip, name, and distance in km ("1.2 km away" from the person, or "from the map centre" until their position is known). Nearest first, at most 20 (`app/map-v2-explore.jsx`).
 
 - **A pin tap** scrolls the row to that listing's card and outlines it in gold (`--accent-ink`, `--select-w`); a gold "Selected" badge sits over its picture (it takes no space, so the row never resizes) and the card carries aria-current. If the listing was further than the row's 20, it is added at the end, so no other card moves. Nothing opens. When the keyboard chose the pin, focus moves to the card.
-- **A card tap** opens the listing sheet. The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
+- **A card tap** opens the expanded listing sheet (below). The row hides while the sheet is open (it stays mounted, so focus returns to the card on close). **Only one bottom area ever shows.**
 - The row reports its height as `--explore-h`, so the map's controls, the MapTiler logo and the "frame the data" padding stay clear of it.
 - **See all** opens the Discover page (below). The card itself is `MapV2Explore.cardFor`, shared by both: never copy it.
 
@@ -102,6 +102,16 @@ The map home's bottom carousel: "Explore" and "See all", then the shared sideway
 - **Distance:** from the person (the map's position, or one silent read when the browser already allows it; the page never asks), else the map centre, else the city centre, and the words say which.
 - **A card tap** opens the listing sheet over the page; one Back closes it and the page is where it was. The pill and every scroll position are kept on the page's own history entry (`history.state.mv2discover`), so Back from anywhere the sheet led restores them.
 - **Touch:** outside the sheet a row keeps the browser's own touch handling (the sheet's `--mv2-ta-row` rule does not reach it), so a vertical swipe that starts on a card scrolls the page and a sideways one scrolls only that row, which snaps. The pills take `pan-x pan-y` here.
+
+### The expanded listing sheet (#210)
+
+What an Explore card opens: the map sheet (`app/map-v2-sheet.jsx`, `expanded`) at **full**, with no half or peek. A pin on the clean map (the nav's Map) still opens the half sheet.
+
+- **Bar:** fixed above the content, `--hit` tall: the grab bar to the eye, ✕ (44 px, "Close details") to a thumb.
+- **Header**, at the top of the content so it scrolls with the items: the cover in the card's own 16:9 media box (a neutral `--surface-2` tile with the category icon in the group colour when there is none or it fails), the name (focus lands here), then the card's category chip (group dot and outline, `data-cat`) and the facts: distance in km in the Explore row's words, measured from where the map was looking when the card was tapped, then open state and followers.
+- **Tabs:** Events, News, Gallery in that order, only those with content, then Today while a Moment is live. No content, no tab bar. The first item of the first tab is in view on open.
+- **Swipe:** a sideways swipe on the tab block (touch or pen, at least 48 px and 1.5 times more sideways than vertical) moves one tab, no wrap; the new panel slides in from that side over `--dur-base`. A swipe that **starts** on a sideways row (News) is the row's, wherever it goes. A vertical swipe scrolls the items.
+- **Close:** ✕, Escape, Back (the one `useBackGuard` entry), or a swipe down with the content at its top: a flick, or a release past a quarter of the sheet's height (shorter springs back). It returns to the row with the card still outlined and focused.
 
 ## 4. Overlays, dialogs and sheets
 
@@ -125,6 +135,7 @@ The pattern is #217 on the map sheet.
 - **Look:** the bar is `--hit` tall with a 1px `--divider` underline. The selected tab is `--text-1` with an `--accent-ink` underline.
 - **The tabbed block:** the bar and panel sit in one wrapper that ends with a 1px `--divider` hairline and `--space-5` of space. Content below it never changes on a tab switch. There is no wrapper when there are no tabs.
 - **Sticky:** the bar is sticky only inside its wrapper (`top: 0`, `--surface-1` background), so it leaves with the block. A tab switch while stuck snaps the block back to the top, instantly.
+- **Swipe (map sheet, #210):** on touch, a sideways swipe on the block moves one tab; a sideways row inside the panel keeps its own swipe (see "The expanded listing sheet").
 
 ## 6. Accessibility and mobile (standing rules for every UI PR)
 
