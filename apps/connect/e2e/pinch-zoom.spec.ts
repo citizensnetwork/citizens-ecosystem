@@ -33,7 +33,9 @@ async function goTo(page: Page, want: "peek" | "half" | "full") {
       if ((await snapOf()) !== "half") await page.locator("[data-mv2='handle']").tap();
       await page.waitForTimeout(300);
       const b = (await page.locator("[data-mv2='actions']").boundingBox())!;
-      await swipe(await touchSession(page), { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) }, 300, { ms: 1000, steps: 20 });
+      // from half (40 % of the screen) to the peek line, not past it (that closes the sheet)
+      const down = Math.round((await page.evaluate(() => window.innerHeight)) * 0.4 - 108);
+      await swipe(await touchSession(page), { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) }, down, { ms: 1000, steps: 20 });
     } else {
       await page.locator("[data-mv2='handle']").tap();
     }

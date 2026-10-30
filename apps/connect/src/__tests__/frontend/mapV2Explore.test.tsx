@@ -1,6 +1,7 @@
 /**
  * Map v2 navigation refresh (issue #210): the category groups and pills, the Explore row
- * (`src/frontend/app/map-v2-explore.jsx`) and the folding nav (`src/frontend/app/map-v2-nav.jsx`).
+ * (`src/frontend/app/map-v2-explore.jsx`) and the folding nav (`src/frontend/app/map-v2-nav.jsx`). The Explore panel also
+ * holds the category list and the lowering handle (founder, 2026-10-30).
  *
  * jsdom has no layout, so what is pinned here is the logic and the markup: every category belongs to one group,
  * the pills' tests, the row's order and cap (the selected listing always kept), the gold outline and its words,
@@ -24,6 +25,7 @@ type ExploreApi = {
   pillMatches: (pill: string, m: unknown) => boolean;
   rank: (origin: { lat: number; lng: number } | null, markers: Marker[], selectedId: string | null, cap?: number) => Ranked[];
   Pills: React.ComponentType<{ value: string; onChange: (id: string) => void; ideas: boolean; onIdeas: () => void }>;
+  Categories: React.ComponentType<{ value: string; ideas: boolean; onPick: (id: string) => void; onIdeas: () => void }>;
   Explore: React.ComponentType<Record<string, unknown>>;
 };
 type NavLib = {
@@ -168,24 +170,123 @@ describe("Explore", () => {
     view.user = null;
   });
 
-  it("outlines the pin's card, says so in words, scrolls the row to it, and a card tap opens that listing", () => {
+  it("outlines the chosen card, says what the next tap does, announces it, and a card tap reports that listing", () => {
     const onOpen = vi.fn();
     render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", onOpen, onSeeAll: vi.fn() }));
     const sel = document.querySelector("[data-explore-id='two']")!;
     expect(sel.hasAttribute("data-selected")).toBe(true);
     expect(document.querySelectorAll("[data-selected]").length).toBe(1);
-    expect(sel.querySelector("[data-mv2='explore-badge']")!.textContent).toBe(S.explore.selectedBadge as string);
+    expect(sel.querySelector("[data-mv2='explore-badge']")!.textContent).toBe("Tap again to open");
     expect(sel.querySelector("[aria-current='true']")).toBeTruthy();
-    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toBe("Second café is chosen. Press it again to open it.");
     fireEvent.click(sel.querySelector("button")!);
     expect(onOpen).toHaveBeenCalledWith("two", "place");
   });
 
+  it("scrolls the row to a card only for a PIN tap (a card tap leaves the row exactly where it is)", () => {
+    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    scrollTo.mockClear();
+    // a card was tapped: it is chosen, and nothing scrolls
+    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", reveal: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    // a pin was tapped: its card is brought into view
+    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", reveal: { id: "three", focus: false, n: 1 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(scrollTo).toHaveBeenCalled();
+  });
+
   it("moves focus to the card only when the keyboard chose the pin", () => {
-    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", focusCard: false, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", reveal: { id: "two", focus: false, n: 1 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
     expect(document.activeElement?.closest("[data-explore-id]")).toBeNull();
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", focusCard: true, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", reveal: { id: "three", focus: true, n: 2 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
+  });
+
+  it("holds its ranking while a listing is chosen, so the cards never reshuffle under the thumb; it ranks again once nothing is chosen", () => {
+    vi.useFakeTimers();
+    let centre = ORIGIN;
+    let tell: () => void = () => {};
+    const live = { current: { view: () => ({ centre, user: null }), onView: (fn: () => void) => { tell = fn; return () => {}; } } };
+    const here = [mk("a", 1, { title: "A" }), mk("b", 9, { title: "B" })];
+    const order = () => [...document.querySelectorAll("[data-mv2='explore-card']")].map((c) => c.getAttribute("data-explore-id"));
+    const { rerender } = render(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(order()).toEqual(["a", "b"]);
+    // a card is chosen, the map jumps next to "b": the row stays as it was
+    rerender(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: "a", onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    centre = at(9);
+    act(() => { tell(); vi.advanceTimersByTime(200); });
+    expect(order()).toEqual(["a", "b"]);
+    // nothing chosen any more: it ranks again around where the map is now
+    rerender(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(order()).toEqual(["b", "a"]);
+  });
+
+  it("makes its title a switch to the category list: the groups, Events and Ideas, a check on what is on", () => {
+    const onPill = vi.fn();
+    const onIdeas = vi.fn();
+    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "serve", ideas: true, onPill, onIdeas, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    const sw = screen.getByRole("button", { name: S.explore.title as string });
+    expect(sw.getAttribute("aria-expanded")).toBe("false");
+    expect(sw.getAttribute("aria-controls")).toBe("mv2-explore-body");
+    // what the panel is filtered to is said beside the title
+    expect(document.querySelector("[data-mv2='explore-filter']")!.textContent).toBe("Serve & care · Ideas");
+    fireEvent.click(sw);
+    expect(sw.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cats");
+    const list = screen.getByRole("list", { name: S.explore.categoriesLabel as string });
+    const rows = [...list.querySelectorAll("[data-mv2='cat']")];
+    expect(rows.map((r) => r.getAttribute("data-cat-id"))).toEqual([...X.PILLS.map((p) => p.id), "ideas"]);
+    const on = (id: string) => rows.find((r) => r.getAttribute("data-cat-id") === id)!;
+    expect(on("serve").getAttribute("aria-pressed")).toBe("true");
+    expect(on("serve").querySelector("[data-icon='Check']")).toBeTruthy();
+    expect(on("ideas").getAttribute("aria-pressed")).toBe("true");
+    expect(on("worship").getAttribute("aria-pressed")).toBe("false");
+    expect(on("worship").querySelector("[data-cat='worship']")).toBeTruthy();   // the group's own colour dot
+    // Ideas is a switch beside the groups: it leaves the list open
+    fireEvent.click(on("ideas"));
+    expect(onIdeas).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cats");
+    // a group sends the panel back to its cards, filtered, and focus returns to the title
+    fireEvent.click(on("culture"));
+    expect(onPill).toHaveBeenCalledWith("culture");
+    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
+    expect(document.activeElement).toBe(sw);
+  });
+
+  it("goes back from the list on Escape, and the view that is not shown cannot be reached", () => {
+    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "all", onPill: vi.fn(), onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    const views = () => [...document.querySelectorAll("[data-mv2='explore-view']")].map((v) => [v.getAttribute("data-view"), v.hasAttribute("inert")]);
+    expect(views()).toEqual([["cards", false], ["cats", true]]);
+    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
+    expect(views()).toEqual([["cards", true], ["cats", false]]);
+    fireEvent.keyDown(document.querySelector("[data-mv2='cat']")!, { key: "Escape" });
+    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
+  });
+
+  it("is lowered to its title strip by the handle (a tap, or a swipe down), raised by it again, and a swipe is not also a tap", () => {
+    const onMin = vi.fn();
+    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, min: false, onMin, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    const grab = screen.getByRole("button", { name: S.explore.lower as string });
+    expect(grab.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(grab);
+    expect(onMin).toHaveBeenLastCalledWith(true);
+    // a swipe down lowers it once (the click that may follow a mouse drag is ignored)
+    onMin.mockClear();
+    fireEvent.pointerDown(grab, { clientY: 100 });
+    fireEvent.pointerUp(grab, { clientY: 140 });
+    fireEvent.click(grab);
+    expect(onMin.mock.calls).toEqual([[true]]);
+    // lowered: the handle says it raises, a swipe up raises it, and the title raises it too
+    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, min: true, onMin, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("data-min")).toBe(true);
+    const up = screen.getByRole("button", { name: S.explore.raise as string });
+    expect(up.getAttribute("aria-expanded")).toBe("false");
+    onMin.mockClear();
+    fireEvent.pointerDown(up, { clientY: 140 });
+    fireEvent.pointerUp(up, { clientY: 100 });
+    expect(onMin.mock.calls).toEqual([[false]]);
+    onMin.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
+    expect(onMin).toHaveBeenCalledWith(false);
   });
 
   it("shows a plain line when nothing is near", () => {
@@ -294,13 +395,27 @@ describe("the stylesheet and the wiring", () => {
   });
 
   it("keeps every nav, pill and Explore control at least a thumb's size", () => {
-    for (const sel of ["[data-mv2='pill']", "[data-mv2='explore-all']", "[data-mv2='home-search']"]) {
+    for (const sel of ["[data-mv2='pill']", "[data-mv2='home-search']", "[data-mv2='cat']"]) {
       expect(css).toMatch(new RegExp(sel.replace(/[[\]]/g, "\\$&") + " \\{[^}]*min-height: var\\(--hit\\)"));
     }
+    // the panel's title line is 36 px (founder, 2026-10-30: more map); each of its two buttons reaches 4 px past its text
+    // above and below (the ::after), so a thumb still has 44 px to land on
+    expect(light).toMatch(/--explore-head-h: 36px;/);
+    expect(css).toMatch(/\[data-mv2='explore-switch'\],\s*\[data-mv2='explore-all'\] \{[^}]*min-height: var\(--explore-head-h\)/);
+    expect(css).toMatch(/\[data-mv2='explore-switch'\]::after,\s*\[data-mv2='explore-all'\]::after \{[^}]*inset: calc\(var\(--space-1\) \* -1\) calc\(var\(--space-2\) \* -1\)/);
+    expect(light).toMatch(/--explore-grab-h: 24px;/);
+    expect(css).toMatch(/\[data-mv2='explore-grab'\] \{[^}]*width: 100%;[^}]*height: var\(--explore-grab-h\)/);
     expect(css).toMatch(/\[data-mv2='nav-toggle'\] \{[^}]*width: var\(--nav-btn\);[^}]*height: var\(--nav-btn\);/);
     expect(css).toMatch(/\[data-mv2='nav-item'\] \{[^}]*min-width: var\(--nav-btn\);[^}]*min-height: var\(--nav-btn\);/);
     expect(css).toMatch(/\[data-mv2='nav-close'\] \{[^}]*width: var\(--hit\);[^}]*height: var\(--hit\);/);
     expect(light).toMatch(/--nav-btn: 56px;/);
+  });
+
+  it("hides only zoom and locate on the home screen while the panel is up (the Online globe is a feature and stays), and brings them back when it is lowered", () => {
+    expect(css).toMatch(/\[data-mv2='home'\]\[data-narrow\]:not\(\[data-clean\]\):not\(\[data-explore-min\]\) \.maplibregl-ctrl-group:has\(\.maplibregl-ctrl-zoom-in, \.maplibregl-ctrl-geolocate\) \{[^}]*visibility: hidden;[^}]*pointer-events: none;/);
+    // never a rule that hides every control group (the globe is one), and the clean map and the lowered panel are never matched
+    expect(css).not.toMatch(/\[data-mv2='home'\][^{]*\.maplibregl-ctrl-group \{[^}]*visibility: hidden/);
+    expect(css).toMatch(/--ctrl-btn: 36px;/);
   });
 
   it("keeps every Explore card one height, distance line or not (a refill never shifts the map's controls)", () => {
@@ -316,14 +431,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const f of ["map-v2-explore.jsx", "map-v2-nav.jsx"]) {
-      expect(html).toContain(`src="app/${f}?v=20261026c"`);
+    for (const [f, v] of [["map-v2-explore.jsx", "20261030a"], ["map-v2-nav.jsx", "20261026c"]]) {
+      expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261027c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261030a");
   });
 
   it("keeps the old map's bottom bar: the folding nav only replaces it under Map v2", () => {

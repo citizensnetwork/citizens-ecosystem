@@ -33,9 +33,17 @@ async function expand(page: Page) {
   await expect(sheet(page)).toHaveAttribute("data-snap", "full");
 }
 
+/** At half the sort bar is not drawn (founder, 2026-10-30): the tab bar and the first event sit where News and Gallery's content does. */
+async function expectNoSortAtHalf(page: Page) {
+  await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+  await expect(page.locator("[data-mv2='sort']")).toBeHidden();
+}
+
 test.describe("P2-07 Upcoming | Recent", () => {
   test("the Events tab opens on Upcoming and Recent lists past events, newest first, with when they were", async ({ page }) => {
     await openContributor(page, 0, { past: 3 });
+    await expectNoSortAtHalf(page);
+    await expand(page);   // the Upcoming | Recent bar is part of the full sheet (half has one composition for every listing)
     await expect(page.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "true");
     const upcoming = page.getByRole("button", { name: "Upcoming" });
     const recent = page.getByRole("button", { name: "Recent" });
@@ -55,6 +63,7 @@ test.describe("P2-07 Upcoming | Recent", () => {
 
   test("a Contributor with nothing coming up but past events opens on Recent, and Upcoming says so plainly", async ({ page }) => {
     await openContributor(page, 2, { past: 2 });
+    await expand(page);
     await expect(page.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Recent" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2"]);
@@ -70,12 +79,16 @@ test.describe("P2-07 Upcoming | Recent", () => {
 
   test("a past event the app does not have loaded is listed but is not a link; the sort choice resets on another pin", async ({ page }) => {
     const { seed } = await openContributor(page, 0, { past: 1 });
+    await expand(page);
     await page.getByRole("button", { name: "Recent" }).click();
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row']")).toHaveCount(0); // not in the store: no button
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1"]);
     const other = seed.contributors[1];
+    await page.locator("[data-mv2='handle']").click();   // back to half: at full the sheet covers the other pin
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [other.physical_longitude, other.physical_latitude]);
     await openPinSheet(page, other.id);
+    await expand(page);
     await expect(page.getByRole("button", { name: "Upcoming" })).toHaveAttribute("aria-pressed", "true");
   });
 });

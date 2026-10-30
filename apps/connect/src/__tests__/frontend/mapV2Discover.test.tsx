@@ -253,19 +253,19 @@ describe("the page", () => {
     expect(window.history.state).toMatchObject({ cc: 1, idx: 1, nav: { page: "explore" } });
   });
 
-  it("a card opens that listing's sheet over the page (the page stays), and closing it leaves the page as it was", () => {
+  it("a card opens that listing's own page at once (founder, 2026-10-30), after writing where the page is so Back finds it as it was", () => {
     render(React.createElement(D.Discover));
-    const card = document.querySelector("[data-row='near'] [data-explore-id='kids-1'] button")!;
-    fireEvent.click(card);
-    expect(sheetProps).toHaveBeenLastCalledWith(expect.objectContaining({ id: "kids-1", type: "event" }));
-    expect(trackImpression).toHaveBeenCalledWith("kids-1");
-    expect(document.querySelector("[data-mv2='discover-row']")).toBeTruthy();
-    expect(go).not.toHaveBeenCalled();
-    // the sheet's own Nearby list moves it on
-    const props = sheetProps.mock.calls.at(-1)![0] as { onPick: (id: string, t: string) => void; nearby: unknown[] };
-    expect(props.nearby.length).toBe(4);
-    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    const open = (id: string) => fireEvent.click(document.querySelector(`[data-row='near'] [data-explore-id='${id}'] button`)!);
+    open("kids-1");
+    expect(go).toHaveBeenLastCalledWith("event", { id: "kids-1" });
+    open("cafe");
+    expect(go).toHaveBeenLastCalledWith("place", { id: "cafe" });
+    open("c1");
+    expect(go).toHaveBeenLastCalledWith("profile", { id: "c1" });
+    // no summary sheet over the page, and no second impression (the event page counts its own)
+    expect(sheetProps).not.toHaveBeenCalled();
     expect(document.querySelector("[data-mv2='sheet']")).toBeNull();
+    expect(trackImpression).not.toHaveBeenCalled();
     expect((window.history.state as Record<string, unknown>).mv2discover).toBeTruthy();
   });
 
@@ -304,7 +304,7 @@ describe("wiring", () => {
   it("registers the module after the nav and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    expect(html).toContain('src="app/map-v2-discover.jsx?v=20261026c"');
+    expect(html).toContain('src="app/map-v2-discover.jsx?v=20261030a"');
     expect(html.indexOf("app/map-v2-nav.jsx")).toBeLessThan(html.indexOf("app/map-v2-discover.jsx"));
     expect(html.indexOf("app/map-v2-discover.jsx")).toBeLessThan(html.indexOf("app/home.jsx"));
     expect(build.indexOf("'map-v2-nav.jsx'")).toBeLessThan(build.indexOf("'map-v2-discover.jsx'"));

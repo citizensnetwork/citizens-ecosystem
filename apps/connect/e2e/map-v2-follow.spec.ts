@@ -106,10 +106,12 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await expect(header).not.toContainText("138");
   });
 
-  test("a Place sheet has no second Follow of its own: its card already carries one", async ({ page }) => {
+  // founder, 2026-10-30: a Place follows the Contributor's rules, so its ONE Follow is a pill in the action row
+  // (the card's own gradient button, and the white box it sat in, are gone)
+  test("a Place sheet has one Follow, in its action row, and the body has none of its own", async ({ page }) => {
     await open(page, "place", 0);
-    await expect(followBtn(page)).toHaveCount(0);
-    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow$/ })).toHaveCount(1);
+    await expect(followBtn(page)).toHaveCount(1);
+    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow(ing)?$/ })).toHaveCount(0);
   });
 
   // Real listings do not carry a follower count, so the card and the profile used to print "0 followers" under every
@@ -152,12 +154,11 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await expect(page.getByText("Now following Fixture Fellowship 1")).toHaveCount(0);
   });
 
-  test("the same guard holds for a Place's own Follow (the card), which had the same fake success", async ({ page }) => {
+  test("the same guard holds for a Place's own Follow, which had the same fake success", async ({ page }) => {
     await open(page, "place", 0);
     await page.evaluate(() => { (window as unknown as { CC_AUTH: object }).CC_AUTH = {}; });
-    const card = page.locator("[data-mv2='card']");
-    await card.getByRole("button", { name: /^Follow$/ }).click();
+    await followBtn(page).click();
     await expect(page.getByText("Sign in to follow.")).toBeVisible();
-    await expect(card.getByRole("button", { name: /^Following$/ })).toHaveCount(0);
+    await expect(followBtn(page)).toHaveText("Follow");
   });
 });

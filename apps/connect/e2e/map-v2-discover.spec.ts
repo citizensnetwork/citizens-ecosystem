@@ -172,7 +172,7 @@ test.describe("on a phone", () => {
     expect(b.width).toBeGreaterThanOrEqual(260);
   });
 
-  test("a card opens that listing over the page; Back closes it and the page is exactly where it was", async ({ page }) => {
+  test("a card opens that listing's full page at once; Back brings the page back exactly where it was", async ({ page }) => {
     await openDiscover(page);
     await scroller(page).evaluate((e) => { e.scrollTop = 220; });
     const second = rowOf(page, "popular");
@@ -190,9 +190,10 @@ test.describe("on a phone", () => {
     const target = listOf(page, "popular").locator("[data-mv2='hrow-item']").nth(card).locator("[data-mv2='card2']");
     const id = await target.evaluate((e) => e.closest("[data-explore-id]")!.getAttribute("data-explore-id"));
     await target.tap();
-    await expect(sheet(page)).toBeVisible();
-    await expect(page).toHaveURL(/\/explore$/);
     expect(id).toBeTruthy();
+    // founder, 2026-10-30: no summary sheet, the listing's own page (an event, a place or a Contributor's profile)
+    await expect(page).toHaveURL(/\/(e|p|c)\/[^/]+$|\/me$/);
+    await expect(sheet(page)).toHaveCount(0);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
     await expect(page).toHaveURL(/\/explore$/);

@@ -672,7 +672,7 @@ test.describe("One profile entry point", () => {
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
-  test("the map's top bar is search + account only, and categories are one scrollable row", async ({ page }) => {
+  test("the map's top bar is search + account only, and the categories are inside the Explore panel", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     const screen = page.locator('[data-screen="discover"]');
@@ -682,13 +682,14 @@ test.describe("One profile entry point", () => {
     await expect(page.getByRole("button", { name: "Filter by category" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Kingdom Discovery" })).toHaveCount(0);
 
-    // One row, starting with All. #210 (founder, 2026-10-26): the pills are the category GROUPS, which between them
-    // cover every event category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping).
-    const pills = screen.getByRole("group", { name: "Show on the map" });
-    await expect(pills.getByRole("button", { name: "All", exact: true })).toBeVisible();
-    await expect(pills.getByRole("button", { name: "Churches & worship" })).toBeVisible();
-    await expect(pills.getByRole("button", { name: "Business" })).toBeAttached();
-    const tops = await pills.getByRole("button").evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
-    expect(tops).toBe(1);
+    // #210 (founder, 2026-10-26 and 2026-10-30): the choices are the category GROUPS, which between them cover every event
+    // category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping). They are no longer a pill row
+    // over the map: they are a list inside the Explore panel, behind its title, starting with All.
+    await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
+    await screen.locator("[data-mv2='explore']").getByRole("button", { name: "Explore", exact: true }).click();
+    const list = screen.getByRole("list", { name: "Categories" });
+    await expect(list.getByRole("button", { name: "All", exact: true })).toBeVisible();
+    await expect(list.getByRole("button", { name: "Churches & worship" })).toBeVisible();
+    await expect(list.getByRole("button", { name: "Business" })).toBeAttached();
   });
 });

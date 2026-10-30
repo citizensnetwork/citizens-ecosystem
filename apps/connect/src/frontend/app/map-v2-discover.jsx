@@ -17,11 +17,11 @@
 //  organiser (a busy host cannot fill the row with its own events), and equal scores take FAIR TURNS: an
 //  order drawn afresh each day from the listing's id, so no name, size or age keeps the front.
 //
-//  A card is the Explore row's own (MapV2Explore.cardFor). Tapping it opens the listing sheet over this page,
-//  so one Back closes the sheet and the page is exactly where it was. Leaving through the sheet (a full
-//  profile, say) and coming Back restores the pill and every scroll position: they are kept on this page's
-//  own history entry (history.state.mv2discover, beside the store's cc/idx/nav), written when the person
-//  stops scrolling, picks a pill or opens a card.
+//  A card is the Explore row's own (MapV2Explore.cardFor). Tapping it opens the FULL profile at once (founder,
+//  2026-10-30: a person who came here to look at listings wants the listing, not a summary of it). Coming Back
+//  restores the pill and every scroll position: they are kept on this page's own history entry
+//  (history.state.mv2discover, beside the store's cc/idx/nav), written when the person stops scrolling, picks a
+//  pill or opens a card.
 //
 //  Pure helpers (listingsOf, activityOf, fairTurn, popular, rowsFor) are unit-tested in mapV2Discover.test.tsx.
 //  Styles: assets/map-v2.css section 4m (tokens only). Text: MapV2Strings.discover (and .explore).
@@ -194,7 +194,6 @@
     const memory = useRef(undefined);
     if (memory.current === undefined) memory.current = readMemory();   // read once, on the first render
     const [pill, setPill] = useState(() => (memory.current && typeof memory.current.pill === 'string' ? memory.current.pill : 'all'));
-    const [sheet, setSheet] = useState(null);
     const scroller = useRef(null);
     const timer = useRef(null);
     const narrow = lib.useNarrow();
@@ -256,10 +255,11 @@
       if (scroller.current) scroller.current.scrollTop = 0;
       writeMemory({ pill: id, top: 0, rows: {} });
     };
+    // A card opens the listing's own page (the event page counts its own impression). The scroll positions are written
+    // first, so Back finds this page exactly as it was left.
     const open = (id, type) => {
       save();
-      setSheet({ id: id, type: type });
-      if (type === 'event' && app.trackImpression) app.trackImpression(id);
+      app.go(type === 'contributor' ? 'profile' : type, { id: id });
     };
 
     const groupWords = xs.groups || {};
@@ -297,11 +297,7 @@
           h(lib.Pills, { value: pill, onChange: pick, label: str.pillsLabel })),
         rows.length && Row
           ? rows.map(section)
-          : h('p', { 'data-mv2': 'discover-empty' }, str.empty)),
-      sheet && window.MapV2Sheet ? h(window.MapV2Sheet, {
-        id: sheet.id, type: sheet.type, onClose: () => setSheet(null), nearby: listings,
-        onPick: (id, t) => open(id, t),
-      }) : null);
+          : h('p', { 'data-mv2': 'discover-empty' }, str.empty)));
   }
 
   window.MapV2Discover = { WINDOW_MS, CITY, listingsOf, activityOf, fairTurn, popular, rowsFor, Discover };

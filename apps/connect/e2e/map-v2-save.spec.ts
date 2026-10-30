@@ -111,19 +111,22 @@ test.describe("P2-04 Save on the sheet", () => {
     expect(b.y + b.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   });
 
-  test("a Place gets Save in the action row (and keeps its card's Follow); an Event gets neither Save nor a second Follow", async ({ page }) => {
+  test("a Place gets Follow and Save in the action row; an Event gets Connect and Consider there, and neither Save nor Follow", async ({ page }) => {
     await open(page, "place", 0);
     await expect(saveBtn(page)).toHaveCount(1);
-    await expect(followBtn(page)).toHaveCount(0);
-    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow$/ })).toHaveCount(1);
+    await expect(followBtn(page)).toHaveCount(1);
+    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow(ing)?$/ })).toHaveCount(0);
     await saveBtn(page).click();
     await expect(saveBtn(page)).toHaveText("Saved");
     await expect(page.getByText(/^Saved .*Only you can see this\.$/)).toBeVisible();
 
-    // an Event: its bookmark is Consider, on the card
+    // an Event: its bookmark is Consider, and what it asks of a person is Connect: both pills in the same row
     await pick(page, seed0(), "event", 0);
     await expect(saveBtn(page)).toHaveCount(0);
     await expect(followBtn(page)).toHaveCount(0);
+    const row = page.locator("[data-mv2='actions'] [data-mv2='action']");
+    await expect(row.filter({ hasText: /^Connect(ed)?$/ })).toHaveCount(1);
+    await expect(row.filter({ hasText: /^Consider(ing)?$/ })).toHaveCount(1);
   });
 
   test("a signed-out visitor on the real site is asked to sign in, and nothing flips (control: demo mode flips)", async ({ page }) => {

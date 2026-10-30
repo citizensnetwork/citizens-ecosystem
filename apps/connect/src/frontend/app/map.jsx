@@ -781,16 +781,20 @@
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
     // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
     // later, so the first paint belongs to the sheet's header. Reduced motion makes it a jump.
+    // #210: a card tapped on the home screen sends `minZoom` too, so the pin it jumps to is close enough to be seen
+    // (a person zoomed out over the province would otherwise land on the same blur they started from).
     useEffect(() => {
       if (!apiRef) return undefined;
       apiRef.current = {
-        focusSelected(padding) {
+        focusSelected(padding, minZoom) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
             const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
             if (!mp || !mk || !padding) return;
             userMovedRef.current = true;   // the "frame the data" fallback must never undo this
-            mp.easeTo({ center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+            const to = { center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;   // never a zoom: undefined (easeTo reads it as NaN)
+            mp.easeTo(to, { originalEvent: {} });
           });
         },
         // #210: where the map is looking and where the person is (null until known), and a way to hear when it settles.

@@ -30,6 +30,15 @@
       // P2-04: Save is a private bookmark (a Contributor or a Place); only the person sees it, in Settings
       save: 'Save',
       saved: 'Saved',
+      // #210: a Place and an Event speak in the same pills (the Event's own Connect and Consider, and a message to its organiser)
+      connect: 'Connect',
+      connected: 'Connected',
+      consider: 'Consider',
+      considering: 'Considering',
+      message: 'Message',
+      by: 'by',
+      with: 'with',
+      counts: (connected, considering) => connected + ' connected · ' + considering + ' considering',
       website: 'Website',
       call: 'Call',
       email: 'Email',
@@ -249,7 +258,15 @@
         audiences: 'Audiences',
         ideas: 'Ideas',
       },
-      selectedBadge: 'Selected',
+      // a card (or a pin) chosen: the card says what the next tap does, in words laid over its picture
+      selectedBadge: 'Tap again to open',
+      selectedAnnounce: (name) => name + ' is chosen. Press it again to open it.',
+      // the panel's own controls (founder, 2026-10-30): the title switches to the category list, the handle lowers the panel
+      chooseCategory: 'Choose a category',
+      backToListings: 'Back to the listings',
+      categoriesLabel: 'Categories',
+      lower: 'Lower this panel to see more of the map',
+      raise: 'Raise this panel',
       under: 'Under 100 m away',
       metres: (n) => n + ' m away',
       km: (n) => n + ' km away',

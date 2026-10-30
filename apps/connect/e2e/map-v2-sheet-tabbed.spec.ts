@@ -125,7 +125,7 @@ test.describe("tabbed block on a phone", () => {
     await expect(page.locator("#mv2-panel")).toHaveCount(0);
     const before = await page.evaluate(() => {
       const block = document.querySelector("[data-mv2='tabbed']") as HTMLElement;
-      const anchor = document.querySelector("[data-mv2='bio']") as HTMLElement;
+      const anchor = document.querySelector("[data-mv2='actions']") as HTMLElement;   // the bio is not drawn at half; the actions always are
       const grid = block.querySelector("[data-mv2='grid']") as HTMLElement;
       return {
         gap: block.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom,
@@ -136,7 +136,7 @@ test.describe("tabbed block on a phone", () => {
     await expect(page.locator("[data-mv2='tabbed']")).toHaveCount(1);
     const after = await page.evaluate(() => {
       const block = document.querySelector("[data-mv2='tabbed']") as HTMLElement;
-      const anchor = document.querySelector("[data-mv2='bio']") as HTMLElement;
+      const anchor = document.querySelector("[data-mv2='actions']") as HTMLElement;
       const grid = block.querySelector("[data-mv2='grid']") as HTMLElement;
       return {
         gap: block.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom,

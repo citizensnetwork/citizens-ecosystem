@@ -79,6 +79,7 @@ export const PAIRS = [
   ['Primary text on the selected nav item', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--surface-1'],
   ['Secondary text on the Explore panel (over the map)', '--text-2', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
   ['Gold ink on the Explore panel (See all)', '--accent-ink', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Primary text on a chosen category row (inside the Explore panel)', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--explore-bg'],
   // #210: one muted colour per category group, as a dot, a chip outline and a card edge (3:1, non-text)
   ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
     [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],

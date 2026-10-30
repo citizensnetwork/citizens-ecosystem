@@ -289,11 +289,11 @@ test.describe("flag off: v1 pins are untouched", () => {
 });
 
 test.describe("E23 and the 12.3 states", () => {
-  test("flag on: the locate and zoom buttons are 44 px; flag off: they keep their v1 size", async ({ page }) => {
+  test("flag on: the locate and zoom buttons are 36 px (founder, 2026-10-30); flag off: they keep their v1 size", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
     const size = () => page.locator(".maplibregl-ctrl-group button").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]));
-    for (const wh of await size()) expect(wh).toEqual([44, 44]);
+    for (const wh of await size()) expect(wh).toEqual([36, 36]);
     await page.goto("/?map=v1");
     await page.waitForSelector('[data-screen="discover"]');
     for (const wh of await size()) expect(wh).toEqual([29, 29]);

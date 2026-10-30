@@ -9,10 +9,13 @@
 //  PILLS: one sideways row (All, the groups, Events, Ideas). The selected pill is a gold fill. A pill filters
 //  by a test per marker, which the map uses to dim the rest; "Events" is a type, not a group.
 //
-//  EXPLORE ROW: the listings near the person (or near the middle of the map before we know where they are),
-//  closest first, as large cards on the shared sideways row (map-v2-row.jsx, map-v2-card.jsx). Tapping a pin
-//  scrolls the row to that card and outlines it in gold; tapping a card opens the listing sheet. The home
-//  screen shows the row OR the sheet, never both. The row ranks again only when the map settles (moveend),
+//  EXPLORE PANEL: the listings near the person (or near the middle of the map before we know where they are),
+//  closest first, as cards on the shared sideways row (map-v2-row.jsx, map-v2-card.jsx). Tapping a pin scrolls
+//  the row to that card and outlines it in gold. Tapping a card does the same without moving the row: it is
+//  chosen, the map eases to its pin, and the SECOND tap on the chosen card opens the full listing (home.jsx).
+//  The panel also holds the category choice (founder, 2026-10-30): its title is a switch between the cards and a
+//  compact list of the groups, and a handle lowers it to a title strip so the map's own buttons come back.
+//  The home screen shows the panel OR the full listing, never both. The row ranks again only when the map settles (moveend),
 //  never per frame, and holds its own state, so a pan never re-renders the map screen. "See all" opens the
 //  Discover page (map-v2-discover.jsx), which draws the SAME card (cardFor) and measures from lastView().
 //
@@ -169,17 +172,53 @@
   let lastView = { centre: null, user: null };
 
   /**
-   * The Explore row. props: markers (what the map draws), sources ({ events, places, contributors }),
-   * apiRef (the map's), selectedId, focusCard (the keyboard chose the pin), tap (counts pin taps), hidden (the sheet is open),
-   * onOpen(id, type), onSeeAll(), onHeight(px).
+   * The category list inside the Explore panel (founder, 2026-10-30): compact rows, in the pill row's own order
+   * (All, the six groups, Events), then Ideas. A group row says its colour with the same dot the cards carry. Choosing
+   * one sends the panel back to its cards, filtered; Ideas is a switch beside them, so it leaves the list open.
+   * A check mark says which rows are on (never the colour alone).
+   * props: value (pill id), ideas (bool), onPick(id), onIdeas()
+   */
+  function Categories(props) {
+    const words = S().groups || {};
+    const Icon = window.Icon;
+    const row = (id, on, click, lead) => h('li', { key: id, 'data-mv2': 'cat-item' },
+      h('button', { type: 'button', 'data-mv2': 'cat', 'data-cat-id': id, 'aria-pressed': on ? 'true' : 'false', onClick: click },
+        lead,
+        h('span', { 'data-mv2': 'cat-name' }, words[id]),
+        on && Icon ? h(Icon, { name: 'Check', size: 16 }) : null));
+    const lead = (p) => (p.group ? h('span', { 'data-mv2': 'pill-dot', 'data-cat': p.id, 'aria-hidden': 'true' })
+      : Icon ? h(Icon, { name: p.icon || 'LayoutGrid', size: 16 }) : null);
+    return h('ul', { 'data-mv2': 'cats', role: 'list', 'aria-label': S().categoriesLabel },
+      PILLS.map((p) => row(p.id, (props.value || 'all') === p.id, () => props.onPick(p.id), lead(p))),
+      row('ideas', !!props.ideas, props.onIdeas, Icon ? h(Icon, { name: 'Lightbulb', size: 16 }) : null));
+  }
+
+  /**
+   * The Explore panel. props: markers (what the map draws), sources ({ events, places, contributors }),
+   * apiRef (the map's), selectedId (the chosen listing), reveal ({ id, focus }: a PIN was tapped, so bring its card into
+   * view; a card tap sends none, and the row stays exactly where it is), hidden (the full listing is open),
+   * pill + onPill(id) + ideas + onIdeas() (the category choice, which lives in this panel), min + onMin(bool) (the panel
+   * is lowered to its title strip, so the map's own buttons come back), onOpen(id, type) (a card was tapped),
+   * onSeeAll(), onHeight(px).
+   *
+   * While a listing is chosen the ranking is FROZEN: the map moves to the pin, and the cards must not reshuffle under
+   * the thumb. The panel ranks again the moment nothing is chosen.
    */
   function Explore(props) {
     const api = props.apiRef;
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
+    const [mode, setMode] = useState('cards');      // 'cards' | 'cats' (the category list)
     const root = useRef(null);
+    const switchBtn = useRef(null);
+    const views = useRef({});
+    const readView = useRef(null);
+    const chosen = useRef(props.selectedId);
+    chosen.current = props.selectedId;
+    const grab = useRef(null);
     const str = S();
     const Card = window.MapV2Card;
     const Row = window.MapV2Row && window.MapV2Row.Row;
+    const Icon = window.Icon;
 
     // Rank again when the map settles or the person's position arrives: one state update per settle, never per frame.
     // A burst of moves (an eased pan ends a move on every frame) is one update, SETTLE_MS after the last.
@@ -190,16 +229,19 @@
         const v = api.current ? api.current.view() : null;
         if (!v) return;
         lastView = v;
+        if (chosen.current) return;
         setView((p) => {
           const same = (a, b) => (a === b) || (a && b && a.lat === b.lat && a.lng === b.lng);
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
         });
       };
+      readView.current = read;
       const later = () => { clearTimeout(timer); timer = setTimeout(read, SETTLE_MS); };
       read();
       const off = api.current.onView(later);
-      return () => { clearTimeout(timer); off(); };
+      return () => { clearTimeout(timer); readView.current = null; off(); };
     }, [api]);
+    useEffect(() => { if (!props.selectedId && readView.current) readView.current(); }, [props.selectedId]);
 
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
 
@@ -207,7 +249,7 @@
     const rows = useMemo(() => rank(origin, props.markers, props.selectedId, ROW_CAP),
       [origin, props.markers, props.selectedId]);
 
-    // Tell the screen how tall the row is, so the map's own controls and credit sit above it.
+    // Tell the screen how tall the panel is, so the map's own controls and credit sit above it.
     useEffect(() => {
       const el = root.current;
       if (!el || !props.onHeight) return undefined;
@@ -220,6 +262,18 @@
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // The view that is not shown cannot be focused or read: `inert`, set by hand (a prop would be read differently by React 18, which the
+    // page loads, and 19, which the unit tests do)
+    useEffect(() => {
+      const on = mode === 'cats';
+      const v = views.current;
+      if (v.cards) { if (on) v.cards.setAttribute('inert', ''); else v.cards.removeAttribute('inert'); }
+      if (v.cats) { if (on) v.cats.removeAttribute('inert'); else v.cats.setAttribute('inert', ''); }
+    }, [mode]);
+
+    // Lowered: the category list has nowhere to show, so the panel comes back to its cards.
+    useEffect(() => { if (props.min) setMode('cards'); }, [props.min]);
+
     // A new ranking starts again at the nearest card (a scroll, never a layout shift). Runs before the pin's own scroll below.
     const rankKey = rows.map((r) => r.m.id).join('|');
     useEffect(() => {
@@ -227,11 +281,12 @@
       if (list) list.scrollLeft = 0;
     }, [rankKey]);
 
-    // A pin was tapped: bring its card to the row's start (a glide, unless reduced motion), without moving focus
-    // unless the keyboard chose the pin.
+    // A PIN was tapped: bring its card to the row's start (a glide, unless reduced motion), without moving focus
+    // unless the keyboard chose the pin. A card tap never comes here: the row stays exactly where it is.
     useEffect(() => {
       const el = root.current;
-      if (!el || !props.selectedId) return;
+      const r = props.reveal;
+      if (!el || !r || !props.selectedId || r.id !== props.selectedId) return;
       const card = el.querySelector('[data-explore-id="' + cssId(props.selectedId) + '"]');
       const list = el.querySelector("[data-mv2='list']");
       if (!card || !list) return;
@@ -240,11 +295,11 @@
       const left = li.offsetLeft - list.offsetLeft - gutter;
       if (typeof list.scrollTo === 'function') list.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
       else list.scrollLeft = left;
-      if (props.focusCard) {
+      if (r.focus) {
         const btn = card.querySelector('button, a');
         if (btn) btn.focus({ preventScroll: true });
       }
-    }, [props.selectedId, props.focusCard, props.tap, rankKey]);
+    }, [props.reveal, rankKey]);
 
     const distWords = view.user ? str : (str.centre || {});
     const render = ({ m, meters }) => cardFor({
@@ -252,20 +307,73 @@
       selected: props.selectedId === m.id, badge: str.selectedBadge, onOpen: props.onOpen,
     });
 
+    // The handle: a tap lowers or raises the panel, and so does a short swipe down or up (never a drag that follows the
+    // finger: the panel has two heights). A swipe that ends on the handle must not also count as the tap.
+    const GRAB_PX = 24;
+    const onGrabDown = (e) => { grab.current = { y: e.clientY, swiped: false }; };
+    const onGrabUp = (e) => {
+      const g = grab.current;
+      if (!g) return;
+      const dy = e.clientY - g.y;
+      if (Math.abs(dy) >= GRAB_PX) { g.swiped = true; props.onMin(dy > 0); }
+    };
+    const onGrabClick = () => {
+      const g = grab.current;
+      grab.current = null;
+      if (g && g.swiped) return;
+      props.onMin(!props.min);
+    };
+
+    const toggleMode = () => {
+      if (props.min) { props.onMin(false); return; }
+      setMode((m) => (m === 'cats' ? 'cards' : 'cats'));
+    };
+    const backToCards = () => {
+      setMode('cards');
+      if (switchBtn.current) switchBtn.current.focus({ preventScroll: true });
+    };
+    const onKeyDown = (e) => { if (e.key === 'Escape' && mode === 'cats') { e.stopPropagation(); backToCards(); } };
+
+    const words = str.groups || {};
+    const filter = [];
+    if (props.pill && props.pill !== 'all') filter.push(words[props.pill]);
+    if (props.ideas) filter.push(words.ideas);
+    const picked = rows.find((r) => r.m.id === props.selectedId);
+    const cats = mode === 'cats';
+
+    const cards = rows.length && Row && Card
+      ? h(Row, {
+        // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
+        // place, so no card ever slides into a new position under the person's eyes (a layout shift).
+        items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
+        strings: { label: view.user ? str.label : str.labelCentre },
+      })
+      : h('p', { 'data-mv2': 'explore-empty' }, str.empty);
+
     return h('section', {
-      ref: root, 'data-mv2': 'explore', 'aria-labelledby': 'mv2-explore-title', hidden: props.hidden || undefined,
+      ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-min': props.min ? '' : undefined,
+      'aria-labelledby': 'mv2-explore-title', hidden: props.hidden || undefined, onKeyDown: onKeyDown,
     },
+      h('button', {
+        type: 'button', 'data-mv2': 'explore-grab', 'aria-expanded': props.min ? 'false' : 'true', 'aria-label': props.min ? str.raise : str.lower,
+        onPointerDown: onGrabDown, onPointerUp: onGrabUp, onPointerCancel: () => { grab.current = null; }, onClick: onGrabClick,
+      }, h('span', { 'data-mv2': 'explore-grab-bar', 'aria-hidden': 'true' })),
       h('div', { 'data-mv2': 'explore-head' },
-        h('h2', { id: 'mv2-explore-title', 'data-mv2': 'explore-title' }, str.title),
+        h('h2', { id: 'mv2-explore-title', 'data-mv2': 'explore-title' },
+          // named "Explore" (the heading and the region keep that name); what it does is its description
+          h('button', {
+            ref: switchBtn, type: 'button', 'data-mv2': 'explore-switch', 'aria-expanded': cats ? 'true' : 'false', 'aria-controls': 'mv2-explore-body',
+            'aria-describedby': 'mv2-explore-hint', onClick: toggleMode,
+          }, h('span', null, str.title), Icon ? h(Icon, { name: 'ChevronDown', size: 18 }) : null)),
+        h('span', { id: 'mv2-explore-hint', 'data-mv2': 'sr' }, cats ? str.backToListings : str.chooseCategory),
+        filter.length ? h('span', { 'data-mv2': 'explore-filter' }, filter.join(' · ')) : null,
         h('button', { type: 'button', 'data-mv2': 'explore-all', 'aria-label': str.seeAllLabel, onClick: props.onSeeAll }, str.seeAll)),
-      rows.length && Row && Card
-        ? h(Row, {
-          // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
-          // place, so no card ever slides into a new position under the person's eyes (a layout shift).
-          items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
-          strings: { label: view.user ? str.label : str.labelCentre },
-        })
-        : h('p', { 'data-mv2': 'explore-empty' }, str.empty));
+      // both views share one box, so the panel is as tall for the list as for the cards (nothing above the map moves)
+      h('div', { id: 'mv2-explore-body', 'data-mv2': 'explore-body' },
+        h('div', { ref: (el) => { views.current.cards = el; }, 'data-mv2': 'explore-view', 'data-view': 'cards', 'aria-hidden': cats ? 'true' : undefined }, cards),
+        h('div', { ref: (el) => { views.current.cats = el; }, 'data-mv2': 'explore-view', 'data-view': 'cats', inert: '', 'aria-hidden': cats ? undefined : 'true' },
+          h(Categories, { value: props.pill, ideas: props.ideas, onPick: (id) => { props.onPill(id); backToCards(); }, onIdeas: props.onIdeas }))),
+      h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, picked ? str.selectedAnnounce(picked.m.title) : ''));
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
@@ -278,7 +386,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, indexSources, cardFor, Pills, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, indexSources, cardFor, Pills, Categories, Explore,
     lastView: () => lastView,
   };
 })();

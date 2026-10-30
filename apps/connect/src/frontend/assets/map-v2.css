@@ -24,7 +24,8 @@
   --surface-1: #ffffff;          /* the sheet */
   --surface-2: #f5f1e8;          /* raised elements, tile placeholders */
   --logo-bg: #ffffff;            /* logos are drawn for a light page: they sit on white in BOTH looks */
-  --card-bg: transparent;        /* the v1 EntityCard body inside the sheet (its text is dark): light in the dark look */
+  --card-bg: transparent;        /* a surface for text that is drawn dark (Convince's note and row): light in the dark look */
+  --card-ink: #0a0908;           /* ...and that dark text, in either look */
   --map-base: #f9f9f6;           /* the live base style's background, for contrast checks */
 
   /* text */
@@ -114,7 +115,7 @@
   --pin-tail: 8px;
   --sheet-radius: var(--radius-lg);
   --sheet-peek-h: calc(88px + env(safe-area-inset-bottom, 0px));
-  --sheet-half-h: 46dvh;
+  --sheet-half-h: 40dvh;            /* founder, 2026-10-30: was 46dvh; a little lower, so more of the map shows */
   --sheet-full-h: calc(90dvh - env(safe-area-inset-top, 0px));
   --sheet-panel-w: 380px;
   --sheet-touch-max-w: 640px;
@@ -156,7 +157,16 @@
   --select-w: 3px;                          /* the gold ring of the nav button and a selected Explore card */
   --nav-btn: 56px;                          /* the folded nav: one round button */
   --nav-zone: calc(var(--nav-btn) + var(--space-3) * 2 + env(safe-area-inset-bottom, 0px));
-  --explore-card-w: 280px;                  /* the Explore row's large cards */
+  --explore-card-w: 280px;                  /* the Discover page's large cards */
+  /* founder, 2026-10-30: more map. The home panel's cards, its buttons and the map's own buttons are a little smaller
+     than the Discover page's (which the founder keeps as it is). The tap targets stay at least 36 px. */
+  --explore-row-card-w: 236px;              /* the cards in the home screen's Explore panel */
+  --explore-cover-ratio: 5 / 2;             /* ...and their picture: flatter than the Discover page's 16 / 9 */
+  --explore-grab-h: 24px;                   /* the panel's handle: 4 px to the eye, the panel's whole width to a thumb */
+  --explore-head-h: 36px;                   /* the title and See all line */
+  --icon-sm: 16px;                          /* the small line icons beside a fact or a category */
+  --explore-body-min: 160px;                /* the least the panel holds, so the category list always has room */
+  --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -772,6 +782,54 @@
   gap: var(--space-2);
   padding: var(--space-1) 0 var(--space-3);
 }
+/* HALF (founder, 2026-10-30): the same composition for EVERY listing, so no card shows more space under its tabs than
+   another. One line for the name and the subtitle, ONE row of actions that scrolls sideways (a second row would push
+   the content down by a different amount for each listing), no bio and no sort bar: under the actions sit the tab bar
+   (a Contributor) or the facts (a Place, an Event), always at the same height. The full sheet shows everything. */
+[data-mv2='sheet'][data-snap='half'] [data-mv2='name'] {
+  -webkit-line-clamp: 1;
+}
+[data-mv2='sheet'][data-snap='half'] [data-mv2='sub'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-mv2='sheet'][data-snap='half'] [data-mv2='actions'] {
+  /* the row runs to the screen's edge (the scroller's own side padding is given back), so the next pill is cut off there
+     and says it scrolls */
+  margin-inline: calc(var(--space-4) * -1);
+  padding-inline: var(--space-4);
+  scroll-padding-inline: var(--space-4);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+[data-mv2='sheet'][data-snap='half'] [data-mv2='actions']::-webkit-scrollbar {
+  display: none;
+}
+[data-mv2='sheet'][data-snap='half'] [data-mv2='actions'] > * {
+  flex: none;
+}
+/* a sideways swipe on the actions scrolls them; a vertical one is still the sheet's (as on a sideways row, 4i) */
+[data-mv2='sheet'][data-snap='half'] [data-mv2='scroller'] [data-mv2='actions'],
+[data-mv2='sheet'][data-snap='half'] [data-mv2='scroller'] [data-mv2='actions'] * {
+  touch-action: pan-x;
+}
+[data-mv2='sheet'][data-snap='half'] [data-mv2='bio'],
+[data-mv2='sheet'][data-snap='half'] [data-mv2='sort'] {
+  display: none;
+}
+/* PEEK: the header strip and nothing else. The content is hidden once the sheet has slid down (so it does not vanish
+   under the header as it goes), and at once on the way back up. The peek is taller than its header on a phone with a
+   home indicator (it includes the inset), and the first row of actions used to show below the name there. */
+[data-mv2='scroller'] {
+  transition: visibility 0s;
+}
+[data-mv2='sheet'][data-snap='peek'] [data-mv2='scroller'] {
+  visibility: hidden;
+  transition: visibility 0s linear var(--dur-base);
+}
 [data-mv2='action'] {
   display: inline-flex;
   align-items: center;
@@ -830,11 +888,89 @@
   margin: 0 0 var(--space-3);
   color: var(--text-2);
 }
+/* a Place's or an Event's body (ListingBody): no box of its own, the sheet's surface and the Contributor's rules.
+   The description is the bio (its rule above), the facts a plain list, the organiser and co-hosts links. */
 [data-mv2='card'] {
-  margin: 0 calc(var(--space-4) * -1);
-  padding: var(--space-3) 0 var(--space-1);
-  background: var(--card-bg);
+  margin: 0 0 var(--space-3);
+}
+[data-mv2='facts'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+}
+[data-mv2='fact'] {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+[data-mv2='fact'] > svg {
+  flex: none;
+  margin-top: calc((var(--lh-2) - var(--icon-sm)) / 2);
+  color: var(--accent-ink);
+}
+[data-mv2='fact-line'] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[data-mv2='fact-line'] b,
+[data-mv2='fact-link'] b {
+  color: var(--text-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='fact-link'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+[data-mv2='fact-link'] > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+[data-mv2='fact-link'] svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+[data-mv2='fact-inline'] {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  text-decoration: underline;
+  text-underline-offset: calc(var(--space-1) / 2);
+  cursor: pointer;
+}
+[data-mv2='fact-link']:focus-visible,
+[data-mv2='fact-inline']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='socials'] {
+  margin: 0 0 var(--space-3);
+}
+/* Convince's own text is drawn for a light surface, so it keeps one under it in either look */
+[data-mv2='convince'] {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
+  background: var(--card-bg);
+  color: var(--card-ink);
 }
 
 /* each tab is a full --hit tall; the bar's underline sits below them (#210: it used to take 1 px from the tabs) */
@@ -1876,10 +2012,11 @@ a[data-mv2='card2'],
     opacity: 0.9;
   }
 }
-/* the locate and zoom buttons MapLibre draws are 29 px; under Map v2 they are a thumb's size */
+/* the locate and zoom buttons MapLibre draws are 29 px; under Map v2 they are --ctrl-btn (founder, 2026-10-30: the
+   44 px they were took too much of the map) */
 .maplibregl-ctrl-group button {
-  width: var(--hit);
-  height: var(--hit);
+  width: var(--ctrl-btn);
+  height: var(--ctrl-btn);
 }
 /* ── 4h. Online in this area (app/map-v2-online.jsx, issue #259): the globe button and its list ──
    The button lives in a MapLibre control group, so it sits with zoom and locate and shares their look and their --hit size. One
@@ -2188,6 +2325,20 @@ a[data-mv2='card2'],
 [data-mv2='home'] .maplibregl-ctrl-bottom-right {
   margin-bottom: calc(var(--explore-h, 0px) + var(--nav-clear) + var(--space-2));
 }
+/* Zoom, un-zoom and locate (founder, 2026-10-30): on the home screen they are hidden while the Explore panel is up or a
+   card is chosen, and come back when the panel is lowered to its title strip (data-explore-min). That is for a phone
+   (data-narrow): a laptop has room and a mouse, and keeps them. The clean map (the nav's Map) keeps them always. Only the groups hide: the credit stays, and the map still zooms by pinch, double tap
+   and the keyboard. Opacity and visibility only (no layout change under the map). Only the groups that HOLD zoom or locate:
+   the "Online in this area" globe (map-v2-online.jsx) is a group in the same stack, and it is a feature, not a map control. */
+[data-mv2='home'] .maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in, .maplibregl-ctrl-geolocate) {
+  transition: opacity var(--dur-fast) linear;
+}
+[data-mv2='home'][data-narrow]:not([data-clean]):not([data-explore-min]) .maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in, .maplibregl-ctrl-geolocate) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) linear, visibility 0s linear var(--dur-fast);
+}
 /* the corner never takes a tap meant for a pin under it; only the MapTiler link inside it is a target */
 [data-mv2='home-corner'] {
   pointer-events: none;
@@ -2230,7 +2381,7 @@ a[data-mv2='card2'],
    ("Selected on the map"). The home screen shows this row OR the listing sheet, never both. Outside the sheet the
    row's touch rule falls back to plain pan-x (4i), so a sideways swipe scrolls the row and nothing else. */
 [data-mv2='explore'] {
-  --hrow-card-w: var(--explore-card-w);
+  --hrow-card-w: var(--explore-row-card-w);
   position: absolute;
   left: 0;
   right: 0;
@@ -2238,9 +2389,8 @@ a[data-mv2='card2'],
   z-index: var(--z-controls);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
   box-sizing: border-box;
-  padding: var(--space-2) var(--space-4) var(--space-3);
+  padding: 0 var(--space-4) var(--space-3);
   border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
   /* no backdrop-filter here: a blur this large is redrawn on every frame the map pans under it (frame time) */
   background: var(--explore-bg);
@@ -2255,13 +2405,35 @@ a[data-mv2='card2'],
   margin: 0 var(--space-2);
   border-radius: var(--sheet-radius);
 }
+/* the handle: tap or swipe it to lower the panel to its title strip (the map's own buttons come back) and to raise it */
+[data-mv2='explore-grab'] {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--explore-grab-h);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: none;
+}
+[data-mv2='explore-grab-bar'] {
+  width: var(--handle-w);
+  height: var(--handle-h);
+  border-radius: var(--radius-full);
+  background: var(--text-2);
+  opacity: 0.45;
+}
 [data-mv2='explore-head'] {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
+  min-height: var(--explore-head-h);
 }
 [data-mv2='explore-title'] {
+  flex: none;
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-3);
@@ -2269,22 +2441,157 @@ a[data-mv2='card2'],
   font-weight: var(--fw-semibold);
   color: var(--text-1);
 }
+/* "Explore" is the switch between the cards and the category list: it looks like the title it always was, with a chevron
+   that turns over. Its tap area reaches past its text (the ::after), so the line stays --explore-head-h tall. */
+[data-mv2='explore-switch'],
 [data-mv2='explore-all'] {
-  min-height: var(--hit);
-  padding: 0 var(--space-3);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--explore-head-h);
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-full);
   background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+[data-mv2='explore-switch']::after,
+[data-mv2='explore-all']::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+}
+[data-mv2='explore-switch'] svg {
+  flex: none;
   color: var(--accent-ink);
+  transition: transform var(--dur-base) var(--ease-enter);
+}
+[data-mv2='explore-switch'][aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+/* what the panel is filtered to, beside the title, while it is anything but All */
+[data-mv2='explore-filter'] {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-ink);
+  border-radius: var(--radius-full);
+  color: var(--accent-ink);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-mv2='explore-all'] {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--space-1);
+  white-space: nowrap;
+  color: var(--accent-ink);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='explore-grab']:focus-visible,
+[data-mv2='explore-switch']:focus-visible,
+[data-mv2='explore-all']:focus-visible,
+[data-mv2='cat']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* Lowered: the title strip only. The body keeps its box (and so the cards keep their scroll place); it is just not seen. */
+[data-mv2='explore'][data-min] {
+  padding-bottom: var(--space-1);
+}
+[data-mv2='explore'][data-min] [data-mv2='explore-body'] {
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+/* The cards and the category list share ONE box (the grid's only cell), so the panel is as tall for the list as for the
+   cards and nothing above the map moves. The view that is not shown is inert and slides out sideways; the list never
+   makes the box taller (contain: size), it scrolls inside it. */
+[data-mv2='explore-body'] {
+  display: grid;
+  min-height: var(--explore-body-min);
+}
+[data-mv2='explore-view'] {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  transition: transform var(--dur-base) var(--ease-enter), opacity var(--dur-base) var(--ease-enter);
+}
+[data-mv2='explore-view'][inert] {
+  opacity: 0;
+  visibility: hidden;
+  transition: transform var(--dur-base) var(--ease-enter), opacity var(--dur-base) var(--ease-enter), visibility 0s linear var(--dur-base);
+}
+[data-mv2='explore-view'][data-view='cards'][inert] {
+  transform: translateX(calc(var(--space-6) * -1));
+}
+[data-mv2='explore-view'][data-view='cats'][inert] {
+  transform: translateX(var(--space-6));
+}
+[data-mv2='explore-view'][data-view='cats'] {
+  contain: size;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+/* the category list: compact rows, two across, scrolled vertically; each row about half an Explore card (founder, 2026-10-30) */
+[data-mv2='cats'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+}
+[data-mv2='cat'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  color: var(--text-1);
   font-family: inherit;
   font-size: var(--fs-2);
   line-height: var(--lh-2);
   font-weight: var(--fw-semibold);
+  text-align: left;
   cursor: pointer;
 }
-[data-mv2='explore-all']:focus-visible {
-  outline: var(--focus-w) solid var(--focus-ring);
-  outline-offset: var(--focus-offset);
+[data-mv2='cat'] svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+/* a long name ("Churches & worship") takes two short lines in its half-width row rather than being cut */
+[data-mv2='cat-name'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: var(--lh-1);
+  overflow-wrap: anywhere;
+}
+[data-mv2='cat'][aria-pressed='true'] {
+  border-color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+[data-mv2='cat']:active {
+  transform: scale(0.98);
 }
 [data-mv2='explore-empty'] {
   margin: 0;
@@ -2303,6 +2610,18 @@ a[data-mv2='card2'],
   flex: 1 1 auto;
   min-width: 0;
   border-top: var(--select-w) solid var(--cat-c, var(--divider));
+}
+/* the home panel's cards (founder, 2026-10-30): narrower, a flatter picture and tighter padding, so more of the map shows */
+[data-mv2='explore'] [data-mv2='card2'] {
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+[data-mv2='explore'] [data-mv2='card-media'] {
+  aspect-ratio: var(--explore-cover-ratio);
+}
+[data-mv2='explore'] [data-mv2='explore-badge'] {
+  top: calc(var(--space-2) * 2);
+  left: calc(var(--space-2) * 2);
 }
 [data-mv2='explore-card'][data-selected] > [data-mv2='card2'] {
   border-color: var(--accent-ink);
@@ -2339,15 +2658,16 @@ a[data-mv2='card2'],
   overflow: hidden;
   white-space: nowrap;
 }
-[data-mv2='explore'] > [data-mv2='hrow'] > [data-mv2='hrow-head'] {
+[data-mv2='explore'] [data-mv2='explore-view'] > [data-mv2='hrow'] > [data-mv2='hrow-head'] {
   position: absolute;
-  top: var(--space-2);
+  top: calc(var(--explore-grab-h) - var(--space-1));
   right: var(--space-4);
 }
 [data-mv2='explore']:has([data-mv2='hrow-nav']) [data-mv2='explore-all'] {
   margin-right: calc(var(--hit) * 2 + var(--space-1) + var(--space-2));
 }
-/* "Selected", in words, over the picture's corner: it takes no space, so choosing a pin never resizes the row */
+/* What the next tap does ("Tap again to open"), in words, over the picture's corner: it takes no space, so choosing a
+   pin or a card never resizes the panel */
 [data-mv2='explore-badge'] {
   position: absolute;
   top: calc(var(--space-3) + var(--space-2));

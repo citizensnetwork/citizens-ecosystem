@@ -84,10 +84,10 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(page.locator("[data-map-sheet-header]")).toContainText("Church");
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     const h = await innerH(page);
-    await settled(page, h * 0.54); // half = 46 % of the viewport
+    await settled(page, h * 0.6); // half = 40 % of the viewport
   });
 
-  test("the handle steps half -> full -> half; the chevron at peek opens it; snap positions are 46 % / 90 % / peek", async ({ page }) => {
+  test("the handle steps half -> full -> half; the chevron at peek opens it; snap positions are 40 % / 90 % / peek", async ({ page }) => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
@@ -120,13 +120,13 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     // 1:1: halfway through a slow drag the sheet is where the pointer is (inline transform, no transition).
     // Start from rest: a drag that begins during the opening slide picks the sheet up where it visibly is,
     // so on a slow machine an unsettled start would shift every number below.
-    await settled(page, h * 0.54);
+    await settled(page, h * 0.6);
     const p = await handle();
     await page.mouse.move(p.x, p.y);
     await page.mouse.down();
     for (let i = 1; i <= 5; i++) { await page.mouse.move(p.x, p.y - 20 * i); await page.waitForTimeout(120); } // 0.17 px/ms: well under a flick
     const mid = await top(page);
-    expect(mid).toBeCloseTo(h * 0.54 - 100, -1);
+    expect(mid).toBeCloseTo(h * 0.6 - 100, -1);
     await page.mouse.up(); // released after only 100 px: nearest is still half
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
 
@@ -139,7 +139,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
 
     // slow drag a long way down: nearest is peek
-    await drag(page, await handle(), 330, 1200); // 0.28 px/ms
+    await drag(page, await handle(), Math.round(h * 0.4 - 88 + 10), 1200); // from half to just past the peek line: about 0.2 px/ms, well under a flick
     await expect(sheet(page)).toHaveAttribute("data-snap", "peek");
     await settled(page, h - 88);
 
@@ -313,7 +313,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
       return Math.round(((b.y + b.height / 2) / 844) * 100);
     };
     await expect.poll(pct, { timeout: 6000 }).toBeLessThan(35);
-    await settled(page, (await innerH(page)) * 0.54);
+    await settled(page, (await innerH(page)) * 0.6);
     expect(await pct()).toBeGreaterThanOrEqual(20);
     const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
     expect(b.y + b.height).toBeLessThan(await top(page)); // not hidden behind the sheet

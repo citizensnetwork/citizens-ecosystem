@@ -1,14 +1,15 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Map v2 bottom sheet (tracker P1-06 to P1-11)
 //  ------------------------------------------------------------------
-//  ONE sheet for a Contributor, a Place and an Event (founder D9). A Contributor
-//  gets the full treatment (header, actions, Events | News | Gallery); a Place or
-//  an Event shows its existing EntityCard body inside the same container.
+//  ONE sheet for a Contributor, a Place and an Event (founder D9). All three have the same header and the same row
+//  of action pills; a Contributor then has Events | News | Gallery, and a Place or an Event has its description and a
+//  plain list of facts (ListingBody; founder 2026-10-30: no white box, no second Follow button).
 //
 //  Three snap states, all `transform: translateY` on a box that is always the
 //  full height, so a drag animates nothing but transform:
-//    peek  a header strip (avatar, name, category · open state, chevron, close)
-//    half  46 % of the viewport (dvh): header and the action row
+//    peek  a header strip (avatar, name, category · open state, chevron, close); nothing below it is drawn
+//    half  40 % of the viewport (dvh, founder 2026-10-30: a little lower, more map): header, ONE row of actions
+//          (it scrolls sideways) and then the tab bar or the facts, at the same height for every listing
 //    full  90 % minus the top safe area: the content scrolls, and only here
 //  Opens at HALF (the reference's behaviour), drag is 1:1 with the pointer, and on
 //  release snaps by velocity (>= 0.5 px/ms) else to the nearest state; a flick down
@@ -192,10 +193,69 @@
       loadingMore && h('span', { 'data-mv2': 'tab', 'data-skeleton': '', 'aria-hidden': 'true' }, ' '));
   }
 
+  // ── a Place's or an Event's body ─────────────────────────────────
+  //  (#210, founder 2026-10-30) A Place and an Event follow the Contributor's rules. Their description reads as a bio does
+  //  (three lines, and not at half), their facts are a plain list, and what a person DOES with the listing (Follow, Connect,
+  //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
+  //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
+  //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
+  function ListingBody({ item, type, org, go, onClose }) {
+    const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
+    const Str = S();
+    const Icon = window.Icon;
+    const U = window.EntityCardUtils || {};
+    const isEvent = type === 'event';
+    const facts = [];
+    const where = isEvent ? item.location : item.address;
+    if (where) facts.push({ key: 'loc', icon: 'MapPin', text: where });
+    if (isEvent && item.date && U.fmtDate) facts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
+    if (!isEvent && item.openHours) facts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
+    if (isEvent) facts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
+    const bucket = !isEvent && window.UI.followerBucket ? window.UI.followerBucket(item.followerCount) : '';
+    if (bucket) facts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
+
+    const orgName = (org && org.name) || item.organizerName || '';
+    // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
+    const toProfile = (pid) => () => { go('profile', { id: pid }); onClose(); };
+    const organiser = orgName
+      ? h('li', { key: 'org', 'data-mv2': 'fact' },
+        org
+          ? h('button', { type: 'button', 'data-mv2': 'fact-link', onClick: toProfile(org.id) },
+            h('span', null, Str.by + ' ', h('b', null, orgName)), h(Icon, { name: 'BadgeCheck', size: 16 }), h(Icon, { name: 'ChevronRight', size: 18 }))
+          : h('span', { 'data-mv2': 'fact-line' }, h('span', null, Str.by + ' ', h('b', null, orgName))))
+      : null;
+    // P2-09: an event two Contributors run together names the others who ACCEPTED the invitation, each a link
+    const coHosts = isEvent && Array.isArray(item.coHostIds) ? item.coHostIds.map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean) : [];
+    const coHostLine = coHosts.length
+      ? h('li', { key: 'co', 'data-mv2': 'fact' },
+        h('span', { 'data-cohosts': '', 'data-mv2': 'fact-line' }, Str.with + ' ',
+          coHosts.map((c, i) => h(React.Fragment, { key: c.id },
+            i > 0 ? ', ' : null,
+            h('button', { type: 'button', 'data-cohost': c.id, 'data-mv2': 'fact-inline', onClick: toProfile(c.id) }, c.name)))))
+      : null;
+    // Convince (FEAT-04): the note under Consider and, when a mutual friend is considering, the Friends considering row.
+    // Both need a signed-in person and a real, upcoming event.
+    // (their text is drawn for a light surface, so they keep one under them in either look)
+    const convince = isEvent && realUser && window.CCConvince && window.CCConvince.eligibleEvent(item)
+      ? h('div', { 'data-mv2': 'convince' },
+        h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
+        h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: item.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
+      : null;
+    const socials = item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
+    const rows = facts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    return h('div', { 'data-mv2': 'card', 'data-entity-card': type },
+      item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null,
+      (rows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, rows, organiser, coHostLine) : null,
+      socials,
+      convince);
+  }
+
   // ── the sheet ────────────────────────────────────────────────────
   function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
+    // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
+    const { followedPlaces, togglePlaceFollow, connected, toggleConnect, considering, toggleConsider, startConversationWith } = app;
     const Str = S();
     const wide = useWide();
     const root = useRef(null);
@@ -351,9 +411,10 @@
       return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5).
+    // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5). Not the expanded sheet
+    // (#210): it covers the whole map, and the person's map and Explore panel must be exactly as they left them on close.
     useEffect(() => {
-      if (!onOccupy) return undefined;
+      if (!onOccupy || expanded) return undefined;
       let pad;
       if (wide) pad = { top: 0, right: 0, bottom: 0, left: cssLen('calc(var(--sheet-panel-w) + 2 * var(--space-3))') };
       else if (snap === 'peek') pad = { top: 0, right: 0, left: 0, bottom: cssLen('var(--sheet-peek-h)') };
@@ -542,12 +603,24 @@
     };
 
     // ── actions ─────────────────────────────────────────────────────
+    // One row of the same pills for a Contributor, a Place and an Event (founder, 2026-10-30): Directions first, then the
+    // one thing a person does with the listing (Follow, or Connect for an event), then Save (Consider for an event), Share,
+    // and the listing's own links. The card's own gradient Follow button and its white box are gone.
     const actions = [];
     if (dir) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true, primary: true }));
-    // P2-04: Follow, for a Contributor that is not you (a Place and an Event show their card's own Follow / Consider)
+    // P2-04: Follow, for a Contributor that is not you
     const following = isContributor && followedOrgs.has(item.id);
     if (isContributor && !(realUser && realUser.id === item.id)) {
       actions.push(h(Action, { key: 'follow', icon: 'Heart', label: following ? Str.following : Str.follow, on: following, onClick: () => toggleFollow(item.id, name) }));
+    }
+    // a Place is followed the way it always was (the card's Follow), an Event is Connected to
+    if (type === 'place') {
+      const on = followedPlaces.has(item.id);
+      actions.push(h(Action, { key: 'follow', icon: 'Heart', label: on ? Str.following : Str.follow, on, onClick: () => togglePlaceFollow(item.id, name) }));
+    }
+    if (type === 'event') {
+      const on = connected.has(item.id);
+      actions.push(h(Action, { key: 'connect', icon: on ? 'Check' : 'CalendarCheck', label: on ? Str.connected : Str.connect, on, onClick: () => toggleConnect(item.id) }));
     }
     // P2-04: Save, a PRIVATE bookmark for a Contributor (not you) or a Place; an Event keeps its Consider bookmark. Never counted,
     // never shown to the listing: the only trace is the person's own list in Settings.
@@ -556,10 +629,18 @@
       const saved = (saveKind === 'place' ? savedPlaces : savedContributors).has(item.id);
       actions.push(h(Action, { key: 'save', icon: 'Bookmark', label: saved ? Str.saved : Str.save, on: saved, onClick: () => toggleSave(saveKind, item.id, name) }));
     }
+    if (type === 'event') {
+      const on = considering.has(item.id);
+      actions.push(h(Action, { key: 'consider', icon: 'Bookmark', label: on ? Str.considering : Str.consider, on, onClick: () => toggleConsider(item.id) }));
+    }
     actions.push(h(Action, { key: 'share', icon: 'Share2', label: Str.share, onClick: () => shareLink({ page: navTarget(type), params: { id } }) }));
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
     if (tel) actions.push(h(Action, { key: 'tel', icon: 'Phone', label: Str.call, href: tel }));
     if (email && !site) actions.push(h(Action, { key: 'mail', icon: 'Mail', label: Str.email, href: email }));
+    // a Place or an Event can be written to through its organiser, when the organiser is a Contributor in the directory
+    if (!isContributor && org) {
+      actions.push(h(Action, { key: 'msg', icon: 'MessageCircle', label: Str.message, onClick: () => startConversationWith(org.name, org.profilePhoto, true, org.id) }));
+    }
     // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
     // action row stays at the height it had and half still shows the header, the actions and the first tab
     // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
@@ -580,7 +661,7 @@
     // ── body ────────────────────────────────────────────────────────
     let body;
     if (!isContributor) {
-      body = h('div', { 'data-mv2': 'card' }, h(window.EntityCard, { item: Object.assign({}, item, { type }), layout: 'sheet' }));
+      body = h(ListingBody, { item, type, org, go, onClose });
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;

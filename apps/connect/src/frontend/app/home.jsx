@@ -83,6 +83,23 @@
     });
   }
 
+  // #210: a card tapped on the home screen moves the map so its pin sits in the OPEN part of the map: below the search
+  // bar, above the Explore panel (measured, as the map's own first framing is), with OPEN_GAP of clear map around it.
+  const OPEN_GAP = 28;
+  const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
+  function openMapPad(root) {
+    if (!root) return null;
+    const box = root.getBoundingClientRect();
+    const rect = (sel) => { const el = root.querySelector(sel); return el && !el.hidden ? el.getBoundingClientRect() : null; };
+    const top = rect("[data-mv2='home-top']");
+    const row = rect("[data-mv2='explore']");
+    return {
+      top: (top ? Math.max(0, top.bottom - box.top) : 0) + OPEN_GAP,
+      bottom: (row ? Math.max(0, box.bottom - row.top) : 0) + OPEN_GAP,
+      left: 0, right: 0,
+    };
+  }
+
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
@@ -101,23 +118,37 @@
     // one state update per crossing, not one per zoom frame.
     const [zoomBand, setZoomBand] = useState('all');
     const pillsRef = useRef(null);
-    // Map v2 (#210): the pill (a group, Events or All), the listing whose sheet is open (a card was tapped; the pin
-    // tap only highlights its card), and whether the keyboard chose the pin (then focus follows to its card).
+    // Map v2 (#210): the pill (a group, Events or All: chosen inside the Explore panel), the listing whose full sheet is
+    // open (a chosen card was tapped AGAIN; the first tap only chooses it and moves the map), whether the panel is
+    // lowered to its title strip, and which pin was just tapped (so the panel brings that card into view; a card tap
+    // never does, the panel stays exactly where it is).
     const v2 = !!(window.isMapV2 && window.isMapV2());
     const X = window.MapV2Explore;
     const [pill, setPill] = useState('all');
     const [sheet, setSheet] = useState(null);
-    const [focusCard, setFocusCard] = useState(false);
-    const [pinTaps, setPinTaps] = useState(0);   // every pin tap, so a second tap on the same pin scrolls to its card again
+    const [min, setMin] = useState(false);
+    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
     const rootRef = useRef(null);
+    const skipFrame = useRef(false);
+    const minRef = useRef(false);
     const narrow = X ? X.useNarrow() : false;
     const clean = v2 && !!(app.nav && app.nav.params && app.nav.params.view === 'map');
     const pillTest = useMemo(() => (X && pill !== 'all' ? (m) => X.pillMatches(pill, m) : null), [X, pill]);
-    // The row's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
+    // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
+    // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
       if (!rootRef.current) return;
       rootRef.current.style.setProperty('--explore-h', px + 'px');
-      if (px > 0 && mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
+      if (px <= 0) return;
+      if (skipFrame.current) { skipFrame.current = false; return; }
+      if (mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
+    }, []);
+    // Lower or raise the panel (the handle, or a pin tap that needs its card). Only a real change skips the next framing.
+    const lower = useCallback((down) => {
+      if (minRef.current === down) return;
+      minRef.current = down;
+      skipFrame.current = true;
+      setMin(down);
     }, []);
 
     const q = query.trim().toLowerCase();
@@ -154,36 +185,44 @@
         setSelected(id); setSelType(t); setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
       };
       const closeSheet = () => setSheet(null);
+      // The first tap on a card CHOOSES it: it keeps its place in the panel (outlined, "Tap again to open"), and the map
+      // eases to its pin, clear of the search bar above and the panel below. The second tap on the chosen card opens the
+      // full listing; closing that returns to this very panel and map (the map never moved for it).
+      const tapCard = (id, t) => {
+        if (selected === id && selType === t) { openSheet(id, t); return; }
+        setSheet(null); setSelected(id); setSelType(t);
+        if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
+      };
       const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
       const showSheet = sheet && window.MapV2Sheet;
       const XS = window.MapV2Strings.explore;
-      return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined },
+      return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-explore-min': min ? '' : undefined },
         React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
           React.createElement(window.StylizedMap, {
             markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
-            // #210: a pin highlights its card in the Explore row (the row scrolls to it); the card opens the sheet.
-            // The clean map (the nav's Map) has no row, so there a pin opens the sheet as before. Ideas keep their panel.
+            // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
+            // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
             onSelect: (id, t) => {
               if (t === 'idea') { setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
               if (clean) { openSheet(id, t); return; }
               const a = document.activeElement;
-              setFocusCard(!!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })()));
+              const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
               // A second tap on the same pin keeps it chosen (and brings its card back into view); a tap on the map clears it.
-              setSheet(null); setSelected(id); setSelType(t); setPinTaps((n) => n + 1);
+              // A pin tap raises a lowered panel: its card has to be there to be chosen.
+              setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 })); lower(false);
             },
             onDismissBubble: dismissBubble,
             onZoomBandChange: setZoomBand,
           })),
 
-        // top: search and the account button, round and glassy (#210); the pills under them, except on the clean map
+        // top: search and the account button, round and glassy (#210). The category choice is inside the Explore panel now.
         React.createElement('div', { 'data-mv2': 'home-top' },
           React.createElement('div', { 'data-mv2': 'home-bar' },
             React.createElement('label', { 'data-mv2': 'home-search' },
               React.createElement(Icon, { name: 'Search', size: 18 }),
               React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
               query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
-            React.createElement(window.AccountButton, { variant: 'round' })),
-          !clean && React.createElement(X.Pills, { value: pill, onChange: setPill, ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v) })),
+            React.createElement(window.AccountButton, { variant: 'round' }))),
 
         // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
         React.createElement('div', { 'data-mv2': 'home-corner' },
@@ -197,15 +236,16 @@
 
         window.MapV2Online && React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
 
-        // ONE bottom area: the Explore row, or the sheet of the card that was tapped, never both. The row stays mounted
-        // (hidden) under the sheet, so it keeps its place and the card that opened the sheet gets focus back.
+        // ONE bottom area: the Explore panel, or the full listing of the card that was tapped twice, never both. The panel
+        // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
         !clean && React.createElement(X.Explore, {
           hidden: !!showSheet,
-          markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, focusCard, tap: pinTaps,
-          onOpen: openSheet, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
+          markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
+          pill, onPill: setPill, ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
+          onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
         }),
-        // a card opens the expanded sheet (#210: full, its cover and distance, swipe down back to the row); the clean
-        // map's pin opens today's half sheet
+        // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
+        // panel; it never moves the map); the clean map's pin opens today's half sheet
         showSheet && React.createElement(window.MapV2Sheet, {
           id: sheet.id, type: sheet.type, expanded: !clean, view: sheet.view,
           onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
