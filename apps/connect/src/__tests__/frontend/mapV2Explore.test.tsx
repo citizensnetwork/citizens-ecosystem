@@ -220,6 +220,21 @@ describe("Explore", () => {
     expect(order()).toEqual(["b", "a"]);
   });
 
+  it("holds the ranking only once the map has told it where it is (a pin tapped before the first reading still gets its distances)", () => {
+    vi.useFakeTimers();
+    let now: { centre: typeof ORIGIN | null; user: null } = { centre: null, user: null };
+    let tell: () => void = () => {};
+    const early = { current: { view: () => now, onView: (fn: () => void) => { tell = fn; return () => {}; } } };
+    const here = [mk("a", 1, { title: "A" }), mk("b", 5, { title: "B" })];
+    // a listing is chosen while the map has not reported a position yet: the cards have no distance line
+    render(React.createElement(X.Explore, { markers: here, sources, apiRef: early, selectedId: "a", onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    expect(document.querySelector("[data-explore-id='a'] [data-mv2='row-meta']")).toBeNull();
+    // the first reading arrives: it must not be held back by the choice
+    now = { centre: ORIGIN, user: null };
+    act(() => { tell(); vi.advanceTimersByTime(200); });
+    expect(document.querySelector("[data-explore-id='a'] [data-mv2='row-meta']")!.textContent).toContain("from the map centre");
+  });
+
   it("makes its title a switch to the category list: the groups, Events and Ideas, a check on what is on", () => {
     const onPill = vi.fn();
     const onIdeas = vi.fn();
@@ -431,7 +446,7 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261030a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261031a"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));

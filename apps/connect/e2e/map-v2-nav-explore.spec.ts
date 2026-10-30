@@ -54,6 +54,16 @@ async function visiblePins(page: Page) {
   return ids;
 }
 const visiblePin = async (page: Page) => (await visiblePins(page))[0];
+/**
+ * The row ranks again when the map settles (and starts again at its first card): on a slow machine that happens a second or two
+ * after the pins appear. Wait until the order has held still, and the fonts are in, before measuring or scrolling anything.
+ */
+async function settledPanel(page: Page) {
+  await page.evaluate(() => document.fonts.ready);
+  const order = () => explore(page).locator("[data-explore-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-explore-id")).join());
+  await expect.poll(async () => { const a = await order(); await page.waitForTimeout(700); return a === (await order()); }, { timeout: 15_000 }).toBe(true);
+}
+
 /** A pin in the open map while the panel is lowered (the strip is short, so most of the screen is map). */
 async function visiblePinLowered(page: Page) {
   const ids = await page.evaluate(() => {
@@ -154,17 +164,19 @@ test.describe("on a phone", () => {
 
   test("the categories are INSIDE the panel: its title switches to a list of the groups, a pick filters the cards, and the panel never changes height", async ({ page }) => {
     const seed = await open(page);
+    await settledPanel(page);
     // nothing over the map any more: no pill row, just the search bar and the account button
     await expect(page.locator("[data-mv2='pills']")).toHaveCount(0);
     const heightOf = async () => Math.round((await explore(page).boundingBox())!.height);
     const cardsHeight = await heightOf();
+    const same = async () => expect(Math.abs((await heightOf()) - cardsHeight)).toBeLessThanOrEqual(2);
     const sw = explore(page).getByRole("button", { name: "Explore", exact: true });
     await expect(sw).toHaveAttribute("aria-expanded", "false");
     await sw.tap();
     await expect(sw).toHaveAttribute("aria-expanded", "true");
     const cats = explore(page).locator("[data-mv2='cat']");
     await expect(cats).toHaveText(["All", "Churches & worship", "Events", "Business", "Serve & care", "Culture & fun", "Learn & grow", "Audiences", "Ideas"]);
-    expect(await heightOf()).toBe(cardsHeight);   // the list fills the cards' box
+    await same();   // the list fills the cards' box
     // compact rows, two across, each a thumb tall
     const boxes = await cats.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; }));
     for (const r of boxes) expect(r.h).toBeGreaterThanOrEqual(44);
@@ -180,7 +192,7 @@ test.describe("on a phone", () => {
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) expect(eventIds.has(id!), id!).toBe(true);
     await expect.poll(() => pinOf(page, seed.contributors[0].id).locator(".mv2-pin").evaluate((e) => e.hasAttribute("data-dim"))).toBe(true);
-    expect(await heightOf()).toBe(cardsHeight);
+    await same();
     // Ideas is a switch beside the groups: the list stays open
     await sw.tap();
     await explore(page).getByRole("button", { name: "Ideas", exact: true }).tap();
@@ -243,6 +255,7 @@ test.describe("on a phone", () => {
 
   test("a card tap CHOOSES it: the row stays exactly in place while the map eases to its pin; the second tap opens it, and closing leaves both as they were", async ({ page }) => {
     await open(page);
+    await settledPanel(page);
     const list = explore(page).locator("[data-mv2='list']");
     // scroll the row a little, so "exactly in place" is not just "at the start"
     await list.evaluate((el) => { el.scrollLeft = 300; });

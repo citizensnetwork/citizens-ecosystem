@@ -212,6 +212,7 @@
     const switchBtn = useRef(null);
     const views = useRef({});
     const readView = useRef(null);
+    const viewed = useRef(!!(view.centre || view.user));   // the map has told us where it is at least once
     const chosen = useRef(props.selectedId);
     chosen.current = props.selectedId;
     const grab = useRef(null);
@@ -229,7 +230,10 @@
         const v = api.current ? api.current.view() : null;
         if (!v) return;
         lastView = v;
-        if (chosen.current) return;
+        // The hold starts only once the panel knows where the map is: a pin tapped before the first reading must not leave
+        // every card without its distance until the choice is cleared.
+        if (chosen.current && viewed.current) return;
+        if (v.centre || v.user) viewed.current = true;
         setView((p) => {
           const same = (a, b) => (a === b) || (a && b && a.lat === b.lat && a.lng === b.lng);
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;

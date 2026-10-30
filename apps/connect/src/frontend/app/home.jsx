@@ -131,6 +131,7 @@
     const rootRef = useRef(null);
     const skipFrame = useRef(false);
     const minRef = useRef(false);
+    const chosen = useRef({ id: null, type: null });   // the latest choice, so a second tap never reads a render's old one
     const narrow = X ? X.useNarrow() : false;
     const clean = v2 && !!(app.nav && app.nav.params && app.nav.params.view === 'map');
     const pillTest = useMemo(() => (X && pill !== 'all' ? (m) => X.pillMatches(pill, m) : null), [X, pill]);
@@ -188,8 +189,10 @@
       // The first tap on a card CHOOSES it: it keeps its place in the panel (outlined, "Tap again to open"), and the map
       // eases to its pin, clear of the search bar above and the panel below. The second tap on the chosen card opens the
       // full listing; closing that returns to this very panel and map (the map never moved for it).
+      chosen.current = { id: selected, type: selType };
       const tapCard = (id, t) => {
-        if (selected === id && selType === t) { openSheet(id, t); return; }
+        if (chosen.current.id === id && chosen.current.type === t) { openSheet(id, t); return; }
+        chosen.current = { id, type: t };
         setSheet(null); setSelected(id); setSelType(t);
         if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
       };
