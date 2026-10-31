@@ -180,10 +180,10 @@ describe("the strings and the wiring", () => {
 
   it("the sheet shows the list only from the map's own markers, and a pick goes back to the home screen's selection", () => {
     const sheet = read("src/frontend/app/map-v2-sheet.jsx");
-    expect(sheet).toContain("function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick })");
+    expect(sheet).toContain("function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view })");
     expect(sheet).toContain("N.rank(item, nearby");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("nearby: markers");
-    expect(home).toContain("onPick: (id, t) => { setSelected(id); setSelType(t);");
+    expect(home).toContain("onPick: (id, t) => openSheet(id, t, sheet.view)");
   });
 });

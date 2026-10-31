@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 import {
   touchSession, swipe, flickTouch, swipeThenCancel, tapTouch, recordPointerEvents, pointerCounts, resetPointerCounts, type Pt,
 } from "./support/touch";
@@ -20,7 +20,6 @@ const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
 const SHEET = "[data-mv2='sheet']";
 const sheet = (page: Page) => page.locator(SHEET);
 const scroller = (page: Page) => page.locator("[data-mv2='scroller']");
-const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 const snapOf = (page: Page) => sheet(page).getAttribute("data-snap");
 const top = (page: Page) => sheet(page).evaluate((e) => e.getBoundingClientRect().top);
 const innerH = (page: Page) => page.evaluate(() => window.innerHeight);
@@ -37,7 +36,7 @@ async function at(loc: Locator): Promise<Pt> {
   return { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) };
 }
 
-/** A phone with a thumb: the sheet opens by a real tap on the pin. */
+/** A phone with a thumb: the sheet opens by a real tap on the pin's card in the Explore row (#210). */
 async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "contributor", size?: { width: number; height: number }) {
   if (size) await page.setViewportSize(size);
   const seed = seed0();
@@ -49,12 +48,12 @@ async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "
   const lng = (pick as unknown as { physical_longitude?: number; longitude?: number }).physical_longitude ?? (pick as unknown as { longitude: number }).longitude;
   const lat = (pick as unknown as { physical_latitude?: number; latitude?: number }).physical_latitude ?? (pick as unknown as { latitude: number }).latitude;
   await jump(page, lng, lat, 15.5);
-  await pinOf(page, pick.id).tap({ force: true });
+  await openPinSheet(page, pick.id, "tap");
   await expect(sheet(page)).toBeVisible();
   // a Contributor's photos arrive from the per-slug fetch: wait for the Gallery panel so the content has its real height
   if (kind === "contributor") await expect(page.getByRole("tab", { name: "Gallery" })).toBeVisible();
   const h = await innerH(page);
-  await expect.poll(() => top(page), { timeout: 3000 }).toBeCloseTo(h * 0.54, -1);
+  await expect.poll(() => top(page), { timeout: 3000 }).toBeCloseTo(h * 0.6, -1);
   const cdp = await touchSession(page);
   return { cdp, h, seed };
 }
@@ -84,11 +83,12 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     const starts: Record<string, Locator> = {
       header: page.locator("[data-mv2='name']"),
       actions: page.locator("[data-mv2='actions'] [data-mv2='action']").first(),
-      content: scroller(page).locator("[data-mv2='bio'], [data-mv2='tabs'], [data-mv2='panel'], [data-mv2='empty']").first(),
+      // (the bio is not drawn at half: under the actions there is the tab bar, the facts, or the empty note)
+      content: scroller(page).locator("[data-mv2='tabs'], [data-mv2='panel'], [data-mv2='facts'], [data-mv2='empty']").first(),
     };
     for (const [label, loc] of Object.entries(starts)) {
       await goTo(page, "half");
-      await settledAt(page, h * 0.54);
+      await settledAt(page, h * 0.6);
       const p = await at(loc);
       await swipe(cdp, p, -260, { ms: 520, steps: 16 });
       await expect.poll(() => snapOf(page), { message: `swipe up from the ${label} (${Math.round(p.y)}px)`, timeout: 3000 }).toBe("full");
@@ -105,11 +105,11 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     let p = await at(scroller(page).locator("[data-mv2='actions']"));
     await swipe(cdp, p, 260, { ms: 900, steps: 18 });
     await expect.poll(() => snapOf(page), { message: "full -> half", timeout: 3000 }).toBe("half");
-    await settledAt(page, h * 0.54);
+    await settledAt(page, h * 0.6);
 
     // half -> peek: a long slow drag starting on the content
     p = await at(scroller(page).locator("[data-mv2='actions']"));
-    await swipe(cdp, p, 300, { ms: 1000, steps: 20 });
+    await swipe(cdp, p, Math.round(h * 0.4 - 108), { ms: 1000, steps: 20 });   // from half to the peek line, not past it (that closes)
     await expect.poll(() => snapOf(page), { message: "half -> peek", timeout: 3000 }).toBe("peek");
 
     // peek -> closed: a flick down on the header
@@ -152,7 +152,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     expect(await snapOf(page)).toBe("full");
     await swipe(cdp, { x: p.x, y: 300 }, 260, { ms: 900, steps: 18 });
     await expect.poll(() => snapOf(page), { message: "second swipe down collapses", timeout: 3000 }).toBe("half");
-    await settledAt(page, h * 0.54);
+    await settledAt(page, h * 0.6);
   });
 
   test("a quick flick moves ONE state in its direction, from the header and from the content", async ({ page }) => {
@@ -163,7 +163,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     await settledAt(page, h * 0.1);
     await flickTouch(cdp, await at(page.locator("[data-mv2='name']")), 160);
     await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("half");
-    await settledAt(page, h * 0.54);
+    await settledAt(page, h * 0.6);
     await flickTouch(cdp, await at(scroller(page).locator("[data-mv2='actions']")), 160);
     await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("peek");
     await settledAt(page, h - 88);
@@ -194,7 +194,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     const snap = await snapOf(page);
     expect(["peek", "half", "full"]).toContain(snap);
     const y = await top(page);
-    const want = { peek: h - 88, half: h * 0.54, full: h * 0.1 }[snap as "peek" | "half" | "full"];
+    const want = { peek: h - 88, half: h * 0.6, full: h * 0.1 }[snap as "peek" | "half" | "full"];
     expect(y).toBeCloseTo(want, -1);
     // the inline transform from the abandoned drag is gone
     expect(await sheet(page).evaluate((e) => (e as HTMLElement).style.transform)).toBe("");
@@ -269,7 +269,7 @@ test.describe("R7 content position and the mouse (phone width)", () => {
       await openMap(page, "/?map=v2", 8);
       const c = seed.contributors[0];
       await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-      await pinOf(page, c.id).click({ force: true });
+      await openPinSheet(page, c.id);
       await expect(sheet(page)).toBeVisible();
       await page.locator("[data-mv2='handle']").click();
       await expect.poll(() => snapOf(page)).toBe("full");
@@ -321,7 +321,7 @@ for (const kind of ["place", "event"] as const) {
       await settledAt(page, h * 0.1);
       await swipe(cdp, await at(scroller(page).locator("[data-mv2='card']")), 260, { ms: 900, steps: 18 });
       await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("half");
-      await settledAt(page, h * 0.54);
+      await settledAt(page, h * 0.6);
     });
   });
 }
@@ -360,7 +360,7 @@ test.describe("D16 a desktop with a mouse (1280 x 900)", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await pinOf(page, c.id).click({ force: true });
+    await openPinSheet(page, c.id);
     await expect(sheet(page)).toHaveAttribute("data-wide", "1");
     await expect(sheet(page)).toHaveAttribute("data-snap", "panel");
     await expect(page.locator("[data-mv2='handle']")).toHaveCount(0);

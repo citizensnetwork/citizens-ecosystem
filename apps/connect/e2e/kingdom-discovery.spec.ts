@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { goTo, mapReady, setRoleAndGo } from "./support/app-hooks";
+import { openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Connect v1 golden path (founder decision D-12): a self-serve Contributor
@@ -173,10 +174,10 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
 
-    // ── Click the pin → the bottom sheet every pin opens (Map v2, the default
+    // ── The pin → its card in the Explore row (#210) → the bottom sheet (Map v2, the default
     //     since D15; it used to jump straight to the full page), and its
     //     "View Full Profile" button is the way in to the Contributor's profile ──
-    await marker.click();
+    await openListing(page, (await marker.getAttribute("data-cc-id"))!);
     const preview = page.locator("[data-mv2='sheet']");
     await expect(preview).toBeVisible({ timeout: 10_000 });
     await expect(preview.getByText(ORG_NAME).first()).toBeVisible();
