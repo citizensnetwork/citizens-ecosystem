@@ -36,8 +36,8 @@ try {
   const browse = kinds(s.log.requests.slice(m));
   m = mark();
   const darkId = process.argv[2] || 'dataviz-dark';
-  // the app's own path when Map v2 is on (the phone turns dark), the raw style swap otherwise
-  const v2 = await s.page.evaluate(() => !!(window.MapV2 && window.isMapV2()));
+  // the app's own path when Map v2 is loaded (the phone turns dark), the raw style swap otherwise
+  const v2 = await s.page.evaluate(() => !!window.MapV2);
   if (v2) await s.page.emulateMedia({ colorScheme: 'dark' });
   const swapped = await s.page.evaluate(async ([id, already]) => {
     const key = window.__CC_ENV.MAPTILER_KEY;

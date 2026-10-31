@@ -1,10 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockMapNetwork, openMap, smallSeed, FIXED_NOW, openListing } from "./support/map-v2";
-import { goTo, useOldMap } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
-//  Map v2 (tracker docs/MAP_UX_TRACKER.md). On by default since D15 (2026-10-13);
-//  `?map=v1` opts a device out. Most specs still pass `?map=v2`: it is the same as the default.
+//  Map v2 (tracker docs/MAP_UX_TRACKER.md): the only map since the old one was deleted (issue #179).
+//  Most specs still pass `?map=v2`: nothing reads it any more, it is the same as no query.
 //  Hermetic: the same fake network as the other map specs (no real Supabase
 //  or MapTiler), clock frozen. This file grows with each Phase 1 item; the
 //  describe blocks are named after the item they guard.
@@ -32,12 +31,11 @@ const idle = (page: Page) =>
       }),
   );
 
-const isOn = (page: Page) => page.evaluate(() => (window as unknown as { isMapV2: () => boolean }).isMapV2());
 const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
 const stored = (page: Page) => page.evaluate(() => localStorage.getItem("cc_map_v2"));
 
-// Map v2 is the default since D15 (2026-10-13); `?map=v1` is the escape hatch, remembered per device.
-test.describe("P1-01 the Map v2 flag (on by default; ?map=v1 opts a device out)", () => {
+// Map v2 is the only map (D15, 2026-10-13; the old one was deleted in issue #179). map-v1-retired.spec.ts covers `?map=v1`.
+test.describe("P1-01 Map v2 is the map", () => {
   test("a first visit gets Map v2: tokens loaded, light look on a light phone, nothing written to storage", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await mockMapNetwork(page);
@@ -45,7 +43,6 @@ test.describe("P1-01 the Map v2 flag (on by default; ?map=v1 opts a device out)"
     await openMap(page, "/", 8);
     await css;
 
-    expect(await isOn(page)).toBe(true);
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
     expect(await theme(page)).toBe("light");
     // the token file is really applied: --accent resolves to gold
@@ -54,57 +51,11 @@ test.describe("P1-01 the Map v2 flag (on by default; ?map=v1 opts a device out)"
     expect(await stored(page)).toBeNull();
   });
 
-  test("?map=v2 is the same as the default and stores nothing", async ({ page }) => {
+  test("?map=v2 is the same as no query and stores nothing", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
-    expect(await isOn(page)).toBe(true);
-    expect(await stored(page)).toBeNull();
-  });
-
-  test("?map=v1 opts a device out: the old map, no Map v2 stylesheet, nothing set on the page, remembered as v1", async ({ page }) => {
-    const requested: string[] = [];
-    page.on("request", (r) => requested.push(r.url()));
-    await mockMapNetwork(page);
-    await openMap(page, "/?map=v1", 8);
-
-    expect(requested.filter((u) => u.includes("map-v2"))).toEqual([]);
-    expect(await theme(page)).toBeNull();
-    expect(await isOn(page)).toBe(false);
-    expect(await stored(page)).toBe("v1");
-  });
-
-  test("the opt-out survives a reload and a screen change that rewrites the address bar", async ({ page }) => {
-    await mockMapNetwork(page);
-    await openMap(page, "/?map=v1", 8);
-
-    // go() rebuilds the URL from the route table, so ?map=v1 is gone from the address bar...
-    await goTo(page, "kingdom-discovery");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    expect(new URL(page.url()).search).toBe("");
-    // ...and a plain reload still has the old map, from storage.
-    await page.reload();
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    expect(await isOn(page)).toBe(false);
-    expect(await theme(page)).toBeNull();
-  });
-
-  test("?map=v2 brings a device back and forgets the opt-out", async ({ page }) => {
-    await mockMapNetwork(page);
-    await openMap(page, "/?map=v1", 8);
-    expect(await isOn(page)).toBe(false);
-
-    await page.goto("/?map=v2");
-    await page.waitForSelector('[data-screen="discover"]');
-    expect(await isOn(page)).toBe(true);
     expect(await theme(page)).not.toBeNull();
     expect(await stored(page)).toBeNull();
-  });
-
-  test("a device that stored 'v2' while Map v2 was behind the flag stays on", async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem("cc_map_v2", "v2"));
-    await mockMapNetwork(page);
-    await openMap(page, "/", 8);
-    expect(await isOn(page)).toBe(true);
   });
 });
 
@@ -124,7 +75,7 @@ test.describe("P1-03 motion tokens and reduced motion", () => {
   });
 });
 
-test.describe("P1-04 the pin (flag on)", () => {
+test.describe("P1-04 the pin", () => {
   test("a Contributor pin is a glyph pin below zoom 15 and a logo pin at and above it", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
@@ -159,6 +110,22 @@ test.describe("P1-04 the pin (flag on)", () => {
     await expect(pin).toHaveClass(/is-loaded/);
     await expect.poll(() => pin.locator("[data-mv2='logo-wrap']").evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
     await expect.poll(() => pin.locator("[data-mv2='body']").evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).a)).toBeCloseTo(1.6, 2);
+  });
+
+  test("a logo that fails to load leaves the category glyph, never a dead image", async ({ page }) => {
+    const seed = smallSeed(FIXED_NOW) as Seed;
+    (seed.contributors[0] as { logo_url: string }).logo_url = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
+    await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
+    await mockMapNetwork(page, seed);
+    await openMap(page, "/", 8);
+    const c0 = seed.contributors[0] as { physical_longitude: number; physical_latitude: number };
+    const pin = page.locator(".mv2-pin--contributor").first();
+    await jump(page, c0.physical_longitude, c0.physical_latitude, 15.5);
+    await idle(page);
+    await expect(pin).toHaveClass(/is-broken/);
+    await expect(pin).not.toHaveClass(/is-loaded/);
+    await expect(pin.locator("[data-mv2='glyph']")).toBeVisible();
+    expect(await pin.locator("[data-mv2='logo-wrap']").evaluate((e) => getComputedStyle(e).opacity)).toBe("0");
   });
 
   test("every pin is a labelled, focusable control", async ({ page }) => {
@@ -277,26 +244,12 @@ test.describe("P1-04 the pin (flag on)", () => {
   });
 });
 
-test.describe("flag off: v1 pins are untouched", () => {
-  test("no Map v2 class, role or tabindex on any marker, and the v1 logo pin is still drawn at every zoom", async ({ page }) => {
-    await useOldMap(page);
-    await mockMapNetwork(page);
-    await openMap(page, "/", 8);
-    expect(await page.locator(".mv2-marker, .mv2-pin").count()).toBe(0);
-    expect(await page.locator(".maplibregl-marker[role]").count()).toBe(0);
-    await expect(page.locator('[data-cc-pin="contributor-logo"]').first()).toBeAttached();
-  });
-});
-
 test.describe("E23 and the 12.3 states", () => {
-  test("flag on: the locate and zoom buttons are 36 px (founder, 2026-10-30); flag off: they keep their v1 size", async ({ page }) => {
+  test("the locate and zoom buttons are 36 px (founder, 2026-10-30)", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
     const size = () => page.locator(".maplibregl-ctrl-group button").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]));
     for (const wh of await size()) expect(wh).toEqual([36, 36]);
-    await page.goto("/?map=v1");
-    await page.waitForSelector('[data-screen="discover"]');
-    for (const wh of await size()) expect(wh).toEqual([29, 29]);
   });
 
   test("an action has a hover state and a pressed state on top of its focus ring", async ({ page }) => {

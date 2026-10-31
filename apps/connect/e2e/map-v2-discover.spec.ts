@@ -8,7 +8,7 @@ import { touchSession, swipe } from "./support/touch";
 //  per group) with no empty row; a real sideways swipe scrolls one row and it snaps, a vertical one from a card
 //  scrolls the page; the pills filter every row; each card carries its group colour and a km distance; a card opens
 //  the listing over the page and Back returns to the same scroll; leaving and coming Back restores the pill and the
-//  scroll; ?map=v1 and the laptop's sidebar keep Kingdom Exploration. Set DISCOVER_SHOTS_DIR to also write the PR
+//  scroll; the laptop's sidebar keeps Kingdom Exploration. Set DISCOVER_SHOTS_DIR to also write the PR
 //  screenshots (375 x 812, light and dark).
 // ════════════════════════════════════════════════════════════════════
 
@@ -233,17 +233,6 @@ test.describe("on a phone", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openDiscover(page);
     await expect(page.locator("[data-mv2='discover'] [data-mv2='pill']").first()).toHaveCSS("transition-duration", "0s");
-  });
-
-  test("the old map (?map=v1) is unchanged: /explore and /discover are Kingdom Exploration, with the old bar", async ({ page }) => {
-    await network(page);
-    await page.goto("/explore?map=v1");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible({ timeout: 20_000 });
-    await expect(page$(page)).toHaveCount(0);
-    await page.goto("/discover");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("nav.fixed.bottom-0")).toBeVisible();
-    await expect(toggle(page)).toHaveCount(0);
   });
 });
 

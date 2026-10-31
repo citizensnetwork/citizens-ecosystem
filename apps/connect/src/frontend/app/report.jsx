@@ -13,7 +13,7 @@
 //
 //  Public surface: window.CCReport = { Action, Dialog, REASONS, STR, signedIn }.
 //  Map v2 copy is MapV2Strings.report (kept equal to STR by a test).
-//  Styles: assets/report.css (loaded on v1 and v2; Map v2 tokens only).
+//  Styles: assets/report.css (Map v2 tokens only).
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;

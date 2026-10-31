@@ -33,7 +33,6 @@ async function expectLogoLink(page: Page) {
 }
 
 for (const [label, path] of [
-  ["flag off", "/?map=v1"],
   ["flag on", "/?map=v2"],
 ] as const) {
   test.describe(`the home map shows the MapTiler logo (${label})`, () => {

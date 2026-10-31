@@ -22,7 +22,7 @@ const nav = (page: Page) => page.locator("[data-mv2='nav']");
 const toggle = (page: Page) => page.locator("[data-mv2='nav-toggle']");
 const explore = (page: Page) => page.locator("[data-mv2='explore']");
 const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
-// the old map's fixed bottom bar (shell.jsx BottomNav), not the sidebar's nav
+// the fixed bottom bar the old map had (deleted with it, issue #179): it must never come back
 const oldBar = (page: Page) => page.locator("nav.fixed.bottom-0");
 const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 
@@ -418,13 +418,6 @@ test.describe("on a phone", () => {
     await toggle(page).tap();
     await expect(nav(page).locator("[data-mv2='nav-bar']")).toHaveCSS("animation-duration", "0s");
     await expect(page.locator("[data-mv2='nav-dim']")).toHaveCSS("animation-duration", "0s");
-  });
-
-  test("the old map (?map=v1) keeps its bottom bar and has no folding nav or row", async ({ page }) => {
-    await open(page, "/?map=v1");
-    await expect(oldBar(page)).toBeVisible();
-    await expect(toggle(page)).toHaveCount(0);
-    await expect(explore(page)).toHaveCount(0);
   });
 });
 
