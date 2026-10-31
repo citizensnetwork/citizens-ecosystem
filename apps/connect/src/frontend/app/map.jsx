@@ -218,6 +218,58 @@
   }
 
   // ── The map component ──────────────────────────────────────────────
+  // The "frame the data" fallback keeps pins clear of what sits over the map. Off the home screen: 70 px all round. On Map v2's home
+  // (#210): measured, not guessed: below its top bar and pills, above the Explore row and the folding nav.
+  const FRAME_GAP = 40;
+  function framePadding(el) {
+    const home = el && el.closest ? el.closest("[data-mv2='home']") : null;
+    if (!home) return 70;
+    const box = el.getBoundingClientRect();
+    // the folding nav lives in the shell, outside the home screen: look for it in the document
+    const reach = (sel, fromTop, root) => {
+      const o = (root || home).querySelector(sel);
+      if (!o || o.hidden) return 0;
+      const r = o.getBoundingClientRect();
+      if (!r.height) return 0;
+      return fromTop ? Math.max(0, r.bottom - box.top) : Math.max(0, box.bottom - r.top);
+    };
+    const top = FRAME_GAP + reach("[data-mv2='home-top']", true);
+    const bottom = FRAME_GAP + Math.max(reach("[data-mv2='explore']", false), reach("[data-mv2='nav-toggle']", false, document));
+    const h = box.height || el.clientHeight || 0;
+    // never ask for more padding than the map is tall (MapLibre would refuse to fit at all)
+    if (h && top + bottom > h * 0.8) return 70;
+    return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
+  }
+
+  // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
+  function frameData(mp, items, el) {
+    const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
+    let outermost = Infinity;   // the lowest gate among the types actually present
+    items.forEach(({ m, coords }) => {
+      b.extend(coords);
+      const gate = ZOOM_GATES[m.type];
+      outermost = Math.min(outermost, gate === undefined ? 0 : gate);
+    });
+    const pad = framePadding(el);
+    mp.fitBounds(b, { padding: pad, maxZoom: 13, duration: 0 });
+    // Data spread across the whole country frames out past every gate and
+    // would open on a blank map. Never zoom out further than the point where
+    // at least one type of pin is still drawn — and centre on THOSE pins, not
+    // on the middle of the data (which can be an empty stretch of country,
+    // with the pins that are drawn cropped off the edge).
+    if (mp.getZoom() < outermost) {
+      const shown = new window.maplibregl.LngLatBounds();
+      items.forEach(({ m, coords }) => {
+        const gate = ZOOM_GATES[m.type];
+        if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
+      });
+      // centred in what is left visible between the overlays (Map v2's home, #210), not in the middle of the screen,
+      // which there is the top edge of the Explore row
+      const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
+      mp.easeTo({ center: shown.getCenter(), zoom: outermost, offset: [0, dy], duration: 0 });
+    }
+  }
+
   function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -237,6 +289,12 @@
     const bandRef = useRef('all');           // last band reported upward
     const selectedRef = useRef(selectedId);
     selectedRef.current = selectedId;
+    // Map v2 (#210): who wants to hear that the view settled (the Explore row ranks by it), and where the person is
+    // once the browser has told us. Plain refs: a pan never re-renders the map screen.
+    const viewSubs = useRef(new Set());
+    const userLocRef = useRef(null);
+    const framedItemsRef = useRef([]);       // what "frame the data" last framed, so #210's row can ask for it again
+    const tellView = React.useCallback(() => { viewSubs.current.forEach((fn) => { try { fn(); } catch { /* one listener must not stop the rest */ } }); }, []);
 
     // Applies the zoom gates to markers already on the map. Runs on every zoom
     // frame, so it does nothing but flip a `display` (and one attribute for the
@@ -307,9 +365,14 @@
           ...(tilt ? { pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false } : {}),
         });
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-        map.addControl(new window.maplibregl.GeolocateControl({
+        const geo = new window.maplibregl.GeolocateControl({
           positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
-        }), 'bottom-right');
+        });
+        map.addControl(geo, 'bottom-right');
+        // Map v2 (#210): the view settled, or the person's position arrived. Never per frame.
+        const onLocatedV2 = (e) => { if (e && e.coords) { userLocRef.current = { lat: e.coords.latitude, lng: e.coords.longitude }; tellView(); } };
+        map.on('moveend', tellView);
+        geo.on('geolocate', onLocatedV2);
         // Once the user pans/zooms by hand, stop auto-framing the data.
         const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
         map.on('dragstart', onUserMove);
@@ -362,6 +425,7 @@
         const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
         const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
         const onLocated = (coords) => {
+          if (mapRef.current === map) onLocatedV2({ coords });
           if (mapRef.current !== map || userMovedRef.current) return;
           userMovedRef.current = true;
           map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
@@ -384,6 +448,8 @@
           map.off('load', applyZoomGates);
           map.off('idle', onIdleV2);
           clearTimeout(idleTimer);
+          map.off('moveend', tellView);
+          geo.off('geolocate', onLocatedV2);
           window.removeEventListener('cc-map-theme', onTheme);
           markerObjs.current.forEach((mk) => mk.remove());
           markerObjs.current.clear();
@@ -398,7 +464,7 @@
         stopWaiting();
         if (cleanupInner) cleanupInner();
       };
-    }, [applyZoomGates, layoutV2]);
+    }, [applyZoomGates, layoutV2, tellView]);
 
     // (re)render pins whenever inputs change. Zoom gating is NOT done here (it
     // is applyZoomGates, per zoom frame), so this only needs to run on
@@ -454,7 +520,9 @@
       items.forEach(({ m, coords }) => {
         seenPins.add(m.id);
         const cat = window.DATA.getItemCategory(m);
-        const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
+        // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
+        const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
+        const dim = !!(filterCategory && !passes && m.type !== 'idea');
         const selected = selectedId === m.id;
         // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
         const anchor = (m.type === 'event' || m.type === 'contributor') ? 'bottom' : 'center';
@@ -466,29 +534,8 @@
       });
 
       // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
-      if (!userMovedRef.current && items.length) {
-        const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
-        let outermost = Infinity;   // the lowest gate among the types actually present
-        items.forEach(({ m, coords }) => {
-          b.extend(coords);
-          const gate = ZOOM_GATES[m.type];
-          outermost = Math.min(outermost, gate === undefined ? 0 : gate);
-        });
-        mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
-        // Data spread across the whole country frames out past every gate and
-        // would open on a blank map. Never zoom out further than the point where
-        // at least one type of pin is still drawn — and centre on THOSE pins, not
-        // on the middle of the data (which can be an empty stretch of country,
-        // with the pins that are drawn cropped off the edge).
-        if (mp.getZoom() < outermost) {
-          const shown = new window.maplibregl.LngLatBounds();
-          items.forEach(({ m, coords }) => {
-            const gate = ZOOM_GATES[m.type];
-            if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
-          });
-          mp.jumpTo({ center: shown.getCenter(), zoom: outermost });
-        }
-      }
+      framedItemsRef.current = items;
+      if (!userMovedRef.current && items.length) frameData(mp, items, containerRef.current);
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.
       applyZoomGates();
@@ -499,17 +546,47 @@
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
     // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
     // later, so the first paint belongs to the sheet's header. Reduced motion makes it a jump.
+    // #210: a card tapped on the home screen sends `minZoom` too, so the pin it jumps to is close enough to be seen
+    // (a person zoomed out over the province would otherwise land on the same blur they started from).
     useEffect(() => {
       if (!apiRef) return undefined;
       apiRef.current = {
-        focusSelected(padding) {
+        focusSelected(padding, minZoom) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
             const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
             if (!mp || !mk || !padding) return;
             userMovedRef.current = true;   // the "frame the data" fallback must never undo this
-            mp.easeTo({ center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+            const to = { center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;   // never a zoom: undefined (easeTo reads it as NaN)
+            mp.easeTo(to, { originalEvent: {} });
           });
+        },
+        // #210: where the map is looking and where the person is (null until known), and a way to hear when it settles.
+        // "Looking" is the middle of the OPEN map, between the top bar and the Explore row, not the canvas centre
+        // (on the home that is the top edge of the row, far from the pins the person is looking at when zoomed out).
+        view() {
+          const mp = mapRef.current;
+          const el = containerRef.current;
+          if (!mp) return { centre: null, user: userLocRef.current };
+          const pad = framePadding(el);
+          let c = mp.getCenter();
+          if (typeof pad === 'object' && el && el.clientHeight) {
+            c = mp.unproject([el.clientWidth / 2, pad.top + (el.clientHeight - pad.top - pad.bottom) / 2]);
+          }
+          return { centre: { lat: c.lat, lng: c.lng }, user: userLocRef.current };
+        },
+        onView(fn) {
+          viewSubs.current.add(fn);
+          return () => viewSubs.current.delete(fn);
+        },
+        // #210: the Explore row measured itself after the first framing; frame again so no pin starts behind it.
+        // Only while the person has not taken the map, and never past their own position (that wins).
+        reframe() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          if (!mp || userMovedRef.current || !items || !items.length) return;
+          frameData(mp, items, containerRef.current);
         },
       };
       return () => { apiRef.current = null; };

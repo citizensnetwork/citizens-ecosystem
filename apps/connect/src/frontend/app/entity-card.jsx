@@ -9,17 +9,15 @@
 //  social handle. Founder call: "I don't think different cards should be
 //  viewed when accessed either from the map, or the Kingdom Exploration area."
 //
-//  So there is now one component with one anatomy, rendered at two densities:
+//  So there is one component with one anatomy:
 //
 //    band → title → description → meta → stats → organiser → socials → actions
 //
 //    layout='grid'   compact tile        (Kingdom Exploration list)
-//    layout='sheet'  the body of the Map v2 bottom sheet (map pin preview; the sheet
-//                    supplies the header, so no band or title here)
 //
-//  Everything else — the data shown, the order it appears in, the action set,
-//  the category-accent palette — is identical by construction. Adding a field
-//  here adds it to both surfaces at once; that is the entire point of the file.
+//  The map's pin preview used to be a second, 'panel' density of this card. The Map v2 sheet
+//  has its own card now (map-v2-card.jsx), and the old map's panel went with the old map
+//  (issue #179), so 'grid' is the only layout left.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -60,16 +58,14 @@
   // different screens for the same listing.
   const navTarget = (type) => (type === 'contributor' ? 'profile' : type);
 
-  function EntityCard({ item, layout = 'grid', myLoc }) {
+  function EntityCard({ item, myLoc }) {
     const app = window.useApp();
     const {
       go, contributors, connected, considering, followedPlaces, followedOrgs,
       toggleConnect, toggleConsider, togglePlaceFollow, toggleFollow,
-      startConversationWith, shareLink, realUser, myProfileMeta, user, toast,
+      startConversationWith, shareLink,
     } = app;
 
-    // 'sheet' is the panel body inside the Map v2 bottom sheet (larger controls, no band); 'grid' is the compact tile.
-    const isSheet = layout === 'sheet';
     const isEvent = item.type === 'event';
     const isPlace = item.type === 'place';
     const isContributor = item.type === 'contributor';
@@ -222,7 +218,7 @@
         h('button', { type: 'button', 'data-cohost': c.id, onClick: stop(() => go('profile', { id: c.id })), className: 'font-bold text-foreground hover:opacity-80 transition-opacity min-w-0 truncate' }, c.name)))) : null;
 
     // ── actions ───────────────────────────────────────────────────────
-    //  The SAME set, in the same order, on both layouts — only the sizing
+    //  The SAME set, in the same order, everywhere the card appears.
     //  differs. A Place whose organiser isn't in the directory has nobody to
     //  message, so that control is absent rather than permanently disabled
     //  (the majority shape of the real directory).
@@ -237,32 +233,31 @@
     const iconBtn = (icon, label, onClick, active) => h('button', {
       key: icon, type: 'button', onClick, 'aria-label': label, title: label,
       className: cx('rounded-full flex items-center justify-center shrink-0 border transition-colors',
-        isSheet ? 'w-10 h-10' : 'w-8 h-8',
+        'w-8 h-8',
         active ? 'border-transparent' : 'border-border bg-white/60 text-muted-foreground hover:text-foreground hover:bg-accent/60'),
       style: active ? { background: hex + '1f', color: hex, borderColor: hex + '4d' } : undefined,
-    }, h(Icon, { name: icon, size: isSheet ? 16 : 14 }));
+    }, h(Icon, { name: icon, size: 14 }));
 
     const secondaryBtns = [
       // Events get a distinct Consider (bookmark) alongside Connect; places and
       // contributors fold saving into the primary Follow button above.
       isEvent && iconBtn('Bookmark', saveLabel, onSave, saved),
-      !isSheet && website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
+      website && iconBtn('Globe', 'Website', stop(() => window.open(website, '_blank', 'noopener,noreferrer'))),
       messageTarget && iconBtn('MessageCircle', 'Message the organiser', onMessage),
       // The same share path as the full profile pages: the phone's share sheet,
       // else the real /c, /p or /e address on the clipboard (C20: this used to
-      // toast "copied" and copy nothing). Inside the Map v2 sheet the sheet's own
-      // header carries Share, so the card's is hidden there.
-      !isSheet && iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
+      // toast "copied" and copy nothing).
+      iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
     ].filter(Boolean);
 
-    const actions = h('div', { className: cx('flex items-center gap-2', isSheet ? 'flex-wrap' : '') },
+    const actions = h('div', { className: 'flex items-center gap-2' },
       h('button', {
         type: 'button', onClick: onPrimary,
         className: cx('flex-1 min-w-0 rounded-full font-bold flex items-center justify-center gap-1.5 px-3 transition-transform active:scale-[0.98]',
-          isSheet ? 'h-11 text-[13px]' : 'h-8 text-[11px]',
+          'h-8 text-[11px]',
           (isConnected || (!isEvent && saved)) ? 'bg-accent text-gold-dark' : 'text-white'),
         style: (isConnected || (!isEvent && saved)) ? undefined : { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` },
-      }, h(Icon, { name: primaryIcon, size: isSheet ? 15 : 12, fill: (!isEvent && saved) ? 'currentColor' : 'none' }),
+      }, h(Icon, { name: primaryIcon, size: 12, fill: (!isEvent && saved) ? 'currentColor' : 'none' }),
          h('span', { className: 'truncate' }, primaryLabel)),
       secondaryBtns);
 
@@ -274,35 +269,23 @@
 
     // ── assembly ──────────────────────────────────────────────────────
     //  Band + title are one tap target on the grid tile (tapping a card opens
-    //  it, as it always has). The sheet has neither: its own header carries the
-    //  name and the close button.
+    //  it, as it always has).
     const titleBlock = h('div', { className: 'min-w-0 px-3 pt-6' },
       h('p', { className: 'font-bold text-foreground leading-snug text-sm line-clamp-2' }, title),
       description && h('p', { className: 'text-xs text-muted-foreground leading-snug mt-1 line-clamp-2' }, description));
-    const sheetDesc = description ? h('p', { className: 'px-4 text-xs text-muted-foreground leading-snug line-clamp-3' }, description) : null;
-    const head = isSheet ? sheetDesc : h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
+    const head = h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
 
-    // Convince (FEAT-04), the sheet only: the note under Consider and, when a mutual friend
-    // is considering this event, the Friends considering row. Both need a signed-in person and a real, upcoming event.
-    const convince = isSheet && isEvent && realUser && window.CCConvince.eligibleEvent(item)
-      ? h(F, null,
-          h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
-          h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
-      : null;
-
-    const body = h('div', { className: cx('flex flex-col mt-2', isSheet ? 'px-4 pb-4 gap-3' : 'px-3 pb-3 gap-2') },
+    const body = h('div', { className: 'flex flex-col mt-2 px-3 pb-3 gap-2' },
       meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground flex-wrap' }, meta),
       stats.length > 0 && h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
       coHostLine,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
-      h('div', { className: cx('flex flex-col mt-auto', isSheet ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, isSheet ? null : viewBtn),
-      convince);
+      h('div', { className: 'flex flex-col mt-auto gap-1.5 pt-0.5' }, actions, viewBtn));
 
     return h('div', {
-      className: cx(isSheet ? 'overflow-hidden flex flex-col' : 'bg-card overflow-hidden flex flex-col',
-        isSheet ? '' : 'rounded-2xl shadow-sm transition-shadow hover:shadow-md'),
-      style: isSheet ? undefined : { border: '1.5px solid ' + hex + '55' },
+      className: 'bg-card overflow-hidden flex flex-col rounded-2xl shadow-sm transition-shadow hover:shadow-md',
+      style: { border: '1.5px solid ' + hex + '55' },
       'data-entity-card': item.type,
     }, head, body);
   }

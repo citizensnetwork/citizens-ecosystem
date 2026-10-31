@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, openMap, smallSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, openMap, smallSeed, FIXED_NOW, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 (tracker docs/MAP_UX_TRACKER.md): the only map since the old one was deleted (issue #179).
@@ -155,7 +155,11 @@ test.describe("P1-04 the pin", () => {
     const outline = await first.evaluate((e) => getComputedStyle(e).outlineStyle + " " + getComputedStyle(e).outlineWidth);
     expect(outline).toBe("solid 2px");
     await page.keyboard.press("Enter");
-    await expect(page.locator("[data-entity-card]")).toBeVisible(); // the sheet's card body
+    // #210: Enter selects the pin and outlines its card in the Explore row, where the keyboard follows; Enter there opens the sheet
+    await expect(page.locator("[data-mv2='explore'] [data-selected]")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-explore-id][data-selected]"))).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
   });
 
   test("the tap target of every pin is at least 44 x 44 CSS px", async ({ page }) => {
@@ -241,11 +245,11 @@ test.describe("P1-04 the pin", () => {
 });
 
 test.describe("E23 and the 12.3 states", () => {
-  test("the locate and zoom buttons are 44 px", async ({ page }) => {
+  test("the locate and zoom buttons are 36 px (founder, 2026-10-30)", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/?map=v2", 8);
     const size = () => page.locator(".maplibregl-ctrl-group button").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]));
-    for (const wh of await size()) expect(wh).toEqual([44, 44]);
+    for (const wh of await size()) expect(wh).toEqual([36, 36]);
   });
 
   test("an action has a hover state and a pressed state on top of its focus ring", async ({ page }) => {
@@ -254,7 +258,7 @@ test.describe("E23 and the 12.3 states", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0] as { id: string; physical_longitude: number; physical_latitude: number };
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    await openListing(page, c.id);
     const share = page.locator("[data-mv2='sheet']").getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
     await share.hover();

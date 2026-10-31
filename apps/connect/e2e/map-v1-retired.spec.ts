@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, openMap, smallSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, openMap, openListing, smallSeed, FIXED_NOW } from "./support/map-v2";
 
 // ═════════════════════════════════════════════════════════════════
 //  Issue #179 (Map v2 R6): the old map and its `?map=v1` escape hatch are deleted.
@@ -20,8 +20,7 @@ async function expectTheOneMap(page: Page, pageErrors: string[]) {
   expect(pageErrors).toEqual([]);
 
   const seed = smallSeed(FIXED_NOW) as { contributors: { id: string }[] };
-  const marker = page.locator(`.maplibregl-marker[data-cc-id="${seed.contributors[0].id}"]`);
-  await marker.click({ force: true });
+  await openListing(page, seed.contributors[0].id); // a pin picks its card in the Explore row; the card opens the sheet
   await expect(page.locator("[data-mv2='sheet']")).toBeVisible(); // the sheet, not the old floating preview card
 }
 

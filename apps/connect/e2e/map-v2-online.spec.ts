@@ -96,18 +96,19 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
   });
 
-  test("a globe appears with a count, among the map's controls, at least 44 px, one labelled button", async ({ page }) => {
+  test("a globe appears with a count, among the map's controls, the size of the map's own buttons (36 px), one labelled button, and it stays when the zoom buttons hide", async ({ page }) => {
     await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
     await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 3 listings");
     await expect(globe(page).locator("[data-mv2='globe-count']")).toHaveText("3");
     const b = (await globe(page).boundingBox())!;
-    expect(b.width).toBeGreaterThanOrEqual(43.5);
-    expect(b.height).toBeGreaterThanOrEqual(43.5);
+    expect(b.width).toBeGreaterThanOrEqual(35.5);
+    expect(b.height).toBeGreaterThanOrEqual(35.5);
     // it sits in the bottom-right control stack, in the same column as the zoom buttons, above them
     const zoomIn = (await page.locator(".maplibregl-ctrl-zoom-in").boundingBox())!;
     expect(Math.abs(b.x - zoomIn.x)).toBeLessThanOrEqual(2);
     expect(b.y).toBeLessThan(zoomIn.y);
+    await expect(globe(page)).toBeVisible();
   });
 
   test("a real tap on the globe opens the list; a real tap on Close ends it; Back ends it too and stays in the app", async ({ page }) => {

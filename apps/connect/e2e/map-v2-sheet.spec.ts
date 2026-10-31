@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, openListing, toCleanMap } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 bottom sheet (tracker P1-06 to P1-11); Map v2 is on by default since D15.
@@ -24,7 +24,13 @@ const jump = (page: Page, lng: number, lat: number, zoom: number) =>
 /** Open the sheet on the first pin of a kind by tapping it (a real click, so it counts as a user gesture). */
 async function openOn(page: Page, id: string, lng: number, lat: number) {
   await jump(page, lng, lat, 15.5);
-  await pinOf(page, id).click({ force: true });
+  await openPinSheet(page, id);
+  await expect(sheet(page)).toBeVisible();
+}
+/** #210: the same listing opened from its Explore card (the expanded sheet): the history rules hold there too. */
+async function openCardOn(page: Page, id: string, lng: number, lat: number) {
+  await jump(page, lng, lat, 15.5);
+  await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 const top = (page: Page) => sheet(page).evaluate((e) => e.getBoundingClientRect().top);
@@ -77,10 +83,10 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(page.locator("[data-map-sheet-header]")).toContainText("Church");
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     const h = await innerH(page);
-    await settled(page, h * 0.54); // half = 46 % of the viewport
+    await settled(page, h * 0.6); // half = 40 % of the viewport
   });
 
-  test("the handle steps half -> full -> half; the chevron at peek opens it; snap positions are 46 % / 90 % / peek", async ({ page }) => {
+  test("the handle steps half -> full -> half; the chevron at peek opens it; snap positions are 40 % / 90 % / peek", async ({ page }) => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
@@ -113,13 +119,13 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     // 1:1: halfway through a slow drag the sheet is where the pointer is (inline transform, no transition).
     // Start from rest: a drag that begins during the opening slide picks the sheet up where it visibly is,
     // so on a slow machine an unsettled start would shift every number below.
-    await settled(page, h * 0.54);
+    await settled(page, h * 0.6);
     const p = await handle();
     await page.mouse.move(p.x, p.y);
     await page.mouse.down();
     for (let i = 1; i <= 5; i++) { await page.mouse.move(p.x, p.y - 20 * i); await page.waitForTimeout(120); } // 0.17 px/ms: well under a flick
     const mid = await top(page);
-    expect(mid).toBeCloseTo(h * 0.54 - 100, -1);
+    expect(mid).toBeCloseTo(h * 0.6 - 100, -1);
     await page.mouse.up(); // released after only 100 px: nearest is still half
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
 
@@ -132,7 +138,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
 
     // slow drag a long way down: nearest is peek
-    await drag(page, await handle(), 330, 1200); // 0.28 px/ms
+    await drag(page, await handle(), Math.round(h * 0.4 - 88 + 10), 1200); // from half to just past the peek line: about 0.2 px/ms, well under a flick
     await expect(sheet(page)).toHaveAttribute("data-snap", "peek");
     await settled(page, h - 88);
 
@@ -173,6 +179,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await mockContributorDetail(page, seed);
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
+    await toCleanMap(page); // an in-app navigation: measure from here
     const before = await page.evaluate(() => history.length);
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     const open = await page.evaluate(() => history.length);
@@ -213,17 +220,17 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     expect(await pushes()).toEqual([]);
 
     const c = seed.contributors[0];
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     expect(await pushes()).toEqual([{ active: true, guard: true, url: expect.any(String) }]);
 
     // closed by its own button, reopened, closed by Back, reopened, closed by Back
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
     await page.waitForTimeout(300); // the guard's own entry is taken back off the stack (async)
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe("/");
@@ -244,10 +251,10 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await mockContributorDetail(page, seed);
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
+    await openCardOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
     // the guard's own entry is taken back off the stack once the sheet is gone: we are on the arrival entry again
@@ -255,7 +262,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     expect(new URL(page.url()).pathname).toBe("/"); // never left the app
   });
 
-  test("keyboard: Enter on a pin moves focus into the sheet; Escape returns it to that pin", async ({ page }) => {
+  test("keyboard: Enter on a pin moves focus to its Explore card, Enter there into the sheet; Escape returns it to the card", async ({ page }) => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
@@ -265,11 +272,16 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     const pin = pinOf(page, c.id);
     await pin.focus();
     await page.keyboard.press("Enter");
+    // #210: the pin outlines its card in the row and the keyboard follows it there
+    const card = () => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"));
+    await expect.poll(card).toBe(c.id);
+    await expect(sheet(page)).toHaveCount(0);
+    await page.keyboard.press("Enter");
     await expect(sheet(page)).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-cc-id"))).toBe(c.id);
+    await expect.poll(card).toBe(c.id);
   });
 
   test("a screen reader hears the state change", async ({ page }) => {
@@ -300,7 +312,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
       return Math.round(((b.y + b.height / 2) / 844) * 100);
     };
     await expect.poll(pct, { timeout: 6000 }).toBeLessThan(35);
-    await settled(page, (await innerH(page)) * 0.54);
+    await settled(page, (await innerH(page)) * 0.6);
     expect(await pct()).toBeGreaterThanOrEqual(20);
     const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
     expect(b.y + b.height).toBeLessThan(await top(page)); // not hidden behind the sheet
@@ -434,16 +446,34 @@ test.describe("P1-08 / P1-09 loading, errors and the gallery", () => {
     await mockContributorDetail(page, seed, { gallery: 6, delayMs: 700 });
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[2]; // no upcoming events, no news: the photos are all there is
+    await toCleanMap(page); // the row and the pills leaving are not the sheet's shift: switch before counting
+    // ...and let that shift be reported before the observer starts: the map's buttons drop by the panel's height as it leaves, and on
+    // a slow runner the browser hands that entry over a frame or two late (CI saw 0.0155 from exactly that)
+    await page.waitForTimeout(600);
     await page.evaluate(() => {
-      (window as unknown as { __cls: number }).__cls = 0;
-      new PerformanceObserver((l) => { for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value; }).observe({ type: "layout-shift", buffered: false });
+      const w = window as unknown as { __cls: number; __clsWho: string[] };
+      w.__cls = 0;
+      w.__clsWho = [];
+      // what moved, kept for the failure message (a shift seen only on a slower runner is otherwise a guess)
+      const name = (n: Node | null) => { const el = n as Element | null; return el && el.getAttribute ? el.getAttribute("data-mv2") || el.className || el.nodeName : String(n); };
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean; sources: { node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[] }[]) {
+          if (e.hadRecentInput) continue;
+          w.__cls += e.value;
+          w.__clsWho.push(e.value.toFixed(4) + " " + e.sources.map((s) => `${name(s.node)} y${Math.round(s.previousRect.y)}->${Math.round(s.currentRect.y)} h${Math.round(s.previousRect.height)}->${Math.round(s.currentRect.height)}`).join(", "));
+        }
+      }).observe({ type: "layout-shift", buffered: false });
     });
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).locator("[data-skeleton]").first()).toBeVisible();
     expect(await sheet(page).locator("[class*='spin']").count()).toBe(0);
     await expect(sheet(page).locator("[data-mv2='tile-img']")).toHaveCount(6, { timeout: 5000 });
     await page.waitForTimeout(400);
-    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBeLessThan(0.01);
+    const cls = await page.evaluate(() => {
+      const w = window as unknown as { __cls: number; __clsWho: string[] };
+      return { total: w.__cls, who: w.__clsWho.join(" | ") };
+    });
+    expect(cls.total, cls.who).toBeLessThan(0.01);
   });
 
   test("a failed photo load says so plainly and Try again works", async ({ page }) => {

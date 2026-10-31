@@ -413,7 +413,9 @@ describe("the list", () => {
     expect(document.querySelectorAll("[data-mv2='online-sheet'] ul[role='list']").length).toBeGreaterThan(0);
     for (const b of document.querySelectorAll("[data-mv2='online-sheet'] button")) expect(b.tagName).toBe("BUTTON");
     const css = readFileSync(join(process.cwd(), "src/frontend/assets/map-v2.css"), "utf8");
-    expect(css).toMatch(/\.maplibregl-ctrl-group button \{\s*width: var\(--hit\);\s*height: var\(--hit\);/); // the globe is a control-group button: 44 px
+    // the globe is a control-group button, so it is the map's own button size (36 px, founder 2026-10-30: more map)
+    expect(css).toMatch(/\.maplibregl-ctrl-group button \{\s*width: var\(--ctrl-btn\);\s*height: var\(--ctrl-btn\);/);
+    expect(css).toMatch(/--ctrl-btn: 36px;/);
     expect(css).toMatch(/\[data-mv2='row'\] \{[^}]*min-height: var\(--hit\);/);
     expect(css).toMatch(/\[data-mv2='icon-btn'\] \{[^}]*width: var\(--hit\);[^}]*height: var\(--hit\);/);
   });

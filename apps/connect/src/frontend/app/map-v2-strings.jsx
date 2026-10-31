@@ -30,6 +30,15 @@
       // P2-04: Save is a private bookmark (a Contributor or a Place); only the person sees it, in Settings
       save: 'Save',
       saved: 'Saved',
+      // #210: a Place and an Event speak in the same pills (the Event's own Connect and Consider, and a message to its organiser)
+      connect: 'Connect',
+      connected: 'Connected',
+      consider: 'Consider',
+      considering: 'Considering',
+      message: 'Message',
+      by: 'by',
+      with: 'with',
+      counts: (connected, considering) => connected + ' connected · ' + considering + ' considering',
       website: 'Website',
       call: 'Call',
       email: 'Email',
@@ -213,6 +222,85 @@
       listen: 'Listen',
       live: 'Live',
       loading: 'Loading',
+    },
+
+    // Issue #210: the folding navigation (app/map-v2-nav.jsx). Messages, Alerts and Projects live in the
+    // account menu that Profile opens (founder, 2026-10-26), each with its count.
+    nav: {
+      label: 'Main',
+      open: 'Open navigation',
+      openUnread: 'Open navigation, you have unread messages or alerts',
+      close: 'Close navigation',
+      items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
+      menu: { projects: 'Projects', messages: 'Messages', alerts: 'Alerts' },
+      unread: (n) => n + ' unread',
+    },
+
+    // Issue #210: the map home's category pills and the Explore row (app/map-v2-explore.jsx).
+    // One muted colour per group (founder, 2026-10-26); the group names are the pills.
+    explore: {
+      title: 'Explore',
+      seeAll: 'See all',
+      seeAllLabel: 'See all listings',
+      label: 'Listings near you, closest first',
+      labelCentre: 'Listings near the middle of the map, closest first',
+      pillsLabel: 'Show on the map',
+      search: 'Search events, places, people…',
+      clearSearch: 'Clear search',
+      groups: {
+        all: 'All',
+        worship: 'Churches & worship',
+        events: 'Events',
+        business: 'Business',
+        serve: 'Serve & care',
+        culture: 'Culture & fun',
+        learn: 'Learn & grow',
+        audiences: 'Audiences',
+        ideas: 'Ideas',
+      },
+      // a card (or a pin) chosen: the card says what the next tap does, in words laid over its picture
+      selectedBadge: 'Tap again to open',
+      selectedAnnounce: (name) => name + ' is chosen. Press it again to open it.',
+      // the panel's own controls (founder, 2026-10-30): the title switches to the category list, the handle lowers the panel
+      chooseCategory: 'Choose a category',
+      backToListings: 'Back to the listings',
+      categoriesLabel: 'Categories',
+      lower: 'Lower this panel to see more of the map',
+      raise: 'Raise this panel',
+      under: 'Under 100 m away',
+      metres: (n) => n + ' m away',
+      km: (n) => n + ' km away',
+      centre: {
+        under: 'Under 100 m from the map centre',
+        metres: (n) => n + ' m from the map centre',
+        km: (n) => n + ' km from the map centre',
+      },
+      empty: 'Nothing here yet. Move the map or pick another category.',
+    },
+
+    // Issue #210 part 3: the Discover page that "See all" and the nav's Explore open (app/map-v2-discover.jsx).
+    // The group names are explore.groups; distances use explore's words (or the city centre's, below).
+    discover: {
+      title: 'Explore',
+      pillsLabel: 'Show on this page',
+      near: 'Near you',
+      nearLabel: 'Listings near you, closest first',
+      popular: 'Popular',
+      popularHint: 'Busy this month with events or news, in fair turns',
+      popularLabel: 'Popular: busy this month with events or news, in fair turns',
+      groupLabel: (name) => name + ', closest first',
+      row: {
+        count: (shown, total) => 'Closest ' + shown + ' of ' + total,
+        all: (total) => 'All ' + total + ' listings',
+        seeAll: (total) => 'See all ' + total,
+        showFewer: 'Show fewer',
+      },
+      city: {
+        under: 'Under 100 m from the city centre',
+        metres: (n) => n + ' m from the city centre',
+        km: (n) => n + ' km from the city centre',
+      },
+      empty: 'Nothing here yet. Pick another category.',
     },
 
     // Issue #160. The same words as CCReport.STR (a test keeps the two copies equal).

@@ -60,6 +60,74 @@ export async function openMap(page: Page, path = "/", min = 1) {
   );
 }
 
+/**
+ * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
+ * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
+ * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
+ * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
+ */
+export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
+  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
+  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
+  await card.waitFor({ state: "visible", timeout: 10_000 });
+  // the row glides the card to its start; press it once it has stopped
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      const w = window as unknown as { __mv2x?: number };
+      const x = el.getBoundingClientRect().left;
+      const still = w.__mv2x === x;
+      w.__mv2x = x;
+      return still;
+    },
+    `[data-mv2='explore'] [data-explore-id="${id}"] [data-mv2='card2']`,
+    { polling: 100, timeout: 5_000 },
+  );
+  if (how === "tap") await card.tap();
+  else await card.click();
+}
+
+/**
+ * #210 part 2: a card opens the EXPANDED sheet (full only; swipe down goes back to the row). The half / peek sheet is
+ * what a pin opens on the clean map (the nav's Map), so a spec about snap states, the handle or the scroll hand-off
+ * switches to that map first (no Explore row, no pills; the map and its pins stay as they are) and presses the pin.
+ * The switch is an in-app navigation: call toCleanMap before measuring history.length.
+ */
+export async function toCleanMap(page: Page) {
+  await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
+  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
+}
+export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
+  if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+}
+
+/**
+ * A point on BARE map for a two-finger gesture: in the open map between the top bar and the Explore row (#210), on a
+ * line where nothing but the map canvas sits for `span` px either side of the centre. A touch that starts on a pin or
+ * an overlay is not the map's, and the home now frames its pins in exactly that open middle.
+ */
+export async function bareMapPoint(page: Page, span = 120): Promise<{ x: number; y: number }> {
+  const pt = await page.evaluate((half) => {
+    const x = window.innerWidth / 2;
+    const top = document.querySelector("[data-mv2='home-top']")?.getBoundingClientRect().bottom ?? 0;
+    const row = document.querySelector("[data-mv2='explore']")?.getBoundingClientRect().top ?? window.innerHeight;
+    const bare = (px: number, py: number) => !!document.elementFromPoint(px, py)?.classList.contains("maplibregl-canvas");
+    for (let y = Math.round(top + 30); y < row - 30; y += 6) {
+      let ok = true;
+      for (let dx = -half; dx <= half && ok; dx += 10) ok = bare(x + dx, y) && bare(x + dx, y - 22) && bare(x + dx, y + 22);
+      if (ok) return { x, y };
+    }
+    return null;
+  }, span);
+  if (!pt) throw new Error("no bare stretch of map for a two-finger gesture");
+  return pt;
+}
+
 /** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
 export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
 const fixtureSvg = (n: number) =>
