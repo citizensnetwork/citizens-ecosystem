@@ -410,8 +410,10 @@ describe("the stylesheet and the wiring", () => {
   });
 
   it("keeps every nav, pill and Explore control at least a thumb's size", () => {
+    // every regex character of the selector is escaped (brackets alone is an incomplete escape: CodeQL js/incomplete-sanitization)
+    const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     for (const sel of ["[data-mv2='pill']", "[data-mv2='home-search']", "[data-mv2='cat']"]) {
-      expect(css).toMatch(new RegExp(sel.replace(/[[\]]/g, "\\$&") + " \\{[^}]*min-height: var\\(--hit\\)"));
+      expect(css).toMatch(new RegExp(escapeRe(sel) + " \\{[^}]*min-height: var\\(--hit\\)"));
     }
     // the panel's title line is 36 px (founder, 2026-10-30: more map); each of its two buttons reaches 4 px past its text
     // above and below (the ::after), so a thumb still has 44 px to land on
