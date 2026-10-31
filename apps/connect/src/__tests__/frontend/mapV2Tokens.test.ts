@@ -47,10 +47,12 @@ describe("Map v2 visual consistency (tracker section 12.3)", () => {
   });
 
   it("one accent: gold is only ever read through the accent tokens, and no new gold exists", () => {
-    expect(components).not.toMatch(/#c9a84c|#d4af37|#8b6914|#e8d48b/i);
-    const gold = (css.match(/#c9a84c|#d4af37|#8b6914|#e8d48b/gi) || []).map((x) => x.toLowerCase());
-    // plain gold, dark gold, light gold: the brand values already in index.html, nothing new
-    expect(new Set(gold)).toEqual(new Set(["#c9a84c", "#8b6914", "#e8d48b"]));
+    // The crown gold (the fill, and the dark look's ink) and its dark ink: the founder's 2026-10-31 decision. Nothing else.
+    expect(components).not.toMatch(/#f2bd22|#836100|#c9a84c|#d4af37|#8b6914|#e8d48b/i);
+    const gold = (css.match(/#f2bd22|#836100|#c9a84c|#d4af37|#8b6914|#e8d48b/gi) || []).map((x) => x.toLowerCase());
+    expect(new Set(gold)).toEqual(new Set(["#f2bd22", "#836100"]));
+    // the retired golds are gone from the token blocks too
+    expect(css).not.toMatch(/#c9a84c|#d4af37|#8b6914|#e8d48b|201, 168, 76/i);
   });
 });
 

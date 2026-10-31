@@ -94,7 +94,7 @@
       h(CrownMark, { size: 72 }),
       h('div', {
         className: 'spin',
-        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(212,175,55,0.25)', borderTopColor: '#D4AF37' },
+        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(242,189,34,0.25)', borderTopColor: '#F2BD22' },
       }));
   }
 

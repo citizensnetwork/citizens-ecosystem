@@ -11,7 +11,7 @@
   // eventCategoryGroups.test.ts. Cards read heading off getItemCategory.
   const EVENT_CATEGORIES = [
     { id: 'worship-prayer',      name: 'Worship & Prayer',      short: 'Worship',     hex: '#B8860B', icon: 'HeartHandshake', group: 'Worship & church', heading: 'Worship & church | Worship & Prayer' },
-    { id: 'church-services',     name: 'Church Services',       short: 'Church',      hex: '#D4AF37', icon: 'Building2',      group: 'Worship & church', heading: 'Worship & church | Church Services' },
+    { id: 'church-services',     name: 'Church Services',       short: 'Church',      hex: '#F2BD22', icon: 'Building2',      group: 'Worship & church', heading: 'Worship & church | Church Services' },
     { id: 'outreach-missions',   name: 'Outreach & Missions',   short: 'Outreach',    hex: '#1ABC9C', icon: 'Globe',          group: 'Serve',             heading: 'Serve | Outreach & Missions' },
     { id: 'markets-expos',       name: 'Markets & Expos',       short: 'Markets',     hex: '#F39C12', icon: 'Store',          group: 'Culture & fun',     heading: 'Culture & fun | Markets & Expos' },
     { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',       hex: '#2ECC71', icon: 'CircleDot',      group: 'Culture & fun',     heading: 'Culture & fun | Sport & Recreation' },
@@ -31,7 +31,7 @@
 
   // ── Place categories (10) ──
   const PLACE_CATEGORIES = [
-    { id: 'churches-ministries', name: 'Churches & Ministries', short: 'Churches',   hex: '#D4AF37', icon: 'Building2' },
+    { id: 'churches-ministries', name: 'Churches & Ministries', short: 'Churches',   hex: '#F2BD22', icon: 'Building2' },
     { id: 'hospitality-cafes',   name: 'Hospitality & Cafés',   short: 'Cafés',      hex: '#8B4513', icon: 'Coffee' },
     { id: 'recreation-sport',    name: 'Recreation & Sport',    short: 'Recreation', hex: '#2ECC71', icon: 'Dumbbell' },
     { id: 'media-broadcasting',  name: 'Media & Broadcasting',  short: 'Media',      hex: '#9B59B6', icon: 'Radio' },
@@ -49,7 +49,7 @@
   //  3 are new. Mirrors CONTRIBUTOR_TYPES in src/lib/categories.ts (server
   //  validation) — change both together.
   const CONTRIBUTOR_TYPES = [
-    { id: 'churches-ministries', name: 'Church',                short: 'Church',    hex: '#D4AF37', icon: 'Church' },
+    { id: 'churches-ministries', name: 'Church',                short: 'Church',    hex: '#F2BD22', icon: 'Church' },
     { id: 'outreach-missions',   name: 'Outreach / Mission',    short: 'Outreach',  hex: '#1ABC9C', icon: 'Globe' },
     { id: 'markets-expos',       name: 'Market / Expo',         short: 'Market',    hex: '#F39C12', icon: 'Store' },
     { id: 'christian-businesses',name: 'Business',              short: 'Business',  hex: '#A67C00', icon: 'Store' },

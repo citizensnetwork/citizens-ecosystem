@@ -539,7 +539,7 @@
     const org = !isContributor && item.organizerId ? contributors.find((c) => c.id === item.organizerId) : null;
     const name = item.title || item.name || '';
     const cat = window.DATA.getItemCategory(Object.assign({}, item, { type }));
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F2BD22';
     const catLabel = cat ? cat.name : ((isContributor && window.MapV2Strings.pin.kind[item.kind]) || window.MapV2Strings.pin.type[type]);
     const avatarSrc = isContributor ? item.profilePhoto : org && org.profilePhoto;
     const avatarName = isContributor ? name : org && org.name;

@@ -71,14 +71,28 @@
     const isContributor = item.type === 'contributor';
 
     const cat = window.DATA.getItemCategory(item);
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F2BD22';
+    // A label on the category colour: white or near-black, whichever has the better WORST contrast over the colours it
+    // sits on (WCAG relative luminance). Light colours (the crown gold, yellows) get near-black; dark ones keep white.
+    const rgb = (() => { const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; })();
+    const lum = (a) => {
+      const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      return 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+    };
+    const toward = (p, t) => rgb.map((v) => (v * p + t * (100 - p)) / 100);
+    const pickLabel = (lums) => {
+      const worst = (l) => Math.min(...lums.map((x) => (Math.max(x, l) + 0.05) / (Math.min(x, l) + 0.05)));
+      return worst(0.003) > worst(1) ? '#0A0908' : '#FFFFFF';
+    };
+    const chipLabel = pickLabel([lum(rgb)]);                                          // the category chip: one colour
+    const btnLabel = pickLabel([lum(toward(68, 255)), lum(rgb), lum(toward(86, 0))]); // the Connect button: its three gradient stops
     // Category-adaptive palette. `color-mix` keeps every derived tone in the
     // listing's own colour instead of hard-coding a second palette per state.
     const mix = (a, p, b) => `color-mix(in srgb, ${a} ${p}%, ${b})`;
-    const grad = `linear-gradient(135deg, ${mix(hex, 68, '#ffffff')}, ${hex} 52%, ${mix(hex, 72, '#000000')})`;
+    const grad = `linear-gradient(135deg, ${mix(hex, 68, '#ffffff')}, ${hex} 52%, ${mix(hex, 86, '#000000')})`; // light, the colour, a deeper tone of it (not near-black: no muddy end stop)
     const ink = mix(hex, 72, '#1a1206');    // readable icon / text accent
     const soft = mix(hex, 13, 'transparent');
-    const softInk = mix(hex, 70, '#000000');
+    const softInk = mix(hex, 56, '#000000'); // text on the soft tint: 4.5:1 even for the crown gold
 
     const title = item.title || item.name || '';
     const description = isContributor ? item.bio : item.description;
@@ -151,8 +165,8 @@
       // category (or, for an uncategorised Contributor, its kind)
       cat
         ? h('span', {
-            className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow',
-            style: { background: hex },
+            className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold shadow',
+            style: { background: hex, color: chipLabel },
           }, h(Icon, { name: cat.icon, size: 9 }), cat.short || cat.name)
         : kind && h('span', {
             className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm bg-white/85 text-gold-dark border border-gold/30',
@@ -167,7 +181,7 @@
           ? h(Avatar, { src: logo, name: orgName, size: 36, rounded: 'full', fit: logoFit(logoKind) })
           : h('span', {
               className: 'flex items-center justify-center rounded-full',
-              style: { width: 36, height: 36, background: hex + '24', color: hex },
+              style: { width: 36, height: 36, background: hex + '24', color: ink },
               'aria-label': cat ? cat.name : (kind ? kind.label : 'Listing'),
             }, h(Icon, { name: bandIcon, size: 17 }))));
 
@@ -183,7 +197,7 @@
     ].filter(Boolean);
 
     const stat = (icon, value, label) => h('span', { key: label, className: 'flex items-center gap-1' },
-      h(Icon, { name: icon, size: 11, style: { color: hex } }),
+      h(Icon, { name: icon, size: 11, style: { color: ink } }),
       h('b', { className: 'text-foreground' }, value), label);
     const stats = isEvent
       ? [stat('Users', (item.connectCount || 0).toLocaleString(), ' connected'),
@@ -235,7 +249,7 @@
       className: cx('rounded-full flex items-center justify-center shrink-0 border transition-colors',
         'w-8 h-8',
         active ? 'border-transparent' : 'border-border bg-white/60 text-muted-foreground hover:text-foreground hover:bg-accent/60'),
-      style: active ? { background: hex + '1f', color: hex, borderColor: hex + '4d' } : undefined,
+      style: active ? { background: hex + '1f', color: ink, borderColor: hex + '4d' } : undefined,
     }, h(Icon, { name: icon, size: 14 }));
 
     const secondaryBtns = [
@@ -255,8 +269,8 @@
         type: 'button', onClick: onPrimary,
         className: cx('flex-1 min-w-0 rounded-full font-bold flex items-center justify-center gap-1.5 px-3 transition-transform active:scale-[0.98]',
           'h-8 text-[11px]',
-          (isConnected || (!isEvent && saved)) ? 'bg-accent text-gold-dark' : 'text-white'),
-        style: (isConnected || (!isEvent && saved)) ? undefined : { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` },
+          (isConnected || (!isEvent && saved)) ? 'bg-accent text-gold-dark' : ''),
+        style: (isConnected || (!isEvent && saved)) ? undefined : { background: grad, color: btnLabel, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` },
       }, h(Icon, { name: primaryIcon, size: 12, fill: (!isEvent && saved) ? 'currentColor' : 'none' }),
          h('span', { className: 'truncate' }, primaryLabel)),
       secondaryBtns);
