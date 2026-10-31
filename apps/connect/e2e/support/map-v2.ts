@@ -61,12 +61,45 @@ export async function openMap(page: Page, path = "/", min = 1) {
 }
 
 /**
+ * Wait until the home screen has stopped rearranging itself: the map is not moving, every pin sits where it will stay, and the
+ * Explore row has ranked its cards and shown their distances (it ranks once, when the map first says where it is). A slow
+ * machine (CI) does all of this AFTER the pins first appear, so a spec that measures a point on bare map, or presses a card,
+ * straight after openMap() can find a pin or a different card under its finger. Call this before measuring or pressing.
+ */
+export async function mapSettled(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __ccMap?: { isMoving(): boolean }; __settle?: { sig: string; at: number } };
+      if (!w.__ccMap || w.__ccMap.isMoving()) return false;
+      const pins = [...document.querySelectorAll(".maplibregl-marker")]
+        .map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y)}`; })
+        .join("|");
+      const explore = document.querySelector("[data-mv2='explore']");
+      const cards = explore ? [...explore.querySelectorAll("[data-explore-id]")].map((e) => e.getAttribute("data-explore-id")).join(",") : "";
+      // the row shows a distance on every card once it knows where the map is
+      if (explore && cards && !/\d\s?(km|m)\b/.test(explore.textContent ?? "")) return false;
+      // the panel's own height and the first card's width too: web fonts arriving late (a slow runner) resize the text, and with it the
+      // panel and the open map above it, which moves the pins a moment after everything looked still
+      const panel = Math.round(explore ? explore.getBoundingClientRect().height : 0);
+      const card1 = Math.round(explore?.querySelector("[data-explore-id]")?.getBoundingClientRect().width ?? 0);
+      const sig = `${pins}#${cards}#${panel}#${card1}#${document.fonts ? document.fonts.status : ""}`;
+      const now = performance.now();
+      if (!w.__settle || w.__settle.sig !== sig) { w.__settle = { sig, at: now }; return false; }
+      return now - w.__settle.at > 500;
+    },
+    undefined,
+    { polling: 100, timeout: 20_000 },
+  );
+}
+
+/**
  * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
  * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
  * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
  * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  await mapSettled(page);
   const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
   // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
   if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
@@ -112,6 +145,7 @@ export async function openPinSheet(page: Page, id: string, how: "click" | "tap" 
  * an overlay is not the map's, and the home now frames its pins in exactly that open middle.
  */
 export async function bareMapPoint(page: Page, span = 120): Promise<{ x: number; y: number }> {
+  await mapSettled(page);
   const pt = await page.evaluate((half) => {
     const x = window.innerWidth / 2;
     const top = document.querySelector("[data-mv2='home-top']")?.getBoundingClientRect().bottom ?? 0;
