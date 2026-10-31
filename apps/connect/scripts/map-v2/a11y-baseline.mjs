@@ -1,4 +1,4 @@
-// P0-05 (deep links) and P0-06 (accessibility baseline) on the flag-off page.
+// P0-05 (deep links) and P0-06 (accessibility baseline), recorded on the old map before Map v2 (kept as history).
 //   node scripts/map-v2/a11y-baseline.mjs
 import { openSession, openMap, jumpTo, FIXED_NOW, BASE_URL, contrast } from './harness.mjs';
 import { smallSeed } from './fixtures.mjs';

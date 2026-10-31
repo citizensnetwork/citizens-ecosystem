@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, bareMapPoint } from "./support/map-v2";
 import { touchSession, pinch, swipe, recordPointerEvents, pointerCounts, resetPointerCounts, type Pt } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -33,7 +33,9 @@ async function goTo(page: Page, want: "peek" | "half" | "full") {
       if ((await snapOf()) !== "half") await page.locator("[data-mv2='handle']").tap();
       await page.waitForTimeout(300);
       const b = (await page.locator("[data-mv2='actions']").boundingBox())!;
-      await swipe(await touchSession(page), { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) }, 300, { ms: 1000, steps: 20 });
+      // from half (40 % of the screen) to the peek line, not past it (that closes the sheet)
+      const down = Math.round((await page.evaluate(() => window.innerHeight)) * 0.4 - 108);
+      await swipe(await touchSession(page), { x: b.x + b.width / 2, y: b.y + Math.min(b.height / 2, 24) }, down, { ms: 1000, steps: 20 });
     } else {
       await page.locator("[data-mv2='handle']").tap();
     }
@@ -105,7 +107,8 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     await openOnMap(page);
     const cdp = await touchSession(page);
     const z0 = await mapZoom(page);
-    await pinch(cdp, { x: 195, y: 420 }, 60, 220, { ms: 500, steps: 16 });
+    // on bare map (#210): the home frames its pins in the open middle, and a touch on a pin is not the map's
+    await pinch(cdp, await bareMapPoint(page), 60, 220, { ms: 500, steps: 16 });
     await expect.poll(() => mapZoom(page), { timeout: 4000 }).toBeGreaterThan(z0 + 0.5);
     expect(await scale(page)).toBe(1);
   });
@@ -120,7 +123,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
         ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
         [c.physical_longitude, c.physical_latitude],
       );
-      await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+      await openPinSheet(page, c.id, "tap");
       const sheet = page.locator(SHEET);
       await expect(sheet).toBeVisible();
       await expect.poll(() => sheet.getAttribute("data-snap")).toBe("half");
@@ -151,7 +154,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
       [c.physical_longitude, c.physical_latitude],
     );
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+    await openPinSheet(page, c.id, "tap");
     const sheet = page.locator(SHEET);
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(400);
@@ -174,7 +177,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
       [c.physical_longitude, c.physical_latitude],
     );
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+    await openPinSheet(page, c.id, "tap");
     await expect(page.locator(SHEET)).toBeVisible();
     await page.waitForTimeout(400);
     const rule = () => page.evaluate(() => {

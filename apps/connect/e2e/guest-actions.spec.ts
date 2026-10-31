@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, openPinSheet, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Guest mode (issue #201). Nobody signed in, Supabase configured (window.CC_AUTH set): Follow, Save, Consider and Connect
@@ -23,7 +23,8 @@ async function openAsGuest(page: Page, kind: Kind) {
   const lng = Number(row.physical_longitude ?? row.longitude);
   const lat = Number(row.physical_latitude ?? row.latitude);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [lng, lat]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${row.id}"]`).click({ force: true });
+  // #210: on the home map a pin picks a card; the half sheet (with the action row these tests press) is what a pin opens on the clean map
+  await openPinSheet(page, row.id);
   await expect(sheet(page)).toBeVisible();
   // the real site has Supabase configured and nobody signed in; the hermetic page has neither
   await page.evaluate(() => { (window as unknown as { CC_AUTH: object }).CC_AUTH = {}; });
@@ -56,35 +57,36 @@ test.describe("#201 a guest's Follow, Save, Consider and Connect never flip, and
 
   test("Follow on a Place", async ({ page }) => {
     await openAsGuest(page, "place");
-    const card = page.locator("[data-mv2='card']");
-    await card.getByRole("button", { name: /^Follow$/ }).click();
+    const btn = actionBtn(page, /^Follow(ing)?$/);
+    await btn.click();
     await expect(toastWith(page, "Sign in to follow.")).toBeVisible();
-    await expect(card.getByRole("button", { name: /^Following$/ })).toHaveCount(0);
+    await expect(btn).toHaveText("Follow");
+    await expect(btn).not.toHaveAttribute("data-on", /.*/);
   });
 
   test("Consider on an Event", async ({ page }) => {
     await openAsGuest(page, "event");
-    const card = page.locator("[data-mv2='card']");
-    await card.getByRole("button", { name: "Consider", exact: true }).click();
+    const btn = actionBtn(page, /^Consider(ing)?$/);
+    await btn.click();
     await expect(toastWith(page, "Sign in to show you're considering it.")).toBeVisible();
     await expect(signInButton(page)).toHaveText("Sign in");
-    await expect(card.getByRole("button", { name: "Remove from considering" })).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Consider", exact: true })).toHaveCount(1);
+    await expect(btn).toHaveText("Consider");
+    await expect(btn).not.toHaveAttribute("data-on", /.*/);
   });
 
   test("Connect on an Event", async ({ page }) => {
     await openAsGuest(page, "event");
-    const card = page.locator("[data-mv2='card']");
-    await card.getByRole("button", { name: "Connect", exact: true }).click();
+    const btn = actionBtn(page, /^Connect(ed)?$/);
+    await btn.click();
     await expect(toastWith(page, "Sign in to connect.")).toBeVisible();
     await expect(signInButton(page)).toHaveText("Sign in");
-    await expect(card.getByRole("button", { name: "Connected" })).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Connect", exact: true })).toHaveCount(1);
+    await expect(btn).toHaveText("Connect");
+    await expect(btn).not.toHaveAttribute("data-on", /.*/);
   });
 
   test("the Sign in button is a real, reachable 44 px button that goes to sign-in and clears the toast", async ({ page }) => {
     await openAsGuest(page, "event");
-    await page.locator("[data-mv2='card']").getByRole("button", { name: "Connect", exact: true }).click();
+    await actionBtn(page, /^Connect(ed)?$/).click();
     const btn = signInButton(page);
     await expect(btn).toBeVisible();
     // layout height, not the drawn box: the toast slides in with a transform that would read 43.99
@@ -103,7 +105,7 @@ test.describe("#201 a guest's Follow, Save, Consider and Connect never flip, and
 
   test("the toast with a button stays about 6 s; an ordinary toast does not outlive 3.2 s", async ({ page }) => {
     await openAsGuest(page, "event");
-    await page.locator("[data-mv2='card']").getByRole("button", { name: "Connect", exact: true }).click();
+    await actionBtn(page, /^Connect(ed)?$/).click();
     await expect(signInButton(page)).toBeVisible();
     await page.waitForTimeout(4000);
     await expect(signInButton(page)).toBeVisible(); // longer than the 3.2 s of a plain toast

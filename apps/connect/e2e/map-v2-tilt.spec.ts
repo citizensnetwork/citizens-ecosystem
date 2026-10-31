@@ -1,6 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, bareMapPoint } from "./support/map-v2";
 import { touchSession, twoFingerSwipe, pinch, rotateGesture, swipe } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -8,7 +7,7 @@ import { touchSession, twoFingerSwipe, pinch, rotateGesture, swipe } from "./sup
 //  The main map is always drawn at one oblique angle (MapV2.PITCH, 45 degrees);
 //  zoom and rotation work as before. A pitch of 0 in map-v2-lib.jsx is the
 //  rollback (MapLibre's own defaults: flat, and a person may tilt it).
-//  The old map (?map=v1) and the address-picker map stay flat and untouched.
+//  The address-picker map stays flat and untouched (unit-tested: no pitch option).
 //  Everything with fingers goes through CDP touch (e2e/support/touch.ts).
 // ════════════════════════════════════════════════════════════════════
 
@@ -51,11 +50,12 @@ test.describe("R8 fixed tilt: the camera (phone)", () => {
     expect(c.touchPitch).toBe(false);
   });
 
-  test("a two-finger vertical drag does not change the pitch (the same drag does on the old map)", async ({ page }) => {
+  test("a two-finger vertical drag does not change the pitch (the same drag does once the camera is unpinned: see the controls below)", async ({ page }) => {
     await open(page);
     const cdp = await touchSession(page);
     const before = await cam(page);
-    await twoFingerSwipe(cdp, { x: 150, y: 420 }, { x: 240, y: 420 }, -220, { ms: 500, steps: 16 });
+    // in the open map (#210): at the screen centre a finger would start on the Explore row and prove nothing
+    await twoFingerSwipe(cdp, { x: 150, y: 340 }, { x: 240, y: 340 }, -220, { ms: 500, steps: 16 });
     await twoFingerSwipe(cdp, { x: 150, y: 300 }, { x: 240, y: 300 }, 260, { ms: 500, steps: 16 });
     const after = await cam(page);
     expect(after.pitch).toBeCloseTo(before.pitch, 5);
@@ -66,10 +66,12 @@ test.describe("R8 fixed tilt: the camera (phone)", () => {
     await open(page);
     const cdp = await touchSession(page);
     const z0 = (await cam(page)).zoom;
-    await pinch(cdp, { x: 195, y: 420 }, 60, 220, { ms: 500, steps: 16 });
+    // on bare map (#210): the home frames its pins in the open middle, and a touch on a pin is not the map's
+    const at = await bareMapPoint(page);
+    await pinch(cdp, at, 60, 220, { ms: 500, steps: 16 });
     await expect.poll(async () => (await cam(page)).zoom, { timeout: 4000 }).toBeGreaterThan(z0 + 0.5);
     const b0 = (await cam(page)).bearing;
-    await rotateGesture(cdp, { x: 195, y: 420 }, 90, 70, { ms: 500, steps: 16 });
+    await rotateGesture(cdp, await bareMapPoint(page, 100), 90, 70, { ms: 500, steps: 16 });
     await expect.poll(async () => Math.abs((await cam(page)).bearing - b0), { timeout: 4000 }).toBeGreaterThan(10);
     expect((await cam(page)).pitch).toBeCloseTo(PITCH, 1);
   });
@@ -111,9 +113,13 @@ test.describe("R8 fixed tilt: desktop", () => {
   test("a right-button drag still rotates and never tilts (no pitch with rotate)", async ({ page }) => {
     await open(page);
     const b0 = (await cam(page)).bearing;
-    await page.mouse.move(700, 450);
+    // start on bare map (#210: the pins are framed in the open middle, and a press on a pin is not a map drag); the
+    // vertical part of the drag goes whichever way has room, and is what would tilt the map if pitch-with-rotate were on
+    const at = await bareMapPoint(page, 40);
+    const dy = at.y > 330 ? -14 : 14;
+    await page.mouse.move(at.x, at.y);
     await page.mouse.down({ button: "right" });
-    for (let i = 1; i <= 12; i++) await page.mouse.move(700 + 12 * i, 450 - 14 * i);
+    for (let i = 1; i <= 12; i++) await page.mouse.move(at.x + 12 * i, at.y + dy * i);
     await page.mouse.up({ button: "right" });
     const c = await cam(page);
     expect(Math.abs(c.bearing - b0)).toBeGreaterThan(5);
@@ -121,47 +127,36 @@ test.describe("R8 fixed tilt: desktop", () => {
   });
 });
 
-test.describe("R8 fixed tilt: what must stay flat", () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-
-  test("the old map (?map=v1) is untouched: flat, and MapLibre's own defaults apply", async ({ page }) => {
-    await useOldMap(page);
-    await open(page, "/");
-    const c = await cam(page);
-    expect(c.pitch).toBe(0);
-    expect(c.minPitch).toBe(0);
-    expect(c.maxPitch).toBe(60);
-    expect(c.touchPitch).toBe(true);
+/** Undo the pin on the camera, exactly the options the map is built without when MapV2.PITCH = 0. */
+const unpin = (page: Page) =>
+  page.evaluate(() => {
+    const m = (window as unknown as { __ccMap: MapApi & { setMinPitch(n: number): void; setMaxPitch(n: number): void; touchPitch: { enable(): void } } }).__ccMap;
+    m.setMinPitch(0);
+    m.setMaxPitch(60);
+    m.touchPitch.enable();
   });
-});
 
-test.describe("R8 controls: the same gestures DO tilt the old map (so the tests above can fail)", () => {
+test.describe("R8 controls: the same gestures DO tilt an unpinned camera (so the tests above can fail)", () => {
   test.describe("touch", () => {
     test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-    test("a two-finger vertical drag raises the pitch of the old map", async ({ page }) => {
-      await useOldMap(page);
-      await open(page, "/");
+    test("a two-finger vertical drag raises the pitch once the pin is lifted", async ({ page }) => {
+      await open(page);
+      await unpin(page);
+      await page.evaluate(() => (window as unknown as { __ccMap: { jumpTo(o: object): void } }).__ccMap.jumpTo({ pitch: 0 }));
+      expect((await cam(page)).pitch).toBe(0);
       const cdp = await touchSession(page);
-      await twoFingerSwipe(cdp, { x: 150, y: 520 }, { x: 240, y: 520 }, -260, { ms: 500, steps: 16 });
+      const at = await bareMapPoint(page, 60);
+      await twoFingerSwipe(cdp, { x: at.x - 45, y: at.y + 30 }, { x: at.x + 45, y: at.y + 30 }, -60, { ms: 500, steps: 16 });
       await expect.poll(async () => (await cam(page)).pitch, { timeout: 4000 }).toBeGreaterThan(10);
     });
   });
   test.describe("desktop", () => {
     test.use({ viewport: { width: 1280, height: 900 } });
-    test("a right-button drag changes both bearing and pitch on the old map", async ({ page }) => {
-      await useOldMap(page);
-      await open(page, "/");
-      await page.mouse.move(700, 450);
-      await page.mouse.down({ button: "right" });
-      for (let i = 1; i <= 12; i++) await page.mouse.move(700 + 12 * i, 450 - 14 * i);
-      await page.mouse.up({ button: "right" });
-      const c = await cam(page);
-      expect(Math.abs(c.bearing)).toBeGreaterThan(5);
-      expect(c.pitch).toBeGreaterThan(10);
-    });
-    test("Shift + Arrow Up raises the pitch of the old map", async ({ page }) => {
-      await useOldMap(page);
-      await open(page, "/");
+    test("Shift + Arrow Up raises the pitch once the pin is lifted", async ({ page }) => {
+      await open(page);
+      await unpin(page);
+      await page.evaluate(() => (window as unknown as { __ccMap: { jumpTo(o: object): void } }).__ccMap.jumpTo({ pitch: 0 }));
+      expect((await cam(page)).pitch).toBe(0);
       await page.locator(".maplibregl-canvas").focus();
       for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowUp");
       await expect.poll(async () => (await cam(page)).pitch, { timeout: 4000 }).toBeGreaterThan(5);
@@ -188,7 +183,7 @@ test.describe("R8 fixed tilt: the map still works under it (phone)", () => {
     const seed = await open(page);
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).tap({ force: true });
+    await openPinSheet(page, c.id, "tap");
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(900); // the 320 ms ease

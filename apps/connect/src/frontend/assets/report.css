@@ -1,88 +1,15 @@
 /* ════════════════════════════════════════════════════════════════════
    Citizens Connect — Report dialog (issue #160)
    ------------------------------------------------------------------
-   Loaded from index.html on every visit, including ?map=v1. Map v2's own
-   stylesheet stays behind the flag (app/map-v2-lib.jsx).
+   Loaded from index.html on every visit.
 
-   The dialog reads the Map v2 tokens (--surface-1, --sheet-radius, --elev-2,
-   --z-viewer, --scrim, and the type, space and radius scales). While Map v2
-   is on it sets data-theme, and assets/map-v2.css owns those tokens, light
-   and dark. On the old map data-theme is never set, so the block below
-   supplies the same values. It is html:not([data-theme]) on purpose: a
-   :root copy would override Map v2's dark set, because both match <html>.
+   The dialog defines no tokens of its own: it reads the Map v2 tokens (--surface-1,
+   --sheet-radius, --elev-2, --z-viewer, --scrim, and the type, space and radius scales),
+   which assets/map-v2.css owns, light and dark (app/map-v2-lib.jsx sets data-theme from
+   the phone's own setting and loads that stylesheet on every page).
 
    Bump the ?v= on the index.html <link> when this file changes.
    ════════════════════════════════════════════════════════════════════ */
-
-/* ── Tokens for the old map only (the same values as assets/map-v2.css) ── */
-html:not([data-theme]) {
-  --surface-1: #ffffff;
-  --surface-2: #f5f1e8;
-  --text-1: #0a0908;
-  --text-2: #5c5444;
-  --accent: #c9a84c;
-  --accent-contrast: #0a0908;
-  --accent-ink: #8b6914;
-  --error: #a32d22;
-  --focus-ring: #8b6914;
-  --divider: rgba(10, 9, 8, 0.12);
-  --scrim: rgba(10, 9, 8, 0.4);
-  --elev-2: 0 8px 28px rgba(10, 9, 8, 0.22);
-
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-8: 48px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-full: 999px;
-  --fs-1: 12px;
-  --lh-1: 16px;
-  --fs-2: 14px;
-  --lh-2: 20px;
-  --fs-3: 18px;
-  --lh-3: 24px;
-  --fw-semibold: 600;
-  --z-viewer: 300;
-  --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --hit: 44px;
-  --focus-w: 2px;
-  --focus-offset: 2px;
-  --sheet-radius: var(--radius-lg);
-  --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
-  --reader-w: 560px;
-  --scrim-blur: 4px;
-}
-
-/* The phone is dark and Map v2 is off: the dialog follows the phone. The page
-   behind keeps its own light chrome, because these tokens are only read here. */
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme]) {
-    --surface-1: #1a1714;
-    --surface-2: #26221d;
-    --text-1: #f7f4ee;
-    --text-2: #b9ae9a;
-    --accent: #c9a84c;
-    --accent-contrast: #0a0908;
-    --accent-ink: #e8d48b;
-    --error: #ff8f80;
-    --focus-ring: #e8d48b;
-    --divider: rgba(247, 244, 238, 0.14);
-    --scrim: rgba(0, 0, 0, 0.55);
-    --elev-2: 0 8px 28px rgba(0, 0, 0, 0.6);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:not([data-theme]) {
-    --dur-fast: 0ms;
-    --dur-base: 0ms;
-  }
-}
 
 /* ── Dialog. Tokens only below this line. ── */
 @keyframes cc-report-scrim-in {
