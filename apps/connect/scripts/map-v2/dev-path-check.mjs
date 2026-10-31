@@ -1,5 +1,5 @@
 // Does the DEV path (raw src/frontend served as-is: Babel-standalone compiles the .jsx tags
-// in the browser) render with the flag on and off? The production path is `next dev` / the build.
+// in the browser) render? `?map=v1` and `?map=v2` are retired and must change nothing. The production path is `next dev` / the build.
 //   node scripts/map-v2/serve-static.mjs src/frontend 3103   (in another shell)
 //   MAPV2_DEV_URL=http://localhost:3103 node scripts/map-v2/dev-path-check.mjs
 import { openSession, FIXED_NOW } from './harness.mjs';
@@ -15,10 +15,9 @@ for (const q of ['/', '/?map=v2', '/?map=v1']) {
     await s.page.waitForFunction(() => document.querySelectorAll('.maplibregl-marker').length >= 8, undefined, { timeout: 30_000 });
     out[q] = await s.page.evaluate(() => ({
       markers: document.querySelectorAll('.maplibregl-marker').length,
-      v2: !!(window.isMapV2 && window.isMapV2()),
+      v2: !!window.MapV2,
       theme: document.documentElement.getAttribute('data-theme'),
       babel: !!document.querySelector('script[type="text/babel"]'),
-      flag: window.isMapV2 && window.isMapV2(),
     }));
     out[q].pageErrors = s.log.pageErrors;
     out[q].mapV2CssRequests = s.log.requests.filter((r) => r.url.includes('map-v2.css')).length;
