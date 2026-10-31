@@ -253,47 +253,13 @@
           !collapsed && React.createElement('span', null, 'Collapse'))));
   }
 
-  // ── Mobile bottom nav ──
-  //  Five pure DESTINATIONS. The old fifth slot was a "You" tab whose profile
-  //  panel opened off the bottom of the screen; account access now lives in
-  //  exactly one place — AccountButton, top-right, on every screen — and this
-  //  slot carries Kingdom Exploration instead, which was previously reachable
-  //  only from a button in the map's top-right corner.
-  function BottomNav() {
-    const app = window.useApp();
-    const { nav, go, unreadNotifs, unreadMsgs } = app;
-    const tabs = [
-      { page: 'home', label: 'Discover', icon: 'Map' },
-      { page: 'kingdom-discovery', label: 'Explore', icon: 'LayoutGrid' },
-      { page: 'community', label: 'Projects', icon: 'Lightbulb' },
-      { page: 'messages', label: 'Messages', icon: 'MessageCircle' },
-      { page: 'notifications', label: 'Alerts', icon: 'Bell' },
-    ];
-    const badge = (p) => (p === 'notifications' ? unreadNotifs : p === 'messages' ? unreadMsgs : 0);
-    const active = (p) => nav.page === p;
-    return React.createElement('nav', { className: 'md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/50 px-2 pb-[env(safe-area-inset-bottom)]' },
-      React.createElement('div', { className: 'flex items-stretch justify-around h-16' },
-        tabs.map((t) => {
-          const a = active(t.page), b = badge(t.page);
-          return React.createElement('button', {
-            key: t.page, onClick: () => go(t.page),
-            className: cx('flex flex-col items-center justify-center gap-0.5 flex-1 transition-colors', a ? 'text-gold-dark' : 'text-foreground/45'),
-          },
-            React.createElement('div', { className: 'relative' },
-              React.createElement(Icon, { name: t.icon, size: 21, strokeWidth: a ? 2.4 : 1.9 }),
-              b > 0 && React.createElement('span', { className: 'absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-0.5 bg-gold text-white text-[8px] font-bold rounded-full flex items-center justify-center' }, b)),
-            React.createElement('span', { className: 'text-[9px] font-semibold' }, t.label));
-        })));
-  }
-
   // ── Floating create FAB (contributors) ──
   function CreateFab() {
     const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
     if (!(isContributor || listingRole === 'editor') || ['messages', 'settings', 'intake-upgrade'].includes(nav.page)) return null;
-    // Map v2 has no bottom bar: the button sits level with the folding nav, clear of the Explore row above it.
-    const v2 = !!(window.isMapV2 && window.isMapV2());
-    return React.createElement('div', { className: cx('fixed right-4 md:bottom-6 z-40 flex flex-col items-end gap-2', v2 ? 'bottom-[calc(env(safe-area-inset-bottom)+12px)]' : 'bottom-20') },
+    // There is no bottom bar: the button sits level with the folding nav, clear of the Explore row above it.
+    return React.createElement('div', { className: 'fixed right-4 md:bottom-6 z-40 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom)+12px)]' },
       open && React.createElement(React.Fragment, null,
         React.createElement('button', { onClick: () => { openCreate('place'); setOpen(false); }, className: 'flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl glass-strong shadow-xl border border-white/60 scale-in' },
           React.createElement(Icon, { name: 'MapPin', size: 15, className: 'text-[#3498DB]' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Add Place')),
@@ -313,8 +279,8 @@
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
-      // #210: Map v2's Discover page; the old map (?map=v1) shows Kingdom Exploration at the same address.
-      case 'explore': return React.createElement(window.isMapV2 && window.isMapV2() && window.MapV2Discover ? window.MapV2Discover.Discover : window.KingdomDiscoveryPage);
+      // #210: Map v2's Discover page.
+      case 'explore': return React.createElement(window.MapV2Discover.Discover);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
@@ -358,8 +324,8 @@
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),
-      // Map v2 (#210): one folding round button instead of the bar; the old map (?map=v1) keeps the bar.
-      React.createElement(window.isMapV2 && window.isMapV2() && window.MapV2Nav ? window.MapV2Nav : BottomNav),
+      // Map v2 (#210): one folding round button instead of a bottom bar.
+      React.createElement(window.MapV2Nav),
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),

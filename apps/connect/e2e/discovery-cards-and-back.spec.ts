@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
+import { openListing } from "./support/map-v2";
 
 declare global {
   interface Window {
@@ -125,15 +125,6 @@ const PAST_EVENT = {
   longitude: PRETORIA.lng - 0.01,
 };
 
-// A WIDE wordmark on a transparent background, like Grace Radio's — the shape
-// that used to be cropped to its middle on a category-coloured disc.
-const WORDMARK =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80" viewBox="0 0 300 80">' +
-      '<text x="150" y="56" text-anchor="middle" font-size="44" font-family="Arial" fill="#111">GRACE FM</text></svg>',
-  );
-
 async function mockNetwork(
   page: Page,
   seedOverride: Partial<Record<"events" | "places" | "contributors", unknown[]>> = {},
@@ -232,33 +223,6 @@ test.describe("Kingdom Discovery cards render at full size", () => {
   });
 });
 
-test.describe("Map pins", () => {
-  test("every entity type renders its own category-coloured badge shape", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page);
-    await page.goto("/");
-    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-    await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1);
-    await expect(page.locator('[data-cc-pin="place"]')).toHaveCount(1);
-    await expect(page.locator('[data-cc-pin="contributor"]')).toHaveCount(1);
-
-    // The event badge is filled with its OWN category colour, not the
-    // generic gold fallback (church-services = #D4AF37 is gold, so assert
-    // on the place, whose category colour is distinct from the fallback).
-    const placeFill = await page
-      .locator('[data-cc-pin="place"] circle:not([fill="none"])')
-      .first()
-      .getAttribute("fill");
-    expect(placeFill).toBe("#D4AF37");
-
-    // …and a category-less Contributor falls back to its KIND glyph rather
-    // than rendering an empty badge.
-    await expect(page.locator('[data-cc-pin="contributor"] g')).toHaveCount(1);
-  });
-});
-
 test.describe("Device Back button", () => {
   test("walks back through the app, closes overlays first, and only then leaves", async ({ page }) => {
     await mockNetwork(page);
@@ -294,30 +258,27 @@ test.describe("Device Back button", () => {
 
 test.describe("One card, both surfaces", () => {
   test("a map pin's preview and the Kingdom Exploration card are the same component with the same socials", async ({ page }) => {
-    await useOldMap(page);
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // Open the pin preview. It renders window.EntityCard at layout='panel' —
+    // Open the pin preview. The Map v2 sheet renders window.EntityCard at layout='sheet' —
     // the SAME component the list renders at layout='grid'.
-    await page.locator('[data-cc-pin="event"]').first().click();
+    await openListing(page, (await page.locator('.maplibregl-marker:has([data-cc-pin="event"])').first().getAttribute("data-cc-id"))!);
     const panel = page.locator('[data-entity-card="event"]');
     await expect(panel).toBeVisible({ timeout: 15_000 });
 
     // Everything the founder asked to see on a listing, on the MAP side too:
-    // the socials (which the preview never had), a real website control (it
-    // used to be a toast that opened nothing) and the route to the profile.
+    // the socials (which the preview never had) and the route to the profile.
     await expect(panel.getByRole("link", { name: "Instagram" })).toHaveAttribute(
       "href", "https://instagram.com/hatfieldsunday",
     );
     await expect(panel.getByRole("link", { name: "YouTube" })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "View Full Profile" })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "Website" })).toBeVisible();
-    await expect(panel.getByText("Hatfield Sunday Celebration")).toBeVisible();
+    await expect(page.locator("[data-mv2='view-full']")).toBeVisible();
+    await expect(page.locator("[data-map-sheet-header]")).toContainText("Hatfield Sunday Celebration");
 
     // And it opens the same screen a card does.
-    await panel.getByRole("button", { name: "View Full Profile" }).click();
+    await page.locator("[data-mv2='view-full']").click();
     await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 10_000 });
     // The full profile lists every handle, with its brand mark. The chip shows
     // the handle as text, so its accessible name is "<Platform> — <handle>"
@@ -335,78 +296,27 @@ test.describe("One card, both surfaces", () => {
 });
 
 test.describe("Every pin opens the same small card", () => {
-  test("tapping a Contributor pin opens the preview card on the map — not the full profile — and View Full Profile opens it", async ({ page }) => {
-    await useOldMap(page);
+  test("tapping a Contributor pin opens the sheet on the map — not the full profile — and View Full Profile opens it", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
 
-    await page.locator('[data-cc-pin="contributor"]').first().click();
-    const card = page.locator('[data-entity-card="contributor"]');
-    await expect(card).toBeVisible({ timeout: 10_000 });
+    await openListing(page, (await page.locator('.maplibregl-marker:has([data-cc-pin="contributor"])').first().getAttribute("data-cc-id"))!);
+    const sheet = page.locator("[data-mv2='sheet']");
+    await expect(sheet).toBeVisible({ timeout: 10_000 });
     // Still on the map: the full-screen profile page was the old behaviour.
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     await expect(page.locator('[data-screen="profile"]')).toHaveCount(0);
 
-    // Same anatomy as the event card: name, bio, address, a primary action, and
-    // the way in to the full page.
-    await expect(card.getByText("Anchor Community Church")).toBeVisible();
-    await expect(card.getByText("We serve our city through weekly gatherings")).toBeVisible();
-    await expect(card.getByText("212 Justice Mahomed Street, Brooklyn, Pretoria")).toBeVisible();
-    await expect(card.getByRole("button", { name: "Follow" }).first()).toBeVisible();
-    await expect(card.getByRole("button", { name: "View Full Profile" })).toBeVisible();
+    // The name, and the way in to the full page.
+    await expect(page.locator("[data-map-sheet-header]")).toContainText("Anchor Community Church");
+    await expect(page.locator("[data-mv2='view-full']")).toBeVisible();
 
-    await card.getByRole("button", { name: "View Full Profile" }).click();
+    await page.locator("[data-mv2='view-full']").click();
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "Anchor Community Church" })).toBeVisible();
   });
-
-  test("the Back button closes a Contributor preview before it leaves the map", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page);
-    await page.goto("/manifest.json");
-    await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-
-    await page.locator('[data-cc-pin="contributor"]').first().click();
-    await expect(page.locator('[data-entity-card="contributor"]')).toBeVisible();
-    await page.goBack();
-    await expect(page.locator('[data-entity-card="contributor"]')).toBeHidden();
-    await expect.poll(() => screenName(page)).toBe("discover");
-  });
-});
-
-// C20: the card's Share used to toast "Share link copied" and copy nothing.
-test.describe("The preview card's Share copies the real link", () => {
-  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
-
-  // Real listings have UUID ids; the shared PLACE fixture's demo id has no
-  // shareable address (routes.jsx), so this test gives the place a real one.
-  const SHARED_PLACE = { ...PLACE, id: "22222222-2222-4222-8222-000000000001" };
-  for (const [type, path] of [
-    ["contributor", `/c/${CONTRIBUTOR.contributor_slug}`],
-    ["place", `/p/${SHARED_PLACE.id}`],
-  ] as const) {
-    test(`a ${type} card copies ${path}`, async ({ page }) => {
-      await useOldMap(page);
-      await mockNetwork(page, { places: [SHARED_PLACE] });
-      await page.goto("/");
-      await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-
-      await page.locator(`[data-cc-pin="${type}"]`).first().click();
-      const card = page.locator(`[data-entity-card="${type}"]`);
-      await expect(card).toBeVisible({ timeout: 10_000 });
-      await card.getByRole("button", { name: "Share" }).click();
-
-      await expect(page.getByText("Link copied")).toBeVisible();
-      const origin = new URL(page.url()).origin;
-      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}${path}`);
-      // Sharing never navigates: the card stays open on the map.
-      await expect(card).toBeVisible();
-      await expect.poll(() => screenName(page)).toBe("discover");
-    });
-  }
 });
 
 test.describe("Finished events", () => {
@@ -448,73 +358,6 @@ test.describe("Finished events", () => {
     await expect(list.getByText("No upcoming events yet")).toBeVisible();
     await expect(list.getByText("Follow organisations to hear when they post.")).toBeVisible();
     await expect(list.locator("[data-entity-card]")).toHaveCount(0);
-  });
-});
-
-test.describe("Contributor logos", () => {
-  const withLogo = (extra: Record<string, unknown>) => ({ ...CONTRIBUTOR, logo_url: WORDMARK, ...extra });
-
-  test("an organisation's wide logo sits whole on a white disc, with the category as the ring", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page, { contributors: [withLogo({ category: "media-broadcasting" })] });
-    await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-
-    const pin = page.locator('[data-cc-pin="contributor-logo"]');
-    await expect(pin).toHaveCount(1);
-    const disc = await pin.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      const img = el.querySelector("img")!;
-      const ics = getComputedStyle(img);
-      return {
-        background: cs.backgroundColor,
-        ring: cs.borderTopColor,
-        ringWidth: parseFloat(cs.borderTopWidth),
-        fit: ics.objectFit,
-        padding: parseFloat(ics.paddingTop),
-      };
-    });
-    // White disc, the WHOLE logo (contain, never a cropping cover), a little
-    // breathing room, and a real coloured ring (not white, not transparent).
-    expect(disc.background).toBe("rgb(255, 255, 255)");
-    expect(disc.fit).toBe("contain");
-    expect(disc.padding).toBeGreaterThanOrEqual(2);
-    expect(disc.ringWidth).toBeGreaterThan(0);
-    expect(disc.ring).not.toBe("rgb(255, 255, 255)");
-    expect(disc.ring).not.toBe("rgba(0, 0, 0, 0)");
-  });
-
-  test("an Individual's photo of themselves still fills the circle", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page, { contributors: [withLogo({ contributor_kind: "individual" })] });
-    await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-    const fit = await page
-      .locator('[data-cc-pin="contributor-logo"] img')
-      .evaluate((el) => getComputedStyle(el).objectFit);
-    expect(fit).toBe("cover");
-  });
-
-  test("a logo that fails to load degrades to the category glyph, never a dead image", async ({ page }) => {
-    await useOldMap(page);
-    const broken = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
-    await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
-    await mockNetwork(page, { contributors: [withLogo({ logo_url: broken })] });
-    await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-    await expect(page.locator('[data-cc-pin="contributor"] g')).toHaveCount(1, { timeout: 10_000 });
-  });
-
-  test("the preview card shows the logo whole too", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page, { contributors: [withLogo({})] });
-    await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-    await page.locator('[data-cc-pin="contributor-logo"]').click();
-    const card = page.locator('[data-entity-card="contributor"]');
-    await expect(card).toBeVisible();
-    const fit = await card.locator("img").first().evaluate((el) => getComputedStyle(el).objectFit);
-    expect(fit).toBe("contain");
   });
 });
 
@@ -606,35 +449,6 @@ test.describe("Map density gates and pin labels", () => {
     await expect.poll(labelsOn).toBe("0");
     await zoomTo(15);
     await expect.poll(labelsOn).toBe("1");
-  });
-
-  test("pin names float on a mist, with no capsule around them", async ({ page }) => {
-    await useOldMap(page);
-    await mockNetwork(page);
-    await page.goto("/");
-    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
-
-    // Selecting a pin names it at ANY zoom.
-    await page.locator('[data-cc-pin="place"]').first().click();
-    const label = page.locator(".cc-pin-label.is-selected").first();
-    await expect(label).toBeVisible();
-    await expect(label.locator(".cc-pin-label-text")).toHaveText("Brooklyn Anchor Campus");
-
-    const style = await label.locator(".cc-pin-label-mist").evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { filter: cs.filter, background: cs.backgroundColor };
-    });
-    // The mist is a real blur, not a bordered white pill.
-    expect(style.filter).toContain("blur");
-
-    const text = await label.locator(".cc-pin-label-text").evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { weight: cs.fontWeight, size: parseFloat(cs.fontSize), shadow: cs.textShadow };
-    });
-    expect(Number(text.weight)).toBeGreaterThanOrEqual(700);
-    expect(text.size).toBeGreaterThanOrEqual(12);
-    expect(text.shadow).not.toBe("none");
   });
 });
 

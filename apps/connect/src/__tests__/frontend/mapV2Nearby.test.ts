@@ -184,6 +184,6 @@ describe("the strings and the wiring", () => {
     expect(sheet).toContain("N.rank(item, nearby");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("nearby: markers");
-    expect(home).toContain("onPick: (id, t) => { setSelected(id); setSelType(t);");
+    expect(home).toContain("onPick: (id, t) => openSheet(id, t, sheet.view)");
   });
 });
