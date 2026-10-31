@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     if (cached) return cached;
     const { data } = await admin
       .from("profiles")
-      .select("id, role, contributor_status, contributor_hidden, deleted_at, auto_update_level")
+      .select("id, role, contributor_status, contributor_hidden, deleted_at, auto_update_level, contributor_category")
       .eq("id", contributorId)
       .maybeSingle();
     const result = contributorEligibility(data as ProfileForAutomation | null);
