@@ -58,6 +58,24 @@ const NPM_CDN_URL_RE =
   /^https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net\/npm)\/((?:@[^/@]+\/)?[^/@]+)(?:@([^/]*))?(\/[^?#]*)?$/;
 const EXACT_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const DEVELOPMENT_BUILD_RE = /\.development\.(?:min\.)?js(?:[?#]|$)/;
+/**
+ * A final base path such as "/citizens/connect": lower-case segments of letters,
+ * digits and inner hyphens, no trailing slash. The value lands in an HTML
+ * attribute and in config.js, so nothing else (quotes, dots, "//") is accepted.
+ */
+const BASE_PATH_RE = /^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+/** The page's `<base href="/">` tag, as the frontends write it. */
+const BASE_HREF_RE = /(<base\s+href=")\/("[^>]*>)/i;
+
+/** Throw unless `basePath` is '' (the site root) or a final base path (see BASE_PATH_RE). */
+function assertBasePath(basePath) {
+  if (basePath === '') return;
+  if (typeof basePath !== 'string' || !BASE_PATH_RE.test(basePath)) {
+    throw new TypeError(
+      `[frontend-build] options.basePath must be '' or a path like "/citizens/connect" (got ${JSON.stringify(basePath)})`,
+    );
+  }
+}
 
 /** First 10 hex chars of the content's SHA-256 — the content-hash used in filenames. */
 function hashOf(content) {
@@ -364,8 +382,18 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  * their declared production twins. A raw capacitor-bridge.js tag (kept in
  * the source for no-build dev) is dropped: the raw file is never copied to
  * the output, so it would only 404 next to the hashed bridge.
+ *
+ * With a `basePath` ("/citizens/connect") the page's `<base href="/">` becomes
+ * `<base href="/citizens/connect/">`, so every relative script, style and vendor
+ * URL resolves under the prefix whatever deep path served the page. A page
+ * without a `<base>` tag is left alone: its relative URLs already resolve
+ * against the directory it was served from.
  */
-function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }) {
+function rewriteIndexHtml(
+  html,
+  { bundleFile, authClientFile, capacitorBridgeFile, basePath = '' },
+) {
+  assertBasePath(basePath);
   html = html.replace(/^\s*<script src="https:\/\/unpkg\.com\/@babel\/standalone[^\n]*\n/m, '');
   html = html.replace(/^\s*<script src="capacitor-bridge\.js(?:\?v=[^"]*)?"><\/script>\n?/gm, '');
   html = swapProductionTwins(html);
@@ -383,6 +411,9 @@ function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFil
     return `<script src="app/${bundleFile}"></script>\n`;
   });
 
+  if (basePath)
+    html = html.replace(BASE_HREF_RE, (_tag, open, close) => `${open}${basePath}/${close}`);
+
   return html;
 }
 
@@ -393,8 +424,18 @@ function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFil
  *    localhost/local-config fallback.
  *  - otherwise → env[env] || local[key] || defaultValue || ''.
  * Key order in the result follows `configVars` order (JSON.stringify keeps it).
+ *
+ * With a `basePath` on a web build ("/citizens/connect"), the app is served
+ * under that prefix, so:
+ *  - an empty API_BASE_URL becomes the prefix (the frontends call
+ *    `API_BASE_URL + '/api/...'`, and the API now lives under the prefix too);
+ *    an API_BASE_URL set on purpose is never overridden;
+ *  - BASE_PATH is added as the LAST key, for the frontend's own path handling.
+ * Without a basePath, or on a mobile build (bundled at the shell's root), the
+ * result is exactly what it was before this option existed.
  */
-function resolveConfigValues({ mobile, configVars, env, local }) {
+function resolveConfigValues({ mobile, configVars, env, local, basePath = '' }) {
+  assertBasePath(basePath);
   const cfg = {};
   for (const v of configVars) {
     if (mobile && v.mobileEnv !== undefined) {
@@ -402,6 +443,10 @@ function resolveConfigValues({ mobile, configVars, env, local }) {
     } else {
       cfg[v.key] = env[v.env] || local[v.key] || v.defaultValue || '';
     }
+  }
+  if (basePath && !mobile) {
+    if (cfg.API_BASE_URL === '') cfg.API_BASE_URL = basePath;
+    cfg.BASE_PATH = basePath;
   }
   return cfg;
 }
@@ -457,6 +502,7 @@ function assertOptions(options) {
       '[frontend-build] options.sriPackages must be an array of npm package names (e.g. ["react", "@supabase/supabase-js"])',
     );
   }
+  if (options.basePath !== undefined) assertBasePath(options.basePath);
 }
 
 /**
@@ -479,10 +525,19 @@ function buildFrontend(options) {
     mobileRequiredKeys = [],
     mobileMissingLabel = 'required',
     sriPackages = [],
+    basePath = '',
     env = process.env,
     log = console.log,
     warn = console.warn,
   } = options;
+
+  // A store build is bundled at the native shell's own root: no prefix applies.
+  const webBasePath = mobile ? '' : basePath;
+  if (mobile && basePath) {
+    warn(
+      `[build-frontend] basePath ${basePath} ignored: a mobile build is bundled at the shell's root.`,
+    );
+  }
 
   const dest = mobile ? mobileDir : publicDir;
   const special = new Set([...DEFAULT_SPECIAL_FILES, ...extraSpecialFiles]);
@@ -502,7 +557,12 @@ function buildFrontend(options) {
 
   fs.writeFileSync(
     path.join(dest, 'index.html'),
-    rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }),
+    rewriteIndexHtml(html, {
+      bundleFile,
+      authClientFile,
+      capacitorBridgeFile,
+      basePath: webBasePath,
+    }),
   );
 
   if (sriVerified.length > 0) {
@@ -520,7 +580,7 @@ function buildFrontend(options) {
   // absolute production API base, env-first with local-config fallback for the
   // non-forced values (mobile bundles are built locally, not on Vercel).
   const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
-  const config = resolveConfigValues({ mobile, configVars, env, local });
+  const config = resolveConfigValues({ mobile, configVars, env, local, basePath: webBasePath });
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
     warn(
       `[build-frontend] WARNING: mobile config is missing ${mobileMissingLabel} values — set NEXT_PUBLIC_* env vars or fill src/frontend/config.js before shipping.`,
@@ -530,6 +590,8 @@ function buildFrontend(options) {
   log(
     `[build-frontend] Generated ${path.basename(dest)}/config.js (API_BASE_URL=${config.API_BASE_URL || "'' (same-origin)"})`,
   );
+  if (webBasePath)
+    log(`[build-frontend] Base path ${webBasePath} (index.html <base>, config.js BASE_PATH)`);
 
   return { dest, bundleFile, authClientFile, capacitorBridgeFile, config, sriVerified };
 }

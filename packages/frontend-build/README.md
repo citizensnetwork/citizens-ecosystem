@@ -108,6 +108,23 @@ the hash from the error. Sanity-check that the CDN serves the same bytes:
   deliberately **ignore** the local fallback: a store build must never point
   at a localhost API base.
 
+## `basePath`: serving under `/citizens/<app>`
+
+`basePath` (default `''`) says the app is served from a path on the shared
+domain instead of the site root. Each host wrapper passes
+`basePathFromEnv('<slug>')` from [`@citizens/ecosystem`](../ecosystem/README.md),
+which is `''` until the app's Vercel project sets `NEXT_PUBLIC_BASE_PATH`.
+
+| `basePath`            | Web build output                                                                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `''` (default)        | Byte-identical to a build without the option.                                                                                                                                                                                                                                                  |
+| `'/citizens/connect'` | `index.html`'s `<base href="/">` becomes `<base href="/citizens/connect/">` (a page with no `<base>`, like Vision's and Wear's, is untouched); an **empty** `API_BASE_URL` becomes `/citizens/connect` (a value set on purpose is never overridden); `config.js` gains a last `BASE_PATH` key. |
+
+A **mobile** build ignores `basePath` (with a warning): the native shell serves
+the bundle from its own root. The value is checked against a strict pattern
+(lower-case segments, no quotes, dots or `//`) because it is written into HTML
+and JS; anything else throws before a file is written.
+
 ## Consumers
 
 All three apps live in this monorepo and depend on the package as
