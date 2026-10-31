@@ -40,6 +40,10 @@ function contentSecurityPolicy() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
+  // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
+  // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
+  agentRules: false,
   reactStrictMode: true,
   transpilePackages: ['@citizens/connect-client', '@citizens/db'],
   // Pin the workspace root so Next doesn't mistakenly pick up a stray
