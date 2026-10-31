@@ -666,10 +666,16 @@
 
     // toasts
     const [toasts, setToasts] = useState([]);
-    const toast = useCallback((msg, kind = 'gold') => {
+    // `action` ({ label, onClick }) adds a button to the toast, which then stays for 6 s (others for 3.2 s) so it can be
+    // reached; pressing it runs onClick and dismisses the toast.
+    const toast = useCallback((msg, kind = 'gold', action) => {
       const id = uid('t');
-      setToasts((t) => [...t, { id, msg, kind }]);
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+      const dismiss = () => setToasts((t) => t.filter((x) => x.id !== id));
+      const act = action && action.label && typeof action.onClick === 'function'
+        ? { label: action.label, onClick: () => { dismiss(); action.onClick(); } }
+        : null;
+      setToasts((t) => [...t, { id, msg, kind, action: act }]);
+      setTimeout(dismiss, act ? 6000 : 3200);
     }, []);
 
     // Pages that write real data on a real account — a genuine guest (browsing
@@ -1890,6 +1896,15 @@
       go('messages', { convId: id });
     }, [conversations, realUser, go, toast]);
 
+    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow, a save, a consider or a
+    // connect: say so, with a "Sign in" button on the toast, BEFORE any optimistic flip (issue #201), instead of flipping a
+    // heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
+    const guestCannot = useCallback((message) => {
+      if (realUser || !window.CC_AUTH) return false;
+      toast(message, 'gold', { label: 'Sign in', onClick: showSignIn });
+      return true;
+    }, [realUser, toast, showSignIn]);
+
     // Connect (attending) and Consider (considering) are two states of ONE rsvps
     // row, so they're mutually exclusive. Each toggle updates the UI optimistically,
     // then (for a real signed-in user on a real event) writes through to the API
@@ -1898,6 +1913,7 @@
     // so a state transition clears the other side first — clearing 'considering' via
     // the consider endpoint (not rsvp DELETE) so we don't log a false cancellation.
     const toggleConnect = useCallback((eventId) => {
+      if (guestCannot('Sign in to connect.')) return;
       const wasConnected = connected.has(eventId);
       const wasConsidering = considering.has(eventId);
       setConnected((prev) => { const n = new Set(prev); wasConnected ? n.delete(eventId) : n.add(eventId); return n; });
@@ -1924,9 +1940,10 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [connected, considering, realUser, toast]);
+    }, [connected, considering, realUser, toast, guestCannot]);
 
     const toggleConsider = useCallback((eventId) => {
+      if (guestCannot("Sign in to show you're considering it.")) return;
       const wasConnected = connected.has(eventId);
       const wasConsidering = considering.has(eventId);
       setConsidering((prev) => { const n = new Set(prev); wasConsidering ? n.delete(eventId) : n.add(eventId); return n; });
@@ -1953,15 +1970,7 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [connected, considering, realUser, toast]);
-
-    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow or a save: say so, instead
-    // of flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
-    const guestCannot = useCallback((message) => {
-      if (realUser || !window.CC_AUTH) return false;
-      toast(message, 'gold');
-      return true;
-    }, [realUser, toast]);
+    }, [connected, considering, realUser, toast, guestCannot]);
 
     const toggleFollow = useCallback((orgId, name) => {
       if (guestCannot('Sign in to follow.')) return;
@@ -2679,7 +2688,7 @@
       // 1) Real events — set as soon as they arrive (do NOT wait on bubbles).
       (async () => {
         try {
-          const res = await fetch(base + '/api/v1/events?limit=100');
+          const res = await fetch(base + DATA.eventsFeedPath());
           if (!res.ok) return;
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptEvent);

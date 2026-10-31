@@ -121,10 +121,20 @@
   function Textarea(props) { return React.createElement('textarea', { ...props, className: cx(inputCls, 'resize-none leading-relaxed', props.className) }); }
 
   // ── Toggle switch ──
-  function Toggle({ checked, onChange, label, desc }) {
+  //  A switch for a screen reader (issue #183): role="switch" with aria-checked, named by its own visible label and described
+  //  by its hint, a visible focus ring, and a whole-row hit area of at least 44 px. It stays a <button>, so Space and Enter work.
+  //  `disabled` is aria-disabled (the button stays focusable and reads as unavailable) and ignores presses. The look is unchanged:
+  //  the knob position, not only the track colour, tells on from off.
+  function Toggle({ checked, onChange, label, desc, disabled }) {
+    const id = React.useId();
+    const labelId = label ? id + '-label' : undefined;
+    const descId = desc ? id + '-desc' : undefined;
     return React.createElement('button', {
-      type: 'button', onClick: () => onChange(!checked),
-      className: 'flex items-center gap-3 w-full text-left',
+      type: 'button', role: 'switch', 'aria-checked': !!checked,
+      'aria-labelledby': labelId, 'aria-describedby': descId,
+      'aria-disabled': disabled ? true : undefined,
+      onClick: () => { if (!disabled) onChange(!checked); },
+      className: cx('flex items-center gap-3 w-full text-left min-h-[44px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-dark', disabled && 'opacity-60'),
     },
       React.createElement('span', {
         className: cx('relative w-11 h-6 rounded-full transition-colors shrink-0', checked ? 'bg-gold' : 'bg-[#D4C5A0]'),
@@ -133,8 +143,8 @@
         style: { transform: checked ? 'translateX(20px)' : 'none' },
       })),
       (label || desc) && React.createElement('span', { className: 'flex-1 min-w-0' },
-        label && React.createElement('span', { className: 'block text-sm font-semibold text-foreground' }, label),
-        desc && React.createElement('span', { className: 'block text-[11px] text-muted-foreground' }, desc)));
+        label && React.createElement('span', { id: labelId, className: 'block text-sm font-semibold text-foreground' }, label),
+        desc && React.createElement('span', { id: descId, className: 'block text-[11px] text-muted-foreground' }, desc)));
   }
 
   // ── Segmented control ──
@@ -347,10 +357,16 @@
     },
       toasts.map((t) => React.createElement('div', {
         key: t.id,
-        className: cx('flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white text-xs font-semibold shadow-2xl slide-up max-w-sm', tone[t.kind] || tone.gold),
+        // The stack ignores the pointer; a toast with a button takes it back, so the button can be pressed.
+        className: cx('flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white text-xs font-semibold shadow-2xl slide-up max-w-sm', t.action && 'pointer-events-auto', tone[t.kind] || tone.gold),
       },
         React.createElement(Icon, { name: ic[t.kind] || 'Sparkles', size: 15 }),
-        React.createElement('span', null, t.msg))));
+        React.createElement('span', null, t.msg),
+        // 44 px tall through padding; the negative margins keep the toast as slim as the others.
+        t.action && React.createElement('button', {
+          type: 'button', onClick: t.action.onClick, 'data-toast-action': '',
+          className: 'underline font-bold ml-2 -my-2.5 -mr-2 px-2 py-3.5 min-h-[44px] rounded-xl',
+        }, t.action.label))));
   }
 
   // ── Empty state ──

@@ -172,6 +172,9 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
     devDependencies:
+      '@citizens/ecosystem':
+        specifier: workspace:*
+        version: link:../../packages/ecosystem
       '@citizens/frontend-build':
         specifier: workspace:*
         version: link:../../packages/frontend-build
@@ -238,6 +241,9 @@ importers:
 
   apps/vision:
     dependencies:
+      '@citizens/ecosystem':
+        specifier: workspace:*
+        version: link:../../packages/ecosystem
       '@citizens/frontend-build':
         specifier: workspace:*
         version: link:../../packages/frontend-build
@@ -348,6 +354,9 @@ importers:
       '@citizens/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@citizens/ecosystem':
+        specifier: workspace:*
+        version: link:../../packages/ecosystem
       '@citizens/frontend-build':
         specifier: workspace:*
         version: link:../../packages/frontend-build
@@ -464,6 +473,42 @@ importers:
       eslint-config-prettier:
         specifier: 10.1.8
         version: 10.1.8(eslint@10.13.0(jiti@2.7.0))
+      typescript:
+        specifier: 5.5.4
+        version: 5.5.4
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@edge-runtime/vm@3.2.0)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.1.6(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/ecosystem:
+    devDependencies:
+      '@citizens/config':
+        specifier: workspace:*
+        version: link:../config
+      '@eslint/js':
+        specifier: 10.0.1
+        version: 10.0.1(eslint@10.13.0(jiti@2.7.0))
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      '@typescript-eslint/eslint-plugin':
+        specifier: 8.72.0
+        version: 8.72.0(@typescript-eslint/parser@8.72.0(eslint@10.13.0(jiti@2.7.0))(typescript@5.5.4))(eslint@10.13.0(jiti@2.7.0))(typescript@5.5.4)
+      '@typescript-eslint/parser':
+        specifier: 8.72.0
+        version: 8.72.0(eslint@10.13.0(jiti@2.7.0))(typescript@5.5.4)
+      '@vitest/coverage-v8':
+        specifier: ^5.0.5
+        version: 5.0.5(vitest@5.0.5)
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      eslint-config-prettier:
+        specifier: 10.1.8
+        version: 10.1.8(eslint@10.13.0(jiti@2.7.0))
+      globals:
+        specifier: 16.4.0
+        version: 16.4.0
       typescript:
         specifier: 5.5.4
         version: 5.5.4

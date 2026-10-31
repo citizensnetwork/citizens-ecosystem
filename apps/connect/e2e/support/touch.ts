@@ -18,6 +18,17 @@ export async function touchSession(page: Page): Promise<CDPSession> {
   return page.context().newCDPSession(page);
 }
 
+/**
+ * Slow the page's CPU down so a timing assumption shows itself: E2E_CPU_THROTTLE=6 runs it six times slower. Unset (the
+ * default, and CI) does nothing. Call before page.goto.
+ */
+export async function throttleCpu(page: Page) {
+  const rate = Number(process.env.E2E_CPU_THROTTLE);
+  if (!(rate > 1)) return;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+}
+
 type TouchOpts = {
   /** Total time of the move phase in ms (default 240). */
   ms?: number;

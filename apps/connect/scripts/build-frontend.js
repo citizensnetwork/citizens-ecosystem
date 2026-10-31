@@ -32,6 +32,8 @@ const fs = require('fs');
 const esbuild = require('esbuild');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildFrontend } = require('@citizens/frontend-build');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { basePathFromEnv } = require('@citizens/ecosystem');
 
 // `next dev`/`next build` load .env.local themselves, but this script runs
 // as a PLAIN node process (a separate step before `next build` in the
@@ -90,6 +92,11 @@ buildFrontend({
   esbuild,
   rootDir: path.join(__dirname, '..'),
   mobile: process.argv.includes('--mobile'),
+
+  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/connect
+  // (see packages/ecosystem/README.md before setting it). Read AFTER
+  // loadDotEnvLocal above, so a local .env.local value counts too.
+  basePath: basePathFromEnv('connect'),
 
   // Every screen module, in the exact dependency order the old
   // <script type="text/babel"> tags loaded them (later files reference

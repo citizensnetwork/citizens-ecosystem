@@ -25,11 +25,16 @@
 const path = require('path');
 const esbuild = require('esbuild');
 const { buildFrontend } = require('@citizens/frontend-build');
+const { basePathFromEnv } = require('@citizens/ecosystem');
 
 buildFrontend({
   esbuild,
   rootDir: path.join(__dirname, '..'),
   mobile: process.argv.includes('--mobile'),
+
+  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/wear
+  // (see packages/ecosystem/README.md before setting it).
+  basePath: basePathFromEnv('wear'),
 
   // Every screen module, in the exact dependency order the old
   // <script type="text/babel"> tags loaded them (later files reference

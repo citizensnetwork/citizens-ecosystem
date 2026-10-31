@@ -613,3 +613,194 @@ describe('buildFrontend — CDN scripts', () => {
     ).toThrow(/options\.sriPackages/);
   });
 });
+
+describe('basePath (serving under /citizens/<app>)', () => {
+  const FILES = {
+    bundleFile: 'bundle.0123456789.js',
+    authClientFile: 'auth-client.0123456789.js',
+    capacitorBridgeFile: 'capacitor-bridge.0123456789.js',
+  };
+  const WITH_BASE = INDEX_HTML.replace('<head>', '<head>\n  <base href="/" />');
+  const BASE = '/citizens/connect';
+
+  /** Everything buildFrontend wrote, as one map, so "no change" is a byte comparison. */
+  function snapshot(dir: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    const walk = (d: string) => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else
+          out[path.relative(dir, full).split(path.sep).join('/')] = fs.readFileSync(full, 'utf8');
+      }
+    };
+    walk(dir);
+    return out;
+  }
+
+  it('is a no-op when empty or omitted: the whole output is byte-identical', () => {
+    const omitted = snapshot(buildFrontend(makeOptions(rootDir)).dest);
+    const empty = snapshot(buildFrontend(makeOptions(rootDir, { basePath: '' })).dest);
+    expect(empty).toEqual(omitted);
+    expect(omitted['config.js']).not.toContain('BASE_PATH');
+  });
+
+  it('rewrites <base href="/"> to the prefix, whatever the tag looks like', () => {
+    for (const tag of ['<base href="/" />', '<base href="/">', '<BASE  HREF="/"/>']) {
+      const html = rewriteIndexHtml(WITH_BASE.replace('<base href="/" />', tag), {
+        ...FILES,
+        basePath: BASE,
+      });
+      expect(html, tag).toMatch(/<base\s+href="\/citizens\/connect\/"/i);
+      expect(html, tag).not.toMatch(/href="\/"/);
+    }
+  });
+
+  it('touches ONLY the base tag, and leaves a page without one alone', () => {
+    const withPrefix = rewriteIndexHtml(WITH_BASE, { ...FILES, basePath: BASE });
+    const without = rewriteIndexHtml(WITH_BASE, FILES);
+    expect(withPrefix.replace('<base href="/citizens/connect/" />', '<base href="/" />')).toBe(
+      without,
+    );
+    expect(rewriteIndexHtml(INDEX_HTML, { ...FILES, basePath: BASE })).toBe(
+      rewriteIndexHtml(INDEX_HTML, FILES),
+    );
+  });
+
+  it('does not rewrite a base tag that already points somewhere else', () => {
+    const elsewhere = INDEX_HTML.replace('<head>', '<head>\n  <base href="/other/" />');
+    expect(rewriteIndexHtml(elsewhere, { ...FILES, basePath: BASE })).toContain(
+      '<base href="/other/" />',
+    );
+  });
+
+  it('a "$" in the page is never read as a replacement pattern', () => {
+    const tricky = "<p>$1 $& $` $'</p>";
+    const html = rewriteIndexHtml(
+      WITH_BASE.replace('</body>', () => `${tricky}</body>`),
+      {
+        ...FILES,
+        basePath: BASE,
+      },
+    );
+    expect(html).toContain(tricky);
+  });
+
+  it('config.js: empty API_BASE_URL defaults to the prefix, BASE_PATH is the LAST key', () => {
+    const cfg = resolveConfigValues({
+      mobile: false,
+      configVars: CONFIG_VARS,
+      env: {},
+      local: {},
+      basePath: BASE,
+    });
+    expect(cfg.API_BASE_URL).toBe(BASE);
+    expect(cfg.BASE_PATH).toBe(BASE);
+    expect(Object.keys(cfg)).toEqual([
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+      'API_BASE_URL',
+      'STYLE',
+      'BASE_PATH',
+    ]);
+  });
+
+  it('config.js: an API_BASE_URL set on purpose is never overridden', () => {
+    const cfg = resolveConfigValues({
+      mobile: false,
+      configVars: CONFIG_VARS,
+      env: { NEXT_PUBLIC_API_BASE_URL: 'https://api.example.org' },
+      local: {},
+      basePath: BASE,
+    });
+    expect(cfg.API_BASE_URL).toBe('https://api.example.org');
+    expect(cfg.BASE_PATH).toBe(BASE);
+  });
+
+  it('config.js: an app with no API_BASE_URL var still gets BASE_PATH, and no invented API base', () => {
+    const cfg = resolveConfigValues({
+      mobile: false,
+      configVars: [{ key: 'SUPABASE_URL', env: 'NEXT_PUBLIC_SUPABASE_URL' }],
+      env: {},
+      local: {},
+      basePath: BASE,
+    });
+    expect(cfg).toEqual({ SUPABASE_URL: '', BASE_PATH: BASE });
+  });
+
+  it('buildFrontend (web) applies it to index.html and config.js and says so in the log', () => {
+    fs.writeFileSync(path.join(rootDir, 'src', 'frontend', 'index.html'), WITH_BASE);
+    const log = vi.fn();
+    const result = buildFrontend(makeOptions(rootDir, { basePath: BASE, log }));
+
+    expect(fs.readFileSync(path.join(result.dest, 'index.html'), 'utf8')).toContain(
+      '<base href="/citizens/connect/" />',
+    );
+    expect(result.config.API_BASE_URL).toBe(BASE);
+    expect(result.config.BASE_PATH).toBe(BASE);
+    expect(fs.readFileSync(path.join(result.dest, 'config.js'), 'utf8')).toContain(
+      `"BASE_PATH": "${BASE}"`,
+    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Base path /citizens/connect'));
+  });
+
+  it('buildFrontend (mobile) ignores it, with a warning: the shell serves the bundle at its own root', () => {
+    fs.writeFileSync(path.join(rootDir, 'src', 'frontend', 'index.html'), WITH_BASE);
+    const warn = vi.fn();
+    const plain = buildFrontend(makeOptions(rootDir, { mobile: true, warn: vi.fn() }));
+    const plainHtml = fs.readFileSync(path.join(plain.dest, 'index.html'), 'utf8');
+    const plainConfig = fs.readFileSync(path.join(plain.dest, 'config.js'), 'utf8');
+
+    const result = buildFrontend(makeOptions(rootDir, { mobile: true, basePath: BASE, warn }));
+
+    expect(fs.readFileSync(path.join(result.dest, 'index.html'), 'utf8')).toBe(plainHtml);
+    expect(fs.readFileSync(path.join(result.dest, 'config.js'), 'utf8')).toBe(plainConfig);
+    expect(result.config).not.toHaveProperty('BASE_PATH');
+    expect(result.config.API_BASE_URL).toBe('https://app.example.org');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('basePath /citizens/connect ignored'),
+    );
+  });
+
+  it.each([
+    'citizens/connect',
+    '/',
+    '/citizens/connect/',
+    '//evil.example',
+    '/citizens//connect',
+    '/Citizens/Connect',
+    '/citizens/connect"><script>',
+    '/citizens/../connect',
+    '/citizens/connect?x=1',
+    '/citizens/connect#x',
+    '/citizens\\connect',
+    'https://219.co.za/citizens/connect',
+    ' /citizens/connect',
+  ])('rejects %j everywhere it is accepted, before anything is written', (bad) => {
+    expect(() => buildFrontend(makeOptions(rootDir, { basePath: bad }))).toThrow(
+      /options\.basePath must be '' or a path like "\/citizens\/connect"/,
+    );
+    expect(() => rewriteIndexHtml(WITH_BASE, { ...FILES, basePath: bad })).toThrow(
+      /options\.basePath/,
+    );
+    expect(() =>
+      resolveConfigValues({
+        mobile: false,
+        configVars: CONFIG_VARS,
+        env: {},
+        local: {},
+        basePath: bad,
+      }),
+    ).toThrow(/options\.basePath/);
+    expect(fs.existsSync(path.join(rootDir, 'public'))).toBe(false);
+  });
+
+  it('rejects a non-string basePath', () => {
+    expect(() => buildFrontend(makeOptions(rootDir, { basePath: 5 as unknown as string }))).toThrow(
+      /options\.basePath/,
+    );
+    expect(() =>
+      buildFrontend(makeOptions(rootDir, { basePath: null as unknown as string })),
+    ).toThrow(/options\.basePath/);
+  });
+});
