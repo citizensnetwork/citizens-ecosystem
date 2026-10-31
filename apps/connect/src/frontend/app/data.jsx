@@ -109,6 +109,18 @@
     return endOfDay.getTime() < now;
   };
 
+  // ── The public events feed (tracker C11) ─────────────────────────────
+  //  /api/v1/events is ordered by start date, oldest first, and one page holds at most 100 rows, past ones included. Asked
+  //  for with no start, the page fills with finished events as they pile up and the UPCOMING ones fall off the end, so the
+  //  map and Kingdom Discovery would silently lose them. The request therefore says where to start: local midnight the day
+  //  before today. A whole day of margin (not "now") keeps an event that began last night and runs past midnight, and keeps
+  //  the cut on the visitor's own calendar day whatever their time zone; isPastEvent above still decides what is drawn.
+  const EVENTS_FEED_LIMIT = 100;
+  const eventsFeedPath = (now = new Date()) => {
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return '/api/v1/events?limit=' + EVENTS_FEED_LIMIT + '&from=' + encodeURIComponent(from.toISOString());
+  };
+
   // ── Events and places: who may see a row? ────────────────────────────
   //  store.jsx keeps ONE merged list per kind: the public feed (published rows
   //  only, /api/v1) plus the signed-in owner's own rows of EVERY status (a direct
@@ -315,6 +327,7 @@
     hasMapPin,
     listedWhere,
     isPastEvent,
+    eventsFeedPath,
     isPubliclyListed,
     publicRows,
     ownedRows,

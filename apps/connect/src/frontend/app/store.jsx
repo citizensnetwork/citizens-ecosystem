@@ -2684,7 +2684,7 @@
       // 1) Real events — set as soon as they arrive (do NOT wait on bubbles).
       (async () => {
         try {
-          const res = await fetch(base + '/api/v1/events?limit=100');
+          const res = await fetch(base + DATA.eventsFeedPath());
           if (!res.ok) return;
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptEvent);
