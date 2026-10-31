@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Map v2 sheet, Phase 2 (tracker P2-07, P2-08, P2-06). Hermetic, clock frozen.
@@ -20,7 +20,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openPinSheet(page, c.id);
   await expect(sheet(page)).toBeVisible();
   return { seed, c };
 }
@@ -33,9 +33,17 @@ async function expand(page: Page) {
   await expect(sheet(page)).toHaveAttribute("data-snap", "full");
 }
 
+/** At half the sort bar is not drawn (founder, 2026-10-30): the tab bar and the first event sit where News and Gallery's content does. */
+async function expectNoSortAtHalf(page: Page) {
+  await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+  await expect(page.locator("[data-mv2='sort']")).toBeHidden();
+}
+
 test.describe("P2-07 Upcoming | Recent", () => {
   test("the Events tab opens on Upcoming and Recent lists past events, newest first, with when they were", async ({ page }) => {
     await openContributor(page, 0, { past: 3 });
+    await expectNoSortAtHalf(page);
+    await expand(page);   // the Upcoming | Recent bar is part of the full sheet (half has one composition for every listing)
     await expect(page.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "true");
     const upcoming = page.getByRole("button", { name: "Upcoming" });
     const recent = page.getByRole("button", { name: "Recent" });
@@ -55,6 +63,7 @@ test.describe("P2-07 Upcoming | Recent", () => {
 
   test("a Contributor with nothing coming up but past events opens on Recent, and Upcoming says so plainly", async ({ page }) => {
     await openContributor(page, 2, { past: 2 });
+    await expand(page);
     await expect(page.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Recent" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1", "Past gathering 2"]);
@@ -70,12 +79,17 @@ test.describe("P2-07 Upcoming | Recent", () => {
 
   test("a past event the app does not have loaded is listed but is not a link; the sort choice resets on another pin", async ({ page }) => {
     const { seed } = await openContributor(page, 0, { past: 1 });
+    await expand(page);
     await page.getByRole("button", { name: "Recent" }).click();
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row']")).toHaveCount(0); // not in the store: no button
     await expect(page.locator("[data-mv2='panel'] [data-mv2='row-title']")).toHaveText(["Past gathering 1"]);
     const other = seed.contributors[1];
+    await page.locator("[data-mv2='handle']").click();   // back to half: at full the sheet covers the other pin
+    await expect(sheet(page)).toHaveAttribute("data-snap", "half");
+    await page.waitForTimeout(700);   // the slide down (200 ms) and the map easing the pin clear of the half sheet (320 ms) must be over: a pin is pressed where it is
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [other.physical_longitude, other.physical_latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${other.id}"]`).click({ force: true });
+    await openPinSheet(page, other.id);
+    await expand(page);
     await expect(page.getByRole("button", { name: "Upcoming" })).toHaveAttribute("aria-pressed", "true");
   });
 });
@@ -105,7 +119,7 @@ test.describe("P2-08 count buckets: shown only from 100, never below", () => {
     await openMap(page, "/?map=v2", 8);
     const pl = seed.places[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [pl.longitude, pl.latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${pl.id}"]`).click({ force: true });
+    await openPinSheet(page, pl.id);
     await expect(sheet(page)).toBeVisible();
     await expect(page.locator("[data-map-sheet-header]")).not.toContainText("followers");
   });
@@ -194,7 +208,7 @@ test.describe("P2-06 QR code per Contributor", () => {
     await openMap(page, "/?map=v2", 8);
     const ev = seed.events[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`).click({ force: true });
+    await openPinSheet(page, ev.id);
     await expect(sheet(page)).toBeVisible();
     await expect(page.getByRole("button", { name: "QR code", exact: true })).toHaveCount(0);
   });

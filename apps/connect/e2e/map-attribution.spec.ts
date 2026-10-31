@@ -99,7 +99,11 @@ for (const [label, path] of [
       const map = await page.locator(".maplibregl-canvas").boundingBox();
       expect(s.uncovered).toBe(true);
       expect(s.x - map!.x).toBeLessThan(40);
-      expect(map!.y + map!.height - s.bottom).toBeLessThan(60);
+      // Map v2 (#210): the Explore row sits at the foot of the map, so the logo sits just above the row instead
+      const row = path.includes("v2") ? await page.locator("[data-mv2='explore']").boundingBox() : null;
+      const floor = row ? row.y : map!.y + map!.height;
+      expect(s.bottom).toBeLessThanOrEqual(floor);
+      expect(floor - s.bottom).toBeLessThan(60);
     });
   });
 }

@@ -15,11 +15,15 @@ const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 // First path segments of the frontend's single-segment screens (see rewrites() below).
 const APP_PAGES = [
-  "map", "discover", "community", "me", "messages", "notifications",
+  "map", "discover", "explore", "community", "me", "messages", "notifications",
   "settings", "apply", "onboarding", "dashboard", "admin",
 ];
 
 const nextConfig: NextConfig = {
+  // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
+  // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
+  // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
+  agentRules: false,
   // Must be the MONOREPO root, not this app's own directory — pnpm hoists
   // Next's own compiled submodules (e.g. next/dist/compiled/source-map) up to
   // the workspace root's node_modules. Scoping this to apps/connect makes

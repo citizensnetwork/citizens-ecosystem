@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, FIXED_NOW, openPinSheet } from "./support/map-v2";
 import { touchSession, swipe, recordPointerEvents, pointerCounts, resetPointerCounts } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -81,9 +81,7 @@ async function openSheet(page: Page, seed: Seed, who: Who, o: { posts?: number; 
     ([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
     [who.lng, who.lat],
   );
-  const pin = page.locator(`.maplibregl-marker[data-cc-id="${who.id}"]`);
-  if (o.touch) await pin.tap({ force: true });
-  else await pin.click({ force: true });
+  await openPinSheet(page, who.id, o.touch ? "tap" : "click");
   await expect(sheet(page)).toBeVisible();
   if (o.touch) await expect.poll(() => snapOf(page)).toBe("half");
   await page.waitForTimeout(400);
@@ -224,7 +222,7 @@ test.describe("a phone, 375 px, real touch", () => {
     await expect(scroller(page)).toHaveAttribute("data-top", "");
     // touch-action is read when a touch starts, from the last committed frame: wait for the row's value to be the
     // hand-off one and for a couple of frames to be painted, so a slow runner does not swipe on the old value
-    await expect.poll(() => page.locator("[data-mv2='hrow'] [data-mv2='card2']").first().evaluate((e) => getComputedStyle(e).touchAction)).toBe("pan-x pan-down pinch-zoom");
+    await expect.poll(() => sheet(page).locator("[data-mv2='hrow'] [data-mv2='card2']").first().evaluate((e) => getComputedStyle(e).touchAction)).toBe("pan-x pan-down pinch-zoom");
     await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
     await page.waitForTimeout(400);
     const top = await geom(page, "Latest news");

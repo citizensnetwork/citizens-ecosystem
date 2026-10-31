@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // Issue 217: the tab bar and its panel are one block. A hairline closes it.
 // Nearby, the QR action and View Full Profile stay outside the block.
@@ -8,7 +8,6 @@ type C = { id: string; contributor_slug: string; physical_longitude: number; phy
 type Seed = MapSeed & { contributors: C[]; places: { id: string; longitude: number; latitude: number }[]; events: { id: string; longitude: number; latitude: number }[] };
 
 const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
-const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const jump = (page: Page, lng: number, lat: number, zoom: number) =>
@@ -16,7 +15,7 @@ const jump = (page: Page, lng: number, lat: number, zoom: number) =>
 
 async function openOn(page: Page, id: string, lng: number, lat: number) {
   await jump(page, lng, lat, 15.5);
-  await pinOf(page, id).click({ force: true });
+  await openPinSheet(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 
@@ -126,7 +125,7 @@ test.describe("tabbed block on a phone", () => {
     await expect(page.locator("#mv2-panel")).toHaveCount(0);
     const before = await page.evaluate(() => {
       const block = document.querySelector("[data-mv2='tabbed']") as HTMLElement;
-      const anchor = document.querySelector("[data-mv2='bio']") as HTMLElement;
+      const anchor = document.querySelector("[data-mv2='actions']") as HTMLElement;   // the bio is not drawn at half; the actions always are
       const grid = block.querySelector("[data-mv2='grid']") as HTMLElement;
       return {
         gap: block.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom,
@@ -137,7 +136,7 @@ test.describe("tabbed block on a phone", () => {
     await expect(page.locator("[data-mv2='tabbed']")).toHaveCount(1);
     const after = await page.evaluate(() => {
       const block = document.querySelector("[data-mv2='tabbed']") as HTMLElement;
-      const anchor = document.querySelector("[data-mv2='bio']") as HTMLElement;
+      const anchor = document.querySelector("[data-mv2='actions']") as HTMLElement;
       const grid = block.querySelector("[data-mv2='grid']") as HTMLElement;
       return {
         gap: block.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom,
