@@ -1,0 +1,33 @@
+{
+  "name": "@citizens/ecosystem",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Where each Citizens app lives on the shared domain (/citizens/<app>): the one registry of app slugs and the base-path rule every app's next.config and build-frontend script follows.",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node --check index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"index.js\" \"test/**/*.ts\"",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@citizens/config": "workspace:*",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.5",
+    "@typescript-eslint/eslint-plugin": "8.72.0",
+    "@typescript-eslint/parser": "8.72.0",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "16.4.0",
+    "typescript": "5.5.4",
+    "vitest": "^5.0.5"
+  }
+}
