@@ -69,6 +69,17 @@ export interface BuildFrontendOptions {
    * Default: [] (no check).
    */
   sriPackages?: string[];
+  /**
+   * Where the app is served on the shared domain, e.g. "/citizens/connect"
+   * (take it from `basePathFromEnv` in @citizens/ecosystem). Default '' = the
+   * site root, and the output is exactly what it was before this option existed.
+   * When set on a web build: index.html's `<base href="/">` becomes
+   * `<base href="/citizens/connect/">`, an empty API_BASE_URL defaults to the
+   * prefix, and config.js gains a last `BASE_PATH` key. Ignored (with a
+   * warning) on a mobile build. Must be lower-case path segments of letters,
+   * digits and hyphens with no trailing slash, or the build throws.
+   */
+  basePath?: string;
   /** Env source. Default: process.env. */
   env?: Record<string, string | undefined>;
   /** Default: console.log */
@@ -114,22 +125,34 @@ export declare function hashOf(content: string): string;
 /** Render the generated config.js source (pure). */
 export declare function renderConfigJs(envGlobalName: string, cfg: Record<string, string>): string;
 
-/** Resolve the config.js values (pure) — see ConfigVar for precedence rules. */
+/**
+ * Resolve the config.js values (pure) — see ConfigVar for precedence rules.
+ * With a web `basePath`, an empty API_BASE_URL becomes the prefix and BASE_PATH
+ * is appended as the last key; without one (or on mobile) nothing changes.
+ */
 export declare function resolveConfigValues(args: {
   mobile: boolean;
   configVars: ConfigVar[];
   env: Record<string, string | undefined>;
   local: Record<string, string | undefined>;
+  basePath?: string;
 }): Record<string, string>;
 
 /**
  * Rewrite index.html onto the hashed outputs (pure). Also swaps every
  * `<script data-prod-src data-prod-integrity>` development tag for its
  * production twin; throws if only one of the two attributes is declared.
+ * With a `basePath`, `<base href="/">` becomes `<base href="<basePath>/">`
+ * (a page with no `<base>` tag is left alone).
  */
 export declare function rewriteIndexHtml(
   html: string,
-  files: { bundleFile: string; authClientFile: string; capacitorBridgeFile: string },
+  files: {
+    bundleFile: string;
+    authClientFile: string;
+    capacitorBridgeFile: string;
+    basePath?: string;
+  },
 ): string;
 
 /** Subresource Integrity value ("sha384-<base64>") of the exact bytes given. */
