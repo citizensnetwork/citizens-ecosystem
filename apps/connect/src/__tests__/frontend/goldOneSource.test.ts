@@ -75,7 +75,12 @@ describe("one gold: the crown's colour", () => {
 });
 
 describe("gold fills and gold text", () => {
-  const rule = (selector: string) => new RegExp(`${selector.replace(/[.[\]*]/g, "\\$&")}[^{]*\\{([^}]*)\\}`).exec(index)?.[1] ?? "";
+  /** The declarations of the first rule whose selector list contains `selector` (plain string search: no regex built from input). */
+  const rule = (selector: string) => {
+    const at = index.indexOf(selector);
+    const open = at < 0 ? -1 : index.indexOf("{", at);
+    return open < 0 ? "" : index.slice(open + 1, index.indexOf("}", open));
+  };
 
   it("the gradient is light, the crown, then amber: no brown end stop", () => {
     expect(rule(".gold-gradient")).toMatch(/linear-gradient\(135deg,\s*var\(--gold-light\) 0%,\s*var\(--gold\) 55%,\s*var\(--gold-deep\) 100%\)/);
