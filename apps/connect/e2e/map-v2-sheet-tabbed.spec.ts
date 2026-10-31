@@ -236,6 +236,12 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
     await expect(page.locator("#mv2-panel img")).toHaveCount(12);
 
     const scroller = page.locator("[data-mv2='scroller']");
+    // Nearby is one row, a card tall, so there is less under the block than when it was a stack (and a runner's fonts
+    // make it shorter still). Give the scroller room up front, so the block can scroll all the way out of view: the
+    // bar sticking and then leaving with its block is what is under test.
+    await scroller.evaluate((el) => {
+      (el as HTMLElement).style.paddingBottom = "900px";
+    });
     const atTop = await scroller.evaluate((el) => {
       const sc = el as HTMLElement;
       const tabs = sc.querySelector("[data-mv2='tabs']") as HTMLElement;
@@ -347,6 +353,12 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
     await page.getByRole("tab", { name: "Gallery" }).click();
     await expect(page.locator("#mv2-panel img")).toHaveCount(12);
     const scroller = page.locator("[data-mv2='scroller']");
+    // Nearby is one row, a card tall, so there is less under the block than when it was a stack (and a runner's fonts
+    // make it shorter still). Give the scroller room up front, so the block can scroll all the way out of view: the
+    // bar sticking and then leaving with its block is what is under test.
+    await scroller.evaluate((el) => {
+      (el as HTMLElement).style.paddingBottom = "900px";
+    });
     expect(await scroller.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
 
     await scroller.evaluate((el) => {

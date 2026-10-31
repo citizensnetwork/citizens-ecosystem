@@ -63,13 +63,27 @@
         under: 'Under 100 m away',
         metres: (n) => n + ' m away',
         km: (n) => n + ' km away',
+        row: { label: 'Nearby listings, closest first' },
       },
+      // The sideways rows (News, Nearby): the arrows beside a row, drawn only for a mouse
+      row: { prev: 'Previous', next: 'Next' },
       empty: {
         title: (name) => name + ' has not shared events, news or photos yet.',
         hint: 'Everything they have shared is on their full profile.',
       },
       // Issue #216: the centred reader a news card opens. The post itself is data.
-      news: { readMore: 'Read more', close: 'Close news post' },
+      news: {
+        readMore: 'Read more',
+        close: 'Close news post',
+        // The row of the newest posts. "See all" turns it into the full list in place; "Show fewer" puts it back.
+        row: {
+          label: 'Latest news',
+          count: (shown, total) => 'Newest ' + shown + ' of ' + total,
+          all: (total) => 'All ' + total + ' posts',
+          seeAll: (total) => 'See all ' + total,
+          showFewer: 'Show fewer',
+        },
+      },
       gallery: {
         loading: 'Loading photos',
         error: 'We could not load the photos.',
