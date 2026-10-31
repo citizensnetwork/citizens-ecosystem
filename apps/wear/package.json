@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@citizens/config": "workspace:*",
+    "@citizens/ecosystem": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
     "@types/node": "26.6.5",
     "@types/react": "^19.3.0",

@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 
+// Where this app is served on the shared domain: "" (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// "/citizens/vision" serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule"). The rule is packages/ecosystem's resolveBasePath. Next 16
+// compiles next.config.ts to CommonJS and Node 22 then fails on a runtime import (Connect's next.config.ts hit
+// it), so the rule is copied here and src/__tests__/basePath.test.ts fails if the copy and the package disagree.
+const BASE_PATH = "/citizens/vision";
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").trim();
+if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") !== BASE_PATH) {
+  throw new Error(
+    `[ecosystem] NEXT_PUBLIC_BASE_PATH=${JSON.stringify(rawBasePath)} is not valid for "vision": ` +
+      `leave it unset to serve from the site root, or set it to exactly "${BASE_PATH}".`,
+  );
+}
+const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
+
 const nextConfig: NextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // the "/" redirect, the headers, public/ files, _next and /api with it.
+  ...(basePath ? { basePath } : {}),
   // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
   // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
   // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
@@ -21,7 +39,10 @@ const nextConfig: NextConfig = {
   ],
   headers: async () => [
     {
-      source: "/(.*)",
+      // `/:path*`, NOT `/(.*)`: under a basePath Next prefixes the pattern, and `/citizens/vision/(.*)` needs a slash
+      // after the prefix, so the bare `/citizens/vision` got no headers. `/:path*` matches it too (same as Wear).
+      // Pinned by src/__tests__/basePath.test.ts.
+      source: "/:path*",
       headers: [
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "X-Frame-Options", value: "DENY" },
