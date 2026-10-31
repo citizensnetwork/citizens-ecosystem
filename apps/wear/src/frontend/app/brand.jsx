@@ -5,7 +5,17 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Crown, Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, Avatar, SafeImg, Spinner, ErrorNote, ScreenHeader, FollowButton } = window.CWUI;
+  const {
+    GOLD,
+    ON_GOLD,
+    GOLD_INK,
+    Avatar,
+    SafeImg,
+    Spinner,
+    ErrorNote,
+    ScreenHeader,
+    FollowButton,
+  } = window.CWUI;
   const PostCard = () => window.CWScreens.PostCard;
 
   /**
@@ -60,15 +70,15 @@
       {
         style: {
           margin: '14px 0 0',
-          border: '1px solid #f0e2b0',
-          background: '#fdf9ec',
+          border: '1px solid var(--divider)',
+          background: 'var(--surface-2)',
           borderRadius: 14,
           padding: '13px 15px',
         },
       },
       h(
         'div',
-        { style: { fontSize: 12.5, fontWeight: 800, color: '#7a6212' } },
+        { style: { fontSize: 12.5, fontWeight: 800, color: 'var(--accent-ink)' } },
         v && v.status === 'pending'
           ? 'Verification pending review'
           : v && v.status === 'rejected'
@@ -130,7 +140,7 @@
                 style: {
                   border: 'none',
                   background: GOLD,
-                  color: '#fff',
+                  color: ON_GOLD,
                   borderRadius: 11,
                   padding: '9px 18px',
                   fontSize: 12.5,
@@ -318,7 +328,7 @@
             ? h(
                 'span',
                 { title: 'Verified', style: { display: 'flex' } },
-                Icon('check', { size: 16, color: GOLD, sw: 2.6 }),
+                Icon('check', { size: 16, color: GOLD_INK, sw: 2.6 }),
               )
             : null,
         ),
@@ -373,11 +383,11 @@
                   marginTop: 8,
                   fontSize: 12,
                   fontWeight: 600,
-                  color: GOLD,
+                  color: GOLD_INK,
                   textDecoration: 'none',
                 },
               },
-              Icon('link', { size: 14, color: GOLD }),
+              Icon('link', { size: 14, color: GOLD_INK }),
               brand.websiteUrl.replace(/^https?:\/\//, ''),
             )
           : null,
@@ -397,7 +407,7 @@
                       width: '100%',
                       border: '1.5px solid ' + (following ? '#e6e3dc' : GOLD),
                       background: following ? '#fff' : GOLD,
-                      color: following ? '#9a9892' : '#fff',
+                      color: following ? 'var(--text-2)' : ON_GOLD,
                       borderRadius: 13,
                       padding: 12,
                       fontSize: 13.5,

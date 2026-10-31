@@ -1,14 +1,17 @@
 // ── Citizens Wear shared UI kit ────────────────────────────────────
-// Design-system components ported from the Claude-design handoff:
-// gold #F2BA1B on white, Manrope, 14–18px radii, soft borders.
-// Exposes window.CWUI.
+// Map v2 tokens: one gold fill (--accent) with a near-black label
+// (--accent-contrast). Gold text, icons and rings use --accent-ink.
+// Radii are the canon scale. Plus Jakarta Sans for the UI, Playfair
+// for the name. Exposes window.CWUI.
 (function () {
   const { createElement: h, useEffect, useRef, useState } = React;
   const { Crown, Icon } = window.CWIcons;
 
-  const GOLD = '#F2BA1B';
-  const INK = '#1a1a1a';
-  const MUTED = '#a09e97';
+  const GOLD = 'var(--accent)';
+  const ON_GOLD = 'var(--accent-contrast)';
+  const GOLD_INK = 'var(--accent-ink)';
+  const INK = 'var(--text-1)';
+  const MUTED = 'var(--text-2)';
 
   /**
    * An <img> that shows `fallback` (an element, or nothing) instead of the
@@ -105,10 +108,11 @@
         disabled,
         style: {
           width: '100%',
-          background: disabled ? '#f0d789' : GOLD,
-          color: '#fff',
+          background: GOLD,
+          color: ON_GOLD,
           border: 'none',
-          borderRadius: 14,
+          borderRadius: 'var(--radius-md)',
+          minHeight: 'var(--hit)',
           padding: '14px',
           fontSize: 14,
           fontWeight: 700,
@@ -116,7 +120,8 @@
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          boxShadow: '0 6px 18px -6px rgba(242,186,27,0.7)',
+          boxShadow: 'var(--elev-1)',
+          opacity: disabled ? 0.55 : 1,
           ...style,
         },
       },
@@ -132,13 +137,14 @@
       {
         onClick,
         style: {
-          border: '1px solid ' + (following ? '#e6e3dc' : GOLD),
-          background: following ? '#fff' : GOLD,
-          color: following ? '#9a9892' : '#fff',
+          border: '1px solid ' + (following ? 'var(--divider)' : GOLD),
+          background: following ? 'var(--surface-1)' : GOLD,
+          color: following ? 'var(--text-2)' : ON_GOLD,
           fontSize: small ? 11.5 : 12.5,
           fontWeight: 700,
+          minHeight: 'var(--hit)',
           padding: small ? '6px 14px' : '7px 18px',
-          borderRadius: small ? 9 : 10,
+          borderRadius: 'var(--radius-full)',
         },
       },
       following ? 'Following' : 'Follow',
@@ -154,8 +160,8 @@
         style: {
           width: size,
           height: size,
-          border: '2.5px solid #f0eee9',
-          borderTopColor: GOLD,
+          border: '2.5px solid var(--divider)',
+          borderTopColor: GOLD_INK,
           borderRadius: '50%',
         },
       }),
@@ -181,12 +187,12 @@
           style: {
             width: 54,
             height: 54,
-            borderRadius: 16,
-            background: '#faf8f3',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--surface-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid #f0eee7',
+            border: '1px solid var(--divider)',
           },
         },
         Icon(icon || 'search', { size: 24, color: MUTED }),
@@ -234,9 +240,9 @@
             {
               onClick: onRetry,
               style: {
-                border: '1px solid #e6e3dc',
-                background: '#fff',
-                borderRadius: 11,
+                border: '1px solid var(--divider)',
+                background: 'var(--surface-1)',
+                borderRadius: 'var(--radius-md)',
                 padding: '9px 22px',
                 fontSize: 12.5,
                 fontWeight: 700,
@@ -274,7 +280,7 @@
           position: 'sticky',
           top: 0,
           zIndex: 30,
-          background: '#fbfaf8',
+          background: 'var(--surface-0)',
           padding: 'calc(14px + var(--safe-top)) 18px 12px',
           display: 'flex',
           alignItems: 'center',
@@ -289,10 +295,10 @@
               onClick: onBack,
               style: {
                 border: 'none',
-                background: '#f2f0ea',
-                borderRadius: '50%',
-                width: 36,
-                height: 36,
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius-full)',
+                width: 'var(--hit)',
+                height: 'var(--hit)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -300,7 +306,7 @@
             },
             Icon('back', { size: 20 }),
           )
-        : h('div', { style: { width: 36 } }),
+        : h('div', { style: { width: 'var(--hit)' } }),
       h(
         'div',
         {
@@ -314,7 +320,7 @@
         },
         title,
       ),
-      right || h('div', { style: { width: 36 } }),
+      right || h('div', { style: { width: 'var(--hit)' } }),
     );
   }
 
@@ -416,7 +422,7 @@
             disabled: busy,
             style: {
               border: '1px solid #e6e3dc',
-              background: busy ? '#faf8f3' : '#fff',
+              background: busy ? 'var(--surface-2)' : '#fff',
               color: '#2a2a2a',
               borderRadius: 11,
               padding: '9px 16px',
@@ -427,7 +433,7 @@
               gap: 7,
             },
           },
-          Icon('plus', { size: 15, color: GOLD, sw: 2 }),
+          Icon('plus', { size: 15, color: GOLD_INK, sw: 2 }),
           busy ? 'Uploading…' : value ? 'Replace image' : 'Upload image',
         ),
         value && uploaded
@@ -582,7 +588,11 @@
               height: 3,
               borderRadius: 2,
               background:
-                i < idx ? GOLD : i === idx ? 'rgba(242,186,27,0.55)' : 'rgba(255,255,255,0.22)',
+                i < idx
+                  ? GOLD
+                  : i === idx
+                    ? 'color-mix(in srgb, var(--accent) 55%, transparent)'
+                    : 'rgba(255,255,255,0.22)',
             },
           }),
         ),
@@ -725,6 +735,8 @@
 
   window.CWUI = {
     GOLD,
+    ON_GOLD,
+    GOLD_INK,
     INK,
     MUTED,
     Avatar,

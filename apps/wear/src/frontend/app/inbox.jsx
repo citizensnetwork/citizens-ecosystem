@@ -6,8 +6,19 @@
   const { createElement: h, useState, useEffect, useCallback, useRef } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, Avatar, Spinner, EmptyState, ErrorNote, ScreenHeader, GoldButton, timeAgo } =
-    window.CWUI;
+  const {
+    GOLD,
+    ON_GOLD,
+    GOLD_INK,
+    INK,
+    Avatar,
+    Spinner,
+    EmptyState,
+    ErrorNote,
+    ScreenHeader,
+    GoldButton,
+    timeAgo,
+  } = window.CWUI;
 
   // ── Notifications ────────────────────────────────────────────────
   const STAGE_LABEL = {
@@ -109,7 +120,7 @@
           gap: 13,
           padding: '14px 20px',
           border: 'none',
-          background: n.read ? 'none' : '#fdf8ec',
+          background: n.read ? 'none' : 'var(--surface-2)',
           borderBottom: '1px solid #f7f5f2',
           textAlign: 'left',
           cursor: n.conceptId || (n.data && n.data.brandSlug) ? 'pointer' : 'default',
@@ -124,7 +135,7 @@
                 width: 42,
                 height: 42,
                 borderRadius: '50%',
-                background: '#faf8f3',
+                background: 'var(--surface-2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -132,7 +143,7 @@
                 flex: 'none',
               },
             },
-            Icon('bell', { size: 20, color: GOLD }),
+            Icon('bell', { size: 20, color: GOLD_INK }),
           ),
       h(
         'div',
@@ -154,7 +165,7 @@
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: GOLD,
+              background: GOLD_INK,
               flex: 'none',
               marginTop: 6,
             },
@@ -287,7 +298,7 @@
                     right: 0,
                     bottom: -1,
                     height: 2.5,
-                    background: GOLD,
+                    background: GOLD_INK,
                     borderRadius: 2,
                   },
                 })
@@ -318,7 +329,7 @@
                   { style: { padding: '22px 20px 0' } },
                   h(GoldButton, {
                     label: 'New Message',
-                    icon: Icon('edit', { size: 16, color: '#fff' }),
+                    icon: Icon('edit', { size: 16, color: ON_GOLD }),
                     onClick: () => setComposeTo(true),
                   }),
                 ),
@@ -393,7 +404,7 @@
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: GOLD,
+                background: GOLD_INK,
                 display: 'block',
               },
             })
@@ -544,7 +555,7 @@
               flex: 'none',
             },
           },
-          Icon('send', { size: 18, color: '#fff' }),
+          Icon('send', { size: 18, color: ON_GOLD }),
         ),
       ),
     );

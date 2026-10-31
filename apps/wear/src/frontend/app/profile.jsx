@@ -5,8 +5,19 @@
   const { createElement: h, useState, useEffect, useCallback } = React;
   const { Icon } = window.CWIcons;
   const { useStore } = window.CWStore;
-  const { GOLD, INK, Avatar, BrandLogo, Spinner, EmptyState, ErrorNote, ScreenHeader, fmtCount } =
-    window.CWUI;
+  const {
+    GOLD,
+    ON_GOLD,
+    GOLD_INK,
+    INK,
+    Avatar,
+    BrandLogo,
+    Spinner,
+    EmptyState,
+    ErrorNote,
+    ScreenHeader,
+    fmtCount,
+  } = window.CWUI;
 
   function ProfileScreen({ params }) {
     const {
@@ -204,8 +215,8 @@
                   display: 'flex',
                   alignItems: 'center',
                   gap: 5,
-                  background: '#faf6ec',
-                  border: '1px solid #f0e2b0',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--divider)',
                   borderRadius: 9,
                   padding: '4px 11px',
                   marginTop: 9,
@@ -213,10 +224,10 @@
                   fontWeight: 800,
                   letterSpacing: '0.4px',
                   textTransform: 'uppercase',
-                  color: '#7a6212',
+                  color: 'var(--accent-ink)',
                 },
               },
-              Icon('star', { size: 12, color: GOLD, fill: GOLD }),
+              Icon('star', { size: 12, color: GOLD_INK, fill: GOLD_INK }),
               'Creator',
             )
           : null,
@@ -276,7 +287,7 @@
                       flex: 1,
                       border: '1.5px solid ' + (following ? '#e6e3dc' : GOLD),
                       background: following ? '#fff' : GOLD,
-                      color: following ? '#9a9892' : '#fff',
+                      color: following ? 'var(--text-2)' : ON_GOLD,
                       borderRadius: 12,
                       padding: 11,
                       fontSize: 13,
@@ -407,7 +418,7 @@
                 padding: '13px 0',
                 border: 'none',
                 background: 'none',
-                borderBottom: '2.5px solid ' + (tab === k ? GOLD : 'transparent'),
+                borderBottom: '2.5px solid ' + (tab === k ? GOLD_INK : 'transparent'),
               },
             },
             Icon(icon, { size: 22, color: tab === k ? INK : '#bdbbb4' }),
@@ -475,7 +486,7 @@
                   fontSize: 11,
                   fontWeight: 800,
                   lineHeight: 1.35,
-                  color: '#F2BA1B',
+                  color: 'var(--accent)',
                   textAlign: 'center',
                   display: '-webkit-box',
                   WebkitLineClamp: 4,
