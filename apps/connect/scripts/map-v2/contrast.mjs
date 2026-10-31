@@ -72,6 +72,21 @@ export const PAIRS = [
   ['Pin white border on the map base', '--pin-border', '--map-base', 3, 'border'],
   ['Pin dark hairline on the map base (composited)', '--pin-hairline', '--map-base', 3, 'over'],
   ['Photo viewer text on its backdrop (over the sheet)', '--viewer-fg', '--viewer-bg', 4.5, 'bgalpha', '--surface-1'],
+  // #210: the frosted controls over the map (search, pills row, Explore panel, folding nav) and the nav's gold highlight
+  ['Primary text on frosted glass (over the map)', '--text-1', '--glass-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Secondary text on frosted glass (over the map)', '--text-2', '--glass-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Gold ink as an icon or ring on frosted glass', '--accent-ink', '--glass-bg', 3, 'bgalpha', '--map-base'],
+  ['Primary text on the selected nav item', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--surface-1'],
+  ['Secondary text on the Explore panel (over the map)', '--text-2', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Gold ink on the Explore panel (See all)', '--accent-ink', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
+  ['Primary text on a chosen category row (inside the Explore panel)', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--explore-bg'],
+  // #210: one muted colour per category group, as a dot, a chip outline and a card edge (3:1, non-text)
+  ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
+    [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],
+    [`Category colour (${g}) on a raised surface`, `--cat-${g}`, '--surface-2', 3],
+    // #210 part 3: the Discover page's row titles carry the group dot on the page background
+    [`Category colour (${g}) on the app background`, `--cat-${g}`, '--surface-0', 3],
+  ]),
 ];
 
 /** Best of white or near-black as a glyph colour on a category fill: the glyph rule. */

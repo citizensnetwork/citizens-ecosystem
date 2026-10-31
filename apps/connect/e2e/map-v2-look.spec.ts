@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The map look (tracker P1-12; founder, D1 as revised 2026-10-12): it
@@ -89,7 +89,7 @@ test.describe("P1-12 the map look follows the phone", () => {
     );
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`);
     await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
-    await pin.click({ force: true });
+    await openListing(page, c.id);
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");

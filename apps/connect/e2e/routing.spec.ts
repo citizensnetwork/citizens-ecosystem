@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { useOldMap } from "./support/app-hooks";
+import { openListing } from "./support/map-v2";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -102,6 +103,12 @@ async function mockData(page: Page) {
   await page.route("**/api/v1/contributors/no-such-listing", (route: Route) =>
     route.fulfill({ status: 404, json: { error: "Contributor not found" } }),
   );
+}
+
+/** Map v2 (#210): a pin outlines its card in the Explore row and the card opens the sheet (with the event's card in it). */
+async function openEventCard(page: Page) {
+  const id = await page.locator('.maplibregl-marker:has([data-cc-pin="event"])').first().getAttribute("data-cc-id");
+  await openListing(page, id!);
 }
 
 /** "No Supabase configured" mode: the app's own demo fallback, signed in as `role`. */
@@ -305,7 +312,7 @@ test.describe("Browser Back and Forward", () => {
     await page.goto("/manifest.json");
     await page.goto("/");
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
-    await page.locator('[data-cc-pin="event"]').first().click();
+    await openEventCard(page);
     await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
 
     await page.goBack();
@@ -551,7 +558,7 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await page.goto("/");
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
     const card = page.locator('[data-entity-card="event"]');
-    await page.locator('[data-cc-pin="event"]').first().click();
+    await openEventCard(page);
     await expect(card).toBeVisible();
     await page.goBack();
     await expect(card).toBeHidden();
@@ -801,7 +808,7 @@ test.describe("The Capacitor hardware Back button", () => {
 
     // an open overlay is dismissed before the screen changes
     await go(page, "home");
-    await page.locator('[data-cc-pin="event"]').first().click();
+    await openEventCard(page);
     await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
     await back();
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();

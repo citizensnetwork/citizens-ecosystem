@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAppShell } from "./support/fake-project";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // Issue #160: a person can report an event, a profile and a Moment, and a guest
 // is sent to sign in. The API is answered here. Nothing reaches a real project.
@@ -145,7 +145,7 @@ test.describe("Report an event, a profile and a Moment", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    await openListing(page, c.id);
     await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
     await page.getByRole("tab", { name: "Today" }).click();
     await page.locator("[data-moment]").getByRole("button", { name: "More options" }).click();

@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, FAKE_PROJECT_CORS, mockAppShell, signInToFakeProject, type FakeUser } from "./support/fake-project";
-import { mockMapNetwork, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 import { goTo } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
@@ -232,7 +232,7 @@ test.describe("on the Map v2 sheet", () => {
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 20_000 });
     await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= 3, undefined, { timeout: 20_000 });
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`).click({ force: true });
+    await openListing(page, ev.id);
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible();
     await expect(sheet.locator("[data-consider-note]")).toBeVisible();
