@@ -229,7 +229,7 @@ test.describe("signed in: applying and waiting", () => {
     await bootAt(page);
     await goTo(page, "apply");
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
-    await page.getByRole("button", { name: /fixed physical location/ }).click();
+    await page.getByRole("switch", { name: /fixed physical location/ }).click();
     await page.getByRole("button", { name: "Retreat / Healing" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
