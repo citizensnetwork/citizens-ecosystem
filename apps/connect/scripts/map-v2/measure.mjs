@@ -1,5 +1,5 @@
-// M1, M3, M4, M6 on the page as it stands (tracker Appendix C). Works for v1 and,
-// with --flag=v2, for the Map v2 sheet. Output is JSON on stdout.
+// M1, M3, M4, M6 on the page as it stands (tracker Appendix C). Measures the Map v2 sheet; the old map is gone
+// (issue #179), so --flag only appends ?map=<flag>, which nothing reads any more. Output is JSON on stdout.
 //
 //   node scripts/map-v2/measure.mjs [--flag=v2] [--tiles=mock|real] [--pins=150] [--runs=10] [--only=m1,m3,m4,m6] [--pitch=0|60]
 //   --pitch overrides MapV2.PITCH with no rebuild (R8: the same page flat and tilted); omit it for the build as it is.
@@ -43,7 +43,7 @@ async function m1m4() {
       document.addEventListener('pointerup', () => {
         window.__m.tap = performance.now(); window.__m.header = null; window.__m.cls = 0; window.__m.shifts = [];
         const poll = () => {
-          // v1: the EntityCard; v2: the sheet's header (data-map-sheet-header) - whichever shows first.
+          // the sheet's header (data-map-sheet-header) or the card body (data-entity-card) - whichever shows first.
           const hit = document.querySelector('[data-map-sheet-header], [data-entity-card]');
           if (hit) requestAnimationFrame(() => requestAnimationFrame(() => { window.__m.header = performance.now(); }));
           else requestAnimationFrame(poll);

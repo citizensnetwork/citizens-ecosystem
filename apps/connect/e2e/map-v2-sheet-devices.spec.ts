@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The sheet on the small phone (360 x 800) and with iOS-style safe areas
@@ -18,7 +18,7 @@ async function open(page: Page, seed: Seed) {
   await openMap(page, "/?map=v2", 8);
   const c = seed.contributors[0];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openPinSheet(page, c.id);
   await expect(page.locator(SHEET)).toBeVisible();
 }
 
@@ -30,7 +30,7 @@ test.describe("360 x 800", () => {
     await expect(page.locator("[data-mv2='sheet'] [data-mv2='name']")).toBeVisible();
     // the sheet slides in over 200 ms (a transform): measure hit areas once it has settled at half, not mid-slide,
     // where sub-pixel positions put the edge of a 43 px tab on the wrong side of a 21 px probe (seen on CI)
-    await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(800 * 0.54, -1);
+    await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(800 * 0.6, -1);
     await page.waitForFunction(() => document.getAnimations().filter((an) => (an as CSSAnimation).animationName === "mv2-sheet-in").every((an) => an.playState !== "running"));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const sheet = (await page.locator(SHEET).boundingBox())!;
@@ -49,13 +49,20 @@ test.describe("360 x 800", () => {
       return bad;
     });
     expect(small).toEqual([]);
+    // at half the actions are ONE row that scrolls sideways inside itself (founder, 2026-10-30): its box stays inside the sheet
+    // and the page never scrolls sideways; at full they wrap, and every pill fits
+    const row = (await page.locator("[data-mv2='sheet'] [data-mv2='actions']").boundingBox())!;
+    expect(row.x).toBeGreaterThanOrEqual(0);
+    expect(Math.round(row.x + row.width)).toBeLessThanOrEqual(360);
+    await page.locator("[data-mv2='handle']").click();
+    await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(80, -1);
     const buttons = await page.locator("[data-mv2='actions'] [data-mv2='action']").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
     expect(Math.max(...buttons)).toBeLessThanOrEqual(360);
   });
 
   test("full is 90 % of the screen and the sheet stays on screen at all three snap states", async ({ page }) => {
     await open(page, seed0());
-    for (const [snap, top] of [["half", 800 * 0.54], ["full", 80]] as const) {
+    for (const [snap, top] of [["half", 800 * 0.6], ["full", 80]] as const) {
       if (snap === "full") await page.locator("[data-mv2='handle']").click();
       await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(top, -1);
     }
@@ -78,7 +85,8 @@ test.describe("iOS safe areas (notch 47 px, home indicator 34 px)", () => {
     const handle = (await page.locator("[data-mv2='handle']").boundingBox())!;
     await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
     await page.mouse.down();
-    for (let i = 1; i <= 10; i++) { await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2 + 27 * i); await page.waitForTimeout(110); }
+    // half is 40 % of 844 and the peek line is 122 px up from the foot: a slow drag of 220 px lands on the peek (270 would overshoot into "close")
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2 + 22 * i); await page.waitForTimeout(110); }
     await page.mouse.up();
     await expect(page.locator(SHEET)).toHaveAttribute("data-snap", "peek");
     await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(H - (88 + 34), -1);

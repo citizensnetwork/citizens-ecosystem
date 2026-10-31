@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, FAKE_PROJECT_CORS, mockAppShell, signInToFakeProject, type FakeUser } from "./support/fake-project";
-import { smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 import { goTo } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
@@ -139,7 +139,7 @@ async function openMapSignedIn(page: Page, min = 5) {
 const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 async function pick(page: Page, id: string, lng: number, lat: number) {
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [lng, lat]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).click({ force: true });
+  await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
 const act = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });

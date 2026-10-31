@@ -345,26 +345,22 @@
             cNews.length > 0 && h('div', null,
               h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'News'),
               h('div', { className: 'space-y-3' }, cNews.map((n) => {
-                // Map v2 loads the reader and its tokens. With the flag off the card stays a div;
-                // the body keeps its line breaks either way.
-                const mapV2News = !!(window.isMapV2 && window.isMapV2() && window.MapV2News);
-                const kids = [
+                // The card opens the news reader (Map v2's dialog, its tokens loaded with the page);
+                // the body keeps its line breaks.
+                return h('button', {
+                  key: n.id, type: 'button', 'aria-haspopup': 'dialog',
+                  className: 'bg-card rounded-2xl border border-border p-3 w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                  onClick: (e) => setReading({ id: n.id, from: e.currentTarget }),
+                }, [
                   h('div', { key: 'h', className: 'flex items-start justify-between gap-2 mb-1' },
                     h('p', { className: 'text-sm font-bold text-foreground' }, n.title),
                     h('span', { className: 'text-[10px] text-muted-foreground shrink-0' }, n.date ? new Date(n.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
                   n.image && h('img', { key: 'i', src: n.image, alt: '', className: 'w-full h-32 object-cover rounded-xl mb-2' }),
-                  h('p', { key: 'b', className: 'text-xs text-muted-foreground leading-relaxed whitespace-pre-line' + (mapV2News ? ' line-clamp-3' : '') }, n.body),
-                ];
-                return mapV2News
-                  ? h('button', {
-                    key: n.id, type: 'button', 'aria-haspopup': 'dialog',
-                    className: 'bg-card rounded-2xl border border-border p-3 w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-                    onClick: (e) => setReading({ id: n.id, from: e.currentTarget }),
-                  }, kids)
-                  : h('div', { key: n.id, className: 'bg-card rounded-2xl border border-border p-3' }, kids);
+                  h('p', { key: 'b', className: 'text-xs text-muted-foreground leading-relaxed whitespace-pre-line line-clamp-3' }, n.body),
+                ]);
               })),
               // the same dialog the map sheet opens, over the page
-              reading && window.MapV2News && window.isMapV2 && window.isMapV2() && cNews.some((n) => n.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
+              reading && cNews.some((n) => n.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
                 post: cNews.find((n) => n.id === reading.id), sourceName: c.name,
                 strings: window.MapV2Strings.sheet.news, returnFocus: reading.from, onClose: () => setReading(null),
               }), document.body)),

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImageUrl, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The News tab (tracker P1-07 / P1-05). The app reads `news_posts` straight
@@ -72,7 +72,7 @@ async function openSheetNews(page: Page, seed: Seed, posts: Post[]) {
   await mockContributorDetail(page, seed, { gallery: 0 });
   await openMap(page, "/?map=v2", 8);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openPinSheet(page, c.id);
   await expect(sheet(page)).toBeVisible();
   // Half clips the list (the scroller does not scroll there). Full shows the card.
   if (await sheet(page).getAttribute("data-wide") !== "1") {
@@ -103,7 +103,7 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   await mockContributorDetail(page, seed, { gallery: 0 });
   await openMap(page, "/?map=v2", 8);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+  await openPinSheet(page, c.id);
   const sheet = page.locator("[data-mv2='sheet']");
   await expect(sheet).toBeVisible();
 
@@ -233,7 +233,7 @@ test("tapping a news card opens the reader, and every close leaves the sheet whe
 });
 
 test.describe("the same reader on the profile page", () => {
-  test("opens from a profile news card, and ?map=v1 keeps the card a div with its line breaks", async ({ page }) => {
+  test("opens from a profile news card, which keeps its line breaks in the card", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     const c = seed.contributors[2];
     await installNews(page, postsFor(c.id, rich()));
@@ -257,14 +257,6 @@ test.describe("the same reader on the profile page", () => {
     await expect(reader(page)).toHaveCount(0);
     await expect(button).toBeFocused();
     expect(page.url()).toContain(`/c/${c.contributor_slug}`);
-
-    await page.goto(`/c/${c.contributor_slug}?map=v1`);
-    await expect(page.locator("[data-screen='profile']").getByRole("heading", { level: 1, name: c.full_name })).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("[data-screen='profile'] button", { hasText: "Fresh update" })).toHaveCount(0);
-    const plain = page.locator("[data-screen='profile'] p", { hasText: "Intro paragraph" });
-    await expect(plain).toHaveClass(/whitespace-pre-line/);
-    await expect(plain).not.toHaveClass(/line-clamp-3/);
-    await expect(page.locator("[data-mv2='news']")).toHaveCount(0);
   });
 });
 

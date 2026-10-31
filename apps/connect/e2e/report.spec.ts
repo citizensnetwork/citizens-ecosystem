@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { mockAppShell } from "./support/fake-project";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // Issue #160: a person can report an event, a profile and a Moment, and a guest
 // is sent to sign in. The API is answered here. Nothing reaches a real project.
@@ -145,7 +145,7 @@ test.describe("Report an event, a profile and a Moment", () => {
     await openMap(page, "/?map=v2", 8);
     const c = seed.contributors[0];
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    await openListing(page, c.id);
     await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
     await page.getByRole("tab", { name: "Today" }).click();
     await page.locator("[data-moment]").getByRole("button", { name: "More options" }).click();
@@ -188,45 +188,5 @@ test.describe("Report an event, a profile and a Moment", () => {
     await expect(page.getByText("Could not send. Please try again.")).toHaveCount(0);
     await expect(page.getByText("Our team is reviewing it.")).toHaveCount(0);
     await expect(page.locator("[data-mv2='report']")).toHaveCount(0);
-  });
-
-  test("on the old map the dialog is styled, and the Map v2 stylesheet is not loaded", async ({ page }) => {
-    await page.emulateMedia({ colorScheme: "light" });
-    const requested: string[] = [];
-    page.on("request", (r) => requested.push(r.url()));
-    await openDemo(page, true);
-    await page.goto(`/e/${EVENT_ID}?map=v1`);
-    await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 15_000 });
-    expect(requested.filter((u) => u.includes("map-v2.css"))).toEqual([]);
-    expect(requested.some((u) => u.includes("/assets/report.css"))).toBe(true);
-    await page.getByRole("button", { name: "Report", exact: true }).click();
-    const dialog = page.locator("[data-mv2='report']");
-    await expect(dialog).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Report this event" })).toBeVisible();
-    const box = await dialog.evaluate((el) => {
-      const s = getComputedStyle(el);
-      const card = el.querySelector("[data-mv2='report-card']");
-      const c = card ? getComputedStyle(card) : null;
-      const send = el.querySelector("[data-mv2='action'][data-primary]");
-      const b = send ? getComputedStyle(send) : null;
-      return {
-        position: s.position,
-        z: s.zIndex,
-        display: s.display,
-        bg: c ? c.backgroundColor : "",
-        radius: c ? c.borderRadius : "",
-        color: c ? c.color : "",
-        hit: b ? b.minHeight : "",
-      };
-    });
-    expect(box).toEqual({
-      position: "fixed",
-      z: "300",
-      display: "flex",
-      bg: "rgb(255, 255, 255)",
-      radius: "20px",
-      color: "rgb(10, 9, 8)",
-      hit: "44px",
-    });
   });
 });
