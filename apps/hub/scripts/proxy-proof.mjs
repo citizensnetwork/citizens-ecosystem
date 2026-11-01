@@ -384,7 +384,7 @@ async function main() {
   check('/citizens has no <script> tag at all', !/<script/i.test(r.text));
   check('/citizens is not marked noindex', !/noindex/i.test(r.text) && !r.headers['x-robots-tag']);
 
-  for (const slug of ['learn', 'play', 'move']) {
+  for (const slug of ['learn', 'play', 'move', 'impact']) {
     r = await get(`/citizens/${slug}`);
     check(
       `/citizens/${slug} is 200 and noindex (meta and header)`,
@@ -396,7 +396,12 @@ async function main() {
     check(`/citizens/${slug} carries the hub CSP once`, only(r, 'content-security-policy'));
   }
 
-  for (const path of ['/citizens/nope', '/citizens/learn/extra', '/citizens/impact', '/nope']) {
+  for (const path of [
+    '/citizens/nope',
+    '/citizens/learn/extra',
+    '/citizens/impact/extra',
+    '/nope',
+  ]) {
     r = await get(path);
     check(
       `${path} is a 404 from the hub (with the hub CSP)`,
@@ -441,9 +446,9 @@ async function main() {
     .filter((rule) => rule.headers.some((h) => h.key === 'X-Robots-Tag'))
     .map((rule) => new RegExp(rule.regex, 'i'));
   check(
-    'three X-Robots-Tag rules, one per coming-soon page',
-    noindexSources.length === 3 &&
-      ['learn', 'play', 'move'].every((slug) =>
+    'four X-Robots-Tag rules, one per coming-soon page',
+    noindexSources.length === 4 &&
+      ['learn', 'play', 'move', 'impact'].every((slug) =>
         noindexSources.some((re) => re.test(`/citizens/${slug}`)),
       ),
   );
@@ -501,6 +506,7 @@ async function main() {
         s.url.startsWith('/citizens/learn') ||
         s.url.startsWith('/citizens/play') ||
         s.url.startsWith('/citizens/move') ||
+        s.url.startsWith('/citizens/impact') ||
         s.url === '/' ||
         s.url.startsWith('/robots'),
     ),

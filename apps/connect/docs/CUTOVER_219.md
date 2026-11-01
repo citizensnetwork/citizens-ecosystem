@@ -1,7 +1,7 @@
 # Cutover to 219.co.za: the runbook (C39 PR D, A19)
 
 Moves the three apps onto one address each: `219.co.za/citizens/connect`, `/citizens/vision`, `/citizens/wear`
-(`/learn`, `/play`, `/move` show a "coming soon" page). **Nothing here has been done.** The code is merged
+(`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Nothing here has been done.** The code is merged
 (`@citizens/ecosystem`, the prefix in every app, the front door `apps/hub`, the old-address rules); production still
 serves every app from its own root, and Claude changes no Vercel setting, domain, variable or DNS record without a
 clear yes in chat for that step.
@@ -99,7 +99,7 @@ for it separately). Keep the existing entries. Save. **Do this before anyone ope
 
 - Read the wording on the new landing page and the coming-soon pages (listed in the PR that built them) and answer the
   open questions there.
-- `learn` is assumed to mean "Citizens Equip"; `impact` is not reserved yet.
+- `learn` means courses, teachers and all learning material, and `impact` is reserved (both decided by the founder, 2026-11-01).
 
 ### P6. Make sure the latest code is live first
 

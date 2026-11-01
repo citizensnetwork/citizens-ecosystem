@@ -62,6 +62,12 @@ describe('the landing page (/citizens)', () => {
     );
   });
 
+  it('names Wear and Impact on the landing page, spelled out (founder, 2026-11-01)', () => {
+    const found = links(markup);
+    expect(found).toContainEqual({ href: '/citizens/wear', text: 'Open Citizens Wear' });
+    expect(found).toContainEqual({ href: '/citizens/impact', text: 'About Citizens Impact' });
+  });
+
   it('says "Coming soon" in words on each unbuilt card (never colour alone)', () => {
     expect(markup.match(/Coming soon/g)).toHaveLength(COMING_SOON.length);
   });
@@ -113,7 +119,7 @@ describe('cards', () => {
   });
 });
 
-describe('the coming-soon pages (/citizens/learn, /play, /move)', () => {
+describe('the coming-soon pages (/citizens/learn, /play, /move, /impact)', () => {
   it('are generated for exactly the registry’s coming-soon slugs, and nothing else is a page', async () => {
     const result = await getStaticPaths();
     expect(result.fallback).toBe(false);
@@ -136,7 +142,7 @@ describe('the coming-soon pages (/citizens/learn, /play, /move)', () => {
   });
 
   it('is a 404 for any other slug (the built apps never reach this page)', async () => {
-    for (const slug of ['connect', 'impact', 'nope']) {
+    for (const slug of ['connect', 'nope']) {
       expect(await getStaticProps({ params: { slug } })).toEqual({ notFound: true });
     }
     expect(await getStaticProps({})).toEqual({ notFound: true });

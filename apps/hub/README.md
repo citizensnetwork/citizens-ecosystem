@@ -9,6 +9,7 @@ The one project that will own the shared domain, `219.co.za`. Every Citizens app
 219.co.za/citizens/learn    "coming soon" page (this app, noindex)    } the registry's COMING_SOON list
 219.co.za/citizens/play     "coming soon" page (this app, noindex)    }
 219.co.za/citizens/move     "coming soon" page (this app, noindex)    }
+219.co.za/citizens/impact   "coming soon" page (this app, noindex)    }
 219.co.za/citizens/connect  proxied to the Connect project            } the registry's APP_SLUGS list
 219.co.za/citizens/vision   proxied to the Vision project             }
 219.co.za/citizens/wear     proxied to the Wear project               }
