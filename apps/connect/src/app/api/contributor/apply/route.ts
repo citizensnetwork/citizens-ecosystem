@@ -36,7 +36,8 @@ import { isApprovedContributor } from "@/lib/profiles/capabilities";
 import { CONTRIBUTOR_TYPES, isContributorType, needsExtraReview } from "@/lib/categories";
 import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
 import { MAX_ADDRESS, MAX_BIO, MAX_DISPLAY_NAME, MAX_URL, trimOrNull } from "@/lib/contributorFields";
-import { adminNotifyEmail, sendEmail, siteOrigin } from "@/lib/email/send";
+import { adminNotifyEmail, sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { newApplicationAdminEmail } from "@/lib/email/templates";
 import { isContributorKind } from "@/types/db";
 
@@ -261,7 +262,7 @@ export async function POST(request: Request) {
         name: displayName,
         categoryLabel,
         area: keepOffMap ? "Care / Recovery: kept off the map (extra review)" : physicalAddress,
-        siteUrl: siteOrigin(request),
+        siteUrl: siteBase(request),
       }),
     });
   } else {

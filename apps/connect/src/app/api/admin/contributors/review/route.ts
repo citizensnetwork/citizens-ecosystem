@@ -33,7 +33,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
-import { sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
+import { sendEmail, type EmailOutcome } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { applicationApprovedEmail, applicationRejectedEmail } from "@/lib/email/templates";
 import { hasMapPin } from "@/lib/contributorFields";
 
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
   let email: EmailOutcome = "skipped";
   const contact = await applicantContact(applicationId);
   if (contact?.email) {
-    const origin = siteOrigin(request);
+    const origin = siteBase(request);
     const mail =
       action === "approve"
         ? applicationApprovedEmail({

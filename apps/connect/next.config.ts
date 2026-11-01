@@ -72,6 +72,9 @@ const nextConfig: NextConfig = {
   // right screen, so a refresh keeps you where you were and a link can be shared.
   // (index.html loads its scripts through <base href="/">, so a nested path such as
   // /e/<id> cannot break them; that is why /c/<slug> used to have to REDIRECT.)
+  // Under a basePath every source below is served under the prefix (/citizens/connect/e/<id>), the build
+  // writes <base href="/citizens/connect/"> instead, and the frontend (routes.jsx stripBase / withBase,
+  // C39 PR B) converts between the address bar and the app-relative paths of this table.
   //
   // The list is EXPLICIT on purpose, and must never become a catch-all: that would
   // shadow /api/*, /auth/*, /_next/* and every static file. An unknown path keeps
