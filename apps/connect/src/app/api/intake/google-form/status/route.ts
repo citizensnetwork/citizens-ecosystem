@@ -17,7 +17,7 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { siteOrigin } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { gateIntakeRequest } from "@/lib/intake/gate";
 import { settleFlaggedUpgrade } from "@/lib/intake/upgradeSideEffects";
 import { ageInDays } from "@/lib/listingClaim";
@@ -110,7 +110,7 @@ async function upgradeStatuses(request: Request, raw: unknown): Promise<NextResp
     return NextResponse.json({ error: "status_failed" }, { status: 500 });
   }
 
-  const origin = siteOrigin(request);
+  const origin = siteBase(request);
   const results = [];
   for (const row of payload.results) {
     if (row.notify_admin && row.status === "expired") {

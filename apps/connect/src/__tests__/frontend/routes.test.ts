@@ -20,6 +20,10 @@ type Routes = {
   titleFor: (nav: Nav, name?: string) => string;
   isUuid: (v: unknown) => boolean;
   isSlug: (v: unknown) => boolean;
+  stripBase: (pathname: unknown, base: string) => string | null;
+  withBase: (path: unknown, base: string) => unknown;
+  appUrl: (path: string) => string;
+  BASE_PATH: string;
   DASHBOARD_TABS: string[];
   ADMIN_TABS: string[];
   PREFIXES: string[];
@@ -364,5 +368,143 @@ describe("PREFIXES: the server rewrites exactly these top-level paths, no more",
     for (const reserved of ["api", "auth", "_next", "index.html", "sw.js", "vendor", "app", "assets", "icons", "manifest.json", "config.js"]) {
       expect(R.PREFIXES, reserved).not.toContain(reserved);
     }
+  });
+});
+
+// ── Served under a prefix (C39 PR B): /citizens/connect on the shared domain ──────────────────
+//  The table above is APP-RELATIVE and does not change. stripBase / withBase are the only
+//  crossings to the address bar, and with an empty base (today's production) they do nothing.
+describe("stripBase / withBase: the prefix crossing", () => {
+  const BASE = "/citizens/connect";
+  const TOKEN = "ab".repeat(32);
+  const APP_PATHS = [
+    "/", "/discover", "/explore", "/community", "/messages", `/messages/${ID}`, "/notifications", "/settings", "/apply",
+    "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/contributors", `/e/${ID}`, `/p/${ID}`,
+    "/c/harvest-hall", `/c/${ID}`, "/me", `/upgrade/${TOKEN}`, `/upgrade/${TOKEN}/decline`,
+  ];
+
+  describe("with an empty base (the site root) nothing changes", () => {
+    it("returns every path as it came in", () => {
+      for (const p of [...APP_PATHS, "/index.html", "/map", "/dashboard/", "/e/not-a-uuid", "/citizens/connect/discover", "/x?y=1#z"]) {
+        expect(R.stripBase(p, ""), p).toBe(p);
+        expect(R.withBase(p, ""), p).toBe(p);
+      }
+    });
+    it("still refuses a non-string pathname", () => {
+      for (const v of [null, undefined, 7, {}, []]) expect(R.stripBase(v, "")).toBeNull();
+    });
+  });
+
+  describe("stripBase", () => {
+    it("takes the prefix off, and the bare prefix with or without a slash is the front door", () => {
+      expect(R.stripBase(BASE, BASE)).toBe("/");
+      expect(R.stripBase(`${BASE}/`, BASE)).toBe("/");
+      expect(R.stripBase(`${BASE}/discover`, BASE)).toBe("/discover");
+      expect(R.stripBase(`${BASE}/e/${ID}`, BASE)).toBe(`/e/${ID}`);
+      expect(R.stripBase(`${BASE}/dashboard/events`, BASE)).toBe("/dashboard/events");
+      expect(R.stripBase(`${BASE}/index.html`, BASE)).toBe("/index.html");
+      // a trailing slash survives, so navFromPath can still tidy the address
+      expect(R.stripBase(`${BASE}/discover/`, BASE)).toBe("/discover/");
+    });
+    it("is null for anything outside the prefix, a lookalike or another app included", () => {
+      for (const p of ["/", "/discover", `/e/${ID}`, "/citizens", "/citizens/", "/citizens/vision/discover", "/citizens/connectx",
+        "/citizens/connect-x/discover", "/citizens/Connect/discover", "/x/citizens/connect/discover", ""]) {
+        expect(R.stripBase(p, BASE), JSON.stringify(p)).toBeNull();
+      }
+      for (const v of [null, undefined, 7, {}, []]) expect(R.stripBase(v, BASE)).toBeNull();
+    });
+    it("leaves a doubled slash for navFromPath to refuse, so /citizens/connect//evil.example is not a screen", () => {
+      const rel = R.stripBase(`${BASE}//evil.example`, BASE);
+      expect(rel).toBe("//evil.example");
+      expect(R.navFromPath(rel).ok).toBe(false);
+      expect(R.safeReturnPath(rel)).toBeNull();
+    });
+  });
+
+  describe("withBase", () => {
+    it("puts the prefix in front, and '/' is the bare prefix (Next redirects the slash form)", () => {
+      expect(R.withBase("/", BASE)).toBe(BASE);
+      expect(R.withBase("/discover", BASE)).toBe(`${BASE}/discover`);
+      expect(R.withBase(`/e/${ID}`, BASE)).toBe(`${BASE}/e/${ID}`);
+      expect(R.withBase("/dashboard/events", BASE)).toBe(`${BASE}/dashboard/events`);
+    });
+    it("keeps a query or hash on the front door", () => {
+      expect(R.withBase("/?c=harvest-hall", BASE)).toBe(`${BASE}?c=harvest-hall`);
+      expect(R.withBase("/#top", BASE)).toBe(`${BASE}#top`);
+      expect(R.withBase("/discover?q=a#b", BASE)).toBe(`${BASE}/discover?q=a#b`);
+    });
+    it("hands back anything that is not a plain app path, so an absolute URL is never glued on", () => {
+      for (const v of ["//evil.example", "//evil.example/x", "https://evil.example", "discover", "", null, undefined, 7]) {
+        expect(R.withBase(v, BASE), String(v)).toBe(v);
+      }
+    });
+  });
+
+  describe("round trips", () => {
+    it("every app path survives withBase then stripBase, and means the same screen", () => {
+      for (const p of APP_PATHS) {
+        const url = R.withBase(p, BASE) as string;
+        expect(url.startsWith(BASE), p).toBe(true);
+        const back = R.stripBase(url, BASE);
+        expect(back, p).toBe(p);
+        expect(R.navFromPath(back, ""), p).toEqual(R.navFromPath(p, ""));
+      }
+    });
+    it("pathFor then withBase then stripBase then navFromPath returns the screen we started on", () => {
+      const screens: Nav[] = [nav("home"), nav("kingdom-discovery"), nav("dashboard", { tab: "events" }), nav("event", { id: ID }), nav("profile", { slug: "harvest-hall" }), nav("messages", { convId: ID })];
+      for (const n of screens) {
+        const url = R.withBase(R.pathFor(n) as string, BASE) as string;
+        expect(R.navFromPath(R.stripBase(url, BASE), "").nav, url).toEqual(n);
+      }
+    });
+    it("the front door in both spellings is the map", () => {
+      expect(R.navFromPath(R.stripBase(BASE, BASE), "")).toMatchObject({ ok: true, nav: nav("home"), canonical: "/" });
+      expect(R.navFromPath(R.stripBase(`${BASE}/`, BASE), "")).toMatchObject({ ok: true, nav: nav("home"), canonical: "/" });
+    });
+    it("a legacy /index.html?c=<slug> under the prefix still opens that Contributor", () => {
+      expect(R.navFromPath(R.stripBase(`${BASE}/index.html`, BASE), "?c=harvest-hall")).toMatchObject({
+        ok: true, legacy: true, canonical: "/c/harvest-hall", nav: nav("profile", { slug: "harvest-hall" }),
+      });
+    });
+  });
+
+  describe("safeReturnPath stays app-relative and still refuses open redirects", () => {
+    it("takes the stripped path, and refuses the prefixed one (it is not an app path)", () => {
+      expect(R.safeReturnPath(R.stripBase(`${BASE}/dashboard/events`, BASE))).toBe("/dashboard/events");
+      expect(R.safeReturnPath(`${BASE}/dashboard/events`)).toBeNull();
+    });
+    it("refuses the same attacks with a prefix configured", () => {
+      const prefixed = loadFrontend("routes.jsx", { __CC_ENV: { BASE_PATH: BASE } }).CC_ROUTES as Routes;
+      for (const a of ["//evil.example", "https://evil.example", "/\\evil.example", "javascript:alert(1)", "/dashboard\n//evil.example", `${BASE}//evil.example`, "/%2f%2fevil.example"]) {
+        expect(prefixed.safeReturnPath(a), JSON.stringify(a)).toBeNull();
+      }
+    });
+  });
+
+  describe("BASE_PATH and appUrl (the build's own prefix, read once from config.js)", () => {
+    const load = (env: unknown) => loadFrontend("routes.jsx", env === undefined ? {} : { __CC_ENV: env }).CC_ROUTES as Routes;
+
+    it("is the site root when config.js has no BASE_PATH, so appUrl changes nothing", () => {
+      for (const env of [undefined, {}, { BASE_PATH: "" }, { API_BASE_URL: "" }]) {
+        const r = load(env);
+        expect(r.BASE_PATH).toBe("");
+        expect(r.appUrl("/discover")).toBe("/discover");
+        expect(r.appUrl("/")).toBe("/");
+        expect(r.appUrl("/assets/map-v2.css?v=1")).toBe("/assets/map-v2.css?v=1");
+      }
+    });
+    it("is the prefix when config.js has one, and appUrl applies it", () => {
+      const r = load({ BASE_PATH: BASE });
+      expect(r.BASE_PATH).toBe(BASE);
+      expect(r.appUrl("/")).toBe(BASE);
+      expect(r.appUrl("/c/harvest-hall")).toBe(`${BASE}/c/harvest-hall`);
+      expect(r.appUrl("/assets/map-v2.css?v=1")).toBe(`${BASE}/assets/map-v2.css?v=1`);
+    });
+    it("forgives one trailing slash and ignores a value that is not a path", () => {
+      expect(load({ BASE_PATH: `${BASE}/` }).BASE_PATH).toBe(BASE);
+      for (const bad of ["citizens/connect", "//evil.example", "https://evil.example", "/", 5, null, {}]) {
+        expect(load({ BASE_PATH: bad }).BASE_PATH, String(bad)).toBe("");
+      }
+    });
   });
 });

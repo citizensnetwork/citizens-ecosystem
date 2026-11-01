@@ -24,6 +24,8 @@
   const h = React.createElement;
   const { useState, useEffect, useRef } = React;
   const useBackGuard = window.useBackGuard || function () {};
+  // The app may be served under a path prefix (/citizens/connect, C39): routes.jsx owns it.
+  const appUrl = (path) => (window.CC_ROUTES ? window.CC_ROUTES.appUrl(path) : path);
 
   const STR = {
     attachTitle: (name) => 'Attach “' + name + '” to your account?',
@@ -161,7 +163,7 @@
             h('div', { 'data-mv2': 'claim-preview-text' },
               h('strong', { 'data-mv2': 'claim-name' }, name),
               category && h('span', { 'data-mv2': 'claim-category' }, category),
-              claim.slug && h('a', { href: '/c/' + encodeURIComponent(claim.slug), target: '_blank', rel: 'noopener noreferrer', 'data-mv2': 'claim-link' }, S.viewListing))),
+              claim.slug && h('a', { href: appUrl('/c/' + encodeURIComponent(claim.slug)), target: '_blank', rel: 'noopener noreferrer', 'data-mv2': 'claim-link' }, S.viewListing))),
           h('p', { id: 'cc-claim-body', 'data-mv2': 'claim-body' }, !eligible ? S.cannotAttach : attach ? S.attachBody : S.selfBody),
           h('p', { 'data-mv2': 'claim-help' }, S.notMeHelp),
           error && h('p', { role: 'alert', 'data-mv2': 'claim-alert' }, error),
@@ -199,7 +201,7 @@
       app.toast(STR.confirmedAttach, 'green');
       // A full load, on purpose: the claim just changed this account's role in the database, and the whole
       // app (role, listing, menus) re-reads it on a fresh load.
-      window.location.href = '/dashboard';
+      window.location.href = appUrl('/dashboard');
     };
     return ReactDOM.createPortal(h(Dialog, { claim: claim, onLater: later, onDone: done }), document.body);
   }

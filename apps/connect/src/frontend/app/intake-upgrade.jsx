@@ -72,7 +72,7 @@
       postUpgrade(token, action).then((res) => {
         setBusy('');
         if (action === 'confirm' && res.status === 200 && res.json.status === 'confirmed') {
-          window.location.assign('/dashboard');
+          window.location.assign(window.CC_ROUTES ? window.CC_ROUTES.appUrl('/dashboard') : '/dashboard');
           return;
         }
         if (action === 'decline' && res.status === 200) {

@@ -129,6 +129,8 @@ vitest-out.txt
 # Playwright e2e output (generated per-run)
 /playwright-report/
 /test-results/
+/playwright-report-base-path/
+/test-results-base-path/
 
 .vercel
 .env*
