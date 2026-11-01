@@ -22,6 +22,7 @@ export const PUBLIC_PROFILE_COLUMNS = [
   "contributor_category",
   "contributor_hidden",
   "contributor_no_fixed_location",
+  "open_to_collaborate",
   "contributor_contact_email",
   "community_contributor_score",
   "website_url",

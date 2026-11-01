@@ -581,7 +581,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101b");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101c");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.matchesFilter(pill, intent, m)");
     expect(home).toContain("onIntent: (id) => { setPill('all'); setIntent(id); }");

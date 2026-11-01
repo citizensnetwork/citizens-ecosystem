@@ -87,6 +87,43 @@ describe("POST /api/contributor/profile", () => {
     );
   });
 
+  it("persists open_to_collaborate only as a boolean", async () => {
+    mockApprovedContributor();
+    const on = await POST(req({ open_to_collaborate: true }));
+    expect(on.status).toBe(200);
+    expect(mockClient._chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ open_to_collaborate: true }),
+    );
+
+    mockApprovedContributor();
+    const off = await POST(req({ open_to_collaborate: false }));
+    expect(off.status).toBe(200);
+    expect(mockClient._chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ open_to_collaborate: false }),
+    );
+  });
+
+  it("400 when open_to_collaborate is not a boolean, and writes nothing", async () => {
+    mockApprovedContributor();
+    const res = await POST(req({ open_to_collaborate: "true", bio: "Hello" }));
+    expect(res.status).toBe(400);
+    expect(mockClient._chain.update).not.toHaveBeenCalled();
+  });
+
+  it("403 for a citizen, so the flag is not written", async () => {
+    mockClient.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    mockClient._chain.single.mockResolvedValueOnce({
+      data: { role: "citizen", contributor_status: "not_applied" },
+      error: null,
+    });
+    const res = await POST(req({ open_to_collaborate: true }));
+    expect(res.status).toBe(403);
+    expect(mockClient._chain.update).not.toHaveBeenCalled();
+  });
+
   it("rejects a request payload trying to smuggle a disallowed key", async () => {
     mockApprovedContributor();
     const res = await POST(req({ role: "admin", bio: "Hi" }));

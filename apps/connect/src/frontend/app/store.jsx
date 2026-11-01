@@ -320,6 +320,7 @@
       // Online / mobile / no permanent office — intentionally no map pin
       // (lat/lng stay null above, which home.jsx already filters out).
       noFixedLocation: !!r.no_fixed_location,
+      openToCollaborate: r.open_to_collaborate === true,
       followerCount: 0,
       involvementLevel: 'Shepherd',
       dominantNiche: '',
@@ -364,7 +365,7 @@
   // record). One constant, used everywhere, so that can't happen again.
   const CONTRIBUTOR_SELECT = 'id, full_name, contributor_slug, contributor_kind, bio, logo_url, avatar_url, ' +
     'website_url, category:contributor_category, physical_address, physical_latitude, physical_longitude, ' +
-    'no_fixed_location:contributor_no_fixed_location, instagram_handle, facebook_url, tiktok_handle, youtube_url, ' +
+    'no_fixed_location:contributor_no_fixed_location, open_to_collaborate, instagram_handle, facebook_url, tiktok_handle, youtube_url, ' +
     'x_handle, linkedin_url, whatsapp_number, ' +
     'gallery_urls, cover_photo_urls, contact_email:contributor_contact_email';
 
@@ -1603,6 +1604,7 @@
         bio: fields.bio ?? undefined,
         website_url: fields.website !== undefined ? asUrl(fields.website) : undefined,
         contributor_no_fixed_location: fields.noFixedLocation !== undefined ? !!fields.noFixedLocation : undefined,
+        open_to_collaborate: fields.openToCollaborate !== undefined ? !!fields.openToCollaborate : undefined,
         physical_address: fields.noFixedLocation ? null : (fields.location ?? undefined),
         logo_url: fields.profilePhoto && /^https:\/\//i.test(fields.profilePhoto) ? fields.profilePhoto : undefined,
         ...(fields.socials ? contributorSocialPayload(fields.socials, 'update') : {}),
@@ -1611,7 +1613,7 @@
       };
       if (listingRole === 'editor' && fields.category !== undefined) payload.contributor_category = fields.category || null;
       if (!realUser) {
-        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, contactEmail: fields.contactEmail !== undefined ? fields.contactEmail : prev.contactEmail, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
+        setMyContributor((prev) => prev ? { ...prev, bio: fields.bio, website: fields.website, contactEmail: fields.contactEmail !== undefined ? fields.contactEmail : prev.contactEmail, location: fields.noFixedLocation ? '' : fields.location, noFixedLocation: !!fields.noFixedLocation, openToCollaborate: fields.openToCollaborate !== undefined ? !!fields.openToCollaborate : !!prev.openToCollaborate, profilePhoto: fields.profilePhoto || prev.profilePhoto, socials: fields.socials || prev.socials, gallery: fields.gallery || prev.gallery } : prev);
         toast('Profile updated.', 'green');
         finish(true);
         return;

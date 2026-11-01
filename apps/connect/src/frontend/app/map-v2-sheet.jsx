@@ -641,6 +641,15 @@
     if (!isContributor && org) {
       actions.push(h(Action, { key: 'msg', icon: 'MessageCircle', label: Str.message, onClick: () => startConversationWith(org.name, org.profilePhoto, true, org.id) }));
     }
+    // C41: the chip is a status, not a button. On the pin sheet it leads the action row, which
+    // already scrolls sideways at half, so a listing that is open to collaborate is no taller
+    // than one that is not. The expanded sheet shows it once, beside the category chip.
+    const collabChip = isContributor && item.openToCollaborate
+      ? h('span', { key: 'collab', 'data-mv2': 'collab-chip' },
+          h(window.Icon, { name: 'Handshake', size: 14, 'aria-hidden': true }),
+          Str.collaborate)
+      : null;
+    if (collabChip && !expanded) actions.unshift(collabChip);
     // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
     // action row stays at the height it had and half still shows the header, the actions and the first tab
     // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
@@ -823,6 +832,7 @@
         h('span', { 'data-mv2': 'card-chip' },
           h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
           h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+        expanded && collabChip,
         facts.length > 0 && h('span', { 'data-mv2': 'sub' },
           facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
     return h('section', {
