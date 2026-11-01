@@ -2,16 +2,24 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isContributor } from "@/lib/profiles/capabilities";
 
-/** Routes that a contributor with `bio_setup_required = true` is allowed to
- *  hit before completing setup. Everything else redirects to /contributor/setup. */
+/** Routes (and everything under them) that a contributor with `bio_setup_required = true` is
+ *  allowed to hit before completing setup. Everything else redirects to the app root. */
 const BIO_SETUP_ALLOW = [
-  "/contributor/setup",
   "/logout",
-  "/login",
   "/api/contributor/setup",
   "/api/auth",
   "/auth",
 ];
+
+/**
+ * Connect has no /login or /contributor/setup page: the app is one static page that draws its
+ * own screens, so both gate redirects go to the app root "/". The root therefore has to be
+ * allowed or the redirect would loop. It is matched EXACTLY and kept out of the prefix list
+ * above, because `startsWith("/" + "/")` would also admit any path that begins with "//".
+ */
+function bioSetupAllows(pathname: string): boolean {
+  return pathname === "/" || BIO_SETUP_ALLOW.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 /**
  * CORS for `/api/*` lives HERE (not next.config.ts static headers) because the
@@ -59,6 +67,20 @@ function redirectWithCookies(target: URL, supabaseResponse: NextResponse): NextR
   const res = NextResponse.redirect(target);
   supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
   return res;
+}
+
+/**
+ * The app root as a redirect target: the one page that always exists. The URL is cloned from the
+ * request, so when the app is served under a prefix (NEXT_PUBLIC_BASE_PATH, e.g. /citizens/connect)
+ * NextURL puts the prefix back on serialising and the person stays inside the app. `reauth=1` is
+ * kept as a hint that the sign-out was forced by us (the old /login page read it).
+ */
+function appRootUrl(request: NextRequest, opts: { reauth?: boolean } = {}): URL {
+  const root = request.nextUrl.clone();
+  root.pathname = "/";
+  root.search = "";
+  if (opts.reauth) root.searchParams.set("reauth", "1");
+  return root;
 }
 
 export async function middleware(request: NextRequest) {
@@ -125,17 +147,13 @@ export async function middleware(request: NextRequest) {
     if (profileErr) {
       console.warn("[middleware] profile lookup failed", profileErr);
       await supabase.auth.signOut();
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
-      loginUrl.search = "";
-      loginUrl.searchParams.set("reauth", "1");
-      return redirectWithCookies(loginUrl, supabaseResponse);
+      return redirectWithCookies(appRootUrl(request, { reauth: true }), supabaseResponse);
     }
 
-    // Force-reauth gate: admin bumped force_reauth_at after a role change.
+    // Force-reauth gate: a role change stamped force_reauth_at (DB trigger).
     // Compare against the access-token `iat`. If the JWT predates the
     // bump — or we cannot establish an iat at all — sign out and send
-    // to /login. Fail-closed on parse errors.
+    // to the app root. Fail-closed on parse errors.
     if (profile?.force_reauth_at) {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
@@ -158,11 +176,7 @@ export async function middleware(request: NextRequest) {
       // Fail-closed: if we can't verify iat, treat the JWT as stale.
       if (iatMs === null || reauthMs > iatMs) {
         await supabase.auth.signOut();
-        const loginUrl = request.nextUrl.clone();
-        loginUrl.pathname = "/login";
-        loginUrl.search = "";
-        loginUrl.searchParams.set("reauth", "1");
-        return redirectWithCookies(loginUrl, supabaseResponse);
+        return redirectWithCookies(appRootUrl(request, { reauth: true }), supabaseResponse);
       }
     }
 
@@ -171,12 +185,9 @@ export async function middleware(request: NextRequest) {
     if (
       profile?.bio_setup_required &&
       isContributor(profile) &&
-      !BIO_SETUP_ALLOW.some((p) => pathname === p || pathname.startsWith(p + "/"))
+      !bioSetupAllows(pathname)
     ) {
-      const setupUrl = request.nextUrl.clone();
-      setupUrl.pathname = "/contributor/setup";
-      setupUrl.search = "";
-      return NextResponse.redirect(setupUrl);
+      return NextResponse.redirect(appRootUrl(request));
     }
   }
 

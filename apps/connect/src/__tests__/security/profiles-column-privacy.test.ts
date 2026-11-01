@@ -199,14 +199,6 @@ const SERVICE_ROLE_READS: Record<string, string[]> = {
   "app/api/intake/google-form/resend/route.ts": ["email"],
 };
 
-/**
- * Never executed: the original design handoff's Supabase wiring reference
- * (its header says "NOT loaded by the prototype"; HTML_FRONTEND_WIRING_SPEC
- * cites it). It still selects a `wants_contributor` column that never
- * existed — the live client is auth-client.js.
- */
-const NOT_EXECUTED = new Set(["frontend/supabase-auth.js"]);
-
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
@@ -274,7 +266,6 @@ function scanProfileReads(): { found: number; violations: Finding[] } {
   let found = 0;
   for (const full of sourceFiles(SRC_DIR)) {
     const file = relative(SRC_DIR, full).split("\\").join("/");
-    if (NOT_EXECUTED.has(file)) continue;
     const src = readFileSync(full, "utf8");
     const allowed = new Set(SERVICE_ROLE_READS[file] ?? []);
     const lists: string[] = [];
