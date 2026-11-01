@@ -14,11 +14,96 @@
 
 | Piece | Where | State |
 |---|---|---|
-| Mobile web bundle | `npm run build:mobile` → `mobile-dist/` (gitignored) | ✅ copies `src/frontend/`, generates `config.js` with **production API base** (`MOBILE_API_BASE_URL` env override; env-first, gitignored-dev-config fallback for Supabase/MapTiler keys) |
+| Mobile web bundle | `npm run build:mobile` → `mobile-dist/` (gitignored) | ✅ copies `src/frontend/`, generates `config.js` with **production API base** (`MOBILE_API_BASE_URL` env override; env-first, gitignored-dev-config fallback for Supabase/MapTiler keys) and the **public web address** native links use (`MOBILE_PUBLIC_ORIGIN`, `MOBILE_PUBLIC_BASE_PATH`; see "Native web address" below) |
 | Capacitor sync | `npm run cap:sync` (runs build:mobile first) | ✅ Android + iOS shells populated; plugins: app, browser, geolocation, push-notifications, share, splash-screen, status-bar |
 | Bundled assets (no webview wrapper) | `capacitor.config.ts` | ✅ `webDir: mobile-dist`, `server.url` removed — offline boot, store-review friendly |
 | API CORS for the shells | `src/middleware.ts` | ✅ allow-list: deployed frontend + `capacitor://localhost` + `http(s)://localhost` + dev `:3001`; OPTIONS → 204 (covered by 4 unit tests) |
 | In-app compliance surfaces | Settings / reports / blocks | ✅ account deletion (`/api/account/delete`), UGC report (`/api/reports`) + block (`/api/blocks`) APIs exist |
+
+## Native web address and API base (the one-domain cutover — RESUME_HERE A19 / C39)
+
+A store build is bundled at the shell's own root, so it cannot learn the public web address from
+where it runs, and the web build's `/citizens/connect` prefix does not apply to it. Three optional
+build-time values tell it. **Every default is today's behaviour; set them only at the cutover.**
+
+| Variable (`build:mobile`) | Default (today) | At the `219.co.za` cutover | What it controls |
+|---|---|---|---|
+| `MOBILE_API_BASE_URL` | `https://citizens-ecosystem-connect.vercel.app` | `https://219.co.za/citizens/connect` | every API call the app makes (`config.js` `API_BASE_URL`) |
+| `MOBILE_PUBLIC_ORIGIN` | `https://www.citizenscentral.co.za` | `https://219.co.za` | origin of the links the app shares and of a listing's QR code (`PUBLIC_ORIGIN`) |
+| `MOBILE_PUBLIC_BASE_PATH` | *(empty)* | `/citizens/connect` | the prefix after that origin (`PUBLIC_BASE_PATH`) |
+
+Cutover build (PowerShell; in Git Bash first run `export MSYS2_ENV_CONV_EXCL=MOBILE_PUBLIC_BASE_PATH`,
+or the shell rewrites the path into `C:/Program Files/Git/...` and the build refuses it):
+
+```powershell
+$env:MOBILE_API_BASE_URL = 'https://219.co.za/citizens/connect'
+$env:MOBILE_PUBLIC_ORIGIN = 'https://219.co.za'
+$env:MOBILE_PUBLIC_BASE_PATH = '/citizens/connect'
+pnpm --filter citizens-connect build:mobile
+```
+
+The build prints `Mobile-only config: PUBLIC_ORIGIN=…, PUBLIC_BASE_PATH=…` and writes the same three
+values into `mobile-dist/config.js`. Both public values are validated strictly and a bad one **fails the
+build before anything is written**: the origin must be `https` with a lower-case host and nothing after
+it (no port, path, query, credentials or trailing slash); the base path must be lower-case segments with
+no trailing slash. A web build never reads them and its `config.js` does not carry them.
+
+**Do not set them early.** The values are baked into the app and only a store release changes them.
+Before the cutover build, check that the new address already answers the way the app needs:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://219.co.za/citizens/connect/api/v1/categories   # 200
+curl -s -o /dev/null -D - -X OPTIONS -H "Origin: capacitor://localhost" \
+  -H "Access-Control-Request-Method: GET" https://219.co.za/citizens/connect/api/v1/categories    # 204 + Access-Control-Allow-Origin
+```
+
+**Why the old API default changed (2026-11-01).** The previous defaults, `https://citizens-connect.vercel.app`
+(Connect) and `https://citizens-wear.vercel.app` (Wear), answer `404 DEPLOYMENT_NOT_FOUND`: they are not among
+this team's projects and nothing is deployed on them, so a store build made without `MOBILE_API_BASE_URL`
+could not reach the API at all — and a `*.vercel.app` name with nothing behind it may be free for anyone to
+take, and so to receive the app's traffic. The
+defaults are now the team's own production aliases (`citizens-ecosystem-connect.vercel.app`,
+`citizens-ecosystem-wear.vercel.app`); `https://www.citizenscentral.co.za` serves Connect's API too. A
+custom domain that later 301s to `219.co.za` would break the app's CORS preflight, which is why the
+default is the alias and not a brand domain.
+
+### Android app link (open the app from a web link)
+
+`AndroidManifest.xml` used to register an app link for the host `citizensconnect.app`. That domain is not
+ours and is not even registered: it first appears in the project's initial commit (`8f52433f`, 2026-04-06,
+with the Capacitor scaffold), the `.app` registry's RDAP answers "not found" for it (checked 2026-11-01), it
+does not resolve, it is not among the Vercel team's domains (`219.co.za`, `citizenscentral.co.za`), and no
+share or QR link the app builds ever used it, so the entry could never verify. It is now
+`android:host="219.co.za"` with `android:pathPrefix="/citizens/connect"`. Still to do, in this order:
+
+1. **`/.well-known/assetlinks.json` at the domain ROOT** (`https://219.co.za/.well-known/assetlinks.json`,
+   `200`, `application/json`, no redirect). This belongs to the front door (`apps/hub`), not to Connect:
+   an app link is verified per host, and a file under `/citizens/connect/` does not count.
+   ```json
+   [{ "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": { "namespace": "android_app", "package_name": "com.citizensconnect.app",
+                  "sha256_cert_fingerprints": ["<release signing certificate SHA-256>"] } }]
+   ```
+   The fingerprint is the one the Play Console shows under App signing; it does not
+   exist until the app has a signed build (A8).
+2. After installing a signed build: `adb shell pm get-app-links com.citizensconnect.app` should list
+   `219.co.za` as `verified`.
+3. **Code gap, found while checking:** nothing in the app yet navigates on an `https` app link. The only
+   `appUrlOpen` listener (`auth-client.js`) handles `citizensconnect://auth-callback`. A verified link opens
+   the app on its home screen. Routing it needs: strip `PUBLIC_BASE_PATH` from the incoming path, then
+   `CC_ROUTES.navFromPath`. Not built.
+
+**Related, not changed here:** the Supabase edge functions `review-contributor-application` (deployed) and
+`submit-contributor-application` (not deployed) build their email links from the `PUBLIC_SITE_URL` secret and
+**default to `https://citizensconnect.app`** when it is unset. Because that domain is unregistered, anyone
+could buy it and receive those links. Check the secret in the Supabase dashboard (Edge Functions → Secrets):
+it must be `https://www.citizenscentral.co.za` (or `https://219.co.za/citizens/connect` after the cutover), and
+the default in both files should then be changed to match.
+
+**iOS** has no associated-domains entry (the `com.citizensconnect.app` matches in `Info.plist` are the bundle
+id). Universal links need the Associated Domains capability with `applinks:219.co.za` and an
+`apple-app-site-association` file at the same root path, listing `/citizens/connect/*`; both wait for the
+Apple Developer account (F2 / A8).
 
 ## ✅ Step 0 — Precompile the frontend — DONE (2026-07-01) — addendum §B0
 `scripts/build-frontend.js` now precompiles the 19 `app/*.jsx` screens (esbuild JSX-strip per

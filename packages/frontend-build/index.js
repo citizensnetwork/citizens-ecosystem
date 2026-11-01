@@ -66,6 +66,44 @@ const DEVELOPMENT_BUILD_RE = /\.development\.(?:min\.)?js(?:[?#]|$)/;
 const BASE_PATH_RE = /^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 /** The page's `<base href="/">` tag, as the frontends write it. */
 const BASE_HREF_RE = /(<base\s+href=")\/("[^>]*>)/i;
+/**
+ * A public https origin such as "https://219.co.za": https only, a lower-case DNS name with at
+ * least one dot, and nothing after the host (no port, path, query, fragment, userinfo or trailing
+ * slash). The last label must start with a letter, so a bare IP address never passes. Every label
+ * is bounded and ends in a literal dot, so the pattern cannot backtrack badly.
+ */
+const HTTPS_ORIGIN_RE =
+  /^https:\/\/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/** The longest host name DNS allows. */
+const MAX_HOST_LENGTH = 253;
+
+/** True for a final, non-empty base path such as "/citizens/connect" (see BASE_PATH_RE). */
+function isBasePath(value) {
+  return typeof value === 'string' && BASE_PATH_RE.test(value);
+}
+
+/** True for a public https origin such as "https://219.co.za" (see HTTPS_ORIGIN_RE). */
+function isHttpsOrigin(value) {
+  return (
+    typeof value === 'string' &&
+    value.length <= 'https://'.length + MAX_HOST_LENGTH &&
+    HTTPS_ORIGIN_RE.test(value)
+  );
+}
+
+/** The `validate` kinds a ConfigVar may name, and what each one tells a person who got it wrong. */
+const VALIDATORS = Object.freeze({
+  'https-origin': {
+    ok: isHttpsOrigin,
+    expected:
+      'an https origin such as "https://219.co.za" (lower-case host; no port, path, query, credentials or trailing slash)',
+  },
+  'base-path': {
+    ok: isBasePath,
+    expected:
+      'a path such as "/citizens/connect" (lower-case letters, digits and hyphens; no trailing slash), or empty',
+  },
+});
 
 /** Throw unless `basePath` is '' (the site root) or a final base path (see BASE_PATH_RE). */
 function assertBasePath(basePath) {
@@ -423,7 +461,14 @@ function rewriteIndexHtml(
  *    mobile API base is FORCED absolute; a store build must never point at a
  *    localhost/local-config fallback.
  *  - otherwise → env[env] || local[key] || defaultValue || ''.
+ *  - a var marked `mobileOnly` is left out of a web build entirely, so adding one never
+ *    changes a web config.js.
  * Key order in the result follows `configVars` order (JSON.stringify keeps it).
+ *
+ * A var with `validate` ("https-origin" or "base-path") must resolve to an empty value or one of
+ * that shape, whichever source it came from, or this throws naming the key and the env var: the
+ * value is written into config.js and into links people share, so a typo fails the build instead
+ * of shipping.
  *
  * With a `basePath` on a web build ("/citizens/connect"), the app is served
  * under that prefix, so:
@@ -438,10 +483,19 @@ function resolveConfigValues({ mobile, configVars, env, local, basePath = '' }) 
   assertBasePath(basePath);
   const cfg = {};
   for (const v of configVars) {
+    if (v.mobileOnly && !mobile) continue;
+    let source;
     if (mobile && v.mobileEnv !== undefined) {
+      source = v.mobileEnv;
       cfg[v.key] = env[v.mobileEnv] || v.mobileDefault || '';
     } else {
+      source = v.env;
       cfg[v.key] = env[v.env] || local[v.key] || v.defaultValue || '';
+    }
+    if (v.validate !== undefined && cfg[v.key] !== '' && !VALIDATORS[v.validate].ok(cfg[v.key])) {
+      throw new TypeError(
+        `[frontend-build] ${v.key} (${source}) must be ${VALIDATORS[v.validate].expected}, got ${JSON.stringify(String(cfg[v.key]).slice(0, 120))}`,
+      );
     }
   }
   if (basePath && !mobile) {
@@ -503,6 +557,18 @@ function assertOptions(options) {
     );
   }
   if (options.basePath !== undefined) assertBasePath(options.basePath);
+  for (const v of configVars) {
+    if (v.validate !== undefined && !Object.hasOwn(VALIDATORS, v.validate)) {
+      throw new TypeError(
+        `[frontend-build] configVars "${v.key}": validate must be one of ${Object.keys(VALIDATORS).join(', ')} (got ${JSON.stringify(v.validate)})`,
+      );
+    }
+    if (v.mobileOnly && typeof v.mobileEnv !== 'string') {
+      throw new TypeError(
+        `[frontend-build] configVars "${v.key}": a mobileOnly var needs a mobileEnv name to read`,
+      );
+    }
+  }
 }
 
 /**
@@ -544,10 +610,18 @@ function buildFrontend(options) {
   const srcLabel = path.relative(rootDir, srcDir).split(path.sep).join('/');
 
   // Fail fast, before anything is written: CDN pins/hashes vs the lockfile,
-  // and no development build may survive the production-twin swap.
+  // no development build may survive the production-twin swap, and every
+  // validated config value must be well-formed (a bad value never leaves a
+  // half-built output directory behind).
   const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
   const sriVerified = verifyCdnIntegrity(html, { rootDir, packages: sriPackages });
   assertNoDevelopmentScripts(swapProductionTwins(html));
+  // config.js. Web: API_BASE_URL is empty when the frontend is served from the
+  // same domain as the API (the standard Vercel deployment topology). Mobile:
+  // absolute production API base, env-first with local-config fallback for the
+  // non-forced values (mobile bundles are built locally, not on Vercel).
+  const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
+  const config = resolveConfigValues({ mobile, configVars, env, local, basePath: webBasePath });
 
   cleanHashedOutputs(dest);
   copyDir(srcDir, dest, special);
@@ -575,12 +649,6 @@ function buildFrontend(options) {
   log(`[build-frontend] Compiled auth-client.js → ${authClientFile}`);
   log(`[build-frontend] Bundled Capacitor plugins → ${capacitorBridgeFile}`);
 
-  // config.js. Web: API_BASE_URL is empty when the frontend is served from the
-  // same domain as the API (the standard Vercel deployment topology). Mobile:
-  // absolute production API base, env-first with local-config fallback for the
-  // non-forced values (mobile bundles are built locally, not on Vercel).
-  const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
-  const config = resolveConfigValues({ mobile, configVars, env, local, basePath: webBasePath });
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
     warn(
       `[build-frontend] WARNING: mobile config is missing ${mobileMissingLabel} values — set NEXT_PUBLIC_* env vars or fill src/frontend/config.js before shipping.`,
@@ -592,6 +660,11 @@ function buildFrontend(options) {
   );
   if (webBasePath)
     log(`[build-frontend] Base path ${webBasePath} (index.html <base>, config.js BASE_PATH)`);
+  const mobileOnlyKeys = configVars.filter((v) => v.mobileOnly).map((v) => v.key);
+  if (mobile && mobileOnlyKeys.length > 0)
+    log(
+      `[build-frontend] Mobile-only config: ${mobileOnlyKeys.map((k) => `${k}=${config[k] || "'' (none)"}`).join(', ')}`,
+    );
 
   return { dest, bundleFile, authClientFile, capacitorBridgeFile, config, sriVerified };
 }
@@ -600,6 +673,8 @@ module.exports = {
   DEFAULT_SPECIAL_FILES,
   buildFrontend,
   hashOf,
+  isBasePath,
+  isHttpsOrigin,
   renderConfigJs,
   resolveConfigValues,
   rewriteIndexHtml,

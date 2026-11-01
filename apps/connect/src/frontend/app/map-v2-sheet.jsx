@@ -841,9 +841,10 @@
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
-      // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
+      // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost;
+      // the phone app has no web origin of its own, so its build supplies the public site's address, see CC_ROUTES.publicUrl)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
-        url: window.MapV2QR.PUBLIC_ORIGIN + (window.CC_ROUTES ? window.CC_ROUTES.appUrl('/c/' + item.slug) : '/c/' + item.slug), name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
+        url: window.CC_ROUTES.publicUrl('/c/' + item.slug, { native: !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform()), webOrigin: window.MapV2QR.PUBLIC_ORIGIN }), name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
       }), document.body),
       // rendered into <body>: a position:fixed box inside the sheet would be fixed to the sheet's own transform
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {
