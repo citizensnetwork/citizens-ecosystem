@@ -74,6 +74,8 @@ function startUpstream(label, { securityHeaders }) {
       }
       // Two Set-Cookie headers on purpose: both must reach the browser, and as two headers.
       const setCookie = ['sb-a=1; Path=/; HttpOnly', 'sb-b=2; Path=/; Secure'];
+      // Named on its own so a reader (and CodeQL) can see the body is JSON, never HTML: it echoes the request.
+      res.setHeader('Content-Type', 'application/json');
       res.writeHead(status, { ...headers, 'Set-Cookie': setCookie });
       res.end(
         JSON.stringify({

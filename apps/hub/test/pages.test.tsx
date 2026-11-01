@@ -11,10 +11,17 @@ import NotFound, { config as notFoundConfig } from '../src/pages/404';
 import { BUILT_APPS, SCRIPTURE, appCards, canonicalUrl } from '../src/lib/content';
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
+/** The text inside a piece of markup: what follows each tag's closing ">" (no regex replace to get wrong). */
+const textOf = (fragment: string) =>
+  fragment
+    .split('<')
+    .map((part, i) => (i === 0 ? part : part.slice(part.indexOf('>') + 1)))
+    .join('')
+    .trim();
 const links = (markup: string) =>
   [...markup.matchAll(/<a\b[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({
     href: m[1] as string,
-    text: (m[2] as string).replace(/<[^>]+>/g, '').trim(),
+    text: textOf(m[2] as string),
   }));
 
 describe('the landing page (/citizens)', () => {
@@ -108,7 +115,7 @@ describe('cards', () => {
 
 describe('the coming-soon pages (/citizens/learn, /play, /move)', () => {
   it('are generated for exactly the registry’s coming-soon slugs, and nothing else is a page', async () => {
-    const result = await getStaticPaths({});
+    const result = await getStaticPaths();
     expect(result.fallback).toBe(false);
     expect(result.paths).toEqual(COMING_SOON.map((app) => ({ params: { slug: app.slug } })));
   });

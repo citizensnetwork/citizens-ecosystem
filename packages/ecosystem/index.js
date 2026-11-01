@@ -168,14 +168,15 @@ function appOrigin(slug, env = process.env) {
 
 /**
  * Host names as the regular expression Next matches a `host` condition's value against. A host name holds only
- * letters, digits, "-" and ".", so escaping the dots is all it takes.
+ * letters, digits, "-" and ".", so escaping the dots is all it takes (a backslash is escaped too, as a rule, though
+ * the check below already refuses one).
  */
 function hostPattern(hosts) {
   const escaped = hosts.map((host) => {
     if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(host)) {
       throw new Error(`[ecosystem] not a plain host name: ${JSON.stringify(host)}`);
     }
-    return host.replace(/\./g, '\\.');
+    return host.replace(/[\\.]/g, '\\$&');
   });
   return escaped.length === 1 ? escaped[0] : `(?:${escaped.join('|')})`;
 }
