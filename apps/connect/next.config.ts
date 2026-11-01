@@ -34,6 +34,66 @@ if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") 
 }
 const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
 
+// The addresses that existed before the shared domain keep working while the prefix is on. The rule is packages/
+// ecosystem's oldAddressRules("connect", basePath); like the base path above it is copied here, and
+// src/__tests__/frontend/basePath.test.ts fails if the copy and the package ever disagree. Both lists are empty
+// when the prefix is unset, so today's behaviour is untouched.
+//   - www.citizenscentral.co.za (and the bare name): every page path, "/" included, is redirected permanently to
+//     the same path on 219.co.za, query kept (printed QR codes /c/<slug>, /index.html?c=<slug>, /dashboard ...).
+//     "/api", "/_next" and an already prefixed "/citizens/..." path are left out of that redirect.
+//   - any host: the bare "/" goes to the prefix, and "/api/*" is REWRITTEN (never redirected: the Apps Script intake
+//     POSTs there and a redirect can turn a POST into a GET). Next refuses a `basePath: false` rewrite to an
+//     internal path, so the destination is this app's own production address: one extra hop into the same project.
+const SITE_ORIGIN = "https://219.co.za";
+const OLD_HOSTS_PATTERN = "(?:citizenscentral\\.co\\.za|www\\.citizenscentral\\.co\\.za)";
+type OldRedirect = {
+  source: string; destination: string; basePath: false; permanent: boolean;
+  has?: { type: "host"; value: string }[];
+};
+type OldRewrite = { source: string; destination: string; basePath: false };
+
+/** HUB_ORIGIN_CONNECT when set (a bare origin), otherwise this app's production address. */
+function ownOrigin(): string {
+  const raw = (process.env.HUB_ORIGIN_CONNECT ?? "").trim();
+  if (raw === "") return "https://citizens-ecosystem-connect.vercel.app";
+  let url: URL | undefined;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = undefined;
+  }
+  const loopback = url !== undefined && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const schemeOk = url !== undefined && (url.protocol === "https:" || (url.protocol === "http:" && loopback));
+  const bare = url !== undefined && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "";
+  if (url === undefined || !schemeOk || !bare) {
+    throw new Error(
+      `[ecosystem] HUB_ORIGIN_CONNECT=${JSON.stringify(raw)} is not valid: use a bare origin such as ` +
+        `"https://example.vercel.app" (https only; http only for localhost), with no path, query or login.`,
+    );
+  }
+  return url.origin;
+}
+
+function oldAddressRules(): { redirects: OldRedirect[]; rewrites: OldRewrite[] } {
+  if (!basePath) return { redirects: [], rewrites: [] };
+  const has = [{ type: "host" as const, value: OLD_HOSTS_PATTERN }];
+  return {
+    redirects: [
+      { source: "/", has, basePath: false, destination: `${SITE_ORIGIN}${basePath}`, permanent: true },
+      {
+        source: "/:path((?!api(?:/|$)|_next(?:/|$)|citizens(?:/|$)).+)",
+        has,
+        basePath: false,
+        destination: `${SITE_ORIGIN}${basePath}/:path`,
+        permanent: true,
+      },
+      { source: "/", basePath: false, destination: basePath, permanent: false },
+    ],
+    rewrites: [{ source: "/api/:path*", basePath: false, destination: `${ownOrigin()}${basePath}/api/:path*` }],
+  };
+}
+const oldAddress = oldAddressRules();
+
 const nextConfig: NextConfig = {
   // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
   // rewrites, headers, public/ files, _next and /api with it; the explicit rewrites below need no change.
@@ -96,8 +156,12 @@ const nextConfig: NextConfig = {
       // Token is required. A bare /upgrade is not a screen and stays a 404.
       toApp("/upgrade/:token"),
       toApp("/upgrade/:token/decline"),
+      // Old address: "/api/*" (empty until NEXT_PUBLIC_BASE_PATH is set).
+      ...oldAddress.rewrites,
     ];
   },
+  // Old addresses (empty until NEXT_PUBLIC_BASE_PATH is set); see oldAddressRules above.
+  ...(basePath ? { redirects: async () => oldAddress.redirects } : {}),
 
   async headers() {
     return [
