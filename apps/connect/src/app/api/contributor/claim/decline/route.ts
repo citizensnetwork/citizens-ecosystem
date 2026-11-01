@@ -13,7 +13,8 @@
 import { getRouteAuth, hasBearerToken } from "@/lib/supabase/route";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { adminNotifyEmail, sendEmail, siteOrigin } from "@/lib/email/send";
+import { adminNotifyEmail, sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { listingDeclinedAdminEmail } from "@/lib/email/listingClaimTemplates";
 
 export const runtime = "nodejs";
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       ...listingDeclinedAdminEmail({
         name: result.name || "A listing",
         slug: result.slug ?? null,
-        siteUrl: siteOrigin(request),
+        siteUrl: siteBase(request),
       }),
     });
   }

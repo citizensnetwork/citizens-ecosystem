@@ -12,7 +12,8 @@ import { escapeHtml } from "@/lib/email/send";
 
 export type Email = { subject: string; html: string; text: string };
 
-const GOLD = "#A67C00";
+const GOLD = "#F2BD22"; // the crown gold: the button and the rule beside a note
+const GOLD_INK = "#836100"; // gold text and links (4.5:1 on white; the crown gold itself is 1.74:1)
 const SIGN_OFF_HTML =
   "Connecting the Kingdom — one citizen, one contributor, one need at a time.<br>The Citizens Connect team";
 const SIGN_OFF_TEXT = "Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team";
@@ -25,7 +26,7 @@ export function subjectSafe(value: string): string {
 export function layout(heading: string, bodyHtml: string): string {
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#1f1f1f;line-height:1.55">' +
-    `<h2 style="color:${GOLD};margin:0 0 12px">${escapeHtml(heading)}</h2>` +
+    `<h2 style="color:${GOLD_INK};margin:0 0 12px">${escapeHtml(heading)}</h2>` +
     bodyHtml +
     `<p>${SIGN_OFF_HTML}</p>` +
     "</div>"
@@ -34,7 +35,7 @@ export function layout(heading: string, bodyHtml: string): string {
 
 export function button(href: string, label: string): string {
   return (
-    `<p><a href="${escapeHtml(href)}" style="display:inline-block;background:${GOLD};color:#fff;padding:12px 20px;` +
+    `<p><a href="${escapeHtml(href)}" style="display:inline-block;background:${GOLD};color:#0A0908;padding:12px 20px;` +
     `border-radius:10px;text-decoration:none;font-weight:bold">${escapeHtml(label)}</a></p>`
   );
 }
@@ -98,7 +99,7 @@ export function applicationApprovedEmail(input: {
       "<p>Thank you for joining the Body on Citizens Connect. Your application was approved: " +
         `you're now ${where}, where citizens across the city can find, ` +
         "follow and connect with you.</p>" +
-        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View your listing</a></p>` +
+        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD_INK}">View your listing</a></p>` +
         "<p>You can add events and places, post news and keep your profile up to date from your " +
         "Contributor Portal:</p>" +
         button(input.dashboardUrl, "Open your Contributor Portal"),
@@ -180,7 +181,7 @@ export function intakeUpgradeEmail(input: { name: string; confirmUrl: string; de
         "<p>Nothing is public, and your account is unchanged, until you confirm it. " +
         "If this is your organisation, confirm the upgrade. If it is not yours, tell us.</p>" +
         button(input.confirmUrl, "Confirm the upgrade") +
-        `<p><a href="${escapeHtml(input.declineUrl)}" style="color:${GOLD}">This is not my organisation</a></p>` +
+        `<p><a href="${escapeHtml(input.declineUrl)}" style="color:${GOLD_INK}">This is not my organisation</a></p>` +
         `<p style="font-size:13px;color:#555">This link expires on ${escapeHtml(input.expiresOn)}. ` +
         "After that, your account stays as it is.</p>",
     ),
@@ -241,11 +242,11 @@ export function ownerWelcomeEmail(input: {
       "<p>Thank you for joining the Body on Citizens Connect. A listing for you has been added, " +
         `and it is now ${where}, where citizens across the city can find, ` +
         "follow and connect with you.</p>" +
-        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View your listing</a></p>` +
+        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD_INK}">View your listing</a></p>` +
         `<p><strong>To see your listing and manage it</strong>, sign in with <strong>${email}</strong>. ` +
         "You don't need a Google account:</p>" +
         '<ol style="padding-left:20px;margin:0 0 14px">' +
-        `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD}">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>` +
+        `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD_INK}">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>` +
         `<li>Enter <strong>${email}</strong>. We'll email you a 6-digit code (check your junk folder too).</li>` +
         "<li>Type the code in, then confirm the listing is yours.</li>" +
         "</ol>" +

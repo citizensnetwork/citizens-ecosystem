@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
 import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openPinSheet, openListing, toCleanMap } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
@@ -199,7 +198,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
   // The C15 rule (RESUME section 3), on the map everyone gets since D15: Chrome on Android skips every history
   // entry a page added WITHOUT a user gesture, which is how Back once left Connect. Playwright's goBack() is
   // programmatic, so it cannot show that; what it CAN show is the cause: each pushState with
-  // navigator.userActivation.isActive at that moment. (routing.spec.ts runs the same rule on the old card.)
+  // navigator.userActivation.isActive at that moment. (routing.spec.ts runs the same rule on the sheet's View Full Profile and Close paths.)
   test("every history entry the sheet adds is pushed inside a tap, one per opening, and Back never gets trapped", async ({ page }) => {
     type Push = { active: boolean; guard: boolean; url: string };
     await page.addInitScript(() => {
@@ -668,19 +667,5 @@ test.describe("P1-06 side panel (wide screens)", () => {
     await expect
       .poll(async () => (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!.x, { timeout: 4000 })
       .toBeGreaterThan(b.x + b.width);
-  });
-});
-
-test.describe("flag off: the v1 card is untouched", () => {
-  test("a pin still opens the v1 preview card, and no Map v2 sheet exists", async ({ page }) => {
-    await useOldMap(page);
-    const seed = seed0();
-    await mockMapNetwork(page, seed);
-    await openMap(page, "/", 8);
-    const c = seed.contributors[0];
-    await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await page.locator('[data-cc-pin="contributor-logo"]').first().click({ force: true });
-    await expect(page.locator("[data-entity-card='contributor']")).toBeVisible();
-    await expect(sheet(page)).toHaveCount(0);
   });
 });

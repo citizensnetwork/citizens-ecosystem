@@ -221,6 +221,13 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect((await res.json()).url).toBe("https://www.citizenscentral.co.za/c/grace-point-community-church");
   });
 
+  it("puts the app's path prefix after the origin in the listing URL when it is served under one (C39)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.citizenscentral.co.za/");
+    vi.stubEnv("NEXT_PUBLIC_BASE_PATH", "/citizens/connect");
+    const res = await POST(signedReq(row));
+    expect((await res.json()).url).toBe("https://www.citizenscentral.co.za/citizens/connect/c/grace-point-community-church");
+  });
+
   it("nulls address and pin for 'No' fixed location, without geocoding", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);

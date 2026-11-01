@@ -10,17 +10,21 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', '..');
 export const CSS_PATH = join(APP, 'src', 'frontend', 'assets', 'map-v2.css');
 export const DATA_PATH = join(APP, 'src', 'frontend', 'app', 'data.jsx');
+// Connect's older look keeps its gold ramp (--gold, --gold-light, --gold-deep, --gold-dark) in this page's :root.
+export const INDEX_PATH = join(APP, 'src', 'frontend', 'index.html');
 
-export function parseTokens(css) {
-  const grab = (re) => {
-    const m = re.exec(css);
+/** `indexHtml` (optional) adds the older look's :root tokens underneath Map v2's, so a pair can name `--gold-light` and the like. */
+export function parseTokens(css, indexHtml = '') {
+  const grab = (text, re) => {
+    const m = re.exec(text);
     const out = {};
     if (!m) return out;
     for (const d of m[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) out[d[1]] = d[2].trim();
     return out;
   };
-  const light = grab(/:root\s*\{([\s\S]*?)\n\}/);
-  const dark = grab(/\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/);
+  const base = indexHtml ? grab(indexHtml.replace(/\/\*[\s\S]*?\*\//g, ''), /:root\s*\{([\s\S]*?)\n  \}/) : {};
+  const light = { ...base, ...grab(css, /:root\s*\{([\s\S]*?)\n\}/) };
+  const dark = grab(css, /\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/);
   return { light, dark: { ...light, ...dark } };
 }
 
@@ -50,6 +54,8 @@ export const ratio = (a, b) => {
 // [label, foreground token, background token, threshold, kind]
 // kind 'over'   = the foreground is semi-transparent: composite it over the background first.
 // kind 'border' = the pair only counts in the dark look (on the light map the hairline carries the separation).
+// kind 'light'  = the pair only counts in the light look (the older look's gold ink has no dark set).
+// A foreground or background that starts with '#' is a literal colour (a tint or a wash that is not a token).
 export const PAIRS = [
   ['Primary text on the app background', '--text-1', '--surface-0', 4.5],
   ['Primary text on the sheet', '--text-1', '--surface-1', 4.5],
@@ -80,6 +86,17 @@ export const PAIRS = [
   ['Secondary text on the Explore panel (over the map)', '--text-2', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
   ['Gold ink on the Explore panel (See all)', '--accent-ink', '--explore-bg', 4.5, 'bgalpha', '--map-base'],
   ['Primary text on a chosen category row (inside the Explore panel)', '--text-1', '--accent-soft', 4.5, 'bgalpha', '--explore-bg'],
+  // The crown gold (founder, 2026-10-31): the older look's gradient is --gold-light > --gold > --gold-deep and carries the near-black
+  // label, never white (white on these stops is 1.5 to 2.3:1). Gold TEXT is the ink (--gold-dark, the same value as --accent-ink in the light look).
+  ['Gradient label on the light stop', '--accent-contrast', '--gold-light', 4.5],
+  ['Gradient label on the crown gold (the middle stop)', '--accent-contrast', '--gold', 4.5],
+  ['Gradient label on the amber end stop', '--accent-contrast', '--gold-deep', 4.5],
+  ['Older-look gold ink (text-gold-dark) on the sheet', '--gold-dark', '--surface-1', 4.5, 'light'],
+  ['Older-look gold ink on the app background', '--gold-dark', '--surface-0', 4.5, 'light'],
+  ['Older-look gold ink on a raised surface', '--gold-dark', '--surface-2', 4.5, 'light'],
+  ['Gold ink on the cream tint (bg-accent, `#fbf1cc`)', '--gold-dark', '#fbf1cc', 4.5, 'light'],
+  ['Gold ink on the landing paper wash, middle (`#f3ecdb`)', '--gold-dark', '#f3ecdb', 4.5, 'light'],
+  ['Gold ink on the landing paper wash, far corner (`#ece1c4`, large title only)', '--gold-dark', '#ece1c4', 3, 'light'],
   // #210: one muted colour per category group, as a dot, a chip outline and a card edge (3:1, non-text)
   ...['worship', 'serve', 'culture', 'learn', 'audiences', 'business'].flatMap((g) => [
     [`Category colour (${g}) on the card`, `--cat-${g}`, '--surface-1', 3],
@@ -107,15 +124,20 @@ export function categoryGlyphMin(dataJsx) {
   return { count: hexes.length, min, worst };
 }
 
-export function evaluate(css) {
-  const t = parseTokens(css);
+export function evaluate(css, indexHtml = '') {
+  const t = parseTokens(css, indexHtml);
   const rows = [];
   for (const [label, fg, bg, need, kind, base] of PAIRS) {
     const out = { label, fg, bg, need, ratios: {} };
     for (const look of ['light', 'dark']) {
       const tokens = t[look];
-      let b = toRgba(tokens[bg], tokens);
-      let f = toRgba(tokens[fg], tokens);
+      const tok = (k) => (k.startsWith('#') ? k : tokens[k]);
+      if (kind === 'light' && look === 'dark') {
+        out.ratios[look] = null;
+        continue;
+      }
+      let b = toRgba(tok(bg), tokens);
+      let f = toRgba(tok(fg), tokens);
       if (kind === 'bgalpha') b = over(b, toRgba(tokens[base], tokens)); // the background itself is translucent: composite it first
       if (kind === 'over') {
         // a fully transparent hairline (dark look) draws nothing: the white border carries the separation there
@@ -135,7 +157,7 @@ export function evaluate(css) {
 
 if (process.argv[1] && process.argv[1].endsWith('contrast.mjs')) {
   const css = readFileSync(CSS_PATH, 'utf8');
-  const rows = evaluate(css);
+  const rows = evaluate(css, readFileSync(INDEX_PATH, 'utf8'));
   const glyph = categoryGlyphMin(readFileSync(DATA_PATH, 'utf8'));
   let failed = 0;
   const cell = (r, need) => (r === null ? 'n/a' : `${r.toFixed(2)}${r < need ? ' **FAIL**' : ''}`);
@@ -153,14 +175,14 @@ if (process.argv[1] && process.argv[1].endsWith('contrast.mjs')) {
     const body = [
       '# Map v2 — token contrast (P1-02, M5)',
       '',
-      'Computed with the WCAG 2.x relative-luminance formula by `apps/connect/scripts/map-v2/contrast.mjs` from the token values in `apps/connect/src/frontend/assets/map-v2.css`, light and dark sets. `src/__tests__/frontend/mapV2Tokens.test.ts` fails the unit tests if any pair drops under its threshold. These ratios are **calculated from token values**; the final pin check is on sampled rendered pixels (P1-04, `docs/audit/phase1-qa.md`).',
+      'Computed with the WCAG 2.x relative-luminance formula by `apps/connect/scripts/map-v2/contrast.mjs` from the token values in `apps/connect/src/frontend/assets/map-v2.css`, light and dark sets (and, for the gold ramp of the older look, the `:root` of `apps/connect/src/frontend/index.html`). `src/__tests__/frontend/mapV2Tokens.test.ts` fails the unit tests if any pair drops under its threshold. These ratios are **calculated from token values**; the final pin check is on sampled rendered pixels (P1-04, `docs/audit/phase1-qa.md`).',
       '',
       md,
       '',
       '## Notes',
       '',
-      '- **Gold (D3):** `--accent #c9a84c` is a fill with the near-black label `#0a0908`. For gold text, rings and icons on light surfaces use `--accent-ink #8b6914`. Plain gold on white is 2.29:1, so it is never used as text, a ring or an icon on the light set.',
-      "- **Difference from `packages/ui` (for RESUME C17):** `packages/ui/src/tokens.ts` has gold `#C9A24A`; Connect's `index.html` `:root` has `--gold #C9A84C`, `--gold-dark #8B6914`, `--gold-crown #D4AF37`. Map v2 starts from Connect's values (`#C9A84C`, `#8B6914`) and adds no new gold. Nothing in `packages/ui` is changed (it has no consumer).",
+      '- **Gold (D3, the crown gold since 2026-10-31):** `--accent #f2bd22` is a fill with the near-black label `#0a0908` (11.44:1). For gold text, rings and icons on light surfaces use `--accent-ink #836100` (4.5:1 or more on every light surface above); in the dark look the ink is the crown gold itself (9.09:1 or more). Plain crown gold on white is 1.74:1, so it is never used as text, a ring or an icon on the light set. The older look keeps the ramp `--gold-light #fcdd6c`, `--gold #f2bd22`, `--gold-deep #e3a00a` for gradients (near-black label on every stop) and `--gold-dark #836100` (the same ink) for text. Where a fill gold is only a decorative ring or edge (the nav button, a chip outline), the label or the words carry the meaning, never the gold.',
+      "- **Difference from `packages/ui` (for RESUME C17):** `packages/ui/src/tokens.ts` still has gold `#C9A24A` (no consumer, not changed here: whether it becomes the shared source or is retired is #195). Connect's `index.html` `:root` and Map v2 now share one gold, the crown's `#F2BD22`. Vision and Wear still carry their own golds until their own pull requests.",
       '- **Pin on the light map:** white alone is 1.06:1 against the base, so the separation is the dark hairline (composited over the base) plus the shadow; on the dark map the white 3 px border carries it.',
       '- **Category colours** stay in `data.jsx` (23 hexes, 9 below 3:1 on white). They are fills, not borders or text: the glyph colour is chosen per fill (white or near-black, whichever contrasts more) and category is shown by glyph and colour, never colour alone.',
       '- **Scrim:** no text sits on `--scrim` in Phase 1 (the stacked menu, E19, is deferred), so it has no pair.',

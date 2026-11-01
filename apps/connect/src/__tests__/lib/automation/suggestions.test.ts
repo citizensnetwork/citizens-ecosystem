@@ -198,6 +198,9 @@ describe("isAutoPublishable: events only, at events_auto only, never already-sta
   it("publishes a future event at events_auto", () => {
     expect(isAutoPublishable("events_auto", { kind: "event", payload: future }, NOW)).toBe(true);
   });
+  it("never a care-recovery event (#202)", () => {
+    expect(isAutoPublishable("events_auto", { kind: "event", payload: { ...future, category: "care-recovery" } }, NOW)).toBe(false);
+  });
   it("never at off or suggest", () => {
     expect(isAutoPublishable("off", { kind: "event", payload: future }, NOW)).toBe(false);
     expect(isAutoPublishable("suggest", { kind: "event", payload: future }, NOW)).toBe(false);

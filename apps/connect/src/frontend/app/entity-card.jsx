@@ -9,16 +9,15 @@
 //  social handle. Founder call: "I don't think different cards should be
 //  viewed when accessed either from the map, or the Kingdom Exploration area."
 //
-//  So there is now one component with one anatomy, rendered at two densities:
+//  So there is one component with one anatomy:
 //
 //    band → title → description → meta → stats → organiser → socials → actions
 //
 //    layout='grid'   compact tile        (Kingdom Exploration list)
-//    layout='panel'  full-width sheet    (map pin preview)
 //
-//  Everything else — the data shown, the order it appears in, the action set,
-//  the category-accent palette — is identical by construction. Adding a field
-//  here adds it to both surfaces at once; that is the entire point of the file.
+//  The map's pin preview used to be a second, 'panel' density of this card. The Map v2 sheet
+//  has its own card now (map-v2-card.jsx), and the old map's panel went with the old map
+//  (issue #179), so 'grid' is the only layout left.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -59,7 +58,7 @@
   // different screens for the same listing.
   const navTarget = (type) => (type === 'contributor' ? 'profile' : type);
 
-  function EntityCard({ item, layout = 'grid', myLoc, onClose }) {
+  function EntityCard({ item, myLoc }) {
     const app = window.useApp();
     const {
       go, contributors, connected, considering, followedPlaces, followedOrgs,
@@ -67,20 +66,33 @@
       startConversationWith, shareLink,
     } = app;
 
-    const isPanel = layout === 'panel';
     const isEvent = item.type === 'event';
     const isPlace = item.type === 'place';
     const isContributor = item.type === 'contributor';
 
     const cat = window.DATA.getItemCategory(item);
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F2BD22';
+    // A label on the category colour: white or near-black, whichever has the better WORST contrast over the colours it
+    // sits on (WCAG relative luminance). Light colours (the crown gold, yellows) get near-black; dark ones keep white.
+    const rgb = (() => { const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; })();
+    const lum = (a) => {
+      const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      return 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+    };
+    const toward = (p, t) => rgb.map((v) => (v * p + t * (100 - p)) / 100);
+    const pickLabel = (lums) => {
+      const worst = (l) => Math.min(...lums.map((x) => (Math.max(x, l) + 0.05) / (Math.min(x, l) + 0.05)));
+      return worst(0.003) > worst(1) ? '#0A0908' : '#FFFFFF';
+    };
+    const chipLabel = pickLabel([lum(rgb)]);                                          // the category chip: one colour
+    const btnLabel = pickLabel([lum(toward(68, 255)), lum(rgb), lum(toward(86, 0))]); // the Connect button: its three gradient stops
     // Category-adaptive palette. `color-mix` keeps every derived tone in the
     // listing's own colour instead of hard-coding a second palette per state.
     const mix = (a, p, b) => `color-mix(in srgb, ${a} ${p}%, ${b})`;
-    const grad = `linear-gradient(135deg, ${mix(hex, 68, '#ffffff')}, ${hex} 52%, ${mix(hex, 72, '#000000')})`;
+    const grad = `linear-gradient(135deg, ${mix(hex, 68, '#ffffff')}, ${hex} 52%, ${mix(hex, 86, '#000000')})`; // light, the colour, a deeper tone of it (not near-black: no muddy end stop)
     const ink = mix(hex, 72, '#1a1206');    // readable icon / text accent
     const soft = mix(hex, 13, 'transparent');
-    const softInk = mix(hex, 70, '#000000');
+    const softInk = mix(hex, 56, '#000000'); // text on the soft tint: 4.5:1 even for the crown gold
 
     const title = item.title || item.name || '';
     const description = isContributor ? item.bio : item.description;
@@ -133,7 +145,7 @@
     // LOGO is deliberately not promoted into the cover slot — it already has
     // its own round badge, and a square logo stretched into a banner looks
     // like a mistake.
-    const bandH = photo ? (isPanel ? 'h-40' : 'h-32 sm:h-36') : (isPanel ? 'h-20' : 'h-14');
+    const bandH = photo ? 'h-32 sm:h-36' : 'h-14';
     const band = h('div', {
       className: cx('relative shrink-0', bandH),
       style: photo ? undefined : { background: `linear-gradient(110deg, ${hex}2e, ${hex}10 62%, ${hex}24)` },
@@ -146,36 +158,32 @@
             }),
             h('div', { className: 'absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent' }))
         : h(Icon, {
-            name: bandIcon, size: isPanel ? 58 : 42,
+            name: bandIcon, size: 42,
             className: 'absolute right-2 -bottom-2 pointer-events-none',
             style: { color: hex, opacity: 0.18 },
           }),
       // category (or, for an uncategorised Contributor, its kind)
       cat
         ? h('span', {
-            className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow',
-            style: { background: hex },
+            className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold shadow',
+            style: { background: hex, color: chipLabel },
           }, h(Icon, { name: cat.icon, size: 9 }), cat.short || cat.name)
         : kind && h('span', {
             className: 'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm bg-white/85 text-gold-dark border border-gold/30',
           }, h(Icon, { name: kind.icon, size: 9 }), kind.label),
       h('div', { className: 'absolute top-2 right-2 flex items-center gap-1.5' },
         item.isLive && h('span', { className: 'inline-flex items-center gap-1 bg-red-500 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow' },
-          h('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }), 'LIVE'),
-        onClose && h('button', {
-          onClick: stop(onClose), 'aria-label': 'Close',
-          className: 'w-7 h-7 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center hover:bg-black/60 transition-colors',
-        }, h(Icon, { name: 'X', size: 14 }))),
+          h('span', { className: 'w-1.5 h-1.5 bg-white rounded-full', style: { animation: 'pinPulse 1.4s infinite' } }), 'LIVE')),
       // The organisation behind this listing — its logo when it has one, its
       // own initials when it doesn't, the category glyph when we don't know.
       h('div', { className: 'absolute -bottom-4 left-3 rounded-full ring-2 ring-white shadow-md overflow-hidden bg-white' },
         (logo || orgName)
-          ? h(Avatar, { src: logo, name: orgName, size: isPanel ? 42 : 36, rounded: 'full', fit: logoFit(logoKind) })
+          ? h(Avatar, { src: logo, name: orgName, size: 36, rounded: 'full', fit: logoFit(logoKind) })
           : h('span', {
               className: 'flex items-center justify-center rounded-full',
-              style: { width: isPanel ? 42 : 36, height: isPanel ? 42 : 36, background: hex + '24', color: hex },
+              style: { width: 36, height: 36, background: hex + '24', color: ink },
               'aria-label': cat ? cat.name : (kind ? kind.label : 'Listing'),
-            }, h(Icon, { name: bandIcon, size: isPanel ? 19 : 17 }))));
+            }, h(Icon, { name: bandIcon, size: 17 }))));
 
     // ── meta ──────────────────────────────────────────────────────────
     const metaItem = (key, icon, text) => h('span', { key, className: 'flex items-center gap-1 min-w-0 max-w-full' },
@@ -189,7 +197,7 @@
     ].filter(Boolean);
 
     const stat = (icon, value, label) => h('span', { key: label, className: 'flex items-center gap-1' },
-      h(Icon, { name: icon, size: 11, style: { color: hex } }),
+      h(Icon, { name: icon, size: 11, style: { color: ink } }),
       h('b', { className: 'text-foreground' }, value), label);
     const stats = isEvent
       ? [stat('Users', (item.connectCount || 0).toLocaleString(), ' connected'),
@@ -224,7 +232,7 @@
         h('button', { type: 'button', 'data-cohost': c.id, onClick: stop(() => go('profile', { id: c.id })), className: 'font-bold text-foreground hover:opacity-80 transition-opacity min-w-0 truncate' }, c.name)))) : null;
 
     // ── actions ───────────────────────────────────────────────────────
-    //  The SAME set, in the same order, on both layouts — only the sizing
+    //  The SAME set, in the same order, everywhere the card appears.
     //  differs. A Place whose organiser isn't in the directory has nobody to
     //  message, so that control is absent rather than permanently disabled
     //  (the majority shape of the real directory).
@@ -239,10 +247,10 @@
     const iconBtn = (icon, label, onClick, active) => h('button', {
       key: icon, type: 'button', onClick, 'aria-label': label, title: label,
       className: cx('rounded-full flex items-center justify-center shrink-0 border transition-colors',
-        isPanel ? 'w-10 h-10' : 'w-8 h-8',
+        'w-8 h-8',
         active ? 'border-transparent' : 'border-border bg-white/60 text-muted-foreground hover:text-foreground hover:bg-accent/60'),
-      style: active ? { background: hex + '1f', color: hex, borderColor: hex + '4d' } : undefined,
-    }, h(Icon, { name: icon, size: isPanel ? 16 : 14 }));
+      style: active ? { background: hex + '1f', color: ink, borderColor: hex + '4d' } : undefined,
+    }, h(Icon, { name: icon, size: 14 }));
 
     const secondaryBtns = [
       // Events get a distinct Consider (bookmark) alongside Connect; places and
@@ -256,51 +264,41 @@
       iconBtn('Share2', 'Share', stop(() => shareLink({ page: navTarget(item.type), params: { id: item.id } }))),
     ].filter(Boolean);
 
-    const actions = h('div', { className: cx('flex items-center gap-2', isPanel ? 'flex-wrap' : '') },
+    const actions = h('div', { className: 'flex items-center gap-2' },
       h('button', {
         type: 'button', onClick: onPrimary,
         className: cx('flex-1 min-w-0 rounded-full font-bold flex items-center justify-center gap-1.5 px-3 transition-transform active:scale-[0.98]',
-          isPanel ? 'h-11 text-[13px]' : 'h-8 text-[11px]',
-          (isConnected || (!isEvent && saved)) ? 'bg-accent text-gold-dark' : 'text-white'),
-        style: (isConnected || (!isEvent && saved)) ? undefined : { background: grad, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` },
-      }, h(Icon, { name: primaryIcon, size: isPanel ? 15 : 12, fill: (!isEvent && saved) ? 'currentColor' : 'none' }),
+          'h-8 text-[11px]',
+          (isConnected || (!isEvent && saved)) ? 'bg-accent text-gold-dark' : ''),
+        style: (isConnected || (!isEvent && saved)) ? undefined : { background: grad, color: btnLabel, boxShadow: `0 6px 16px ${mix(hex, 38, 'transparent')}` },
+      }, h(Icon, { name: primaryIcon, size: 12, fill: (!isEvent && saved) ? 'currentColor' : 'none' }),
          h('span', { className: 'truncate' }, primaryLabel)),
       secondaryBtns);
 
     const viewBtn = h('button', {
       type: 'button', onClick: stop(open),
-      className: cx('w-full rounded-full font-bold flex items-center justify-center gap-2 transition-opacity hover:opacity-90',
-        isPanel ? 'h-11 text-[13px]' : 'h-8 text-[11px]'),
+      className: 'w-full rounded-full font-bold flex items-center justify-center gap-2 transition-opacity hover:opacity-90 h-8 text-[11px]',
       style: { background: soft, color: softInk },
-    }, h(Icon, { name: 'Eye', size: isPanel ? 15 : 12 }), 'View Full Profile');
+    }, h(Icon, { name: 'Eye', size: 12 }), 'View Full Profile');
 
     // ── assembly ──────────────────────────────────────────────────────
     //  Band + title are one tap target on the grid tile (tapping a card opens
-    //  it, as it always has). On the panel they stay a plain block: the cover
-    //  there carries a close button, and a <button> inside a <button> is
-    //  invalid markup that screen readers and keyboards both stumble over.
-    const titleBlock = h('div', { className: cx('min-w-0', isPanel ? 'px-4 pt-6' : 'px-3 pt-6') },
-      h('p', {
-        className: cx('font-bold text-foreground leading-snug', isPanel ? 'text-lg line-clamp-2 font-display' : 'text-sm line-clamp-2'),
-      }, title),
-      description && h('p', {
-        className: 'text-xs text-muted-foreground leading-snug mt-1 ' + (isPanel && !isContributor ? 'line-clamp-3' : 'line-clamp-2'),
-      }, description));
-    const head = isPanel
-      ? h('div', null, band, titleBlock)
-      : h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
+    //  it, as it always has).
+    const titleBlock = h('div', { className: 'min-w-0 px-3 pt-6' },
+      h('p', { className: 'font-bold text-foreground leading-snug text-sm line-clamp-2' }, title),
+      description && h('p', { className: 'text-xs text-muted-foreground leading-snug mt-1 line-clamp-2' }, description));
+    const head = h('button', { type: 'button', onClick: stop(open), className: 'block w-full text-left' }, band, titleBlock);
 
-    const body = h('div', { className: cx('flex flex-col mt-2', isPanel ? 'px-4 pb-4 gap-3' : 'px-3 pb-3 gap-2') },
+    const body = h('div', { className: 'flex flex-col mt-2 px-3 pb-3 gap-2' },
       meta.length > 0 && h('div', { className: 'flex items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground flex-wrap' }, meta),
       stats.length > 0 && h('div', { className: 'flex items-center gap-3 text-[11px] text-foreground/70' }, stats),
       organiser,
       coHostLine,
       socials && h(SocialLinks, { socials, variant: 'compact', accent: ink }),
-      h('div', { className: cx('flex flex-col mt-auto', isPanel ? 'gap-2 pt-1' : 'gap-1.5 pt-0.5') }, actions, viewBtn));
+      h('div', { className: 'flex flex-col mt-auto gap-1.5 pt-0.5' }, actions, viewBtn));
 
     return h('div', {
-      className: cx('bg-card overflow-hidden flex flex-col',
-        isPanel ? 'rounded-t-3xl md:rounded-3xl' : 'rounded-2xl shadow-sm transition-shadow hover:shadow-md'),
+      className: 'bg-card overflow-hidden flex flex-col rounded-2xl shadow-sm transition-shadow hover:shadow-md',
       style: { border: '1.5px solid ' + hex + '55' },
       'data-entity-card': item.type,
     }, head, body);

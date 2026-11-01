@@ -22,7 +22,7 @@ const nav = (page: Page) => page.locator("[data-mv2='nav']");
 const toggle = (page: Page) => page.locator("[data-mv2='nav-toggle']");
 const explore = (page: Page) => page.locator("[data-mv2='explore']");
 const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
-// the old map's fixed bottom bar (shell.jsx BottomNav), not the sidebar's nav
+// the fixed bottom bar the old map had (deleted with it, issue #179): it must never come back
 const oldBar = (page: Page) => page.locator("nav.fixed.bottom-0");
 const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 
@@ -98,7 +98,7 @@ test.describe("on a phone", () => {
     expect(Math.abs(b.x + b.width / 2 - 375 / 2)).toBeLessThan(2);
     expect(812 - (b.y + b.height)).toBeLessThan(40);
     await expect(toggle(page)).toHaveCSS("border-radius", /px/);
-    await expect(toggle(page)).toHaveCSS("border-top-color", "rgb(201, 168, 76)"); // --accent, the one gold
+    await expect(toggle(page)).toHaveCSS("border-top-color", "rgb(242, 189, 34)"); // --accent, the one gold
     await expect(toggle(page)).toHaveAccessibleName("Open navigation");
   });
 
@@ -220,7 +220,7 @@ test.describe("on a phone", () => {
     const withCat = explore(page).locator("[data-mv2='card2'][data-cat]").first();
     await expect(withCat).toBeVisible();
     const edge = await withCat.evaluate((e) => getComputedStyle(e).borderTopColor);
-    expect(edge).not.toBe("rgb(201, 168, 76)");
+    expect(edge).not.toBe("rgb(242, 189, 34)");
     // #210 part 3: See all opens the Discover page (e2e/map-v2-discover.spec.ts)
     await explore(page).getByRole("button", { name: "See all listings" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
@@ -238,7 +238,7 @@ test.describe("on a phone", () => {
     const cardBox = (await card.locator("[data-mv2='card2']").boundingBox())!;
     const other = (await explore(page).locator("[data-explore-id]:not([data-selected]) [data-mv2='card2']").first().boundingBox())!;
     expect(Math.abs(cardBox.height - other.height)).toBeLessThan(1);
-    await expect(card.locator("[data-mv2='card2']")).toHaveCSS("box-shadow", /rgb\(139, 105, 20\)/); // --accent-ink ring
+    await expect(card.locator("[data-mv2='card2']")).toHaveCSS("box-shadow", /rgb\(131, 97, 0\)/); // --accent-ink ring
     await expect(sheet(page)).toHaveCount(0);
     // the row brought it to the start, fully on screen
     await expect.poll(async () => { const c = (await card.boundingBox())!; return c.x >= 0 && c.x + c.width <= 375; }, { timeout: 8000 }).toBe(true);
@@ -418,13 +418,6 @@ test.describe("on a phone", () => {
     await toggle(page).tap();
     await expect(nav(page).locator("[data-mv2='nav-bar']")).toHaveCSS("animation-duration", "0s");
     await expect(page.locator("[data-mv2='nav-dim']")).toHaveCSS("animation-duration", "0s");
-  });
-
-  test("the old map (?map=v1) keeps its bottom bar and has no folding nav or row", async ({ page }) => {
-    await open(page, "/?map=v1");
-    await expect(oldBar(page)).toBeVisible();
-    await expect(toggle(page)).toHaveCount(0);
-    await expect(explore(page)).toHaveCount(0);
   });
 });
 

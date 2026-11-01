@@ -379,8 +379,8 @@ describe("where the button is wired", () => {
     expect(html.indexOf("app/report.jsx")).toBeLessThan(html.indexOf("app/auth.jsx"));
     expect(build.indexOf("'ui.jsx'")).toBeLessThan(build.indexOf("'report.jsx'"));
     expect(build.indexOf("'report.jsx'")).toBeLessThan(build.indexOf("'auth.jsx'"));
-    expect(html).toContain("app/report.jsx?v=20261019e");
-    expect(html).toContain('href="assets/report.css?v=20261019e"');
+    expect(html).toContain("app/report.jsx?v=20261026a");
+    expect(html).toContain('href="assets/report.css?v=20261026a"');
     expect(html).not.toContain("map-v2.css");
   });
 
@@ -417,20 +417,19 @@ describe("the dialog stylesheet", () => {
     return text.slice(i, j);
   };
 
-  it("uses the Map v2 tokens, and only supplies them when the old map has set no theme", () => {
+  it("reads the Map v2 tokens and defines none of its own", () => {
     const report = read("src/frontend/assets/report.css");
     const map = read("src/frontend/assets/map-v2.css");
     expect(report).not.toMatch(/:root\s*\{/);
+    expect(report).not.toContain("html:not([data-theme])");
+    expect(report).not.toMatch(/--[\w-]+\s*:/); // no custom property is declared here, only read
     expect(map).not.toContain("[data-mv2='report']");
     expect(map).not.toContain("[data-mv2='report-reason']");
-    const light = decls(between(report, "html:not([data-theme]) {", "@media (prefers-color-scheme: dark)"));
-    const dark = decls(between(report, "@media (prefers-color-scheme: dark)", "@media (prefers-reduced-motion"));
+    // every token the dialog reads is declared by the Map v2 stylesheet (light base)
+    const used = new Set([...report.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]));
     const mapLight = decls(between(map, ":root {", "/* ── 2. Tokens: dark"));
-    const mapDark = decls(between(map, "[data-theme='dark'] {", "/* ── 3. Reduced motion"));
-    expect(light.size).toBeGreaterThan(10);
-    expect(dark.size).toBeGreaterThan(5);
-    for (const [name, value] of light) expect(mapLight.get(name), name).toBe(value);
-    for (const [name, value] of dark) expect(mapDark.get(name), name).toBe(value);
+    expect(used.size).toBeGreaterThan(10);
+    for (const name of used) expect(mapLight.has(name.slice(2)), name).toBe(true);
     const components = report.slice(report.indexOf("/* ── Dialog"));
     expect(components).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     const px = [...components.matchAll(/(?<![\w.-])(\d+(?:\.\d+)?)px\b/g)].map((m) => m[1]).filter((n) => n !== "0" && n !== "1");

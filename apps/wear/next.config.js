@@ -1,4 +1,10 @@
 const path = require('path');
+const { basePathFromEnv } = require('@citizens/ecosystem');
+
+// Where this app is served on the shared domain: '' (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// '/citizens/wear' serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule").
+const basePath = basePathFromEnv('wear');
 
 const SUPABASE_HOST = 'xyiajtrvhlxaeplsiajj.supabase.co';
 
@@ -40,6 +46,9 @@ function contentSecurityPolicy() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // the "/" redirect, the headers, public/ files, _next and /api with it.
+  ...(basePath ? { basePath } : {}),
   // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
   // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
   // the block if it is there. See apps/connect/RESUME_HERE.md, C38.

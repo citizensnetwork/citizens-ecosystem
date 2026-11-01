@@ -8,8 +8,7 @@
 //  back after IDLE_MS without a touch, a click or a key, or on a tap outside, Escape or Back.
 //  The folded button shows a small dot (and says so in its name) when anything is unread.
 //
-//  Wide screens keep the sidebar (shell.jsx); this draws nothing there. The old map (?map=v1) keeps the old
-//  bottom bar: shell.jsx picks one or the other.
+//  Wide screens keep the sidebar (shell.jsx); this draws nothing there. There is no bottom bar any more.
 //  Styles: assets/map-v2.css section 4l (tokens only). Text: MapV2Strings.nav.
 // ════════════════════════════════════════════════════════════════════
 (function () {

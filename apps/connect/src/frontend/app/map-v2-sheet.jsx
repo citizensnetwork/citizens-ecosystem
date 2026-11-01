@@ -539,7 +539,7 @@
     const org = !isContributor && item.organizerId ? contributors.find((c) => c.id === item.organizerId) : null;
     const name = item.title || item.name || '';
     const cat = window.DATA.getItemCategory(Object.assign({}, item, { type }));
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F2BD22';
     const catLabel = cat ? cat.name : ((isContributor && window.MapV2Strings.pin.kind[item.kind]) || window.MapV2Strings.pin.type[type]);
     const avatarSrc = isContributor ? item.profilePhoto : org && org.profilePhoto;
     const avatarName = isContributor ? name : org && org.name;
@@ -843,7 +843,7 @@
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
-        url: window.MapV2QR.PUBLIC_ORIGIN + '/c/' + item.slug, name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
+        url: window.MapV2QR.PUBLIC_ORIGIN + (window.CC_ROUTES ? window.CC_ROUTES.appUrl('/c/' + item.slug) : '/c/' + item.slug), name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
       }), document.body),
       // rendered into <body>: a position:fixed box inside the sheet would be fixed to the sheet's own transform
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {

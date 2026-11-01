@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════
-   Citizens Connect — Map v2 design tokens and styles (flag ?map=v2 only)
+   Citizens Connect — Map v2 design tokens and styles
    ------------------------------------------------------------------
-   Loaded by app/map-v2-lib.jsx ONLY when the flag is on, so the v1 page
-   never requests it. Bump the ?v= in map-v2-lib.jsx when this file changes.
+   Loaded by app/map-v2-lib.jsx on every page. Bump the ?v= (CSS_HREF) in
+   map-v2-lib.jsx when this file changes.
 
    RULE (tracker P1-02): every raw colour and every px value lives in the
    token blocks below. The component rules further down read var(--…) only
@@ -33,9 +33,9 @@
   --text-2: #5c5444;
 
   /* accent: a fill with a near-black label; gold ink for text, rings, icons */
-  --accent: #c9a84c;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
-  --accent-ink: #8b6914;
+  --accent-ink: #836100;
 
   /* status: always paired with text, never colour alone */
   --ok: #1e6b3c;
@@ -49,7 +49,7 @@
   --pin-label-halo: rgba(255, 255, 255, 0.95);
 
   /* focus ring, dividers, dimming behind a stacked menu */
-  --focus-ring: #8b6914;
+  --focus-ring: #836100;
   --divider: rgba(10, 9, 8, 0.12);
   --scrim: rgba(10, 9, 8, 0.4);
 
@@ -84,7 +84,7 @@
   --lh-3: 24px;
   --fw-regular: 400;
   --fw-semibold: 600;
-  /* z-index: the app's real stacking (bottom nav 50, the v1 preview 120, modals 200, toasts 400) */
+  /* z-index: the app's real stacking (bottom nav 50, the Impact Idea preview 120, modals 200, toasts 400) */
   --z-sticky: 1;             /* local lift: a sticky bar paints above the content in its own block */
   --z-pin: 10;
   --z-controls: 20;
@@ -119,7 +119,7 @@
   --sheet-full-h: calc(90dvh - env(safe-area-inset-top, 0px));
   --sheet-panel-w: 380px;
   --sheet-touch-max-w: 640px;
-  --sheet-panel-top: 112px;          /* clears the v1 search and category row (measured: it ends at about 104 px) */
+  --sheet-panel-top: 112px;          /* clears the search and category row (measured: it ends at about 104 px) */
   --handle-w: 36px;
   --handle-h: 4px;
   --avatar-peek: 40px;
@@ -153,7 +153,7 @@
   --explore-bg: rgba(255, 255, 255, 0.96);  /* the Explore panel: nearly solid and NOT blurred (a large blur re-renders every pan frame) */
   --glass-blur: 16px;
   --nav-dim: rgba(10, 9, 8, 0.18);          /* the map fades back a little while the nav is open */
-  --accent-soft: rgba(201, 168, 76, 0.26);  /* the selected nav item's soft gold highlight */
+  --accent-soft: rgba(242, 189, 34, 0.26);  /* the selected nav item's soft gold highlight */
   --select-w: 3px;                          /* the gold ring of the nav button and a selected Explore card */
   --nav-btn: 56px;                          /* the folded nav: one round button */
   --nav-zone: calc(var(--nav-btn) + var(--space-3) * 2 + env(safe-area-inset-bottom, 0px));
@@ -175,15 +175,15 @@
   --surface-1: #1a1714;
   --surface-2: #26221d;
   --card-bg: #ffffff;
-  --map-bg: #292929;              /* what the map shows before its tiles arrive (v1's is warm beige) */
+  --map-bg: #292929;              /* what the map shows before its tiles arrive (the old map's was warm beige) */
   --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
 
   --text-1: #f7f4ee;
   --text-2: #b9ae9a;
 
-  --accent: #c9a84c;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
-  --accent-ink: #e8d48b;
+  --accent-ink: #f2bd22;
 
   --ok: #62d68f;
   --closed: #ff8f80;
@@ -194,7 +194,7 @@
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
 
-  --focus-ring: #e8d48b;
+  --focus-ring: #f2bd22;
   --divider: rgba(247, 244, 238, 0.14);
   --scrim: rgba(0, 0, 0, 0.55);
 
@@ -213,7 +213,7 @@
   --glass-bg: rgba(26, 23, 20, 0.84);
   --explore-bg: rgba(26, 23, 20, 0.96);
   --nav-dim: rgba(0, 0, 0, 0.32);
-  --accent-soft: rgba(201, 168, 76, 0.3);
+  --accent-soft: rgba(242, 189, 34, 0.3);
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
@@ -1527,7 +1527,7 @@
 }
 
 /* ── 4g. The Moment menu on the sheet. The report dialog itself is assets/report.css,
-      which loads on both maps, so a report on ?map=v1 is not an unstyled card. ── */
+      which reads these tokens. ── */
 [data-mv2='menu-wrap'] {
   position: relative;
   flex: none;

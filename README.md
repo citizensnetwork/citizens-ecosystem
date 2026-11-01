@@ -28,6 +28,7 @@ apps/
   wear/            Citizens Wear
 packages/
   frontend-build/  @citizens/frontend-build — shared esbuild static-frontend pipeline
+  ecosystem/       @citizens/ecosystem — where each app lives on the shared domain (/citizens/<app>)
   connect-client/  @citizens/connect-client — typed client for Connect's /api/v1
   db/              @citizens/db — Wear store contract + memory reference impl
   ui/              @citizens/ui — design tokens (Wear)

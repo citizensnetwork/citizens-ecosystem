@@ -16,6 +16,7 @@
     "build:frontend": "node scripts/build-frontend.js"
   },
   "dependencies": {
+    "@citizens/ecosystem": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
     "@citizens/utils": "workspace:*",
     "@supabase/ssr": "^0.12.7",

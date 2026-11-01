@@ -9,10 +9,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetRateLimitStore } from "@/lib/rate-limit";
 
-// Mock the server Supabase client. `resolveApiKey` only calls `.rpc`.
+// `resolveApiKey` calls the RPC on the service-role client (migration 200).
 const rpcMock = vi.fn();
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ rpc: rpcMock }),
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({ rpc: rpcMock }),
 }));
 
 // Force in-memory path (no Upstash env).
@@ -68,6 +68,9 @@ describe("gateV1", () => {
     const result = await gateV1(req, { bucket: "keyed" });
     expect(result.key?.id).toBe("k1");
     expect(result.deny).toBeUndefined();
+    expect(rpcMock).toHaveBeenCalledWith("resolve_api_key", {
+      p_raw_key: "cck_live_abcdef12345678901234",
+    });
   });
 
   it("ignores non-cck tokens and falls back to anonymous", async () => {

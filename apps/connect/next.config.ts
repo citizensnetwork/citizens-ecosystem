@@ -19,7 +19,25 @@ const APP_PAGES = [
   "settings", "apply", "onboarding", "dashboard", "admin",
 ];
 
+// Where this app is served on the shared domain: "" (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// "/citizens/connect" serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule"). The rule is packages/ecosystem's resolveBasePath. This file
+// cannot import it (see the note at the top), so it is copied here, and
+// src/__tests__/frontend/basePath.test.ts fails if the copy and the package ever disagree.
+const BASE_PATH = "/citizens/connect";
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").trim();
+if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") !== BASE_PATH) {
+  throw new Error(
+    `[ecosystem] NEXT_PUBLIC_BASE_PATH=${JSON.stringify(rawBasePath)} is not valid for "connect": ` +
+      `leave it unset to serve from the site root, or set it to exactly "${BASE_PATH}".`,
+  );
+}
+const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
+
 const nextConfig: NextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // rewrites, headers, public/ files, _next and /api with it; the explicit rewrites below need no change.
+  ...(basePath ? { basePath } : {}),
   // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
   // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
   // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
@@ -54,6 +72,9 @@ const nextConfig: NextConfig = {
   // right screen, so a refresh keeps you where you were and a link can be shared.
   // (index.html loads its scripts through <base href="/">, so a nested path such as
   // /e/<id> cannot break them; that is why /c/<slug> used to have to REDIRECT.)
+  // Under a basePath every source below is served under the prefix (/citizens/connect/e/<id>), the build
+  // writes <base href="/citizens/connect/"> instead, and the frontend (routes.jsx stripBase / withBase,
+  // C39 PR B) converts between the address bar and the app-relative paths of this table.
   //
   // The list is EXPLICIT on purpose, and must never become a catch-all: that would
   // shadow /api/*, /auth/*, /_next/* and every static file. An unknown path keeps
@@ -81,7 +102,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // `/:path*`, NOT `/(.*)`: under a basePath Next prefixes the pattern, and `/citizens/connect/(.*)` needs a
+        // slash after the prefix, so the bare `/citizens/connect` (the app's front door) got no headers at all.
+        // `/:path*` matches the bare prefix too. Pinned by src/__tests__/frontend/basePath.test.ts.
+        source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },

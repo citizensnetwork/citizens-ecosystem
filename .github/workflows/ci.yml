@@ -119,6 +119,21 @@ jobs:
           path: apps/connect/playwright-report/
           retention-days: 7
 
+      # The same app built and served under /citizens/connect (NEXT_PUBLIC_BASE_PATH), a 30-test smoke of
+      # routing, history, share links, sign-in return and "no request fails". It runs after the root suite, never
+      # beside it: both modes write the one generated public/ (apps/connect/playwright.base-path.config.ts).
+      # About 2.5 minutes. The prefix is not set on any Vercel project yet (C39, PR D).
+      - name: Run Connect e2e under /citizens/connect
+        run: pnpm --filter citizens-connect test:e2e:base-path
+
+      - name: Upload Playwright report (prefix mode)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-connect-base-path
+          path: apps/connect/playwright-report-base-path/
+          retention-days: 7
+
   # Vision's suite is hermetic: a reserved .test Supabase host, mocked
   # config.js / API / map tiles (apps/vision/e2e/support/app-shell.ts),
   # no secrets and no auth cookie. Signed-out requests do not call that host.

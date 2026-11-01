@@ -422,13 +422,17 @@ export function validateSuggestionEdit(
   return validateSuggestion(kind, merged, sourceUrl, now);
 }
 
-/** Events only, only at `events_auto`, and only if it has not started yet. */
+/**
+ * Events only, only at `events_auto`, and only if it has not started yet. Never a Care / Recovery
+ * event (founder decision 2026-10-21, issue #202): those wait for the owner, whatever the level.
+ */
 export function isAutoPublishable(
   level: AutoUpdateLevel,
   suggestion: { kind: SuggestionKind; payload: SuggestionPayload },
   now: Date = new Date(),
 ): boolean {
   if (level !== "events_auto" || suggestion.kind !== "event") return false;
+  if ((suggestion.payload as EventPayload).category === "care-recovery") return false;
   const start = Date.parse((suggestion.payload as EventPayload).start);
   return Number.isFinite(start) && start > now.getTime();
 }

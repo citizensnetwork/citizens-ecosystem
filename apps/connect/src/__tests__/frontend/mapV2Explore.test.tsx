@@ -455,11 +455,12 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261030a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101a");
   });
 
-  it("keeps the old map's bottom bar: the folding nav only replaces it under Map v2", () => {
+  it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("window.isMapV2 && window.isMapV2() && window.MapV2Nav ? window.MapV2Nav : BottomNav");
+    expect(shell).toContain("React.createElement(window.MapV2Nav)");
+    expect(shell).not.toContain("BottomNav");
   });
 });
