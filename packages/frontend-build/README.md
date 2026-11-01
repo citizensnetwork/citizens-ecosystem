@@ -44,7 +44,7 @@ buildFrontend({
       key: 'API_BASE_URL',
       env: 'NEXT_PUBLIC_API_BASE_URL',
       mobileEnv: 'MOBILE_API_BASE_URL',
-      mobileDefault: 'https://citizens-wear.vercel.app',
+      mobileDefault: 'https://citizens-ecosystem-wear.vercel.app',
     },
   ],
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'],
@@ -107,6 +107,31 @@ the hash from the error. Sanity-check that the CDN serves the same bytes:
   mobile build's `mobileEnv` vars, which resolve `env || mobileDefault` and
   deliberately **ignore** the local fallback: a store build must never point
   at a localhost API base.
+
+## Mobile-only and validated config values
+
+Two `configVars` options, for values that only a store build needs and that end up
+in links people share (Connect's native share and QR links use them):
+
+```js
+{
+  key: 'PUBLIC_ORIGIN',
+  env: 'MOBILE_PUBLIC_ORIGIN', // never read for a mobileOnly var; same name as mobileEnv
+  mobileEnv: 'MOBILE_PUBLIC_ORIGIN',
+  mobileDefault: 'https://www.citizenscentral.co.za',
+  mobileOnly: true,
+  validate: 'https-origin',
+}
+```
+
+- `mobileOnly: true` leaves the key out of a **web** `config.js` entirely, so adding
+  one never changes a web build's bytes. It needs a `mobileEnv`.
+- `validate` checks the resolved value whichever source it came from (env, default)
+  and fails the build, before anything is written, naming the key and the env var.
+  `'https-origin'` is `https://219.co.za` (lower-case host with a dot; no port, path,
+  query, credentials or trailing slash). `'base-path'` is `/citizens/connect` (the
+  same pattern `basePath` uses). An empty value is never checked: it means "unset".
+  `isHttpsOrigin` and `isBasePath` are exported for callers that need the same test.
 
 ## `basePath`: serving under `/citizens/<app>`
 

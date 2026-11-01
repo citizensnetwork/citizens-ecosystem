@@ -35,6 +35,21 @@ export interface ConfigVar {
   mobileEnv?: string;
   /** Mobile-build fallback for `mobileEnv`, e.g. the app's production origin. */
   mobileDefault?: string;
+  /**
+   * Emit this key in a mobile build only. A web build leaves it out of config.js
+   * entirely, so adding one never changes a web build's output. Needs `mobileEnv`;
+   * `env` is never read for such a var (give it the same name as `mobileEnv`).
+   */
+  mobileOnly?: boolean;
+  /**
+   * Check the resolved value, whichever source it came from; the build throws, naming
+   * the key and the env var, when a non-empty value is not of this shape:
+   *  - "https-origin": `https://219.co.za` (lower-case host, no port, path, query,
+   *    credentials or trailing slash);
+   *  - "base-path": `/citizens/connect` (lower-case segments, no trailing slash).
+   * Use it for values that land in config.js and in links people share.
+   */
+  validate?: 'https-origin' | 'base-path';
 }
 
 export interface BuildFrontendOptions {
@@ -122,11 +137,18 @@ export declare function buildFrontend(options: BuildFrontendOptions): BuildFront
 /** First 10 hex chars of the content's SHA-256 — the content-hash used in filenames. */
 export declare function hashOf(content: string): string;
 
+/** True for a public https origin such as "https://219.co.za" (see ConfigVar.validate). */
+export declare function isHttpsOrigin(value: unknown): boolean;
+
+/** True for a non-empty final base path such as "/citizens/connect" (see ConfigVar.validate). */
+export declare function isBasePath(value: unknown): boolean;
+
 /** Render the generated config.js source (pure). */
 export declare function renderConfigJs(envGlobalName: string, cfg: Record<string, string>): string;
 
 /**
  * Resolve the config.js values (pure) — see ConfigVar for precedence rules.
+ * Skips `mobileOnly` vars on a web build and throws on a value that fails its `validate`.
  * With a web `basePath`, an empty API_BASE_URL becomes the prefix and BASE_PATH
  * is appended as the last key; without one (or on mobile) nothing changes.
  */

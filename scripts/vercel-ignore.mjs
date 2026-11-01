@@ -12,7 +12,7 @@
  * path, or a workspace graph it could not read), it builds. A thrown error
  * also exits 1. Production code is never skipped by mistake.
  *
- *   node scripts/vercel-ignore.mjs connect|vision|wear
+ *   node scripts/vercel-ignore.mjs connect|vision|wear|hub
  */
 
 import { execFileSync } from 'node:child_process';
@@ -20,7 +20,7 @@ import { readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const APPS = ['connect', 'vision', 'wear'];
+export const APPS = ['connect', 'vision', 'wear', 'hub'];
 
 const APP_DEP_FIELDS = [
   'dependencies',

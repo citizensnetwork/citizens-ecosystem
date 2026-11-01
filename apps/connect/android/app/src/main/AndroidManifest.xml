@@ -22,12 +22,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep linking: open app from citizensconnect.app URLs -->
+            <!-- Deep linking: open the app from Connect's public web address, https://219.co.za/citizens/connect/...
+                 (the one-domain move, RESUME_HERE A19/C39). This entry used to name citizensconnect.app, a
+                 domain nobody has registered (it does not resolve), so it could never verify.
+                 It only verifies once https://219.co.za/.well-known/assetlinks.json is served at the domain ROOT,
+                 listing this app's package and release-signing certificate; the front door (apps/hub) owns
+                 that file. Steps: docs/MOBILE_LAUNCH_RUNBOOK.md, "Native web address". -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="citizensconnect.app" />
+                <data android:scheme="https" android:host="219.co.za" android:pathPrefix="/citizens/connect" />
             </intent-filter>
 
             <!-- Custom URL scheme: citizensconnect:// -->
