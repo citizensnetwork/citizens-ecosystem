@@ -39,7 +39,9 @@ export default defineConfig({
     command: `node scripts/build-frontend.js && next dev -p ${PORT}`,
     // Under a basePath the site root is a 404, so wait on the app's own front door.
     url: `http://localhost:${PORT}${BASE_PATH}`,
-    env: { NEXT_PUBLIC_BASE_PATH: BASE_PATH },
+    // HUB_ORIGIN_CONNECT: the old-address rule rewrites /api/* to the app's OWN production address (Next refuses a
+    // path destination), so a test must point it at this very server or it would call the live site.
+    env: { NEXT_PUBLIC_BASE_PATH: BASE_PATH, HUB_ORIGIN_CONNECT: `http://localhost:${PORT}` },
     reuseExistingServer: false,
     timeout: 120_000,
   },
