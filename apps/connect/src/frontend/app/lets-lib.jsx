@@ -2,14 +2,17 @@
 //  Citizens Connect — "Let's…" gatherings (issue #313, stages 1 and 2)
 //  ------------------------------------------------------------------
 //  Eight starters. Each one presets an existing event category and marks
-//  the row lets_starter so the citizen cap (migration 037, exemption in
-//  202) does not count it. Stage 3 (a generated daily "I'm in") is not
-//  here. Labels are data, the same way category names are data.
+//  the row lets_starter. A citizen may create 4 of those per rolling
+//  window (migration 202). Ordinary community events keep their own cap
+//  (migration 037, default 1 per 30 days) and Let's rows are not counted
+//  in it. Stage 3 (a generated daily "I'm in") is not here. Labels are
+//  data, the same way category names are data.
 //
-//  communityInsertBlocked mirrors events_enforce_community_rate_limit
-//  after migration 202. recentNonLets is how many ordinary community
-//  events this citizen already created inside the window. Let's rows
-//  are not included in that number, and a known starter is never blocked.
+//  communityInsertBlocked and letsUpdateBlocked mirror
+//  events_enforce_community_rate_limit after migration 202.
+//  recentNonLets is ordinary community events in the window.
+//  recentLets is Let's rows in the window. A non-admin cannot change
+//  the marker or the category of a Let's row.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const STARTERS = [
@@ -31,17 +34,38 @@
     return null;
   }
 
+  const LETS_CAP = 4;
+
   /**
-   * True when this insert must be refused. role 'citizen' and no known
-   * starter, and recentNonLets is already at the cap (default 1).
+   * True when this insert must be refused.
+   * A citizen with a known starter is refused once recentLets is at 4.
+   * A citizen without one is refused once recentNonLets is at the ordinary cap (default 1).
+   * Contributors and admins are never refused. An unknown marker is not a Let's row.
    */
   function communityInsertBlocked(input) {
     const row = input || {};
     if (row.role !== 'citizen') return false;
-    if (starterById(row.letsStarter)) return false;
+    if (starterById(row.letsStarter)) {
+      const letsLimit = Number.isFinite(row.letsLimit) && row.letsLimit >= 1 ? row.letsLimit : LETS_CAP;
+      const recentLets = Number.isFinite(row.recentLets) && row.recentLets > 0 ? row.recentLets : 0;
+      return recentLets >= letsLimit;
+    }
     const limit = Number.isFinite(row.limit) && row.limit >= 1 ? row.limit : 1;
     const recent = Number.isFinite(row.recentNonLets) && row.recentNonLets > 0 ? row.recentNonLets : 0;
     return recent >= limit;
+  }
+
+  /**
+   * True when a non-admin update must be refused. The marker cannot change.
+   * On a Let's row the category cannot change either. Title and description are not looked at.
+   */
+  function letsUpdateBlocked(input) {
+    const row = input || {};
+    if (row.actor === 'admin' || row.actor === 'service_role') return false;
+    const nextMarker = Object.prototype.hasOwnProperty.call(row, 'nextLetsStarter') ? row.nextLetsStarter : row.letsStarter;
+    if ((nextMarker || '') !== (row.letsStarter || '')) return true;
+    if (starterById(row.letsStarter) && row.nextCategory != null && row.nextCategory !== row.category) return true;
+    return false;
   }
 
   function upcomingLets(events, now) {
@@ -100,7 +124,9 @@
   window.LETS = {
     STARTERS: STARTERS,
     starterById: starterById,
+    LETS_CAP: LETS_CAP,
     communityInsertBlocked: communityInsertBlocked,
+    letsUpdateBlocked: letsUpdateBlocked,
     upcomingLets: upcomingLets,
     fromApiRow: fromApiRow,
     mergeActivities: mergeActivities,

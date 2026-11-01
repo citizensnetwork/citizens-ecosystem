@@ -119,9 +119,9 @@
       h('p', { 'data-mv2': 'lets-pick-hint' }, f.letsStarter ? letsCopy.cap : letsCopy.preset)) : null;
     const Basics = h(F, null,
       starterPick,
-      lockedStarter ? h('p', { 'data-mv2': 'lets-locked' }, lockedStarter.label + '. ' + (letsCopy.locked || '')) : null,
+      lockedStarter ? h('p', { 'data-mv2': 'lets-locked' }, lockedStarter.label) : null,
       h(Field, { label: isEvent ? 'Event title' : 'Place name', required: true }, h(Input, { value: isEvent ? f.title : f.name, onChange: (e) => up(isEvent ? 'title' : 'name', e.target.value), placeholder: isEvent ? 'e.g. Sunday Glory Service' : 'e.g. Grace City Café' })),
-      h(Field, { label: 'Category', required: true, hint: 'Sets your colour & icon on the map.' }, h(CatGrid, { list: isEvent ? window.DATA.EVENT_CATEGORIES : window.DATA.PLACE_CATEGORIES, value: f.category, onChange: (v) => (isEvent ? pickCategory(v) : up('category', v)) })),
+      h(Field, { label: 'Category', required: true, hint: lockedStarter ? letsCopy.locked : 'Sets your colour & icon on the map.' }, h(CatGrid, { list: isEvent ? window.DATA.EVENT_CATEGORIES : window.DATA.PLACE_CATEGORIES, value: f.category, onChange: (v) => { if (lockedStarter) return; if (isEvent) pickCategory(v); else up('category', v); } })),
       h(Field, { label: 'Description' }, h(Textarea, { value: f.description, rows: 3, onChange: (e) => up('description', e.target.value), placeholder: 'Tell citizens what to expect…' })));
 
     const When = h(F, null,

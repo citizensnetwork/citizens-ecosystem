@@ -13,7 +13,9 @@ type Starter = { id: string; label: string; category: string; icon: string };
 type LetsApi = {
   STARTERS: Starter[];
   starterById: (id: unknown) => Starter | null;
-  communityInsertBlocked: (input: { role?: string; letsStarter?: string; recentNonLets?: number; limit?: number }) => boolean;
+  LETS_CAP: number;
+  communityInsertBlocked: (input: { role?: string; letsStarter?: string; recentNonLets?: number; recentLets?: number; limit?: number; letsLimit?: number }) => boolean;
+  letsUpdateBlocked: (input: { actor?: string; letsStarter?: string; nextLetsStarter?: string | null; category?: string; nextCategory?: string | null }) => boolean;
   upcomingLets: (events: unknown[], now?: number) => { id: string; title: string }[];
   fromApiRow: (row: unknown) => { id: string; letsStarter: string } | null;
   mergeActivities: (local: { id: string; title?: string }[], remote: { id: string; title?: string }[]) => { id: string; title?: string }[];
@@ -80,23 +82,36 @@ describe("the citizen cap", () => {
   const blocked = (over: Record<string, unknown>) =>
     L.communityInsertBlocked({ role: "citizen", recentNonLets: 1, limit: 1, ...over });
 
-  it("blocks a second ordinary event and lets a Let's event through", () => {
+  it("keeps the ordinary cap at one and caps Let's rows at four", () => {
+    expect(L.LETS_CAP).toBe(4);
     expect(L.communityInsertBlocked({ role: "citizen", recentNonLets: 0, limit: 1 })).toBe(false);
     expect(blocked({})).toBe(true);
-    expect(blocked({ letsStarter: "pray", recentNonLets: 5 })).toBe(false);
-    expect(blocked({ letsStarter: "flashmob" })).toBe(false);
+    expect(blocked({ letsStarter: "pray", recentNonLets: 5, recentLets: 0 })).toBe(false);
+    expect(blocked({ letsStarter: "pray", recentLets: 3 })).toBe(false);
+    expect(blocked({ letsStarter: "flashmob", recentLets: 4 })).toBe(true);
+    expect(L.communityInsertBlocked({ role: "citizen", letsStarter: "coffee", recentLets: 4 })).toBe(true);
   });
 
   it("does not treat an unknown marker as a Let's event, and does not cap a contributor", () => {
     expect(blocked({ letsStarter: "spam" })).toBe(true);
     expect(blocked({ letsStarter: "" })).toBe(true);
-    expect(L.communityInsertBlocked({ role: "contributor", recentNonLets: 9, limit: 1 })).toBe(false);
-    expect(L.communityInsertBlocked({ role: "admin", recentNonLets: 9 })).toBe(false);
+    expect(L.communityInsertBlocked({ role: "contributor", recentNonLets: 9, recentLets: 9, letsStarter: "pray" })).toBe(false);
+    expect(L.communityInsertBlocked({ role: "admin", recentNonLets: 9, recentLets: 9 })).toBe(false);
     expect(L.communityInsertBlocked({})).toBe(false);
   });
 
-  it("ignores Let's rows in the count the caller passes (they are not recentNonLets)", () => {
-    expect(L.communityInsertBlocked({ role: "citizen", recentNonLets: 0, limit: 1, letsStarter: "" })).toBe(false);
+  it("does not let Let's rows consume the ordinary cap", () => {
+    expect(L.communityInsertBlocked({ role: "citizen", recentNonLets: 0, recentLets: 4, limit: 1, letsStarter: "" })).toBe(false);
+  });
+
+  it("rejects a category change or a cleared marker on a Let's row, and allows a title edit", () => {
+    const row = { letsStarter: "pray", category: "worship-prayer" };
+    expect(L.letsUpdateBlocked({ ...row, nextCategory: "sport-recreation" })).toBe(true);
+    expect(L.letsUpdateBlocked({ ...row, nextLetsStarter: "" })).toBe(true);
+    expect(L.letsUpdateBlocked({ ...row, nextLetsStarter: null })).toBe(true);
+    expect(L.letsUpdateBlocked({ ...row })).toBe(false);
+    expect(L.letsUpdateBlocked({ ...row, nextCategory: "sport-recreation", actor: "admin" })).toBe(false);
+    expect(L.letsUpdateBlocked({ letsStarter: "", category: "church-services", nextCategory: "kids" })).toBe(false);
   });
 });
 

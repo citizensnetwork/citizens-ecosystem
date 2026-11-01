@@ -1273,8 +1273,10 @@
         } catch (e) {
           console.warn('[createEvent]', e);
           const msg = String((e && (e.message || e.details)) || '');
-          if (msg.indexOf('community_event_rate_limited') !== -1) {
-            toast('That is the limit on community events for now. A Let\'s gathering is not counted.', 'gold');
+          if (msg.indexOf('lets_event_rate_limited') !== -1) {
+            toast('You can start four Let\'s gatherings in 30 days.', 'gold');
+          } else if (msg.indexOf('community_event_rate_limited') !== -1) {
+            toast('You can share one community event in 30 days.', 'gold');
           } else {
             toast('Could not publish the event — please try again.', 'red');
           }

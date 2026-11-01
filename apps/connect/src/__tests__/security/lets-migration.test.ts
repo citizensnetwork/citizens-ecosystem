@@ -1,7 +1,7 @@
 /**
  * Migration 202 is a proposal. It is not applied here. These checks pin the
- * exemption, the empty search_path, and the anon revoke so a later edit cannot
- * quietly drop them. 201 stays free for issue #314.
+ * Let's cap, the category lock, the empty search_path, and the anon revoke
+ * so a later edit cannot quietly drop them. 201 stays free for issue #314.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -24,24 +24,41 @@ describe("migration 202 (not applied)", () => {
     expect(sql).toMatch(/Do not apply/);
   });
 
-  it("exempts a Let's row, still caps ordinary citizen events, and uses the same starter ids as the app", () => {
-    expect(sql).toMatch(/if new\.lets_starter is not null then/);
+  it("caps Let's rows at four, keeps the ordinary cap, and uses the same starter ids as the app", () => {
+    expect(sql).toMatch(/v_lets_cap int := 4/);
+    expect(sql).toMatch(/lets_event_rate_limited/);
+    expect(sql).toMatch(/e\.lets_starter is not null/);
     expect(sql).toMatch(/e\.lets_starter is null/);
     expect(sql).toMatch(/v_role is distinct from 'citizen'/);
     expect(sql).not.toMatch(/coalesce\(new\.community_contributor, false\) = false/);
     expect(sql).toMatch(/community_event_rate_limited/);
+    expect(sql).not.toMatch(/Let's gatherings are exempt/);
     const fromSql = [...sql.matchAll(/'(evangelise|run|pray|worship|social|clean-up|coffee|flashmob)'/g)].map((m) => m[1]);
     const fromLib = starterIds(lib);
     expect(fromSql).toEqual(fromLib);
     expect(new Set(fromSql).size).toBe(8);
   });
 
-  it("is security definer with an empty search_path, an auth.uid() guard, and no anon execute", () => {
+  it("rejects a category change and a marker change on a Let's row for a non-admin", () => {
+    expect(sql).toMatch(/new\.category is distinct from old\.category/);
+    expect(sql).toMatch(/lets_category_locked/);
+    expect(sql).toMatch(/new\.lets_starter is distinct from old\.lets_starter/);
+    expect(sql).toMatch(/lets_starter_locked/);
+    const probe = readFileSync(join(root, "docs/audit/probes/202_lets_gatherings.probe.sql"), "utf8");
+    expect(probe).toMatch(/fifth Let''s event/);
+    expect(probe).toMatch(/lets_event_rate_limited/);
+    expect(probe).toMatch(/ordinary cap is unchanged/);
+    expect(probe).toMatch(/lets_category_locked/);
+  });
+
+  it("is security definer with an empty search_path, one direct-call guard, and no anon execute", () => {
     expect(sql).toMatch(/security definer/i);
     expect(sql).toMatch(/set search_path = ''/);
     expect(sql).toMatch(/v_uid uuid := auth\.uid\(\)/);
     expect(sql).toMatch(/if v_uid is null then/);
-    expect(sql).toMatch(/raise exception 'not allowed'/);
+    expect(sql).toMatch(/if TG_OP is null then/);
+    expect(sql.match(/raise exception 'not allowed'/g)).toEqual(["raise exception 'not allowed'"]);
+    expect(sql).not.toMatch(/if v_uid is null then\s*raise exception 'not allowed'/);
     expect(sql).toMatch(/revoke all on function public\.events_enforce_community_rate_limit\(\) from public, anon, authenticated/);
     expect(sql).not.toMatch(/grant execute on function public\.events_enforce_community_rate_limit\(\) to (anon|authenticated)/);
     expect(sql).toMatch(/grant execute on function public\.events_enforce_community_rate_limit\(\) to service_role/);

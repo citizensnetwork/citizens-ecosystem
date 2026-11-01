@@ -11,21 +11,23 @@
 --  ("Open to collaborate"). This file is 202 so the two do not collide.
 --
 --  Issue #313. "Let's…" gatherings are ordinary events with a starter
---  id. Any signed-in citizen may create them, and they do not count
---  toward app_settings.community_event_rate_limit (1 public community
---  event per 30 days, migration 037). Other community events keep
---  that cap.
+--  id. Any signed-in citizen may create them. They have their own cap,
+--  separate from app_settings.community_event_rate_limit (migration
+--  037): 4 Let's rows per rolling window (the same day count as that
+--  setting, default 30). Ordinary community events stay at that
+--  setting (default 1 per 30 days) and Let's rows are not counted in
+--  it. Contributors and admins stay unlimited.
 --
 --  WHAT IT ADDS
 --   * public.events.lets_starter text, null or one of the eight starter
 --     ids. Null is an ordinary event. The check constraint is the list.
---   * The rate-limit trigger exempts a row whose lets_starter is set,
---     and counts only rows where lets_starter is null. A blank string
---     is stored as null so it cannot sneak past the cap.
---   * On update, a citizen cannot set or clear the marker. An admin
---     (public.is_admin()) or service_role can, so moderation can
---     reclassify a row later. The marker is how a limit can be put
---     back without a redesign.
+--   * A citizen insert with a starter is counted only against the
+--     Let's cap. A blank string is stored as null so it cannot sneak
+--     into that cap.
+--   * On update, a non-admin cannot change the marker (set, clear, or
+--     swap it) and cannot change category on a row that already has
+--     one. Title and description stay editable. An admin
+--     (public.is_admin()) or service_role can reclassify a row.
 --
 --  WHY THE CAP LOOKS AT THE CREATOR'S ROLE
 --   events_enforce_* sorts before events_set_community_flag (Postgres
@@ -78,7 +80,7 @@ alter table public.events
   );
 
 comment on column public.events.lets_starter is
-  'Let''s gathering starter (issue 313). Null is an ordinary event and counts toward app_settings.community_event_rate_limit. A known id is exempt. Non-admins cannot change it after insert.';
+  'Let''s gathering starter (issue 313). Null is an ordinary event and counts toward app_settings.community_event_rate_limit. A known id counts toward the separate Let''s cap (4 per window). Non-admins cannot change the marker or the category afterwards.';
 
 create index if not exists events_lets_public_date_idx
   on public.events (date)
@@ -97,25 +99,38 @@ declare
   v_role text;
   v_days int;
   v_count int;
+  v_lets_cap int := 4;
   v_recent int;
   v_cfg jsonb;
 begin
-  -- Not a trigger. Refuse a direct call. A missing JWT is not a way through.
+  -- Not a trigger. One guard: a direct call is refused whether or not a
+  -- JWT is present. A missing JWT on a real trigger does not skip the
+  -- cap; the creator's role is read below.
   if TG_OP is null then
-    if v_uid is null then
-      raise exception 'not allowed' using errcode = '42501';
-    end if;
     raise exception 'not allowed' using errcode = '42501';
   end if;
 
   if TG_OP = 'UPDATE' then
     if v_uid is null then
-      if coalesce(auth.role(), '') is distinct from 'service_role' then
-        new.lets_starter := old.lets_starter;
+      if coalesce(auth.role(), '') = 'service_role' then
+        return new;
       end if;
-    elsif not coalesce(public.is_admin(), false) then
-      new.lets_starter := old.lets_starter;
+    elsif coalesce(public.is_admin(), false) then
+      return new;
     end if;
+
+    -- The marker is chosen at insert. Clearing it would turn a Let's
+    -- row into an ordinary event that never used the ordinary cap.
+    if new.lets_starter is distinct from old.lets_starter then
+      raise exception 'lets_starter_locked: the Let''s marker cannot be changed.'
+        using errcode = '42501';
+    end if;
+
+    if old.lets_starter is not null and new.category is distinct from old.category then
+      raise exception 'lets_category_locked: the category of a Let''s gathering cannot be changed.'
+        using errcode = '42501';
+    end if;
+
     return new;
   end if;
 
@@ -125,13 +140,6 @@ begin
 
   if new.lets_starter is not null and btrim(new.lets_starter) = '' then
     new.lets_starter := null;
-  end if;
-
-  -- Let's gatherings are exempt and do not consume the citizen cap.
-  -- An id outside the check constraint never commits, so it cannot
-  -- persist as an unlimited ordinary event.
-  if new.lets_starter is not null then
-    return new;
   end if;
 
   -- A missing JWT does not skip the cap. The creator's role decides.
@@ -154,6 +162,23 @@ begin
     v_count := 1;
   end if;
 
+  if new.lets_starter is not null then
+    select count(*) into v_recent
+      from public.events e
+     where e.created_by = new.created_by
+       and e.lets_starter is not null
+       and e.created_at >= (pg_catalog.now() - pg_catalog.make_interval(days => v_days));
+
+    if v_recent >= v_lets_cap then
+      raise exception
+        'lets_event_rate_limited: citizens may create % Let''s gathering(s) per % day(s); please wait and try again.',
+        v_lets_cap, v_days
+        using errcode = 'P0001';
+    end if;
+
+    return new;
+  end if;
+
   select count(*) into v_recent
     from public.events e
    where e.created_by = new.created_by
@@ -173,7 +198,7 @@ end;
 $$;
 
 comment on function public.events_enforce_community_rate_limit() is
-  'Caps citizen community events from app_settings.community_event_rate_limit. A Let''s row (lets_starter set) is exempt and is not counted. Direct calls are refused. search_path is empty.';
+  'Caps citizen community events. Ordinary rows use app_settings.community_event_rate_limit. Let''s rows (lets_starter set) use a separate cap of 4 per the same day window and are not counted in the ordinary cap. Non-admins cannot change the marker or the category of a Let''s row. Direct calls are refused. search_path is empty.';
 
 revoke all on function public.events_enforce_community_rate_limit() from public, anon, authenticated;
 grant execute on function public.events_enforce_community_rate_limit() to service_role;

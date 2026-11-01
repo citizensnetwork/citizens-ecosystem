@@ -249,8 +249,8 @@
         retry: 'Try again',
         signIn: 'Sign in to start one',
         preset: 'Picks a category for the map.',
-        cap: 'A gathering started here skips the monthly cap.',
-        locked: 'This gathering keeps its starter.',
+        cap: 'Up to four of these in 30 days.',
+        locked: 'The category stays with this gathering.',
         loading: 'Loading gatherings',
       },
 
