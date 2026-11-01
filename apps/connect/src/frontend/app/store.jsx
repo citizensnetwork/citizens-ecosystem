@@ -2844,10 +2844,10 @@
       if (path === null) { toast('This page has no shareable link yet.', 'red'); return; }
       const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
       // The web link carries the prefix when the app is served under one (appUrl). The native shell is bundled
-      // at its own root (BASE_PATH is empty there), so its link is the bare public path, as before.
-      // TODO(C39 PR D, cutover): a native share must carry the web prefix too: give the mobile config a
-      // PUBLIC_BASE_PATH (see the PR description) once the public site lives under /citizens/connect.
-      const url = isNative ? 'https://www.citizenscentral.co.za' + path : window.location.origin + appUrl(path);
+      // at its own root, so its link is the public site's address from the mobile build's config.js
+      // (PUBLIC_ORIGIN + PUBLIC_BASE_PATH; today's https://www.citizenscentral.co.za until a build sets them).
+      const url = ROUTES.publicUrl(path, { native: isNative, webOrigin: window.location.origin });
+      if (url === null) { toast('This page has no shareable link yet.', 'red'); return; }
       try {
         if (navigator.share && /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent)) { await navigator.share({ url }); return; }
       } catch (e) {

@@ -28,7 +28,8 @@
 //  (NEXT_PUBLIC_BASE_PATH=/citizens/connect, C39). `stripBase` and `withBase` are the
 //  two crossings between that and the address bar, and are no-ops with an empty base.
 //  BASE_PATH is the one read of config.js's BASE_PATH key (written by @citizens/frontend-build
-//  only when a prefix is set); `appUrl` is `withBase` bound to it.
+//  only when a prefix is set); `appUrl` is `withBase` bound to it. `publicUrl` is the same crossing for a
+//  link someone else will open (a share, a QR code): see its note for how the native shell differs.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -268,6 +269,32 @@
   /** An app-relative path as an address-bar or link path for this build (see withBase). */
   const appUrl = (path) => withBase(path, BASE_PATH);
 
+  // The PUBLIC web address a native build shares. Only a mobile build's config.js carries these two keys
+  // (scripts/frontend-config.js; the build validates them strictly). They are checked again here because a
+  // hand-written config.js, or a bundle built before the keys existed, must still give a real link, so an
+  // unusable value falls back to today's public site at its root.
+  const DEFAULT_PUBLIC_ORIGIN = 'https://www.citizenscentral.co.za';
+  const env = window.__CC_ENV || {};
+  const PUBLIC_ORIGIN = typeof env.PUBLIC_ORIGIN === 'string' && /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(env.PUBLIC_ORIGIN) ? env.PUBLIC_ORIGIN : DEFAULT_PUBLIC_ORIGIN;
+  const PUBLIC_BASE_PATH = typeof env.PUBLIC_BASE_PATH === 'string' && /^(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)+\/?$/.test(env.PUBLIC_BASE_PATH) ? env.PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
+
+  /**
+   * The address of a screen that a person can SHARE or print as a QR code (an app-relative path in, a full
+   * https URL out), as opposed to the address-bar path of appUrl. `opts.native` is true inside the Capacitor shell.
+   *   web:    opts.webOrigin + appUrl(path). The caller picks the origin: the page's own for a share link, the
+   *           public site for a printed code. The mobile-only PUBLIC_* keys are never read.
+   *   native: PUBLIC_ORIGIN + PUBLIC_BASE_PATH + path. The shell's own origin (capacitor://localhost) is not an
+   *           address anyone can open, and its bundle sits at the shell's root, so the web prefix (BASE_PATH) does not
+   *           apply either: the public site's own prefix does.
+   * Null for anything that is not a plain app path (or a web call with no origin), so no caller builds a half link.
+   */
+  function publicUrl(path, opts) {
+    if (typeof path !== 'string' || path.charAt(0) !== '/' || path.charAt(1) === '/') return null;
+    const o = opts || {};
+    if (o.native) return PUBLIC_ORIGIN + withBase(path, PUBLIC_BASE_PATH);
+    return typeof o.webOrigin === 'string' && o.webOrigin !== '' ? o.webOrigin + appUrl(path) : null;
+  }
+
   const BASE_TITLE = 'Citizens Connect';
   const TITLES = {
     'kingdom-discovery': 'Kingdom Exploration', explore: 'Explore', community: 'Kingdom Projects', messages: 'Messages',
@@ -291,6 +318,7 @@
   window.CC_ROUTES = {
     pathFor, navFromPath, safeReturnPath, accessFor, isEntityRoute, titleFor,
     stripBase, withBase, appUrl, BASE_PATH,
+    publicUrl, PUBLIC_ORIGIN, PUBLIC_BASE_PATH,
     DASHBOARD_TABS, ADMIN_TABS, PREFIXES, PAGES, isUuid, isSlug,
   };
 })();

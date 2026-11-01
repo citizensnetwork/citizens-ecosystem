@@ -8,6 +8,8 @@ import {
   DEFAULT_SPECIAL_FILES,
   buildFrontend,
   hashOf,
+  isBasePath,
+  isHttpsOrigin,
   renderConfigJs,
   resolveConfigValues,
   rewriteIndexHtml,
@@ -98,6 +100,20 @@ function makeOptions(
     warn: vi.fn(),
     ...overrides,
   };
+}
+
+/** Everything buildFrontend wrote, as one map, so "no change" is a byte comparison. */
+function snapshot(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (d: string) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else out[path.relative(dir, full).split(path.sep).join('/')] = fs.readFileSync(full, 'utf8');
+    }
+  };
+  walk(dir);
+  return out;
 }
 
 let rootDir: string;
@@ -623,21 +639,6 @@ describe('basePath (serving under /citizens/<app>)', () => {
   const WITH_BASE = INDEX_HTML.replace('<head>', '<head>\n  <base href="/" />');
   const BASE = '/citizens/connect';
 
-  /** Everything buildFrontend wrote, as one map, so "no change" is a byte comparison. */
-  function snapshot(dir: string): Record<string, string> {
-    const out: Record<string, string> = {};
-    const walk = (d: string) => {
-      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-        const full = path.join(d, entry.name);
-        if (entry.isDirectory()) walk(full);
-        else
-          out[path.relative(dir, full).split(path.sep).join('/')] = fs.readFileSync(full, 'utf8');
-      }
-    };
-    walk(dir);
-    return out;
-  }
-
   it('is a no-op when empty or omitted: the whole output is byte-identical', () => {
     const omitted = snapshot(buildFrontend(makeOptions(rootDir)).dest);
     const empty = snapshot(buildFrontend(makeOptions(rootDir, { basePath: '' })).dest);
@@ -802,5 +803,274 @@ describe('basePath (serving under /citizens/<app>)', () => {
     expect(() =>
       buildFrontend(makeOptions(rootDir, { basePath: null as unknown as string })),
     ).toThrow(/options\.basePath/);
+  });
+});
+
+describe('mobileOnly and validate (native public links)', () => {
+  const PUBLIC_VARS: ConfigVar[] = [
+    ...CONFIG_VARS,
+    {
+      key: 'PUBLIC_ORIGIN',
+      env: 'MOBILE_PUBLIC_ORIGIN',
+      mobileEnv: 'MOBILE_PUBLIC_ORIGIN',
+      mobileDefault: 'https://www.example.org',
+      mobileOnly: true,
+      validate: 'https-origin',
+    },
+    {
+      key: 'PUBLIC_BASE_PATH',
+      env: 'MOBILE_PUBLIC_BASE_PATH',
+      mobileEnv: 'MOBILE_PUBLIC_BASE_PATH',
+      mobileDefault: '',
+      mobileOnly: true,
+      validate: 'base-path',
+    },
+  ];
+  const resolve = (mobile: boolean, env: Record<string, string> = {}, local = {}) =>
+    resolveConfigValues({ mobile, configVars: PUBLIC_VARS, env, local });
+
+  it('a web build leaves them out: its output is byte-identical to one without the vars', () => {
+    const without = snapshot(buildFrontend(makeOptions(rootDir)).dest);
+    const withVars = snapshot(
+      buildFrontend(makeOptions(rootDir, { configVars: PUBLIC_VARS })).dest,
+    );
+    expect(withVars).toEqual(without);
+    expect(withVars['config.js']).not.toContain('PUBLIC_');
+  });
+
+  it('a web build ignores even a malformed MOBILE_* value: it never reads it', () => {
+    const cfg = resolve(false, {
+      MOBILE_PUBLIC_ORIGIN: 'http://nope',
+      MOBILE_PUBLIC_BASE_PATH: 'x',
+    });
+    expect(cfg).not.toHaveProperty('PUBLIC_ORIGIN');
+    expect(cfg).not.toHaveProperty('PUBLIC_BASE_PATH');
+    expect(Object.keys(cfg)).toEqual([
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+      'API_BASE_URL',
+      'STYLE',
+    ]);
+  });
+
+  it('a mobile build carries the defaults, after the existing keys', () => {
+    const cfg = resolve(true);
+    expect(cfg.PUBLIC_ORIGIN).toBe('https://www.example.org');
+    expect(cfg.PUBLIC_BASE_PATH).toBe('');
+    expect(Object.keys(cfg)).toEqual([
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+      'API_BASE_URL',
+      'STYLE',
+      'PUBLIC_ORIGIN',
+      'PUBLIC_BASE_PATH',
+    ]);
+  });
+
+  it('a mobile build takes the env values, and never the local config', () => {
+    const cfg = resolve(
+      true,
+      { MOBILE_PUBLIC_ORIGIN: 'https://219.co.za', MOBILE_PUBLIC_BASE_PATH: '/citizens/connect' },
+      { PUBLIC_ORIGIN: 'https://evil.example', PUBLIC_BASE_PATH: '/evil' },
+    );
+    expect(cfg.PUBLIC_ORIGIN).toBe('https://219.co.za');
+    expect(cfg.PUBLIC_BASE_PATH).toBe('/citizens/connect');
+    const local = resolve(true, {}, { PUBLIC_ORIGIN: 'https://evil.example' });
+    expect(local.PUBLIC_ORIGIN).toBe('https://www.example.org');
+  });
+
+  it('an empty env value falls back to the default, like every other mobile var', () => {
+    const cfg = resolve(true, { MOBILE_PUBLIC_ORIGIN: '', MOBILE_PUBLIC_BASE_PATH: '' });
+    expect(cfg.PUBLIC_ORIGIN).toBe('https://www.example.org');
+    expect(cfg.PUBLIC_BASE_PATH).toBe('');
+  });
+
+  it('writes the values into the mobile config.js and says so in the log', () => {
+    const log = vi.fn();
+    const result = buildFrontend(
+      makeOptions(rootDir, {
+        mobile: true,
+        configVars: PUBLIC_VARS,
+        log,
+        env: {
+          MOBILE_PUBLIC_ORIGIN: 'https://219.co.za',
+          MOBILE_PUBLIC_BASE_PATH: '/citizens/connect',
+        },
+      }),
+    );
+    const configJs = fs.readFileSync(path.join(result.dest, 'config.js'), 'utf8');
+    expect(configJs).toContain('"PUBLIC_ORIGIN": "https://219.co.za"');
+    expect(configJs).toContain('"PUBLIC_BASE_PATH": "/citizens/connect"');
+    expect(log).toHaveBeenCalledWith(
+      '[build-frontend] Mobile-only config: PUBLIC_ORIGIN=https://219.co.za, PUBLIC_BASE_PATH=/citizens/connect',
+    );
+  });
+
+  it('logs an empty base path as none, and nothing at all when no var is mobileOnly', () => {
+    const log = vi.fn();
+    buildFrontend(makeOptions(rootDir, { mobile: true, configVars: PUBLIC_VARS, log }));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("PUBLIC_BASE_PATH='' (none)"));
+    const quiet = vi.fn();
+    buildFrontend(makeOptions(rootDir, { mobile: true, log: quiet }));
+    expect(quiet).not.toHaveBeenCalledWith(expect.stringContaining('Mobile-only'));
+  });
+
+  it.each([
+    'https://219.co.za',
+    'https://www.citizenscentral.co.za',
+    'https://citizens-ecosystem-connect.vercel.app',
+    'https://a.b.c.d.example.org',
+    'https://xn--80ak6aa92e.com',
+    'https://a1.co',
+  ])('accepts the origin %j', (origin) => {
+    expect(resolve(true, { MOBILE_PUBLIC_ORIGIN: origin }).PUBLIC_ORIGIN).toBe(origin);
+  });
+
+  it.each([
+    'http://219.co.za',
+    'ftp://219.co.za',
+    '//219.co.za',
+    '219.co.za',
+    'https://',
+    'https://219.co.za/',
+    'https://219.co.za/citizens/connect',
+    'https://219.co.za?x=1',
+    'https://219.co.za#top',
+    'https://user@219.co.za',
+    'https://user:pw@219.co.za',
+    'https://219.co.za@evil.example',
+    'https://evil.example\\@219.co.za',
+    'https://219.co.za:8443',
+    'https://219.co.za:443',
+    'https://219.CO.ZA',
+    'https://localhost',
+    'https://127.0.0.1',
+    'https://10.0.0.1',
+    'https://[::1]',
+    'https://219.co.za.',
+    'https://219..co.za',
+    'https://-219.co.za',
+    'https://219-.co.za',
+    'https://219.co.za\n',
+    ' https://219.co.za',
+    'https://219.co.za ',
+    'https://21 9.co.za',
+    'https://219.co.za"><script>',
+    "https://219.co.za'",
+    `https://${'a'.repeat(64)}.co.za`,
+    `https://${`${'a'.repeat(63)}.`.repeat(4)}com`,
+  ])('rejects the origin %j', (origin) => {
+    expect(() => resolve(true, { MOBILE_PUBLIC_ORIGIN: origin })).toThrow(
+      /PUBLIC_ORIGIN \(MOBILE_PUBLIC_ORIGIN\) must be an https origin such as "https:\/\/219\.co\.za"/,
+    );
+  });
+
+  it.each(['/citizens/connect', '/citizens/wear', '/a', '/a-b/c-d/e1'])(
+    'accepts the base path %j',
+    (basePath) => {
+      expect(resolve(true, { MOBILE_PUBLIC_BASE_PATH: basePath }).PUBLIC_BASE_PATH).toBe(basePath);
+    },
+  );
+
+  it.each([
+    '/',
+    'citizens/connect',
+    '/citizens/connect/',
+    '//citizens',
+    '/citizens//connect',
+    '/Citizens/Connect',
+    '/citizens/../connect',
+    '/citizens/./connect',
+    '/citizens/connect?x=1',
+    '/citizens/connect#x',
+    '/citizens\\connect',
+    '/citizens/connect"><script>',
+    '/-a',
+    '/a-',
+    '/a b',
+    ' /citizens/connect',
+    '/citizens/connect\n',
+    'https://219.co.za/citizens/connect',
+    // What Git Bash turns "/citizens/connect" into when MSYS path conversion is not switched off.
+    'C:/Program Files/Git/citizens/connect',
+  ])('rejects the base path %j', (basePath) => {
+    expect(() => resolve(true, { MOBILE_PUBLIC_BASE_PATH: basePath })).toThrow(
+      /PUBLIC_BASE_PATH \(MOBILE_PUBLIC_BASE_PATH\) must be a path such as "\/citizens\/connect"/,
+    );
+  });
+
+  it('fails before anything is written, so a bad value never leaves a half-built mobile-dist', () => {
+    expect(() =>
+      buildFrontend(
+        makeOptions(rootDir, {
+          mobile: true,
+          configVars: PUBLIC_VARS,
+          env: { MOBILE_PUBLIC_ORIGIN: 'http://219.co.za' },
+        }),
+      ),
+    ).toThrow(/PUBLIC_ORIGIN/);
+    expect(fs.existsSync(path.join(rootDir, 'mobile-dist'))).toBe(false);
+  });
+
+  it('truncates a very long bad value in the message', () => {
+    let message = '';
+    try {
+      resolve(true, { MOBILE_PUBLIC_ORIGIN: `https://${'x'.repeat(5000)}` });
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain('must be an https origin');
+    expect(message.length).toBeLessThan(500);
+  });
+
+  it('validates a default too: a bad mobileDefault cannot ship', () => {
+    const badDefault: ConfigVar[] = [
+      {
+        key: 'PUBLIC_ORIGIN',
+        env: 'MOBILE_PUBLIC_ORIGIN',
+        mobileEnv: 'MOBILE_PUBLIC_ORIGIN',
+        mobileDefault: 'http://www.example.org',
+        mobileOnly: true,
+        validate: 'https-origin',
+      },
+    ];
+    expect(() =>
+      resolveConfigValues({ mobile: true, configVars: badDefault, env: {}, local: {} }),
+    ).toThrow(/PUBLIC_ORIGIN/);
+  });
+
+  it('validate also guards an ordinary var, in a web build, from env or local config', () => {
+    const vars: ConfigVar[] = [{ key: 'SITE', env: 'NEXT_PUBLIC_SITE', validate: 'https-origin' }];
+    const run = (env: Record<string, string>, local: Record<string, string> = {}) =>
+      resolveConfigValues({ mobile: false, configVars: vars, env, local });
+    expect(run({ NEXT_PUBLIC_SITE: 'https://219.co.za' })).toEqual({ SITE: 'https://219.co.za' });
+    expect(run({})).toEqual({ SITE: '' });
+    expect(() => run({ NEXT_PUBLIC_SITE: 'http://219.co.za' })).toThrow(
+      /SITE \(NEXT_PUBLIC_SITE\)/,
+    );
+    expect(() => run({}, { SITE: 'https://219.co.za/x' })).toThrow(/SITE \(NEXT_PUBLIC_SITE\)/);
+  });
+
+  it('rejects an unknown validate kind and a mobileOnly var with no mobileEnv, before building', () => {
+    const unknown = [{ key: 'X', env: 'X', validate: 'https-url' }] as unknown as ConfigVar[];
+    expect(() => buildFrontend(makeOptions(rootDir, { configVars: unknown }))).toThrow(
+      /configVars "X": validate must be one of https-origin, base-path/,
+    );
+    const noEnv = [{ key: 'X', env: 'X', mobileOnly: true }] as ConfigVar[];
+    expect(() => buildFrontend(makeOptions(rootDir, { configVars: noEnv }))).toThrow(
+      /configVars "X": a mobileOnly var needs a mobileEnv/,
+    );
+    expect(fs.existsSync(path.join(rootDir, 'public'))).toBe(false);
+  });
+
+  it('isHttpsOrigin and isBasePath are exported and never throw on a non-string', () => {
+    for (const v of [undefined, null, 5, {}, ['https://219.co.za']]) {
+      expect(isHttpsOrigin(v)).toBe(false);
+      expect(isBasePath(v)).toBe(false);
+    }
+    expect(isHttpsOrigin('https://219.co.za')).toBe(true);
+    expect(isHttpsOrigin(`https://${`${'a'.repeat(63)}.`.repeat(3)}com`)).toBe(true);
+    expect(isBasePath('/citizens/connect')).toBe(true);
+    expect(isBasePath('')).toBe(false);
   });
 });
