@@ -290,6 +290,19 @@ export function isContributorType(value: unknown): value is ContributorType {
 }
 
 /**
+ * The Care / Recovery Contributor types (founder decision 2026-10-21, issue #202). They MAY list, with EXTRA
+ * admin review: they opt in to the map (the apply route keeps a pin and an address off unless the applicant says
+ * otherwise) and the discovery routine never auto-publishes for them. This list is the `care_recovery` preset's
+ * categories in `config/onboarding-presets.json`; a test keeps the two equal, and `onboarding-presets-lib.jsx`
+ * carries the browser's copy.
+ */
+export const EXTRA_REVIEW_CONTRIBUTOR_TYPES: readonly ContributorType[] = ["retreat-healing", "clinic", "rehab-development"];
+
+export function needsExtraReview(category: unknown): boolean {
+  return typeof category === "string" && (EXTRA_REVIEW_CONTRIBUTOR_TYPES as readonly string[]).includes(category);
+}
+
+/**
  * Map place category slugs to keywords matched against place name, description,
  * address, and DB category name for client-side filtering.
  */
