@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — browser Supabase auth client
 //  ------------------------------------------------------------------
-//  Browser adaptation of supabase-auth.js (which is written for a Vite
-//  build with import.meta.env). This runs in the no-build app: it needs
+//  Browser client for the no-build app (it began as an adaptation of the
+//  design handoff's Vite reference, supabase-auth.js, removed 2026-11-01). It needs
 //  the @supabase/supabase-js UMD global (window.supabase) and window.__CC_ENV
 //  (config.js) loaded first, then exposes window.CC_AUTH for store.jsx.
 //

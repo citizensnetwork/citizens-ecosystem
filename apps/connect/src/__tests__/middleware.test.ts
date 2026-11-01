@@ -51,7 +51,7 @@ vi.mock("next/server", () => {
   return { NextResponse };
 });
 
-function makeRequest(pathname = "/events", opts: { method?: string; origin?: string } = {}) {
+function makeRequest(pathname = "/dashboard", opts: { method?: string; origin?: string } = {}) {
   const headers = new Headers();
   if (opts.origin) headers.set("origin", opts.origin);
   return {
@@ -68,6 +68,14 @@ function makeRequest(pathname = "/events", opts: { method?: string; origin?: str
   };
 }
 
+/** The URL the last redirect was built for (the mocked clone() hands back a plain object). */
+async function redirectTarget() {
+  const { NextResponse } = await import("next/server");
+  const calls = vi.mocked(NextResponse.redirect).mock.calls;
+  expect(calls.length, "the middleware should have redirected").toBeGreaterThan(0);
+  return calls[calls.length - 1][0] as unknown as { pathname: string; searchParams: URLSearchParams };
+}
+
 describe("middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,7 +90,7 @@ describe("middleware", () => {
 
   it("returns a NextResponse for public routes", async () => {
     const { middleware } = await import("@/middleware");
-    const response = await middleware(makeRequest("/events") as never);
+    const response = await middleware(makeRequest("/") as never);
     expect(response).toBe(mockNextResponse);
   });
 
@@ -137,7 +145,7 @@ describe("middleware", () => {
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const response = await middleware(makeRequest("/events") as never);
+    const response = await middleware(makeRequest("/dashboard") as never);
     expect(response).toBe(mockNextResponse);
     expect(mockRpc).toHaveBeenCalledWith("get_my_profile_private");
     expect(mockRpcSelect).toHaveBeenCalledWith("force_reauth_at, bio_setup_required, role");
@@ -172,13 +180,15 @@ describe("middleware", () => {
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const { NextResponse } = await import("next/server");
-    await middleware(makeRequest("/events") as never);
+    await middleware(makeRequest("/dashboard") as never);
     expect(mockSignOut).toHaveBeenCalled();
-    expect(NextResponse.redirect).toHaveBeenCalled();
+    // The app has no /login page: the person is sent to the app root, with the reauth hint.
+    const target = await redirectTarget();
+    expect(target.pathname).toBe("/");
+    expect(target.searchParams.get("reauth")).toBe("1");
   });
 
-  it("bio-setup gate: redirects contributors with bio_setup_required to /contributor/setup", async () => {
+  it("bio-setup gate: redirects contributors with bio_setup_required to the app root", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "u2" } },
       error: null,
@@ -192,12 +202,14 @@ describe("middleware", () => {
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const { NextResponse } = await import("next/server");
-    await middleware(makeRequest("/events") as never);
-    expect(NextResponse.redirect).toHaveBeenCalled();
+    await middleware(makeRequest("/dashboard") as never);
+    // /contributor/setup is not a page of the app, so the root is the target (and carries no reauth hint).
+    const target = await redirectTarget();
+    expect(target.pathname).toBe("/");
+    expect(target.searchParams.get("reauth")).toBeNull();
   });
 
-  it("bio-setup gate: does NOT redirect when already on /contributor/setup", async () => {
+  it("bio-setup gate: does NOT redirect when already at the app root (the target itself, so no loop)", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "u3" } },
       error: null,
@@ -211,8 +223,23 @@ describe("middleware", () => {
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const response = await middleware(makeRequest("/contributor/setup") as never);
+    const response = await middleware(makeRequest("/") as never);
     expect(response).toBe(mockNextResponse);
+  });
+
+  it("bio-setup gate: the old /login and /contributor/setup are ordinary paths now, and so is anything starting with //", async () => {
+    const { middleware } = await import("@/middleware");
+    const { NextResponse } = await import("next/server");
+    for (const path of ["/login", "/contributor/setup", "//dashboard"]) {
+      vi.mocked(NextResponse.redirect).mockClear();
+      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u3" } }, error: null });
+      mockMaybeSingle.mockResolvedValueOnce({
+        data: { force_reauth_at: null, bio_setup_required: true, role: "contributor" },
+        error: null,
+      });
+      await middleware(makeRequest(path) as never);
+      expect((await redirectTarget()).pathname, path).toBe("/");
+    }
   });
 
   it("force-reauth gate: fails closed when access_token cannot be parsed", async () => {
@@ -235,13 +262,12 @@ describe("middleware", () => {
       error: null,
     });
     const { middleware } = await import("@/middleware");
-    const { NextResponse } = await import("next/server");
-    await middleware(makeRequest("/events") as never);
+    await middleware(makeRequest("/dashboard") as never);
     expect(mockSignOut).toHaveBeenCalled();
-    expect(NextResponse.redirect).toHaveBeenCalled();
+    expect((await redirectTarget()).pathname).toBe("/");
   });
 
-  it("profile lookup error: signs out and redirects to /login?reauth=1", async () => {
+  it("profile lookup error: signs out and redirects to the app root with reauth=1", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "u5" } },
       error: null,
@@ -251,10 +277,11 @@ describe("middleware", () => {
       error: { code: "42P01", message: "transient db error" },
     });
     const { middleware } = await import("@/middleware");
-    const { NextResponse } = await import("next/server");
-    await middleware(makeRequest("/events") as never);
+    await middleware(makeRequest("/dashboard") as never);
     expect(mockSignOut).toHaveBeenCalled();
-    expect(NextResponse.redirect).toHaveBeenCalled();
+    const target = await redirectTarget();
+    expect(target.pathname).toBe("/");
+    expect(target.searchParams.get("reauth")).toBe("1");
   });
 
   it("propagates cleared auth cookies onto the redirect on signOut paths", async () => {
@@ -293,7 +320,7 @@ describe("middleware", () => {
     });
 
     const { middleware } = await import("@/middleware");
-    await middleware(makeRequest("/events") as never);
+    await middleware(makeRequest("/dashboard") as never);
 
     expect(mockSignOut).toHaveBeenCalled();
     expect(redirectCookieSet).toHaveBeenCalledTimes(supabaseCookieJar.length);
