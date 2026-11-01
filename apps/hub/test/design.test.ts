@@ -33,9 +33,9 @@ function contrast(a: string, b: string): number {
 describe('palette', () => {
   const t = tokens();
 
-  it('is white, near-black and the Connect gold', () => {
+  it('is white, near-black and Connect’s one gold (#304)', () => {
     expect(t.white).toBe('#ffffff');
-    expect(t.gold).toBe('#c8a24f');
+    expect(t.gold).toBe('#f2bd22');
     expect(t.ink).toBe('#111111');
     expect(t.black).toBe('#0a0a0a');
   });
@@ -95,6 +95,14 @@ describe('icons', () => {
       true,
     );
   });
+
+  it.each(['vision', 'wear'])(
+    'the shared mark in %s is a byte-for-byte copy of Connect’s (copy it again when Connect’s changes)',
+    (app) => {
+      const copy = read(`../../${app}/src/frontend/icons/icon.svg`);
+      expect(copy.equals(read('../../connect/public/icons/icon.svg'))).toBe(true);
+    },
+  );
 
   it('favicon.ico is a real icon holding 16, 32 and 48 pixel PNGs', () => {
     const ico = read('../public/favicon.ico');

@@ -16,8 +16,11 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import net from 'node:net';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -51,7 +54,10 @@ function startUpstream(label, { securityHeaders }) {
         headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains; preload';
       }
       if (url.pathname.endsWith('/redirect-me')) {
-        res.writeHead(302, { ...headers, Location: url.pathname.replace('/redirect-me', '/index.html') });
+        res.writeHead(302, {
+          ...headers,
+          Location: url.pathname.replace('/redirect-me', '/index.html'),
+        });
         res.end();
         return;
       }
@@ -156,10 +162,24 @@ async function waitFor(port, tries = 60) {
 
 const only = (r, name) => r.headers[name]?.length === 1;
 
+/** A currently free TCP port on 127.0.0.1, chosen by the operating system. */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
 async function main() {
   const up1 = await startUpstream('upstream-1', { securityHeaders: true });
   const up2 = await startUpstream('upstream-2', { securityHeaders: false });
-  const hubPort = 3190 + Math.floor(Math.random() * 9);
+  // A port the operating system just handed out, never a guess: a guessed one could be another session's server,
+  // and waitFor() would then happily probe THAT.
+  const hubPort = await freePort();
   const env = {
     HUB_ORIGIN_CONNECT: `http://127.0.0.1:${up1.port}`,
     HUB_ORIGIN_VISION: `http://127.0.0.1:${up2.port}`,
@@ -167,7 +187,9 @@ async function main() {
     NODE_ENV: 'production',
   };
 
-  console.log(`upstream-1 :${up1.port} (connect, wear)   upstream-2 :${up2.port} (vision)   hub :${hubPort}`);
+  console.log(
+    `upstream-1 :${up1.port} (connect, wear)   upstream-2 :${up2.port} (vision)   hub :${hubPort}`,
+  );
   const build = await run(['build'], env);
   check('hub builds with the fake upstream origins', build.code === 0, `exit ${build.code}`);
   if (build.code !== 0) {
@@ -189,106 +211,298 @@ async function main() {
 
   // 1. path, query, method and headers reach the right upstream untouched
   let r = await get('/citizens/connect/e/123?x=1&x=2&y=%20z');
-  check('GET path and query are preserved', r.json?.url === '/citizens/connect/e/123?x=1&x=2&y=%20z', r.json?.url);
+  check(
+    'GET path and query are preserved',
+    r.json?.url === '/citizens/connect/e/123?x=1&x=2&y=%20z',
+    r.json?.url,
+  );
   check('GET goes to the connect upstream', r.json?.upstream === 'upstream-1');
 
   r = await get('/citizens/connect');
-  check('the bare prefix reaches the app as /citizens/connect', r.json?.url === '/citizens/connect', r.json?.url);
+  check(
+    'the bare prefix reaches the app as /citizens/connect',
+    r.json?.url === '/citizens/connect',
+    r.json?.url,
+  );
 
   r = await get('/citizens/vision/index.html');
-  check('vision goes to the second upstream', r.json?.upstream === 'upstream-2' && r.json?.url === '/citizens/vision/index.html');
+  check(
+    'vision goes to the second upstream',
+    r.json?.upstream === 'upstream-2' && r.json?.url === '/citizens/vision/index.html',
+  );
 
-  r = await get('/citizens/wear/api/me', { headers: { Authorization: 'Bearer abc', Cookie: 'sb-token=xyz; other=1' } });
-  check('Authorization and Cookie reach the app', r.json?.authorization === 'Bearer abc' && r.json?.cookie === 'sb-token=xyz; other=1');
-  check('the app sees its own host (changeOrigin) and the original host in x-forwarded-host', r.json?.host === `127.0.0.1:${up1.port}` && r.json?.xForwardedHost === `127.0.0.1:${hubPort}`, `host=${r.json?.host} xfh=${r.json?.xForwardedHost}`);
+  r = await get('/citizens/wear/api/me', {
+    headers: { Authorization: 'Bearer abc', Cookie: 'sb-token=xyz; other=1' },
+  });
+  check(
+    'Authorization and Cookie reach the app',
+    r.json?.authorization === 'Bearer abc' && r.json?.cookie === 'sb-token=xyz; other=1',
+  );
+  check(
+    'the app sees its own host (changeOrigin) and the original host in x-forwarded-host',
+    r.json?.host === `127.0.0.1:${up1.port}` && r.json?.xForwardedHost === `127.0.0.1:${hubPort}`,
+    `host=${r.json?.host} xfh=${r.json?.xForwardedHost}`,
+  );
 
   // 2. POST body, byte for byte
   const payload = Buffer.from(JSON.stringify({ title: 'Quarter finals', note: 'café ✓' }));
   r = await get('/citizens/connect/api/intake/google-form', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': payload.length, 'X-Intake-Secret': 's3cret' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': payload.length,
+      'X-Intake-Secret': 's3cret',
+    },
     body: payload,
   });
-  check('POST reaches the app as a POST', r.json?.method === 'POST' && r.json?.url === '/citizens/connect/api/intake/google-form');
-  check('POST body arrives byte for byte', r.json?.bodySha256 === createHash('sha256').update(payload).digest('hex') && r.json?.contentType === 'application/json', `${r.json?.bodyBytes} bytes`);
+  check(
+    'POST reaches the app as a POST',
+    r.json?.method === 'POST' && r.json?.url === '/citizens/connect/api/intake/google-form',
+  );
+  check(
+    'POST body arrives byte for byte',
+    r.json?.bodySha256 === createHash('sha256').update(payload).digest('hex') &&
+      r.json?.contentType === 'application/json',
+    `${r.json?.bodyBytes} bytes`,
+  );
 
   const big = Buffer.alloc(3 * 1024 * 1024, 'a');
-  r = await get('/citizens/vision/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': big.length }, body: big });
-  check('a 3 MB POST body arrives byte for byte', r.json?.bodySha256 === createHash('sha256').update(big).digest('hex'), `${r.json?.bodyBytes} bytes`);
+  r = await get('/citizens/vision/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': big.length },
+    body: big,
+  });
+  check(
+    'a 3 MB POST body arrives byte for byte',
+    r.json?.bodySha256 === createHash('sha256').update(big).digest('hex'),
+    `${r.json?.bodyBytes} bytes`,
+  );
 
   for (const method of ['PATCH', 'DELETE', 'PUT']) {
-    r = await get('/citizens/connect/api/x', { method, headers: { 'Content-Type': 'application/json', 'Content-Length': 2 }, body: '{}' });
-    check(`${method} reaches the app as ${method} with its body`, r.json?.method === method && r.json?.bodyText === '{}');
+    r = await get('/citizens/connect/api/x', {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': 2 },
+      body: '{}',
+    });
+    check(
+      `${method} reaches the app as ${method} with its body`,
+      r.json?.method === method && r.json?.bodyText === '{}',
+    );
   }
 
   // 3. CORS preflight
   r = await get('/citizens/wear/api/me', {
     method: 'OPTIONS',
-    headers: { Origin: 'capacitor://localhost', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' },
+    headers: {
+      Origin: 'capacitor://localhost',
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'authorization,content-type',
+    },
   });
   check('OPTIONS preflight: 204 from the app', r.status === 204, String(r.status));
-  check('OPTIONS preflight: the app\'s CORS headers arrive, once each', r.headers['access-control-allow-origin']?.join() === 'capacitor://localhost' && only(r, 'access-control-allow-origin') && only(r, 'access-control-allow-methods') && only(r, 'access-control-allow-headers'), JSON.stringify(r.headers['access-control-allow-origin']));
+  check(
+    "OPTIONS preflight: the app's CORS headers arrive, once each",
+    r.headers['access-control-allow-origin']?.join() === 'capacitor://localhost' &&
+      only(r, 'access-control-allow-origin') &&
+      only(r, 'access-control-allow-methods') &&
+      only(r, 'access-control-allow-headers'),
+    JSON.stringify(r.headers['access-control-allow-origin']),
+  );
 
   // 4. headers: exactly the upstream's, nothing added by the hub
   r = await get('/citizens/connect/index.html');
-  check('proxied response carries the upstream CSP, once, unchanged', only(r, 'content-security-policy') && r.headers['content-security-policy'][0] === UPSTREAM_CSP, JSON.stringify(r.headers['content-security-policy']));
+  check(
+    'proxied response carries the upstream CSP, once, unchanged',
+    only(r, 'content-security-policy') && r.headers['content-security-policy'][0] === UPSTREAM_CSP,
+    JSON.stringify(r.headers['content-security-policy']),
+  );
   for (const name of ['x-frame-options', 'x-content-type-options', 'strict-transport-security']) {
     check(`proxied response: ${name} appears once`, only(r, name), JSON.stringify(r.headers[name]));
   }
-  check('proxied response: no hub-only header (referrer-policy, permissions-policy, x-robots-tag)', !r.headers['referrer-policy'] && !r.headers['permissions-policy'] && !r.headers['x-robots-tag']);
-  check('proxied response: both Set-Cookie headers arrive as two headers', r.headers['set-cookie']?.length === 2 && r.headers['set-cookie'][0] === 'sb-a=1; Path=/; HttpOnly' && r.headers['set-cookie'][1] === 'sb-b=2; Path=/; Secure', JSON.stringify(r.headers['set-cookie']));
+  check(
+    'proxied response: no hub-only header (referrer-policy, permissions-policy, x-robots-tag)',
+    !r.headers['referrer-policy'] && !r.headers['permissions-policy'] && !r.headers['x-robots-tag'],
+  );
+  check(
+    'proxied response: both Set-Cookie headers arrive as two headers',
+    r.headers['set-cookie']?.length === 2 &&
+      r.headers['set-cookie'][0] === 'sb-a=1; Path=/; HttpOnly' &&
+      r.headers['set-cookie'][1] === 'sb-b=2; Path=/; Secure',
+    JSON.stringify(r.headers['set-cookie']),
+  );
 
   r = await get('/citizens/vision/index.html');
-  const hubOnly = ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'strict-transport-security', 'referrer-policy', 'permissions-policy'];
-  check('proxied response from an app that sends no security headers gets NONE from the hub', hubOnly.every((name) => !r.headers[name]), hubOnly.filter((name) => r.headers[name]).join(','));
+  const hubOnly = [
+    'content-security-policy',
+    'x-frame-options',
+    'x-content-type-options',
+    'strict-transport-security',
+    'referrer-policy',
+    'permissions-policy',
+  ];
+  check(
+    'proxied response from an app that sends no security headers gets NONE from the hub',
+    hubOnly.every((name) => !r.headers[name]),
+    hubOnly.filter((name) => r.headers[name]).join(','),
+  );
 
   r = await get('/citizens/wear/redirect-me');
-  check('an upstream redirect is passed on as is (302, relative Location)', r.status === 302 && r.headers.location?.[0] === '/citizens/wear/index.html', `${r.status} ${r.headers.location}`);
+  check(
+    'an upstream redirect is passed on as is (302, relative Location)',
+    r.status === 302 && r.headers.location?.[0] === '/citizens/wear/index.html',
+    `${r.status} ${r.headers.location}`,
+  );
 
   r = await get('/citizens/connect/x?__status=503');
   check('an upstream error status is passed on (503)', r.status === 503);
 
   // 5. the hub's own pages
   r = await get('/', { headers: {} });
-  check('/ is a 302 to /citizens', r.status === 302 && r.headers.location?.[0] === '/citizens', `${r.status} ${r.headers.location}`);
+  check(
+    '/ is a 302 to /citizens',
+    r.status === 302 && r.headers.location?.[0] === '/citizens',
+    `${r.status} ${r.headers.location}`,
+  );
 
   r = await get('/citizens');
-  check('/citizens is 200 HTML', r.status === 200 && /<h1[^>]*>Connecting the Kingdom<\/h1>/.test(r.text));
-  check('/citizens carries the hub CSP exactly once, with no inline allowance', only(r, 'content-security-policy') && !/unsafe-inline|unsafe-eval/.test(r.headers['content-security-policy'][0]), r.headers['content-security-policy']?.[0]);
-  check('/citizens carries the other security headers once', hubOnly.every((name) => only(r, name)));
+  check(
+    '/citizens is 200 HTML',
+    r.status === 200 && /<h1[^>]*>Connecting the Kingdom<\/h1>/.test(r.text),
+  );
+  check(
+    '/citizens carries the hub CSP exactly once, with no inline allowance',
+    only(r, 'content-security-policy') &&
+      !/unsafe-inline|unsafe-eval/.test(r.headers['content-security-policy'][0]),
+    r.headers['content-security-policy']?.[0],
+  );
+  check(
+    '/citizens carries the other security headers once',
+    hubOnly.every((name) => only(r, name)),
+  );
   check('/citizens has no <script> tag at all', !/<script/i.test(r.text));
   check('/citizens is not marked noindex', !/noindex/i.test(r.text) && !r.headers['x-robots-tag']);
 
   for (const slug of ['learn', 'play', 'move']) {
     r = await get(`/citizens/${slug}`);
-    check(`/citizens/${slug} is 200 and noindex (meta and header)`, r.status === 200 && /<meta name="robots" content="noindex"/.test(r.text) && r.headers['x-robots-tag']?.join() === 'noindex', `${r.status} ${r.headers['x-robots-tag']}`);
+    check(
+      `/citizens/${slug} is 200 and noindex (meta and header)`,
+      r.status === 200 &&
+        /<meta name="robots" content="noindex"/.test(r.text) &&
+        r.headers['x-robots-tag']?.join() === 'noindex',
+      `${r.status} ${r.headers['x-robots-tag']}`,
+    );
     check(`/citizens/${slug} carries the hub CSP once`, only(r, 'content-security-policy'));
   }
 
   for (const path of ['/citizens/nope', '/citizens/learn/extra', '/citizens/impact', '/nope']) {
     r = await get(path);
-    check(`${path} is a 404 from the hub (with the hub CSP)`, r.status === 404 && only(r, 'content-security-policy') && !r.headers['x-upstream'], `${r.status}`);
+    check(
+      `${path} is a 404 from the hub (with the hub CSP)`,
+      r.status === 404 && only(r, 'content-security-policy') && !r.headers['x-upstream'],
+      `${r.status}`,
+    );
   }
+
+  // 5b. what Next compiled. `next start` does not put the hub's header rules on a proxied answer, but Vercel builds its
+  // routing table from this very manifest and may, so the rule's compiled pattern itself must keep off the apps' paths.
+  const manifest = JSON.parse(readFileSync(join(hubDir, '.next', 'routes-manifest.json'), 'utf8'));
+  const withCsp = manifest.headers.filter((rule) =>
+    rule.headers.some((h) => h.key === 'Content-Security-Policy'),
+  );
+  check(
+    'the build has exactly one header rule that carries the CSP',
+    withCsp.length === 1,
+    String(withCsp.length),
+  );
+  const cspRule = new RegExp(withCsp[0]?.regex ?? '$^', 'i');
+  for (const slug of ['connect', 'vision', 'wear']) {
+    for (const path of [
+      `/citizens/${slug}`,
+      `/citizens/${slug}/`,
+      `/citizens/${slug}/index.html`,
+      `/citizens/${slug}/api/v1/x`,
+    ]) {
+      check(`compiled CSP rule does NOT match the proxied path ${path}`, !cspRule.test(path));
+    }
+  }
+  for (const path of [
+    '/',
+    '/citizens',
+    '/citizens/learn',
+    '/citizens/nope',
+    '/nope',
+    '/robots.txt',
+  ]) {
+    check(`compiled CSP rule matches the hub's own path ${path}`, cspRule.test(path));
+  }
+  const noindexSources = manifest.headers
+    .filter((rule) => rule.headers.some((h) => h.key === 'X-Robots-Tag'))
+    .map((rule) => new RegExp(rule.regex, 'i'));
+  check(
+    'three X-Robots-Tag rules, one per coming-soon page',
+    noindexSources.length === 3 &&
+      ['learn', 'play', 'move'].every((slug) =>
+        noindexSources.some((re) => re.test(`/citizens/${slug}`)),
+      ),
+  );
+  check(
+    'no X-Robots-Tag rule matches the landing page or a proxied path',
+    noindexSources.every((re) => !re.test('/citizens') && !re.test('/citizens/connect')),
+  );
 
   // 6. static files
   r = await get('/robots.txt');
-  check('/robots.txt is 200 text with a Sitemap line', r.status === 200 && /^Sitemap: https:\/\/219\.co\.za\/sitemap\.xml$/m.test(r.text));
+  check(
+    '/robots.txt is 200 text with a Sitemap line',
+    r.status === 200 && /^Sitemap: https:\/\/219\.co\.za\/sitemap\.xml$/m.test(r.text),
+  );
   r = await get('/sitemap.xml');
-  check('/sitemap.xml lists /citizens only', r.status === 200 && (r.text.match(/<loc>/g) ?? []).length === 1 && /<loc>https:\/\/219\.co\.za\/citizens<\/loc>/.test(r.text));
+  check(
+    '/sitemap.xml lists /citizens only',
+    r.status === 200 &&
+      (r.text.match(/<loc>/g) ?? []).length === 1 &&
+      /<loc>https:\/\/219\.co\.za\/citizens<\/loc>/.test(r.text),
+  );
   r = await get('/icon.svg');
-  check('/icon.svg is an SVG', r.status === 200 && /^image\/svg\+xml/.test(r.headers['content-type']?.[0] ?? ''), r.headers['content-type']?.[0]);
+  check(
+    '/icon.svg is an SVG',
+    r.status === 200 && /^image\/svg\+xml/.test(r.headers['content-type']?.[0] ?? ''),
+    r.headers['content-type']?.[0],
+  );
   r = await get('/favicon.ico');
-  check('/favicon.ico is an icon', r.status === 200 && /icon|octet-stream/.test(r.headers['content-type']?.[0] ?? ''), r.headers['content-type']?.[0]);
+  check(
+    '/favicon.ico is an icon',
+    r.status === 200 && /icon|octet-stream/.test(r.headers['content-type']?.[0] ?? ''),
+    r.headers['content-type']?.[0],
+  );
   r = await get('/.well-known/assetlinks.json');
-  check('/.well-known/assetlinks.json is NOT invented by the hub (404)', r.status === 404, String(r.status));
+  check(
+    '/.well-known/assetlinks.json is NOT invented by the hub (404)',
+    r.status === 404,
+    String(r.status),
+  );
 
   // 7. things worth knowing (reported, not asserted)
   r = await get('/citizens/connect/');
-  console.log(`INFO  trailing slash /citizens/connect/ -> ${r.status} ${r.headers.location ?? ''} (upstream saw ${r.json?.url ?? 'nothing'})`);
+  console.log(
+    `INFO  trailing slash /citizens/connect/ -> ${r.status} ${r.headers.location ?? ''} (upstream saw ${r.json?.url ?? 'nothing'})`,
+  );
   r = await get('/citizens/connect/p/a%20b%2Fc');
-  console.log(`INFO  encoded path /citizens/connect/p/a%20b%2Fc -> upstream saw ${r.json?.url ?? r.status}`);
+  console.log(
+    `INFO  encoded path /citizens/connect/p/a%20b%2Fc -> upstream saw ${r.json?.url ?? r.status}`,
+  );
 
-  check('the upstreams saw no request for a hub-only path', ![...up1.seen, ...up2.seen].some((s) => s.url.startsWith('/citizens/learn') || s.url.startsWith('/citizens/play') || s.url.startsWith('/citizens/move') || s.url === '/' || s.url.startsWith('/robots')));
+  check(
+    'the upstreams saw no request for a hub-only path',
+    ![...up1.seen, ...up2.seen].some(
+      (s) =>
+        s.url.startsWith('/citizens/learn') ||
+        s.url.startsWith('/citizens/play') ||
+        s.url.startsWith('/citizens/move') ||
+        s.url === '/' ||
+        s.url.startsWith('/robots'),
+    ),
+  );
 
   return finish(hub, up1, up2);
 }

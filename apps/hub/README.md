@@ -75,8 +75,11 @@ object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 plus `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` and HSTS. The header rule's
 `source` is generated to **exclude `/citizens/<built app>` and everything below it**: those responses come from the
 apps, which send their own CSP, and a second policy from the hub would be added to theirs or replace it. A proxied
-response therefore carries exactly the upstream's headers. This is checked by a unit test of the pattern and by the
-proof script against a real build (an upstream that sends no security headers gets none from the hub).
+response therefore carries exactly the upstream's headers. This is checked three ways: a unit test of the pattern; the
+proof script against a real `next start` (an upstream that sends no security headers gets none from the hub); and the
+proof script's read of the build's own `.next/routes-manifest.json`, whose compiled pattern must not match any proxied
+path. The third matters because a mutation test showed `next start` never puts the hub's header rules on a proxied
+answer even when the pattern is wrong, whereas Vercel builds its routing table from that same manifest and may.
 
 Pages are Pages Router with `unstable_runtimeJS: false` (the App Router would put inline `self.__next_f.push(...)`
 scripts in every page, which a strict CSP forbids).

@@ -4,7 +4,7 @@
  *
  * Contrast (WCAG AA needs 4.5 for text, 3 for large text and interface lines; test/design.test.ts checks every
  * pair below from these very values):
- *   ink on white 18.9   white on black 19.5   gold on black 8.2   ink on gold 7.8
+ *   ink on white 18.9   white on black 19.5   gold on black 11.4   ink on gold 10.9
  * Gold is never used for text on white (the design system's rule), only as a fill with an ink label, a rule, or text
  * on black.
  *
@@ -15,7 +15,7 @@
   --white: #ffffff;
   --ink: #111111;
   --black: #0a0a0a;
-  --gold: #c8a24f;
+  --gold: #f2bd22;
   --muted: #3d3d3d;
   --on-black-soft: #e6e6e6;
   --line: #d9d9d9;
