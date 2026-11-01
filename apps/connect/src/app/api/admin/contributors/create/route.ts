@@ -59,7 +59,8 @@ import { requireAdmin, logAdminAction } from "@/lib/adminGuard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { coercePublicUrl, normalisePublicUrl } from "@/lib/publicUrl";
 import { MAX_URL, hasMapPin, parseListingFields, trimOrNull } from "@/lib/contributorFields";
-import { adminNotifyEmail, sendEmail, siteOrigin, type EmailOutcome } from "@/lib/email/send";
+import { adminNotifyEmail, sendEmail, type EmailOutcome } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { ownerWelcomeEmail } from "@/lib/email/templates";
 
 export const runtime = "nodejs";
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
   // 1. Create the auth user this listing will live under (a placeholder: no password, no OAuth identity, only
   //    ever usable by its owner once they have confirmed). If the address already has an account the user gets
   //    an alias address instead. Only the service_role client can call the Admin Auth API.
-  const origin = siteOrigin(request);
+  const origin = siteBase(request);
   const listingUser = await createListingUser(admin, {
     claimEmail: fields.claimEmail,
     userMetadata: { full_name: fields.displayName, created_by_admin: true },

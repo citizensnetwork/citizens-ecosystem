@@ -67,8 +67,9 @@ everything under that prefix (pages, `public/` files, `_next`, `/api`) and makes
 project makes that app answer only under its prefix, so its old root URLs stop
 working. Leave it unset in every Vercel environment until all of these exist:
 
-1. The app's frontend is prefix-aware (Connect's route table and history calls
-   still assume the site root).
+1. The app's frontend is prefix-aware. Connect's is (C39 PR B: `stripBase` and
+   `withBase` in its route table, proven by Connect's `test:e2e:base-path`
+   script); Vision's and Wear's have not been checked.
 2. Something routes `/citizens/<app>/*` to the app (a front-door project on the
    shared domain).
 3. The old addresses forward to the new ones (pages redirect, `/api/*` is
