@@ -82,6 +82,38 @@ immediately find a way to act. Citizens Connect is the platform where Pretoria's
 Kingdom community makes itself visible; the ecosystem is the infrastructure for that
 across every dimension of community life.
 
+## Two halves of Connecting the Kingdom
+
+*Recorded from the founder, 2026-11-01.*
+
+1. **App-driven** — connecting and representing a large portion of Christian activity in
+   one central place. This is what the app is for.
+2. **Human-driven** — collaborative efforts that bring people together under united goals.
+   This is the founder's external work, for the future.
+
+The app-driven half comes first. Judge app features by whether they widen access and
+awareness of the vast Christian market and utility, and so make the human half possible.
+
+## What Connect aims to boast (the founder's list, 2026-11-01)
+
+These are aspirations, not a status report. `RESUME_HERE.md` says what is built.
+
+- **Discovery map** for every Christian expression, happening and creation.
+- **Intuitive, animated, interactive pins**, inclusions and navigation, so discovery is a
+  pleasure and each entity can be understood in depth.
+- **Personal profile customisation** for community discovery, communication, interaction
+  and connection, with safety rails that protect privacy.
+- **Extensive, all-in-one, image-first Contributor profiles**: social platforms, community
+  engagement and updates in one place to explore.
+- **Dedicated tools and pages for Contributors** to customise their own entries and
+  exposure, fully and easily.
+- **Immediately accessible content**: public Christian news, updates, community meet-ups,
+  insights, security and online events.
+- **Engagement for every user**: following, messaging, nudging (Convincing) other users,
+  profile customisation and exploring the ecosystem.
+
+More features may be added as we go.
+
 ## The ecosystem (one north star, many channels)
 
 - **Citizens Connect** — the discovery + connection layer (current focus). Map,
@@ -95,6 +127,11 @@ across every dimension of community life.
 - **Citizens Equip** — Discovery of Christian educational, equipping and training organisations
 - **Citizens Play** — Cloud based Christian platform providing storage, resources, tools
   games and entertainment to break the ice, share fun and share memories for Chrsitian gatherings of any size.
+
+The platforms offer physical, real-world use, and each one is reachable from inside every
+other application. Examples: find and buy clothing (Wear); get ice-breakers for weekly
+fellowship groups and games nights (Play); get connected to ministry and leadership
+equipping sources, teachers and institutes (Equip). *(Founder, 2026-11-01.)*
 
 ## Culture
 
