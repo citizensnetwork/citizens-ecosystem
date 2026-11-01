@@ -33,7 +33,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isApprovedContributor } from "@/lib/profiles/capabilities";
-import { CONTRIBUTOR_TYPES, isContributorType } from "@/lib/categories";
+import { CONTRIBUTOR_TYPES, isContributorType, needsExtraReview } from "@/lib/categories";
 import { coercePublicUrl, normaliseSocialValue } from "@/lib/publicUrl";
 import { MAX_ADDRESS, MAX_BIO, MAX_DISPLAY_NAME, MAX_URL, trimOrNull } from "@/lib/contributorFields";
 import { adminNotifyEmail, sendEmail } from "@/lib/email/send";
@@ -134,6 +134,11 @@ export async function POST(request: Request) {
   // defensively.
   const noFixedLocation = payload.no_fixed_location === true;
 
+  // Care / Recovery (founder decision 2026-10-21, issue #202): they OPT IN to the map. Unless the body says
+  // `show_on_map: true`, the address and the pin are never stored, whatever else was sent, so the safe default
+  // holds even for a client that forgets the question. The category is the server's own check, not the wizard's.
+  const keepOffMap = needsExtraReview(contributorCategory) && payload.show_on_map !== true;
+
   // The website ends up rendered as a real link (profile page, and the
   // Kingdom Discovery card's Website button), so it must be http(s) — a
   // stored `javascript:` URL is stored XSS. The wizard's own placeholder is
@@ -173,7 +178,7 @@ export async function POST(request: Request) {
     socialUrls[key] = norm;
   }
 
-  const physicalAddress = noFixedLocation ? null : trimOrNull(payload.physical_address, MAX_ADDRESS);
+  const physicalAddress = noFixedLocation || keepOffMap ? null : trimOrNull(payload.physical_address, MAX_ADDRESS);
   const insertRow = {
     user_id: user.id,
     status: "pending" as const,
@@ -188,8 +193,8 @@ export async function POST(request: Request) {
     youtube_url: socialUrls.youtube_url,
     no_fixed_location: noFixedLocation,
     physical_address: physicalAddress,
-    physical_latitude: noFixedLocation ? null : finiteOrNull(payload.physical_latitude),
-    physical_longitude: noFixedLocation ? null : finiteOrNull(payload.physical_longitude),
+    physical_latitude: noFixedLocation || keepOffMap ? null : finiteOrNull(payload.physical_latitude),
+    physical_longitude: noFixedLocation || keepOffMap ? null : finiteOrNull(payload.physical_longitude),
     motivation_text: trimOrNull(payload.motivation_text, MAX_MOTIVATION),
   };
 
@@ -256,7 +261,7 @@ export async function POST(request: Request) {
       ...newApplicationAdminEmail({
         name: displayName,
         categoryLabel,
-        area: physicalAddress,
+        area: keepOffMap ? "Care / Recovery: kept off the map (extra review)" : physicalAddress,
         siteUrl: siteBase(request),
       }),
     });

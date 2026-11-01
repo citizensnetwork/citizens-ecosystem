@@ -976,11 +976,14 @@
     const submitApplication = useCallback((form, done) => {
       const finish = (ok) => { if (done) done(ok); };
       const kind = contributorKindValue(form.kind);
+      // Care / Recovery opts in to the map (#202): no address or pin unless they turned it on. The server enforces the same.
+      const offMap = window.CCPresets.keepsOffMap(form);
+      const noPin = !!form.noFixedLocation || offMap;
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
         kind: kind, bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
-        submittedAt: today(), location: form.noFixedLocation ? '' : form.location,
-        lat: form.noFixedLocation ? null : form.lat, lng: form.noFixedLocation ? null : form.lng,
+        submittedAt: today(), location: noPin ? '' : form.location,
+        lat: noPin ? null : form.lat, lng: noPin ? null : form.lng,
         noFixedLocation: !!form.noFixedLocation,
         website: form.website, socials: form.socials || {}, applicantName: (realUser && realUser.name) || '', isMine: true,
       };
@@ -1002,7 +1005,7 @@
           // exactly that. Skip geocoding entirely for a "no fixed location"
           // contributor — there's no address to resolve, and the server
           // nulls physical_* regardless of what's sent here.
-          const geo = form.noFixedLocation
+          const geo = noPin
             ? null
             : (typeof form.lat === 'number' && typeof form.lng === 'number')
               ? { lat: form.lat, lng: form.lng }
@@ -1015,7 +1018,8 @@
               contributor_category: form.category,
               bio: form.bio,
               no_fixed_location: !!form.noFixedLocation,
-              physical_address: form.noFixedLocation ? null : form.location,
+              show_on_map: form.showOnMap === true,
+              physical_address: noPin ? null : form.location,
               physical_latitude: geo ? geo.lat : null,
               physical_longitude: geo ? geo.lng : null,
               website_url: form.website || null,

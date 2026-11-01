@@ -33,9 +33,9 @@
   --text-2: #5c5444;
 
   /* accent: a fill with a near-black label; gold ink for text, rings, icons */
-  --accent: #c9a84c;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
-  --accent-ink: #8b6914;
+  --accent-ink: #836100;
 
   /* status: always paired with text, never colour alone */
   --ok: #1e6b3c;
@@ -49,7 +49,7 @@
   --pin-label-halo: rgba(255, 255, 255, 0.95);
 
   /* focus ring, dividers, dimming behind a stacked menu */
-  --focus-ring: #8b6914;
+  --focus-ring: #836100;
   --divider: rgba(10, 9, 8, 0.12);
   --scrim: rgba(10, 9, 8, 0.4);
 
@@ -153,7 +153,7 @@
   --explore-bg: rgba(255, 255, 255, 0.96);  /* the Explore panel: nearly solid and NOT blurred (a large blur re-renders every pan frame) */
   --glass-blur: 16px;
   --nav-dim: rgba(10, 9, 8, 0.18);          /* the map fades back a little while the nav is open */
-  --accent-soft: rgba(201, 168, 76, 0.26);  /* the selected nav item's soft gold highlight */
+  --accent-soft: rgba(242, 189, 34, 0.26);  /* the selected nav item's soft gold highlight */
   --select-w: 3px;                          /* the gold ring of the nav button and a selected Explore card */
   --nav-btn: 56px;                          /* the folded nav: one round button */
   --nav-zone: calc(var(--nav-btn) + var(--space-3) * 2 + env(safe-area-inset-bottom, 0px));
@@ -181,9 +181,9 @@
   --text-1: #f7f4ee;
   --text-2: #b9ae9a;
 
-  --accent: #c9a84c;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
-  --accent-ink: #e8d48b;
+  --accent-ink: #f2bd22;
 
   --ok: #62d68f;
   --closed: #ff8f80;
@@ -194,7 +194,7 @@
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
 
-  --focus-ring: #e8d48b;
+  --focus-ring: #f2bd22;
   --divider: rgba(247, 244, 238, 0.14);
   --scrim: rgba(0, 0, 0, 0.55);
 
@@ -213,7 +213,7 @@
   --glass-bg: rgba(26, 23, 20, 0.84);
   --explore-bg: rgba(26, 23, 20, 0.96);
   --nav-dim: rgba(0, 0, 0, 0.32);
-  --accent-soft: rgba(201, 168, 76, 0.3);
+  --accent-soft: rgba(242, 189, 34, 0.3);
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
