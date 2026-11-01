@@ -21,7 +21,7 @@
 (function () {
   const h = React.createElement;
   const F = React.Fragment;
-  const { useState, useEffect, useCallback } = React;
+  const { useState, useEffect, useCallback, useRef } = React;
   const { cx, Button, Field, Input, Textarea, Toggle, Empty } = window.UI;
   const Icon = window.Icon;
 
@@ -127,9 +127,114 @@
     facebook_url: 'Facebook', tiktok_handle: 'TikTok', youtube_url: 'YouTube', x_handle: 'X', linkedin_url: 'LinkedIn',
   };
 
+  // ── choosing several suggestions at once (pure) ──────────────────────────
+
+  /** What a suggestion is called to someone using a screen reader: its title, or what it would change. */
+  function suggestionTitle(s) {
+    const p = (s && s.payload) || {};
+    if (s && s.kind === 'profile') return 'Update your ' + (FIELD_LABEL[p.field] || 'profile');
+    return p.title || (s && s.kind === 'news' ? 'News post' : 'Event');
+  }
+
+  /** `picked` is a list of ids. Add or remove one, never duplicating. */
+  function toggled(picked, id, on) {
+    const rest = picked.filter((x) => x !== id);
+    return on ? rest.concat(id) : rest;
+  }
+
+  /**
+   * The selection as it stands against what is STILL waiting: a card decided somewhere else (another
+   * tab, an editor, a per-card Dismiss) drops out, so a count or a confirm can never mention it.
+   */
+  function selectionOf(pending, picked) {
+    const ids = pending.map((s) => s.id).filter((id) => picked.indexOf(id) !== -1);
+    const total = pending.length;
+    return { ids, count: ids.length, total, all: total > 0 && ids.length === total, some: ids.length > 0 && ids.length < total };
+  }
+
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const selectionText = (count, total) => (count === 0 ? 'None selected' : count + ' of ' + total + ' selected');
+  const dismissQuestion = (count) => 'Dismiss ' + plural(count, 'suggestion', 'suggestions') + '?';
+
+  /** The toast after a batch Dismiss. `failed` of `total` were not dismissed and stay selected. */
+  function dismissedText(total, failed) {
+    if (!failed) return 'Dismissed ' + plural(total, 'suggestion', 'suggestions') + '.';
+    return 'Dismissed ' + (total - failed) + ' of ' + total + '. ' + failed + (failed === 1 ? ' is' : ' are') + ' still selected. Please try again.';
+  }
+
+  /** Run `fn` over `items`, `size` at a time, keeping the order of the results. */
+  async function mapInChunks(items, size, fn) {
+    const out = [];
+    for (let i = 0; i < items.length; i += size) {
+      out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+    }
+    return out;
+  }
+
+  // ── editing a suggestion that is still waiting (pure) ────────────────────
+
+  /** The fields an owner can change, as the form shows them (an event's start split into their local date and time). */
+  function draftFromSuggestion(s) {
+    const p = (s && s.payload) || {};
+    if (s && s.kind === 'event') {
+      const start = new Date(p.start);
+      const ok = !isNaN(start.getTime());
+      return { title: p.title || '', description: p.description || '', location: p.location || '', date: ok ? localDate(start) : '', time: ok ? localTime(start) : '' };
+    }
+    if (s && s.kind === 'news') return { title: p.title || '', body: p.body || '' };
+    return { value: p.value || '' };
+  }
+
+  /**
+   * What the owner changed, in payload terms (the keys the server accepts), or null when nothing differs.
+   * A new date or time becomes `start`, an ISO instant from their local clock; an unreadable one becomes ''
+   * so the server's own rule refuses it with its own reason.
+   */
+  function changesFromDraft(s, draft) {
+    const before = draftFromSuggestion(s);
+    const changes = {};
+    Object.keys(before).forEach((k) => {
+      if (k !== 'date' && k !== 'time' && draft[k] !== before[k]) changes[k] = draft[k];
+    });
+    if (s.kind === 'event' && (draft.date !== before.date || draft.time !== before.time)) {
+      const when = draft.date && draft.time ? new Date(draft.date + 'T' + draft.time) : null;
+      changes.start = when && !isNaN(when.getTime()) ? when.toISOString() : '';
+    }
+    return Object.keys(changes).length ? changes : null;
+  }
+
+  /** The suggestion's payload with `changes` laid over it. Moving an event's start moves its end too (the length is kept), as on the server. */
+  function applyChanges(s, changes) {
+    const p = Object.assign({}, s.payload, changes || {});
+    if (s.kind === 'event' && changes && changes.start && !('end' in changes) && s.payload.end) {
+      const was = Date.parse(s.payload.start);
+      const wasEnd = Date.parse(s.payload.end);
+      const next = Date.parse(changes.start);
+      if (isFinite(was) && isFinite(wasEnd) && isFinite(next)) p.end = new Date(next + (wasEnd - was)).toISOString();
+    }
+    return p;
+  }
+
+  const EDIT_ERRORS = {
+    event_title_required: 'Please give it a title of at least 3 letters.',
+    news_title_required: 'Please give it a title of at least 3 letters.',
+    news_body_required: 'A news post needs some text.',
+    event_start_invalid: 'Please check the date and the time.',
+    event_start_out_of_range: 'That date is too far away to be right. Please check it.',
+    profile_value_required: 'Please type the new text.',
+    profile_value_invalid: 'That does not look right for this field. Please check it.',
+    not_pending: 'This one has already been dealt with, so it has left your list.',
+    not_found: 'This one is no longer in your list.',
+    consent_off: 'Automatic updates are off, so nothing can be saved.',
+    rate_limited: 'Too many tries. Please wait a moment.',
+    edit_unavailable: 'Saving changes is not switched on yet. You can still change the text and publish it.',
+  };
+  const editErrorText = (reason) => EDIT_ERRORS[reason] || 'Could not save that change. Please try again.';
+
   window.CC_AUTOMATION_HELPERS = {
     LEVELS, SOURCE_KINDS, parseSourceUrl, sourceDomain, timeAgo, eventFormFromPayload, newsFormFromPayload,
-    profileFieldsFrom, FIELD_LABEL,
+    profileFieldsFrom, FIELD_LABEL, suggestionTitle, toggled, selectionOf, selectionText, dismissQuestion,
+    dismissedText, mapInChunks, draftFromSuggestion, changesFromDraft, applyChanges, editErrorText,
   };
 
   // ── the hook ─────────────────────────────────────────────────────────────
@@ -144,6 +249,8 @@
     // status: 'idle' (not applicable) | 'loading' | 'ready' | 'unavailable'
     const [data, setData] = useState({ status: 'idle', settings: null, sources: [], suggestions: [] });
     const [busy, setBusy] = useState(false);
+    // Set when the server says it cannot save edits yet (the database function is not deployed): the form then stops offering Save.
+    const [saveOff, setSaveOff] = useState(false);
     // An editor writes sources against the listing, not their own profile.
     const uid = listingRole === 'editor' ? activeContributorId : (realUser ? realUser.id : null);
 
@@ -224,9 +331,52 @@
       return true;
     });
 
-    // Publish a pending suggestion. `edited` (optional) is the owner's inline edit of the payload.
+    // Dismiss several at once: the same database call as one Dismiss, a few at a time. A dismissed row
+    // stays (only its status changes), so its fingerprint still tells the Reader "already known" and the
+    // same item is not suggested again. Resolves to { total, failedIds }, or false when not ready.
+    const dismissOne = async (id) => {
+      const { data: res, error } = await sb.rpc('decide_listing_suggestion', { _id: id, _action: 'dismiss', _ref: null });
+      if (error || !res) return 'failed';
+      if (res.success) return 'done';
+      // Already decided somewhere else, or removed: it is out of the inbox either way.
+      return res.reason === 'not_pending' || res.reason === 'not_found' ? 'gone' : 'failed';
+    };
+    const dismissMany = guard(async (ids) => {
+      const outcomes = await mapInChunks(ids, 6, dismissOne);
+      const failedIds = ids.filter((_, i) => outcomes[i] === 'failed');
+      toast(dismissedText(ids.length, failedIds.length), failedIds.length ? 'red' : 'green');
+      await load();
+      return { total: ids.length, failedIds };
+    });
+
+    // Keep an edit of a waiting suggestion without publishing it. The server checks it with the same rules as
+    // a suggestion from the Reader (validateSuggestion) and that the caller may edit this listing; it resolves
+    // to { ok: true, payload, warnings } or { ok: false, message }.
+    const saveEdit = guard(async (s, changes) => {
+      let res;
+      let body = null;
+      try {
+        res = await window.authedFetch('/api/automation/suggestions/' + encodeURIComponent(s.id), { method: 'PATCH', body: JSON.stringify({ edits: changes }) });
+        body = await res.json().catch(() => null);
+      } catch (e) {
+        return { ok: false, message: editErrorText() };
+      }
+      if (!res.ok || !body || !body.payload) {
+        // A missing route or function, a proxy error page: all "not available", never a half-save.
+        const reason = (body && body.error) || ([404, 405, 501, 502, 503].indexOf(res.status) !== -1 ? 'edit_unavailable' : undefined);
+        if (reason === 'edit_unavailable') setSaveOff(true);
+        if (reason === 'not_pending' || reason === 'not_found') await load(); // it has left the list
+        return { ok: false, message: editErrorText(reason) };
+      }
+      const warnings = body.warnings || [];
+      toast(warnings.length ? 'Saved. ' + warnings.join(' ') : 'Saved. It is still waiting for you to publish or dismiss.', warnings.length ? 'gold' : 'green');
+      await load();
+      return { ok: true, payload: body.payload, warnings };
+    });
+
+    // Publish a pending suggestion. `edited` (optional) is what the owner changed in the form, in payload terms.
     const publish = guard(async (s, edited) => {
-      const p = Object.assign({}, s.payload, edited || {});
+      const p = applyChanges(s, edited);
       const finishWith = async (ok, ref) => {
         if (!ok) return false; // the create function already told the owner
         // An event or post must be linked to the suggestion (the database checks it is theirs).
@@ -265,7 +415,7 @@
 
     const pending = data.suggestions.filter((s) => s.status === 'pending');
     const autoPublished = data.suggestions.filter((s) => s.status === 'auto_published');
-    return Object.assign({}, data, { enabled, busy, pending, autoPublished, canManageConsent, viewOnly, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, publish, unpublish });
+    return Object.assign({}, data, { enabled, busy, pending, autoPublished, canManageConsent, viewOnly, saveOff, reload: load, setLevel, addSource, toggleSource, removeSource, dismiss, dismissMany, saveEdit, publish, unpublish });
   }
 
   // ── Profile tab: the card ────────────────────────────────────────────────
@@ -347,8 +497,22 @@
 
   // ── Suggestions tab ──────────────────────────────────────────────────────
 
-  function Card({ children, kind }) {
-    return h('div', { className: 'bg-card rounded-2xl border border-border p-4 space-y-3', 'data-suggestion': kind }, children);
+  function Card({ children, kind, selected }) {
+    return h('div', {
+      className: cx('bg-card rounded-2xl border p-4 space-y-3 transition-colors', selected ? 'border-gold bg-accent/30' : 'border-border'),
+      'data-suggestion': kind, 'data-selected': selected ? 'true' : undefined,
+    }, children);
+  }
+
+  // A native checkbox, so Space, the screen reader's "checkbox, not checked" and the browser's own
+  // focus ring all work. The label around it makes the whole 44 x 44 px square tappable.
+  function PickBox({ checked, onChange, label, disabled }) {
+    return h('label', { className: 'shrink-0 w-11 h-11 flex items-center justify-center cursor-pointer' },
+      h('input', {
+        type: 'checkbox', checked, disabled, 'aria-label': label,
+        onChange: (e) => onChange(e.target.checked),
+        className: 'w-5 h-5 accent-[#A67C00] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A67C00]',
+      }));
   }
 
   function SourceLine({ url }) {
@@ -362,15 +526,35 @@
     return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  function SuggestionCard({ s, auto }) {
+  function SuggestionCard({ s, auto, pick }) {
     const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(() => draftFromSuggestion(s));
+    const [problem, setProblem] = useState('');
+    const rowRef = useRef(null);
+    const backToEdit = useRef(false);
     const p = s.payload || {};
-    const [draft, setDraft] = useState(() => (
-      s.kind === 'event' ? { title: p.title || '', description: p.description || '', location: p.location || '' }
-      : s.kind === 'news' ? { title: p.title || '', body: p.body || '' }
-      : { value: p.value || '' }));
-    const set = (k) => (e) => setDraft((d) => Object.assign({}, d, { [k]: e.target.value }));
-    const edited = editing ? draft : null;
+    const set = (k) => (e) => { setProblem(''); setDraft((d) => Object.assign({}, d, { [k]: e.target.value })); };
+    // What would change if this were saved or published now (null: nothing).
+    const changes = editing ? changesFromDraft(s, draft) : null;
+    const tall = 'min-h-[44px]';
+
+    // After the form closes, a keyboard or screen-reader user lands back on "Edit", not on nothing.
+    useEffect(() => {
+      if (editing || !backToEdit.current) return;
+      backToEdit.current = false;
+      const el = rowRef.current && rowRef.current.querySelector('[data-focus="edit"]');
+      if (el) el.focus();
+    }, [editing]);
+
+    const startEditing = () => { setDraft(draftFromSuggestion(s)); setProblem(''); setEditing(true); };
+    const stopEditing = (from) => { backToEdit.current = true; setProblem(''); setDraft(draftFromSuggestion(from || s)); setEditing(false); };
+    const save = async () => {
+      if (!changes) return;
+      const res = await auto.saveEdit(s, changes);
+      if (!res) return;
+      if (!res.ok) { setProblem(res.message); return; }
+      stopEditing({ kind: s.kind, payload: res.payload });
+    };
 
     const head = s.kind === 'event'
       ? h('div', null,
@@ -380,21 +564,36 @@
         ? h('p', { className: 'text-sm font-bold text-foreground' }, p.title)
         : h('p', { className: 'text-sm font-bold text-foreground' }, 'Update your ' + (FIELD_LABEL[p.field] || 'profile'));
     const body = s.kind === 'profile' ? p.value : (s.kind === 'news' ? p.body : p.description);
+    const valueLabel = FIELD_LABEL[p.field] || 'New value';
 
-    return h(Card, { kind: s.kind },
-      head,
+    return h(Card, { kind: s.kind, selected: !!(pick && pick.checked) },
+      h('div', { className: 'flex items-start gap-1' },
+        pick && h('div', { className: '-ml-3 -mt-2 -mb-2' },
+          h(PickBox, { checked: pick.checked, disabled: pick.disabled, onChange: pick.onChange, label: 'Select ' + suggestionTitle(s) })),
+        h('div', { className: cx('flex-1 min-w-0', pick && 'pt-0.5') }, head)),
       !editing && body && h('p', { className: 'text-xs text-muted-foreground leading-relaxed line-clamp-4 whitespace-pre-line' }, body),
-      editing && h('div', { className: 'space-y-2' },
-        s.kind !== 'profile' && h(Field, { label: 'Title' }, h(Input, { value: draft.title, onChange: set('title'), maxLength: 120, 'aria-label': 'Title' })),
-        s.kind === 'event' && h(Field, { label: 'Where' }, h(Input, { value: draft.location, onChange: set('location'), maxLength: 300, 'aria-label': 'Where' })),
+      editing && h('div', { className: 'space-y-2', onKeyDown: (e) => { if (e.key === 'Escape') stopEditing(); }, 'data-editing': s.kind },
+        s.kind !== 'profile' && h(Field, { label: 'Title' }, h(Input, { value: draft.title, onChange: set('title'), maxLength: 120, 'aria-label': 'Title', autoFocus: true, className: tall })),
+        s.kind === 'event' && h('div', { className: 'grid grid-cols-2 gap-2' },
+          h(Field, { label: 'Date' }, h(Input, { type: 'date', value: draft.date, onChange: set('date'), 'aria-label': 'Date', className: tall })),
+          h(Field, { label: 'Time' }, h(Input, { type: 'time', value: draft.time, onChange: set('time'), 'aria-label': 'Time', className: tall }))),
+        s.kind === 'event' && h(Field, { label: 'Where' }, h(Input, { value: draft.location, onChange: set('location'), maxLength: 300, 'aria-label': 'Where', className: tall })),
         s.kind === 'event' && h(Field, { label: 'Details' }, h(Textarea, { value: draft.description, onChange: set('description'), rows: 4, maxLength: 2000, 'aria-label': 'Details' })),
         s.kind === 'news' && h(Field, { label: 'Post' }, h(Textarea, { value: draft.body, onChange: set('body'), rows: 5, maxLength: 4000, 'aria-label': 'Post' })),
-        s.kind === 'profile' && h(Field, { label: FIELD_LABEL[p.field] || 'New value' }, h(Textarea, { value: draft.value, onChange: set('value'), rows: 3, maxLength: 1000, 'aria-label': FIELD_LABEL[p.field] || 'New value' }))),
+        s.kind === 'profile' && h(Field, { label: valueLabel }, h(Textarea, { value: draft.value, onChange: set('value'), rows: 3, maxLength: 1000, 'aria-label': valueLabel, autoFocus: true })),
+        problem && h('p', { role: 'alert', className: 'text-xs font-semibold text-destructive' }, problem),
+        h('p', { className: 'text-[11px] text-muted-foreground leading-relaxed' },
+          auto.saveOff
+            ? 'Saving changes is not switched on yet. Publish this when it looks right, or dismiss it.'
+            : 'Save keeps your changes here and nothing is published yet. You can publish or dismiss it later.')),
       h(SourceLine, { url: s.source_url }),
-      !auto.viewOnly && h('div', { className: 'flex flex-wrap gap-2' },
-        h(Button, { variant: 'primary', size: 'sm', icon: 'Check', disabled: auto.busy, onClick: () => auto.publish(s, edited) }, s.kind === 'profile' ? 'Apply' : 'Publish'),
-        h(Button, { variant: 'outline', size: 'sm', icon: 'Pencil', disabled: auto.busy, onClick: () => setEditing((v) => !v) }, editing ? 'Stop editing' : 'Edit'),
-        h(Button, { variant: 'ghost', size: 'sm', icon: 'X', disabled: auto.busy, onClick: () => auto.dismiss(s.id) }, 'Dismiss')));
+      !auto.viewOnly && h('div', { ref: rowRef, className: 'flex flex-wrap gap-2' },
+        h(Button, { variant: 'primary', size: 'sm', icon: 'Check', className: tall, disabled: auto.busy, onClick: () => auto.publish(s, changes) }, s.kind === 'profile' ? 'Apply' : 'Publish'),
+        editing
+          ? (!auto.saveOff && h(Button, { variant: 'soft', size: 'sm', icon: 'Save', className: tall, disabled: auto.busy || !changes, onClick: save }, 'Save changes'))
+          : h(Button, { 'data-focus': 'edit', variant: 'outline', size: 'sm', icon: 'Pencil', className: tall, disabled: auto.busy, onClick: startEditing }, 'Edit'),
+        editing && h(Button, { variant: 'outline', size: 'sm', className: tall, disabled: auto.busy, onClick: () => stopEditing() }, 'Cancel'),
+        h(Button, { variant: 'ghost', size: 'sm', icon: 'X', className: tall, disabled: auto.busy, onClick: () => auto.dismiss(s.id) }, 'Dismiss')));
   }
 
   function SuggestionsTab({ auto, onOpenSettings, onViewEvent }) {
@@ -408,10 +607,65 @@
     if (auto.status === 'unavailable') {
       return h(Empty, { icon: 'Sparkles', title: 'Suggestions are not available right now', sub: 'Please check back soon.' });
     }
+    return h(Inbox, { auto, onOpenSettings, onViewEvent });
+  }
+
+  // The selection bar: "Select all", how many are chosen (announced politely as it changes), and the one
+  // batch action. Dismissing asks first, in the page, and says how many.
+  function SelectionBar({ auto, sel, setPicked, onDismissed }) {
+    const [confirming, setConfirming] = useState(false);
+    const allRef = useRef(null);
+    const barRef = useRef(null);
+    // (Button does not forward a ref, so a control is found by its data-focus name.)
+    const focusOn = (name) => { const el = barRef.current && barRef.current.querySelector('[data-focus="' + name + '"]'); if (el) el.focus(); };
+    useEffect(() => { if (allRef.current) allRef.current.indeterminate = sel.some; });
+    useEffect(() => { if (confirming) focusOn('confirm'); }, [confirming]);
+    // A different selection is a different question, so an open confirm closes.
+    useEffect(() => { setConfirming(false); }, [sel.count]);
+
+    const cancel = () => { setConfirming(false); focusOn('open'); };
+    const confirm = async () => {
+      const res = await auto.dismissMany(sel.ids);
+      setConfirming(false);
+      if (!res) return;
+      setPicked(res.failedIds); // only what could not be dismissed stays selected
+      onDismissed();
+    };
+    const question = dismissQuestion(sel.count);
+
+    return h('div', { ref: barRef, className: 'bg-card rounded-2xl border border-border p-2 space-y-2', 'data-bar': 'selection' },
+      h('div', { className: 'flex flex-wrap items-center gap-x-3 gap-y-1' },
+        h('label', { className: 'flex items-center gap-1 min-h-[44px] pr-2 cursor-pointer' },
+          h('span', { className: 'w-11 h-11 flex items-center justify-center' },
+            h('input', {
+              ref: allRef, type: 'checkbox', checked: sel.all, disabled: auto.busy,
+              onChange: (e) => setPicked(e.target.checked ? auto.pending.map((s) => s.id) : []),
+              className: 'w-5 h-5 accent-[#A67C00] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A67C00]',
+            })),
+          h('span', { className: 'text-xs font-bold text-foreground' }, 'Select all (' + sel.total + ')')),
+        h('p', { role: 'status', 'aria-live': 'polite', 'data-selection-count': sel.count, className: 'text-xs text-muted-foreground flex-1' }, selectionText(sel.count, sel.total)),
+        sel.count > 0 && h('div', { className: 'flex gap-2' },
+          h(Button, { 'data-focus': 'open', variant: 'danger', size: 'sm', icon: 'Trash2', className: 'min-h-[44px]', disabled: auto.busy, 'aria-expanded': confirming, onClick: () => setConfirming(true) }, 'Dismiss selected (' + sel.count + ')'),
+          h(Button, { variant: 'ghost', size: 'sm', className: 'min-h-[44px]', disabled: auto.busy, onClick: () => setPicked([]) }, 'Clear'))),
+      confirming && sel.count > 0 && h('div', {
+        role: 'group', 'aria-label': question, onKeyDown: (e) => { if (e.key === 'Escape') cancel(); },
+        className: 'p-3 rounded-xl border border-border bg-white/60 space-y-2', 'data-confirm': 'dismiss',
+      },
+        h('p', { className: 'text-sm font-bold text-foreground' }, question),
+        h('p', { className: 'text-xs text-muted-foreground leading-relaxed' }, 'They leave this list, and we will not suggest these same items again. Nothing is deleted from your listing.'),
+        h('div', { className: 'flex flex-wrap gap-2' },
+          h(Button, { 'data-focus': 'confirm', variant: 'danger', size: 'sm', className: 'min-h-[44px]', disabled: auto.busy, onClick: confirm }, 'Yes, dismiss ' + sel.count),
+          h(Button, { variant: 'outline', size: 'sm', className: 'min-h-[44px]', disabled: auto.busy, onClick: cancel }, 'Keep them'))));
+  }
+
+  function Inbox({ auto, onOpenSettings, onViewEvent }) {
+    const [picked, setPicked] = useState([]);
+    const introRef = useRef(null);
     const groups = [['event', 'Events'], ['news', 'News posts'], ['profile', 'Profile updates']];
     const level = auto.settings.level;
+    const sel = selectionOf(auto.pending, picked);
     return h('div', { className: 'space-y-4 fade-in' },
-      h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
+      h('p', { ref: introRef, tabIndex: -1, className: 'text-xs text-muted-foreground leading-relaxed outline-none' },
         level === 'off'
           ? 'Automatic updates are off, so nothing new will arrive. '
           : 'Updates we found on your public sources wait here for your decision. ',
@@ -420,12 +674,16 @@
         icon: 'Sparkles', title: 'Nothing is waiting for you',
         sub: level === 'off' ? 'Turn on automatic updates in your Profile tab and new events, news and profile changes will appear here for you to approve.' : 'When we find something new on your website, YouTube channel or calendar it will appear here for you to approve.',
       }),
+      auto.pending.length > 0 && h(SelectionBar, { auto, sel, setPicked, onDismissed: () => { if (introRef.current) introRef.current.focus(); } }),
       groups.map(([kind, label]) => {
         const rows = auto.pending.filter((s) => s.kind === kind);
         if (!rows.length) return null;
         return h(F, { key: kind },
           h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-1' }, label),
-          rows.map((s) => h(SuggestionCard, { key: s.id, s, auto })));
+          rows.map((s) => h(SuggestionCard, {
+            key: s.id, s, auto,
+            pick: { checked: sel.ids.indexOf(s.id) !== -1, disabled: auto.busy, onChange: (on) => setPicked((cur) => toggled(cur, s.id, on)) },
+          })));
       }),
       auto.autoPublished.length > 0 && h(F, null,
         h('p', { className: 'text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2' }, 'Published automatically'),
@@ -435,8 +693,8 @@
             h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, [s.payload && whenText(s.payload.start), s.payload && s.payload.location].filter(Boolean).join(' · '))),
           h(SourceLine, { url: s.source_url }),
           h('div', { className: 'flex flex-wrap gap-2' },
-            s.published_ref && h(Button, { variant: 'outline', size: 'sm', icon: 'Calendar', onClick: () => onViewEvent(s.published_ref) }, 'View event'),
-            h(Button, { variant: 'danger', size: 'sm', icon: 'Undo2', disabled: auto.busy, onClick: () => auto.unpublish(s) }, 'Unpublish'))))));
+            s.published_ref && h(Button, { variant: 'outline', size: 'sm', icon: 'Calendar', className: 'min-h-[44px]', onClick: () => onViewEvent(s.published_ref) }, 'View event'),
+            h(Button, { variant: 'danger', size: 'sm', icon: 'Undo2', className: 'min-h-[44px]', disabled: auto.busy, onClick: () => auto.unpublish(s) }, 'Unpublish'))))));
   }
 
   window.useAutomation = useAutomation;

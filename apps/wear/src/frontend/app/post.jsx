@@ -283,7 +283,7 @@
             border: 'none',
             borderRadius: 13,
             padding: '12px 15px',
-            fontSize: 13.5,
+            fontSize: 'var(--fs-3)',
             fontWeight: 500,
             outline: 'none',
           },
