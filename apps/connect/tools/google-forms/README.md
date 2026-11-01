@@ -11,7 +11,7 @@ anybody until they say yes, and "Not me" hides the listing at once.
 ```
 You tick "Approve" in the Sheet
   → intake.gs (runs as you, inside Google)
-  → signed POST  https://www.citizenscentral.co.za/api/intake/google-form
+  → signed POST  to INTAKE_URL (the address in One-time setup, step 6)
   → Connect: check signature → validate → map labels → locate → create listing → upload logo/cover
   → the Sheet row gets Status / Listing URL / Processed at / Notes
   → the owner gets a welcome email (from your Gmail)
@@ -62,8 +62,17 @@ Owner signs in with that email (6-digit code, or Google) → Connect asks "Confi
    - Save with Ctrl+S or the disk icon.
 6. **Script properties.** In the Apps Script editor, go to Project Settings (gear) → Script
    properties → Add:
-   - `INTAKE_URL` = `https://www.citizenscentral.co.za/api/intake/google-form`. Use it exactly, with
-     `www`: the bare domain redirects and a redirect breaks the signed request.
+   - `INTAKE_URL` = the Connect intake address. **Which one depends on whether the 219.co.za move has happened**
+     (the runbook is `apps/connect/docs/CUTOVER_219.md`). To tell, open `https://219.co.za/citizens/connect` in a
+     browser: the Connect map means it has; a "not found" page means it has not.
+     - **Until the move:** `https://www.citizenscentral.co.za/api/intake/google-form`. Use it exactly, with `www`: the
+       bare domain redirects and a redirect breaks the signed request.
+     - **After the move:** `https://219.co.za/citizens/connect/api/intake/google-form`. Use it exactly: keep
+       `/citizens/connect` (the front door owns `https://219.co.za/api/...`, and `www.219.co.za` redirects), and no
+       `www.citizenscentral.co.za`.
+     - After the move the old address keeps working too: Connect hands the request on with its method and body, and
+       the runbook's Step 3 proves it. So a form still on the old address keeps delivering; switch so it no longer
+       depends on that hand-on, then run `testConnection` (step 8).
    - `INTAKE_SECRET` = the same secret as in Vercel.
 7. **Run `setup`.** This needs step 2's headers in the Sheet first; `setup` checks them.
    - In the toolbar above the code, next to **Run** and **Debug**, there's a dropdown. It said
@@ -147,7 +156,7 @@ Notes point to, then tick **Approve** again.
 | `Sheet columns: no question containing "…"` / `"…" matches 2 questions` | A Form question was renamed or duplicated, and the script finds every question by its wording (see below) | Restore the wording, or update `Q` in `intake.gs` and re-paste it |
 | `unauthorized` | The two secrets differ | Re-copy the same value into Vercel and the Script property, then redeploy |
 | `intake_not_configured` | Vercel has no `INTAKE_WEBHOOK_SECRET` | Add it (step 4) and redeploy |
-| `INTAKE_URL redirects …` | `INTAKE_URL` isn't the exact `www` address | Fix the Script property (step 6) |
+| `INTAKE_URL redirects …` | `INTAKE_URL` isn't one of the two exact addresses in step 6 (the script's message still says "the exact https://www… address"; read it as "the exact address in step 6") | Fix the Script property (step 6) |
 | `rate_limited` | Too many approvals in a minute | Wait a minute, tick again |
 | `create_failed`, `target_not_fresh`, `create_user_failed` | Server-side problem; nothing was left half-created | Tell the dev session |
 | *(Live ✓ with)* `No map pin: …` | The location couldn't be found | Live in Kingdom Discovery; the owner drops the pin from their dashboard |

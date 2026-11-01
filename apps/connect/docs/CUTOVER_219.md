@@ -1,10 +1,10 @@
 # Cutover to 219.co.za: the runbook (C39 PR D, A19)
 
 Moves the three apps onto one address each: `219.co.za/citizens/connect`, `/citizens/vision`, `/citizens/wear`
-(`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Nothing here has been done.** The code is merged
-(`@citizens/ecosystem`, the prefix in every app, the front door `apps/hub`, the old-address rules); production still
-serves every app from its own root, and Claude changes no Vercel setting, domain, variable or DNS record without a
-clear yes in chat for that step.
+(`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Steps 1 to 6 have not been done** (most
+preconditions have, see below). The code is merged (`@citizens/ecosystem`, the prefix in every app, the front door
+`apps/hub`, the old-address rules); production still serves every app from its own root, and Claude changes no Vercel
+setting, domain, variable or DNS record without a clear yes in chat for that step.
 
 Written so that a person who does not write code can follow it. Each step has the same four parts: **Why**, **Do**,
 **Check**, **Roll back**. Do the steps in order, and do not start the next one until the Check of the one before passes.
@@ -12,6 +12,14 @@ Written so that a person who does not write code can follow it. Each step has th
 > **Who does what.** The clicks in Vercel, Supabase, Google, MapTiler and Absolute Hosting are the founder's (or
 > someone the founder gives access). Claude can run every "Check" that is a command and read the result. The dashboards'
 > button names below are as they looked when this was written; if one has moved, the words around it are enough to find it.
+>
+> **The pre-flight.** `node scripts/cutover-preflight.mjs` (Node 22, from the repository root) runs this runbook's own Check commands and prints
+> one line each: `PASS`, `FAIL` or `INFO`, with the reason. It only looks (DNS lookups, GET, HEAD, OPTIONS; it never POSTs, sends no login, needs
+> no token) and exits 1 only on a `FAIL`. Run it before Step 1, after Step 1 with `--hub-url https://citizens-ecosystem-hub.vercel.app`, and after Step 4
+> with `--phase after`.
+
+**State on 2026-11-01:** P1 done and checked; P2 to P4 reported done by the founder; P5 decided; **P6 not satisfied for Wear**;
+Vercel is refusing some deployments (see "Deployment budget"); Steps 1 to 6 not started.
 
 ## What people will notice
 
@@ -24,7 +32,35 @@ Written so that a person who does not write code can follow it. Each step has th
 ## Do this at a quiet time
 
 Step 4 has a gap of up to a minute when `219.co.za` answers nothing. Early morning (South Africa) on a weekday is best.
-Allow about two hours for the whole runbook, with the checks.
+Allow about two hours for the whole runbook, with the checks. **Keep the repository quiet too:** from the first pre-flight to the last Check,
+merge and push nothing and let no other session or scheduled job push (each push costs 3 deployments, 4 once the front door exists).
+
+## Deployment budget
+
+Vercel's free plan refuses new deployments after 100 in a rolling day ("Deployment rate limited, retry in 24 hours"); the cap
+was hit about 19:00 UTC on 2026-11-01. No counter can be read. **Not known:** whether cancelled or skipped builds count, and
+how fast room returns (gradually: it is a rolling window). At 20:39 UTC one push saw Connect and Vision accepted and Wear
+refused: **one project succeeding does not prove the others will.**
+
+> **Rule: before Step 1, check that a real deployment succeeds on all three projects. If any says "rate limited", stop.**
+> The pre-flight prints `FAIL ... do not start` when the newest `main` commit's Vercel status says so. It cannot prove the
+> cap has cleared: only a deployment that completes does.
+
+| When         | What                                          | Deployments                                                                       |
+| ------------ | --------------------------------------------- | --------------------------------------------------------------------------------- |
+| P6           | Wear: a new deployment from current `main`    | 1, or 0 extra if the cutover day pack's merge does it (that merge itself makes 3) |
+| Step 1       | The front door's first deployment             | 1 (2 if you redeploy after changing its Node version)                             |
+| Step 2       | Redeploy Vision and Wear                      | 2                                                                                 |
+| Step 3       | Redeploy Connect                              | 1                                                                                 |
+| Steps 4, 5   | Move the domain; Supabase and Apps Script     | 0                                                                                 |
+| Step 6       | Redeploy Vision and Wear                      | 2                                                                                 |
+| **Total**    | Happy path                                    | **7** (6 if the day pack's merge covers P6; 8 with the Node redeploy)             |
+
+- A roll back by "remove the variable and redeploy" costs the same again (Step 2: 2, Step 3: 1, Step 6: 2); Instant Rollback
+  builds nothing and is believed not to count (unverified). Worst case about 12: **keep at least 15 free.**
+- Every push to a PR branch costs 3 (a preview per project, built or skipped), 4 once the front door exists; every merge to
+  `main` costs the same again. A change that is not docs-only under `scripts/`, `supabase/` or a root file builds every app instead
+  of skipping (a package builds its dependents; `scripts/vercel-ignore.mjs`). A cheaper order is proposed after Step 6 (saves 2; not in force).
 
 ---
 
@@ -33,6 +69,9 @@ Allow about two hours for the whole runbook, with the checks.
 Do all of these first. Every one is reversible and none changes what visitors see today.
 
 ### P1. Remove the two parking nameservers at Absolute Hosting
+
+**Status: DONE, checked from 1.1.1.1 and 8.8.8.8 on 2026-11-01:** the delegation is only `ns1.vercel-dns.com` and
+`ns2.vercel-dns.com`, and the apex and `www` answer Vercel addresses. The text below stays for a re-check.
 
 **Why.** The registry lists four nameservers for `219.co.za`: Vercel's two (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`) and
 two parking servers (`parking1.zadns.co.za`, `parking2.zadns.co.za`). Resolvers pick among them, so some visitors get
@@ -52,12 +91,16 @@ nslookup 219.co.za 8.8.8.8
 nslookup www.219.co.za 1.1.1.1
 ```
 
-All must show **only** the two `vercel-dns.com` names, and the address answers must be the same on both resolvers and must
-**not** be `102.214.8.148`. If they differ, wait and repeat. **Do not continue until both resolvers agree.**
+Both name-server answers must show **only** the two `vercel-dns.com` names, and no address answer may be `102.214.8.148`. The addresses
+need **not** be identical: Vercel hands out a pool (on 2026-11-01 one resolver gave `64.29.17.x` addresses on one query and `216.198.79.x` on the
+next), so each must be a Vercel address and none the parking one. If a name-server answer differs or the parking address shows,
+wait and repeat. **Do not continue until both resolvers agree on the name servers.** The pre-flight's `dns/...` lines do the same test.
 
 **Roll back.** Add the two parking nameservers again at Absolute Hosting.
 
 ### P2. Let `219.co.za` load the map (MapTiler)
+
+**Status: reported DONE by the founder, 2026-11-01.** Claude cannot see this dashboard; it is not checked.
 
 **Why.** The map key only works on the websites it lists. If the new address is missing, the map is blank there.
 
@@ -70,6 +113,8 @@ for it separately). Keep the existing entries. Save. **Do this before anyone ope
 **Roll back.** Remove the entry.
 
 ### P3. Let sign-in come back to the new address (Supabase)
+
+**Status: reported DONE by the founder, 2026-11-01.** Claude cannot see this dashboard; it is not checked.
 
 **Why.** After signing in, Supabase only sends a person back to addresses on its allowed list.
 
@@ -86,6 +131,8 @@ for it separately). Keep the existing entries. Save. **Do this before anyone ope
 
 ### P4. Let Google sign-in work on the new address
 
+**Status: reported DONE by the founder, 2026-11-01.** Claude cannot see this console; it is not checked.
+
 **Do.** [console.cloud.google.com](https://console.cloud.google.com) > the project that holds the sign-in client >
 **APIs & Services** > **Credentials** > the **OAuth 2.0 Client ID** the site uses > **Authorised JavaScript origins** >
 **Add URI**: `https://219.co.za`. Save. Leave **Authorised redirect URIs** alone if they point at
@@ -97,15 +144,32 @@ for it separately). Keep the existing entries. Save. **Do this before anyone ope
 
 ### P5. Decisions the founder owes (they do not block the steps, they block going public)
 
-- Read the wording on the new landing page and the coming-soon pages (listed in the PR that built them) and answer the
-  open questions there.
-- `learn` means courses, teachers and all learning material, and `impact` is reserved (both decided by the founder, 2026-11-01).
+**Status: DECIDED by the founder, 2026-11-01, and merged in #318.** Nothing is open.
+
+- The wording on the landing page and the coming-soon pages is approved as written.
+- `learn` means courses, teachers and all learning material, and `impact` is reserved and shown as a Coming soon card.
 
 ### P6. Make sure the latest code is live first
 
-The apps and the front door must be deployed from a `main` that contains PR C **and** the Vision fix for
-`CONNECT_API_BASE_URL` (Vision used to drop any path in that variable; Step 6 depends on the fix). Open each project's
-**Deployments** tab and confirm the newest **Production** deployment is **Ready** and was built from that `main`.
+**Status: NOT satisfied for Wear (checked 2026-11-01).** The apps and the front door must be deployed from a `main` that
+contains PR C (`c9d60a74`) **and** the Vision fix for `CONNECT_API_BASE_URL` (Vision used to drop any path in that variable;
+Step 6 depends on it). Connect's and Vision's newest Production deployments are from `main` that day. Wear's is from
+`868f1aa8`, before PR C: the deployments after it were refused by the rate limit, so they were never created.
+
+**Check.** The proof that the front-door code is live in an app is that its `index.html` carries the relative icon link
+(Connect and Vision print it, Wear prints nothing today). The pre-flight's `app/...` lines run this for all three:
+
+```powershell
+curl.exe -s https://citizens-ecosystem-wear.vercel.app/index.html | findstr "icons/icon.svg"
+```
+
+Also confirm in each project's **Deployments** tab that the newest **Production** deployment is **Ready** and built from the
+`main` you mean.
+
+**Do.** Wear needs a **new** deployment from the current `main`: **Redeploy** on its old deployment rebuilds that deployment's
+commit (`868f1aa8` again). A merge to `main` that is not docs-only should do it, since Wear's ignore step compares with its
+last good build (inferred from `scripts/vercel-ignore.mjs`, not yet seen); the cutover day pack's merge is one. Otherwise ask
+Claude to create it (needs your yes; costs 1).
 
 ---
 
@@ -127,14 +191,15 @@ The apps and the front door must be deployed from a `main` that contains PR C **
 8. **Deploy**. When it says **Ready**, click **Visit**.
 
 Then open the project > **Settings** > **General** and make **Node.js Version** the same as the Connect project's.
+(*Costs 1 deployment, 2 if you redeploy after changing the Node version.*)
 
 **Check.** Call the test address `H`. Everything on this list works, except the line marked "not yet":
 
 | Open                                        | You should see                                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `https://H/`                                | The address changes to `https://H/citizens`                                                   |
-| `https://H/citizens`                        | "Connecting the Kingdom", three cards that say "Open ..." and three that say "Coming soon"    |
-| `https://H/citizens/learn`, `/play`, `/move` | A "Coming soon" page for each, with a link back                                              |
+| `https://H/citizens`                        | "Connecting the Kingdom", three cards that say "Open ..." and four that say "Coming soon"     |
+| `https://H/citizens/learn`, `/play`, `/move`, `/impact` | A "Coming soon" page for each, with a link back                                   |
 | `https://H/citizens/nothing`                | "Page not found"                                                                              |
 | `https://H/robots.txt`, `/sitemap.xml`      | Plain text and XML                                                                            |
 | `https://H/citizens/connect`                | **Not yet.** A "not found" page: Connect is not under its prefix until Step 3. This is expected. |
@@ -157,9 +222,9 @@ yet. The front door can then reach them.
 2. **Key**: `NEXT_PUBLIC_BASE_PATH`. **Value**: `/citizens/vision` for Vision, `/citizens/wear` for Wear. Type it exactly:
    lowercase, a leading slash, no trailing slash or space. **Environments**: tick **Production** only; untick Preview and
    Development. **Save**.
-3. **Deployments** tab > the newest **Production** deployment > the **...** menu > **Redeploy** > **untick** "Use existing
-   Build Cache" > **Redeploy**. Wait for **Ready**. (The value is read when the app is built, so it does nothing until
-   there is a new build.)
+3. **Deployments** tab > the newest **Production** deployment (after P6 its Source commit is the current `main`) > the
+   **...** menu > **Redeploy** > **untick** "Use existing Build Cache" > **Redeploy**. Wait for **Ready**. (The value is
+   read when the app is built, so it does nothing until there is a new build. *Costs 1 deployment per project, 2 in all.*)
 
 A wrong value makes the build fail with a message that names the right one; nothing goes live from a failed build.
 
@@ -196,6 +261,7 @@ turns the old `www.citizenscentral.co.za` addresses into forwards.
 3. `NEXT_PUBLIC_SITE_URL` = `https://219.co.za` (the address only: no `/citizens/connect`, no trailing slash), **Production**
    only. If a row for it already exists, click **...** > **Edit**, and **write the old value down first**: you need it to roll back.
 4. **Deployments** > newest **Production** deployment > **...** > **Redeploy**, "Use existing Build Cache" **unticked**.
+   (*Costs 1 deployment.*)
 
 **What changes the moment it is Ready.** `www.citizenscentral.co.za` and `citizenscentral.co.za` send every page address to the
 same path under `https://219.co.za/citizens/connect/`, and the bare `/` on any other Connect address
@@ -233,7 +299,7 @@ own address; this could not be tried before today). **Roll back at once** (below
 otherwise stop delivering Contributors.
 
 In a browser, open `https://219.co.za/citizens/connect`: the map shows (P2), and sharing a listing makes a link that starts
-`https://219.co.za/citizens/connect/`.
+`https://219.co.za/citizens/connect/`. `--phase after` of the pre-flight runs commands 1 to 6 and 8; **it never sends command 7** (a POST): run that by hand.
 
 **Roll back.** **Environment Variables**: **Remove** `NEXT_PUBLIC_BASE_PATH`, put `NEXT_PUBLIC_SITE_URL` back to the old value you
 wrote down (or remove it if it did not exist), **Redeploy** without the build cache. Connect serves from its root again and
@@ -254,8 +320,8 @@ wrote down (or remove it if it did not exist), **Redeploy** without the build ca
    Choose to connect it to **Production**.
 3. **Add** `www.219.co.za`. When it asks what to do, choose **Redirect to Another Domain**, pick `219.co.za`, and keep the
    status **308 Permanent Redirect**.
-4. Wait until both rows say **Valid Configuration** (a minute or two). The certificate was already issued for both names
-   (valid to 2027-01-30); Vercel re-uses or renews it.
+4. Wait until both rows say **Valid Configuration** (a minute or two). Both names already have a valid certificate (two
+   separate ones, from Let's Encrypt, valid to 2027-01-30, read on 2026-11-01); Vercel re-uses or renews them. *No deployment.*
 
 **Check.** Right away:
 
@@ -272,6 +338,8 @@ curl.exe -sI https://219.co.za/citizens/connect
 | 2       | `308`, `location: https://219.co.za/` (the apex)                                                               |
 | 3       | `200`, the front door's page; its `content-security-policy` ends `frame-ancestors 'none'` and has no `unsafe-inline` |
 | 4       | `200`, **Connect's** page and **Connect's** `content-security-policy` (it lists `unpkg.com`), exactly one such line  |
+
+`--phase after` of the pre-flight runs these four too.
 
 **Roll back.** Hub > **Settings** > **Domains**: **Remove** both. Connect > **Settings** > **Domains** > **Add** `219.co.za` and
 `www.219.co.za` again. Because Step 3 is still on, `https://219.co.za/citizens/connect/...` keeps working while the domain
@@ -319,12 +387,40 @@ https://citizens-ecosystem-connect.vercel.app/citizens/connect
 
 (Connect's own project address, **not** `219.co.za`: a server-to-server call needs no detour through the front door. No
 trailing slash. No `/api/v1` on the end.) **Production** only. Write the old value down. Then **Redeploy** both projects
-(without the build cache).
+(without the build cache; *2 deployments*).
 
 **Check.** In Vision, open the page that lists Connect's events or places; in Wear, open the Contributors directory.
 Both show data (they would show an empty list or an error if the address were wrong).
 
 **Roll back.** Put the old value back and redeploy; it keeps working through the pass-through.
+
+---
+
+## PROPOSAL (not adopted): Connect first, then Vision and Wear with one redeploy each
+
+> **A proposal for the founder to accept or refuse. The steps above stay in their written order until you say so.**
+
+**The idea.** Step 6 is last only because its value (`.../citizens/connect`) needs Connect under its prefix already. Do Step 3 first; then, in Step 2, set
+`NEXT_PUBLIC_BASE_PATH` **and** `CONNECT_API_BASE_URL` before the one redeploy of Vision and of Wear. Step 6 disappears (its Check runs after Step 5: the data
+pages need a signed-in user). **Saves 2 deployments** (7 to 5). Order: P1 to P6, Step 1, **3**, **2 (with Step 6's variable)**, 4, 5.
+
+**Safe at each point?** Checked against `apps/hub`, the ecosystem README's "Rollout rule", `oldAddressRules` and the code. Connect never links to Vision or Wear or
+the reverse (only Vision and Wear read Connect's `/api/v1`), so the order matters only through that one variable.
+- **After Step 3:** Connect at its prefix; Vision and Wear at their roots, still reading Connect at its old address through the `/api` pass-through. The written order
+  is in this same state between its Steps 3 and 6.
+- **After Step 2:** all three prefixed; the new variable points at an address that has existed since Step 3. `/citizens/vision` is a 404 on `219.co.za` until Step 4,
+  exactly as in the written order.
+- **The Rollout rule's three conditions** (prefix-aware frontends, something routing the prefix, old addresses forwarding) hold as in the written order: Connect's own
+  rules start at Step 3 in both; Vision and Wear are reached only after Step 4.
+
+**What it costs.** (a) The written order tries the prefix on Vision and Wear, which no visitor uses, before touching Connect; the proposal's first live use is
+Connect (its base-path e2e passes in CI; Step 3's roll back is complete). (b) If Connect has to be rolled back after Step 2, Vision's and Wear's
+`CONNECT_API_BASE_URL` must go back first (2 deployments): Connect at its root no longer answers `.../citizens/connect/api/v1`.
+
+**Not provable here (true of both orders):** that the `/api` pass-through works on Vercel (Step 3 commands 7 and 8 prove it; the proposal runs them before Vision and
+Wear change), and that their data pages work with the prefixed variable on real Vercel (Vision's join is unit-tested; the client Wear uses joins by plain
+concatenation, read in the code, with no prefixed-base test). So: **no unsafe point found, but not proven safe on Vercel.** A third option, skipping Step 6
+altogether, also saves 2 and leaves those reads taking the extra hop for good.
 
 ---
 
@@ -362,7 +458,10 @@ build with a message saying what is allowed.
 
 - Keep `citizenscentral.co.za` **renewed**: it expires 2027-06-08 at domains.co.za and Vercel does not renew it. The
   forwards, the Apps Script address and the `no-reply@` sender depend on it.
-- Update `apps/connect/tools/google-forms/README.md` (it tells people to use the `www.citizenscentral.co.za` address).
+- The Apps Script README (`apps/connect/tools/google-forms/README.md`) already names both addresses (done in the cutover day
+  pack); set `INTAKE_URL` as in Step 5.
+- Post a session-journal entry (issue #323) saying what was done and when, with no secret values (the repository is public).
+  Sessions do not edit `RESUME_HERE.md`; the daily fold does.
 - Drop `'unsafe-inline'` from Connect's `script-src`: all apps now share one address and one session.
 - The phone apps' API base points at `citizens-connect.vercel.app` / `citizens-wear.vercel.app`, which are not the
   projects' current names (RESUME_HERE, C39). Check before the next store build.
@@ -380,3 +479,5 @@ Stated plainly so nobody assumes otherwise:
 3. Vision's and Wear's pages were built and served under their prefix and fetched with `curl` (PR A), not walked through
    with a signed-in user. Step 5 is that walk.
 4. The dashboard button names above are from memory of the Vercel, Supabase, Google and MapTiler screens.
+5. Whether cancelled or skipped builds count toward the deployment cap, and how fast room returns; and that **Redeploy**
+   rebuilds the old deployment's commit (as understood; check the new deployment's Source). P2 to P4 are the founder's word.
